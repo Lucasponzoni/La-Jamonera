@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Emoji Chat</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0;background:#0b0b0f;color:#fff}
+    .wrap{max-width:900px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+    header{padding:18px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
+    header h1{margin:0;font-size:16px;opacity:.9}
+    #chat{flex:1;padding:16px;display:flex;flex-direction:column;gap:12px}
+    .row{display:flex;gap:10px}
+    .row.user{justify-content:flex-end}
+    .bubble{max-width:78%;padding:12px 14px;border-radius:16px;line-height:1.35;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.10)}
+    .row.user .bubble{background:rgba(0,140,255,.25);border-color:rgba(0,140,255,.28)}
+
+    /* el “fondo blanco” lo reforzamos visualmente también en el chat */
+    .imgwrap{background:#fff;border-radius:14px;padding:12px;margin-top:10px}
+    .img{display:block;max-width:100%;border-radius:10px}
+
+    .composer{padding:14px 16px;border-top:1px solid rgba(255,255,255,.08);display:flex;gap:10px}
+    input{flex:1;padding:12px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#fff;outline:none}
+    button{padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.10);color:#fff;cursor:pointer}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    .hint{padding:0 16px 12px;opacity:.65;font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header><h1>Emoji Chat (estilo iOS-like)</h1></header>
+    <div class="hint">Escribí algo corto: <em>"jamón crudo"</em>, <em>"mate"</em>, <em>"campera"</em></div>
+
+    <div id="chat"></div>
+
+    <div class="composer">
+      <input id="prompt" placeholder="Escribí: jamón crudo..." />
+      <button id="send">Generar</button>
+    </div>
+  </div>
+
+<script>
+  const WORKER_BASE = "https://worker.lucasponzoninovogar.workers.dev";
+
+  const chat = document.getElementById("chat");
+  const promptEl = document.getElementById("prompt");
+  const sendBtn = document.getElementById("send");
+
+  function addMessage(role, text, imgUrl) {
+    const row = document.createElement("div");
+    row.className = "row " + role;
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+
+    const p = document.createElement("div");
+    p.textContent = text;
+    bubble.appendChild(p);
+
+    if (imgUrl) {
+      const wrap = document.createElement("div");
+      wrap.className = "imgwrap";
+
+      const img = document.createElement("img");
+      img.className = "img";
+      img.src = imgUrl;
+      img.alt = "Emoji generado";
+
+      wrap.appendChild(img);
+      bubble.appendChild(wrap);
+    }
+
+    row.appendChild(bubble);
+    chat.appendChild(row);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  async function generate() {
+    const prompt = promptEl.value.trim();
+    if (!prompt) return;
+
+    addMessage("user", prompt);
+    promptEl.value = "";
+
+    sendBtn.disabled = true;
+    addMessage("assistant", "Generando emoji...");
+
+    // timeout simple
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 60000);
+
+    try {
+      const res = await fetch(WORKER_BASE + "/emoji", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, mode: "fast" }), // "fast" (FLUX) o "free" (SDXL)
+        signal: ctrl.signal
+      });
+
+      if (!res.ok) {
+        let msg = `${res.status} ${res.statusText}`;
+        try {
+          const j = await res.json();
+          msg = j?.details ? `${j.error}: ${j.details}` : (j?.error || msg);
+        } catch {
+          // si no es JSON, leo texto
+          try { msg = (await res.text()).slice(0, 200); } catch {}
+        }
+        addMessage("assistant", "❌ " + msg);
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      addMessage("assistant", "✅ Listo:", url);
+    } catch (e) {
+      addMessage("assistant", "❌ No se pudo conectar: " + (e?.message || e));
+    } finally {
+      clearTimeout(t);
+      sendBtn.disabled = false;
+    }
+  }
+
+  sendBtn.addEventListener("click", generate);
+  promptEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") generate();
+  });
+</script>
+</body>
+</html>
