@@ -171,7 +171,7 @@ html.login-protected.auth-ok body {
   background: #d8d8d8;
   border: 1px solid #dbe0ef;
   border-bottom: none;
-  padding: 28px 20px;
+  padding: 15px 20px;
   width: 100%;
   margin: 0 auto;
 }
@@ -181,7 +181,7 @@ html.login-protected.auth-ok body {
   background: #f8f9fd;
   border: 1px solid #dbe0ef;
   border-top: none;
-  padding: 28px 20px;
+  padding: 10px 15px;
   width: 100%;
   margin: 0 auto;
   min-height: 50vh;
@@ -1034,7 +1034,7 @@ html.login-protected.auth-ok body {
 
   .header-content,
   .home-content {
-    padding: 22px 16px;
+    padding: 10px 15px;
     border-radius: 0;
   }
 
