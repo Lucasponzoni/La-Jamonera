@@ -253,7 +253,7 @@
         <input type="hidden" id="${prefix}_method" value="ai">
 
         <div id="${prefix}_preview" class="image-preview-circle">
-          ${initialImage ? `<img src="${initialImage}" alt="Vista previa">` : getPlaceholderCircle()}
+          <img src="${initialImage || IA_ICON_SRC}" alt="Vista previa">
         </div>
 
         <div id="${prefix}_urlWrap">
@@ -305,12 +305,18 @@
       uploadWrap.classList.toggle('d-none', method !== 'upload');
       aiWrap.classList.toggle('d-none', method !== 'ai');
       aiError.classList.add('d-none');
+      if (method === 'ai' && !imageState.generatedBlob && !normalizeValue(imageUrlInput.value)) {
+        setPreview(IA_ICON_SRC);
+      }
     };
 
     methodButtons.forEach((button) => {
       button.addEventListener('click', () => toggleMethod(button.dataset.imageMethod));
     });
     toggleMethod('ai');
+    if (!normalizeValue(imageUrlInput.value)) {
+      setPreview(IA_ICON_SRC);
+    }
 
     imageUrlInput.addEventListener('input', () => {
       if (methodInput.value === 'url') {
