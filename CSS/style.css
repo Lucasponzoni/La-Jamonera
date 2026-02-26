@@ -184,6 +184,9 @@ html.login-protected.auth-ok body {
 
 .login-support {
   margin-top: 14px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .support-link {
