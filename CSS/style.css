@@ -72,6 +72,7 @@ body {
 }
 
 .login-card {
+  position: relative;
   width: min(100%, 420px);
   border-radius: 24px;
   background: #f7f8fb;
@@ -94,13 +95,41 @@ body {
   margin-bottom: 0;
   font-family: 'Viga', sans-serif;
   font-size: clamp(1.8rem, 8vw, 2.2rem);
-  font-weight: 800;
+  font-weight: 400;
   letter-spacing: 0.02em;
   color: #495b94;
 }
 
 .login-form {
+  position: relative;
   width: 100%;
+}
+
+.login-fields {
+  transition: filter 0.35s ease, opacity 0.35s ease;
+}
+
+.login-overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-card.is-loading .login-fields {
+  filter: blur(3px);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.login-card.is-loading .login-overlay {
+  display: flex;
+}
+
+.overlay-spinner {
+  width: 56px;
+  height: 56px;
 }
 
 .ios-input,
@@ -138,6 +167,12 @@ body {
   background: transparent;
   color: #2d7df0;
   min-width: 48px;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+.ios-toggle-pass:hover {
+  background: #e9edf8;
+  color: #1f7ae8;
 }
 
 .ios-toggle-pass:focus,
@@ -156,11 +191,12 @@ body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  transition: opacity 0.2s ease;
+  transition: transform 0.25s ease, opacity 0.25s ease, background-color 0.25s ease, color 0.25s ease;
 }
 
 .ios-btn:hover {
-  opacity: 0.93;
+  opacity: 0.94;
+  transform: translateY(-1px);
 }
 
 .ios-btn:focus,
@@ -223,8 +259,17 @@ body {
   margin-top: 0;
 }
 
+.swal2-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+
 .swal2-actions .ios-btn {
-  min-width: 132px;
+  min-width: 150px;
+  margin: 0;
 }
 /*FIN SWEETALERT*/
 
@@ -240,6 +285,10 @@ body {
 
   .brand-image {
     width: 78px;
+  }
+
+  .swal2-actions {
+    flex-wrap: nowrap;
   }
 }
 /*FIN RESPONSIVE*/

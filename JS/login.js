@@ -2,14 +2,16 @@
   const SESSION_KEY = 'laJamoneraSession';
   const SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
 
-  const loginView = document.getElementById('loginView');
-  const appView = document.getElementById('appView');
   const loginForm = document.getElementById('loginForm');
+  if (!loginForm) {
+    return;
+  }
+
   const usernameInput = document.getElementById('usernameInput');
   const passwordInput = document.getElementById('passwordInput');
   const togglePasswordButton = document.getElementById('togglePassword');
   const loginButton = document.getElementById('loginButton');
-  const logoutButton = document.getElementById('logoutButton');
+  const loginCard = document.getElementById('loginCard');
 
   const normalizeValue = (value) => String(value || '').trim().toLowerCase();
 
@@ -18,47 +20,17 @@
     localStorage.setItem(SESSION_KEY, JSON.stringify({ expiresAt }));
   };
 
-  const clearSession = () => {
-    localStorage.removeItem(SESSION_KEY);
-  };
-
-  const hasActiveSession = () => {
-    const raw = localStorage.getItem(SESSION_KEY);
-    if (!raw) {
-      return false;
-    }
-
-    try {
-      const parsed = JSON.parse(raw);
-      if (Date.now() >= Number(parsed.expiresAt)) {
-        clearSession();
-        return false;
-      }
-      return true;
-    } catch (error) {
-      clearSession();
-      return false;
-    }
-  };
-
-  const showApp = () => {
-    loginView.classList.add('d-none');
-    appView.classList.remove('d-none');
-  };
-
-  const showLogin = () => {
-    appView.classList.add('d-none');
-    loginView.classList.remove('d-none');
-  };
-
   const setLoading = (loading) => {
     if (loading) {
       loginButton.classList.add('is-loading');
       loginButton.setAttribute('disabled', 'disabled');
+      loginCard.classList.add('is-loading');
       return;
     }
+
     loginButton.classList.remove('is-loading');
     loginButton.removeAttribute('disabled');
+    loginCard.classList.remove('is-loading');
   };
 
   const extractCredentials = (value) => {
@@ -77,8 +49,7 @@
     const paths = ['user', 'auth', '/'];
 
     for (const path of paths) {
-      const snapshot = await window.dbLaJamonera.ref(path).once('value');
-      const value = snapshot.val();
+      const value = await window.dbLaJamoneraRest.read(path);
       const credentials = extractCredentials(value);
       if (credentials) {
         return {
@@ -128,54 +99,15 @@
 
       if (enteredUser === credentials.user && enteredPass === credentials.pass) {
         saveSession();
-        showApp();
+        window.location.replace('./index.html');
         return;
       }
 
       showError('Datos inválidos', 'Revisá usuario y contraseña para continuar.');
     } catch (error) {
-      if (error && String(error.code || '').includes('PERMISSION_DENIED')) {
-        showError('Sin permisos', 'Tus reglas de Firebase bloquean la lectura.');
-      } else {
-        showError('Error de Firebase', 'No se pudo leer user/pass en /user, /auth o /.');
-      }
+      showError('Error de Firebase', 'No se pudo leer user/pass para validar el ingreso.');
     } finally {
       setLoading(false);
     }
   });
-
-  logoutButton.addEventListener('click', async () => {
-    const result = await Swal.fire({
-      title: '¿Cerrar sesión?',
-      html: '<p>Tu sesión actual se cerrará en este dispositivo.</p>',
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Sí, cerrar',
-      cancelButtonText: 'Cancelar',
-      reverseButtons: true,
-      customClass: {
-        popup: 'ios-alert',
-        title: 'ios-alert-title',
-        htmlContainer: 'ios-alert-text',
-        confirmButton: 'ios-btn ios-btn-primary',
-        cancelButton: 'ios-btn ios-btn-secondary'
-      },
-      buttonsStyling: false
-    });
-
-    if (result.isConfirmed) {
-      clearSession();
-      usernameInput.value = '';
-      passwordInput.value = '';
-      passwordInput.type = 'password';
-      togglePasswordButton.innerHTML = '<i class="fa-solid fa-eye"></i>';
-      showLogin();
-    }
-  });
-
-  if (hasActiveSession()) {
-    showApp();
-  } else {
-    showLogin();
-  }
 })();
