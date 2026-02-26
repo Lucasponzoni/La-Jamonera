@@ -313,10 +313,8 @@
     methodButtons.forEach((button) => {
       button.addEventListener('click', () => toggleMethod(button.dataset.imageMethod));
     });
-    toggleMethod('ai');
-    if (!normalizeValue(imageUrlInput.value)) {
-      setPreview(IA_ICON_SRC);
-    }
+    const defaultMethod = normalizeValue(imageUrlInput.value) ? 'url' : 'ai';
+    toggleMethod(defaultMethod);
 
     imageUrlInput.addEventListener('input', () => {
       if (methodInput.value === 'url') {
@@ -405,6 +403,10 @@
       }
       if (method === 'ai') {
         if (!imageState.generatedBlob) {
+          const existingUrl = normalizeValue(imageUrlInput.value);
+          if (existingUrl) {
+            return existingUrl;
+          }
           throw new Error('Generá una imagen IA antes de guardar.');
         }
         const aiFile = new File([imageState.generatedBlob], `ia_${Date.now()}.png`, { type: imageState.generatedBlob.type || 'image/png' });
@@ -412,6 +414,30 @@
       }
       return '';
     };
+  };
+
+  const showSavingOverlay = () => {
+    ingredientesModal.setAttribute('inert', '');
+    Swal.fire({
+      title: 'Guardando...',
+      html: '<img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner-login">',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      customClass: {
+        popup: 'ios-alert ingredientes-alert',
+        title: 'ios-alert-title',
+        htmlContainer: 'ios-alert-text'
+      },
+      willClose: () => {
+        ingredientesModal.removeAttribute('inert');
+      }
+    });
+  };
+
+  const hideSavingOverlay = () => {
+    Swal.close();
+    ingredientesModal.removeAttribute('inert');
   };
 
   const openFamilyForm = async (initial = null) => {
@@ -473,10 +499,15 @@
       }
     });
 
-    await persistIngredientes();
-    state.activeFamilyId = familyId;
-    refreshView();
-    return familyId;
+    showSavingOverlay();
+    try {
+      await persistIngredientes();
+      state.activeFamilyId = familyId;
+      refreshView();
+      return familyId;
+    } finally {
+      hideSavingOverlay();
+    }
   };
 
   const openIngredientForm = async (initial = null, draft = null) => {
@@ -631,9 +662,14 @@
       createdAt: initial?.createdAt || Date.now()
     };
 
-    await persistIngredientes();
-    state.activeFamilyId = result.value.familyId;
-    refreshView();
+    showSavingOverlay();
+    try {
+      await persistIngredientes();
+      state.activeFamilyId = result.value.familyId;
+      refreshView();
+    } finally {
+      hideSavingOverlay();
+    }
   };
 
   const confirmDelete = async (title, text) => {
