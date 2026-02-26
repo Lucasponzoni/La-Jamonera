@@ -12,5 +12,7 @@
     (firebase.apps && firebase.apps.find((item) => item.name === appName)) ||
     firebase.initializeApp(window.LA_JAMONERA_FIREBASE_CONFIG, appName);
 
+  window.appLaJamonera = app;
   window.dbLaJamonera = app.database();
+  window.storageLaJamonera = app.storage();
 })();

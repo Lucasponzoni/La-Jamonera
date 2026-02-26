@@ -84,18 +84,18 @@ body {
 }
 
 .brand-image {
-  width: 82px;
-  height: 82px;
-  border-radius: 50%;
-  object-fit: cover;
+  width: 128px;
+  max-width: 100%;
+  height: auto;
 }
 
 .brand-title {
-  margin-top: 12px;
+  margin-top: 8px;
   margin-bottom: 0;
-  font-family: 'Nunito', sans-serif;
+  font-family: 'Manrope', sans-serif;
   font-size: clamp(1.8rem, 8vw, 2.2rem);
   font-weight: 800;
+  letter-spacing: 0.02em;
   color: #495b94;
 }
 
@@ -236,6 +236,10 @@ body {
 
   .view-app {
     padding: 32px 24px 24px;
+  }
+
+  .brand-image {
+    width: 156px;
   }
 }
 /*FIN RESPONSIVE*/
