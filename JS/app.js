@@ -1,13 +1,10 @@
 (function appModule() {
+  const SESSION_KEY = 'laJamoneraSession';
   const logoutButtons = document.querySelectorAll('.js-logout');
   const yearNode = document.getElementById('currentYear');
 
   if (yearNode) {
     yearNode.textContent = new Date().getFullYear();
-  }
-
-  if (!logoutButtons.length) {
-    return;
   }
 
   const closeSession = async () => {
@@ -26,11 +23,12 @@
         confirmButton: 'ios-btn ios-btn-primary',
         cancelButton: 'ios-btn ios-btn-secondary'
       },
-      buttonsStyling: false
+      buttonsStyling: false,
+      returnFocus: false
     });
 
     if (result.isConfirmed) {
-      localStorage.removeItem('laJamoneraSession');
+      localStorage.removeItem(SESSION_KEY);
       window.location.replace('./login.html');
     }
   };
