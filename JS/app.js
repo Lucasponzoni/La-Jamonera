@@ -1,10 +1,16 @@
 (function appModule() {
-  const logoutButton = document.getElementById('logoutButton');
-  if (!logoutButton) {
+  const logoutButtons = document.querySelectorAll('.js-logout');
+  const yearNode = document.getElementById('currentYear');
+
+  if (yearNode) {
+    yearNode.textContent = new Date().getFullYear();
+  }
+
+  if (!logoutButtons.length) {
     return;
   }
 
-  logoutButton.addEventListener('click', async () => {
+  const closeSession = async () => {
     const result = await Swal.fire({
       title: '¿Cerrar sesión?',
       html: '<p>Tu sesión actual se cerrará en este dispositivo.</p>',
@@ -27,5 +33,9 @@
       localStorage.removeItem('laJamoneraSession');
       window.location.replace('./login.html');
     }
+  };
+
+  logoutButtons.forEach((button) => {
+    button.addEventListener('click', closeSession);
   });
 })();
