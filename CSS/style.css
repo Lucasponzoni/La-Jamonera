@@ -198,6 +198,34 @@ html.login-protected.auth-ok body {
   color: #55607f;
 }
 
+.home-actions-scroll {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.home-action-btn {
+  border-radius: 14px;
+  border: 1px solid #d7def2;
+  color: #3b4b73;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  padding: 10px 14px;
+  white-space: nowrap;
+}
+
+.home-action-btn:hover {
+  border-color: #c5cfe9;
+  color: #2b3d67;
+  background: #f9faff;
+}
+
+.icon-lila {
+  color: #8b5cf6;
+}
+
 /* =========================================
    FOOTER
 ========================================= */
@@ -396,6 +424,57 @@ html.login-protected.auth-ok body {
 
 .login-card.is-loading .login-overlay {
   display: flex;
+}
+
+
+/* =========================================
+   MODAL
+========================================= */
+.ios-modal {
+  border-radius: 22px;
+  border: 1px solid #dbe0ef;
+  background: #f8f9fd;
+}
+
+.ios-modal-header {
+  border-bottom: 1px solid #e4e8f4;
+  padding: 16px 18px;
+}
+
+.ios-modal-title {
+  color: #2a3556;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.ios-modal-close {
+  border-radius: 10px;
+}
+
+.ios-modal-close:focus {
+  box-shadow: none;
+}
+
+.ios-modal-body {
+  min-height: 300px;
+  padding: 18px;
+}
+
+.ingredientes-loading,
+.ingredientes-empty,
+.ingredientes-data {
+  min-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  text-align: center;
+}
+
+.ingredientes-empty-text {
+  margin: 0;
+  color: #5a6482;
 }
 
 /* =========================================
@@ -601,6 +680,22 @@ html.login-protected.auth-ok body {
   .home-content {
     padding: 22px 16px;
     border-radius: 0;
+  }
+
+  .home-actions-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    padding-bottom: 4px;
+  }
+
+  .home-actions-scroll::-webkit-scrollbar {
+    height: 5px;
+  }
+
+  .home-actions-scroll::-webkit-scrollbar-thumb {
+    background: #cfd8f4;
+    border-radius: 999px;
   }
 
   .app-footer {
