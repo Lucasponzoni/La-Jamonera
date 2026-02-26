@@ -61,16 +61,34 @@
     loginButton.removeAttribute('disabled');
   };
 
+  const extractCredentials = (value) => {
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+
+    if (typeof value.user === 'string' && typeof value.pass === 'string') {
+      return value;
+    }
+
+    return null;
+  };
+
   const readCredentialsFromFirebase = async () => {
-    const authSnapshot = await window.dbLaJamonera.ref('auth').once('value');
-    const rootSnapshot = await window.dbLaJamonera.ref('/').once('value');
-    const authValue = authSnapshot.val() || {};
-    const rootValue = rootSnapshot.val() || {};
-    const value = authValue.user && authValue.pass ? authValue : rootValue;
-    return {
-      user: normalizeValue(value.user),
-      pass: normalizeValue(value.pass)
-    };
+    const paths = ['user', 'auth', '/'];
+
+    for (const path of paths) {
+      const snapshot = await window.dbLaJamonera.ref(path).once('value');
+      const value = snapshot.val();
+      const credentials = extractCredentials(value);
+      if (credentials) {
+        return {
+          user: normalizeValue(credentials.user),
+          pass: normalizeValue(credentials.pass)
+        };
+      }
+    }
+
+    throw new Error('Credenciales no encontradas en Firebase');
   };
 
   const showError = (title, text) => {
@@ -116,7 +134,11 @@
 
       showError('Datos inválidos', 'Revisá usuario y contraseña para continuar.');
     } catch (error) {
-      showError('Sin conexión', 'No se pudo validar en Firebase. Intentá nuevamente.');
+      if (error && String(error.code || '').includes('PERMISSION_DENIED')) {
+        showError('Sin permisos', 'Tus reglas de Firebase bloquean la lectura.');
+      } else {
+        showError('Error de Firebase', 'No se pudo leer user/pass en /user, /auth o /.');
+      }
     } finally {
       setLoading(false);
     }
