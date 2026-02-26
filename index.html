@@ -91,10 +91,60 @@
       <div class="contenido">
         <div class="header-content">
           <h2 class="home-title">Aca va a ir contenido mas adelante</h2>
+          <div class="home-actions-scroll" aria-label="Acciones disponibles">
+            <button
+              id="openIngredientesModal"
+              type="button"
+              class="btn btn-light home-action-btn"
+              data-bs-toggle="modal"
+              data-bs-target="#ingredientesModal"
+            >
+              <i class="fa-solid fa-carrot icon-lila" aria-hidden="true"></i>
+              <span>Ingredientes</span>
+            </button>
+          </div>
         </div>
         <div class="home-content">
           <h2 class="home-title">Panel de La Jamonera</h2>
           <p class="home-text">Sesión iniciada correctamente.</p>
+        </div>
+      </div>
+
+      <div class="modal fade" id="ingredientesModal" tabindex="-1" aria-labelledby="ingredientesModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content ios-modal ingredientes-modal">
+            <div class="modal-header ios-modal-header">
+              <h5 class="modal-title ios-modal-title" id="ingredientesModalLabel">Ingredientes</h5>
+              <button type="button" class="btn-close ios-modal-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body ios-modal-body">
+              <div id="ingredientesLoading" class="ingredientes-loading" aria-live="polite">
+                <img src="./IMG/Meta-ai-logo.webp" alt="Cargando ingredientes" class="meta-spinner-login">
+              </div>
+
+              <div id="ingredientesEmpty" class="ingredientes-empty d-none" aria-live="polite">
+                <p class="ingredientes-empty-text">No hay ingredientes cargados.</p>
+                <button id="emptyCreateIngredientBtn" type="button" class="btn ios-btn ios-btn-primary">Cargar un ingrediente</button>
+              </div>
+
+              <div id="ingredientesData" class="ingredientes-data d-none" aria-live="polite">
+                <div class="ingredientes-toolbar">
+                  <div class="input-group ios-input-group ingredientes-search-group">
+                    <span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+                    <input id="ingredientesSearchInput" type="search" class="form-control ios-input ingredientes-search-input" placeholder="Buscar familia o ingrediente">
+                  </div>
+                  <button id="createIngredientBtn" type="button" class="btn ios-btn ios-btn-primary">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Crear ingrediente</span>
+                  </button>
+                </div>
+
+                <div id="familiasCircles" class="familias-circles"></div>
+                <div id="ingredientesList" class="ingredientes-list"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
