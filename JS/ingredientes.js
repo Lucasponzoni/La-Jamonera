@@ -1,7 +1,6 @@
 (function ingredientesModule() {
-  const DEFAULT_IMAGE = '';
   const IA_WORKER_BASE = 'https://worker.lucasponzoninovogar.workers.dev';
-  const IA_ICON_SRC = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23ede9fe'/%3E%3Cpath d='M32 12l4 10 10 4-10 4-4 10-4-10-10-4 10-4 4-10zm15 30l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5zm-30 0l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z' fill='%238b5cf6'/%3E%3C/svg%3E";
+  const IA_ICON_SRC = './IMG/ia-unscreen.gif';
   const PLACEHOLDER_ICON = '<i class="fa-solid fa-carrot"></i>';
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
@@ -106,7 +105,7 @@
     if (!found) {
       return capitalizeLabel(name);
     }
-    return `${capitalizeLabel(found.name)} - ${found.abbr}`;
+    return `${capitalizeLabel(found.name)} (${found.abbr})`;
   };
 
   const validateImageFile = (file) => {
@@ -159,10 +158,12 @@
     const families = getFamiliasArray().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
 
     const allButton = `
-      <button type="button" class="family-circle-item ${state.activeFamilyId === 'all' ? 'is-active' : ''}" data-family-filter="all">
-        <span class="family-circle-thumb family-circle-thumb-placeholder">${PLACEHOLDER_ICON}</span>
-        <span class="family-circle-name">Todas</span>
-      </button>
+      <div class="family-circle-wrap">
+        <button type="button" class="family-circle-item ${state.activeFamilyId === 'all' ? 'is-active' : ''}" data-family-filter="all">
+          <span class="family-circle-thumb family-circle-thumb-placeholder">${PLACEHOLDER_ICON}</span>
+          <span class="family-circle-name">Todas</span>
+        </button>
+      </div>
     `;
 
     const familyButtons = families.map((family) => `
@@ -247,7 +248,7 @@
         <div class="image-method-buttons" id="${prefix}_methodButtons">
           <button type="button" class="btn image-method-btn" data-image-method="url">Link</button>
           <button type="button" class="btn image-method-btn" data-image-method="upload">Subir</button>
-          <button type="button" class="btn image-method-btn is-active" data-image-method="ai"><img src="${IA_ICON_SRC}" alt="IA"> IA</button>
+          <button type="button" class="btn image-method-btn is-active" data-image-method="ai"><i class="fa-solid fa-wand-sparkles" aria-hidden="true"></i> IA</button>
         </div>
         <input type="hidden" id="${prefix}_method" value="ai">
 
@@ -269,7 +270,7 @@
           <label for="${prefix}_aiPrompt">Prompt corto para IA</label>
           <input id="${prefix}_aiPrompt" class="swal2-input ios-input" placeholder="Ej: carne de cerdo">
           <button id="${prefix}_aiGenerate" type="button" class="ai-generate-btn mt-2">
-            <img src="${IA_ICON_SRC}" alt="IA">
+            <i class="fa-solid fa-wand-sparkles" aria-hidden="true"></i>
             <span>Generar imagen con IA</span>
           </button>
           <div id="${prefix}_aiError" class="ai-alert-note d-none mt-2"></div>
@@ -422,7 +423,7 @@
             <h6 class="step-title">1) Datos de familia</h6>
             <div class="step-content">
               <label for="familyNameInput">Nombre de familia *</label>
-              <input id="familyNameInput" class="swal2-input ios-input" placeholder="Ej: Carnes" value="${draft?.name ?? (initial ? capitalizeLabel(initial.name) : '')}">
+              <input id="familyNameInput" class="swal2-input ios-input" placeholder="Ej: Carnes" value="${initial ? capitalizeLabel(initial.name) : ''}">
             </div>
           </section>
           ${buildImageStepHtml('familyImage', initial?.imageUrl || '')}
@@ -481,8 +482,12 @@
     const result = await openIosSwal({
       title: isEdit ? 'Editar ingrediente' : 'Crear ingrediente',
       showCancelButton: true,
-      confirmButtonText: isEdit ? 'Guardar ingrediente' : 'Crear ingrediente',
+      confirmButtonText: isEdit ? 'Guardar' : 'Crear ingrediente',
       cancelButtonText: 'Cancelar',
+      customClass: {
+        confirmButton: `ios-btn ${isEdit ? 'ios-btn-primary' : 'ios-btn-success'}`,
+        cancelButton: 'ios-btn ios-btn-secondary'
+      },
       html: `
         <div class="ingrediente-form-grid">
           <section class="step-block">
@@ -511,12 +516,12 @@
               <label for="ingredientMeasureSelect">Medida *</label>
               <select id="ingredientMeasureSelect" class="form-select ios-input">
                 <option value="">Seleccioná una medida</option>
-                ${measures.map((item) => `<option value="${item.name}" ${measureKey((draft?.measure || initial?.measure)) === measureKey(item.name) ? 'selected' : ''}>${capitalizeLabel(item.name)} - ${item.abbr}</option>`).join('')}
+                ${measures.map((item) => `<option value="${item.name}" ${measureKey((draft?.measure || initial?.measure)) === measureKey(item.name) ? 'selected' : ''}>${capitalizeLabel(item.name)} (${item.abbr})</option>`).join('')}
                 <option value="custom">Otra medida</option>
               </select>
               <div id="customMeasureWrap" class="d-none custom-measure-wrap">
                 <input id="ingredientMeasureCustomName" class="swal2-input ios-input" placeholder="Nombre de medida">
-                <input id="ingredientMeasureCustomAbbr" class="swal2-input ios-input" placeholder="Abreviatura (ej: Uni.)">
+                <input id="ingredientMeasureCustomAbbr" class="swal2-input ios-input" placeholder="Abreviatura">
               </div>
             </div>
           </section>
