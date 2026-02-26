@@ -48,16 +48,18 @@ html.login-protected.auth-ok body {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  align-items: center;
 }
 
-.header-content {
-  border-radius: 24px 24px 0 0 ;
+.header-content { 
+  border-radius: 24px 24px 0 0;
   background: #d8d8d8;
   border: 1px solid #dbe0ef;
   border-bottom: none;
   padding: 28px 20px;
+  width: fit-content;
   width: 1200px;
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .home-content {
@@ -66,7 +68,19 @@ html.login-protected.auth-ok body {
   border: 1px solid #dbe0ef;
   border-top: none;
   padding: 28px 20px;
+  width: fit-content;
   width: 1200px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/* Tablet y mobile */
+@media (max-width: 1024px) {
+  .header-content,
+  .home-content {
+    width: 100%;
+    max-width: 100%;
+  }
 }
 
 .home-title {
