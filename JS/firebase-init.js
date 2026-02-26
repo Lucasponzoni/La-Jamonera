@@ -15,4 +15,9 @@
   window.appLaJamonera = app;
   window.dbLaJamonera = app.database();
   window.storageLaJamonera = app.storage();
+
+  window.laJamoneraKeys = {
+    privateKey: 'TZ7ivKSXFLljT5MVs9lLfP8FLWuoyjmTP3u-fqs8BeM',
+    keyPair: 'BHCVLnM40Ix6cvBAzRodKmbx1ZLcjSMSmyhNwBLh9JCRLRe63qHS0G-XFGMox1PUBV3UoEmBTYAWzuN_X6hbtcw'
+  };
 })();
