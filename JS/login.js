@@ -92,6 +92,7 @@
     const enteredPass = normalizeValue(passwordInput.value);
 
     try {
+      await window.laJamoneraReady;
       const credentials = await readCredentialsFromFirebase();
       await new Promise((resolve) => setTimeout(resolve, 2000));
 

@@ -3,61 +3,49 @@
     throw new Error('Firebase SDK no cargado');
   }
 
-  if (!window.LA_JAMONERA_FIREBASE_CONFIG) {
-    throw new Error('Falta JS/firebase-config.local.js con LA_JAMONERA_FIREBASE_CONFIG');
-  }
+  const WORKER_BASE_URL = 'https://jamonera.lucasponzoninovogar.workers.dev';
 
-  if (!window.LA_JAMONERA_DB_SECRET) {
-    throw new Error('Falta JS/firebase-config.local.js con LA_JAMONERA_DB_SECRET');
-  }
-
-  const firebaseConfig = window.LA_JAMONERA_FIREBASE_CONFIG;
-  const dbSecret = window.LA_JAMONERA_DB_SECRET;
-  const appName = 'laJamonera';
-
-  const app =
-    (firebase.apps && firebase.apps.find((item) => item.name === appName)) ||
-    firebase.initializeApp(firebaseConfig, appName);
-
-  const db = app.database();
-  const storage = app.storage();
-
-  window.appLaJamonera = app;
-  window.dbLaJamonera = db;
-  window.storageLaJamonera = storage;
-
-  const baseDbUrl = firebaseConfig.databaseURL.replace(/\/$/, '');
-  const cleanPath = (path) => String(path || '').replace(/^\/+|\/+$/g, '');
-  const buildUrl = (path) => `${baseDbUrl}/${cleanPath(path)}.json?auth=${encodeURIComponent(dbSecret)}`;
-
-  const parseResponse = async (response) => {
+  const fetchJson = async (url, options) => {
+    const response = await fetch(url, options);
     if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`Firebase REST ${response.status}: ${body}`);
+      const message = await response.text();
+      throw new Error(`Worker ${response.status}: ${message}`);
     }
     return response.json();
   };
 
-  window.dbLaJamoneraRest = {
-    read: async (path) => {
-      const response = await fetch(buildUrl(path), { method: 'GET' });
-      return parseResponse(response);
-    },
-    write: async (path, value) => {
-      const response = await fetch(buildUrl(path), {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(value)
-      });
-      return parseResponse(response);
-    },
-    update: async (path, value) => {
-      const response = await fetch(buildUrl(path), {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(value)
-      });
-      return parseResponse(response);
+  const init = async () => {
+    const bootstrap = await fetchJson(`${WORKER_BASE_URL}/bootstrap`);
+
+    if (!bootstrap || !bootstrap.firebaseConfig) {
+      throw new Error('Worker sin firebaseConfig');
     }
+
+    const appName = 'laJamonera';
+    const app =
+      (firebase.apps && firebase.apps.find((item) => item.name === appName)) ||
+      firebase.initializeApp(bootstrap.firebaseConfig, appName);
+
+    window.appLaJamonera = app;
+    window.dbLaJamonera = app.database();
+    window.storageLaJamonera = app.storage();
+
+    window.dbLaJamoneraRest = {
+      read: async (path) => fetchJson(`${WORKER_BASE_URL}/rtdb/read?path=${encodeURIComponent(path || '')}`),
+      write: async (path, value) =>
+        fetchJson(`${WORKER_BASE_URL}/rtdb/write`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path, value })
+        }),
+      update: async (path, value) =>
+        fetchJson(`${WORKER_BASE_URL}/rtdb/update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path, value })
+        })
+    };
   };
+
+  window.laJamoneraReady = init();
 })();
