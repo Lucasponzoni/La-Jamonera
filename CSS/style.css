@@ -23,7 +23,6 @@ body {
   color: #1f2a44;
 }
 
-
 html.index-protected body,
 html.login-protected body {
   visibility: hidden;
@@ -75,6 +74,52 @@ html.login-protected.auth-ok body {
   display: flex;
   justify-content: center;
 }
+
+.app-footer-white {
+  background: #ffffff;
+  border: 1px solid #dbe0ef;
+  border-radius: 20px;
+  padding: 16px;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.footer-logout {
+  margin-bottom: 2px;
+}
+
+.footer-support {
+  width: 100%;
+  max-width: 580px;
+}
+
+.footer-legal,
+.footer-copy {
+  margin: 0;
+  text-align: center;
+  color: #5a6482;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.footer-legal a,
+.footer-copy a {
+  color: #2a4ea3;
+  text-decoration: none;
+  transition: color 0.25s ease;
+}
+
+.footer-legal a:hover,
+.footer-copy a:hover {
+  color: #1f7ae8;
+}
+
+.footer-mail {
+  display: inline-flex;
+  margin-left: 6px;
+  font-size: 1rem;
+}
 /*FIN LAYOUT*/
 
 /*LOGIN*/
@@ -106,9 +151,16 @@ html.login-protected.auth-ok body {
   margin-bottom: 0;
   font-family: 'Viga', sans-serif;
   font-size: clamp(1.8rem, 8vw, 2.2rem);
-  font-weight: 400;
   letter-spacing: 0.02em;
   color: #495b94;
+}
+
+.brand-light {
+  font-weight: 400;
+}
+
+.brand-bold {
+  font-weight: 800;
 }
 
 .login-card-content {
@@ -117,6 +169,34 @@ html.login-protected.auth-ok body {
 
 .login-form {
   width: 100%;
+}
+
+.login-support {
+  margin-top: 14px;
+}
+
+.support-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #e1e6f4;
+  border-radius: 12px;
+  padding: 9px 10px;
+  text-decoration: none;
+  color: #6a7492;
+  font-size: 0.83rem;
+  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+}
+
+.support-link:hover {
+  background: #eef3ff;
+  color: #2a4ea3;
+  border-color: #cfd8f4;
+}
+
+.support-icon {
+  width: 22px;
+  height: 22px;
 }
 
 .login-overlay {
@@ -135,11 +215,6 @@ html.login-protected.auth-ok body {
 
 .login-card.is-loading .login-overlay {
   display: flex;
-}
-
-.overlay-spinner {
-  width: 190px;
-  height: 190px;
 }
 
 .ios-input,
@@ -201,12 +276,11 @@ html.login-protected.auth-ok body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  transition: transform 0.25s ease, opacity 0.25s ease, background-color 0.25s ease, color 0.25s ease;
+  transition: background-color 0.25s ease, color 0.25s ease, opacity 0.25s ease;
 }
 
 .ios-btn:hover {
   opacity: 0.94;
-  transform: translateY(-1px);
 }
 
 .ios-btn:focus,
@@ -216,6 +290,11 @@ html.login-protected.auth-ok body {
 
 .ios-btn-primary {
   background: #1f7ae8;
+  color: #fff;
+}
+
+.ios-btn-primary:hover {
+  background: #166ad0;
   color: #fff;
 }
 
@@ -230,7 +309,18 @@ html.login-protected.auth-ok body {
   color: #2a4ea3;
 }
 
+.ios-btn-secondary:hover {
+  background: #d6def6;
+  color: #1f3e8a;
+}
+
 .meta-spinner {
+  width: 20px;
+  height: 20px;
+  animation: spin 0.8s linear infinite;
+}
+
+.meta-spinner-login {
   width: 80px;
   height: 80px;
   animation: spin 0.8s linear infinite;
@@ -287,6 +377,10 @@ html.login-protected.auth-ok body {
 
   .swal2-actions {
     flex-wrap: nowrap;
+  }
+
+  .app-footer-white {
+    padding: 18px 26px;
   }
 }
 /*FIN RESPONSIVE*/
