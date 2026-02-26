@@ -302,12 +302,12 @@
         <div class="image-method-buttons" id="${prefix}_methodButtons">
           <button type="button" class="btn image-method-btn" data-image-method="url">Link</button>
           <button type="button" class="btn image-method-btn" data-image-method="upload">Subir</button>
-          <button type="button" class="btn image-method-btn is-active" data-image-method="ai"><img src="${IA_ICON_SRC}" alt="IA"> IA</button>
+          <button type="button" class="btn image-method-btn is-active" data-image-method="ai"><i class="fa-solid fa-wand-sparkles" aria-hidden="true"></i> IA</button>
         </div>
         <input type="hidden" id="${prefix}_method" value="ai">
 
         <div id="${prefix}_preview" class="image-preview-circle">
-          ${initialImage ? `<img src="${initialImage}" alt="Vista previa">` : getPlaceholderCircle()}
+          <img src="${initialImage || IA_ICON_SRC}" alt="Vista previa">
         </div>
 
         <div id="${prefix}_urlWrap">
@@ -324,7 +324,7 @@
           <label for="${prefix}_aiPrompt">Prompt corto para IA</label>
           <input id="${prefix}_aiPrompt" class="swal2-input ios-input" placeholder="Ej: carne de cerdo">
           <button id="${prefix}_aiGenerate" type="button" class="ai-generate-btn mt-2">
-            <img src="${IA_ICON_SRC}" alt="IA">
+            <i class="fa-solid fa-wand-sparkles" aria-hidden="true"></i>
             <span>Generar imagen con IA</span>
           </button>
           <div id="${prefix}_aiError" class="ai-alert-note d-none mt-2"></div>
@@ -359,6 +359,9 @@
       uploadWrap.classList.toggle('d-none', method !== 'upload');
       aiWrap.classList.toggle('d-none', method !== 'ai');
       aiError.classList.add('d-none');
+      if (method === 'ai' && !imageState.generatedBlob && !normalizeValue(imageUrlInput.value)) {
+        setPreview(IA_ICON_SRC);
+      }
     };
 
     methodButtons.forEach((button) => {
