@@ -1,0 +1,22 @@
+{
+  "name": "La Jamonera",
+  "short_name": "Jamonera",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f8f9fd",
+  "theme_color": "#1f7ae8",
+  "icons": [
+    {
+      "src": "./IMG/La Jamonera Cerdito.webp",
+      "sizes": "192x192",
+      "type": "image/webp",
+      "purpose": "any"
+    },
+    {
+      "src": "./IMG/La Jamonera Cerdito.webp",
+      "sizes": "512x512",
+      "type": "image/webp",
+      "purpose": "any"
+    }
+  ]
+}
