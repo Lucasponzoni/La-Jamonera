@@ -559,12 +559,37 @@ html.login-protected.auth-ok body {
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
 }
 
 .family-circle-thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+
+.thumb-loading {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #eef2fd;
+}
+
+.thumb-loading .meta-spinner-login {
+  width: 22px;
+  height: 22px;
+}
+
+.thumb-image {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.thumb-image.is-loaded {
+  opacity: 1;
 }
 
 .family-circle-name {
@@ -592,6 +617,26 @@ html.login-protected.auth-ok body {
   padding-right: 4px;
 }
 
+
+.ingredientes-list.has-scroll-hint {
+  mask-image: linear-gradient(to bottom, #000 85%, transparent 100%);
+}
+
+.ingredientes-list.has-scroll-hint::after {
+  content: '↓ Deslizá para ver más ingredientes';
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: block;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #6d7aa0;
+  background: linear-gradient(to bottom, rgba(242, 245, 252, 0), rgba(242, 245, 252, 0.95));
+  padding: 12px 0 4px;
+  pointer-events: none;
+}
+
 .ingrediente-card {
   border: 1px solid #dbe0ef;
   background: #fdfdff;
@@ -610,6 +655,7 @@ html.login-protected.auth-ok body {
   border: 1px solid #d6deef;
   background: #eff2fb;
   flex-shrink: 0;
+  position: relative;
 }
 
 .ingrediente-avatar img {
@@ -743,8 +789,8 @@ html.login-protected.auth-ok body {
 }
 
 .ai-generate-btn img {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   object-fit: contain;
 }
 
@@ -833,8 +879,8 @@ html.login-protected.auth-ok body {
 }
 
 .image-method-btn img {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   object-fit: contain;
 }
 

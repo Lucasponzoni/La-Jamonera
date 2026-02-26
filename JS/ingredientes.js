@@ -151,7 +151,7 @@
   const getIngredientesArray = () => Object.values(safeObject(state.ingredientes.items));
 
   const familyAvatar = (url, alt) => url
-    ? `<span class="family-circle-thumb"><img src="${url}" alt="${alt}"></span>`
+    ? `<span class="family-circle-thumb"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-family-thumb" src="${url}" alt="${alt}" loading="lazy"></span>`
     : `<span class="family-circle-thumb family-circle-thumb-placeholder">${PLACEHOLDER_ICON}</span>`;
 
   const renderFamilies = () => {
@@ -180,6 +180,7 @@
     `).join('');
 
     familiasCircles.innerHTML = allButton + familyButtons;
+    prepareThumbLoaders('.js-family-thumb');
   };
 
   const matchesSearch = (item) => {
@@ -191,8 +192,44 @@
   };
 
   const ingredientAvatar = (url, alt) => url
-    ? `<div class="ingrediente-avatar"><img src="${url}" alt="${alt}"></div>`
+    ? `<div class="ingrediente-avatar"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingrediente-thumb" src="${url}" alt="${alt}" loading="lazy"></div>`
     : `<div class="ingrediente-avatar ingrediente-avatar-placeholder">${PLACEHOLDER_ICON}</div>`;
+
+  const prepareThumbLoaders = (selector) => {
+    document.querySelectorAll(selector).forEach((image) => {
+      const wrapper = image.closest('.family-circle-thumb, .ingrediente-avatar');
+      if (!wrapper) {
+        return;
+      }
+
+      const loading = wrapper.querySelector('.thumb-loading');
+      const showImage = () => {
+        image.classList.add('is-loaded');
+        if (loading) {
+          loading.classList.add('d-none');
+        }
+      };
+
+      const showFallback = () => {
+        wrapper.innerHTML = getPlaceholderCircle();
+      };
+
+      if (image.complete && image.naturalWidth > 0) {
+        showImage();
+      } else {
+        image.addEventListener('load', showImage, { once: true });
+        image.addEventListener('error', showFallback, { once: true });
+      }
+    });
+  };
+
+  const updateListScrollHint = () => {
+    if (!ingredientesList) {
+      return;
+    }
+    const hasOverflow = ingredientesList.scrollHeight > ingredientesList.clientHeight + 4;
+    ingredientesList.classList.toggle('has-scroll-hint', hasOverflow);
+  };
 
   const renderIngredientes = () => {
     const items = getIngredientesArray().filter((item) => {
@@ -204,6 +241,7 @@
 
     if (!items.length) {
       ingredientesList.innerHTML = '<div class="ingrediente-empty-list">No encontramos ingredientes con ese filtro.</div>';
+      updateListScrollHint();
       return;
     }
 
@@ -222,6 +260,9 @@
         </div>
       </article>
     `).join('');
+
+    prepareThumbLoaders('.js-ingrediente-thumb');
+    updateListScrollHint();
   };
 
   const refreshView = () => {
@@ -779,6 +820,9 @@
   }
   if (ingredientesData) {
     ingredientesData.addEventListener('click', handleDataClicks);
+  }
+  if (ingredientesList) {
+    ingredientesList.addEventListener('scroll', updateListScrollHint);
   }
   if (createIngredientBtn) {
     createIngredientBtn.addEventListener('click', () => openIngredientForm());
