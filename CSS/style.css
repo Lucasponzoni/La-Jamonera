@@ -287,6 +287,10 @@ html.login-protected.auth-ok body {
   gap: 10px;
 }
 
+.session-countdown {
+  font-weight: 400;
+}
+
 .footer-support {
   width: auto;
   max-width: none;
