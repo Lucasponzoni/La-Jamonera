@@ -479,6 +479,16 @@ html.login-protected.auth-ok body {
 
 .ingredientes-modal .ios-modal-body {
   min-height: 65vh;
+  max-height: 72vh;
+  overflow: hidden;
+}
+
+.ingredientes-data {
+  width: 100%;
+  height: 100%;
+  align-items: stretch;
+  justify-content: flex-start;
+  text-align: left;
 }
 
 .ingredientes-toolbar {
@@ -567,10 +577,19 @@ html.login-protected.auth-ok body {
   border-color: #8b5cf6;
 }
 
+.family-circle-item:focus,
+.family-circle-item:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 .ingredientes-list {
   width: 100%;
   display: grid;
   gap: 10px;
+  max-height: 40vh;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .ingrediente-card {
@@ -620,6 +639,14 @@ html.login-protected.auth-ok body {
 
 .ingrediente-meta {
   text-transform: capitalize;
+}
+
+.ingrediente-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ingrediente-actions {
@@ -811,6 +838,11 @@ html.login-protected.auth-ok body {
   object-fit: contain;
 }
 
+.image-method-btn i,
+.ai-generate-btn i {
+  font-size: 1rem;
+}
+
 
 .image-file-input {
   min-height: 0;
@@ -830,11 +862,19 @@ html.login-protected.auth-ok body {
   margin-right: 10px;
 }
 
-.image-placeholder-circle,
-.family-circle-thumb-placeholder,
-.ingrediente-avatar-placeholder {
+.image-placeholder-circle {
   width: 100%;
   height: 100%;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ece6ff;
+  color: #7048e8;
+}
+
+.family-circle-thumb-placeholder,
+.ingrediente-avatar-placeholder {
   border-radius: 999px;
   display: inline-flex;
   align-items: center;

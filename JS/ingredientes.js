@@ -105,7 +105,7 @@
     if (!found) {
       return capitalizeLabel(name);
     }
-    return capitalizeLabel(found.name);
+    return `${capitalizeLabel(found.name)} (${found.abbr})`;
   };
 
   const validateImageFile = (file) => {
@@ -158,10 +158,12 @@
     const families = getFamiliasArray().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
 
     const allButton = `
-      <button type="button" class="family-circle-item ${state.activeFamilyId === 'all' ? 'is-active' : ''}" data-family-filter="all">
-        <span class="family-circle-thumb family-circle-thumb-placeholder">${PLACEHOLDER_ICON}</span>
-        <span class="family-circle-name">Todas</span>
-      </button>
+      <div class="family-circle-wrap">
+        <button type="button" class="family-circle-item ${state.activeFamilyId === 'all' ? 'is-active' : ''}" data-family-filter="all">
+          <span class="family-circle-thumb family-circle-thumb-placeholder">${PLACEHOLDER_ICON}</span>
+          <span class="family-circle-name">Todas</span>
+        </button>
+      </div>
     `;
 
     const familyButtons = families.map((family) => `
@@ -246,7 +248,7 @@
         <div class="image-method-buttons" id="${prefix}_methodButtons">
           <button type="button" class="btn image-method-btn" data-image-method="url">Link</button>
           <button type="button" class="btn image-method-btn" data-image-method="upload">Subir</button>
-          <button type="button" class="btn image-method-btn is-active" data-image-method="ai"><img src="${IA_ICON_SRC}" alt="IA"> IA</button>
+          <button type="button" class="btn image-method-btn is-active" data-image-method="ai"><i class="fa-solid fa-wand-sparkles" aria-hidden="true"></i> IA</button>
         </div>
         <input type="hidden" id="${prefix}_method" value="ai">
 
@@ -268,7 +270,7 @@
           <label for="${prefix}_aiPrompt">Prompt corto para IA</label>
           <input id="${prefix}_aiPrompt" class="swal2-input ios-input" placeholder="Ej: carne de cerdo">
           <button id="${prefix}_aiGenerate" type="button" class="ai-generate-btn mt-2">
-            <img src="${IA_ICON_SRC}" alt="IA">
+            <i class="fa-solid fa-wand-sparkles" aria-hidden="true"></i>
             <span>Generar imagen con IA</span>
           </button>
           <div id="${prefix}_aiError" class="ai-alert-note d-none mt-2"></div>
@@ -486,7 +488,7 @@
     const result = await openIosSwal({
       title: isEdit ? 'Editar ingrediente' : 'Crear ingrediente',
       showCancelButton: true,
-      confirmButtonText: isEdit ? 'Guardar ingrediente' : 'Crear ingrediente',
+      confirmButtonText: isEdit ? 'Guardar' : 'Crear ingrediente',
       cancelButtonText: 'Cancelar',
       customClass: {
         confirmButton: `ios-btn ${isEdit ? 'ios-btn-primary' : 'ios-btn-success'}`,
@@ -520,7 +522,7 @@
               <label for="ingredientMeasureSelect">Medida *</label>
               <select id="ingredientMeasureSelect" class="form-select ios-input">
                 <option value="">Seleccioná una medida</option>
-                ${measures.map((item) => `<option value="${item.name}" ${measureKey((draft?.measure || initial?.measure)) === measureKey(item.name) ? 'selected' : ''}>${capitalizeLabel(item.name)}</option>`).join('')}
+                ${measures.map((item) => `<option value="${item.name}" ${measureKey((draft?.measure || initial?.measure)) === measureKey(item.name) ? 'selected' : ''}>${capitalizeLabel(item.name)} (${item.abbr})</option>`).join('')}
                 <option value="custom">Otra medida</option>
               </select>
               <div id="customMeasureWrap" class="d-none custom-measure-wrap">
