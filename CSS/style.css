@@ -1,3 +1,6 @@
+/* =========================================
+   CONFIGURACION GENERAL
+========================================= */
 * {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   box-sizing: border-box;
@@ -32,6 +35,9 @@ html.login-protected.auth-ok body {
   visibility: visible;
 }
 
+/* =========================================
+   LAYOUT BASE
+========================================= */
 .app-shell,
 .view {
   min-height: 100vh;
@@ -52,11 +58,13 @@ html.login-protected.auth-ok body {
   padding: 20px 0 28px;
 }
 
+/* =========================================
+   TOPBAR / NAVEGACION
+========================================= */
 .topbar-nav {
   background: #f8f9fd;
   border: 1px solid #dbe0ef;
   padding: 12px 14px;
-  box-shadow: 0 10px 30px rgba(38, 61, 120, 0.07);
 }
 
 .topbar-container {
@@ -155,6 +163,9 @@ html.login-protected.auth-ok body {
   font-size: 0.92rem;
 }
 
+/* =========================================
+   CONTENIDO HOME
+========================================= */
 .header-content {
   border-radius: 24px 24px 0 0;
   background: #d8d8d8;
@@ -187,6 +198,9 @@ html.login-protected.auth-ok body {
   color: #55607f;
 }
 
+/* =========================================
+   FOOTER
+========================================= */
 .app-footer {
   width: 100%;
   padding: 0 16px 16px;
@@ -195,15 +209,14 @@ html.login-protected.auth-ok body {
 }
 
 .app-footer-white {
-    background: #ffffff;
-    border: 1px solid #dbe0ef;
-    padding: 18px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: 14px;
-    box-shadow: 0 10px 30px rgba(38, 61, 120, 0.08);
+  background: #ffffff;
+  border: 1px solid #dbe0ef;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
 }
 
 .footer-main {
@@ -285,6 +298,9 @@ html.login-protected.auth-ok body {
   font-size: 1rem;
 }
 
+/* =========================================
+   LOGIN
+========================================= */
 .view-login {
   padding: 16px;
 }
@@ -382,6 +398,9 @@ html.login-protected.auth-ok body {
   display: flex;
 }
 
+/* =========================================
+   COMPONENTES IOS (INPUTS/BOTONES/ALERT)
+========================================= */
 .ios-input,
 .ios-input-group {
   min-height: 50px;
@@ -477,18 +496,6 @@ html.login-protected.auth-ok body {
   color: #1f3e8a;
 }
 
-.meta-spinner {
-  width: 20px;
-  height: 20px;
-  animation: spin 0.8s linear infinite;
-}
-
-.meta-spinner-login {
-  width: 80px;
-  height: 80px;
-  animation: spin 0.8s linear infinite;
-}
-
 .swal2-popup.ios-alert {
   border-radius: 22px;
   border: 1px solid #dce3f5;
@@ -521,6 +528,34 @@ html.login-protected.auth-ok body {
   margin: 0;
 }
 
+/* =========================================
+   SPINNERS Y ANIMACIONES
+========================================= */
+.meta-spinner {
+  width: 20px;
+  height: 20px;
+  animation: spin 0.8s linear infinite;
+}
+
+.meta-spinner-login {
+  width: 80px;
+  height: 80px;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* =========================================
+   RESPONSIVE
+========================================= */
 @media (max-width: 991.98px) {
   .topbar-links {
     margin-top: 12px;
@@ -531,7 +566,7 @@ html.login-protected.auth-ok body {
     display: flex;
     align-items: end;
     justify-content: end;
- }
+  }
 
   .topbar-user-menu {
     margin-top: 8px;
@@ -588,15 +623,5 @@ html.login-protected.auth-ok body {
 
   .swal2-actions {
     flex-wrap: nowrap;
-  }
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
   }
 }
