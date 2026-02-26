@@ -479,6 +479,16 @@ html.login-protected.auth-ok body {
 
 .ingredientes-modal .ios-modal-body {
   min-height: 65vh;
+  max-height: 72vh;
+  overflow: hidden;
+}
+
+.ingredientes-data {
+  width: 100%;
+  height: 100%;
+  align-items: stretch;
+  justify-content: flex-start;
+  text-align: left;
 }
 
 .ingredientes-toolbar {
@@ -549,12 +559,37 @@ html.login-protected.auth-ok body {
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
 }
 
 .family-circle-thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+
+.thumb-loading {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #eef2fd;
+}
+
+.thumb-loading .meta-spinner-login {
+  width: 22px;
+  height: 22px;
+}
+
+.thumb-image {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.thumb-image.is-loaded {
+  opacity: 1;
 }
 
 .family-circle-name {
@@ -567,10 +602,36 @@ html.login-protected.auth-ok body {
   border-color: #8b5cf6;
 }
 
+.family-circle-item:focus,
+.family-circle-item:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 .ingredientes-list {
   width: 100%;
   display: grid;
   gap: 10px;
+  max-height: 40vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+
+.ingredientes-list.has-scroll-hint::after {
+  content: '↓ Deslizá para ver más ingredientes';
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: block;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #516089;
+  background: linear-gradient(to bottom, rgba(242, 245, 252, 0), rgba(242, 245, 252, 1));
+  padding: 10px 0 4px;
+  pointer-events: none;
 }
 
 .ingrediente-card {
@@ -591,6 +652,7 @@ html.login-protected.auth-ok body {
   border: 1px solid #d6deef;
   background: #eff2fb;
   flex-shrink: 0;
+  position: relative;
 }
 
 .ingrediente-avatar img {
@@ -620,6 +682,27 @@ html.login-protected.auth-ok body {
 
 .ingrediente-meta {
   text-transform: capitalize;
+}
+
+.ingrediente-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 3px 0 0;
+  color: #7b86a4;
+  font-size: 0.72rem;
+}
+
+.ingrediente-dates i {
+  margin-right: 4px;
+}
+
+.ingrediente-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ingrediente-actions {
@@ -716,8 +799,8 @@ html.login-protected.auth-ok body {
 }
 
 .ai-generate-btn img {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   object-fit: contain;
 }
 
@@ -806,8 +889,8 @@ html.login-protected.auth-ok body {
 }
 
 .image-method-btn img {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   object-fit: contain;
 }
 
@@ -830,11 +913,19 @@ html.login-protected.auth-ok body {
   margin-right: 10px;
 }
 
-.image-placeholder-circle,
-.family-circle-thumb-placeholder,
-.ingrediente-avatar-placeholder {
+.image-placeholder-circle {
   width: 100%;
   height: 100%;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ece6ff;
+  color: #7048e8;
+}
+
+.family-circle-thumb-placeholder,
+.ingrediente-avatar-placeholder {
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
@@ -846,7 +937,7 @@ html.login-protected.auth-ok body {
 .image-placeholder-circle i,
 .family-circle-thumb-placeholder i,
 .ingrediente-avatar-placeholder i {
-  font-size: 1.45rem;
+  font-size: 2.2rem;
 }
 
 
@@ -935,6 +1026,17 @@ html.login-protected.auth-ok body {
 
 .ios-btn-primary[disabled] {
   opacity: 0.75;
+}
+
+
+.ios-btn-success {
+  background: #34c759;
+  color: #fff;
+}
+
+.ios-btn-success:hover {
+  background: #28b14a;
+  color: #fff;
 }
 
 .ios-btn-secondary {
