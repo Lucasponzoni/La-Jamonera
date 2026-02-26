@@ -1,8 +1,30 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="login-protected">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>
+    (function earlyLoginGuard() {
+      const SESSION_KEY = 'laJamoneraSession';
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (!raw) {
+        document.documentElement.classList.add('auth-ok');
+        return;
+      }
+
+      try {
+        const session = JSON.parse(raw);
+        if (Date.now() < Number(session.expiresAt)) {
+          window.location.replace('./index.html');
+          return;
+        }
+      } catch (error) {
+      }
+
+      localStorage.removeItem(SESSION_KEY);
+      document.documentElement.classList.add('auth-ok');
+    })();
+  </script>
   <title>La Jamonera | Login</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,12 +37,12 @@
   <main class="app-shell container-fluid px-0">
     <section class="view view-login d-flex align-items-center justify-content-center">
       <div id="loginCard" class="login-card mx-3">
-        <div class="login-brand text-center">
-          <img src="./IMG/La Jamonera Cerdito.webp" alt="Logo La Jamonera" class="brand-image">
-          <h1 class="brand-title">La Jamonera</h1>
-        </div>
-        <form id="loginForm" class="login-form" autocomplete="off">
-          <div class="login-fields">
+        <div class="login-card-content">
+          <div class="login-brand text-center">
+            <img src="./IMG/La Jamonera Cerdito.webp" alt="Logo La Jamonera" class="brand-image">
+            <h1 class="brand-title">La Jamonera</h1>
+          </div>
+          <form id="loginForm" class="login-form" autocomplete="off">
             <div class="mb-3">
               <label class="visually-hidden" for="usernameInput">Usuario</label>
               <input id="usernameInput" type="text" class="form-control ios-input" placeholder="Usuario" required>
@@ -36,15 +58,12 @@
             </div>
             <button id="loginButton" type="submit" class="btn ios-btn ios-btn-primary w-100">
               <span class="button-text">Ingresar</span>
-              <span class="spinner-wrap" aria-hidden="true">
-                <img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner">
-              </span>
             </button>
-          </div>
-          <div class="login-overlay" aria-hidden="true">
-            <img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner overlay-spinner">
-          </div>
-        </form>
+          </form>
+        </div>
+        <div class="login-overlay" aria-hidden="true">
+          <img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner overlay-spinner">
+        </div>
       </div>
     </section>
   </main>
@@ -53,8 +72,8 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="./JS/firebase-config.local.js"></script>
   <script src="./JS/firebase-init.js"></script>
-  <script src="./JS/auth-guard.js"></script>
   <script src="./JS/login.js"></script>
 </body>
 </html>

@@ -22,13 +22,11 @@
 
   const setLoading = (loading) => {
     if (loading) {
-      loginButton.classList.add('is-loading');
       loginButton.setAttribute('disabled', 'disabled');
       loginCard.classList.add('is-loading');
       return;
     }
 
-    loginButton.classList.remove('is-loading');
     loginButton.removeAttribute('disabled');
     loginCard.classList.remove('is-loading');
   };

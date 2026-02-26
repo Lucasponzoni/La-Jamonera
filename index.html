@@ -1,8 +1,30 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="index-protected">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>
+    (function earlyIndexGuard() {
+      const SESSION_KEY = 'laJamoneraSession';
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (!raw) {
+        window.location.replace('./login.html');
+        return;
+      }
+
+      try {
+        const session = JSON.parse(raw);
+        if (Date.now() < Number(session.expiresAt)) {
+          document.documentElement.classList.add('auth-ok');
+          return;
+        }
+      } catch (error) {
+      }
+
+      localStorage.removeItem(SESSION_KEY);
+      window.location.replace('./login.html');
+    })();
+  </script>
   <title>La Jamonera | Back Office</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,8 +53,8 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="./JS/firebase-config.local.js"></script>
   <script src="./JS/firebase-init.js"></script>
-  <script src="./JS/auth-guard.js"></script>
   <script src="./JS/app.js"></script>
 </body>
 </html>
