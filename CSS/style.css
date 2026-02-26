@@ -812,6 +812,25 @@ html.login-protected.auth-ok body {
   object-fit: contain;
 }
 
+
+.image-file-input {
+  min-height: 0;
+  height: auto;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid #d2d8e8;
+  background: #f2f4fa;
+}
+
+.image-file-input::file-selector-button {
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: #e3eafc;
+  color: #2a4ea3;
+  margin-right: 10px;
+}
+
 .image-placeholder-circle,
 .family-circle-thumb-placeholder,
 .ingrediente-avatar-placeholder {

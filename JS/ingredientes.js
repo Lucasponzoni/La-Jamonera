@@ -2,7 +2,7 @@
   const DEFAULT_IMAGE = '';
   const IA_WORKER_BASE = 'https://worker.lucasponzoninovogar.workers.dev';
   const IA_ICON_SRC = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23ede9fe'/%3E%3Cpath d='M32 12l4 10 10 4-10 4-4 10-4-10-10-4 10-4 4-10zm15 30l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5zm-30 0l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z' fill='%238b5cf6'/%3E%3C/svg%3E";
-  const PLACEHOLDER_ICON = '<i class="bi bi-carrot-fill"></i>';
+  const PLACEHOLDER_ICON = '<i class="fa-solid fa-carrot"></i>';
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -55,9 +55,16 @@
 
   const openIosSwal = (options) => {
     blurActiveElement();
+    ingredientesModal.setAttribute('inert', '');
     return Swal.fire({
       ...options,
       returnFocus: false,
+      willClose: () => {
+        ingredientesModal.removeAttribute('inert');
+        if (typeof options.willClose === 'function') {
+          options.willClose();
+        }
+      },
       customClass: {
         popup: `ios-alert ingredientes-alert ${options?.customClass?.popup || ''}`.trim(),
         title: 'ios-alert-title',
@@ -238,11 +245,11 @@
       <h6 class="step-title">3) Imagen</h6>
       <div class="step-content">
         <div class="image-method-buttons" id="${prefix}_methodButtons">
-          <button type="button" class="btn image-method-btn is-active" data-image-method="url">Link</button>
+          <button type="button" class="btn image-method-btn" data-image-method="url">Link</button>
           <button type="button" class="btn image-method-btn" data-image-method="upload">Subir</button>
-          <button type="button" class="btn image-method-btn" data-image-method="ai"><img src="${IA_ICON_SRC}" alt="IA"> IA</button>
+          <button type="button" class="btn image-method-btn is-active" data-image-method="ai"><img src="${IA_ICON_SRC}" alt="IA"> IA</button>
         </div>
-        <input type="hidden" id="${prefix}_method" value="url">
+        <input type="hidden" id="${prefix}_method" value="ai">
 
         <div id="${prefix}_preview" class="image-preview-circle">
           ${initialImage ? `<img src="${initialImage}" alt="Vista previa">` : getPlaceholderCircle()}
@@ -255,7 +262,7 @@
 
         <div id="${prefix}_uploadWrap" class="d-none">
           <label for="${prefix}_imageFile">Subir imagen</label>
-          <input id="${prefix}_imageFile" type="file" class="form-control ios-input" accept="image/*">
+          <input id="${prefix}_imageFile" type="file" class="form-control image-file-input" accept="image/*">
         </div>
 
         <div id="${prefix}_aiWrap" class="d-none">
@@ -302,6 +309,7 @@
     methodButtons.forEach((button) => {
       button.addEventListener('click', () => toggleMethod(button.dataset.imageMethod));
     });
+    toggleMethod('ai');
 
     imageUrlInput.addEventListener('input', () => {
       if (methodInput.value === 'url') {
@@ -414,7 +422,7 @@
             <h6 class="step-title">1) Datos de familia</h6>
             <div class="step-content">
               <label for="familyNameInput">Nombre de familia *</label>
-              <input id="familyNameInput" class="swal2-input ios-input" placeholder="Ej: Carnes" value="${initial ? capitalizeLabel(initial.name) : ''}">
+              <input id="familyNameInput" class="swal2-input ios-input" placeholder="Ej: Carnes" value="${draft?.name ?? (initial ? capitalizeLabel(initial.name) : '')}">
             </div>
           </section>
           ${buildImageStepHtml('familyImage', initial?.imageUrl || '')}
@@ -464,7 +472,7 @@
     return familyId;
   };
 
-  const openIngredientForm = async (initial = null) => {
+  const openIngredientForm = async (initial = null, draft = null) => {
     let resolveImage;
     const isEdit = Boolean(initial);
     const families = getFamiliasArray().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
@@ -481,19 +489,19 @@
             <h6 class="step-title">1) Datos básicos</h6>
             <div class="step-content">
               <label for="ingredientNameInput">Nombre de ingrediente *</label>
-              <input id="ingredientNameInput" class="swal2-input ios-input" placeholder="Ej: Jamón cocido" value="${initial ? capitalizeLabel(initial.name) : ''}">
+              <input id="ingredientNameInput" class="swal2-input ios-input" placeholder="Ej: Jamón cocido" value="${draft?.name ?? (initial ? capitalizeLabel(initial.name) : '')}">
 
               <label for="ingredientFamilySelect">Familia *</label>
               <div class="family-inline-create">
                 <select id="ingredientFamilySelect" class="form-select ios-input">
                   <option value="">Seleccioná una familia</option>
-                  ${families.map((family) => `<option value="${family.id}" ${initial?.familyId === family.id ? 'selected' : ''}>${capitalizeLabel(family.name)}</option>`).join('')}
+                  ${families.map((family) => `<option value="${family.id}" ${(draft?.familyId || initial?.familyId) === family.id ? 'selected' : ''}>${capitalizeLabel(family.name)}</option>`).join('')}
                 </select>
                 <button type="button" id="createFamilyInline" class="btn ios-btn ios-btn-secondary">Crear familia</button>
               </div>
 
               <label for="ingredientDescriptionInput">Descripción (opcional)</label>
-              <textarea id="ingredientDescriptionInput" class="swal2-textarea ios-input" placeholder="Descripción del ingrediente">${initial?.description || ''}</textarea>
+              <textarea id="ingredientDescriptionInput" class="swal2-textarea ios-input" placeholder="Descripción del ingrediente">${draft?.description ?? (initial?.description || '')}</textarea>
             </div>
           </section>
 
@@ -503,7 +511,7 @@
               <label for="ingredientMeasureSelect">Medida *</label>
               <select id="ingredientMeasureSelect" class="form-select ios-input">
                 <option value="">Seleccioná una medida</option>
-                ${measures.map((item) => `<option value="${item.name}" ${measureKey(initial?.measure) === measureKey(item.name) ? 'selected' : ''}>${capitalizeLabel(item.name)} - ${item.abbr}</option>`).join('')}
+                ${measures.map((item) => `<option value="${item.name}" ${measureKey((draft?.measure || initial?.measure)) === measureKey(item.name) ? 'selected' : ''}>${capitalizeLabel(item.name)} - ${item.abbr}</option>`).join('')}
                 <option value="custom">Otra medida</option>
               </select>
               <div id="customMeasureWrap" class="d-none custom-measure-wrap">
@@ -528,16 +536,23 @@
         });
 
         createFamilyInline.addEventListener('click', async () => {
+          const draftState = {
+            name: document.getElementById('ingredientNameInput').value,
+            familyId: familySelect.value,
+            description: document.getElementById('ingredientDescriptionInput').value,
+            measure: document.getElementById('ingredientMeasureSelect').value,
+            customName: document.getElementById('ingredientMeasureCustomName').value,
+            customAbbr: document.getElementById('ingredientMeasureCustomAbbr').value
+          };
+
           const familyId = await openFamilyForm();
           if (!familyId) {
+            await openIngredientForm(initial, draftState);
             return;
           }
+
           const family = state.ingredientes.familias[familyId];
-          const option = document.createElement('option');
-          option.value = family.id;
-          option.textContent = capitalizeLabel(family.name);
-          familySelect.appendChild(option);
-          familySelect.value = family.id;
+          await openIngredientForm(initial, { ...draftState, familyId: family?.id || '' });
         });
       },
       preConfirm: async () => {
@@ -697,6 +712,16 @@
       await openIosSwal({ title: 'No se pudo cargar', html: '<p>Error leyendo ingredientes desde Firebase.</p>', icon: 'error', confirmButtonText: 'Entendido' });
     }
   };
+
+
+  ingredientesModal.addEventListener('hide.bs.modal', () => {
+    blurActiveElement();
+  });
+
+  ingredientesModal.addEventListener('hidden.bs.modal', () => {
+    blurActiveElement();
+    ingredientesModal.removeAttribute('inert');
+  });
 
   ingredientesModal.addEventListener('show.bs.modal', loadIngredientes);
   if (searchInput) {
