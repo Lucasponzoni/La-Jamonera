@@ -48,14 +48,25 @@ html.login-protected.auth-ok body {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 24px 16px 18px;
+  align-items: center;
+}
+
+.header-content {
+  border-radius: 24px 24px 0 0 ;
+  background: #d8d8d8;
+  border: 1px solid #dbe0ef;
+  border-bottom: none;
+  padding: 28px 20px;
+  width: 1200px;
 }
 
 .home-content {
-  border-radius: 24px;
+  border-radius: 0 0 24px 24px;
   background: #f8f9fd;
   border: 1px solid #dbe0ef;
+  border-top: none;
   padding: 28px 20px;
+  width: 1200px;
 }
 
 .home-title {
@@ -76,9 +87,9 @@ html.login-protected.auth-ok body {
 }
 
 .app-footer-white {
+    width: 100%;
   background: #ffffff;
   border: 1px solid #dbe0ef;
-  border-radius: 20px;
   padding: 16px;
   flex-direction: column;
   gap: 12px;
@@ -176,16 +187,15 @@ html.login-protected.auth-ok body {
 }
 
 .support-link {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid #e1e6f4;
-  border-radius: 12px;
-  padding: 9px 10px;
-  text-decoration: none;
-  color: #6a7492;
-  font-size: 0.83rem;
-  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+ display: flex;
+ gap: 8px;
+ width: fit-content;
+ border-radius: 12px;
+ padding: 4px 6px;
+ text-decoration: none;
+ color: #6a7492;
+ font-size: 0.8rem;
+ transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
 }
 
 .support-link:hover {
@@ -367,20 +377,12 @@ html.login-protected.auth-ok body {
     padding: 28px;
   }
 
-  .view-app {
-    padding: 32px 24px 24px;
-  }
-
   .brand-image {
     width: 78px;
   }
 
   .swal2-actions {
     flex-wrap: nowrap;
-  }
-
-  .app-footer-white {
-    padding: 18px 26px;
   }
 }
 /*FIN RESPONSIVE*/
