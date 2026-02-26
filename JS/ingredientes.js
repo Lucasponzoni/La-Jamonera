@@ -121,7 +121,7 @@
     return '';
   };
 
-  const getPlaceholderCircle = () => '<span class="image-placeholder-circle">' + PLACEHOLDER_ICON + '</span>';
+  const getPlaceholderCircle = () => '<span class="image-placeholder-circle-2">' + PLACEHOLDER_ICON + '</span>';
 
   const showIngredientesState = (stateKey) => {
     ingredientesLoading.classList.toggle('d-none', stateKey !== 'loading');
