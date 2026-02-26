@@ -618,10 +618,6 @@ html.login-protected.auth-ok body {
 }
 
 
-.ingredientes-list.has-scroll-hint {
-  mask-image: linear-gradient(to bottom, #000 85%, transparent 100%);
-}
-
 .ingredientes-list.has-scroll-hint::after {
   content: '↓ Deslizá para ver más ingredientes';
   position: sticky;
@@ -630,10 +626,11 @@ html.login-protected.auth-ok body {
   right: 0;
   display: block;
   text-align: center;
-  font-size: 0.75rem;
-  color: #6d7aa0;
-  background: linear-gradient(to bottom, rgba(242, 245, 252, 0), rgba(242, 245, 252, 0.95));
-  padding: 12px 0 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #516089;
+  background: linear-gradient(to bottom, rgba(242, 245, 252, 0), rgba(242, 245, 252, 1));
+  padding: 10px 0 4px;
   pointer-events: none;
 }
 
@@ -685,6 +682,19 @@ html.login-protected.auth-ok body {
 
 .ingrediente-meta {
   text-transform: capitalize;
+}
+
+.ingrediente-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 3px 0 0;
+  color: #7b86a4;
+  font-size: 0.72rem;
+}
+
+.ingrediente-dates i {
+  margin-right: 4px;
 }
 
 .ingrediente-description {

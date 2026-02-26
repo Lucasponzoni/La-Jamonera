@@ -228,7 +228,16 @@
       return;
     }
     const hasOverflow = ingredientesList.scrollHeight > ingredientesList.clientHeight + 4;
-    ingredientesList.classList.toggle('has-scroll-hint', hasOverflow);
+    const isAtEnd = ingredientesList.scrollTop + ingredientesList.clientHeight >= ingredientesList.scrollHeight - 4;
+    ingredientesList.classList.toggle('has-scroll-hint', hasOverflow && !isAtEnd);
+  };
+
+  const formatDateLabel = (timestamp) => {
+    const date = new Date(Number(timestamp || 0));
+    if (Number.isNaN(date.getTime())) {
+      return 'S/D';
+    }
+    return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
   };
 
   const renderIngredientes = () => {
@@ -252,6 +261,10 @@
         <div class="ingrediente-main">
           <h6 class="ingrediente-name">${capitalizeLabel(item.name)}</h6>
           <p class="ingrediente-meta">${capitalizeLabel(item.familyName)} · ${getMeasureLabel(item.measure)}</p>
+          <p class="ingrediente-dates">
+            <span><i class="fa-regular fa-calendar-plus" aria-hidden="true"></i> Alta: ${formatDateLabel(item.createdAt)}</span>
+            <span><i class="fa-regular fa-calendar-check" aria-hidden="true"></i> Mod: ${formatDateLabel(item.updatedAt)}</span>
+          </p>
           ${item.description ? `<p class="ingrediente-description">${item.description}</p>` : ''}
         </div>
         <div class="ingrediente-actions">
