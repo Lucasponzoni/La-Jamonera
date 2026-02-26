@@ -846,7 +846,7 @@ html.login-protected.auth-ok body {
 .image-placeholder-circle i,
 .family-circle-thumb-placeholder i,
 .ingrediente-avatar-placeholder i {
-  font-size: 1.45rem;
+  font-size: 3rem;
 }
 
 
@@ -935,6 +935,17 @@ html.login-protected.auth-ok body {
 
 .ios-btn-primary[disabled] {
   opacity: 0.75;
+}
+
+
+.ios-btn-success {
+  background: #34c759;
+  color: #fff;
+}
+
+.ios-btn-success:hover {
+  background: #28b14a;
+  color: #fff;
 }
 
 .ios-btn-secondary {

@@ -1,7 +1,6 @@
 (function ingredientesModule() {
-  const DEFAULT_IMAGE = '';
   const IA_WORKER_BASE = 'https://worker.lucasponzoninovogar.workers.dev';
-  const IA_ICON_SRC = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23ede9fe'/%3E%3Cpath d='M32 12l4 10 10 4-10 4-4 10-4-10-10-4 10-4 4-10zm15 30l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5zm-30 0l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z' fill='%238b5cf6'/%3E%3C/svg%3E";
+  const IA_ICON_SRC = './IMG/ia-unscreen.gif';
   const PLACEHOLDER_ICON = '<i class="fa-solid fa-carrot"></i>';
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
@@ -106,7 +105,7 @@
     if (!found) {
       return capitalizeLabel(name);
     }
-    return `${capitalizeLabel(found.name)} - ${found.abbr}`;
+    return capitalizeLabel(found.name);
   };
 
   const validateImageFile = (file) => {
@@ -252,7 +251,7 @@
         <input type="hidden" id="${prefix}_method" value="ai">
 
         <div id="${prefix}_preview" class="image-preview-circle">
-          ${initialImage ? `<img src="${initialImage}" alt="Vista previa">` : getPlaceholderCircle()}
+          <img src="${initialImage || IA_ICON_SRC}" alt="Vista previa">
         </div>
 
         <div id="${prefix}_urlWrap">
@@ -304,12 +303,18 @@
       uploadWrap.classList.toggle('d-none', method !== 'upload');
       aiWrap.classList.toggle('d-none', method !== 'ai');
       aiError.classList.add('d-none');
+      if (method === 'ai' && !imageState.generatedBlob && !normalizeValue(imageUrlInput.value)) {
+        setPreview(IA_ICON_SRC);
+      }
     };
 
     methodButtons.forEach((button) => {
       button.addEventListener('click', () => toggleMethod(button.dataset.imageMethod));
     });
     toggleMethod('ai');
+    if (!normalizeValue(imageUrlInput.value)) {
+      setPreview(IA_ICON_SRC);
+    }
 
     imageUrlInput.addEventListener('input', () => {
       if (methodInput.value === 'url') {
@@ -422,7 +427,7 @@
             <h6 class="step-title">1) Datos de familia</h6>
             <div class="step-content">
               <label for="familyNameInput">Nombre de familia *</label>
-              <input id="familyNameInput" class="swal2-input ios-input" placeholder="Ej: Carnes" value="${draft?.name ?? (initial ? capitalizeLabel(initial.name) : '')}">
+              <input id="familyNameInput" class="swal2-input ios-input" placeholder="Ej: Carnes" value="${initial ? capitalizeLabel(initial.name) : ''}">
             </div>
           </section>
           ${buildImageStepHtml('familyImage', initial?.imageUrl || '')}
@@ -483,6 +488,10 @@
       showCancelButton: true,
       confirmButtonText: isEdit ? 'Guardar ingrediente' : 'Crear ingrediente',
       cancelButtonText: 'Cancelar',
+      customClass: {
+        confirmButton: `ios-btn ${isEdit ? 'ios-btn-primary' : 'ios-btn-success'}`,
+        cancelButton: 'ios-btn ios-btn-secondary'
+      },
       html: `
         <div class="ingrediente-form-grid">
           <section class="step-block">
@@ -511,12 +520,12 @@
               <label for="ingredientMeasureSelect">Medida *</label>
               <select id="ingredientMeasureSelect" class="form-select ios-input">
                 <option value="">Seleccioná una medida</option>
-                ${measures.map((item) => `<option value="${item.name}" ${measureKey((draft?.measure || initial?.measure)) === measureKey(item.name) ? 'selected' : ''}>${capitalizeLabel(item.name)} - ${item.abbr}</option>`).join('')}
+                ${measures.map((item) => `<option value="${item.name}" ${measureKey((draft?.measure || initial?.measure)) === measureKey(item.name) ? 'selected' : ''}>${capitalizeLabel(item.name)}</option>`).join('')}
                 <option value="custom">Otra medida</option>
               </select>
               <div id="customMeasureWrap" class="d-none custom-measure-wrap">
                 <input id="ingredientMeasureCustomName" class="swal2-input ios-input" placeholder="Nombre de medida">
-                <input id="ingredientMeasureCustomAbbr" class="swal2-input ios-input" placeholder="Abreviatura (ej: Uni.)">
+                <input id="ingredientMeasureCustomAbbr" class="swal2-input ios-input" placeholder="Abreviatura">
               </div>
             </div>
           </section>
