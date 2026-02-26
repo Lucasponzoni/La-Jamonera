@@ -201,7 +201,6 @@ html.login-protected.auth-ok body {
 .home-actions-scroll {
   display: flex;
   gap: 10px;
-  margin-top: 14px;
 }
 
 .home-action-btn {
@@ -1061,7 +1060,6 @@ html.login-protected.auth-ok body {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
-    padding-bottom: 4px;
   }
 
   .home-actions-scroll::-webkit-scrollbar {
