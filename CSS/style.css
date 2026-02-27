@@ -112,11 +112,17 @@ html.login-protected.auth-ok body {
 }
 
 
+.topbar-divider-item {
+  display: inline-flex;
+  align-items: center;
+  pointer-events: none;
+}
+
 .barra-vertical {
   display: inline-block;
   width: 1px;
-  height: 16px;
-  background: #999;
+  height: 28px;
+  background: #c9cede;
   margin: 0 8px;
   vertical-align: middle;
 }
@@ -1285,7 +1291,8 @@ html.login-protected.auth-ok body {
 }
 
 .informes-users-list {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 14px;
   max-height: 180px;
@@ -1719,7 +1726,8 @@ html.login-protected.auth-ok body {
    INFORMES UI FIXES V2
 ========================================= */
 .informes-users-list {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 14px;
   max-height: 240px;
@@ -1746,8 +1754,10 @@ html.login-protected.auth-ok body {
 
 .informe-user-circle-wrap {
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  align-items: center;
+  width: calc(50% - 5px);
+  min-width: 260px;
 }
 
 .informe-user-circle {
@@ -1786,6 +1796,7 @@ html.login-protected.auth-ok body {
 .informe-user-actions {
   display: flex;
   gap: 6px;
+  justify-content: center;
 }
 
 .informes-saving-alert .swal2-html-container {
@@ -1851,13 +1862,17 @@ html.login-protected.auth-ok body {
 }
 
 @media (max-width: 768px) {
+  .topbar-divider-item {
+    display: none;
+  }
+
   .informe-user-circle-wrap {
-    flex-direction: column;
-    align-items: stretch;
+    width: 100%;
+    min-width: 0;
   }
 
   .informe-user-actions {
-    justify-content: flex-end;
+    justify-content: flex-start;
   }
 
   .editor-toolbar-scroll {
@@ -1883,20 +1898,25 @@ html.login-protected.auth-ok body {
 }
 
 
-.informes-modal .ios-modal-body.has-scroll-hint::after {
-  content: '↓ Desliza hacia abajo';
+.informes-data.has-scroll-hint::before {
+  content: "↓ Desliza hacia abajo";
   position: sticky;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  top: 0;
+  z-index: 2;
   display: block;
   text-align: center;
   font-size: 0.78rem;
   font-weight: 600;
   color: #516089;
-  background: linear-gradient(to bottom, rgba(242, 245, 252, 0), rgba(242, 245, 252, 1));
-  padding: 10px 0 6px;
+  background: linear-gradient(to bottom, rgba(242, 245, 252, 0.96), rgba(242, 245, 252, 0.75));
+  padding: 6px 0 8px;
   pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .informes-data.has-scroll-hint::before {
+    display: none;
+  }
 }
 
 

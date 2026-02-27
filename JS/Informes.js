@@ -78,6 +78,9 @@
   const showState = (key) => {
     informesLoading.classList.toggle('d-none', key !== 'loading');
     informesData.classList.toggle('d-none', key !== 'data');
+    if (key !== 'data') {
+      informesData.classList.remove('has-scroll-hint');
+    }
   };
 
   const getDateParts = (date) => {
@@ -158,6 +161,29 @@
     return span;
   };
 
+  const placeCaretOutsideFormatting = (node) => {
+    if (!node) return;
+    const styledTags = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'MARK', 'FONT', 'SPAN']);
+    let cursor = node.parentElement;
+    let styledAncestor = null;
+
+    while (cursor && cursor !== informeEditor) {
+      const hasInlineStyle = Boolean(cursor.getAttribute('style'));
+      if (styledTags.has(cursor.tagName) || hasInlineStyle) {
+        styledAncestor = cursor;
+      }
+      cursor = cursor.parentElement;
+    }
+
+    if (!styledAncestor || !styledAncestor.parentNode) {
+      return;
+    }
+
+    const spacer = createPlainWrapper();
+    styledAncestor.parentNode.insertBefore(spacer, styledAncestor.nextSibling);
+    setCollapsedSelection(spacer.firstChild, spacer.firstChild.length);
+  };
+
   const ensurePlainTypingContext = () => {
     const selection = window.getSelection();
     if (!selection || !selection.rangeCount) {
@@ -172,6 +198,7 @@
     const plain = createPlainWrapper();
     range.insertNode(plain);
     setCollapsedSelection(plain.firstChild, plain.firstChild.length);
+    placeCaretOutsideFormatting(plain);
   };
 
   const renderUsers = () => {
@@ -269,6 +296,7 @@
       renderUsers();
       renderAttachments();
       showState('data');
+      updateMainScrollHint();
     } catch (error) {
       await openIosSwal({ title: 'Error', html: '<p>No se pudieron cargar los datos de informes.</p>', icon: 'error', confirmButtonText: 'Entendido' });
       showState('data');
@@ -521,8 +549,8 @@
   };
 
   const updatePreview = () => {
-    const previewColor = textColorInput.value || '#2a3556';
-    const previewHighlight = highlightColorInput.value || 'transparent';
+    const previewColor = textColorInput.value || '#000000';
+    const previewHighlight = highlightColorInput.value || '#ffffff';
     const previewBold = document.queryCommandState('bold');
     const previewItalic = document.queryCommandState('italic');
     const previewUnderline = document.queryCommandState('underline');
@@ -580,6 +608,7 @@
         const plainNode = createPlainWrapper(plainText);
         range.insertNode(plainNode);
         setCollapsedSelection(plainNode.firstChild, plainNode.firstChild.length);
+        placeCaretOutsideFormatting(plainNode);
       }
 
       clearTypingStates();
@@ -665,7 +694,11 @@
 
   const restoreDraft = async () => {
     const raw = localStorage.getItem(DRAFT_KEY);
-    if (!raw) return;
+    if (!raw) {
+      resetEditorControls();
+      updatePreview();
+      return;
+    }
     try {
       const draft = JSON.parse(raw);
       informeEditor.innerHTML = draft.editorHtml || '';
@@ -838,10 +871,19 @@
   });
 
   const informesModalBody = informesModal.querySelector('.ios-modal-body');
+  const updateMainScrollHint = () => {
+    if (!informesModalBody || informesData.classList.contains('d-none')) {
+      informesData.classList.remove('has-scroll-hint');
+      return;
+    }
+
+    const hasOverflow = informesModalBody.scrollHeight > informesModalBody.clientHeight + 4;
+    const nearBottom = informesModalBody.scrollTop + informesModalBody.clientHeight >= informesModalBody.scrollHeight - 6;
+    informesData.classList.toggle('has-scroll-hint', hasOverflow && !nearBottom);
+  };
+
   if (informesModalBody) {
-    informesModalBody.addEventListener('scroll', () => {
-      toggleScrollHint(informesModalBody);
-    });
+    informesModalBody.addEventListener('scroll', updateMainScrollHint);
   }
 
   saveInformeBtn.addEventListener('click', saveInforme);
@@ -952,9 +994,6 @@
     updateImportanceLabel();
     await loadData();
     await restoreDraft();
-    const informesModalBody = informesModal.querySelector('.ios-modal-body');
-    if (informesModalBody) {
-      toggleScrollHint(informesModalBody);
-    }
+    updateMainScrollHint();
   });
 })();
