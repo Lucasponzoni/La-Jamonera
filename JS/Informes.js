@@ -245,39 +245,10 @@
     return root.innerHTML;
   };
 
-  const blobToDataUrl = (blob) => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : '');
-    reader.onerror = () => reject(new Error('image_read_error'));
-    reader.readAsDataURL(blob);
-  });
-
-  const buildAttachmentImageBlocks = async (images) => {
-    const blocks = [];
-
-    for (const item of images) {
-      const inlineDataUrl = normalizeValue(item.printDataUrl || item.dataUrl);
-      if (inlineDataUrl) {
-        blocks.push({ text: item.name || 'Imagen adjunta', margin: [0, 0, 0, 4], bold: true, color: '#2a3556' });
-        blocks.push({ image: inlineDataUrl, fit: [520, 320], margin: [0, 0, 0, 10] });
-        continue;
-      }
-
-      blocks.push({ text: `${item.name || 'Imagen'} (no disponible para impresión)`, margin: [0, 0, 0, 2], color: '#8b5a3c' });
-      blocks.push({ text: 'Para evitar errores CORS, esta imagen se imprime cuando el informe guarda un campo printDataUrl.', margin: [0, 0, 0, 2], color: '#5a6482' });
-      if (item.url) {
-        blocks.push({ text: item.url, link: item.url, color: '#1d4ed8', margin: [0, 0, 0, 10] });
-      }
-    }
-
-    return blocks;
-  };
-
-  const buildPdfDefinition = async (report) => {
+  const buildPdfDefinition = (report) => {
     const attachments = Array.isArray(report?.attachments) ? report.attachments : [];
     const images = attachments.filter((item) => item.type === 'image' && item.url);
     const docs = attachments.filter((item) => item.type !== 'image' && item.url);
-    const imageBlocks = await buildAttachmentImageBlocks(images);
 
     const safeHtml = sanitizeHtmlForPdfMake(report.html || '');
     const htmlContent = window.htmlToPdfmake
@@ -296,7 +267,9 @@
         { text: 'Contenido', style: 'sectionTitle' },
         ...(Array.isArray(htmlContent) ? htmlContent : [htmlContent]),
         { text: 'Imágenes adjuntas', style: 'sectionTitle', margin: [0, 14, 0, 6] },
-        ...(images.length ? imageBlocks : [{ text: 'Sin imágenes adjuntas.', color: '#5a6482' }]),
+        images.length
+          ? { ul: images.map((item) => ({ text: `${item.name || 'Imagen'} - ${item.url}`, link: item.url, color: '#1d4ed8' })) }
+          : { text: 'Sin imágenes adjuntas.', color: '#5a6482' },
         { text: 'Otros adjuntos', style: 'sectionTitle', margin: [0, 14, 0, 6] },
         docs.length
           ? { ul: docs.map((item) => ({ text: `${item.name || 'Archivo'}${item.url ? ` - ${item.url}` : ''}`, link: item.url || undefined, color: item.url ? '#1d4ed8' : '#1f2a44' })) }
@@ -353,7 +326,7 @@
       throw new Error('pdf_lib_unavailable');
     }
 
-    const docDefinition = await buildPdfDefinition(report);
+    const docDefinition = buildPdfDefinition(report);
     return await new Promise((resolve, reject) => {
       try {
         window.pdfMake.createPdf(docDefinition).getBlob((blob) => resolve(blob));
@@ -828,44 +801,6 @@
     return ref.getDownloadURL();
   };
 
-  const imageFileToPrintDataUrl = async (file) => {
-    if (!file || !String(file.type || '').startsWith('image/')) {
-      return '';
-    }
-
-    const rawDataUrl = await blobToDataUrl(file);
-    if (!rawDataUrl) {
-      return '';
-    }
-
-    return await new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const maxWidth = 1280;
-          const maxHeight = 1280;
-          const ratio = Math.min(maxWidth / img.width, maxHeight / img.height, 1);
-          const width = Math.max(1, Math.round(img.width * ratio));
-          const height = Math.max(1, Math.round(img.height * ratio));
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) {
-            resolve(rawDataUrl);
-            return;
-          }
-          ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', 0.82));
-        } catch (error) {
-          resolve(rawDataUrl);
-        }
-      };
-      img.onerror = () => resolve(rawDataUrl);
-      img.src = rawDataUrl;
-    });
-  };
-
   const promptUserKey = async () => {
     const keyCheck = await openIosSwal({
       title: 'Verificar clave',
@@ -1073,8 +1008,7 @@
           type: item.type,
           mime: item.file.type,
           size: item.file.size,
-          url,
-          printDataUrl: item.type === 'image' ? await imageFileToPrintDataUrl(item.file) : ''
+          url
         });
       }
 
@@ -1082,7 +1016,6 @@
       const reportPayload = {
         id: reportId,
         createdAt: Date.now(),
-        updatedAt: Date.now(),
         reportDate: `${year}-${month}-${day}`,
         userId: selectedUserId,
         userName: state.users[selectedUserId].fullName,
@@ -1102,7 +1035,6 @@
         userName: state.users[selectedUserId].fullName,
         importance: getImportanceValue(),
         createdAt: Date.now(),
-        updatedAt: Date.now(),
         attachmentsCount: attachmentsSaved.length,
         commentsCount: 0
       });
@@ -1226,7 +1158,6 @@
             <p><strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')}</p>
             <p><strong>Email:</strong> ${escapeHtml(report.userEmail || '-')}</p>
             <p><strong>Fecha:</strong> ${getDateLabel(report.createdAt)}</p>
-            <p><strong>Última actualización:</strong> ${report.updatedAt ? getDateLabel(report.updatedAt) : 'Sin actualizaciones'}</p>
           </div>
           <div class="report-viewer-content-wrap"><div class="report-viewer-content">${report.html || ''}</div></div>
           <div class="attachments-grid">${attachmentHtml}</div>
@@ -1456,29 +1387,23 @@
       uploadedMap.set(item.tmpId, url);
     }
 
-    const finalAttachments = [];
-    for (const item of currentAttachments) {
-      if (!item.isLocal) {
-        finalAttachments.push(item);
-        continue;
-      }
+    const finalAttachments = currentAttachments.map((item) => {
+      if (!item.isLocal) return item;
       const source = localUploads.find((upload) => upload.tmpId === item.id);
-      finalAttachments.push({
+      return {
         name: item.name,
         type: item.type,
         mime: item.mime || source?.file?.type || '',
         size: item.size || source?.file?.size || 0,
-        url: uploadedMap.get(item.id) || item.url,
-        printDataUrl: source?.file && item.type === 'image' ? await imageFileToPrintDataUrl(source.file) : ''
-      });
-    }
+        url: uploadedMap.get(item.id) || item.url
+      };
+    });
 
     currentAttachments.forEach((item) => {
       if (item.isLocal && item.url) URL.revokeObjectURL(item.url);
     });
 
-    const updatedAt = Date.now();
-    const updated = { ...report, html: answer.value.html, importance: normalizeImportance(answer.value.importance, 50), attachments: finalAttachments, updatedAt };
+    const updated = { ...report, html: answer.value.html, importance: normalizeImportance(answer.value.importance, 50), attachments: finalAttachments, updatedAt: Date.now() };
     await window.dbLaJamoneraRest.write(path, updated);
     await window.dbLaJamoneraRest.write(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, {
       id: report.id,
@@ -1489,7 +1414,7 @@
       createdAt: Number(report.createdAt || Date.now()),
       attachmentsCount: finalAttachments.length,
       commentsCount: getCommentsCount(updated),
-      updatedAt
+      updatedAt: Date.now()
     });
     await loadReportsBoard();
   };
