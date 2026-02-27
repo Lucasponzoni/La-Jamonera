@@ -1737,19 +1737,19 @@ html.login-protected.auth-ok body {
 }
 
 .informes-users-list.has-scroll-hint::after {
-  content: '→ Deslizá para ver más usuarios';
-  position: sticky;
-  right: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 220px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: #516089;
-  background: linear-gradient(90deg, rgba(242, 245, 252, 0), rgba(242, 245, 252, 1));
-  padding: 0 10px;
-  pointer-events: none;
+   content: '→ Deslizá para ver más usuarios';
+   position: sticky;
+   right: -10px;
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+   min-width: 220px;
+   font-size: 0.78rem;
+   font-weight: 600;
+   color: #ffffff;
+   background: linear-gradient(90deg, rgba(242, 245, 252, 0), rgb(42 78 163));
+   padding: 0 10px;
+   pointer-events: none;
 }
 
 .informe-user-circle-wrap {

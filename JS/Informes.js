@@ -223,7 +223,6 @@
       <div class="informe-user-circle-wrap">
         <article class="informe-user-circle" data-user-id="${user.id}">
           ${renderUserAvatar(user)}
-          <i class="bi bi-person-fill informe-user-item-icon" aria-hidden="true"></i>
           <div class="informe-user-main">
             <h6>${user.fullName}</h6>
             <p>${user.position}</p>
