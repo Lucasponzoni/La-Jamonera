@@ -1118,7 +1118,7 @@ html.login-protected.auth-ok body {
 
 .swal2-popup.ios-alert.informes-alert .swal2-html-container {
   padding: 0 !important;
-  text-align: left;
+  text-align: center;
 }
 
 .swal2-popup.ios-alert.informes-alert .swal2-textarea {

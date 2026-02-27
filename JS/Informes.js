@@ -226,29 +226,22 @@
 
   const getReportPath = (report) => `/informes/${report.year}/${report.month}/${report.day}/${report.id}`;
 
-  const printReport = async (report) => {
+  const buildPrintWindowHtml = (report, includeImages = true) => {
     const attachments = Array.isArray(report?.attachments) ? report.attachments : [];
     const images = attachments.filter((item) => item.type === 'image' && item.url);
     const docs = attachments.filter((item) => item.type !== 'image' && item.url);
 
-    if (!window.html2pdf) {
-      await openIosSwal({ title: 'Impresión no disponible', html: '<p>No pudimos cargar la librería de PDF. Reintentá en unos segundos.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
-      return;
-    }
-
-    const container = document.createElement('div');
-    container.className = 'print-report-container';
-    container.style.cssText = 'position:fixed;left:-99999px;top:0;width:800px;background:#ffffff;color:#1f2a44;padding:24px;font-family:Inter,Arial,sans-serif;';
-
     const imagesHtml = images.length
-      ? images.map((item) => `<figure style="margin:0 0 14px;"><img src="${item.url}" alt="${escapeHtml(item.name || 'Adjunto')}" style="max-width:100%;border-radius:10px;border:1px solid #dbe2f3;"><figcaption style="font-size:12px;color:#5a6482;">${escapeHtml(item.name || 'Imagen')}</figcaption></figure>`).join('')
+      ? (includeImages
+        ? images.map((item) => `<figure style="margin:0 0 14px;"><img src="${item.url}" alt="${escapeHtml(item.name || 'Adjunto')}" style="max-width:100%;border-radius:10px;border:1px solid #dbe2f3;"><figcaption style="font-size:12px;color:#5a6482;">${escapeHtml(item.name || 'Imagen')}</figcaption></figure>`).join('')
+        : `<ul>${images.map((item) => `<li>${escapeHtml(item.name || 'Imagen')}<br><small>${escapeHtml(item.url)}</small></li>`).join('')}</ul>`)
       : '<p style="color:#5a6482;">Sin imágenes adjuntas.</p>';
 
     const docsHtml = docs.length
       ? `<ul>${docs.map((item) => `<li>${escapeHtml(item.name || 'Archivo')}</li>`).join('')}</ul>`
       : '<p style="color:#5a6482;">Sin archivos adjuntos.</p>';
 
-    container.innerHTML = `
+    return `
       <h1 style="margin:0 0 8px;">Informe bromatológico</h1>
       <p style="margin:0 0 4px;"><strong>Usuario:</strong> ${escapeHtml(report.userName || '-')}</p>
       <p style="margin:0 0 4px;"><strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')}</p>
@@ -257,7 +250,40 @@
       <section style="margin-bottom:14px;"><h2 style="font-size:18px;">Imágenes adjuntas</h2>${imagesHtml}</section>
       <section><h2 style="font-size:18px;">Otros adjuntos</h2>${docsHtml}</section>
     `;
+  };
 
+  const printReport = async (report) => {
+    const choice = await openIosSwal({
+      title: 'Imprimir informe',
+      html: '<p>Elegí cómo querés generar el informe.</p>',
+      showDenyButton: true,
+      showCancelButton: true,
+      confirmButtonText: 'Imprimir directo',
+      denyButtonText: 'Descargar PDF',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (choice.isConfirmed) {
+      const popup = window.open('', '_blank', 'noopener,noreferrer,width=980,height=760');
+      if (!popup) return;
+      popup.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Impresión informe</title></head><body style="font-family:Inter,Arial,sans-serif;padding:20px;color:#1f2a44;">${buildPrintWindowHtml(report, true)}<script>window.onload=()=>window.print();<\/script></body></html>`);
+      popup.document.close();
+      return;
+    }
+
+    if (!choice.isDenied) {
+      return;
+    }
+
+    if (!window.html2pdf) {
+      await openIosSwal({ title: 'PDF no disponible', html: '<p>No pudimos cargar la librería de PDF. Reintentá en unos segundos.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+      return;
+    }
+
+    const container = document.createElement('div');
+    container.className = 'print-report-container';
+    container.style.cssText = 'position:fixed;left:-99999px;top:0;width:800px;background:#ffffff;color:#1f2a44;padding:24px;font-family:Inter,Arial,sans-serif;';
+    container.innerHTML = buildPrintWindowHtml(report, false);
     document.body.appendChild(container);
 
     try {
@@ -265,7 +291,7 @@
         margin: 8,
         filename: `informe_${report.id || Date.now()}.pdf`,
         image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true },
+        html2canvas: { scale: 2, useCORS: false },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       }).from(container).save();
     } catch (error) {
@@ -669,12 +695,21 @@
       input: 'password',
       inputClass: 'ios-input informes-key-input',
       inputLabel: 'Ingresá la clave de 4 dígitos',
-      inputAttributes: { maxlength: 4, inputmode: 'numeric' },
+      inputAttributes: { maxlength: 4, inputmode: 'numeric', autocomplete: 'new-password' },
       confirmButtonText: 'Validar',
       showCancelButton: true,
       cancelButtonText: 'Cancelar',
       customClass: {
         popup: 'informes-key-alert'
+      },
+      didOpen: () => {
+        const input = document.querySelector('.swal2-input.informes-key-input');
+        if (input) {
+          input.setAttribute('autocomplete', 'new-password');
+          input.setAttribute('autocorrect', 'off');
+          input.setAttribute('autocapitalize', 'off');
+          input.setAttribute('spellcheck', 'false');
+        }
       },
       preConfirm: (val) => {
         if (!/^\d{4}$/.test(String(val || ''))) {
@@ -911,8 +946,8 @@
         html: '<p>El informe fue almacenado correctamente.</p><p>¿Querés imprimirlo ahora?</p>',
         icon: 'success',
         showCancelButton: true,
-        confirmButtonText: 'Imprimir',
-        cancelButtonText: 'Cerrar'
+        confirmButtonText: 'Sí, imprimir',
+        cancelButtonText: 'No, cerrar'
       });
       if (printChoice.isConfirmed) {
         await printReport(reportPayload);
