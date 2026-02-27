@@ -226,23 +226,53 @@
 
   const getReportPath = (report) => `/informes/${report.year}/${report.month}/${report.day}/${report.id}`;
 
-  const printReport = (report) => {
+  const printReport = async (report) => {
     const attachments = Array.isArray(report?.attachments) ? report.attachments : [];
     const images = attachments.filter((item) => item.type === 'image' && item.url);
     const docs = attachments.filter((item) => item.type !== 'image' && item.url);
-    const popup = window.open('', '_blank', 'noopener,noreferrer,width=980,height=760');
-    if (!popup) return;
+
+    if (!window.html2pdf) {
+      await openIosSwal({ title: 'Impresión no disponible', html: '<p>No pudimos cargar la librería de PDF. Reintentá en unos segundos.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+      return;
+    }
+
+    const container = document.createElement('div');
+    container.className = 'print-report-container';
+    container.style.cssText = 'position:fixed;left:-99999px;top:0;width:800px;background:#ffffff;color:#1f2a44;padding:24px;font-family:Inter,Arial,sans-serif;';
 
     const imagesHtml = images.length
       ? images.map((item) => `<figure style="margin:0 0 14px;"><img src="${item.url}" alt="${escapeHtml(item.name || 'Adjunto')}" style="max-width:100%;border-radius:10px;border:1px solid #dbe2f3;"><figcaption style="font-size:12px;color:#5a6482;">${escapeHtml(item.name || 'Imagen')}</figcaption></figure>`).join('')
       : '<p style="color:#5a6482;">Sin imágenes adjuntas.</p>';
 
     const docsHtml = docs.length
-      ? `<ul>${docs.map((item) => `<li><a href="${item.url}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.name || 'Archivo')}</a></li>`).join('')}</ul>`
+      ? `<ul>${docs.map((item) => `<li>${escapeHtml(item.name || 'Archivo')}</li>`).join('')}</ul>`
       : '<p style="color:#5a6482;">Sin archivos adjuntos.</p>';
 
-    popup.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Impresión informe</title></head><body style="font-family:Inter,Arial,sans-serif;padding:20px;color:#1f2a44;">      <h1 style="margin:0 0 8px;">Informe bromatológico</h1>      <p style="margin:0 0 4px;"><strong>Usuario:</strong> ${escapeHtml(report.userName || '-')}</p>      <p style="margin:0 0 4px;"><strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')}</p>      <p style="margin:0 0 16px;"><strong>Fecha:</strong> ${getDateLabel(report.createdAt)}</p>      <section style="margin-bottom:14px;"><h2 style="font-size:18px;">Contenido</h2><div>${report.html || ''}</div></section>      <section style="margin-bottom:14px;"><h2 style="font-size:18px;">Imágenes adjuntas</h2>${imagesHtml}</section>      <section><h2 style="font-size:18px;">Otros adjuntos</h2>${docsHtml}</section>      <script>window.onload=()=>{window.print();};<\/script>    </body></html>`);
-    popup.document.close();
+    container.innerHTML = `
+      <h1 style="margin:0 0 8px;">Informe bromatológico</h1>
+      <p style="margin:0 0 4px;"><strong>Usuario:</strong> ${escapeHtml(report.userName || '-')}</p>
+      <p style="margin:0 0 4px;"><strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')}</p>
+      <p style="margin:0 0 16px;"><strong>Fecha:</strong> ${getDateLabel(report.createdAt)}</p>
+      <section style="margin-bottom:14px;"><h2 style="font-size:18px;">Contenido</h2><div>${report.html || ''}</div></section>
+      <section style="margin-bottom:14px;"><h2 style="font-size:18px;">Imágenes adjuntas</h2>${imagesHtml}</section>
+      <section><h2 style="font-size:18px;">Otros adjuntos</h2>${docsHtml}</section>
+    `;
+
+    document.body.appendChild(container);
+
+    try {
+      await window.html2pdf().set({
+        margin: 8,
+        filename: `informe_${report.id || Date.now()}.pdf`,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      }).from(container).save();
+    } catch (error) {
+      await openIosSwal({ title: 'Error al generar PDF', html: '<p>No se pudo generar el PDF del informe.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+    } finally {
+      container.remove();
+    }
   };
 
   const getImportanceValue = () => {
@@ -878,14 +908,14 @@
       await loadReportsBoard();
       const printChoice = await openIosSwal({
         title: 'Informe guardado',
-        html: '<p>El informe fue almacenado correctamente en Firebase.</p><p>¿Querés imprimirlo ahora?</p>',
+        html: '<p>El informe fue almacenado correctamente.</p><p>¿Querés imprimirlo ahora?</p>',
         icon: 'success',
         showCancelButton: true,
         confirmButtonText: 'Imprimir',
         cancelButtonText: 'Cerrar'
       });
       if (printChoice.isConfirmed) {
-        printReport(reportPayload);
+        await printReport(reportPayload);
       }
     } catch (error) {
       await openIosSwal({ title: 'Error al guardar', html: '<p>No se pudo guardar el informe. Reintentá.</p>', icon: 'error', confirmButtonText: 'Entendido' });
@@ -1827,7 +1857,7 @@
       if (!report) return;
 
       if (event.target.closest('[data-print-report]')) {
-        printReport(report);
+        await printReport(report);
         return;
       }
       if (event.target.closest('[data-view-report]')) {

@@ -2409,22 +2409,23 @@ html.login-protected.auth-ok body {
 
 .attachment-delete-confirm {
   position: absolute;
-  inset: auto 6px 6px 6px;
+  inset: auto 4px 4px 4px;
   display: flex;
-  gap: 6px;
+  gap: 4px;
   z-index: 4;
 }
 
 .attachment-delete-btn {
   flex: 1;
   border-radius: 8px;
-  min-height: 26px;
+  min-height: 24px;
   border: 1px solid #d3dcf1;
-  font-size: 0.72rem;
+  font-size: 0.67rem;
   font-weight: 700;
-  padding: 2px 6px;
+  padding: 2px 4px;
   background: #eef3ff;
   color: #345d9f;
+  white-space: nowrap;
 }
 
 .attachment-delete-btn.yes {
