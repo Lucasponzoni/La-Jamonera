@@ -140,25 +140,59 @@
 
                 <div class="editor-wrap">
                   <div class="editor-toolbar" role="toolbar" aria-label="Herramientas de edición">
-                    <button type="button" class="editor-btn" data-cmd="bold"><b>B</b></button>
-                    <button type="button" class="editor-btn" data-cmd="underline"><u>U</u></button>
-                    <button type="button" class="editor-btn" data-cmd="hiliteColor" data-value="#fff59d"><i class="fa-solid fa-highlighter"></i></button>
+                    <button type="button" class="editor-btn" data-cmd="bold" title="Negrita"><i class="fa-solid fa-bold"></i></button>
+                    <button type="button" class="editor-btn" data-cmd="italic" title="Cursiva"><i class="fa-solid fa-italic"></i></button>
+                    <button type="button" class="editor-btn" data-cmd="underline" title="Subrayado"><i class="fa-solid fa-underline"></i></button>
+                    <button type="button" class="editor-btn" data-cmd="strikeThrough" title="Tachado"><i class="fa-solid fa-strikethrough"></i></button>
+
+                    <select id="formatBlockSelect" class="editor-select" aria-label="Tipo de texto">
+                      <option value="P">Normal</option>
+                      <option value="H3">Título</option>
+                      <option value="H4">Subtítulo</option>
+                      <option value="BLOCKQUOTE">Cita</option>
+                    </select>
+
                     <select id="fontSizeSelect" class="editor-select">
-                      <option value="3">Tamaño base</option>
+                      <option value="3">Normal</option>
                       <option value="2">Pequeño</option>
                       <option value="4">Grande</option>
                       <option value="5">Muy grande</option>
                     </select>
-                    <button type="button" class="editor-btn" data-emoji="✅">✅</button>
-                    <button type="button" class="editor-btn" data-emoji="⚠️">⚠️</button>
-                    <button type="button" class="editor-btn" data-emoji="🧪">🧪</button>
+
+                    <label class="editor-color-wrap" title="Color de texto">
+                      <i class="fa-solid fa-font"></i>
+                      <input id="textColorInput" type="color" class="editor-color-input" value="#2a3556" aria-label="Color de texto">
+                    </label>
+                    <label class="editor-color-wrap" title="Color de resaltado">
+                      <i class="fa-solid fa-highlighter"></i>
+                      <input id="highlightColorInput" type="color" class="editor-color-input" value="#fff59d" aria-label="Color de resaltado">
+                    </label>
+                    <button type="button" class="editor-btn" id="applyHighlightBtn" title="Aplicar resaltado"><i class="fa-solid fa-highlighter"></i></button>
+                    <button type="button" class="editor-btn" data-cmd="removeFormat" title="Quitar formato"><i class="fa-solid fa-eraser"></i></button>
+                    <button type="button" class="editor-btn" data-cmd="insertUnorderedList" title="Lista con viñetas"><i class="fa-solid fa-list-ul"></i></button>
+                    <button type="button" class="editor-btn" data-cmd="insertOrderedList" title="Lista numerada"><i class="fa-solid fa-list-ol"></i></button>
+                    <button type="button" class="editor-btn" data-cmd="justifyLeft" title="Alinear a izquierda"><i class="fa-solid fa-align-left"></i></button>
+                    <button type="button" class="editor-btn" data-cmd="justifyCenter" title="Alinear al centro"><i class="fa-solid fa-align-center"></i></button>
+                    <button type="button" class="editor-btn" data-cmd="justifyRight" title="Alinear a derecha"><i class="fa-solid fa-align-right"></i></button>
+                    <button type="button" class="editor-btn" data-cmd="justifyFull" title="Justificar"><i class="fa-solid fa-align-justify"></i></button>
+
+                    <div class="emoji-picker-wrap">
+                      <button type="button" class="editor-btn" id="toggleEmojiPanel" title="Insertar emoji"><i class="fa-regular fa-face-smile"></i></button>
+                      <div id="emojiPanel" class="emoji-panel" aria-label="Selector de emojis"></div>
+                    </div>
                   </div>
-                  <div id="informeEditor" class="informe-editor" contenteditable="true" aria-label="Editor de texto enriquecido"></div>
+                  <div id="informeEditor" class="informe-editor" contenteditable="true" aria-label="Editor de texto enriquecido" data-placeholder="Escribí el informe acá..."></div>
+                </div>
+
+                <div class="editor-preview-wrap">
+                  <h6 class="editor-preview-title">Texto vista previa</h6>
+                  <div id="informePreview" class="informe-preview">Texto vista previa</div>
                 </div>
 
                 <div class="importance-wrap">
                   <label class="form-label" for="importanceRange">Importancia sanitaria</label>
                   <input id="importanceRange" type="range" min="0" max="100" value="50" class="importance-range">
+                  <div id="importanceLabel" class="importance-label">Normal 😐</div>
                 </div>
 
                 <div class="attachments-wrap">
@@ -172,7 +206,11 @@
                   <div id="attachmentsGrid" class="attachments-grid"></div>
                 </div>
 
-                <div class="d-flex justify-content-end mt-3">
+                <div class="d-flex justify-content-end gap-2 mt-3">
+                  <button id="clearInformeBtn" type="button" class="btn ios-btn ios-btn-secondary">
+                    <i class="fa-solid fa-eraser"></i>
+                    <span>Borrar todo el informe</span>
+                  </button>
                   <button id="saveInformeBtn" type="button" class="btn ios-btn ios-btn-success">
                     <i class="fa-solid fa-floppy-disk"></i>
                     <span>Guardar informe</span>
