@@ -68,8 +68,10 @@
   const normalizeLower = (value) => normalizeValue(value).toLowerCase();
   const makeId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
+  const getSwalTarget = () => (informesModal && informesModal.classList.contains('show') ? informesModal : document.body);
+
   const openIosSwal = (options) => Swal.fire({
-    target: informesModal,
+    target: getSwalTarget(),
     ...options,
     customClass: {
       popup: `ios-alert informes-alert ${options?.customClass?.popup || ''}`.trim(),
@@ -188,6 +190,15 @@
     if (Array.isArray(comments)) return comments.length;
     if (typeof comments === 'object') return Object.keys(comments).length;
     return 0;
+  };
+
+  const getImportanceMeta = (importanceValue) => {
+    const value = Number(importanceValue || 50);
+    if (value <= 28) return { label: 'Muy bueno 🙂', tone: 'ok' };
+    if (value <= 56) return { label: 'Normal 😐', tone: 'normal' };
+    if (value <= 70) return { label: 'Atención 😶', tone: 'warn' };
+    if (value <= 84) return { label: 'Importante ⚠️', tone: 'high' };
+    return { label: 'Muy importante 🚨', tone: 'critical' };
   };
 
   const getReportPath = (report) => `/informes/${report.year}/${report.month}/${report.day}/${report.id}`;
@@ -364,9 +375,9 @@
           const reports = daysObj[day] || {};
           Object.keys(reports).forEach((id) => {
             const report = reports[id];
-            if (report && typeof report === 'object' && report.id && report.userId) {
-              output.push({ ...report, year, month, day });
-            }
+            if (!report || typeof report !== 'object') return;
+            if (!report.html && !report.createdAt) return;
+            output.push({ ...report, id: report.id || id, year, month, day });
           });
         });
       });
@@ -399,33 +410,47 @@
 
     const totalPages = Math.max(1, Math.ceil(source.length / REPORTS_PER_PAGE));
     state.currentPage = Math.min(state.currentPage, totalPages);
-    const start = (state.currentPage - 1) * REPORTS_PER_PAGE;
-    const pageItems = source.slice(start, start + REPORTS_PER_PAGE);
+    const startAt = (state.currentPage - 1) * REPORTS_PER_PAGE;
+    const pageItems = source.slice(startAt, startAt + REPORTS_PER_PAGE);
 
     informesCardsGrid.innerHTML = pageItems.map((report) => {
       const user = state.users[report.userId] || {};
       const attachments = Array.isArray(report.attachments) ? report.attachments : [];
+      const imageCount = attachments.filter((item) => item.type === 'image').length;
+      const docCount = Math.max(0, attachments.length - imageCount);
       const commentsCount = getCommentsCount(report);
+      const importance = getImportanceMeta(report.importance);
+      const displayName = user.fullName || report.userName || 'Usuario';
+      const displayUser = user.fullName ? user : { fullName: displayName, photoUrl: '' };
+
       return `
         <article class="informe-card" data-report-id="${report.id}" data-year="${report.year}" data-month="${report.month}" data-day="${report.day}">
           <div class="informe-card-head">
-            <span class="informe-card-date">${getDateLabel(report.createdAt)}</span>
-            <span class="informe-card-comments ${commentsCount ? 'has-comments' : ''}">${commentsCount ? `💬 ${commentsCount} comentario(s)` : 'Sin comentarios'}</span>
+            <span class="informe-card-date"><i class="fa-regular fa-calendar"></i> ${getDateLabel(report.createdAt)}</span>
+            <span class="informe-card-comments ${commentsCount ? 'has-comments' : 'no-comments'}"><i class="fa-solid ${commentsCount ? 'fa-comment-dots' : 'fa-comment-slash'}"></i> ${commentsCount ? `${commentsCount} comentario(s)` : 'Sin comentarios'}</span>
           </div>
+
           <div class="informe-card-preview">${report.html || '<p>Sin contenido</p>'}</div>
+
           <div class="informe-card-meta">
-            <span><i class="fa-solid fa-paperclip"></i> ${attachments.length} adjunto(s)</span>
-            <span>${report.importance || 50}%</span>
+            <span class="informe-attach-chip"><i class="fa-regular fa-image"></i> ${imageCount}</span>
+            <span class="informe-attach-chip"><i class="fa-regular fa-file-lines"></i> ${docCount}</span>
+            <span class="importance-chip importance-${importance.tone}">${Number(report.importance || 50)}% · ${importance.label}</span>
           </div>
+
           <div class="informe-card-user">
-            ${renderUserAvatar(user.fullName ? user : { fullName: report.userName || 'Usuario', photoUrl: '' })}
-            <strong>${escapeHtml(user.fullName || report.userName || 'Usuario')}</strong>
+            ${renderUserAvatar(displayUser)}
+            <div class="informe-card-user-text">
+              <strong>${escapeHtml(displayName)}</strong>
+              <small>${escapeHtml(user.position || report.userPosition || 'Sin puesto')}</small>
+            </div>
           </div>
+
           <div class="informe-card-actions">
             <button class="btn ios-btn ios-btn-primary" type="button" data-view-report="${report.id}">Ver informe completo</button>
-            <button class="btn ios-btn ios-btn-secondary" type="button" data-edit-report="${report.id}">Editar</button>
-            <button class="btn ios-btn ios-btn-secondary" type="button" data-comment-report="${report.id}">Comentar</button>
-            <button class="btn ios-btn ios-btn-secondary" type="button" data-delete-report="${report.id}">Borrar</button>
+            <button class="btn informe-icon-btn" type="button" data-comment-report="${report.id}" title="Comentar"><i class="fa-regular fa-message"></i></button>
+            <button class="btn informe-icon-btn" type="button" data-edit-report="${report.id}" title="Editar"><i class="fa-solid fa-pen"></i></button>
+            <button class="btn informe-icon-btn danger" type="button" data-delete-report="${report.id}" title="Borrar"><i class="fa-solid fa-trash"></i></button>
           </div>
         </article>
       `;
@@ -462,6 +487,9 @@
         state.filteredReports = [];
       }
       renderReportsBoard();
+      if (reportsFilterPicker) {
+        reportsFilterPicker.redraw();
+      }
     } catch (error) {
       setBoardState('empty');
       informesBoardEmpty.textContent = 'No hay informes para cargar';
@@ -820,6 +848,8 @@
         <div class="report-viewer">
           <div class="report-viewer-meta">
             <p><strong>Creador:</strong> ${escapeHtml(report.userName || '')}</p>
+            <p><strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')}</p>
+            <p><strong>Email:</strong> ${escapeHtml(report.userEmail || '-')}</p>
             <p><strong>Fecha:</strong> ${getDateLabel(report.createdAt)}</p>
           </div>
           <div class="report-viewer-content">${report.html || ''}</div>
@@ -1347,7 +1377,7 @@
   textColorInput.addEventListener('change', persistDraft);
   highlightColorInput.addEventListener('change', persistDraft);
 
-  loadReportsBoard();
+  window.laJamoneraReady.then(() => loadReportsBoard()).catch(() => setBoardState('empty'));
 
 
 
@@ -1390,7 +1420,16 @@
       mode: 'range',
       dateFormat: 'Y-m-d',
       locale: window.flatpickr?.l10ns?.es || undefined,
-      onDayCreate: (_dObj, _dStr, fp, dayElem) => {
+      positionElement: openFilterInformesBtn,
+      appendTo: openFilterInformesBtn.parentElement,
+      disableMobile: true,
+      onReady: (_dates, _str, fp) => {
+        fp.calendarContainer.classList.add('informes-filter-calendar');
+      },
+      onOpen: (_dates, _str, fp) => {
+        fp.redraw();
+      },
+      onDayCreate: (_dObj, _dStr, _fp, dayElem) => {
         const dateObj = dayElem.dateObj;
         if (!dateObj) return;
         const key = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
@@ -1410,6 +1449,7 @@
 
     openFilterInformesBtn.addEventListener('click', () => {
       if (reportsFilterPicker) {
+        reportsFilterPicker.redraw();
         reportsFilterPicker.open();
       }
     });
