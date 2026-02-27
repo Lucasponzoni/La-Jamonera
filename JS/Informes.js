@@ -132,11 +132,54 @@
     });
   };
 
+  const toggleScrollHint = (element) => {
+    if (!element) {
+      return;
+    }
+    const hasOverflow = element.scrollHeight > element.clientHeight + 4;
+    const nearBottom = element.scrollTop + element.clientHeight >= element.scrollHeight - 6;
+    element.classList.toggle('has-scroll-hint', hasOverflow && !nearBottom);
+  };
+
+  const setCollapsedSelection = (node, offset = 0) => {
+    const selection = window.getSelection();
+    if (!selection) return;
+    const range = document.createRange();
+    range.setStart(node, offset);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  };
+
+  const createPlainWrapper = (text = '​') => {
+    const span = document.createElement('span');
+    span.className = 'editor-plain-text';
+    span.textContent = text || '​';
+    return span;
+  };
+
+  const ensurePlainTypingContext = () => {
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) {
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    if (!range.collapsed || !informeEditor.contains(range.startContainer)) {
+      return;
+    }
+
+    const plain = createPlainWrapper();
+    range.insertNode(plain);
+    setCollapsedSelection(plain.firstChild, plain.firstChild.length);
+  };
+
   const renderUsers = () => {
     const users = Object.values(state.users).sort((a, b) => String(a.fullName).localeCompare(String(b.fullName)));
 
     if (!users.length) {
       informesUsersList.innerHTML = '<div class="informes-empty">No hay usuarios cargados.</div>';
+      informesUsersList.classList.remove('has-scroll-hint');
       renderUserSelect();
       return;
     }
@@ -145,8 +188,11 @@
       <div class="informe-user-circle-wrap">
         <article class="informe-user-circle" data-user-id="${user.id}">
           ${renderUserAvatar(user)}
-          <h6>${user.fullName}</h6>
-          <p>${user.position}</p>
+          <i class="bi bi-person-fill informe-user-item-icon" aria-hidden="true"></i>
+          <div class="informe-user-main">
+            <h6>${user.fullName}</h6>
+            <p>${user.position}</p>
+          </div>
         </article>
         <div class="informe-user-actions">
           <button class="family-manage-btn" type="button" data-user-edit="${user.id}" title="Editar usuario"><i class="fa-solid fa-pen"></i></button>
@@ -157,6 +203,7 @@
 
     renderUserSelect();
     prepareThumbLoaders('.js-user-photo');
+    toggleScrollHint(informesUsersList);
   };
 
   const renderUserSelect = () => {
@@ -164,7 +211,7 @@
     const current = informeUserSelect.value;
 
     const options = users.map((user) => `<option value="${user.id}">${user.fullName} (${user.position})</option>`).join('');
-    informeUserSelect.innerHTML = `<option value="">Seleccioná un usuario</option>${options}<option value="create">Cargar usuario</option>`;
+    informeUserSelect.innerHTML = `<option value="">Seleccioná un usuario</option>${options}<option value="create">Crear usuario</option>`;
 
     if (current && state.users[current]) {
       informeUserSelect.value = current;
@@ -240,11 +287,15 @@
     const keyCheck = await openIosSwal({
       title: 'Verificar clave',
       input: 'password',
+      inputClass: 'ios-input informes-key-input',
       inputLabel: 'Ingresá la clave de 4 dígitos',
       inputAttributes: { maxlength: 4, inputmode: 'numeric' },
       confirmButtonText: 'Validar',
       showCancelButton: true,
       cancelButtonText: 'Cancelar',
+      customClass: {
+        popup: 'informes-key-alert'
+      },
       preConfirm: (val) => {
         if (!/^\d{4}$/.test(String(val || ''))) {
           Swal.showValidationMessage('La clave debe tener 4 dígitos numéricos.');
@@ -403,11 +454,11 @@
 
     Swal.fire({
       title: 'Guardando informe...',
-      html: '<img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner-login">',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner-login"></div>',
       allowOutsideClick: false,
       allowEscapeKey: false,
       showConfirmButton: false,
-      customClass: { popup: 'ios-alert informes-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' }
+      customClass: { popup: 'ios-alert informes-alert informes-saving-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' }
     });
 
     try {
@@ -497,7 +548,7 @@
     fontSizeSelect.value = '3';
     formatBlockSelect.value = 'P';
     textColorInput.value = '#000000';
-    highlightColorInput.value = '#fff59d';
+    highlightColorInput.value = '#ffffff';
   };
 
   const clearTypingStates = () => {
@@ -512,17 +563,31 @@
   };
 
   const applyEditorCommand = (cmd, value = null) => {
+    const selection = window.getSelection();
+    const hasSelection =
+      selection
+      && selection.rangeCount > 0
+      && !selection.isCollapsed
+      && informeEditor.contains(selection.anchorNode)
+      && informeEditor.contains(selection.focusNode);
+
     informeEditor.focus();
     if (cmd === 'removeFormat') {
-      document.execCommand('removeFormat', false);
-      document.execCommand('styleWithCSS', false, true);
-      document.execCommand('hiliteColor', false, 'transparent');
-      document.execCommand('backColor', false, 'transparent');
-      document.execCommand('foreColor', false, '#000000');
-      document.execCommand('fontSize', false, '3');
-      document.execCommand('formatBlock', false, '<P>');
+      if (hasSelection && selection.rangeCount) {
+        const range = selection.getRangeAt(0);
+        const plainText = range.toString();
+        range.deleteContents();
+        const plainNode = createPlainWrapper(plainText);
+        range.insertNode(plainNode);
+        setCollapsedSelection(plainNode.firstChild, plainNode.firstChild.length);
+      }
+
       clearTypingStates();
       resetEditorControls();
+      ensurePlainTypingContext();
+      updateToolbarState();
+      updatePreview();
+      return;
     } else if (cmd === 'formatBlock') {
       document.execCommand('formatBlock', false, `<${value}>`);
     } else if (cmd === 'hiliteColor') {
@@ -768,6 +833,17 @@
     }
   });
 
+  informesUsersList.addEventListener('scroll', () => {
+    toggleScrollHint(informesUsersList);
+  });
+
+  const informesModalBody = informesModal.querySelector('.ios-modal-body');
+  if (informesModalBody) {
+    informesModalBody.addEventListener('scroll', () => {
+      toggleScrollHint(informesModalBody);
+    });
+  }
+
   saveInformeBtn.addEventListener('click', saveInforme);
 
   clearInformeBtn.addEventListener('click', async () => {
@@ -778,7 +854,10 @@
       showCancelButton: true,
       confirmButtonText: 'Solo texto',
       denyButtonText: 'Texto y adjuntos',
-      cancelButtonText: 'Cancelar'
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        popup: 'informes-clear-alert'
+      }
     });
 
     if (answer.isConfirmed || answer.isDenied) {
@@ -797,7 +876,15 @@
     }
   });
 
-  informeEditor.addEventListener('input', () => { updatePreview(); persistDraft(); });
+  informeEditor.addEventListener('input', () => {
+    informeEditor.querySelectorAll('.editor-plain-text').forEach((node) => {
+      if (node.textContent === '\u200B') {
+        node.remove();
+      }
+    });
+    updatePreview();
+    persistDraft();
+  });
   informeEditor.addEventListener('keyup', updateToolbarState);
   informeEditor.addEventListener('mouseup', updateToolbarState);
   document.addEventListener('selectionchange', () => {
@@ -865,5 +952,9 @@
     updateImportanceLabel();
     await loadData();
     await restoreDraft();
+    const informesModalBody = informesModal.querySelector('.ios-modal-body');
+    if (informesModalBody) {
+      toggleScrollHint(informesModalBody);
+    }
   });
 })();
