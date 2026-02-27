@@ -252,34 +252,21 @@
     reader.readAsDataURL(blob);
   });
 
-  const fetchImageAsDataUrl = async (url) => {
-    const safeUrl = normalizeValue(url);
-    if (!safeUrl) {
-      throw new Error('image_url_missing');
-    }
-
-    const response = await fetch(safeUrl);
-    if (!response.ok) {
-      throw new Error(`image_fetch_error_${response.status}`);
-    }
-
-    const blob = await response.blob();
-    return blobToDataUrl(blob);
-  };
-
   const buildAttachmentImageBlocks = async (images) => {
     const blocks = [];
 
     for (const item of images) {
-      try {
-        const dataUrl = await fetchImageAsDataUrl(item.url);
+      const inlineDataUrl = normalizeValue(item.printDataUrl || item.dataUrl);
+      if (inlineDataUrl) {
         blocks.push({ text: item.name || 'Imagen adjunta', margin: [0, 0, 0, 4], bold: true, color: '#2a3556' });
-        blocks.push({ image: dataUrl, fit: [520, 320], margin: [0, 0, 0, 10] });
-      } catch (error) {
-        blocks.push({ text: `${item.name || 'Imagen'} (no se pudo incrustar)`, margin: [0, 0, 0, 2], color: '#8b5a3c' });
-        if (item.url) {
-          blocks.push({ text: item.url, link: item.url, color: '#1d4ed8', margin: [0, 0, 0, 10] });
-        }
+        blocks.push({ image: inlineDataUrl, fit: [520, 320], margin: [0, 0, 0, 10] });
+        continue;
+      }
+
+      blocks.push({ text: `${item.name || 'Imagen'} (no disponible para impresión)`, margin: [0, 0, 0, 2], color: '#8b5a3c' });
+      blocks.push({ text: 'Para evitar errores CORS, esta imagen se imprime cuando el informe guarda un campo printDataUrl.', margin: [0, 0, 0, 2], color: '#5a6482' });
+      if (item.url) {
+        blocks.push({ text: item.url, link: item.url, color: '#1d4ed8', margin: [0, 0, 0, 10] });
       }
     }
 
@@ -841,6 +828,44 @@
     return ref.getDownloadURL();
   };
 
+  const imageFileToPrintDataUrl = async (file) => {
+    if (!file || !String(file.type || '').startsWith('image/')) {
+      return '';
+    }
+
+    const rawDataUrl = await blobToDataUrl(file);
+    if (!rawDataUrl) {
+      return '';
+    }
+
+    return await new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const maxWidth = 1280;
+          const maxHeight = 1280;
+          const ratio = Math.min(maxWidth / img.width, maxHeight / img.height, 1);
+          const width = Math.max(1, Math.round(img.width * ratio));
+          const height = Math.max(1, Math.round(img.height * ratio));
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(rawDataUrl);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.82));
+        } catch (error) {
+          resolve(rawDataUrl);
+        }
+      };
+      img.onerror = () => resolve(rawDataUrl);
+      img.src = rawDataUrl;
+    });
+  };
+
   const promptUserKey = async () => {
     const keyCheck = await openIosSwal({
       title: 'Verificar clave',
@@ -1048,7 +1073,8 @@
           type: item.type,
           mime: item.file.type,
           size: item.file.size,
-          url
+          url,
+          printDataUrl: item.type === 'image' ? await imageFileToPrintDataUrl(item.file) : ''
         });
       }
 
@@ -1430,17 +1456,22 @@
       uploadedMap.set(item.tmpId, url);
     }
 
-    const finalAttachments = currentAttachments.map((item) => {
-      if (!item.isLocal) return item;
+    const finalAttachments = [];
+    for (const item of currentAttachments) {
+      if (!item.isLocal) {
+        finalAttachments.push(item);
+        continue;
+      }
       const source = localUploads.find((upload) => upload.tmpId === item.id);
-      return {
+      finalAttachments.push({
         name: item.name,
         type: item.type,
         mime: item.mime || source?.file?.type || '',
         size: item.size || source?.file?.size || 0,
-        url: uploadedMap.get(item.id) || item.url
-      };
-    });
+        url: uploadedMap.get(item.id) || item.url,
+        printDataUrl: source?.file && item.type === 'image' ? await imageFileToPrintDataUrl(source.file) : ''
+      });
+    }
 
     currentAttachments.forEach((item) => {
       if (item.isLocal && item.url) URL.revokeObjectURL(item.url);
