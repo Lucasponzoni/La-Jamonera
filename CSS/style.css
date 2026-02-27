@@ -1800,6 +1800,17 @@ html.login-protected.auth-ok body {
 
 .informe-user-main {
   min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.informe-user-main .email-user {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: #7b86a4;
+  line-height: 1.25;
+  word-break: break-word;
 }
 
 .informe-user-main h6 {
@@ -2243,9 +2254,10 @@ html.login-protected.auth-ok body {
 .report-comment-item {
   border: 1px solid #d7def1;
   border-radius: 12px;
-  padding: 8px 10px;
+  padding: 8px 10px 8px 12px;
   background: #f8faff;
   text-align: left;
+  border-left: 4px solid var(--comment-accent, #2f6fd6);
 }
 
 .report-comment-head {
@@ -2266,7 +2278,7 @@ html.login-protected.auth-ok body {
 .report-comment-replies {
   margin-top: 8px;
   padding-left: 10px;
-  border-left: 2px solid #dce3f5;
+  border-left: 2px dashed rgba(74, 104, 170, 0.45);
   display: grid;
   gap: 8px;
 }
@@ -2286,8 +2298,12 @@ html.login-protected.auth-ok body {
   color: #2a3556;
 }
 
+.report-comment-item[data-comment-level]:not([data-comment-level="0"]) {
+  background: #f3f6ff;
+}
+
 .report-comment-item[data-comment-level]:not([data-comment-level="0"]) .report-comment-text {
-  color: #4f5f84;
+  color: #415174;
 }
 
 .report-comment-form label {
@@ -2321,4 +2337,57 @@ html.login-protected.auth-ok body {
 
 .report-edit-toolbar {
   margin-bottom: 10px;
+}
+
+#clearFilterInformesBtn {
+  position: relative;
+  z-index: 120;
+  order: -1;
+}
+
+.report-comment-item.is-reply .report-comment-head strong {
+  font-size: 0.95rem;
+}
+
+.report-edit-add-btn {
+  background: #fff4e8;
+  border-color: #f6c18a;
+  color: #b76307;
+}
+
+.report-edit-add-btn:hover {
+  background: #ffe8d0;
+  border-color: #eba45f;
+  color: #9b4f00;
+}
+
+.remove-attachment-btn.is-image {
+  border-color: #f0b4c6;
+  background: #fff1f6;
+  color: #ce3b6a;
+}
+
+.remove-attachment-btn.is-doc {
+  border-color: #cfdcf7;
+  background: #eef3ff;
+  color: #2e5db0;
+}
+
+@media (max-width: 768px) {
+  .report-comments-head {
+    gap: 6px;
+  }
+
+  .report-comments-wrap h6 {
+    min-width: 0;
+  }
+
+  .report-comments-title-text {
+    display: none;
+  }
+
+  .report-add-comment-btn {
+    padding-inline: 10px;
+    min-width: auto;
+  }
 }

@@ -235,6 +235,18 @@
 
   const sortComments = (comments) => [...comments].sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
 
+  const commentAccentFromUserId = (userId) => {
+    const seed = String(userId || 'anon');
+    let hash = 0;
+    for (let i = 0; i < seed.length; i += 1) {
+      hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+      hash |= 0;
+    }
+    const palette = ['#2f6fd6', '#20a36b', '#b56a15', '#7f57d9', '#d14e69', '#0e8f9a'];
+    const idx = Math.abs(hash) % palette.length;
+    return palette[idx];
+  };
+
   const setCollapsedSelection = (node, offset = 0) => {
     const selection = window.getSelection();
     if (!selection) return;
@@ -890,8 +902,9 @@
 
     const date = getDateLabel(comment.createdAt);
     const replies = Array.isArray(comment.replies) ? comment.replies : [];
+    const accent = commentAccentFromUserId(comment.userId || comment.userName || 'anon');
     return `
-      <article class="report-comment-item" data-comment-id="${comment.id}" data-comment-level="${level}">
+      <article class="report-comment-item ${level > 0 ? 'is-reply' : ''}" style="--comment-accent:${accent};" data-comment-id="${comment.id}" data-comment-level="${level}">
         <header class="report-comment-head">
           <strong>${author}</strong>
           <small>${date}</small>
@@ -938,7 +951,7 @@
           <div class="attachments-grid">${attachmentHtml}</div>
           <section class="report-comments-wrap">
             <div class="report-comments-head">
-              <h6>Comentarios</h6>
+              <h6><i class="fa-regular fa-comments"></i> <span class="report-comments-title-text">Comentarios</span></h6>
               <button type="button" class="btn ios-btn ios-btn-secondary report-add-comment-btn" data-comment-from-viewer="1">Comentar</button>
             </div>
             ${buildCommentsPanel(report)}
@@ -963,14 +976,14 @@
         const addCommentBtn = popup.querySelector('[data-comment-from-viewer]');
         addCommentBtn?.addEventListener('click', async () => {
           Swal.close();
-          await addCommentToReport(report);
+          await addCommentToReport(report, null, { returnToViewer: true });
         });
 
         popup.querySelectorAll('[data-reply-comment]').forEach((node) => {
           node.addEventListener('click', async (event) => {
             const commentId = String(event.currentTarget.dataset.replyComment || '');
             Swal.close();
-            await addCommentToReport(report, commentId);
+            await addCommentToReport(report, commentId, { returnToViewer: true });
           });
         });
       }
@@ -1010,12 +1023,12 @@
                 ${item.type === 'image'
                   ? `<img src="${item.url}" alt="${escapeHtml(item.name)}" class="attachment-image is-loaded">`
                   : `<i class="bi bi-file-earmark"></i><span>${escapeHtml(item.name)}</span>`}
-                <button type="button" class="btn remove-attachment-btn" data-remove-edit-attachment="${idx}" title="Quitar adjunto"><i class="fa-solid fa-xmark"></i></button>
+                <button type="button" class="btn remove-attachment-btn ${item.type === 'image' ? 'is-image' : 'is-doc'}" data-remove-edit-attachment="${idx}" title="Quitar adjunto">${item.type === 'image' ? '<i class="fa-solid fa-circle-xmark"></i>' : '<i class="fa-solid fa-trash-can"></i>'}</button>
               </article>
             `).join('') : '<div class="informes-empty">Sin adjuntos</div>'}
           </div>
           <div class="mt-2 d-flex justify-content-end">
-            <button type="button" id="editAddAttachmentsBtn" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-paperclip"></i> Agregar adjuntos</button>
+            <button type="button" id="editAddAttachmentsBtn" class="btn ios-btn ios-btn-secondary report-edit-add-btn"><i class="fa-solid fa-paperclip"></i> Agregar adjuntos</button>
             <input id="editAttachmentsInput" type="file" class="d-none" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt">
           </div>
         </div>
@@ -1057,7 +1070,7 @@
                 ${item.type === 'image'
                   ? `<img src="${item.url}" alt="${escapeHtml(item.name)}" class="attachment-image is-loaded">`
                   : `<i class="bi bi-file-earmark"></i><span>${escapeHtml(item.name)}</span>`}
-                <button type="button" class="btn remove-attachment-btn" data-remove-edit-attachment="${idx}" title="Quitar adjunto"><i class="fa-solid fa-xmark"></i></button>
+                <button type="button" class="btn remove-attachment-btn ${item.type === 'image' ? 'is-image' : 'is-doc'}" data-remove-edit-attachment="${idx}" title="Quitar adjunto">${item.type === 'image' ? '<i class="fa-solid fa-circle-xmark"></i>' : '<i class="fa-solid fa-trash-can"></i>'}</button>
               </article>
             `).join('')
             : '<div class="informes-empty">Sin adjuntos</div>';
@@ -1188,6 +1201,13 @@
     await loadReportsBoard();
   };
 
+  const reopenReportViewerById = async (reportId) => {
+    const report = findReportById(reportId);
+    if (report) {
+      await openReportViewer(report);
+    }
+  };
+
   const findCommentById = (comments, commentId) => {
     for (const comment of comments) {
       if (comment.id === commentId) return comment;
@@ -1198,18 +1218,18 @@
     return null;
   };
 
-  const addCommentToReport = async (report, parentCommentId = null) => {
+  const addCommentToReport = async (report, parentCommentId = null, options = {}) => {
     const canContinue = await ensureUsersAvailableForComment();
     if (!canContinue) return;
     const users = Object.values(state.users);
-    const options = [
+    const optionsHtml = [
       '<option value="">Seleccioná un usuario</option>',
       ...users.map((user) => `<option value="${user.id}">${escapeHtml(user.fullName)}</option>`),
       '<option value="create">Crear nuevo usuario</option>'
     ].join('');
     const commentPrompt = await openIosSwal({
       title: parentCommentId ? 'Responder comentario' : 'Nuevo comentario',
-      html: `<div class="text-start report-comment-form"><label>Usuario</label><select id="commentUser" class="form-select ios-input mb-2">${options}</select><label>Comentario</label><textarea id="commentText" class="swal2-textarea ios-input" placeholder="Escribí tu comentario"></textarea></div>`,
+      html: `<div class="text-start report-comment-form"><label>Usuario</label><select id="commentUser" class="form-select ios-input mb-2">${optionsHtml}</select><label>Comentario</label><textarea id="commentText" class="swal2-textarea ios-input" placeholder="Escribí tu comentario"></textarea><label>Clave</label><input id="commentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos"></div>`,
       showCancelButton: true,
       confirmButtonText: 'Continuar',
       cancelButtonText: 'Cancelar',
@@ -1232,6 +1252,7 @@
       preConfirm: () => {
         const userId = normalizeValue(document.getElementById('commentUser').value);
         const text = normalizeValue(document.getElementById('commentText').value);
+        const pin = normalizeValue(document.getElementById('commentPin').value);
         if (!userId || !state.users[userId]) {
           Swal.showValidationMessage('Seleccioná un usuario.');
           return false;
@@ -1240,19 +1261,25 @@
           Swal.showValidationMessage('Escribí un comentario.');
           return false;
         }
-        return { userId, text };
+        if (!/^\d{4}$/.test(pin)) {
+          Swal.showValidationMessage('Ingresá una clave válida de 4 dígitos.');
+          return false;
+        }
+        if (pin !== String(state.users[userId].pin || '')) {
+          Swal.showValidationMessage('Clave incorrecta. Volvé a intentarlo.');
+          return false;
+        }
+        return { userId, text, pin };
       }
     });
-    if (!commentPrompt.isConfirmed) return;
-
-    const author = state.users[commentPrompt.value.userId];
-    const pinCheck = await promptUserKey();
-    if (!pinCheck.isConfirmed || pinCheck.value !== author.pin) {
-      if (pinCheck.isConfirmed) {
-        await openIosSwal({ title: 'Clave incorrecta', html: '<p>No coincide la clave del usuario.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+    if (!commentPrompt.isConfirmed) {
+      if (options.returnToViewer) {
+        await reopenReportViewerById(report.id);
       }
       return;
     }
+
+    const author = state.users[commentPrompt.value.userId];
 
     const comments = sortComments(getCommentList(report));
     const commentId = makeId('cmt');
@@ -1296,6 +1323,9 @@
       updatedAt: Date.now()
     });
     await loadReportsBoard();
+    if (options.returnToViewer) {
+      await reopenReportViewerById(report.id);
+    }
   };
 
   const updatePreview = () => {
