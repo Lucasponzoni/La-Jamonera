@@ -139,6 +139,14 @@
     if (!element) {
       return;
     }
+
+    if (element === informesUsersList) {
+      const hasOverflow = element.scrollWidth > element.clientWidth + 4;
+      const nearEnd = element.scrollLeft + element.clientWidth >= element.scrollWidth - 6;
+      element.classList.toggle('has-scroll-hint', hasOverflow && !nearEnd);
+      return;
+    }
+
     const hasOverflow = element.scrollHeight > element.clientHeight + 4;
     const nearBottom = element.scrollTop + element.clientHeight >= element.scrollHeight - 6;
     element.classList.toggle('has-scroll-hint', hasOverflow && !nearBottom);
@@ -869,22 +877,6 @@
   informesUsersList.addEventListener('scroll', () => {
     toggleScrollHint(informesUsersList);
   });
-
-  const informesModalBody = informesModal.querySelector('.ios-modal-body');
-  const updateMainScrollHint = () => {
-    if (!informesModalBody || informesData.classList.contains('d-none')) {
-      informesData.classList.remove('has-scroll-hint');
-      return;
-    }
-
-    const hasOverflow = informesModalBody.scrollHeight > informesModalBody.clientHeight + 4;
-    const nearBottom = informesModalBody.scrollTop + informesModalBody.clientHeight >= informesModalBody.scrollHeight - 6;
-    informesData.classList.toggle('has-scroll-hint', hasOverflow && !nearBottom);
-  };
-
-  if (informesModalBody) {
-    informesModalBody.addEventListener('scroll', updateMainScrollHint);
-  }
 
   saveInformeBtn.addEventListener('click', saveInforme);
 
