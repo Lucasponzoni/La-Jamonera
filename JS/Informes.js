@@ -249,39 +249,6 @@
     const attachments = Array.isArray(report?.attachments) ? report.attachments : [];
     const images = attachments.filter((item) => item.type === 'image' && item.url);
     const docs = attachments.filter((item) => item.type !== 'image' && item.url);
-    const safeHtml = normalizeHtmlForPdf(report.html || '');
-
-    const safeHtml = sanitizeHtmlForPdfMake(report.html || '');
-    const htmlContent = window.htmlToPdfmake
-      ? window.htmlToPdfmake(safeHtml || '<p>Sin contenido</p>', { window })
-      : [{ text: safeHtml || 'Sin contenido' }];
-
-    return {
-      pageSize: 'A4',
-      pageMargins: [28, 24, 28, 24],
-      defaultStyle: { fontSize: 11 },
-      content: [
-        { text: 'Informe bromatológico', style: 'title' },
-        { text: `Usuario: ${report.userName || '-'}`, margin: [0, 2, 0, 0] },
-        { text: `Puesto: ${report.userPosition || '-'}`, margin: [0, 2, 0, 0] },
-        { text: `Fecha: ${getDateLabel(report.createdAt)}`, margin: [0, 2, 0, 10] },
-        { text: 'Contenido', style: 'sectionTitle' },
-        ...(Array.isArray(htmlContent) ? htmlContent : [htmlContent]),
-        { text: 'Imágenes adjuntas', style: 'sectionTitle', margin: [0, 14, 0, 6] },
-        images.length
-          ? { ul: images.map((item) => ({ text: `${item.name || 'Imagen'} - ${item.url}`, link: item.url, color: '#1d4ed8' })) }
-          : { text: 'Sin imágenes adjuntas.', color: '#5a6482' },
-        { text: 'Otros adjuntos', style: 'sectionTitle', margin: [0, 14, 0, 6] },
-        docs.length
-          ? { ul: docs.map((item) => ({ text: `${item.name || 'Archivo'}${item.url ? ` - ${item.url}` : ''}`, link: item.url || undefined, color: item.url ? '#1d4ed8' : '#1f2a44' })) }
-          : { text: 'Sin archivos adjuntos.', color: '#5a6482' }
-      ],
-      styles: {
-        title: { fontSize: 18, bold: true },
-        sectionTitle: { fontSize: 13, bold: true }
-      }
-    };
-  };
 
     const safeHtml = sanitizeHtmlForPdfMake(report.html || '');
     const htmlContent = window.htmlToPdfmake
@@ -380,35 +347,6 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
-  const openBrowserPrintWithImages = (report) => {
-    const attachments = Array.isArray(report?.attachments) ? report.attachments : [];
-    const docs = attachments.filter((item) => item.type !== 'image' && item.url);
-
-    const popup = window.open('', '_blank', 'noopener,noreferrer,width=980,height=760');
-    if (!popup) {
-      throw new Error('print_popup_blocked');
-    }
-
-    const docsHtml = docs.length
-      ? `<ul>${docs.map((item) => `<li><a href="${item.url}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.name || 'Archivo')}</a></li>`).join('')}</ul>`
-      : '<p style="color:#5a6482;">Sin archivos adjuntos.</p>';
-
-    popup.document.open();
-    popup.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Impresión informe</title><style>body{font-family:Inter,Arial,sans-serif;padding:20px;color:#1f2a44;}img{max-width:100%;height:auto;border-radius:10px;border:1px solid #dbe2f3;}h1{margin:0 0 8px;}section{margin-bottom:14px;}</style></head><body><h1>Informe bromatológico</h1><p><strong>Usuario:</strong> ${escapeHtml(report.userName || '-')}</p><p><strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')}</p><p><strong>Fecha:</strong> ${getDateLabel(report.createdAt)}</p>${report.updatedAt ? `<p><strong>Actualizado:</strong> ${getDateLabel(report.updatedAt)}</p>` : ''}<section><h2 style="font-size:18px;">Contenido</h2><div>${report.html || ''}</div></section><section><h2 style="font-size:18px;">Otros adjuntos</h2>${docsHtml}</section><script>window.onload=()=>window.print();<\/script></body></html>`);
-    popup.document.close();
-  };
-
-  const downloadPdfBlob = (blob, fileName) => {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
-
   const printPdfBlob = async (blob) => new Promise((resolve) => {
     const url = URL.createObjectURL(blob);
     const frame = document.createElement('iframe');
@@ -453,20 +391,18 @@
         throw new Error('empty_report_html');
       }
 
+      const blob = await buildReportPdfBlob(latestReport);
+      const filename = `informe_${latestReport.id || Date.now()}.pdf`;
+
       if (choice.isConfirmed) {
-        openBrowserPrintWithImages(latestReport);
+        await printPdfBlob(blob);
       } else {
-        const blob = await buildReportPdfBlob(latestReport);
-        const filename = `informe_${latestReport.id || Date.now()}.pdf`;
         downloadPdfBlob(blob, filename);
       }
     } catch (error) {
-      let message = '<p>No se pudo generar el informe para imprimir o descargar.</p>';
+      let message = '<p>No se pudo generar el PDF del informe.</p>';
       if (error?.message === 'pdf_lib_unavailable') {
         message = '<p>No pudimos cargar la librería PDF (pdfmake/html-to-pdfmake). Reintentá en unos segundos.</p>';
-      }
-      if (error?.message === 'print_popup_blocked') {
-        message = '<p>El navegador bloqueó la ventana de impresión. Permití pop-ups y reintentá.</p>';
       }
       if (error?.message === 'empty_report_html') {
         message = '<p>El informe no tiene contenido HTML para imprimir. Verificá que esté guardado correctamente en Firebase.</p>';
@@ -1222,7 +1158,6 @@
             <p><strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')}</p>
             <p><strong>Email:</strong> ${escapeHtml(report.userEmail || '-')}</p>
             <p><strong>Fecha:</strong> ${getDateLabel(report.createdAt)}</p>
-            <p><strong>Actualizado:</strong> ${report.updatedAt ? getDateLabel(report.updatedAt) : 'Sin modificaciones'}</p>
           </div>
           <div class="report-viewer-content-wrap"><div class="report-viewer-content">${report.html || ''}</div></div>
           <div class="attachments-grid">${attachmentHtml}</div>
