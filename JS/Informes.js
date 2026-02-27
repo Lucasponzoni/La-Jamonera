@@ -56,13 +56,22 @@
     reportDayCount: {},
     activeRange: null,
     currentPage: 1,
-    viewerImages: []
+    viewerImages: [],
+    reportsLoaded: false,
+    reopenViewerReportId: ''
   };
 
   let datePicker = null;
   let imageViewerModal = null;
   let reportsFilterPicker = null;
   const REPORTS_PER_PAGE = 9;
+  let initialLoadPromise = null;
+
+  const ensureImageViewerModal = () => {
+    if (!imageViewerModal && window.bootstrap && imageViewerModalEl) {
+      imageViewerModal = new bootstrap.Modal(imageViewerModalEl);
+    }
+  };
 
   const normalizeValue = (value) => String(value || '').trim();
   const normalizeLower = (value) => normalizeValue(value).toLowerCase();
@@ -184,16 +193,24 @@
     });
   };
 
+  const countCommentEntries = (comment) => {
+    const replies = Array.isArray(comment?.replies) ? comment.replies : [];
+    return 1 + replies.reduce((acc, item) => acc + countCommentEntries(item), 0);
+  };
+
   const getCommentsCount = (report) => {
-    const comments = report?.comments;
-    if (!comments) return 0;
-    if (Array.isArray(comments)) return comments.length;
-    if (typeof comments === 'object') return Object.keys(comments).length;
-    return 0;
+    const comments = sortComments(getCommentList(report));
+    return comments.reduce((acc, item) => acc + countCommentEntries(item), 0);
+  };
+
+  const normalizeImportance = (value, fallback = 50) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return fallback;
+    return Math.min(100, Math.max(0, Math.round(numeric)));
   };
 
   const getImportanceMeta = (importanceValue) => {
-    const value = Number(importanceValue || 50);
+    const value = normalizeImportance(importanceValue, 50);
     if (value <= 28) return { label: 'Muy bueno 🙂', tone: 'ok' };
     if (value <= 56) return { label: 'Normal 😐', tone: 'normal' };
     if (value <= 70) return { label: 'Atención 😶', tone: 'warn' };
@@ -202,6 +219,21 @@
   };
 
   const getReportPath = (report) => `/informes/${report.year}/${report.month}/${report.day}/${report.id}`;
+
+  const getImportanceValue = () => {
+    if (!importanceRange) return 50;
+    return normalizeImportance(importanceRange.value, 50);
+  };
+
+  const getCommentList = (report) => {
+    const comments = report?.comments;
+    if (!comments) return [];
+    if (Array.isArray(comments)) return comments;
+    if (typeof comments === 'object') return Object.values(comments);
+    return [];
+  };
+
+  const sortComments = (comments) => [...comments].sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
 
   const setCollapsedSelection = (node, offset = 0) => {
     const selection = window.getSelection();
@@ -296,7 +328,7 @@
     const current = informeUserSelect.value;
 
     const options = users.map((user) => `<option value="${user.id}">${user.fullName} (${user.position})</option>`).join('');
-    informeUserSelect.innerHTML = `<option value="">Seleccioná un usuario</option>${options}<option value="create">Crear usuario</option>`;
+    informeUserSelect.innerHTML = `<option value="">Seleccioná un usuario</option>${options}<option value="create">Crear nuevo usuario</option>`;
 
     if (current && state.users[current]) {
       informeUserSelect.value = current;
@@ -435,7 +467,7 @@
           <div class="informe-card-meta">
             <span class="informe-attach-chip"><i class="fa-regular fa-image"></i> ${imageCount}</span>
             <span class="informe-attach-chip"><i class="fa-regular fa-file-lines"></i> ${docCount}</span>
-            <span class="importance-chip importance-${importance.tone}">${Number(report.importance || 50)}% · ${importance.label}</span>
+            <span class="importance-chip importance-${importance.tone}">${normalizeImportance(report.importance, 50)}% · ${importance.label}</span>
           </div>
 
           <div class="informe-card-user">
@@ -534,6 +566,25 @@
     } catch (error) {
       await openIosSwal({ title: 'Error', html: '<p>No se pudieron cargar los datos de informes.</p>', icon: 'error', confirmButtonText: 'Entendido' });
       showState('data');
+    }
+  };
+
+  const ensureInitialDataLoaded = async () => {
+    if (initialLoadPromise) {
+      return initialLoadPromise;
+    }
+
+    initialLoadPromise = (async () => {
+      await loadData();
+      await restoreDraft();
+      state.reportsLoaded = true;
+      updateMainScrollHint();
+    })();
+
+    try {
+      await initialLoadPromise;
+    } finally {
+      initialLoadPromise = null;
     }
   };
 
@@ -757,7 +808,7 @@
         userPosition: state.users[selectedUserId].position,
         userEmail: state.users[selectedUserId].email || '',
         html: editorHtml,
-        importance: Number(importanceRange.value || 50),
+        importance: getImportanceValue(),
         attachments: attachmentsSaved,
         comments: {}
       };
@@ -768,7 +819,7 @@
         reportDate: `${year}-${month}-${day}`,
         userId: selectedUserId,
         userName: state.users[selectedUserId].fullName,
-        importance: Number(importanceRange.value || 50),
+        importance: getImportanceValue(),
         createdAt: Date.now(),
         attachmentsCount: attachmentsSaved.length,
         commentsCount: 0
@@ -780,8 +831,11 @@
       state.attachments = [];
       renderAttachments();
       informeEditor.innerHTML = '';
+      resetEditorControls();
+      clearTypingStates();
+      importanceRange.value = '50';
+      updateToolbarState();
       updatePreview();
-      importanceRange.value = 50;
       updateImportanceLabel();
       clearDraft();
       await loadReportsBoard();
@@ -830,8 +884,36 @@
     return true;
   };
 
+  const renderCommentTree = (comments = [], level = 0) => sortComments(comments).map((comment) => {
+    const author = escapeHtml(comment.userName || 'Usuario');
+    const text = escapeHtml(comment.text || '').replaceAll('\\n', '<br>');
+
+    const date = getDateLabel(comment.createdAt);
+    const replies = Array.isArray(comment.replies) ? comment.replies : [];
+    return `
+      <article class="report-comment-item" data-comment-id="${comment.id}" data-comment-level="${level}">
+        <header class="report-comment-head">
+          <strong>${author}</strong>
+          <small>${date}</small>
+        </header>
+        <p class="report-comment-text">${text}</p>
+        <button type="button" class="btn report-comment-reply-btn" data-reply-comment="${comment.id}">Responder</button>
+        ${replies.length ? `<div class="report-comment-replies">${renderCommentTree(replies, level + 1)}</div>` : ''}
+      </article>
+    `;
+  }).join('');
+
+  const buildCommentsPanel = (report) => {
+    const comments = getCommentList(report);
+    if (!comments.length) {
+      return '<div class="informes-empty report-comments-empty">Sin comentarios todavía.</div>';
+    }
+    return `<div class="report-comments-thread">${renderCommentTree(comments)}</div>`;
+  };
+
   const openReportViewer = async (report) => {
     const attachments = Array.isArray(report.attachments) ? report.attachments : [];
+    const imageAttachments = attachments.filter((item) => item.type === 'image');
     const attachmentHtml = attachments.length
       ? attachments.map((item, index) => {
         if (item.type === 'image') {
@@ -852,8 +934,15 @@
             <p><strong>Email:</strong> ${escapeHtml(report.userEmail || '-')}</p>
             <p><strong>Fecha:</strong> ${getDateLabel(report.createdAt)}</p>
           </div>
-          <div class="report-viewer-content">${report.html || ''}</div>
+          <div class="report-viewer-content-wrap"><div class="report-viewer-content">${report.html || ''}</div></div>
           <div class="attachments-grid">${attachmentHtml}</div>
+          <section class="report-comments-wrap">
+            <div class="report-comments-head">
+              <h6>Comentarios</h6>
+              <button type="button" class="btn ios-btn ios-btn-secondary report-add-comment-btn" data-comment-from-viewer="1">Comentar</button>
+            </div>
+            ${buildCommentsPanel(report)}
+          </section>
         </div>
       `,
       confirmButtonText: 'Cerrar',
@@ -861,8 +950,27 @@
         popup.querySelectorAll('[data-open-report-image]').forEach((node) => {
           node.addEventListener('click', (event) => {
             const idx = Number(event.currentTarget.dataset.openReportImage);
-            state.viewerImages = attachments.filter((item) => item.type === 'image').map((item) => ({ previewUrl: item.url }));
-            openImageViewer(idx);
+            const selected = attachments[idx];
+            const imageIndex = imageAttachments.findIndex((item) => item.url === selected?.url);
+            if (imageIndex < 0) return;
+            state.viewerImages = imageAttachments.map((item) => ({ previewUrl: item.url }));
+            state.reopenViewerReportId = report.id;
+            Swal.close();
+            setTimeout(() => openImageViewer(imageIndex), 80);
+          });
+        });
+
+        const addCommentBtn = popup.querySelector('[data-comment-from-viewer]');
+        addCommentBtn?.addEventListener('click', async () => {
+          Swal.close();
+          await addCommentToReport(report);
+        });
+
+        popup.querySelectorAll('[data-reply-comment]').forEach((node) => {
+          node.addEventListener('click', async (event) => {
+            const commentId = String(event.currentTarget.dataset.replyComment || '');
+            Swal.close();
+            await addCommentToReport(report, commentId);
           });
         });
       }
@@ -872,27 +980,193 @@
   const editReport = async (report) => {
     const allowed = await verifyReportCreatorPin(report);
     if (!allowed) return;
+
+    const currentAttachments = Array.isArray(report.attachments) ? [...report.attachments] : [];
+    const localUploads = [];
+
     const answer = await openIosSwal({
       title: 'Editar informe',
-      html: `<div class="text-start"><label class="mb-2">Contenido del informe</label><div id="editReportHtml" class="informe-editor" contenteditable="true">${report.html || ''}</div></div>`,
-      width: 960,
+      html: `
+        <div class="text-start report-edit-wrap">
+          <label class="mb-2">Contenido del informe</label>
+          <div class="editor-toolbar report-edit-toolbar" role="toolbar" aria-label="Herramientas de edición">
+            <button type="button" class="editor-btn" data-edit-cmd="bold"><i class="fa-solid fa-bold"></i></button>
+            <button type="button" class="editor-btn" data-edit-cmd="italic"><i class="fa-solid fa-italic"></i></button>
+            <button type="button" class="editor-btn" data-edit-cmd="underline"><i class="fa-solid fa-underline"></i></button>
+            <button type="button" class="editor-btn" data-edit-cmd="insertUnorderedList"><i class="fa-solid fa-list-ul"></i></button>
+            <button type="button" class="editor-btn" data-edit-cmd="justifyLeft"><i class="fa-solid fa-align-left"></i></button>
+            <button type="button" class="editor-btn" data-edit-cmd="justifyCenter"><i class="fa-solid fa-align-center"></i></button>
+          </div>
+          <div class="report-editor-scroll"><div id="editReportHtml" class="informe-editor" contenteditable="true">${report.html || ''}</div></div>
+          <div class="importance-wrap mt-3">
+            <label class="form-label" for="editImportanceRange">Importancia sanitaria</label>
+            <input id="editImportanceRange" type="range" min="0" max="100" value="${normalizeImportance(report.importance, 50)}" class="importance-range">
+            <div id="editImportanceLabel" class="importance-label"></div>
+          </div>
+          <label class="mt-3 mb-2">Adjuntos actuales</label>
+          <div id="editAttachmentsGrid" class="attachments-grid report-edit-attachments">
+            ${currentAttachments.length ? currentAttachments.map((item, idx) => `
+              <article class="attachment-card ${item.type !== 'image' ? 'attachment-doc' : ''}" data-edit-attachment="${idx}">
+                ${item.type === 'image'
+                  ? `<img src="${item.url}" alt="${escapeHtml(item.name)}" class="attachment-image is-loaded">`
+                  : `<i class="bi bi-file-earmark"></i><span>${escapeHtml(item.name)}</span>`}
+                <button type="button" class="btn remove-attachment-btn" data-remove-edit-attachment="${idx}" title="Quitar adjunto"><i class="fa-solid fa-xmark"></i></button>
+              </article>
+            `).join('') : '<div class="informes-empty">Sin adjuntos</div>'}
+          </div>
+          <div class="mt-2 d-flex justify-content-end">
+            <button type="button" id="editAddAttachmentsBtn" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-paperclip"></i> Agregar adjuntos</button>
+            <input id="editAttachmentsInput" type="file" class="d-none" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt">
+          </div>
+        </div>
+      `,
+      width: 980,
       showCancelButton: true,
       confirmButtonText: 'Guardar cambios',
       cancelButtonText: 'Cancelar',
+      didOpen: (popup) => {
+        const grid = popup.querySelector('#editAttachmentsGrid');
+        const input = popup.querySelector('#editAttachmentsInput');
+        const addBtn = popup.querySelector('#editAddAttachmentsBtn');
+        const editEditor = popup.querySelector('#editReportHtml');
+        const editImportanceRange = popup.querySelector('#editImportanceRange');
+        const editImportanceLabel = popup.querySelector('#editImportanceLabel');
+
+        const updateEditImportanceLabel = () => {
+          const meta = getImportanceMeta(editImportanceRange?.value);
+          if (editImportanceLabel) {
+            editImportanceLabel.textContent = `${normalizeImportance(editImportanceRange?.value, 50)}% · ${meta.label}`;
+          }
+        };
+
+        popup.querySelectorAll('[data-edit-cmd]').forEach((button) => {
+          button.addEventListener('click', () => {
+            editEditor?.focus();
+            document.execCommand(button.dataset.editCmd, false, null);
+          });
+        });
+
+        editImportanceRange?.addEventListener('input', updateEditImportanceLabel);
+        updateEditImportanceLabel();
+
+        const redraw = () => {
+          if (!grid) return;
+          grid.innerHTML = currentAttachments.length
+            ? currentAttachments.map((item, idx) => `
+              <article class="attachment-card ${item.type !== 'image' ? 'attachment-doc' : ''}" data-edit-attachment="${idx}">
+                ${item.type === 'image'
+                  ? `<img src="${item.url}" alt="${escapeHtml(item.name)}" class="attachment-image is-loaded">`
+                  : `<i class="bi bi-file-earmark"></i><span>${escapeHtml(item.name)}</span>`}
+                <button type="button" class="btn remove-attachment-btn" data-remove-edit-attachment="${idx}" title="Quitar adjunto"><i class="fa-solid fa-xmark"></i></button>
+              </article>
+            `).join('')
+            : '<div class="informes-empty">Sin adjuntos</div>';
+        };
+
+        addBtn?.addEventListener('click', () => input?.click());
+        input?.addEventListener('change', (event) => {
+          const files = Array.from(event.target.files || []);
+          files.forEach((file) => {
+            const message = validateFile(file);
+            if (message) return;
+            const type = getFileCategory(file);
+            const previewUrl = type === 'image' ? URL.createObjectURL(file) : '';
+            const tmpId = makeId('tmpAtt');
+            localUploads.push({ tmpId, file });
+            currentAttachments.push({
+              id: tmpId,
+              name: file.name,
+              type,
+              mime: file.type,
+              size: file.size,
+              url: previewUrl,
+              isLocal: true
+            });
+          });
+          event.target.value = '';
+          redraw();
+        });
+
+        grid?.addEventListener('click', async (event) => {
+          const removeBtn = event.target.closest('[data-remove-edit-attachment]');
+          if (!removeBtn) return;
+          const idx = Number(removeBtn.dataset.removeEditAttachment);
+          const target = currentAttachments[idx];
+          if (!target) return;
+
+          const confirmDelete = await openIosSwal({
+            title: 'Eliminar adjunto',
+            html: `<p><strong>${escapeHtml(target.name || 'Adjunto')}</strong></p><p>Esta acción quitará el archivo del informe.</p>`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Eliminar',
+            cancelButtonText: 'Cancelar'
+          });
+          if (!confirmDelete.isConfirmed) return;
+
+          if (target?.isLocal && target.url) {
+            URL.revokeObjectURL(target.url);
+          }
+          currentAttachments.splice(idx, 1);
+          redraw();
+        });
+      },
       preConfirm: () => {
         const html = normalizeValue(document.getElementById('editReportHtml').innerHTML);
         if (!html) {
           Swal.showValidationMessage('El informe no puede quedar vacío.');
           return false;
         }
-        return html;
+        const importance = normalizeImportance(document.getElementById('editImportanceRange')?.value, 50);
+        return { html, importance };
       }
     });
 
-    if (!answer.isConfirmed) return;
+    if (!answer.isConfirmed) {
+      currentAttachments.forEach((item) => {
+        if (item.isLocal && item.url) URL.revokeObjectURL(item.url);
+      });
+      return;
+    }
+
     const path = getReportPath(report);
-    const updated = { ...report, html: answer.value, updatedAt: Date.now() };
+    const uploadedMap = new Map();
+    for (const item of localUploads) {
+      const folder = getFileCategory(item.file) === 'image' ? 'images' : 'docs';
+      const storagePath = `informes/${report.year}/${report.month}/${report.day}/${report.id}/${folder}`;
+      const url = await uploadToStorage(item.file, storagePath);
+      uploadedMap.set(item.tmpId, url);
+    }
+
+    const finalAttachments = currentAttachments.map((item) => {
+      if (!item.isLocal) return item;
+      const source = localUploads.find((upload) => upload.tmpId === item.id);
+      return {
+        name: item.name,
+        type: item.type,
+        mime: item.mime || source?.file?.type || '',
+        size: item.size || source?.file?.size || 0,
+        url: uploadedMap.get(item.id) || item.url
+      };
+    });
+
+    currentAttachments.forEach((item) => {
+      if (item.isLocal && item.url) URL.revokeObjectURL(item.url);
+    });
+
+    const updated = { ...report, html: answer.value.html, importance: normalizeImportance(answer.value.importance, 50), attachments: finalAttachments, updatedAt: Date.now() };
     await window.dbLaJamoneraRest.write(path, updated);
+    await window.dbLaJamoneraRest.write(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, {
+      id: report.id,
+      reportDate: report.reportDate,
+      userId: report.userId,
+      userName: report.userName,
+      importance: normalizeImportance(updated.importance, 50),
+      createdAt: Number(report.createdAt || Date.now()),
+      attachmentsCount: finalAttachments.length,
+      commentsCount: getCommentsCount(updated),
+      updatedAt: Date.now()
+    });
     await loadReportsBoard();
   };
 
@@ -914,17 +1188,47 @@
     await loadReportsBoard();
   };
 
-  const addCommentToReport = async (report) => {
+  const findCommentById = (comments, commentId) => {
+    for (const comment of comments) {
+      if (comment.id === commentId) return comment;
+      const replies = Array.isArray(comment.replies) ? comment.replies : [];
+      const found = findCommentById(replies, commentId);
+      if (found) return found;
+    }
+    return null;
+  };
+
+  const addCommentToReport = async (report, parentCommentId = null) => {
     const canContinue = await ensureUsersAvailableForComment();
     if (!canContinue) return;
     const users = Object.values(state.users);
-    const options = users.map((user) => `<option value="${user.id}">${escapeHtml(user.fullName)}</option>`).join('');
+    const options = [
+      '<option value="">Seleccioná un usuario</option>',
+      ...users.map((user) => `<option value="${user.id}">${escapeHtml(user.fullName)}</option>`),
+      '<option value="create">Crear nuevo usuario</option>'
+    ].join('');
     const commentPrompt = await openIosSwal({
-      title: 'Nuevo comentario',
-      html: `<div class="text-start"><label>Usuario</label><select id="commentUser" class="form-select ios-input mb-2">${options}</select><label>Comentario</label><textarea id="commentText" class="swal2-textarea ios-input" placeholder="Escribí tu comentario"></textarea></div>`,
+      title: parentCommentId ? 'Responder comentario' : 'Nuevo comentario',
+      html: `<div class="text-start report-comment-form"><label>Usuario</label><select id="commentUser" class="form-select ios-input mb-2">${options}</select><label>Comentario</label><textarea id="commentText" class="swal2-textarea ios-input" placeholder="Escribí tu comentario"></textarea></div>`,
       showCancelButton: true,
       confirmButtonText: 'Continuar',
       cancelButtonText: 'Cancelar',
+      didOpen: (popup) => {
+        const userSelect = popup.querySelector('#commentUser');
+        userSelect?.addEventListener('change', async (event) => {
+          if (event.target.value !== 'create') return;
+          const id = await openUserForm();
+          if (!id) {
+            event.target.value = '';
+            return;
+          }
+          const extra = document.createElement('option');
+          extra.value = id;
+          extra.textContent = state.users[id] ? state.users[id].fullName : 'Usuario';
+          event.target.insertBefore(extra, event.target.querySelector('option[value="create"]'));
+          event.target.value = id;
+        });
+      },
       preConfirm: () => {
         const userId = normalizeValue(document.getElementById('commentUser').value);
         const text = normalizeValue(document.getElementById('commentText').value);
@@ -950,17 +1254,47 @@
       return;
     }
 
-    const comments = report.comments && typeof report.comments === 'object' ? report.comments : {};
+    const comments = sortComments(getCommentList(report));
     const commentId = makeId('cmt');
-    comments[commentId] = {
+    const newComment = {
       id: commentId,
       userId: author.id,
       userName: author.fullName,
       text: commentPrompt.value.text,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      replies: []
     };
-    const updated = { ...report, comments };
+
+    if (parentCommentId) {
+      const parent = findCommentById(comments, parentCommentId);
+      if (parent) {
+        parent.replies = Array.isArray(parent.replies) ? parent.replies : [];
+        parent.replies.push(newComment);
+      } else {
+        comments.push(newComment);
+      }
+    } else {
+      comments.push(newComment);
+    }
+
+    const commentsObject = comments.reduce((acc, item) => {
+      acc[item.id] = item;
+      return acc;
+    }, {});
+
+    const updated = { ...report, comments: commentsObject };
     await window.dbLaJamoneraRest.write(getReportPath(report), updated);
+    await window.dbLaJamoneraRest.write(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, {
+      id: report.id,
+      reportDate: report.reportDate,
+      userId: report.userId,
+      userName: report.userName,
+      importance: normalizeImportance(report.importance, 50),
+      createdAt: Number(report.createdAt || Date.now()),
+      attachmentsCount: Array.isArray(report.attachments) ? report.attachments.length : 0,
+      commentsCount: getCommentsCount(updated),
+      updatedAt: Date.now()
+    });
     await loadReportsBoard();
   };
 
@@ -1059,7 +1393,7 @@
   ];
 
   const updateImportanceLabel = () => {
-    const value = Number(importanceRange.value || 0);
+    const value = getImportanceValue();
     const found = IMPORTANCE_STATES.find((item) => value <= item.max) || IMPORTANCE_STATES[IMPORTANCE_STATES.length - 1];
     importanceLabel.textContent = found.text;
   };
@@ -1089,7 +1423,7 @@
       const draft = {
         editorHtml: informeEditor.innerHTML,
         userId: informeUserSelect.value,
-        importance: Number(importanceRange.value || 50),
+        importance: getImportanceValue(),
         date: informeDateInput.value,
         fontSize: fontSizeSelect.value,
         formatBlock: formatBlockSelect.value,
@@ -1118,7 +1452,7 @@
     try {
       const draft = JSON.parse(raw);
       informeEditor.innerHTML = draft.editorHtml || '';
-      importanceRange.value = Number(draft.importance || 50);
+      importanceRange.value = String(normalizeImportance(draft.importance, 50));
       if (draft.userId && state.users[draft.userId]) informeUserSelect.value = draft.userId;
       if (draft.date && datePicker) datePicker.setDate(draft.date, true, 'd/m/Y');
       if (draft.fontSize) fontSizeSelect.value = draft.fontSize;
@@ -1151,8 +1485,9 @@
   };
 
   const openImageViewer = (index) => {
+    ensureImageViewerModal();
     const images = state.viewerImages.length ? state.viewerImages : state.attachments.filter((item) => item.type === 'image');
-    if (!images.length) return;
+    if (!images.length || !imageViewerModal) return;
     state.imageViewerIndex = index;
     state.viewerScale = 1;
     viewerImage.style.transform = 'scale(1)';
@@ -1342,6 +1677,15 @@
   viewerNextBtn.addEventListener('click', () => updateViewerImage(1));
   viewerZoomInBtn.addEventListener('click', () => setViewerScale(state.viewerScale + 0.25));
   viewerZoomOutBtn.addEventListener('click', () => setViewerScale(state.viewerScale - 0.25));
+  imageViewerModalEl?.addEventListener('hidden.bs.modal', async () => {
+    if (!state.reopenViewerReportId) return;
+    const report = findReportById(state.reopenViewerReportId);
+    state.reopenViewerReportId = '';
+    if (report) {
+      await openReportViewer(report);
+    }
+  });
+
   viewerImage.addEventListener('wheel', (event) => {
     event.preventDefault();
     const delta = event.deltaY > 0 ? -0.2 : 0.2;
@@ -1377,7 +1721,7 @@
   textColorInput.addEventListener('change', persistDraft);
   highlightColorInput.addEventListener('change', persistDraft);
 
-  window.laJamoneraReady.then(() => loadReportsBoard()).catch(() => setBoardState('empty'));
+  window.laJamoneraReady.then(() => ensureInitialDataLoaded()).catch(() => setBoardState('empty'));
 
 
 
@@ -1472,16 +1816,12 @@
         locale: window.flatpickr.l10ns.es
       });
     }
-    if (!imageViewerModal && window.bootstrap && imageViewerModalEl) {
-      imageViewerModal = new bootstrap.Modal(imageViewerModalEl);
-    }
+    ensureImageViewerModal();
 
     renderEmojiPanel();
     updatePreview();
     updateToolbarState();
     updateImportanceLabel();
-    await loadData();
-    await restoreDraft();
-    updateMainScrollHint();
+    await ensureInitialDataLoaded();
   });
 })();
