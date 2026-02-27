@@ -250,6 +250,14 @@ html.login-protected.auth-ok body {
   color: #10b981;
 }
 
+.icon-orange {
+  color: #ff8a2a;
+}
+
+.icon-gray {
+  color: #8e97ad;
+}
+
 /* =========================================
    FOOTER
 ========================================= */
@@ -1108,6 +1116,24 @@ html.login-protected.auth-ok body {
   margin-top: 0;
 }
 
+.swal2-popup.ios-alert.informes-alert .swal2-html-container {
+  padding: 0 !important;
+  text-align: left;
+}
+
+.swal2-popup.ios-alert.informes-alert .swal2-textarea {
+  margin: 0 !important;
+  width: 100% !important;
+  min-height: 120px;
+}
+
+.swal2-popup.ios-alert.informes-alert .swal2-select,
+.swal2-popup.ios-alert.informes-alert .swal2-input,
+.swal2-popup.ios-alert.informes-alert .swal2-file {
+  margin: 0 0 10px !important;
+  width: 100% !important;
+}
+
 .swal2-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1742,19 +1768,8 @@ html.login-protected.auth-ok body {
 }
 
 .informes-users-list.has-scroll-hint::after {
-   content: '→ Deslizá para ver más usuarios';
-   position: sticky;
-   right: -10px;
-   display: inline-flex;
-   align-items: center;
-   justify-content: center;
-   min-width: 220px;
-   font-size: 0.78rem;
-   font-weight: 600;
-   color: #ffffff;
-   background: linear-gradient(90deg, rgba(242, 245, 252, 0), rgb(42 78 163));
-   padding: 0 10px;
-   pointer-events: none;
+   content: none;
+   display: none;
 }
 
 .informe-user-circle-wrap {
@@ -1785,6 +1800,20 @@ html.login-protected.auth-ok body {
 
 .informe-user-main {
   min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.informe-user-main .email-user {
+  display: block;
+  margin-top: 2px;
+  max-width: 100%;
+  font-size: 0.72rem;
+  color: #7b86a4;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .informe-user-main h6 {
@@ -1930,8 +1959,8 @@ html.login-protected.auth-ok body {
 }
 
 .informes-board-spinner {
-  width: 124px;
-  height: 124px;
+  width: 92px;
+  height: 92px;
 }
 
 .informes-board-empty {
@@ -2059,11 +2088,11 @@ html.login-protected.auth-ok body {
    INFORMES BOARD REFINES
 ========================================= */
 #openFilterInformesBtn i {
-  color: #1db86a;
+  color: #ff8a2a;
 }
 
 #clearFilterInformesBtn i {
-  color: #8e66ff;
+  color: #8e97ad;
 }
 
 .informes-home-content {
@@ -2195,4 +2224,212 @@ html.login-protected.auth-ok body {
 
 .report-viewer .attachments-grid {
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+}
+
+.report-viewer-content-wrap {
+  overflow-x: auto;
+}
+
+.report-comments-wrap {
+  margin-top: 12px;
+  border-top: 1px solid #dbe2f3;
+  padding-top: 10px;
+}
+
+.report-comments-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.report-comments-wrap h6 {
+  margin-bottom: 0;
+  font-weight: 700;
+}
+
+.report-comments-thread {
+  display: grid;
+  gap: 8px;
+}
+
+.report-comment-item {
+  border: 1px solid #d7def1;
+  border-radius: 12px;
+  padding: 8px 10px 8px 12px;
+  background: #f8faff;
+  text-align: left;
+  border-left: 4px solid var(--comment-accent, #2f6fd6);
+}
+
+.report-comment-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.report-comment-head small {
+  color: #7886a8;
+}
+
+.report-comment-text {
+  margin: 6px 0;
+  color: #2a3556;
+}
+
+.report-comment-replies {
+  margin-top: 8px;
+  padding-left: 10px;
+  border-left: 2px dashed rgba(74, 104, 170, 0.45);
+  display: grid;
+  gap: 8px;
+}
+
+.report-comment-reply-btn {
+  border: 1px solid #ccd8f5;
+  background: #eef3ff;
+  color: #325ea9;
+  border-radius: 10px;
+  padding: 4px 10px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  margin-left: 0;
+}
+
+.report-comment-item[data-comment-level="0"] .report-comment-text {
+  color: #2a3556;
+}
+
+.report-comment-item[data-comment-level]:not([data-comment-level="0"]) {
+  background: #f3f6ff;
+}
+
+.report-comment-item[data-comment-level]:not([data-comment-level="0"]) .report-comment-text {
+  color: #415174;
+}
+
+.report-comment-form label {
+  margin-bottom: 6px;
+  color: #4f5f84;
+}
+
+.report-edit-wrap .report-editor-scroll {
+  overflow-x: auto;
+}
+
+.report-edit-attachments .attachment-card {
+  position: relative;
+}
+
+.remove-attachment-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid #e9bfd0;
+  background: #fff1f4;
+  color: #c7345b;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.report-edit-toolbar {
+  margin-bottom: 10px;
+}
+
+#clearFilterInformesBtn {
+  position: relative;
+  z-index: 120;
+  order: -1;
+}
+
+.report-comment-item.is-reply .report-comment-head strong {
+  font-size: 0.95rem;
+}
+
+.report-edit-add-btn {
+  background: #fff4e8;
+  border-color: #f6c18a;
+  color: #b76307;
+}
+
+.report-edit-add-btn:hover {
+  background: #ffe8d0;
+  border-color: #eba45f;
+  color: #9b4f00;
+}
+
+.remove-attachment-btn.is-danger {
+  border-color: #f0b4c6;
+  background: #fff1f6;
+  color: #ce3b6a;
+}
+
+@media (max-width: 768px) {
+  .report-comments-head {
+    gap: 6px;
+  }
+
+  .report-comments-wrap h6 {
+    min-width: 0;
+  }
+
+  .report-comments-title-text {
+    display: none;
+  }
+
+  .report-add-comment-btn {
+    padding-inline: 10px;
+    min-width: auto;
+  }
+}
+
+.informe-print-chip {
+  border: 1px solid #d5dff4;
+  background: #f4f7ff;
+  color: #2f5fb0;
+  border-radius: 999px;
+  min-height: 30px;
+  min-width: 30px;
+  padding: 4px 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.informe-print-chip:hover {
+  background: #e8efff;
+  color: #234a96;
+}
+
+.attachment-delete-confirm {
+  position: absolute;
+  inset: auto 4px 4px 4px;
+  display: flex;
+  gap: 4px;
+  z-index: 4;
+}
+
+.attachment-delete-btn {
+  flex: 1;
+  border-radius: 8px;
+  min-height: 24px;
+  border: 1px solid #d3dcf1;
+  font-size: 0.67rem;
+  font-weight: 700;
+  padding: 2px 4px;
+  background: #eef3ff;
+  color: #345d9f;
+  white-space: nowrap;
+}
+
+.attachment-delete-btn.yes {
+  border-color: #efb6c7;
+  background: #fff1f6;
+  color: #c73567;
 }
