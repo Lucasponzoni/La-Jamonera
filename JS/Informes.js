@@ -30,6 +30,13 @@
   const clearInformeBtn = document.getElementById('clearInformeBtn');
   const importanceRange = document.getElementById('importanceRange');
   const importanceLabel = document.getElementById('importanceLabel');
+  const informesBoardLoading = document.getElementById('informesBoardLoading');
+  const informesBoardEmpty = document.getElementById('informesBoardEmpty');
+  const informesCardsGrid = document.getElementById('informesCardsGrid');
+  const informesPagination = document.getElementById('informesPagination');
+  const openFilterInformesBtn = document.getElementById('openFilterInformesBtn');
+  const clearFilterInformesBtn = document.getElementById('clearFilterInformesBtn');
+  const informesFilterInput = document.getElementById('informesFilterInput');
 
   const imageViewerModalEl = document.getElementById('imageViewerModal');
   const viewerImage = document.getElementById('viewerImage');
@@ -43,18 +50,28 @@
     attachments: [],
     imageViewerIndex: 0,
     viewerScale: 1,
-    reportsByDate: {}
+    reportsByDate: {},
+    reports: [],
+    filteredReports: [],
+    reportDayCount: {},
+    activeRange: null,
+    currentPage: 1,
+    viewerImages: []
   };
 
   let datePicker = null;
   let imageViewerModal = null;
+  let reportsFilterPicker = null;
+  const REPORTS_PER_PAGE = 9;
 
   const normalizeValue = (value) => String(value || '').trim();
   const normalizeLower = (value) => normalizeValue(value).toLowerCase();
   const makeId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
+  const getSwalTarget = () => (informesModal && informesModal.classList.contains('show') ? informesModal : document.body);
+
   const openIosSwal = (options) => Swal.fire({
-    target: informesModal,
+    target: getSwalTarget(),
     ...options,
     customClass: {
       popup: `ios-alert informes-alert ${options?.customClass?.popup || ''}`.trim(),
@@ -152,6 +169,40 @@
     element.classList.toggle('has-scroll-hint', hasOverflow && !nearBottom);
   };
 
+  const updateMainScrollHint = () => {
+    toggleScrollHint(informesUsersList);
+  };
+
+  const getDateLabel = (value) => {
+    const date = new Date(value || Date.now());
+    return date.toLocaleDateString('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getCommentsCount = (report) => {
+    const comments = report?.comments;
+    if (!comments) return 0;
+    if (Array.isArray(comments)) return comments.length;
+    if (typeof comments === 'object') return Object.keys(comments).length;
+    return 0;
+  };
+
+  const getImportanceMeta = (importanceValue) => {
+    const value = Number(importanceValue || 50);
+    if (value <= 28) return { label: 'Muy bueno 🙂', tone: 'ok' };
+    if (value <= 56) return { label: 'Normal 😐', tone: 'normal' };
+    if (value <= 70) return { label: 'Atención 😶', tone: 'warn' };
+    if (value <= 84) return { label: 'Importante ⚠️', tone: 'high' };
+    return { label: 'Muy importante 🚨', tone: 'critical' };
+  };
+
+  const getReportPath = (report) => `/informes/${report.year}/${report.month}/${report.day}/${report.id}`;
+
   const setCollapsedSelection = (node, offset = 0) => {
     const selection = window.getSelection();
     if (!selection) return;
@@ -225,7 +276,7 @@
           ${renderUserAvatar(user)}
           <div class="informe-user-main">
             <h6>${user.fullName}</h6>
-            <p>${user.position}</p>
+            <p>${user.position}</p><small>${user.email || ""}</small>
           </div>
         </article>
         <div class="informe-user-actions">
@@ -294,6 +345,181 @@
     });
   };
 
+
+
+  const escapeHtml = (value) => String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+
+  const setBoardState = (key) => {
+    if (!informesBoardLoading || !informesBoardEmpty || !informesCardsGrid || !informesPagination) return;
+    informesBoardLoading.classList.toggle('d-none', key !== 'loading');
+    informesBoardEmpty.classList.toggle('d-none', key !== 'empty');
+    informesCardsGrid.classList.toggle('d-none', key !== 'data');
+    informesPagination.classList.toggle('d-none', key !== 'data');
+  };
+
+  const collectReports = async () => {
+    await window.laJamoneraReady;
+    const tree = await window.dbLaJamoneraRest.read('/informes');
+    const output = [];
+    const years = tree && typeof tree === 'object' ? Object.keys(tree) : [];
+    years.forEach((year) => {
+      const monthsObj = tree[year] || {};
+      Object.keys(monthsObj).forEach((month) => {
+        const daysObj = monthsObj[month] || {};
+        Object.keys(daysObj).forEach((day) => {
+          const reports = daysObj[day] || {};
+          Object.keys(reports).forEach((id) => {
+            const report = reports[id];
+            if (!report || typeof report !== 'object') return;
+            if (!report.html && !report.createdAt) return;
+            output.push({ ...report, id: report.id || id, year, month, day });
+          });
+        });
+      });
+    });
+    output.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+    return output;
+  };
+
+  const renderBoardPagination = (totalPages) => {
+    if (totalPages <= 1) {
+      informesPagination.innerHTML = '';
+      return;
+    }
+    let html = `<button class="btn ios-btn ios-btn-secondary" data-page="${Math.max(1, state.currentPage - 1)}">Anterior</button>`;
+    for (let page = 1; page <= totalPages; page += 1) {
+      html += `<button class="btn ios-btn ${page === state.currentPage ? 'ios-btn-primary' : 'ios-btn-secondary'}" data-page="${page}">${page}</button>`;
+    }
+    html += `<button class="btn ios-btn ios-btn-secondary" data-page="${Math.min(totalPages, state.currentPage + 1)}">Siguiente</button>`;
+    informesPagination.innerHTML = html;
+  };
+
+  const renderReportsBoard = () => {
+    const source = state.filteredReports.length || state.activeRange ? state.filteredReports : state.reports;
+    if (!source.length) {
+      setBoardState('empty');
+      informesCardsGrid.innerHTML = '';
+      informesPagination.innerHTML = '';
+      return;
+    }
+
+    const totalPages = Math.max(1, Math.ceil(source.length / REPORTS_PER_PAGE));
+    state.currentPage = Math.min(state.currentPage, totalPages);
+    const startAt = (state.currentPage - 1) * REPORTS_PER_PAGE;
+    const pageItems = source.slice(startAt, startAt + REPORTS_PER_PAGE);
+
+    informesCardsGrid.innerHTML = pageItems.map((report) => {
+      const user = state.users[report.userId] || {};
+      const attachments = Array.isArray(report.attachments) ? report.attachments : [];
+      const imageCount = attachments.filter((item) => item.type === 'image').length;
+      const docCount = Math.max(0, attachments.length - imageCount);
+      const commentsCount = getCommentsCount(report);
+      const importance = getImportanceMeta(report.importance);
+      const displayName = user.fullName || report.userName || 'Usuario';
+      const displayUser = user.fullName ? user : { fullName: displayName, photoUrl: '' };
+
+      return `
+        <article class="informe-card" data-report-id="${report.id}" data-year="${report.year}" data-month="${report.month}" data-day="${report.day}">
+          <div class="informe-card-head">
+            <span class="informe-card-date"><i class="fa-regular fa-calendar"></i> ${getDateLabel(report.createdAt)}</span>
+            <span class="informe-card-comments ${commentsCount ? 'has-comments' : 'no-comments'}"><i class="fa-solid ${commentsCount ? 'fa-comment-dots' : 'fa-comment-slash'}"></i> ${commentsCount ? `${commentsCount} comentario(s)` : 'Sin comentarios'}</span>
+          </div>
+
+          <div class="informe-card-preview">${report.html || '<p>Sin contenido</p>'}</div>
+
+          <div class="informe-card-meta">
+            <span class="informe-attach-chip"><i class="fa-regular fa-image"></i> ${imageCount}</span>
+            <span class="informe-attach-chip"><i class="fa-regular fa-file-lines"></i> ${docCount}</span>
+            <span class="importance-chip importance-${importance.tone}">${Number(report.importance || 50)}% · ${importance.label}</span>
+          </div>
+
+          <div class="informe-card-user">
+            ${renderUserAvatar(displayUser)}
+            <div class="informe-card-user-text">
+              <strong>${escapeHtml(displayName)}</strong>
+              <small>${escapeHtml(user.position || report.userPosition || 'Sin puesto')}</small>
+            </div>
+          </div>
+
+          <div class="informe-card-actions">
+            <button class="btn ios-btn ios-btn-primary" type="button" data-view-report="${report.id}">Ver informe completo</button>
+            <button class="btn informe-icon-btn" type="button" data-comment-report="${report.id}" title="Comentar"><i class="fa-regular fa-message"></i></button>
+            <button class="btn informe-icon-btn" type="button" data-edit-report="${report.id}" title="Editar"><i class="fa-solid fa-pen"></i></button>
+            <button class="btn informe-icon-btn danger" type="button" data-delete-report="${report.id}" title="Borrar"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </article>
+      `;
+    }).join('');
+
+    prepareThumbLoaders('.informe-card .js-user-photo');
+    renderBoardPagination(totalPages);
+    setBoardState('data');
+  };
+
+  const buildReportDayCount = async () => {
+    const index = await window.dbLaJamoneraRest.read('/informes_index');
+    const dayCount = {};
+    if (index && typeof index === 'object') {
+      Object.keys(index).forEach((year) => {
+        Object.keys(index[year] || {}).forEach((month) => {
+          Object.keys(index[year][month] || {}).forEach((day) => {
+            const key = `${year}-${month}-${day}`;
+            dayCount[key] = Object.keys(index[year][month][day] || {}).length;
+          });
+        });
+      });
+    }
+    state.reportDayCount = dayCount;
+  };
+
+  const loadReportsBoard = async () => {
+    if (!informesBoardLoading) return;
+    setBoardState('loading');
+    try {
+      await buildReportDayCount();
+      state.reports = await collectReports();
+      if (!state.activeRange) {
+        state.filteredReports = [];
+      }
+      renderReportsBoard();
+      if (reportsFilterPicker) {
+        reportsFilterPicker.redraw();
+      }
+    } catch (error) {
+      setBoardState('empty');
+      informesBoardEmpty.textContent = 'No hay informes para cargar';
+    }
+  };
+
+  const applyDateFilter = (startDate, endDate) => {
+    if (!startDate || !endDate) {
+      state.activeRange = null;
+      state.filteredReports = [];
+      state.currentPage = 1;
+      clearFilterInformesBtn.classList.add('d-none');
+      renderReportsBoard();
+      return;
+    }
+
+    state.activeRange = [startDate, endDate];
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    state.filteredReports = state.reports.filter((report) => {
+      const created = new Date(Number(report.createdAt || Date.now()));
+      return created >= start && created <= end;
+    });
+    state.currentPage = 1;
+    clearFilterInformesBtn.classList.remove('d-none');
+    renderReportsBoard();
+  };
+
   const loadData = async () => {
     showState('loading');
     try {
@@ -304,6 +530,7 @@
       renderAttachments();
       showState('data');
       updateMainScrollHint();
+      await loadReportsBoard();
     } catch (error) {
       await openIosSwal({ title: 'Error', html: '<p>No se pudieron cargar los datos de informes.</p>', icon: 'error', confirmButtonText: 'Entendido' });
       showState('data');
@@ -359,6 +586,8 @@
               <input id="userFullName" class="swal2-input ios-input" autocomplete="off" placeholder="Ej: Juan Pérez" value="${initial ? initial.fullName : ''}">
               <label for="userPosition">Puesto en la empresa *</label>
               <input id="userPosition" class="swal2-input ios-input" autocomplete="off" placeholder="Ej: Bromatólogo" value="${initial ? initial.position : ''}">
+              <label for="userEmail">Email *</label>
+              <input id="userEmail" class="swal2-input ios-input" autocomplete="off" type="email" placeholder="Ej: usuario@empresa.com" value="${initial ? (initial.email || '') : ''}">
               <label for="userPin">Clave de 4 dígitos *</label>
               <div class="ios-input-group d-flex align-items-center px-2">
                 <input id="userPin" class="swal2-input ios-input border-0 bg-transparent flex-grow-1" type="password" maxlength="4" inputmode="numeric" autocomplete="new-password" placeholder="4 dígitos" value="${initial ? initial.pin : ''}">
@@ -418,10 +647,15 @@
       preConfirm: async () => {
         const fullName = normalizeValue(document.getElementById('userFullName').value);
         const position = normalizeValue(document.getElementById('userPosition').value);
+        const email = normalizeLower(document.getElementById('userEmail').value);
         const pin = normalizeValue(document.getElementById('userPin').value);
 
-        if (!fullName || !position) {
-          Swal.showValidationMessage('Completá nombre y puesto.');
+        if (!fullName || !position || !email) {
+          Swal.showValidationMessage('Completá nombre, puesto e email.');
+          return false;
+        }
+        if (!/^\S+@\S+\.\S+$/.test(email)) {
+          Swal.showValidationMessage('Ingresá un email válido.');
           return false;
         }
         if (!/^\d{4}$/.test(pin)) {
@@ -440,7 +674,7 @@
           }
         }
 
-        return { fullName, position, pin, photoUrl };
+        return { fullName, position, email, pin, photoUrl };
       }
     });
 
@@ -521,9 +755,11 @@
         userId: selectedUserId,
         userName: state.users[selectedUserId].fullName,
         userPosition: state.users[selectedUserId].position,
+        userEmail: state.users[selectedUserId].email || '',
         html: editorHtml,
         importance: Number(importanceRange.value || 50),
-        attachments: attachmentsSaved
+        attachments: attachmentsSaved,
+        comments: {}
       };
 
       await window.dbLaJamoneraRest.write(basePath, reportPayload);
@@ -534,7 +770,8 @@
         userName: state.users[selectedUserId].fullName,
         importance: Number(importanceRange.value || 50),
         createdAt: Date.now(),
-        attachmentsCount: attachmentsSaved.length
+        attachmentsCount: attachmentsSaved.length,
+        commentsCount: 0
       });
 
       state.attachments.forEach((item) => {
@@ -547,12 +784,184 @@
       importanceRange.value = 50;
       updateImportanceLabel();
       clearDraft();
+      await loadReportsBoard();
       await openIosSwal({ title: 'Informe guardado', html: '<p>El informe fue almacenado correctamente en Firebase.</p>', icon: 'success', confirmButtonText: 'Entendido' });
     } catch (error) {
       await openIosSwal({ title: 'Error al guardar', html: '<p>No se pudo guardar el informe. Reintentá.</p>', icon: 'error', confirmButtonText: 'Entendido' });
     } finally {
       Swal.close();
     }
+  };
+
+
+
+  const findReportById = (reportId) => {
+    const source = state.reports || [];
+    return source.find((item) => item.id === reportId) || null;
+  };
+
+  const ensureUsersAvailableForComment = async () => {
+    const users = Object.values(state.users || {});
+    if (users.length) return true;
+    const answer = await openIosSwal({
+      title: 'Sin usuarios',
+      html: '<p>Necesitás crear un usuario antes de comentar.</p>',
+      showCancelButton: true,
+      confirmButtonText: 'Crear usuario',
+      cancelButtonText: 'Cancelar'
+    });
+    if (!answer.isConfirmed) return false;
+    const id = await openUserForm();
+    return Boolean(id);
+  };
+
+  const verifyReportCreatorPin = async (report) => {
+    const user = state.users[report.userId];
+    if (!user) {
+      await openIosSwal({ title: 'Usuario no encontrado', html: '<p>No existe el usuario creador del informe.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      return false;
+    }
+    const keyCheck = await promptUserKey();
+    if (!keyCheck.isConfirmed) return false;
+    if (keyCheck.value !== user.pin) {
+      await openIosSwal({ title: 'Clave incorrecta', html: '<p>No coincide la clave del creador.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      return false;
+    }
+    return true;
+  };
+
+  const openReportViewer = async (report) => {
+    const attachments = Array.isArray(report.attachments) ? report.attachments : [];
+    const attachmentHtml = attachments.length
+      ? attachments.map((item, index) => {
+        if (item.type === 'image') {
+          return `<button type="button" class="attachment-card" data-open-report-image="${index}"><img src="${item.url}" alt="${escapeHtml(item.name)}" class="attachment-image is-loaded"></button>`;
+        }
+        return `<a href="${item.url}" target="_blank" rel="noopener noreferrer" class="attachment-card attachment-doc"><i class="bi bi-file-earmark"></i><span>${escapeHtml(item.name)}</span></a>`;
+      }).join('')
+      : '<div class="informes-empty">Sin adjuntos</div>';
+
+    await openIosSwal({
+      title: 'Informe completo',
+      width: 980,
+      html: `
+        <div class="report-viewer">
+          <div class="report-viewer-meta">
+            <p><strong>Creador:</strong> ${escapeHtml(report.userName || '')}</p>
+            <p><strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')}</p>
+            <p><strong>Email:</strong> ${escapeHtml(report.userEmail || '-')}</p>
+            <p><strong>Fecha:</strong> ${getDateLabel(report.createdAt)}</p>
+          </div>
+          <div class="report-viewer-content">${report.html || ''}</div>
+          <div class="attachments-grid">${attachmentHtml}</div>
+        </div>
+      `,
+      confirmButtonText: 'Cerrar',
+      didOpen: (popup) => {
+        popup.querySelectorAll('[data-open-report-image]').forEach((node) => {
+          node.addEventListener('click', (event) => {
+            const idx = Number(event.currentTarget.dataset.openReportImage);
+            state.viewerImages = attachments.filter((item) => item.type === 'image').map((item) => ({ previewUrl: item.url }));
+            openImageViewer(idx);
+          });
+        });
+      }
+    });
+  };
+
+  const editReport = async (report) => {
+    const allowed = await verifyReportCreatorPin(report);
+    if (!allowed) return;
+    const answer = await openIosSwal({
+      title: 'Editar informe',
+      html: `<div class="text-start"><label class="mb-2">Contenido del informe</label><div id="editReportHtml" class="informe-editor" contenteditable="true">${report.html || ''}</div></div>`,
+      width: 960,
+      showCancelButton: true,
+      confirmButtonText: 'Guardar cambios',
+      cancelButtonText: 'Cancelar',
+      preConfirm: () => {
+        const html = normalizeValue(document.getElementById('editReportHtml').innerHTML);
+        if (!html) {
+          Swal.showValidationMessage('El informe no puede quedar vacío.');
+          return false;
+        }
+        return html;
+      }
+    });
+
+    if (!answer.isConfirmed) return;
+    const path = getReportPath(report);
+    const updated = { ...report, html: answer.value, updatedAt: Date.now() };
+    await window.dbLaJamoneraRest.write(path, updated);
+    await loadReportsBoard();
+  };
+
+  const deleteReport = async (report) => {
+    const allowed = await verifyReportCreatorPin(report);
+    if (!allowed) return;
+    const confirmation = await openIosSwal({
+      title: 'Borrar informe',
+      html: '<p>Esta acción eliminará el informe de forma definitiva.</p>',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Borrar',
+      cancelButtonText: 'Cancelar'
+    });
+    if (!confirmation.isConfirmed) return;
+    const path = getReportPath(report);
+    await window.dbLaJamoneraRest.write(path, null);
+    await window.dbLaJamoneraRest.write(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, null);
+    await loadReportsBoard();
+  };
+
+  const addCommentToReport = async (report) => {
+    const canContinue = await ensureUsersAvailableForComment();
+    if (!canContinue) return;
+    const users = Object.values(state.users);
+    const options = users.map((user) => `<option value="${user.id}">${escapeHtml(user.fullName)}</option>`).join('');
+    const commentPrompt = await openIosSwal({
+      title: 'Nuevo comentario',
+      html: `<div class="text-start"><label>Usuario</label><select id="commentUser" class="form-select ios-input mb-2">${options}</select><label>Comentario</label><textarea id="commentText" class="swal2-textarea ios-input" placeholder="Escribí tu comentario"></textarea></div>`,
+      showCancelButton: true,
+      confirmButtonText: 'Continuar',
+      cancelButtonText: 'Cancelar',
+      preConfirm: () => {
+        const userId = normalizeValue(document.getElementById('commentUser').value);
+        const text = normalizeValue(document.getElementById('commentText').value);
+        if (!userId || !state.users[userId]) {
+          Swal.showValidationMessage('Seleccioná un usuario.');
+          return false;
+        }
+        if (!text) {
+          Swal.showValidationMessage('Escribí un comentario.');
+          return false;
+        }
+        return { userId, text };
+      }
+    });
+    if (!commentPrompt.isConfirmed) return;
+
+    const author = state.users[commentPrompt.value.userId];
+    const pinCheck = await promptUserKey();
+    if (!pinCheck.isConfirmed || pinCheck.value !== author.pin) {
+      if (pinCheck.isConfirmed) {
+        await openIosSwal({ title: 'Clave incorrecta', html: '<p>No coincide la clave del usuario.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      }
+      return;
+    }
+
+    const comments = report.comments && typeof report.comments === 'object' ? report.comments : {};
+    const commentId = makeId('cmt');
+    comments[commentId] = {
+      id: commentId,
+      userId: author.id,
+      userName: author.fullName,
+      text: commentPrompt.value.text,
+      createdAt: Date.now()
+    };
+    const updated = { ...report, comments };
+    await window.dbLaJamoneraRest.write(getReportPath(report), updated);
+    await loadReportsBoard();
   };
 
   const updatePreview = () => {
@@ -742,7 +1151,7 @@
   };
 
   const openImageViewer = (index) => {
-    const images = state.attachments.filter((item) => item.type === 'image');
+    const images = state.viewerImages.length ? state.viewerImages : state.attachments.filter((item) => item.type === 'image');
     if (!images.length) return;
     state.imageViewerIndex = index;
     state.viewerScale = 1;
@@ -752,7 +1161,7 @@
   };
 
   const updateViewerImage = (delta) => {
-    const images = state.attachments.filter((item) => item.type === 'image');
+    const images = state.viewerImages.length ? state.viewerImages : state.attachments.filter((item) => item.type === 'image');
     if (!images.length) return;
     state.imageViewerIndex = (state.imageViewerIndex + delta + images.length) % images.length;
     state.viewerScale = 1;
@@ -869,6 +1278,7 @@
     const target = state.attachments[clickedIndex];
     const imageIndex = imageAttachments.findIndex((img) => img.previewUrl === target.previewUrl);
     if (imageIndex >= 0) {
+      state.viewerImages = imageAttachments;
       openImageViewer(imageIndex);
     }
   });
@@ -966,6 +1376,93 @@
   formatBlockSelect.addEventListener('change', persistDraft);
   textColorInput.addEventListener('change', persistDraft);
   highlightColorInput.addEventListener('change', persistDraft);
+
+  window.laJamoneraReady.then(() => loadReportsBoard()).catch(() => setBoardState('empty'));
+
+
+
+  if (informesPagination) {
+    informesPagination.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-page]');
+      if (!button) return;
+      state.currentPage = Number(button.dataset.page || 1);
+      renderReportsBoard();
+    });
+  }
+
+  if (informesCardsGrid) {
+    informesCardsGrid.addEventListener('click', async (event) => {
+      const article = event.target.closest('.informe-card');
+      if (!article) return;
+      const report = findReportById(article.dataset.reportId);
+      if (!report) return;
+
+      if (event.target.closest('[data-view-report]')) {
+        await openReportViewer(report);
+        return;
+      }
+      if (event.target.closest('[data-edit-report]')) {
+        await editReport(report);
+        return;
+      }
+      if (event.target.closest('[data-delete-report]')) {
+        await deleteReport(report);
+        return;
+      }
+      if (event.target.closest('[data-comment-report]')) {
+        await addCommentToReport(report);
+      }
+    });
+  }
+
+  if (openFilterInformesBtn && informesFilterInput && window.flatpickr) {
+    reportsFilterPicker = flatpickr(informesFilterInput, {
+      mode: 'range',
+      dateFormat: 'Y-m-d',
+      locale: window.flatpickr?.l10ns?.es || undefined,
+      positionElement: openFilterInformesBtn,
+      appendTo: openFilterInformesBtn.parentElement,
+      disableMobile: true,
+      onReady: (_dates, _str, fp) => {
+        fp.calendarContainer.classList.add('informes-filter-calendar');
+      },
+      onOpen: (_dates, _str, fp) => {
+        fp.redraw();
+      },
+      onDayCreate: (_dObj, _dStr, _fp, dayElem) => {
+        const dateObj = dayElem.dateObj;
+        if (!dateObj) return;
+        const key = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+        const count = state.reportDayCount[key] || 0;
+        if (!count) return;
+        const badge = document.createElement('span');
+        badge.className = 'flatpickr-report-badge';
+        badge.textContent = String(count);
+        dayElem.appendChild(badge);
+      },
+      onClose: (selectedDates) => {
+        if (selectedDates.length === 2) {
+          applyDateFilter(selectedDates[0], selectedDates[1]);
+        }
+      }
+    });
+
+    openFilterInformesBtn.addEventListener('click', () => {
+      if (reportsFilterPicker) {
+        reportsFilterPicker.redraw();
+        reportsFilterPicker.open();
+      }
+    });
+  }
+
+  if (clearFilterInformesBtn) {
+    clearFilterInformesBtn.addEventListener('click', () => {
+      if (reportsFilterPicker) {
+        reportsFilterPicker.clear();
+      }
+      applyDateFilter(null, null);
+    });
+  }
 
   informesModal.addEventListener('show.bs.modal', async () => {
     if (!datePicker && window.flatpickr) {
