@@ -276,7 +276,7 @@
           ${renderUserAvatar(user)}
           <div class="informe-user-main">
             <h6>${user.fullName}</h6>
-            <p>${user.position}</p><small>${user.email || ""}</small>
+            <p>${user.position}</p><small class="email-user">${user.email || ""}</small>
           </div>
         </article>
         <div class="informe-user-actions">
