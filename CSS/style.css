@@ -1807,10 +1807,13 @@ html.login-protected.auth-ok body {
 .informe-user-main .email-user {
   display: block;
   margin-top: 2px;
+  max-width: 100%;
   font-size: 0.72rem;
   color: #7b86a4;
   line-height: 1.25;
-  word-break: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .informe-user-main h6 {

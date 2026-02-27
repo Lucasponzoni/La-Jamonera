@@ -209,13 +209,19 @@
     return Math.min(100, Math.max(0, Math.round(numeric)));
   };
 
+  const IMPORTANCE_LEVELS = [
+    { max: 14, label: 'Excelente 😄', tone: 'ok' },
+    { max: 28, label: 'Muy bueno 🙂', tone: 'ok' },
+    { max: 42, label: 'Bueno 😊', tone: 'normal' },
+    { max: 56, label: 'Normal 😐', tone: 'normal' },
+    { max: 70, label: 'Atención 😶', tone: 'warn' },
+    { max: 84, label: 'Importante ⚠️', tone: 'high' },
+    { max: 100, label: 'Muy importante 🚨', tone: 'critical' }
+  ];
+
   const getImportanceMeta = (importanceValue) => {
     const value = normalizeImportance(importanceValue, 50);
-    if (value <= 28) return { label: 'Muy bueno 🙂', tone: 'ok' };
-    if (value <= 56) return { label: 'Normal 😐', tone: 'normal' };
-    if (value <= 70) return { label: 'Atención 😶', tone: 'warn' };
-    if (value <= 84) return { label: 'Importante ⚠️', tone: 'high' };
-    return { label: 'Muy importante 🚨', tone: 'critical' };
+    return IMPORTANCE_LEVELS.find((item) => value <= item.max) || IMPORTANCE_LEVELS[IMPORTANCE_LEVELS.length - 1];
   };
 
   const getReportPath = (report) => `/informes/${report.year}/${report.month}/${report.day}/${report.id}`;
@@ -242,9 +248,8 @@
       hash = ((hash << 5) - hash) + seed.charCodeAt(i);
       hash |= 0;
     }
-    const palette = ['#2f6fd6', '#20a36b', '#b56a15', '#7f57d9', '#d14e69', '#0e8f9a'];
-    const idx = Math.abs(hash) % palette.length;
-    return palette[idx];
+    const hue = Math.abs(hash) % 360;
+    return `hsl(${hue}, 65%, 46%)`;
   };
 
   const setCollapsedSelection = (node, offset = 0) => {
@@ -1329,6 +1334,13 @@
   };
 
   const updatePreview = () => {
+    const hasContent = normalizeValue(informeEditor?.textContent || '');
+    if (!hasContent) {
+      informePreview.style.textAlign = 'left';
+      informePreview.innerHTML = '<span style="color:#000000;background:#ffffff;font-weight:400;font-style:normal;text-decoration:none;">Texto vista previa</span>';
+      return;
+    }
+
     const previewColor = textColorInput.value || '#000000';
     const previewHighlight = highlightColorInput.value || '#ffffff';
     const previewBold = document.queryCommandState('bold');
@@ -1412,20 +1424,9 @@
     updatePreview();
   };
 
-  const IMPORTANCE_STATES = [
-    { max: 14, text: 'Excelente 😄' },
-    { max: 28, text: 'Muy bueno 🙂' },
-    { max: 42, text: 'Bueno 😊' },
-    { max: 56, text: 'Normal 😐' },
-    { max: 70, text: 'Atención 😶' },
-    { max: 84, text: 'Importante ⚠️' },
-    { max: 100, text: 'Muy importante 🚨' }
-  ];
-
   const updateImportanceLabel = () => {
-    const value = getImportanceValue();
-    const found = IMPORTANCE_STATES.find((item) => value <= item.max) || IMPORTANCE_STATES[IMPORTANCE_STATES.length - 1];
-    importanceLabel.textContent = found.text;
+    const meta = getImportanceMeta(getImportanceValue());
+    importanceLabel.textContent = meta.label;
   };
 
   const EMOJIS = ['😀', '😁', '😂', '🤣', '😊', '🙂', '😉', '😍', '😘', '😎', '🤔', '😐', '😶', '🙄', '😢', '😭', '😡', '🤯', '🥳', '👍', '👎', '👏', '🙏', '💡', '🔥', '⚠️', '🚨', '✅', '❌', '🧪', '📌', '📎', '📅', '🧼', '🧫'];
