@@ -1540,8 +1540,8 @@ html.login-protected.auth-ok body {
 
 .editor-select {
   min-width: 108px;
-  text-align: center;
-  text-align-last: center;
+  text-align: left;
+  text-align-last: left;
 }
 
 .editor-color-wrap {
@@ -1633,19 +1633,19 @@ html.login-protected.auth-ok body {
 
 .importance-range::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   background: #1f7aec;
-  border: 3px solid #ffffff;
+  border: 0;
 }
 
 .importance-range::-moz-range-thumb {
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   background: #1f7aec;
-  border: 3px solid #ffffff;
+  border: 0;
 }
 
 .importance-label {
@@ -1703,3 +1703,122 @@ html.login-protected.auth-ok body {
 
 /* =========================================
    INFORMES UI FIXES V2
+========================================= */
+.informes-users-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+  max-height: 240px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+
+.informes-users-list.has-scroll-hint::after {
+  content: '↓ Deslizá para ver más usuarios';
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: block;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #516089;
+  background: linear-gradient(to bottom, rgba(242, 245, 252, 0), rgba(242, 245, 252, 1));
+  padding: 10px 0 4px;
+  pointer-events: none;
+}
+
+.informe-user-circle-wrap {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.informe-user-circle {
+  border: 1px solid #dbe0ef;
+  background: #fdfdff;
+  border-radius: 16px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.informe-user-circle h6 {
+  margin: 0;
+  color: #2a3556;
+  font-weight: 700;
+}
+
+.informe-user-circle p {
+  margin: 2px 0 0;
+  color: #5f6a89;
+  font-size: 0.85rem;
+}
+
+.informe-user-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.informes-saving-alert .swal2-html-container {
+  overflow: hidden;
+  margin: 0;
+}
+
+.informes-saving-spinner {
+  min-height: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.swal2-popup.informes-key-alert .swal2-input.informes-key-input {
+  border-radius: 14px;
+  border: 1px solid #d2d8e8;
+  background: #f2f4fa;
+  color: #3a4564;
+  min-height: 50px;
+}
+
+.swal2-popup.informes-key-alert .swal2-input.informes-key-input:focus {
+  box-shadow: none;
+  border-color: #9caad2;
+  background: #f7f9ff;
+}
+
+.swal2-popup.informes-clear-alert .swal2-actions {
+  justify-content: center;
+  gap: 10px;
+}
+
+.swal2-popup.informes-clear-alert .swal2-confirm {
+  background: #1f7ae8;
+  color: #fff;
+}
+
+.swal2-popup.informes-clear-alert .swal2-deny {
+  background: #e6ebfa;
+  color: #2a4ea3;
+}
+
+.swal2-popup.informes-clear-alert .swal2-cancel {
+  background: #ff3b30;
+  color: #fff;
+}
+
+@media (max-width: 768px) {
+  .informe-user-circle-wrap {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .informe-user-actions {
+    justify-content: flex-end;
+  }
+}

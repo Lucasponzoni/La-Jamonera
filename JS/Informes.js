@@ -132,11 +132,21 @@
     });
   };
 
+  const toggleScrollHint = (element) => {
+    if (!element) {
+      return;
+    }
+    const hasOverflow = element.scrollHeight > element.clientHeight + 4;
+    const nearBottom = element.scrollTop + element.clientHeight >= element.scrollHeight - 6;
+    element.classList.toggle('has-scroll-hint', hasOverflow && !nearBottom);
+  };
+
   const renderUsers = () => {
     const users = Object.values(state.users).sort((a, b) => String(a.fullName).localeCompare(String(b.fullName)));
 
     if (!users.length) {
       informesUsersList.innerHTML = '<div class="informes-empty">No hay usuarios cargados.</div>';
+      informesUsersList.classList.remove('has-scroll-hint');
       renderUserSelect();
       return;
     }
@@ -157,6 +167,7 @@
 
     renderUserSelect();
     prepareThumbLoaders('.js-user-photo');
+    toggleScrollHint(informesUsersList);
   };
 
   const renderUserSelect = () => {
@@ -164,7 +175,7 @@
     const current = informeUserSelect.value;
 
     const options = users.map((user) => `<option value="${user.id}">${user.fullName} (${user.position})</option>`).join('');
-    informeUserSelect.innerHTML = `<option value="">Seleccioná un usuario</option>${options}<option value="create">Cargar usuario</option>`;
+    informeUserSelect.innerHTML = `<option value="">Seleccioná un usuario</option>${options}<option value="create">Crear usuario</option>`;
 
     if (current && state.users[current]) {
       informeUserSelect.value = current;
@@ -240,11 +251,15 @@
     const keyCheck = await openIosSwal({
       title: 'Verificar clave',
       input: 'password',
+      inputClass: 'ios-input informes-key-input',
       inputLabel: 'Ingresá la clave de 4 dígitos',
       inputAttributes: { maxlength: 4, inputmode: 'numeric' },
       confirmButtonText: 'Validar',
       showCancelButton: true,
       cancelButtonText: 'Cancelar',
+      customClass: {
+        popup: 'informes-key-alert'
+      },
       preConfirm: (val) => {
         if (!/^\d{4}$/.test(String(val || ''))) {
           Swal.showValidationMessage('La clave debe tener 4 dígitos numéricos.');
@@ -403,11 +418,11 @@
 
     Swal.fire({
       title: 'Guardando informe...',
-      html: '<img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner-login">',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner-login"></div>',
       allowOutsideClick: false,
       allowEscapeKey: false,
       showConfirmButton: false,
-      customClass: { popup: 'ios-alert informes-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' }
+      customClass: { popup: 'ios-alert informes-alert informes-saving-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' }
     });
 
     try {
@@ -497,7 +512,7 @@
     fontSizeSelect.value = '3';
     formatBlockSelect.value = 'P';
     textColorInput.value = '#000000';
-    highlightColorInput.value = '#fff59d';
+    highlightColorInput.value = '#ffffff';
   };
 
   const clearTypingStates = () => {
@@ -512,6 +527,14 @@
   };
 
   const applyEditorCommand = (cmd, value = null) => {
+    const selection = window.getSelection();
+    const hasSelection =
+      selection
+      && selection.rangeCount > 0
+      && !selection.isCollapsed
+      && informeEditor.contains(selection.anchorNode)
+      && informeEditor.contains(selection.focusNode);
+
     informeEditor.focus();
     if (cmd === 'removeFormat') {
       document.execCommand('removeFormat', false);
@@ -523,6 +546,15 @@
       document.execCommand('formatBlock', false, '<P>');
       clearTypingStates();
       resetEditorControls();
+
+      if (hasSelection) {
+        const endRange = selection.getRangeAt(0).cloneRange();
+        endRange.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(endRange);
+      }
+
+      document.execCommand('styleWithCSS', false, false);
     } else if (cmd === 'formatBlock') {
       document.execCommand('formatBlock', false, `<${value}>`);
     } else if (cmd === 'hiliteColor') {
@@ -768,6 +800,10 @@
     }
   });
 
+  informesUsersList.addEventListener('scroll', () => {
+    toggleScrollHint(informesUsersList);
+  });
+
   saveInformeBtn.addEventListener('click', saveInforme);
 
   clearInformeBtn.addEventListener('click', async () => {
@@ -778,7 +814,10 @@
       showCancelButton: true,
       confirmButtonText: 'Solo texto',
       denyButtonText: 'Texto y adjuntos',
-      cancelButtonText: 'Cancelar'
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        popup: 'informes-clear-alert'
+      }
     });
 
     if (answer.isConfirmed || answer.isDenied) {
