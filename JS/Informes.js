@@ -226,7 +226,7 @@
 
   const getReportPath = (report) => `/informes/${report.year}/${report.month}/${report.day}/${report.id}`;
 
-  const normalizeHtmlForPdf = (rawHtml) => {
+  const sanitizeHtmlForPdfMake = (rawHtml) => {
     const source = String(rawHtml || '').trim();
     if (!source) return '';
 
@@ -238,11 +238,6 @@
       const url = normalizeValue(img.getAttribute('src'));
       const alt = normalizeValue(img.getAttribute('alt')) || 'Imagen';
       const replacement = doc.createElement('p');
-      replacement.style.margin = '8px 0';
-      replacement.style.padding = '8px';
-      replacement.style.border = '1px solid #dbe2f3';
-      replacement.style.borderRadius = '10px';
-      replacement.style.background = '#f8f9fd';
       replacement.innerHTML = `<strong>${escapeHtml(alt)}</strong><br><small>Imagen externa omitida del PDF por restricción CORS.</small>${url ? `<br><small>${escapeHtml(url)}</small>` : ''}`;
       img.replaceWith(replacement);
     });
@@ -250,29 +245,42 @@
     return root.innerHTML;
   };
 
-  const buildPrintWindowHtml = (report) => {
+  const buildPdfDefinition = (report) => {
     const attachments = Array.isArray(report?.attachments) ? report.attachments : [];
     const images = attachments.filter((item) => item.type === 'image' && item.url);
     const docs = attachments.filter((item) => item.type !== 'image' && item.url);
     const safeHtml = normalizeHtmlForPdf(report.html || '');
 
-    const imagesHtml = images.length
-      ? `<ul>${images.map((item) => `<li>${escapeHtml(item.name || 'Imagen')}<br><small>${escapeHtml(item.url)}</small></li>`).join('')}</ul>`
-      : '<p style="color:#5a6482;">Sin imágenes adjuntas.</p>';
+    const safeHtml = sanitizeHtmlForPdfMake(report.html || '');
+    const htmlContent = window.htmlToPdfmake
+      ? window.htmlToPdfmake(safeHtml || '<p>Sin contenido</p>', { window })
+      : [{ text: safeHtml || 'Sin contenido' }];
 
-    const docsHtml = docs.length
-      ? `<ul>${docs.map((item) => `<li>${escapeHtml(item.name || 'Archivo')}</li>`).join('')}</ul>`
-      : '<p style="color:#5a6482;">Sin archivos adjuntos.</p>';
-
-    return `
-      <h1 style="margin:0 0 8px;">Informe bromatológico</h1>
-      <p style="margin:0 0 4px;"><strong>Usuario:</strong> ${escapeHtml(report.userName || '-')}</p>
-      <p style="margin:0 0 4px;"><strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')}</p>
-      <p style="margin:0 0 16px;"><strong>Fecha:</strong> ${getDateLabel(report.createdAt)}</p>
-      <section style="margin-bottom:14px;"><h2 style="font-size:18px;">Contenido</h2><div>${safeHtml}</div></section>
-      <section style="margin-bottom:14px;"><h2 style="font-size:18px;">Imágenes adjuntas</h2>${imagesHtml}</section>
-      <section><h2 style="font-size:18px;">Otros adjuntos</h2>${docsHtml}</section>
-    `;
+    return {
+      pageSize: 'A4',
+      pageMargins: [28, 24, 28, 24],
+      defaultStyle: { fontSize: 11 },
+      content: [
+        { text: 'Informe bromatológico', style: 'title' },
+        { text: `Usuario: ${report.userName || '-'}`, margin: [0, 2, 0, 0] },
+        { text: `Puesto: ${report.userPosition || '-'}`, margin: [0, 2, 0, 0] },
+        { text: `Fecha: ${getDateLabel(report.createdAt)}`, margin: [0, 2, 0, 10] },
+        { text: 'Contenido', style: 'sectionTitle' },
+        ...(Array.isArray(htmlContent) ? htmlContent : [htmlContent]),
+        { text: 'Imágenes adjuntas', style: 'sectionTitle', margin: [0, 14, 0, 6] },
+        images.length
+          ? { ul: images.map((item) => ({ text: `${item.name || 'Imagen'} - ${item.url}`, link: item.url, color: '#1d4ed8' })) }
+          : { text: 'Sin imágenes adjuntas.', color: '#5a6482' },
+        { text: 'Otros adjuntos', style: 'sectionTitle', margin: [0, 14, 0, 6] },
+        docs.length
+          ? { ul: docs.map((item) => ({ text: `${item.name || 'Archivo'}${item.url ? ` - ${item.url}` : ''}`, link: item.url || undefined, color: item.url ? '#1d4ed8' : '#1f2a44' })) }
+          : { text: 'Sin archivos adjuntos.', color: '#5a6482' }
+      ],
+      styles: {
+        title: { fontSize: 18, bold: true },
+        sectionTitle: { fontSize: 13, bold: true }
+      }
+    };
   };
 
   const openProcessingAlert = (message) => {
@@ -292,21 +300,11 @@
     });
   };
 
-  const createPrintContainer = (report) => {
-    const container = document.createElement('div');
-    container.className = 'print-report-container';
-    container.style.cssText = 'position:fixed;left:-12000px;top:0;width:794px;background:#ffffff;color:#1f2a44;padding:24px;font-family:Inter,Arial,sans-serif;pointer-events:none;z-index:-1;';
-    container.innerHTML = buildPrintWindowHtml(report);
-    document.body.appendChild(container);
-    return container;
-  };
-
   const fetchLatestReportData = async (report) => {
     await window.laJamoneraReady;
     const path = getReportPath(report);
     const latest = await window.dbLaJamoneraRest.read(path);
     const latestHtml = await window.dbLaJamoneraRest.read(`${path}/html`);
-    console.info('[Informes][PDF] Firebase path leído:', `${path}/html`, 'tipo:', typeof latestHtml, 'chars:', typeof latestHtml === 'string' ? latestHtml.length : 0);
     if (!latest || typeof latest !== 'object') {
       return {
         ...report,
@@ -325,40 +323,18 @@
   };
 
   const buildReportPdfBlob = async (report) => {
-    if (!window.jspdf || !window.jspdf.jsPDF || !window.html2canvas) {
+    if (!window.pdfMake || !window.htmlToPdfmake) {
       throw new Error('pdf_lib_unavailable');
     }
 
-    const container = createPrintContainer(report);
-
-    try {
-      const pdf = new window.jspdf.jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-        compress: true
-      });
-
-      await pdf.html(container, {
-        x: 8,
-        y: 10,
-        width: 194,
-        windowWidth: Math.max(container.scrollWidth, 794),
-        autoPaging: 'text',
-        margin: [10, 8, 10, 8],
-        html2canvas: {
-          scale: 1.4,
-          useCORS: false,
-          allowTaint: false,
-          backgroundColor: '#ffffff',
-          logging: false
-        }
-      });
-
-      return pdf.output('blob');
-    } finally {
-      container.remove();
-    }
+    const docDefinition = buildPdfDefinition(report);
+    return await new Promise((resolve, reject) => {
+      try {
+        window.pdfMake.createPdf(docDefinition).getBlob((blob) => resolve(blob));
+      } catch (error) {
+        reject(error);
+      }
+    });
   };
 
   const downloadPdfBlob = (blob, fileName) => {
@@ -427,7 +403,7 @@
     } catch (error) {
       let message = '<p>No se pudo generar el PDF del informe.</p>';
       if (error?.message === 'pdf_lib_unavailable') {
-        message = '<p>No pudimos cargar la librería PDF (jsPDF/html2canvas). Reintentá en unos segundos.</p>';
+        message = '<p>No pudimos cargar la librería PDF (pdfmake/html-to-pdfmake). Reintentá en unos segundos.</p>';
       }
       if (error?.message === 'empty_report_html') {
         message = '<p>El informe no tiene contenido HTML para imprimir. Verificá que esté guardado correctamente en Firebase.</p>';
