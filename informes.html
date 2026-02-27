@@ -98,11 +98,24 @@
               <i class="fa-solid fa-file-lines icon-green" aria-hidden="true"></i>
               <span>Nuevo informe</span>
             </button>
+            <button id="openFilterInformesBtn" type="button" class="btn btn-light home-action-btn">
+              <i class="fa-solid fa-filter icon-green" aria-hidden="true"></i>
+              <span>Filtrar informes</span>
+            </button>
+            <button id="clearFilterInformesBtn" type="button" class="btn btn-light home-action-btn d-none">
+              <i class="fa-solid fa-rotate-left icon-green" aria-hidden="true"></i>
+              <span>Volver atrás</span>
+            </button>
+            <input id="informesFilterInput" type="text" class="d-none" aria-label="Filtro por fecha">
           </div>
         </div>
-        <div class="home-content">
-          <h2 class="home-title">Informes bromatológicos</h2>
-          <p class="home-text">Desde aquí se podrán crear y administrar informes.</p>
+        <div class="home-content informes-home-content">
+          <div id="informesBoardLoading" class="informes-board-loading" aria-live="polite">
+            <img src="./IMG/Meta-ai-logo.webp" alt="Cargando informes" class="meta-spinner-login informes-board-spinner">
+          </div>
+          <div id="informesBoardEmpty" class="informes-board-empty d-none">No hay informes para cargar</div>
+          <div id="informesCardsGrid" class="informes-cards-grid d-none"></div>
+          <div id="informesPagination" class="informes-pagination d-none"></div>
         </div>
       </div>
 
