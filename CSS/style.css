@@ -1116,6 +1116,24 @@ html.login-protected.auth-ok body {
   margin-top: 0;
 }
 
+.swal2-popup.ios-alert.informes-alert .swal2-html-container {
+  padding: 0 !important;
+  text-align: left;
+}
+
+.swal2-popup.ios-alert.informes-alert .swal2-textarea {
+  margin: 0 !important;
+  width: 100% !important;
+  min-height: 120px;
+}
+
+.swal2-popup.ios-alert.informes-alert .swal2-select,
+.swal2-popup.ios-alert.informes-alert .swal2-input,
+.swal2-popup.ios-alert.informes-alert .swal2-file {
+  margin: 0 0 10px !important;
+  width: 100% !important;
+}
+
 .swal2-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1750,19 +1768,8 @@ html.login-protected.auth-ok body {
 }
 
 .informes-users-list.has-scroll-hint::after {
-   content: '→ Deslizá para ver más usuarios';
-   position: sticky;
-   right: -10px;
-   display: inline-flex;
-   align-items: center;
-   justify-content: center;
-   min-width: 220px;
-   font-size: 0.78rem;
-   font-weight: 600;
-   color: #ffffff;
-   background: linear-gradient(90deg, rgba(242, 245, 252, 0), rgb(42 78 163));
-   padding: 0 10px;
-   pointer-events: none;
+   content: none;
+   display: none;
 }
 
 .informe-user-circle-wrap {
@@ -2215,8 +2222,16 @@ html.login-protected.auth-ok body {
   padding-top: 10px;
 }
 
-.report-comments-wrap h6 {
+.report-comments-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 8px;
+}
+
+.report-comments-wrap h6 {
+  margin-bottom: 0;
   font-weight: 700;
 }
 
@@ -2230,6 +2245,7 @@ html.login-protected.auth-ok body {
   border-radius: 12px;
   padding: 8px 10px;
   background: #f8faff;
+  text-align: left;
 }
 
 .report-comment-head {
@@ -2263,6 +2279,15 @@ html.login-protected.auth-ok body {
   padding: 4px 10px;
   font-weight: 600;
   font-size: 0.8rem;
+  margin-left: 0;
+}
+
+.report-comment-item[data-comment-level="0"] .report-comment-text {
+  color: #2a3556;
+}
+
+.report-comment-item[data-comment-level]:not([data-comment-level="0"]) .report-comment-text {
+  color: #4f5f84;
 }
 
 .report-comment-form label {
@@ -2292,4 +2317,8 @@ html.login-protected.auth-ok body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.report-edit-toolbar {
+  margin-bottom: 10px;
 }

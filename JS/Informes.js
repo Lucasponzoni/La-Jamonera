@@ -57,7 +57,8 @@
     activeRange: null,
     currentPage: 1,
     viewerImages: [],
-    reportsLoaded: false
+    reportsLoaded: false,
+    reopenViewerReportId: ''
   };
 
   let datePicker = null;
@@ -202,8 +203,14 @@
     return comments.reduce((acc, item) => acc + countCommentEntries(item), 0);
   };
 
+  const normalizeImportance = (value, fallback = 50) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return fallback;
+    return Math.min(100, Math.max(0, Math.round(numeric)));
+  };
+
   const getImportanceMeta = (importanceValue) => {
-    const value = Number(importanceValue || 50);
+    const value = normalizeImportance(importanceValue, 50);
     if (value <= 28) return { label: 'Muy bueno 🙂', tone: 'ok' };
     if (value <= 56) return { label: 'Normal 😐', tone: 'normal' };
     if (value <= 70) return { label: 'Atención 😶', tone: 'warn' };
@@ -214,9 +221,8 @@
   const getReportPath = (report) => `/informes/${report.year}/${report.month}/${report.day}/${report.id}`;
 
   const getImportanceValue = () => {
-    const raw = Number.parseInt(String(importanceRange?.value ?? ''), 10);
-    if (Number.isNaN(raw)) return 50;
-    return Math.min(100, Math.max(0, raw));
+    if (!importanceRange) return 50;
+    return normalizeImportance(importanceRange.value, 50);
   };
 
   const getCommentList = (report) => {
@@ -461,7 +467,7 @@
           <div class="informe-card-meta">
             <span class="informe-attach-chip"><i class="fa-regular fa-image"></i> ${imageCount}</span>
             <span class="informe-attach-chip"><i class="fa-regular fa-file-lines"></i> ${docCount}</span>
-            <span class="importance-chip importance-${importance.tone}">${Number(report.importance || 50)}% · ${importance.label}</span>
+            <span class="importance-chip importance-${importance.tone}">${normalizeImportance(report.importance, 50)}% · ${importance.label}</span>
           </div>
 
           <div class="informe-card-user">
@@ -825,8 +831,11 @@
       state.attachments = [];
       renderAttachments();
       informeEditor.innerHTML = '';
+      resetEditorControls();
+      clearTypingStates();
+      importanceRange.value = '50';
+      updateToolbarState();
       updatePreview();
-      importanceRange.value = 50;
       updateImportanceLabel();
       clearDraft();
       await loadReportsBoard();
@@ -928,7 +937,10 @@
           <div class="report-viewer-content-wrap"><div class="report-viewer-content">${report.html || ''}</div></div>
           <div class="attachments-grid">${attachmentHtml}</div>
           <section class="report-comments-wrap">
-            <h6>Comentarios</h6>
+            <div class="report-comments-head">
+              <h6>Comentarios</h6>
+              <button type="button" class="btn ios-btn ios-btn-secondary report-add-comment-btn" data-comment-from-viewer="1">Comentar</button>
+            </div>
             ${buildCommentsPanel(report)}
           </section>
         </div>
@@ -942,9 +954,16 @@
             const imageIndex = imageAttachments.findIndex((item) => item.url === selected?.url);
             if (imageIndex < 0) return;
             state.viewerImages = imageAttachments.map((item) => ({ previewUrl: item.url }));
+            state.reopenViewerReportId = report.id;
             Swal.close();
             setTimeout(() => openImageViewer(imageIndex), 80);
           });
+        });
+
+        const addCommentBtn = popup.querySelector('[data-comment-from-viewer]');
+        addCommentBtn?.addEventListener('click', async () => {
+          Swal.close();
+          await addCommentToReport(report);
         });
 
         popup.querySelectorAll('[data-reply-comment]').forEach((node) => {
@@ -970,7 +989,20 @@
       html: `
         <div class="text-start report-edit-wrap">
           <label class="mb-2">Contenido del informe</label>
+          <div class="editor-toolbar report-edit-toolbar" role="toolbar" aria-label="Herramientas de edición">
+            <button type="button" class="editor-btn" data-edit-cmd="bold"><i class="fa-solid fa-bold"></i></button>
+            <button type="button" class="editor-btn" data-edit-cmd="italic"><i class="fa-solid fa-italic"></i></button>
+            <button type="button" class="editor-btn" data-edit-cmd="underline"><i class="fa-solid fa-underline"></i></button>
+            <button type="button" class="editor-btn" data-edit-cmd="insertUnorderedList"><i class="fa-solid fa-list-ul"></i></button>
+            <button type="button" class="editor-btn" data-edit-cmd="justifyLeft"><i class="fa-solid fa-align-left"></i></button>
+            <button type="button" class="editor-btn" data-edit-cmd="justifyCenter"><i class="fa-solid fa-align-center"></i></button>
+          </div>
           <div class="report-editor-scroll"><div id="editReportHtml" class="informe-editor" contenteditable="true">${report.html || ''}</div></div>
+          <div class="importance-wrap mt-3">
+            <label class="form-label" for="editImportanceRange">Importancia sanitaria</label>
+            <input id="editImportanceRange" type="range" min="0" max="100" value="${normalizeImportance(report.importance, 50)}" class="importance-range">
+            <div id="editImportanceLabel" class="importance-label"></div>
+          </div>
           <label class="mt-3 mb-2">Adjuntos actuales</label>
           <div id="editAttachmentsGrid" class="attachments-grid report-edit-attachments">
             ${currentAttachments.length ? currentAttachments.map((item, idx) => `
@@ -996,6 +1028,26 @@
         const grid = popup.querySelector('#editAttachmentsGrid');
         const input = popup.querySelector('#editAttachmentsInput');
         const addBtn = popup.querySelector('#editAddAttachmentsBtn');
+        const editEditor = popup.querySelector('#editReportHtml');
+        const editImportanceRange = popup.querySelector('#editImportanceRange');
+        const editImportanceLabel = popup.querySelector('#editImportanceLabel');
+
+        const updateEditImportanceLabel = () => {
+          const meta = getImportanceMeta(editImportanceRange?.value);
+          if (editImportanceLabel) {
+            editImportanceLabel.textContent = `${normalizeImportance(editImportanceRange?.value, 50)}% · ${meta.label}`;
+          }
+        };
+
+        popup.querySelectorAll('[data-edit-cmd]').forEach((button) => {
+          button.addEventListener('click', () => {
+            editEditor?.focus();
+            document.execCommand(button.dataset.editCmd, false, null);
+          });
+        });
+
+        editImportanceRange?.addEventListener('input', updateEditImportanceLabel);
+        updateEditImportanceLabel();
 
         const redraw = () => {
           if (!grid) return;
@@ -1035,11 +1087,23 @@
           redraw();
         });
 
-        grid?.addEventListener('click', (event) => {
+        grid?.addEventListener('click', async (event) => {
           const removeBtn = event.target.closest('[data-remove-edit-attachment]');
           if (!removeBtn) return;
           const idx = Number(removeBtn.dataset.removeEditAttachment);
           const target = currentAttachments[idx];
+          if (!target) return;
+
+          const confirmDelete = await openIosSwal({
+            title: 'Eliminar adjunto',
+            html: `<p><strong>${escapeHtml(target.name || 'Adjunto')}</strong></p><p>Esta acción quitará el archivo del informe.</p>`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Eliminar',
+            cancelButtonText: 'Cancelar'
+          });
+          if (!confirmDelete.isConfirmed) return;
+
           if (target?.isLocal && target.url) {
             URL.revokeObjectURL(target.url);
           }
@@ -1053,7 +1117,8 @@
           Swal.showValidationMessage('El informe no puede quedar vacío.');
           return false;
         }
-        return { html };
+        const importance = normalizeImportance(document.getElementById('editImportanceRange')?.value, 50);
+        return { html, importance };
       }
     });
 
@@ -1089,14 +1154,14 @@
       if (item.isLocal && item.url) URL.revokeObjectURL(item.url);
     });
 
-    const updated = { ...report, html: answer.value.html, attachments: finalAttachments, updatedAt: Date.now() };
+    const updated = { ...report, html: answer.value.html, importance: normalizeImportance(answer.value.importance, 50), attachments: finalAttachments, updatedAt: Date.now() };
     await window.dbLaJamoneraRest.write(path, updated);
     await window.dbLaJamoneraRest.write(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, {
       id: report.id,
       reportDate: report.reportDate,
       userId: report.userId,
       userName: report.userName,
-      importance: Number(report.importance || 50),
+      importance: normalizeImportance(updated.importance, 50),
       createdAt: Number(report.createdAt || Date.now()),
       attachmentsCount: finalAttachments.length,
       commentsCount: getCommentsCount(updated),
@@ -1224,7 +1289,7 @@
       reportDate: report.reportDate,
       userId: report.userId,
       userName: report.userName,
-      importance: Number(report.importance || 50),
+      importance: normalizeImportance(report.importance, 50),
       createdAt: Number(report.createdAt || Date.now()),
       attachmentsCount: Array.isArray(report.attachments) ? report.attachments.length : 0,
       commentsCount: getCommentsCount(updated),
@@ -1387,7 +1452,7 @@
     try {
       const draft = JSON.parse(raw);
       informeEditor.innerHTML = draft.editorHtml || '';
-      importanceRange.value = Number(draft.importance || 50);
+      importanceRange.value = String(normalizeImportance(draft.importance, 50));
       if (draft.userId && state.users[draft.userId]) informeUserSelect.value = draft.userId;
       if (draft.date && datePicker) datePicker.setDate(draft.date, true, 'd/m/Y');
       if (draft.fontSize) fontSizeSelect.value = draft.fontSize;
@@ -1612,6 +1677,15 @@
   viewerNextBtn.addEventListener('click', () => updateViewerImage(1));
   viewerZoomInBtn.addEventListener('click', () => setViewerScale(state.viewerScale + 0.25));
   viewerZoomOutBtn.addEventListener('click', () => setViewerScale(state.viewerScale - 0.25));
+  imageViewerModalEl?.addEventListener('hidden.bs.modal', async () => {
+    if (!state.reopenViewerReportId) return;
+    const report = findReportById(state.reopenViewerReportId);
+    state.reopenViewerReportId = '';
+    if (report) {
+      await openReportViewer(report);
+    }
+  });
+
   viewerImage.addEventListener('wheel', (event) => {
     event.preventDefault();
     const delta = event.deltaY > 0 ? -0.2 : 0.2;
