@@ -226,15 +226,38 @@
 
   const getReportPath = (report) => `/informes/${report.year}/${report.month}/${report.day}/${report.id}`;
 
-  const buildPrintWindowHtml = (report, includeImages = true) => {
+  const normalizeHtmlForPdf = (rawHtml) => {
+    const source = String(rawHtml || '').trim();
+    if (!source) return '';
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<div>${source}</div>`, 'text/html');
+    const root = doc.body.firstElementChild || doc.body;
+
+    root.querySelectorAll('img').forEach((img) => {
+      const url = normalizeValue(img.getAttribute('src'));
+      const alt = normalizeValue(img.getAttribute('alt')) || 'Imagen';
+      const replacement = doc.createElement('p');
+      replacement.style.margin = '8px 0';
+      replacement.style.padding = '8px';
+      replacement.style.border = '1px solid #dbe2f3';
+      replacement.style.borderRadius = '10px';
+      replacement.style.background = '#f8f9fd';
+      replacement.innerHTML = `<strong>${escapeHtml(alt)}</strong><br><small>Imagen externa omitida del PDF por restricción CORS.</small>${url ? `<br><small>${escapeHtml(url)}</small>` : ''}`;
+      img.replaceWith(replacement);
+    });
+
+    return root.innerHTML;
+  };
+
+  const buildPrintWindowHtml = (report) => {
     const attachments = Array.isArray(report?.attachments) ? report.attachments : [];
     const images = attachments.filter((item) => item.type === 'image' && item.url);
     const docs = attachments.filter((item) => item.type !== 'image' && item.url);
+    const safeHtml = normalizeHtmlForPdf(report.html || '');
 
     const imagesHtml = images.length
-      ? (includeImages
-        ? images.map((item) => `<figure style="margin:0 0 14px;"><img src="${item.url}" alt="${escapeHtml(item.name || 'Adjunto')}" style="max-width:100%;border-radius:10px;border:1px solid #dbe2f3;"><figcaption style="font-size:12px;color:#5a6482;">${escapeHtml(item.name || 'Imagen')}</figcaption></figure>`).join('')
-        : `<ul>${images.map((item) => `<li>${escapeHtml(item.name || 'Imagen')}<br><small>${escapeHtml(item.url)}</small></li>`).join('')}</ul>`)
+      ? `<ul>${images.map((item) => `<li>${escapeHtml(item.name || 'Imagen')}<br><small>${escapeHtml(item.url)}</small></li>`).join('')}</ul>`
       : '<p style="color:#5a6482;">Sin imágenes adjuntas.</p>';
 
     const docsHtml = docs.length
@@ -246,11 +269,130 @@
       <p style="margin:0 0 4px;"><strong>Usuario:</strong> ${escapeHtml(report.userName || '-')}</p>
       <p style="margin:0 0 4px;"><strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')}</p>
       <p style="margin:0 0 16px;"><strong>Fecha:</strong> ${getDateLabel(report.createdAt)}</p>
-      <section style="margin-bottom:14px;"><h2 style="font-size:18px;">Contenido</h2><div>${report.html || ''}</div></section>
+      <section style="margin-bottom:14px;"><h2 style="font-size:18px;">Contenido</h2><div>${safeHtml}</div></section>
       <section style="margin-bottom:14px;"><h2 style="font-size:18px;">Imágenes adjuntas</h2>${imagesHtml}</section>
       <section><h2 style="font-size:18px;">Otros adjuntos</h2>${docsHtml}</section>
     `;
   };
+
+  const openProcessingAlert = (message) => {
+    Swal.fire({
+      target: getSwalTarget(),
+      title: 'Procesando informe',
+      html: `<div class="d-flex flex-column align-items-center gap-2"><img src="./IMG/Meta-ai-logo.webp" alt="Procesando" class="meta-spinner-login"><p class="mb-0">${escapeHtml(message)}</p></div>`,
+      allowEscapeKey: false,
+      allowOutsideClick: false,
+      showConfirmButton: false,
+      customClass: {
+        popup: 'ios-alert informes-alert informes-saving-alert',
+        title: 'ios-alert-title',
+        htmlContainer: 'ios-alert-text'
+      },
+      buttonsStyling: false
+    });
+  };
+
+  const createPrintContainer = (report) => {
+    const container = document.createElement('div');
+    container.className = 'print-report-container';
+    container.style.cssText = 'position:fixed;left:-12000px;top:0;width:794px;background:#ffffff;color:#1f2a44;padding:24px;font-family:Inter,Arial,sans-serif;pointer-events:none;z-index:-1;';
+    container.innerHTML = buildPrintWindowHtml(report);
+    document.body.appendChild(container);
+    return container;
+  };
+
+  const fetchLatestReportData = async (report) => {
+    await window.laJamoneraReady;
+    const path = getReportPath(report);
+    const latest = await window.dbLaJamoneraRest.read(path);
+    const latestHtml = await window.dbLaJamoneraRest.read(`${path}/html`);
+    console.info('[Informes][PDF] Firebase path leído:', `${path}/html`, 'tipo:', typeof latestHtml, 'chars:', typeof latestHtml === 'string' ? latestHtml.length : 0);
+    if (!latest || typeof latest !== 'object') {
+      return {
+        ...report,
+        html: typeof latestHtml === 'string' ? latestHtml : report.html
+      };
+    }
+    return {
+      ...report,
+      ...latest,
+      html: typeof latestHtml === 'string' ? latestHtml : latest.html,
+      id: latest.id || report.id,
+      year: report.year,
+      month: report.month,
+      day: report.day
+    };
+  };
+
+  const buildReportPdfBlob = async (report) => {
+    if (!window.jspdf || !window.jspdf.jsPDF || !window.html2canvas) {
+      throw new Error('pdf_lib_unavailable');
+    }
+
+    const container = createPrintContainer(report);
+
+    try {
+      const pdf = new window.jspdf.jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+        compress: true
+      });
+
+      await pdf.html(container, {
+        x: 8,
+        y: 10,
+        width: 194,
+        windowWidth: Math.max(container.scrollWidth, 794),
+        autoPaging: 'text',
+        margin: [10, 8, 10, 8],
+        html2canvas: {
+          scale: 1.4,
+          useCORS: false,
+          allowTaint: false,
+          backgroundColor: '#ffffff',
+          logging: false
+        }
+      });
+
+      return pdf.output('blob');
+    } finally {
+      container.remove();
+    }
+  };
+
+  const downloadPdfBlob = (blob, fileName) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const printPdfBlob = async (blob) => new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    const frame = document.createElement('iframe');
+    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none;';
+    frame.src = url;
+    document.body.appendChild(frame);
+
+    frame.onload = () => {
+      try {
+        frame.contentWindow?.focus();
+        frame.contentWindow?.print();
+      } catch (error) {
+      }
+
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+        frame.remove();
+        resolve();
+      }, 2500);
+    };
+  });
 
   const printReport = async (report) => {
     const choice = await openIosSwal({
@@ -263,41 +405,36 @@
       cancelButtonText: 'Cancelar'
     });
 
-    if (choice.isConfirmed) {
-      const popup = window.open('', '_blank', 'noopener,noreferrer,width=980,height=760');
-      if (!popup) return;
-      popup.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Impresión informe</title></head><body style="font-family:Inter,Arial,sans-serif;padding:20px;color:#1f2a44;">${buildPrintWindowHtml(report, true)}<script>window.onload=()=>window.print();<\/script></body></html>`);
-      popup.document.close();
+    if (!choice.isConfirmed && !choice.isDenied) {
       return;
     }
-
-    if (!choice.isDenied) {
-      return;
-    }
-
-    if (!window.html2pdf) {
-      await openIosSwal({ title: 'PDF no disponible', html: '<p>No pudimos cargar la librería de PDF. Reintentá en unos segundos.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
-      return;
-    }
-
-    const container = document.createElement('div');
-    container.className = 'print-report-container';
-    container.style.cssText = 'position:fixed;left:-99999px;top:0;width:800px;background:#ffffff;color:#1f2a44;padding:24px;font-family:Inter,Arial,sans-serif;';
-    container.innerHTML = buildPrintWindowHtml(report, false);
-    document.body.appendChild(container);
 
     try {
-      await window.html2pdf().set({
-        margin: 8,
-        filename: `informe_${report.id || Date.now()}.pdf`,
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: false },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      }).from(container).save();
+      openProcessingAlert(choice.isConfirmed ? 'Leyendo informe desde Firebase y preparando PDF...' : 'Leyendo informe desde Firebase y generando PDF...');
+      const latestReport = await fetchLatestReportData(report);
+      if (!normalizeValue(latestReport.html || '')) {
+        throw new Error('empty_report_html');
+      }
+
+      const blob = await buildReportPdfBlob(latestReport);
+      const filename = `informe_${latestReport.id || Date.now()}.pdf`;
+
+      if (choice.isConfirmed) {
+        await printPdfBlob(blob);
+      } else {
+        downloadPdfBlob(blob, filename);
+      }
     } catch (error) {
-      await openIosSwal({ title: 'Error al generar PDF', html: '<p>No se pudo generar el PDF del informe.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      let message = '<p>No se pudo generar el PDF del informe.</p>';
+      if (error?.message === 'pdf_lib_unavailable') {
+        message = '<p>No pudimos cargar la librería PDF (jsPDF/html2canvas). Reintentá en unos segundos.</p>';
+      }
+      if (error?.message === 'empty_report_html') {
+        message = '<p>El informe no tiene contenido HTML para imprimir. Verificá que esté guardado correctamente en Firebase.</p>';
+      }
+      await openIosSwal({ title: 'Error al generar PDF', html: message, icon: 'error', confirmButtonText: 'Entendido' });
     } finally {
-      container.remove();
+      Swal.close();
     }
   };
 
@@ -1353,7 +1490,7 @@
     ].join('');
     const commentPrompt = await openIosSwal({
       title: parentCommentId ? 'Responder comentario' : 'Nuevo comentario',
-      html: `<div class="text-start report-comment-form"><label>Usuario</label><select id="commentUser" class="form-select ios-input mb-2">${optionsHtml}</select><label>Comentario</label><textarea id="commentText" class="swal2-textarea ios-input" placeholder="Escribí tu comentario"></textarea><label>Clave</label><input id="commentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos"></div>`,
+      html: `<div class="text-start report-comment-form"><label>Usuario</label><select id="commentUser" class="form-select ios-input mb-2">${optionsHtml}</select><label>Comentario</label><textarea id="commentText" class="swal2-textarea ios-input" placeholder="Escribí tu comentario"></textarea><label>Clave</label><input id="commentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"></div>`,
       showCancelButton: true,
       confirmButtonText: 'Continuar',
       cancelButtonText: 'Cancelar',
