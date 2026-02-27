@@ -61,6 +61,7 @@
       title: 'ios-alert-title',
       htmlContainer: 'ios-alert-text',
       confirmButton: 'ios-btn ios-btn-primary',
+      denyButton: 'ios-btn ios-btn-secondary',
       cancelButton: 'ios-btn ios-btn-secondary',
       ...options.customClass
     },
@@ -492,12 +493,36 @@
     });
   };
 
+  const resetEditorControls = () => {
+    fontSizeSelect.value = '3';
+    formatBlockSelect.value = 'P';
+    textColorInput.value = '#000000';
+    highlightColorInput.value = '#fff59d';
+  };
+
+  const clearTypingStates = () => {
+    ['bold', 'italic', 'underline', 'strikeThrough', 'insertUnorderedList', 'insertOrderedList'].forEach((cmd) => {
+      let active = false;
+      try { active = document.queryCommandState(cmd); } catch (error) { active = false; }
+      if (active) {
+        document.execCommand(cmd, false, null);
+      }
+    });
+    document.execCommand('justifyLeft', false, null);
+  };
+
   const applyEditorCommand = (cmd, value = null) => {
     informeEditor.focus();
     if (cmd === 'removeFormat') {
       document.execCommand('removeFormat', false);
+      document.execCommand('styleWithCSS', false, true);
       document.execCommand('hiliteColor', false, 'transparent');
       document.execCommand('backColor', false, 'transparent');
+      document.execCommand('foreColor', false, '#000000');
+      document.execCommand('fontSize', false, '3');
+      document.execCommand('formatBlock', false, '<P>');
+      clearTypingStates();
+      resetEditorControls();
     } else if (cmd === 'formatBlock') {
       document.execCommand('formatBlock', false, `<${value}>`);
     } else if (cmd === 'hiliteColor') {
@@ -765,6 +790,8 @@
         state.attachments = [];
         renderAttachments();
       }
+      resetEditorControls();
+      applyEditorCommand('removeFormat');
       updatePreview();
       persistDraft();
     }
