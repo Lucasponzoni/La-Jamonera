@@ -245,10 +245,52 @@
     return root.innerHTML;
   };
 
-  const buildPdfDefinition = (report) => {
+  const blobToDataUrl = (blob) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => reject(new Error('image_read_error'));
+    reader.readAsDataURL(blob);
+  });
+
+  const fetchImageAsDataUrl = async (url) => {
+    const safeUrl = normalizeValue(url);
+    if (!safeUrl) {
+      throw new Error('image_url_missing');
+    }
+
+    const response = await fetch(safeUrl);
+    if (!response.ok) {
+      throw new Error(`image_fetch_error_${response.status}`);
+    }
+
+    const blob = await response.blob();
+    return blobToDataUrl(blob);
+  };
+
+  const buildAttachmentImageBlocks = async (images) => {
+    const blocks = [];
+
+    for (const item of images) {
+      try {
+        const dataUrl = await fetchImageAsDataUrl(item.url);
+        blocks.push({ text: item.name || 'Imagen adjunta', margin: [0, 0, 0, 4], bold: true, color: '#2a3556' });
+        blocks.push({ image: dataUrl, fit: [520, 320], margin: [0, 0, 0, 10] });
+      } catch (error) {
+        blocks.push({ text: `${item.name || 'Imagen'} (no se pudo incrustar)`, margin: [0, 0, 0, 2], color: '#8b5a3c' });
+        if (item.url) {
+          blocks.push({ text: item.url, link: item.url, color: '#1d4ed8', margin: [0, 0, 0, 10] });
+        }
+      }
+    }
+
+    return blocks;
+  };
+
+  const buildPdfDefinition = async (report) => {
     const attachments = Array.isArray(report?.attachments) ? report.attachments : [];
     const images = attachments.filter((item) => item.type === 'image' && item.url);
     const docs = attachments.filter((item) => item.type !== 'image' && item.url);
+    const imageBlocks = await buildAttachmentImageBlocks(images);
 
     const safeHtml = sanitizeHtmlForPdfMake(report.html || '');
     const htmlContent = window.htmlToPdfmake
@@ -267,9 +309,7 @@
         { text: 'Contenido', style: 'sectionTitle' },
         ...(Array.isArray(htmlContent) ? htmlContent : [htmlContent]),
         { text: 'Imágenes adjuntas', style: 'sectionTitle', margin: [0, 14, 0, 6] },
-        images.length
-          ? { ul: images.map((item) => ({ text: `${item.name || 'Imagen'} - ${item.url}`, link: item.url, color: '#1d4ed8' })) }
-          : { text: 'Sin imágenes adjuntas.', color: '#5a6482' },
+        ...(images.length ? imageBlocks : [{ text: 'Sin imágenes adjuntas.', color: '#5a6482' }]),
         { text: 'Otros adjuntos', style: 'sectionTitle', margin: [0, 14, 0, 6] },
         docs.length
           ? { ul: docs.map((item) => ({ text: `${item.name || 'Archivo'}${item.url ? ` - ${item.url}` : ''}`, link: item.url || undefined, color: item.url ? '#1d4ed8' : '#1f2a44' })) }
@@ -326,7 +366,7 @@
       throw new Error('pdf_lib_unavailable');
     }
 
-    const docDefinition = buildPdfDefinition(report);
+    const docDefinition = await buildPdfDefinition(report);
     return await new Promise((resolve, reject) => {
       try {
         window.pdfMake.createPdf(docDefinition).getBlob((blob) => resolve(blob));
@@ -1016,6 +1056,7 @@
       const reportPayload = {
         id: reportId,
         createdAt: Date.now(),
+        updatedAt: Date.now(),
         reportDate: `${year}-${month}-${day}`,
         userId: selectedUserId,
         userName: state.users[selectedUserId].fullName,
@@ -1035,6 +1076,7 @@
         userName: state.users[selectedUserId].fullName,
         importance: getImportanceValue(),
         createdAt: Date.now(),
+        updatedAt: Date.now(),
         attachmentsCount: attachmentsSaved.length,
         commentsCount: 0
       });
@@ -1158,6 +1200,7 @@
             <p><strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')}</p>
             <p><strong>Email:</strong> ${escapeHtml(report.userEmail || '-')}</p>
             <p><strong>Fecha:</strong> ${getDateLabel(report.createdAt)}</p>
+            <p><strong>Última actualización:</strong> ${report.updatedAt ? getDateLabel(report.updatedAt) : 'Sin actualizaciones'}</p>
           </div>
           <div class="report-viewer-content-wrap"><div class="report-viewer-content">${report.html || ''}</div></div>
           <div class="attachments-grid">${attachmentHtml}</div>
@@ -1403,7 +1446,8 @@
       if (item.isLocal && item.url) URL.revokeObjectURL(item.url);
     });
 
-    const updated = { ...report, html: answer.value.html, importance: normalizeImportance(answer.value.importance, 50), attachments: finalAttachments, updatedAt: Date.now() };
+    const updatedAt = Date.now();
+    const updated = { ...report, html: answer.value.html, importance: normalizeImportance(answer.value.importance, 50), attachments: finalAttachments, updatedAt };
     await window.dbLaJamoneraRest.write(path, updated);
     await window.dbLaJamoneraRest.write(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, {
       id: report.id,
@@ -1414,7 +1458,7 @@
       createdAt: Number(report.createdAt || Date.now()),
       attachmentsCount: finalAttachments.length,
       commentsCount: getCommentsCount(updated),
-      updatedAt: Date.now()
+      updatedAt
     });
     await loadReportsBoard();
   };
