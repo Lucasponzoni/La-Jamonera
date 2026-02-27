@@ -272,36 +272,61 @@
   const createPrintContainer = (report) => {
     const container = document.createElement('div');
     container.className = 'print-report-container';
-    container.style.cssText = 'position:fixed;left:0;top:0;width:794px;background:#ffffff;color:#1f2a44;padding:24px;font-family:Inter,Arial,sans-serif;opacity:0;pointer-events:none;z-index:-1;';
+    container.style.cssText = 'position:fixed;left:-12000px;top:0;width:794px;background:#ffffff;color:#1f2a44;padding:24px;font-family:Inter,Arial,sans-serif;pointer-events:none;z-index:-1;';
     container.innerHTML = buildPrintWindowHtml(report, true);
     document.body.appendChild(container);
     return container;
   };
 
+  const fetchLatestReportData = async (report) => {
+    await window.laJamoneraReady;
+    const path = getReportPath(report);
+    const latest = await window.dbLaJamoneraRest.read(path);
+    if (!latest || typeof latest !== 'object') {
+      return report;
+    }
+    return {
+      ...report,
+      ...latest,
+      id: latest.id || report.id,
+      year: report.year,
+      month: report.month,
+      day: report.day
+    };
+  };
+
   const buildReportPdfBlob = async (report) => {
-    if (!window.html2pdf) {
-      throw new Error('html2pdf_unavailable');
+    if (!window.jspdf || !window.jspdf.jsPDF || !window.html2canvas) {
+      throw new Error('pdf_lib_unavailable');
     }
 
     const container = createPrintContainer(report);
 
     try {
-      const worker = window.html2pdf().set({
+      const pdf = new window.jspdf.jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+        compress: true
+      });
+
+      await pdf.html(container, {
+        x: 8,
+        y: 10,
+        width: 194,
+        windowWidth: Math.max(container.scrollWidth, 794),
+        autoPaging: 'text',
         margin: [10, 8, 10, 8],
-        filename: `informe_${report.id || Date.now()}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
         html2canvas: {
-          scale: 2,
+          scale: 1.6,
           useCORS: true,
-          allowTaint: false,
+          allowTaint: true,
           backgroundColor: '#ffffff',
           logging: false
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'] }
-      }).from(container);
+        }
+      });
 
-      return await worker.outputPdf('blob');
+      return pdf.output('blob');
     } finally {
       container.remove();
     }
@@ -356,9 +381,14 @@
     }
 
     try {
-      openProcessingAlert(choice.isConfirmed ? 'Preparando PDF para impresión...' : 'Generando PDF para descarga...');
-      const blob = await buildReportPdfBlob(report);
-      const filename = `informe_${report.id || Date.now()}.pdf`;
+      openProcessingAlert(choice.isConfirmed ? 'Leyendo informe desde Firebase y preparando PDF...' : 'Leyendo informe desde Firebase y generando PDF...');
+      const latestReport = await fetchLatestReportData(report);
+      if (!normalizeValue(latestReport.html || latestReport.textContent || '')) {
+        throw new Error('empty_report_html');
+      }
+
+      const blob = await buildReportPdfBlob(latestReport);
+      const filename = `informe_${latestReport.id || Date.now()}.pdf`;
 
       if (choice.isConfirmed) {
         await printPdfBlob(blob);
@@ -366,9 +396,13 @@
         downloadPdfBlob(blob, filename);
       }
     } catch (error) {
-      const message = error?.message === 'html2pdf_unavailable'
-        ? '<p>No pudimos cargar la librería de PDF. Reintentá en unos segundos.</p>'
-        : '<p>No se pudo generar el PDF del informe.</p>';
+      let message = '<p>No se pudo generar el PDF del informe.</p>';
+      if (error?.message === 'pdf_lib_unavailable') {
+        message = '<p>No pudimos cargar la librería PDF (jsPDF/html2canvas). Reintentá en unos segundos.</p>';
+      }
+      if (error?.message === 'empty_report_html') {
+        message = '<p>El informe no tiene contenido HTML para imprimir. Verificá que esté guardado correctamente en Firebase.</p>';
+      }
       await openIosSwal({ title: 'Error al generar PDF', html: message, icon: 'error', confirmButtonText: 'Entendido' });
     } finally {
       Swal.close();
