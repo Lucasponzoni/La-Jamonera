@@ -5,6 +5,7 @@
   }
 
   const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
+  const DRAFT_KEY = 'laJamoneraInformeDraft';
   const USER_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
   const informesLoading = document.getElementById('informesLoading');
@@ -18,6 +19,7 @@
   const formatBlockSelect = document.getElementById('formatBlockSelect');
   const textColorInput = document.getElementById('textColorInput');
   const highlightColorInput = document.getElementById('highlightColorInput');
+  const applyHighlightBtn = document.getElementById('applyHighlightBtn');
   const toggleEmojiPanel = document.getElementById('toggleEmojiPanel');
   const emojiPanel = document.getElementById('emojiPanel');
   const informePreview = document.getElementById('informePreview');
@@ -25,6 +27,7 @@
   const attachmentsInput = document.getElementById('attachmentsInput');
   const attachmentsGrid = document.getElementById('attachmentsGrid');
   const saveInformeBtn = document.getElementById('saveInformeBtn');
+  const clearInformeBtn = document.getElementById('clearInformeBtn');
   const importanceRange = document.getElementById('importanceRange');
   const importanceLabel = document.getElementById('importanceLabel');
 
@@ -51,6 +54,7 @@
   const makeId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   const openIosSwal = (options) => Swal.fire({
+    target: informesModal,
     ...options,
     customClass: {
       popup: `ios-alert informes-alert ${options?.customClass?.popup || ''}`.trim(),
@@ -137,17 +141,17 @@
     }
 
     informesUsersList.innerHTML = users.map((user) => `
-      <article class="user-card">
-        ${renderUserAvatar(user)}
-        <div class="user-main">
+      <div class="informe-user-circle-wrap">
+        <article class="informe-user-circle" data-user-id="${user.id}">
+          ${renderUserAvatar(user)}
           <h6>${user.fullName}</h6>
           <p>${user.position}</p>
+        </article>
+        <div class="informe-user-actions">
+          <button class="family-manage-btn" type="button" data-user-edit="${user.id}" title="Editar usuario"><i class="fa-solid fa-pen"></i></button>
+          <button class="family-manage-btn" type="button" data-user-delete="${user.id}" title="Eliminar usuario"><i class="fa-solid fa-trash"></i></button>
         </div>
-        <div class="ingrediente-actions">
-          <button class="ingrediente-action" type="button" data-user-edit="${user.id}" title="Editar usuario"><i class="fa-solid fa-pen"></i></button>
-          <button class="ingrediente-action" type="button" data-user-delete="${user.id}" title="Eliminar usuario"><i class="fa-solid fa-trash"></i></button>
-        </div>
-      </article>
+      </div>
     `).join('');
 
     renderUserSelect();
@@ -265,11 +269,14 @@
             <h6 class="step-title">1) Datos personales</h6>
             <div class="step-content">
               <label for="userFullName">Nombre y apellido *</label>
-              <input id="userFullName" class="swal2-input ios-input" value="${initial ? initial.fullName : ''}">
+              <input id="userFullName" class="swal2-input ios-input" autocomplete="off" placeholder="Ej: Juan Pérez" value="${initial ? initial.fullName : ''}">
               <label for="userPosition">Puesto en la empresa *</label>
-              <input id="userPosition" class="swal2-input ios-input" value="${initial ? initial.position : ''}">
+              <input id="userPosition" class="swal2-input ios-input" autocomplete="off" placeholder="Ej: Bromatólogo" value="${initial ? initial.position : ''}">
               <label for="userPin">Clave de 4 dígitos *</label>
-              <input id="userPin" class="swal2-input ios-input" type="password" maxlength="4" inputmode="numeric" value="${initial ? initial.pin : ''}">
+              <div class="ios-input-group d-flex align-items-center px-2">
+                <input id="userPin" class="swal2-input ios-input border-0 bg-transparent flex-grow-1" type="password" maxlength="4" inputmode="numeric" autocomplete="new-password" placeholder="4 dígitos" value="${initial ? initial.pin : ''}">
+                <button id="toggleUserPin" type="button" class="btn ios-toggle-pass" aria-label="Ver u ocultar clave"><i class="fa-solid fa-eye"></i></button>
+              </div>
             </div>
           </section>
           <section class="step-block">
@@ -285,6 +292,8 @@
         const fullNameInput = document.getElementById('userFullName');
         const photoInput = document.getElementById('userPhotoInput');
         const preview = document.getElementById('userPhotoPreview');
+        const userPinInput = document.getElementById('userPin');
+        const toggleUserPin = document.getElementById('toggleUserPin');
 
         const updateInitials = () => {
           if (pendingUpload || (initial && initial.photoUrl)) {
@@ -297,6 +306,11 @@
         };
 
         fullNameInput.addEventListener('input', updateInitials);
+        toggleUserPin.addEventListener('click', () => {
+          const hidden = userPinInput.type === 'password';
+          userPinInput.type = hidden ? 'text' : 'password';
+          toggleUserPin.innerHTML = hidden ? '<i class="fa-solid fa-eye-slash"></i>' : '<i class="fa-solid fa-eye"></i>';
+        });
         updateInitials();
 
         photoInput.addEventListener('change', async () => {
@@ -374,6 +388,14 @@
       return;
     }
 
+    const keyCheck = await promptUserKey();
+    if (!keyCheck.isConfirmed || keyCheck.value !== state.users[selectedUserId].pin) {
+      if (keyCheck.isConfirmed) {
+        await openIosSwal({ title: 'Clave incorrecta', html: '<p>No coincide la clave del usuario.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      }
+      return;
+    }
+
     const date = getCurrentDate();
     const { year, month, day } = getDateParts(date);
     const reportId = makeId('inf');
@@ -437,6 +459,7 @@
       updatePreview();
       importanceRange.value = 50;
       updateImportanceLabel();
+      clearDraft();
       await openIosSwal({ title: 'Informe guardado', html: '<p>El informe fue almacenado correctamente en Firebase.</p>', icon: 'success', confirmButtonText: 'Entendido' });
     } catch (error) {
       await openIosSwal({ title: 'Error al guardar', html: '<p>No se pudo guardar el informe. Reintentá.</p>', icon: 'error', confirmButtonText: 'Entendido' });
@@ -446,8 +469,16 @@
   };
 
   const updatePreview = () => {
-    const html = normalizeValue(informeEditor.innerHTML);
-    informePreview.innerHTML = html || 'Vista previa de formato';
+    const previewColor = textColorInput.value || '#2a3556';
+    const previewHighlight = highlightColorInput.value || 'transparent';
+    const previewBold = document.queryCommandState('bold');
+    const previewItalic = document.queryCommandState('italic');
+    const previewUnderline = document.queryCommandState('underline');
+    const previewStrike = document.queryCommandState('strikeThrough');
+    const align = ['justifyCenter', 'justifyRight', 'justifyFull'].find((cmd) => document.queryCommandState(cmd));
+    informePreview.style.textAlign = align === 'justifyCenter' ? 'center' : align === 'justifyRight' ? 'right' : align === 'justifyFull' ? 'justify' : 'left';
+    const deco = `${previewUnderline ? 'underline ' : ''}${previewStrike ? 'line-through' : 'none'}`.trim();
+    informePreview.innerHTML = `<span style="color:${previewColor};background:${previewHighlight};font-weight:${previewBold ? 700 : 400};font-style:${previewItalic ? 'italic' : 'normal'};text-decoration:${deco || 'none'};">Texto vista previa</span>`;
   };
 
   const updateToolbarState = () => {
@@ -472,6 +503,9 @@
     } else if (cmd === 'hiliteColor') {
       document.execCommand('styleWithCSS', false, true);
       document.execCommand('hiliteColor', false, value || 'transparent');
+    } else if (cmd === 'foreColor') {
+      document.execCommand('styleWithCSS', false, true);
+      document.execCommand('foreColor', false, value);
     } else {
       document.execCommand(cmd, false, value);
     }
@@ -499,6 +533,82 @@
 
   const renderEmojiPanel = () => {
     emojiPanel.innerHTML = EMOJIS.map((emoji) => `<button type="button" class="emoji-btn" data-emoji="${emoji}">${emoji}</button>`).join('');
+  };
+
+
+  const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const persistDraft = async () => {
+    try {
+      const attachments = await Promise.all(state.attachments.map(async (item) => ({
+        name: item.file.name,
+        type: item.file.type,
+        size: item.file.size,
+        dataUrl: await readFileAsDataUrl(item.file)
+      })));
+      const draft = {
+        editorHtml: informeEditor.innerHTML,
+        userId: informeUserSelect.value,
+        importance: Number(importanceRange.value || 50),
+        date: informeDateInput.value,
+        fontSize: fontSizeSelect.value,
+        formatBlock: formatBlockSelect.value,
+        textColor: textColorInput.value,
+        highlightColor: highlightColorInput.value,
+        attachments,
+        updatedAt: Date.now()
+      };
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch (error) {
+      // noop
+    }
+  };
+
+  const clearDraft = () => {
+    localStorage.removeItem(DRAFT_KEY);
+  };
+
+  const restoreDraft = async () => {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return;
+    try {
+      const draft = JSON.parse(raw);
+      informeEditor.innerHTML = draft.editorHtml || '';
+      importanceRange.value = Number(draft.importance || 50);
+      if (draft.userId && state.users[draft.userId]) informeUserSelect.value = draft.userId;
+      if (draft.date && datePicker) datePicker.setDate(draft.date, true, 'd/m/Y');
+      if (draft.fontSize) fontSizeSelect.value = draft.fontSize;
+      if (draft.formatBlock) formatBlockSelect.value = draft.formatBlock;
+      if (draft.textColor) textColorInput.value = draft.textColor;
+      if (draft.highlightColor) highlightColorInput.value = draft.highlightColor;
+
+      state.attachments.forEach((item) => {
+        if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+      });
+
+      state.attachments = await Promise.all((draft.attachments || []).map(async (item) => {
+        const response = await fetch(item.dataUrl);
+        const blob = await response.blob();
+        const file = new File([blob], item.name, { type: item.type || blob.type });
+        return {
+          file,
+          type: getFileCategory(file),
+          previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : ''
+        };
+      }));
+
+      renderAttachments();
+      updateImportanceLabel();
+      updateToolbarState();
+      updatePreview();
+    } catch (error) {
+      clearDraft();
+    }
   };
 
   const openImageViewer = (index) => {
@@ -586,7 +696,8 @@
   fontSizeSelect.addEventListener('change', () => applyEditorCommand('fontSize', fontSizeSelect.value));
   formatBlockSelect.addEventListener('change', () => applyEditorCommand('formatBlock', formatBlockSelect.value));
   textColorInput.addEventListener('input', () => applyEditorCommand('foreColor', textColorInput.value));
-  highlightColorInput.addEventListener('input', () => applyEditorCommand('hiliteColor', highlightColorInput.value));
+  highlightColorInput.addEventListener('input', updatePreview);
+  applyHighlightBtn.addEventListener('click', () => applyEditorCommand('hiliteColor', highlightColorInput.value));
 
   toggleEmojiPanel.addEventListener('click', () => {
     emojiPanel.classList.toggle('is-open');
@@ -617,6 +728,7 @@
     });
     event.target.value = '';
     renderAttachments();
+    persistDraft();
   });
 
   attachmentsGrid.addEventListener('click', (event) => {
@@ -633,7 +745,32 @@
 
   saveInformeBtn.addEventListener('click', saveInforme);
 
-  informeEditor.addEventListener('input', updatePreview);
+  clearInformeBtn.addEventListener('click', async () => {
+    const answer = await openIosSwal({
+      title: 'Borrar informe',
+      html: '<p>¿Qué querés borrar?</p>',
+      showDenyButton: true,
+      showCancelButton: true,
+      confirmButtonText: 'Solo texto',
+      denyButtonText: 'Texto y adjuntos',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (answer.isConfirmed || answer.isDenied) {
+      informeEditor.innerHTML = '';
+      if (answer.isDenied) {
+        state.attachments.forEach((item) => {
+          if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+        });
+        state.attachments = [];
+        renderAttachments();
+      }
+      updatePreview();
+      persistDraft();
+    }
+  });
+
+  informeEditor.addEventListener('input', () => { updatePreview(); persistDraft(); });
   informeEditor.addEventListener('keyup', updateToolbarState);
   informeEditor.addEventListener('mouseup', updateToolbarState);
   document.addEventListener('selectionchange', () => {
@@ -642,7 +779,7 @@
     }
   });
 
-  importanceRange.addEventListener('input', updateImportanceLabel);
+  importanceRange.addEventListener('input', () => { updateImportanceLabel(); persistDraft(); });
 
   viewerPrevBtn.addEventListener('click', () => updateViewerImage(-1));
   viewerNextBtn.addEventListener('click', () => updateViewerImage(1));
@@ -675,6 +812,14 @@
     }
   }, { passive: true });
 
+  window.addEventListener('beforeunload', persistDraft);
+  informesModal.addEventListener('hidden.bs.modal', persistDraft);
+  informeUserSelect.addEventListener('change', persistDraft);
+  fontSizeSelect.addEventListener('change', persistDraft);
+  formatBlockSelect.addEventListener('change', persistDraft);
+  textColorInput.addEventListener('change', persistDraft);
+  highlightColorInput.addEventListener('change', persistDraft);
+
   informesModal.addEventListener('show.bs.modal', async () => {
     if (!datePicker && window.flatpickr) {
       datePicker = flatpickr(informeDateInput, {
@@ -692,5 +837,6 @@
     updateToolbarState();
     updateImportanceLabel();
     await loadData();
+    await restoreDraft();
   });
 })();
