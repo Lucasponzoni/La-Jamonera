@@ -1139,6 +1139,7 @@
   const openReportViewer = async (report) => {
     const attachments = Array.isArray(report.attachments) ? report.attachments : [];
     const imageAttachments = attachments.filter((item) => item.type === 'image');
+    const lastUpdatedAt = Number(report.updatedAt || 0);
     const attachmentHtml = attachments.length
       ? attachments.map((item, index) => {
         if (item.type === 'image') {
@@ -1158,6 +1159,7 @@
             <p><strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')}</p>
             <p><strong>Email:</strong> ${escapeHtml(report.userEmail || '-')}</p>
             <p><strong>Fecha:</strong> ${getDateLabel(report.createdAt)}</p>
+            <p><strong>Última actualización:</strong> ${lastUpdatedAt ? getDateLabel(lastUpdatedAt) : 'Sin actualizaciones'}</p>
           </div>
           <div class="report-viewer-content-wrap"><div class="report-viewer-content">${report.html || ''}</div></div>
           <div class="attachments-grid">${attachmentHtml}</div>
@@ -1403,7 +1405,8 @@
       if (item.isLocal && item.url) URL.revokeObjectURL(item.url);
     });
 
-    const updated = { ...report, html: answer.value.html, importance: normalizeImportance(answer.value.importance, 50), attachments: finalAttachments, updatedAt: Date.now() };
+    const updatedAt = Date.now();
+    const updated = { ...report, html: answer.value.html, importance: normalizeImportance(answer.value.importance, 50), attachments: finalAttachments, updatedAt };
     await window.dbLaJamoneraRest.write(path, updated);
     await window.dbLaJamoneraRest.write(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, {
       id: report.id,
@@ -1414,7 +1417,7 @@
       createdAt: Number(report.createdAt || Date.now()),
       attachmentsCount: finalAttachments.length,
       commentsCount: getCommentsCount(updated),
-      updatedAt: Date.now()
+      updatedAt
     });
     await loadReportsBoard();
   };
