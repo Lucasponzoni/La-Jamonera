@@ -1028,7 +1028,7 @@
                 ${item.type === 'image'
                   ? `<img src="${item.url}" alt="${escapeHtml(item.name)}" class="attachment-image is-loaded">`
                   : `<i class="bi bi-file-earmark"></i><span>${escapeHtml(item.name)}</span>`}
-                <button type="button" class="btn remove-attachment-btn ${item.type === 'image' ? 'is-image' : 'is-doc'}" data-remove-edit-attachment="${idx}" title="Quitar adjunto">${item.type === 'image' ? '<i class="fa-solid fa-circle-xmark"></i>' : '<i class="fa-solid fa-trash-can"></i>'}</button>
+                <button type="button" class="btn remove-attachment-btn is-danger" data-remove-edit-attachment="${idx}" title="Quitar adjunto"><i class="fa-solid fa-circle-xmark"></i></button>
               </article>
             `).join('') : '<div class="informes-empty">Sin adjuntos</div>'}
           </div>
@@ -1075,7 +1075,7 @@
                 ${item.type === 'image'
                   ? `<img src="${item.url}" alt="${escapeHtml(item.name)}" class="attachment-image is-loaded">`
                   : `<i class="bi bi-file-earmark"></i><span>${escapeHtml(item.name)}</span>`}
-                <button type="button" class="btn remove-attachment-btn ${item.type === 'image' ? 'is-image' : 'is-doc'}" data-remove-edit-attachment="${idx}" title="Quitar adjunto">${item.type === 'image' ? '<i class="fa-solid fa-circle-xmark"></i>' : '<i class="fa-solid fa-trash-can"></i>'}</button>
+                <button type="button" class="btn remove-attachment-btn is-danger" data-remove-edit-attachment="${idx}" title="Quitar adjunto"><i class="fa-solid fa-circle-xmark"></i></button>
               </article>
             `).join('')
             : '<div class="informes-empty">Sin adjuntos</div>';
@@ -1112,15 +1112,11 @@
           const target = currentAttachments[idx];
           if (!target) return;
 
-          const confirmDelete = await openIosSwal({
-            title: 'Eliminar adjunto',
-            html: `<p><strong>${escapeHtml(target.name || 'Adjunto')}</strong></p><p>Esta acción quitará el archivo del informe.</p>`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Eliminar',
-            cancelButtonText: 'Cancelar'
-          });
-          if (!confirmDelete.isConfirmed) return;
+          const confirmDelete = window.confirm(`Eliminar adjunto:
+${target.name || 'Adjunto'}
+
+Esta acción quitará el archivo del informe.`);
+          if (!confirmDelete) return;
 
           if (target?.isLocal && target.url) {
             URL.revokeObjectURL(target.url);

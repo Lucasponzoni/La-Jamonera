@@ -2364,16 +2364,10 @@ html.login-protected.auth-ok body {
   color: #9b4f00;
 }
 
-.remove-attachment-btn.is-image {
+.remove-attachment-btn.is-danger {
   border-color: #f0b4c6;
   background: #fff1f6;
   color: #ce3b6a;
-}
-
-.remove-attachment-btn.is-doc {
-  border-color: #cfdcf7;
-  background: #eef3ff;
-  color: #2e5db0;
 }
 
 @media (max-width: 768px) {
