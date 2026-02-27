@@ -15,11 +15,18 @@
   const informeUserSelect = document.getElementById('informeUserSelect');
   const informeEditor = document.getElementById('informeEditor');
   const fontSizeSelect = document.getElementById('fontSizeSelect');
+  const formatBlockSelect = document.getElementById('formatBlockSelect');
+  const textColorInput = document.getElementById('textColorInput');
+  const highlightColorInput = document.getElementById('highlightColorInput');
+  const toggleEmojiPanel = document.getElementById('toggleEmojiPanel');
+  const emojiPanel = document.getElementById('emojiPanel');
+  const informePreview = document.getElementById('informePreview');
   const attachFilesBtn = document.getElementById('attachFilesBtn');
   const attachmentsInput = document.getElementById('attachmentsInput');
   const attachmentsGrid = document.getElementById('attachmentsGrid');
   const saveInformeBtn = document.getElementById('saveInformeBtn');
   const importanceRange = document.getElementById('importanceRange');
+  const importanceLabel = document.getElementById('importanceLabel');
 
   const imageViewerModalEl = document.getElementById('imageViewerModal');
   const viewerImage = document.getElementById('viewerImage');
@@ -58,9 +65,9 @@
 
   const initialsFromName = (fullName) => {
     const parts = normalizeValue(fullName).split(/\s+/).filter(Boolean);
-    if (!parts.length) return '??';
+    if (!parts.length) return '';
     const initial = parts.slice(0, 2).map((p) => p[0].toUpperCase()).join('');
-    return initial || '??';
+    return initial || '';
   };
 
   const showState = (key) => {
@@ -96,7 +103,8 @@
     if (user.photoUrl) {
       return `<span class="user-avatar-thumb"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-user-photo" src="${user.photoUrl}" alt="${user.fullName}"></span>`;
     }
-    return `<span class="user-avatar-thumb user-avatar-initials">${initialsFromName(user.fullName)}</span>`;
+    const initials = initialsFromName(user.fullName);
+    return `<span class="user-avatar-thumb user-avatar-initials">${initials || '<i class=\"bi bi-person-fill\"></i>'}</span>`;
   };
 
   const prepareThumbLoaders = (selector) => {
@@ -250,6 +258,7 @@
       showCancelButton: true,
       confirmButtonText: initial ? 'Guardar cambios' : 'Crear usuario',
       cancelButtonText: 'Cancelar',
+      customClass: { popup: 'informes-user-form-alert ingredientes-alert' },
       html: `
         <div class="ingrediente-form-grid">
           <section class="step-block">
@@ -266,7 +275,7 @@
           <section class="step-block">
             <h6 class="step-title">2) Fotografía (opcional)</h6>
             <div class="step-content">
-              <div id="userPhotoPreview" class="image-preview-circle">${initial?.photoUrl ? `<img src="${initial.photoUrl}" alt="Foto">` : '<span class="image-placeholder-circle-2 user-initials-preview">??</span>'}</div>
+              <div id="userPhotoPreview" class="image-preview-circle">${initial?.photoUrl ? `<img src="${initial.photoUrl}" alt="Foto">` : '<span class="image-placeholder-circle-2 user-initials-preview"><i class="bi bi-person-fill"></i></span>'}</div>
               <input id="userPhotoInput" type="file" class="form-control image-file-input" accept="image/*">
             </div>
           </section>
@@ -281,7 +290,10 @@
           if (pendingUpload || (initial && initial.photoUrl)) {
             return;
           }
-          preview.innerHTML = `<span class="image-placeholder-circle-2 user-initials-preview">${initialsFromName(fullNameInput.value)}</span>`;
+          const initials = initialsFromName(fullNameInput.value);
+          preview.innerHTML = initials
+            ? `<span class="image-placeholder-circle-2 user-initials-preview">${initials}</span>`
+            : '<span class="image-placeholder-circle-2 user-initials-preview"><i class="bi bi-person-fill"></i></span>';
         };
 
         fullNameInput.addEventListener('input', updateInitials);
@@ -422,7 +434,9 @@
       state.attachments = [];
       renderAttachments();
       informeEditor.innerHTML = '';
+      updatePreview();
       importanceRange.value = 50;
+      updateImportanceLabel();
       await openIosSwal({ title: 'Informe guardado', html: '<p>El informe fue almacenado correctamente en Firebase.</p>', icon: 'success', confirmButtonText: 'Entendido' });
     } catch (error) {
       await openIosSwal({ title: 'Error al guardar', html: '<p>No se pudo guardar el informe. Reintentá.</p>', icon: 'error', confirmButtonText: 'Entendido' });
@@ -431,9 +445,60 @@
     }
   };
 
+  const updatePreview = () => {
+    const html = normalizeValue(informeEditor.innerHTML);
+    informePreview.innerHTML = html || 'Vista previa de formato';
+  };
+
+  const updateToolbarState = () => {
+    const toggles = ['bold', 'italic', 'underline', 'strikeThrough', 'insertUnorderedList', 'insertOrderedList', 'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull'];
+    toggles.forEach((cmd) => {
+      const button = document.querySelector(`.editor-btn[data-cmd="${cmd}"]`);
+      if (!button) return;
+      let active = false;
+      try { active = document.queryCommandState(cmd); } catch (error) { active = false; }
+      button.classList.toggle('is-active', !!active);
+    });
+  };
+
   const applyEditorCommand = (cmd, value = null) => {
     informeEditor.focus();
-    document.execCommand(cmd, false, value);
+    if (cmd === 'removeFormat') {
+      document.execCommand('removeFormat', false);
+      document.execCommand('hiliteColor', false, 'transparent');
+      document.execCommand('backColor', false, 'transparent');
+    } else if (cmd === 'formatBlock') {
+      document.execCommand('formatBlock', false, `<${value}>`);
+    } else if (cmd === 'hiliteColor') {
+      document.execCommand('styleWithCSS', false, true);
+      document.execCommand('hiliteColor', false, value || 'transparent');
+    } else {
+      document.execCommand(cmd, false, value);
+    }
+    updateToolbarState();
+    updatePreview();
+  };
+
+  const IMPORTANCE_STATES = [
+    { max: 14, text: 'Excelente 😄' },
+    { max: 28, text: 'Muy bueno 🙂' },
+    { max: 42, text: 'Bueno 😊' },
+    { max: 56, text: 'Normal 😐' },
+    { max: 70, text: 'Atención 😶' },
+    { max: 84, text: 'Importante ⚠️' },
+    { max: 100, text: 'Muy importante 🚨' }
+  ];
+
+  const updateImportanceLabel = () => {
+    const value = Number(importanceRange.value || 0);
+    const found = IMPORTANCE_STATES.find((item) => value <= item.max) || IMPORTANCE_STATES[IMPORTANCE_STATES.length - 1];
+    importanceLabel.textContent = found.text;
+  };
+
+  const EMOJIS = ['😀', '😁', '😂', '🤣', '😊', '🙂', '😉', '😍', '😘', '😎', '🤔', '😐', '😶', '🙄', '😢', '😭', '😡', '🤯', '🥳', '👍', '👎', '👏', '🙏', '💡', '🔥', '⚠️', '🚨', '✅', '❌', '🧪', '📌', '📎', '📅', '🧼', '🧫'];
+
+  const renderEmojiPanel = () => {
+    emojiPanel.innerHTML = EMOJIS.map((emoji) => `<button type="button" class="emoji-btn" data-emoji="${emoji}">${emoji}</button>`).join('');
   };
 
   const openImageViewer = (index) => {
@@ -518,11 +583,27 @@
     button.addEventListener('click', () => applyEditorCommand(button.dataset.cmd, button.dataset.value || null));
   });
 
-  document.querySelectorAll('.editor-btn[data-emoji]').forEach((button) => {
-    button.addEventListener('click', () => applyEditorCommand('insertText', button.dataset.emoji));
+  fontSizeSelect.addEventListener('change', () => applyEditorCommand('fontSize', fontSizeSelect.value));
+  formatBlockSelect.addEventListener('change', () => applyEditorCommand('formatBlock', formatBlockSelect.value));
+  textColorInput.addEventListener('input', () => applyEditorCommand('foreColor', textColorInput.value));
+  highlightColorInput.addEventListener('input', () => applyEditorCommand('hiliteColor', highlightColorInput.value));
+
+  toggleEmojiPanel.addEventListener('click', () => {
+    emojiPanel.classList.toggle('is-open');
   });
 
-  fontSizeSelect.addEventListener('change', () => applyEditorCommand('fontSize', fontSizeSelect.value));
+  emojiPanel.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-emoji]');
+    if (!button) return;
+    applyEditorCommand('insertText', button.dataset.emoji);
+    emojiPanel.classList.remove('is-open');
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!emojiPanel.classList.contains('is-open')) return;
+    if (event.target.closest('.emoji-picker-wrap')) return;
+    emojiPanel.classList.remove('is-open');
+  });
 
   attachFilesBtn.addEventListener('click', () => attachmentsInput.click());
   attachmentsInput.addEventListener('change', (event) => {
@@ -551,6 +632,17 @@
   });
 
   saveInformeBtn.addEventListener('click', saveInforme);
+
+  informeEditor.addEventListener('input', updatePreview);
+  informeEditor.addEventListener('keyup', updateToolbarState);
+  informeEditor.addEventListener('mouseup', updateToolbarState);
+  document.addEventListener('selectionchange', () => {
+    if (document.activeElement === informeEditor || informeEditor.contains(document.activeElement)) {
+      updateToolbarState();
+    }
+  });
+
+  importanceRange.addEventListener('input', updateImportanceLabel);
 
   viewerPrevBtn.addEventListener('click', () => updateViewerImage(-1));
   viewerNextBtn.addEventListener('click', () => updateViewerImage(1));
@@ -595,6 +687,10 @@
       imageViewerModal = new bootstrap.Modal(imageViewerModalEl);
     }
 
+    renderEmojiPanel();
+    updatePreview();
+    updateToolbarState();
+    updateImportanceLabel();
     await loadData();
   });
 })();
