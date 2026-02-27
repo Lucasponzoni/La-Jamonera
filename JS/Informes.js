@@ -249,6 +249,7 @@
     const attachments = Array.isArray(report?.attachments) ? report.attachments : [];
     const images = attachments.filter((item) => item.type === 'image' && item.url);
     const docs = attachments.filter((item) => item.type !== 'image' && item.url);
+    const safeHtml = normalizeHtmlForPdf(report.html || '');
 
     const safeHtml = sanitizeHtmlForPdfMake(report.html || '');
     const htmlContent = window.htmlToPdfmake
