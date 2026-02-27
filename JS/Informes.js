@@ -226,6 +226,25 @@
 
   const getReportPath = (report) => `/informes/${report.year}/${report.month}/${report.day}/${report.id}`;
 
+  const printReport = (report) => {
+    const attachments = Array.isArray(report?.attachments) ? report.attachments : [];
+    const images = attachments.filter((item) => item.type === 'image' && item.url);
+    const docs = attachments.filter((item) => item.type !== 'image' && item.url);
+    const popup = window.open('', '_blank', 'noopener,noreferrer,width=980,height=760');
+    if (!popup) return;
+
+    const imagesHtml = images.length
+      ? images.map((item) => `<figure style="margin:0 0 14px;"><img src="${item.url}" alt="${escapeHtml(item.name || 'Adjunto')}" style="max-width:100%;border-radius:10px;border:1px solid #dbe2f3;"><figcaption style="font-size:12px;color:#5a6482;">${escapeHtml(item.name || 'Imagen')}</figcaption></figure>`).join('')
+      : '<p style="color:#5a6482;">Sin imágenes adjuntas.</p>';
+
+    const docsHtml = docs.length
+      ? `<ul>${docs.map((item) => `<li><a href="${item.url}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.name || 'Archivo')}</a></li>`).join('')}</ul>`
+      : '<p style="color:#5a6482;">Sin archivos adjuntos.</p>';
+
+    popup.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Impresión informe</title></head><body style="font-family:Inter,Arial,sans-serif;padding:20px;color:#1f2a44;">      <h1 style="margin:0 0 8px;">Informe bromatológico</h1>      <p style="margin:0 0 4px;"><strong>Usuario:</strong> ${escapeHtml(report.userName || '-')}</p>      <p style="margin:0 0 4px;"><strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')}</p>      <p style="margin:0 0 16px;"><strong>Fecha:</strong> ${getDateLabel(report.createdAt)}</p>      <section style="margin-bottom:14px;"><h2 style="font-size:18px;">Contenido</h2><div>${report.html || ''}</div></section>      <section style="margin-bottom:14px;"><h2 style="font-size:18px;">Imágenes adjuntas</h2>${imagesHtml}</section>      <section><h2 style="font-size:18px;">Otros adjuntos</h2>${docsHtml}</section>      <script>window.onload=()=>{window.print();};<\/script>    </body></html>`);
+    popup.document.close();
+  };
+
   const getImportanceValue = () => {
     if (!importanceRange) return 50;
     return normalizeImportance(importanceRange.value, 50);
@@ -485,6 +504,7 @@
             <span class="informe-attach-chip"><i class="fa-regular fa-image"></i> ${imageCount}</span>
             <span class="informe-attach-chip"><i class="fa-regular fa-file-lines"></i> ${docCount}</span>
             <span class="importance-chip importance-${importance.tone}">${normalizeImportance(report.importance, 50)}% · ${importance.label}</span>
+            <button class="btn informe-print-chip" type="button" data-print-report="${report.id}" title="Imprimir informe"><i class="fa-solid fa-print"></i></button>
           </div>
 
           <div class="informe-card-user">
@@ -856,7 +876,17 @@
       updateImportanceLabel();
       clearDraft();
       await loadReportsBoard();
-      await openIosSwal({ title: 'Informe guardado', html: '<p>El informe fue almacenado correctamente en Firebase.</p>', icon: 'success', confirmButtonText: 'Entendido' });
+      const printChoice = await openIosSwal({
+        title: 'Informe guardado',
+        html: '<p>El informe fue almacenado correctamente en Firebase.</p><p>¿Querés imprimirlo ahora?</p>',
+        icon: 'success',
+        showCancelButton: true,
+        confirmButtonText: 'Imprimir',
+        cancelButtonText: 'Cerrar'
+      });
+      if (printChoice.isConfirmed) {
+        printReport(reportPayload);
+      }
     } catch (error) {
       await openIosSwal({ title: 'Error al guardar', html: '<p>No se pudo guardar el informe. Reintentá.</p>', icon: 'error', confirmButtonText: 'Entendido' });
     } finally {
@@ -1105,18 +1135,46 @@
           redraw();
         });
 
-        grid?.addEventListener('click', async (event) => {
+        let pendingDeleteIndex = null;
+
+        const renderDeleteConfirm = () => {
+          grid?.querySelectorAll('.attachment-delete-confirm').forEach((node) => node.remove());
+          if (pendingDeleteIndex === null) return;
+          const card = grid?.querySelector(`[data-edit-attachment="${pendingDeleteIndex}"]`);
+          if (!card) {
+            pendingDeleteIndex = null;
+            return;
+          }
+          const confirm = document.createElement('div');
+          confirm.className = 'attachment-delete-confirm';
+          confirm.innerHTML = '<button type="button" class="btn attachment-delete-btn yes" data-attachment-confirm="yes">Eliminar</button><button type="button" class="btn attachment-delete-btn no" data-attachment-confirm="no">Cancelar</button>';
+          card.appendChild(confirm);
+        };
+
+        grid?.addEventListener('click', (event) => {
           const removeBtn = event.target.closest('[data-remove-edit-attachment]');
-          if (!removeBtn) return;
-          const idx = Number(removeBtn.dataset.removeEditAttachment);
+          if (removeBtn) {
+            pendingDeleteIndex = Number(removeBtn.dataset.removeEditAttachment);
+            renderDeleteConfirm();
+            return;
+          }
+
+          const confirmBtn = event.target.closest('[data-attachment-confirm]');
+          if (!confirmBtn) return;
+          const decision = confirmBtn.dataset.attachmentConfirm;
+          const idx = pendingDeleteIndex;
+          pendingDeleteIndex = null;
+
+          if (decision !== 'yes') {
+            renderDeleteConfirm();
+            return;
+          }
+
           const target = currentAttachments[idx];
-          if (!target) return;
-
-          const confirmDelete = window.confirm(`Eliminar adjunto:
-${target.name || 'Adjunto'}
-
-Esta acción quitará el archivo del informe.`);
-          if (!confirmDelete) return;
+          if (!target) {
+            renderDeleteConfirm();
+            return;
+          }
 
           if (target?.isLocal && target.url) {
             URL.revokeObjectURL(target.url);
@@ -1768,6 +1826,10 @@ Esta acción quitará el archivo del informe.`);
       const report = findReportById(article.dataset.reportId);
       if (!report) return;
 
+      if (event.target.closest('[data-print-report]')) {
+        printReport(report);
+        return;
+      }
       if (event.target.closest('[data-view-report]')) {
         await openReportViewer(report);
         return;

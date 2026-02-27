@@ -2388,3 +2388,47 @@ html.login-protected.auth-ok body {
     min-width: auto;
   }
 }
+
+.informe-print-chip {
+  border: 1px solid #d5dff4;
+  background: #f4f7ff;
+  color: #2f5fb0;
+  border-radius: 999px;
+  min-height: 30px;
+  min-width: 30px;
+  padding: 4px 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.informe-print-chip:hover {
+  background: #e8efff;
+  color: #234a96;
+}
+
+.attachment-delete-confirm {
+  position: absolute;
+  inset: auto 6px 6px 6px;
+  display: flex;
+  gap: 6px;
+  z-index: 4;
+}
+
+.attachment-delete-btn {
+  flex: 1;
+  border-radius: 8px;
+  min-height: 26px;
+  border: 1px solid #d3dcf1;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  background: #eef3ff;
+  color: #345d9f;
+}
+
+.attachment-delete-btn.yes {
+  border-color: #efb6c7;
+  background: #fff1f6;
+  color: #c73567;
+}
