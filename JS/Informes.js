@@ -226,30 +226,143 @@
 
   const getReportPath = (report) => `/informes/${report.year}/${report.month}/${report.day}/${report.id}`;
 
-  const buildPrintWindowHtml = (report, includeImages = true) => {
+  const sanitizeHtmlForPdfMake = (rawHtml) => {
+    const source = String(rawHtml || '').trim();
+    if (!source) return '';
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<div>${source}</div>`, 'text/html');
+    const root = doc.body.firstElementChild || doc.body;
+
+    root.querySelectorAll('img').forEach((img) => {
+      const url = normalizeValue(img.getAttribute('src'));
+      const alt = normalizeValue(img.getAttribute('alt')) || 'Imagen';
+      const replacement = doc.createElement('p');
+      replacement.innerHTML = `<strong>${escapeHtml(alt)}</strong><br><small>Imagen externa omitida del PDF por restricción CORS.</small>${url ? `<br><small>${escapeHtml(url)}</small>` : ''}`;
+      img.replaceWith(replacement);
+    });
+
+    return root.innerHTML;
+  };
+
+  const buildPdfDefinition = (report) => {
     const attachments = Array.isArray(report?.attachments) ? report.attachments : [];
     const images = attachments.filter((item) => item.type === 'image' && item.url);
     const docs = attachments.filter((item) => item.type !== 'image' && item.url);
 
-    const imagesHtml = images.length
-      ? (includeImages
-        ? images.map((item) => `<figure style="margin:0 0 14px;"><img src="${item.url}" alt="${escapeHtml(item.name || 'Adjunto')}" style="max-width:100%;border-radius:10px;border:1px solid #dbe2f3;"><figcaption style="font-size:12px;color:#5a6482;">${escapeHtml(item.name || 'Imagen')}</figcaption></figure>`).join('')
-        : `<ul>${images.map((item) => `<li>${escapeHtml(item.name || 'Imagen')}<br><small>${escapeHtml(item.url)}</small></li>`).join('')}</ul>`)
-      : '<p style="color:#5a6482;">Sin imágenes adjuntas.</p>';
+    const safeHtml = sanitizeHtmlForPdfMake(report.html || '');
+    const htmlContent = window.htmlToPdfmake
+      ? window.htmlToPdfmake(safeHtml || '<p>Sin contenido</p>', { window })
+      : [{ text: safeHtml || 'Sin contenido' }];
+
+    return {
+      pageSize: 'A4',
+      pageMargins: [28, 24, 28, 24],
+      defaultStyle: { fontSize: 11 },
+      content: [
+        { text: 'Informe bromatológico', style: 'title' },
+        { text: `Usuario: ${report.userName || '-'}`, margin: [0, 2, 0, 0] },
+        { text: `Puesto: ${report.userPosition || '-'}`, margin: [0, 2, 0, 0] },
+        { text: `Fecha: ${getDateLabel(report.createdAt)}`, margin: [0, 2, 0, 10] },
+        { text: 'Contenido', style: 'sectionTitle' },
+        ...(Array.isArray(htmlContent) ? htmlContent : [htmlContent]),
+        { text: 'Imágenes adjuntas', style: 'sectionTitle', margin: [0, 14, 0, 6] },
+        images.length
+          ? { ul: images.map((item) => ({ text: `${item.name || 'Imagen'} - ${item.url}`, link: item.url, color: '#1d4ed8' })) }
+          : { text: 'Sin imágenes adjuntas.', color: '#5a6482' },
+        { text: 'Otros adjuntos', style: 'sectionTitle', margin: [0, 14, 0, 6] },
+        docs.length
+          ? { ul: docs.map((item) => ({ text: `${item.name || 'Archivo'}${item.url ? ` - ${item.url}` : ''}`, link: item.url || undefined, color: item.url ? '#1d4ed8' : '#1f2a44' })) }
+          : { text: 'Sin archivos adjuntos.', color: '#5a6482' }
+      ],
+      styles: {
+        title: { fontSize: 18, bold: true },
+        sectionTitle: { fontSize: 13, bold: true }
+      }
+    };
+  };
+
+  const openProcessingAlert = (message) => {
+    Swal.fire({
+      target: getSwalTarget(),
+      title: 'Procesando informe',
+      html: `<div class="d-flex flex-column align-items-center gap-2"><img src="./IMG/Meta-ai-logo.webp" alt="Procesando" class="meta-spinner-login"><p class="mb-0">${escapeHtml(message)}</p></div>`,
+      allowEscapeKey: false,
+      allowOutsideClick: false,
+      showConfirmButton: false,
+      customClass: {
+        popup: 'ios-alert informes-alert informes-saving-alert',
+        title: 'ios-alert-title',
+        htmlContainer: 'ios-alert-text'
+      },
+      buttonsStyling: false
+    });
+  };
+
+  const fetchLatestReportData = async (report) => {
+    await window.laJamoneraReady;
+    const path = getReportPath(report);
+    const latest = await window.dbLaJamoneraRest.read(path);
+    const latestHtml = await window.dbLaJamoneraRest.read(`${path}/html`);
+    if (!latest || typeof latest !== 'object') {
+      return {
+        ...report,
+        html: typeof latestHtml === 'string' ? latestHtml : report.html
+      };
+    }
+    return {
+      ...report,
+      ...latest,
+      html: typeof latestHtml === 'string' ? latestHtml : latest.html,
+      id: latest.id || report.id,
+      year: report.year,
+      month: report.month,
+      day: report.day
+    };
+  };
+
+  const buildReportPdfBlob = async (report) => {
+    if (!window.pdfMake || !window.htmlToPdfmake) {
+      throw new Error('pdf_lib_unavailable');
+    }
+
+    const docDefinition = buildPdfDefinition(report);
+    return await new Promise((resolve, reject) => {
+      try {
+        window.pdfMake.createPdf(docDefinition).getBlob((blob) => resolve(blob));
+      } catch (error) {
+        reject(error);
+      }
+    });
+  };
+
+  const downloadPdfBlob = (blob, fileName) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const openBrowserPrintWithImages = (report) => {
+    const attachments = Array.isArray(report?.attachments) ? report.attachments : [];
+    const docs = attachments.filter((item) => item.type !== 'image' && item.url);
+
+    const popup = window.open('', '_blank', 'noopener,noreferrer,width=980,height=760');
+    if (!popup) {
+      throw new Error('print_popup_blocked');
+    }
 
     const docsHtml = docs.length
-      ? `<ul>${docs.map((item) => `<li>${escapeHtml(item.name || 'Archivo')}</li>`).join('')}</ul>`
+      ? `<ul>${docs.map((item) => `<li><a href="${item.url}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.name || 'Archivo')}</a></li>`).join('')}</ul>`
       : '<p style="color:#5a6482;">Sin archivos adjuntos.</p>';
 
-    return `
-      <h1 style="margin:0 0 8px;">Informe bromatológico</h1>
-      <p style="margin:0 0 4px;"><strong>Usuario:</strong> ${escapeHtml(report.userName || '-')}</p>
-      <p style="margin:0 0 4px;"><strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')}</p>
-      <p style="margin:0 0 16px;"><strong>Fecha:</strong> ${getDateLabel(report.createdAt)}</p>
-      <section style="margin-bottom:14px;"><h2 style="font-size:18px;">Contenido</h2><div>${report.html || ''}</div></section>
-      <section style="margin-bottom:14px;"><h2 style="font-size:18px;">Imágenes adjuntas</h2>${imagesHtml}</section>
-      <section><h2 style="font-size:18px;">Otros adjuntos</h2>${docsHtml}</section>
-    `;
+    popup.document.open();
+    popup.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Impresión informe</title><style>body{font-family:Inter,Arial,sans-serif;padding:20px;color:#1f2a44;}img{max-width:100%;height:auto;border-radius:10px;border:1px solid #dbe2f3;}h1{margin:0 0 8px;}section{margin-bottom:14px;}</style></head><body><h1>Informe bromatológico</h1><p><strong>Usuario:</strong> ${escapeHtml(report.userName || '-')}</p><p><strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')}</p><p><strong>Fecha:</strong> ${getDateLabel(report.createdAt)}</p>${report.updatedAt ? `<p><strong>Actualizado:</strong> ${getDateLabel(report.updatedAt)}</p>` : ''}<section><h2 style="font-size:18px;">Contenido</h2><div>${report.html || ''}</div></section><section><h2 style="font-size:18px;">Otros adjuntos</h2>${docsHtml}</section><script>window.onload=()=>window.print();<\/script></body></html>`);
+    popup.document.close();
   };
 
   const printReport = async (report) => {
@@ -263,41 +376,38 @@
       cancelButtonText: 'Cancelar'
     });
 
-    if (choice.isConfirmed) {
-      const popup = window.open('', '_blank', 'noopener,noreferrer,width=980,height=760');
-      if (!popup) return;
-      popup.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Impresión informe</title></head><body style="font-family:Inter,Arial,sans-serif;padding:20px;color:#1f2a44;">${buildPrintWindowHtml(report, true)}<script>window.onload=()=>window.print();<\/script></body></html>`);
-      popup.document.close();
+    if (!choice.isConfirmed && !choice.isDenied) {
       return;
     }
-
-    if (!choice.isDenied) {
-      return;
-    }
-
-    if (!window.html2pdf) {
-      await openIosSwal({ title: 'PDF no disponible', html: '<p>No pudimos cargar la librería de PDF. Reintentá en unos segundos.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
-      return;
-    }
-
-    const container = document.createElement('div');
-    container.className = 'print-report-container';
-    container.style.cssText = 'position:fixed;left:-99999px;top:0;width:800px;background:#ffffff;color:#1f2a44;padding:24px;font-family:Inter,Arial,sans-serif;';
-    container.innerHTML = buildPrintWindowHtml(report, false);
-    document.body.appendChild(container);
 
     try {
-      await window.html2pdf().set({
-        margin: 8,
-        filename: `informe_${report.id || Date.now()}.pdf`,
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: false },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      }).from(container).save();
+      openProcessingAlert(choice.isConfirmed ? 'Leyendo informe desde Firebase y preparando PDF...' : 'Leyendo informe desde Firebase y generando PDF...');
+      const latestReport = await fetchLatestReportData(report);
+      if (!normalizeValue(latestReport.html || '')) {
+        throw new Error('empty_report_html');
+      }
+
+      if (choice.isConfirmed) {
+        openBrowserPrintWithImages(latestReport);
+      } else {
+        const blob = await buildReportPdfBlob(latestReport);
+        const filename = `informe_${latestReport.id || Date.now()}.pdf`;
+        downloadPdfBlob(blob, filename);
+      }
     } catch (error) {
-      await openIosSwal({ title: 'Error al generar PDF', html: '<p>No se pudo generar el PDF del informe.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      let message = '<p>No se pudo generar el informe para imprimir o descargar.</p>';
+      if (error?.message === 'pdf_lib_unavailable') {
+        message = '<p>No pudimos cargar la librería PDF (pdfmake/html-to-pdfmake). Reintentá en unos segundos.</p>';
+      }
+      if (error?.message === 'print_popup_blocked') {
+        message = '<p>El navegador bloqueó la ventana de impresión. Permití pop-ups y reintentá.</p>';
+      }
+      if (error?.message === 'empty_report_html') {
+        message = '<p>El informe no tiene contenido HTML para imprimir. Verificá que esté guardado correctamente en Firebase.</p>';
+      }
+      await openIosSwal({ title: 'Error al generar PDF', html: message, icon: 'error', confirmButtonText: 'Entendido' });
     } finally {
-      container.remove();
+      Swal.close();
     }
   };
 
@@ -1046,6 +1156,7 @@
             <p><strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')}</p>
             <p><strong>Email:</strong> ${escapeHtml(report.userEmail || '-')}</p>
             <p><strong>Fecha:</strong> ${getDateLabel(report.createdAt)}</p>
+            <p><strong>Actualizado:</strong> ${report.updatedAt ? getDateLabel(report.updatedAt) : 'Sin modificaciones'}</p>
           </div>
           <div class="report-viewer-content-wrap"><div class="report-viewer-content">${report.html || ''}</div></div>
           <div class="attachments-grid">${attachmentHtml}</div>
@@ -1353,7 +1464,7 @@
     ].join('');
     const commentPrompt = await openIosSwal({
       title: parentCommentId ? 'Responder comentario' : 'Nuevo comentario',
-      html: `<div class="text-start report-comment-form"><label>Usuario</label><select id="commentUser" class="form-select ios-input mb-2">${optionsHtml}</select><label>Comentario</label><textarea id="commentText" class="swal2-textarea ios-input" placeholder="Escribí tu comentario"></textarea><label>Clave</label><input id="commentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos"></div>`,
+      html: `<div class="text-start report-comment-form"><label>Usuario</label><select id="commentUser" class="form-select ios-input mb-2">${optionsHtml}</select><label>Comentario</label><textarea id="commentText" class="swal2-textarea ios-input" placeholder="Escribí tu comentario"></textarea><label>Clave</label><input id="commentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"></div>`,
       showCancelButton: true,
       confirmButtonText: 'Continuar',
       cancelButtonText: 'Cancelar',
