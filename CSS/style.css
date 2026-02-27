@@ -250,6 +250,14 @@ html.login-protected.auth-ok body {
   color: #10b981;
 }
 
+.icon-orange {
+  color: #ff8a2a;
+}
+
+.icon-gray {
+  color: #8e97ad;
+}
+
 /* =========================================
    FOOTER
 ========================================= */
@@ -1930,8 +1938,8 @@ html.login-protected.auth-ok body {
 }
 
 .informes-board-spinner {
-  width: 124px;
-  height: 124px;
+  width: 92px;
+  height: 92px;
 }
 
 .informes-board-empty {
@@ -2059,11 +2067,11 @@ html.login-protected.auth-ok body {
    INFORMES BOARD REFINES
 ========================================= */
 #openFilterInformesBtn i {
-  color: #1db86a;
+  color: #ff8a2a;
 }
 
 #clearFilterInformesBtn i {
-  color: #8e66ff;
+  color: #8e97ad;
 }
 
 .informes-home-content {
@@ -2195,4 +2203,93 @@ html.login-protected.auth-ok body {
 
 .report-viewer .attachments-grid {
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+}
+
+.report-viewer-content-wrap {
+  overflow-x: auto;
+}
+
+.report-comments-wrap {
+  margin-top: 12px;
+  border-top: 1px solid #dbe2f3;
+  padding-top: 10px;
+}
+
+.report-comments-wrap h6 {
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+.report-comments-thread {
+  display: grid;
+  gap: 8px;
+}
+
+.report-comment-item {
+  border: 1px solid #d7def1;
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: #f8faff;
+}
+
+.report-comment-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.report-comment-head small {
+  color: #7886a8;
+}
+
+.report-comment-text {
+  margin: 6px 0;
+  color: #2a3556;
+}
+
+.report-comment-replies {
+  margin-top: 8px;
+  padding-left: 10px;
+  border-left: 2px solid #dce3f5;
+  display: grid;
+  gap: 8px;
+}
+
+.report-comment-reply-btn {
+  border: 1px solid #ccd8f5;
+  background: #eef3ff;
+  color: #325ea9;
+  border-radius: 10px;
+  padding: 4px 10px;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.report-comment-form label {
+  margin-bottom: 6px;
+  color: #4f5f84;
+}
+
+.report-edit-wrap .report-editor-scroll {
+  overflow-x: auto;
+}
+
+.report-edit-attachments .attachment-card {
+  position: relative;
+}
+
+.remove-attachment-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid #e9bfd0;
+  background: #fff1f4;
+  color: #c7345b;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
