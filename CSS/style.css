@@ -225,6 +225,10 @@ html.login-protected.auth-ok body {
   color: #8b5cf6;
 }
 
+.icon-green {
+  color: #10b981;
+}
+
 /* =========================================
    FOOTER
 ========================================= */
