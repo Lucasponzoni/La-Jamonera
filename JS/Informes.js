@@ -304,6 +304,7 @@
       renderUsers();
       renderAttachments();
       showState('data');
+      updateMainScrollHint();
     } catch (error) {
       await openIosSwal({ title: 'Error', html: '<p>No se pudieron cargar los datos de informes.</p>', icon: 'error', confirmButtonText: 'Entendido' });
       showState('data');
@@ -985,5 +986,6 @@
     updateImportanceLabel();
     await loadData();
     await restoreDraft();
+    updateMainScrollHint();
   });
 })();
