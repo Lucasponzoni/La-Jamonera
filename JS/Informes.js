@@ -252,6 +252,94 @@
     `;
   };
 
+  const openProcessingAlert = (message) => {
+    Swal.fire({
+      target: getSwalTarget(),
+      title: 'Procesando informe',
+      html: `<div class="d-flex flex-column align-items-center gap-2"><img src="./IMG/Meta-ai-logo.webp" alt="Procesando" class="meta-spinner-login"><p class="mb-0">${escapeHtml(message)}</p></div>`,
+      allowEscapeKey: false,
+      allowOutsideClick: false,
+      showConfirmButton: false,
+      customClass: {
+        popup: 'ios-alert informes-alert informes-saving-alert',
+        title: 'ios-alert-title',
+        htmlContainer: 'ios-alert-text'
+      },
+      buttonsStyling: false
+    });
+  };
+
+  const createPrintContainer = (report) => {
+    const container = document.createElement('div');
+    container.className = 'print-report-container';
+    container.style.cssText = 'position:fixed;left:0;top:0;width:794px;background:#ffffff;color:#1f2a44;padding:24px;font-family:Inter,Arial,sans-serif;opacity:0;pointer-events:none;z-index:-1;';
+    container.innerHTML = buildPrintWindowHtml(report, true);
+    document.body.appendChild(container);
+    return container;
+  };
+
+  const buildReportPdfBlob = async (report) => {
+    if (!window.html2pdf) {
+      throw new Error('html2pdf_unavailable');
+    }
+
+    const container = createPrintContainer(report);
+
+    try {
+      const worker = window.html2pdf().set({
+        margin: [10, 8, 10, 8],
+        filename: `informe_${report.id || Date.now()}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: '#ffffff',
+          logging: false
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'] }
+      }).from(container);
+
+      return await worker.outputPdf('blob');
+    } finally {
+      container.remove();
+    }
+  };
+
+  const downloadPdfBlob = (blob, fileName) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const printPdfBlob = async (blob) => new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    const frame = document.createElement('iframe');
+    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none;';
+    frame.src = url;
+    document.body.appendChild(frame);
+
+    frame.onload = () => {
+      try {
+        frame.contentWindow?.focus();
+        frame.contentWindow?.print();
+      } catch (error) {
+      }
+
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+        frame.remove();
+        resolve();
+      }, 2500);
+    };
+  });
+
   const printReport = async (report) => {
     const choice = await openIosSwal({
       title: 'Imprimir informe',
@@ -263,41 +351,27 @@
       cancelButtonText: 'Cancelar'
     });
 
-    if (choice.isConfirmed) {
-      const popup = window.open('', '_blank', 'noopener,noreferrer,width=980,height=760');
-      if (!popup) return;
-      popup.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Impresión informe</title></head><body style="font-family:Inter,Arial,sans-serif;padding:20px;color:#1f2a44;">${buildPrintWindowHtml(report, true)}<script>window.onload=()=>window.print();<\/script></body></html>`);
-      popup.document.close();
+    if (!choice.isConfirmed && !choice.isDenied) {
       return;
     }
-
-    if (!choice.isDenied) {
-      return;
-    }
-
-    if (!window.html2pdf) {
-      await openIosSwal({ title: 'PDF no disponible', html: '<p>No pudimos cargar la librería de PDF. Reintentá en unos segundos.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
-      return;
-    }
-
-    const container = document.createElement('div');
-    container.className = 'print-report-container';
-    container.style.cssText = 'position:fixed;left:-99999px;top:0;width:800px;background:#ffffff;color:#1f2a44;padding:24px;font-family:Inter,Arial,sans-serif;';
-    container.innerHTML = buildPrintWindowHtml(report, false);
-    document.body.appendChild(container);
 
     try {
-      await window.html2pdf().set({
-        margin: 8,
-        filename: `informe_${report.id || Date.now()}.pdf`,
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: false },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      }).from(container).save();
+      openProcessingAlert(choice.isConfirmed ? 'Preparando PDF para impresión...' : 'Generando PDF para descarga...');
+      const blob = await buildReportPdfBlob(report);
+      const filename = `informe_${report.id || Date.now()}.pdf`;
+
+      if (choice.isConfirmed) {
+        await printPdfBlob(blob);
+      } else {
+        downloadPdfBlob(blob, filename);
+      }
     } catch (error) {
-      await openIosSwal({ title: 'Error al generar PDF', html: '<p>No se pudo generar el PDF del informe.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      const message = error?.message === 'html2pdf_unavailable'
+        ? '<p>No pudimos cargar la librería de PDF. Reintentá en unos segundos.</p>'
+        : '<p>No se pudo generar el PDF del informe.</p>';
+      await openIosSwal({ title: 'Error al generar PDF', html: message, icon: 'error', confirmButtonText: 'Entendido' });
     } finally {
-      container.remove();
+      Swal.close();
     }
   };
 
@@ -1353,7 +1427,7 @@
     ].join('');
     const commentPrompt = await openIosSwal({
       title: parentCommentId ? 'Responder comentario' : 'Nuevo comentario',
-      html: `<div class="text-start report-comment-form"><label>Usuario</label><select id="commentUser" class="form-select ios-input mb-2">${optionsHtml}</select><label>Comentario</label><textarea id="commentText" class="swal2-textarea ios-input" placeholder="Escribí tu comentario"></textarea><label>Clave</label><input id="commentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos"></div>`,
+      html: `<div class="text-start report-comment-form"><label>Usuario</label><select id="commentUser" class="form-select ios-input mb-2">${optionsHtml}</select><label>Comentario</label><textarea id="commentText" class="swal2-textarea ios-input" placeholder="Escribí tu comentario"></textarea><label>Clave</label><input id="commentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"></div>`,
       showCancelButton: true,
       confirmButtonText: 'Continuar',
       cancelButtonText: 'Cancelar',
