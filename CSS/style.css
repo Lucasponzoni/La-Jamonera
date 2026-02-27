@@ -111,6 +111,16 @@ html.login-protected.auth-ok body {
   gap: 6px;
 }
 
+
+.barra-vertical {
+  display: inline-block;
+  width: 1px;
+  height: 16px;
+  background: #999;
+  margin: 0 8px;
+  vertical-align: middle;
+}
+
 .topbar-link {
   color: #5f6a89;
   font-weight: 400;
@@ -1340,6 +1350,10 @@ html.login-protected.auth-ok body {
   margin-bottom: 12px;
 }
 
+.editor-toolbar-scroll {
+  width: 100%;
+}
+
 .editor-toolbar {
   border-bottom: 1px solid #e4e8f4;
   padding: 8px;
@@ -1740,7 +1754,7 @@ html.login-protected.auth-ok body {
   border: 1px solid #dbe0ef;
   background: #fdfdff;
   border-radius: 16px;
-  padding: 10px;
+  padding: 10px 12px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1748,13 +1762,22 @@ html.login-protected.auth-ok body {
   min-width: 0;
 }
 
-.informe-user-circle h6 {
+.informe-user-item-icon {
+  color: #5f6a89;
+  font-size: 0.92rem;
+}
+
+.informe-user-main {
+  min-width: 0;
+}
+
+.informe-user-main h6 {
   margin: 0;
   color: #2a3556;
   font-weight: 700;
 }
 
-.informe-user-circle p {
+.informe-user-main p {
   margin: 2px 0 0;
   color: #5f6a89;
   font-size: 0.85rem;
@@ -1792,9 +1815,24 @@ html.login-protected.auth-ok body {
   background: #f7f9ff;
 }
 
+.swal2-popup.informes-clear-alert {
+  padding: 1.5rem;
+}
+
+.swal2-popup.informes-clear-alert .swal2-html-container {
+  margin: 0.6rem 0 0.3rem;
+}
+
 .swal2-popup.informes-clear-alert .swal2-actions {
   justify-content: center;
   gap: 10px;
+  margin-top: 0.8rem;
+}
+
+.swal2-popup.informes-clear-alert .swal2-actions .ios-btn {
+  width: auto;
+  max-width: none;
+  min-width: 150px;
 }
 
 .swal2-popup.informes-clear-alert .swal2-confirm {
@@ -1821,4 +1859,51 @@ html.login-protected.auth-ok body {
   .informe-user-actions {
     justify-content: flex-end;
   }
+
+  .editor-toolbar-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  .editor-toolbar {
+    flex-wrap: nowrap;
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .editor-toolbar-scroll::-webkit-scrollbar {
+    height: 5px;
+  }
+
+  .editor-toolbar-scroll::-webkit-scrollbar-thumb {
+    background: #cfd8f4;
+    border-radius: 999px;
+  }
+}
+
+
+.informes-modal .ios-modal-body.has-scroll-hint::after {
+  content: '↓ Desliza hacia abajo';
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: block;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #516089;
+  background: linear-gradient(to bottom, rgba(242, 245, 252, 0), rgba(242, 245, 252, 1));
+  padding: 10px 0 6px;
+  pointer-events: none;
+}
+
+
+.editor-plain-text {
+  color: #000000;
+  background: transparent;
+  font-weight: 400;
+  font-style: normal;
+  text-decoration: none;
 }

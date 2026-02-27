@@ -60,7 +60,7 @@
             <div class="collapse navbar-collapse" id="topbarMenu">
               <ul class="navbar-nav topbar-links me-auto mb-2 mb-lg-0">
                 <li class="nav-item">
-                  <a class="nav-link topbar-link" href="./index.html">Inicio</a>
+                  <span class="barra-vertical"></span><a class="nav-link topbar-link" href="./index.html">Inicio</a>
                 </li>
                 <li class="nav-item">
                   <a class="nav-link topbar-link active" href="./informes.html" aria-current="page">Informes bromatológicos</a>
@@ -139,7 +139,8 @@
                 </div>
 
                 <div class="editor-wrap">
-                  <div class="editor-toolbar" role="toolbar" aria-label="Herramientas de edición">
+                  <div class="editor-toolbar-scroll">
+                    <div class="editor-toolbar" role="toolbar" aria-label="Herramientas de edición">
                     <button type="button" class="editor-btn" data-cmd="bold" title="Negrita"><i class="fa-solid fa-bold"></i></button>
                     <button type="button" class="editor-btn" data-cmd="italic" title="Cursiva"><i class="fa-solid fa-italic"></i></button>
                     <button type="button" class="editor-btn" data-cmd="underline" title="Subrayado"><i class="fa-solid fa-underline"></i></button>
@@ -179,6 +180,7 @@
                     <div class="emoji-picker-wrap">
                       <button type="button" class="editor-btn" id="toggleEmojiPanel" title="Insertar emoji"><i class="fa-regular fa-face-smile"></i></button>
                       <div id="emojiPanel" class="emoji-panel" aria-label="Selector de emojis"></div>
+                    </div>
                     </div>
                   </div>
                   <div id="informeEditor" class="informe-editor" contenteditable="true" aria-label="Editor de texto enriquecido" data-placeholder="Escribí el informe acá..."></div>
