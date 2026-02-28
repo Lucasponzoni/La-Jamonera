@@ -1463,7 +1463,9 @@
             <p><strong>Email:</strong> ${escapeHtml(report.userEmail || '-')}</p>
             <p><strong>Fecha:</strong> ${getDateLabel(report.createdAt)}</p>
             <p><strong>Última actualización:</strong> ${lastUpdatedAt ? getDateLabel(lastUpdatedAt) : 'Sin actualizaciones'}</p>
-            <button type="button" class="btn ios-btn ios-btn-warning report-resend-btn" data-resend-report-email="1"><i class="fa-regular fa-paper-plane"></i><span>Reenviar por email</span></button>
+            <div class="report-viewer-meta-actions">
+              <button type="button" class="btn ios-btn ios-btn-warning report-resend-btn" data-resend-report-email="1"><i class="fa-regular fa-paper-plane"></i><span>Reenviar email</span></button>
+            </div>
           </div>
           <div class="report-viewer-content-wrap"><div class="report-viewer-content">${report.html || ''}</div></div>
           <div class="attachments-grid">${attachmentHtml}</div>
