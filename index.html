@@ -114,7 +114,7 @@
               data-bs-toggle="modal"
               data-bs-target="#recetasModal"
             >
-              <i class="fa-solid fa-book-open icon-orangered" aria-hidden="true"></i>
+              <i class="fa-solid fa-utensils icon-orangered" aria-hidden="true"></i>
               <span>Recetas</span>
             </button>
           </div>
@@ -181,7 +181,7 @@
 
               <div id="recetasEmpty" class="ingredientes-empty d-none" aria-live="polite">
                 <p class="ingredientes-empty-text">No hay recetas cargadas.</p>
-                <button id="emptyCreateRecipeBtn" type="button" class="btn ios-btn ios-btn-success">Nueva receta</button>
+                <button id="emptyCreateRecipeBtn" type="button" class="btn ios-btn ios-btn-success"><i class="fa-solid fa-plus"></i><span>Crear receta</span></button>
               </div>
 
               <div id="recetasData" class="ingredientes-data d-none" aria-live="polite">
@@ -192,11 +192,25 @@
                   </div>
                   <button id="createRecipeBtn" type="button" class="btn ios-btn ios-btn-success">
                     <i class="fa-solid fa-plus"></i>
-                    <span>Nueva receta</span>
+                    <span>Crear receta</span>
                   </button>
                 </div>
 
                 <div id="recetasList" class="recetas-list"></div>
+              </div>
+
+              <div id="recetasEditor" class="recetas-editor d-none" aria-live="polite">
+                <div class="recetas-editor-header">
+                  <button id="recipeBackBtn" type="button" class="btn ios-btn ios-btn-secondary recetas-back-btn">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    <span>Volver</span>
+                  </button>
+                  <div>
+                    <p class="recetas-editor-kicker">Recetas</p>
+                    <h6 id="recipeEditorTitle" class="recetas-editor-title mb-0">Nueva receta</h6>
+                  </div>
+                </div>
+                <form id="recipeEditorForm" class="recetas-editor-form" novalidate></form>
               </div>
             </div>
           </div>
