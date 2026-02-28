@@ -300,8 +300,8 @@
       <h6 class="step-title">3) Imagen</h6>
       <div class="step-content">
         <div class="image-method-buttons" id="${prefix}_methodButtons">
-          <button type="button" class="btn image-method-btn" data-image-method="url">Link</button>
-          <button type="button" class="btn image-method-btn" data-image-method="upload">Subir</button>
+          <button type="button" class="btn image-method-btn" data-image-method="url"><i class="fa-solid fa-link"></i>Link</button>
+          <button type="button" class="btn image-method-btn" data-image-method="upload"><i class="fa-solid fa-upload"></i>Subir</button>
           <button type="button" class="btn image-method-btn is-active" data-image-method="ai"><img src="${IA_ICON_SRC}" alt="" aria-hidden="true"> IA</button>
         </div>
         <input type="hidden" id="${prefix}_method" value="ai">
@@ -700,7 +700,7 @@
     });
 
     if (!result.isConfirmed) {
-      return;
+      return null;
     }
 
     const itemId = initial?.id || makeId('ing');
@@ -721,6 +721,7 @@
       await persistIngredientes();
       state.activeFamilyId = result.value.familyId;
       refreshView();
+      return itemId;
     } finally {
       hideSavingOverlay();
     }
@@ -843,4 +844,22 @@
   if (emptyCreateIngredientBtn) {
     emptyCreateIngredientBtn.addEventListener('click', () => openIngredientForm());
   }
+
+  window.laJamoneraIngredientesAPI = {
+    openIngredientForm: async (initial = null, draft = null) => {
+      await window.laJamoneraReady;
+      await fetchIngredientes();
+      return openIngredientForm(initial, draft);
+    },
+    getIngredientesSnapshot: async () => {
+      await window.laJamoneraReady;
+      await fetchIngredientes();
+      return {
+        familias: safeObject(state.ingredientes.familias),
+        items: safeObject(state.ingredientes.items),
+        measures: getMeasures()
+      };
+    }
+  };
+
 })();
