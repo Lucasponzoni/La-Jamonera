@@ -2297,6 +2297,18 @@ html.login-protected.auth-ok body {
   margin-left: 0;
 }
 
+.report-comment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.report-comment-reply-btn.is-danger {
+  border-color: #f3c7cd;
+  background: #fff1f3;
+  color: #b23d4d;
+}
+
 .report-comment-item[data-comment-level="0"] .report-comment-text {
   color: #2a3556;
 }

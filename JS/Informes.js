@@ -1110,23 +1110,30 @@
 
   const renderCommentTree = (comments = [], level = 0) => sortComments(comments).map((comment) => {
     const author = escapeHtml(comment.userName || 'Usuario');
-    const text = escapeHtml(comment.text || '').replaceAll('\\n', '<br>');
+    const text = escapeHtml(comment.text || '').replaceAll('\n', '<br>');
 
     const date = getDateLabel(comment.createdAt);
+    const editedAt = Number(comment.updatedAt || 0);
+    const dateLabel = editedAt ? `${date} · editado ${getDateLabel(editedAt)}` : date;
     const replies = Array.isArray(comment.replies) ? comment.replies : [];
     const accent = commentAccentFromUserId(comment.userId || comment.userName || 'anon');
     return `
       <article class="report-comment-item ${level > 0 ? 'is-reply' : ''}" style="--comment-accent:${accent};" data-comment-id="${comment.id}" data-comment-level="${level}">
         <header class="report-comment-head">
           <strong>${author}</strong>
-          <small>${date}</small>
+          <small>${dateLabel}</small>
         </header>
         <p class="report-comment-text">${text}</p>
-        <button type="button" class="btn report-comment-reply-btn" data-reply-comment="${comment.id}">Responder</button>
+        <div class="report-comment-actions">
+          <button type="button" class="btn report-comment-reply-btn" data-reply-comment="${comment.id}">Responder</button>
+          <button type="button" class="btn report-comment-reply-btn" data-edit-comment="${comment.id}">Editar</button>
+          <button type="button" class="btn report-comment-reply-btn is-danger" data-delete-comment="${comment.id}">Eliminar</button>
+        </div>
         ${replies.length ? `<div class="report-comment-replies">${renderCommentTree(replies, level + 1)}</div>` : ''}
       </article>
     `;
   }).join('');
+
 
   const buildCommentsPanel = (report) => {
     const comments = getCommentList(report);
@@ -1139,6 +1146,7 @@
   const openReportViewer = async (report) => {
     const attachments = Array.isArray(report.attachments) ? report.attachments : [];
     const imageAttachments = attachments.filter((item) => item.type === 'image');
+    const lastUpdatedAt = Number(report.updatedAt || 0);
     const attachmentHtml = attachments.length
       ? attachments.map((item, index) => {
         if (item.type === 'image') {
@@ -1158,6 +1166,7 @@
             <p><strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')}</p>
             <p><strong>Email:</strong> ${escapeHtml(report.userEmail || '-')}</p>
             <p><strong>Fecha:</strong> ${getDateLabel(report.createdAt)}</p>
+            <p><strong>Última actualización:</strong> ${lastUpdatedAt ? getDateLabel(lastUpdatedAt) : 'Sin actualizaciones'}</p>
           </div>
           <div class="report-viewer-content-wrap"><div class="report-viewer-content">${report.html || ''}</div></div>
           <div class="attachments-grid">${attachmentHtml}</div>
@@ -1196,6 +1205,22 @@
             const commentId = String(event.currentTarget.dataset.replyComment || '');
             Swal.close();
             await addCommentToReport(report, commentId, { returnToViewer: true });
+          });
+        });
+
+        popup.querySelectorAll('[data-edit-comment]').forEach((node) => {
+          node.addEventListener('click', async (event) => {
+            const commentId = String(event.currentTarget.dataset.editComment || '');
+            Swal.close();
+            await editCommentInReport(report, commentId);
+          });
+        });
+
+        popup.querySelectorAll('[data-delete-comment]').forEach((node) => {
+          node.addEventListener('click', async (event) => {
+            const commentId = String(event.currentTarget.dataset.deleteComment || '');
+            Swal.close();
+            await deleteCommentFromReport(report, commentId);
           });
         });
       }
@@ -1403,7 +1428,8 @@
       if (item.isLocal && item.url) URL.revokeObjectURL(item.url);
     });
 
-    const updated = { ...report, html: answer.value.html, importance: normalizeImportance(answer.value.importance, 50), attachments: finalAttachments, updatedAt: Date.now() };
+    const updatedAt = Date.now();
+    const updated = { ...report, html: answer.value.html, importance: normalizeImportance(answer.value.importance, 50), attachments: finalAttachments, updatedAt };
     await window.dbLaJamoneraRest.write(path, updated);
     await window.dbLaJamoneraRest.write(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, {
       id: report.id,
@@ -1414,7 +1440,7 @@
       createdAt: Number(report.createdAt || Date.now()),
       attachmentsCount: finalAttachments.length,
       commentsCount: getCommentsCount(updated),
-      updatedAt: Date.now()
+      updatedAt
     });
     await loadReportsBoard();
   };
@@ -1452,6 +1478,126 @@
       if (found) return found;
     }
     return null;
+  };
+
+
+  const removeCommentById = (comments, commentId) => {
+    const source = Array.isArray(comments) ? comments : [];
+    return source.reduce((acc, comment) => {
+      if (comment.id === commentId) {
+        return acc;
+      }
+      const replies = removeCommentById(comment.replies, commentId);
+      acc.push({ ...comment, replies });
+      return acc;
+    }, []);
+  };
+
+  const verifyCommentAuthorPin = async (comment) => {
+    const user = state.users[comment?.userId];
+    if (!user) {
+      await openIosSwal({ title: 'Usuario no encontrado', html: '<p>No existe el usuario autor del comentario.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      return false;
+    }
+    const keyCheck = await promptUserKey();
+    if (!keyCheck.isConfirmed) return false;
+    if (keyCheck.value !== String(user.pin || '')) {
+      await openIosSwal({ title: 'Clave incorrecta', html: '<p>La clave no coincide con el autor del comentario.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      return false;
+    }
+    return true;
+  };
+
+  const persistReportFromViewer = async (report, partial = {}) => {
+    const path = getReportPath(report);
+    const updatedAt = Date.now();
+    const updated = { ...report, ...partial, updatedAt };
+    await window.dbLaJamoneraRest.write(path, updated);
+    await window.dbLaJamoneraRest.write(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, {
+      id: report.id,
+      reportDate: report.reportDate,
+      userId: report.userId,
+      userName: report.userName,
+      importance: normalizeImportance(updated.importance, 50),
+      createdAt: Number(report.createdAt || Date.now()),
+      attachmentsCount: Array.isArray(updated.attachments) ? updated.attachments.length : 0,
+      commentsCount: getCommentsCount(updated),
+      updatedAt
+    });
+    await loadReportsBoard();
+  };
+
+  const editCommentInReport = async (report, commentId) => {
+    const comments = sortComments(getCommentList(report));
+    const target = findCommentById(comments, commentId);
+    if (!target) {
+      await openIosSwal({ title: 'Comentario no encontrado', html: '<p>No se encontró el comentario seleccionado.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      return;
+    }
+
+    const allowed = await verifyCommentAuthorPin(target);
+    if (!allowed) return;
+
+    const response = await openIosSwal({
+      title: 'Editar comentario',
+      html: `<div class="text-start report-comment-form"><label>Comentario</label><textarea id="editCommentText" class="swal2-textarea ios-input" placeholder="Escribí tu comentario">${escapeHtml(target.text || '')}</textarea></div>`,
+      showCancelButton: true,
+      confirmButtonText: 'Guardar',
+      cancelButtonText: 'Cancelar',
+      preConfirm: () => {
+        const text = normalizeValue(document.getElementById('editCommentText')?.value);
+        if (!text) {
+          Swal.showValidationMessage('El comentario no puede estar vacío.');
+          return false;
+        }
+        return { text };
+      }
+    });
+
+    if (!response.isConfirmed) return;
+
+    target.text = response.value.text;
+    target.updatedAt = Date.now();
+
+    const commentsObject = comments.reduce((acc, item) => {
+      acc[item.id] = item;
+      return acc;
+    }, {});
+
+    await persistReportFromViewer(report, { comments: commentsObject });
+    await reopenReportViewerById(report.id);
+  };
+
+  const deleteCommentFromReport = async (report, commentId) => {
+    const comments = sortComments(getCommentList(report));
+    const target = findCommentById(comments, commentId);
+    if (!target) {
+      await openIosSwal({ title: 'Comentario no encontrado', html: '<p>No se encontró el comentario seleccionado.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      return;
+    }
+
+    const allowed = await verifyCommentAuthorPin(target);
+    if (!allowed) return;
+
+    const confirmation = await openIosSwal({
+      title: 'Eliminar comentario',
+      html: '<p>Se borrará el comentario y todas sus respuestas.</p>',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (!confirmation.isConfirmed) return;
+
+    const cleaned = removeCommentById(comments, commentId);
+    const commentsObject = cleaned.reduce((acc, item) => {
+      acc[item.id] = item;
+      return acc;
+    }, {});
+
+    await persistReportFromViewer(report, { comments: commentsObject });
+    await reopenReportViewerById(report.id);
   };
 
   const addCommentToReport = async (report, parentCommentId = null, options = {}) => {
@@ -1546,19 +1692,7 @@
     }, {});
 
     const updated = { ...report, comments: commentsObject };
-    await window.dbLaJamoneraRest.write(getReportPath(report), updated);
-    await window.dbLaJamoneraRest.write(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, {
-      id: report.id,
-      reportDate: report.reportDate,
-      userId: report.userId,
-      userName: report.userName,
-      importance: normalizeImportance(report.importance, 50),
-      createdAt: Number(report.createdAt || Date.now()),
-      attachmentsCount: Array.isArray(report.attachments) ? report.attachments.length : 0,
-      commentsCount: getCommentsCount(updated),
-      updatedAt: Date.now()
-    });
-    await loadReportsBoard();
+    await persistReportFromViewer(report, { comments: commentsObject, importance: updated.importance, attachments: updated.attachments });
     if (options.returnToViewer) {
       await reopenReportViewerById(report.id);
     }
