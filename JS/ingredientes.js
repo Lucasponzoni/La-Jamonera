@@ -700,7 +700,7 @@
     });
 
     if (!result.isConfirmed) {
-      return;
+      return null;
     }
 
     const itemId = initial?.id || makeId('ing');
@@ -721,6 +721,7 @@
       await persistIngredientes();
       state.activeFamilyId = result.value.familyId;
       refreshView();
+      return itemId;
     } finally {
       hideSavingOverlay();
     }
