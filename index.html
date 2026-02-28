@@ -106,6 +106,17 @@
               <i class="fa-solid fa-carrot icon-lila" aria-hidden="true"></i>
               <span>Ingredientes</span>
             </button>
+
+            <button
+              id="openRecetasModal"
+              type="button"
+              class="btn btn-light home-action-btn"
+              data-bs-toggle="modal"
+              data-bs-target="#recetasModal"
+            >
+              <i class="fa-solid fa-book-open icon-orangered" aria-hidden="true"></i>
+              <span>Recetas</span>
+            </button>
           </div>
         </div>
         <div class="home-content">
@@ -114,6 +125,7 @@
         </div>
       </div>
 
+      <!-- // MODAL INGREDIENTES -->
       <div class="modal fade" id="ingredientesModal" tabindex="-1" aria-labelledby="ingredientesModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
           <div class="modal-content ios-modal ingredientes-modal">
@@ -151,6 +163,46 @@
           </div>
         </div>
       </div>
+      <!-- // FIN MODAL INGREDIENTES -->
+
+      <!-- // MODAL RECETAS -->
+      <div class="modal fade" id="recetasModal" tabindex="-1" aria-labelledby="recetasModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content ios-modal recetas-modal">
+            <div class="modal-header ios-modal-header">
+              <h5 class="modal-title ios-modal-title" id="recetasModalLabel">Recetas</h5>
+              <button type="button" class="btn-close ios-modal-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body ios-modal-body">
+              <div id="recetasLoading" class="ingredientes-loading" aria-live="polite">
+                <img src="./IMG/Meta-ai-logo.webp" alt="Cargando recetas" class="meta-spinner-login">
+              </div>
+
+              <div id="recetasEmpty" class="ingredientes-empty d-none" aria-live="polite">
+                <p class="ingredientes-empty-text">No hay recetas cargadas.</p>
+                <button id="emptyCreateRecipeBtn" type="button" class="btn ios-btn ios-btn-success">Nueva receta</button>
+              </div>
+
+              <div id="recetasData" class="ingredientes-data d-none" aria-live="polite">
+                <div class="ingredientes-toolbar">
+                  <div class="input-group ios-input-group ingredientes-search-group">
+                    <span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+                    <input id="recetasSearchInput" type="search" class="form-control ios-input ingredientes-search-input" placeholder="Buscar receta">
+                  </div>
+                  <button id="createRecipeBtn" type="button" class="btn ios-btn ios-btn-success">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Nueva receta</span>
+                  </button>
+                </div>
+
+                <div id="recetasList" class="recetas-list"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- // FIN MODAL RECETAS -->
 
       <footer class="app-footer app-footer-white">
         <div class="footer-main">
@@ -203,6 +255,7 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="./JS/firebase-init.js"></script>
   <script src="./JS/ingredientes.js"></script>
+  <script src="./JS/recetas.js"></script>
   <script src="./JS/app.js"></script>
 </body>
 </html>

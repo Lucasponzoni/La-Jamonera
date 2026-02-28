@@ -2663,3 +2663,138 @@ html.login-protected.auth-ok body {
   background: #fff1f6;
   color: #c73567;
 }
+
+.icon-orangered {
+  color: orangered;
+}
+
+.recetas-modal .ios-modal-body {
+  max-height: min(80vh, 820px);
+}
+
+.recetas-list {
+  display: grid;
+  gap: 12px;
+  max-height: 52vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.receta-card {
+  border: 1px solid #d7e1f7;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.receta-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.receta-card-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.receta-thumb {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #d8e1f6;
+  background: #f4f7ff;
+}
+
+.receta-card-meta {
+  color: #5b6f9a;
+  font-size: 0.85rem;
+}
+
+.recipe-form-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.recipe-table-wrap {
+  border: 1px solid #d9e3f8;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.recipe-table {
+  width: 100%;
+  font-size: 0.92rem;
+}
+
+.recipe-table th,
+.recipe-table td {
+  border-bottom: 1px solid #ecf1ff;
+  padding: 8px;
+  vertical-align: middle;
+}
+
+.recipe-table tbody tr.is-comment {
+  background: #fff5e8;
+}
+
+.recipe-table tbody tr.is-dragging {
+  opacity: 0.55;
+}
+
+.recipe-table tbody tr.drag-over {
+  outline: 2px dashed #4d74cf;
+  outline-offset: -2px;
+}
+
+.recipe-ing-autocomplete {
+  position: relative;
+}
+
+.recipe-suggest-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 180px;
+  overflow: auto;
+  border: 1px solid #d7e2f7;
+  border-radius: 12px;
+  background: #fff;
+  z-index: 20;
+}
+
+.recipe-suggest-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 7px 8px;
+  text-align: left;
+}
+
+.recipe-suggest-item:hover {
+  background: #f0f5ff;
+}
+
+.recipe-suggest-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #d4def5;
+  background: #f2f6ff;
+}
+
+.recipe-row-actions {
+  display: flex;
+  gap: 6px;
+}

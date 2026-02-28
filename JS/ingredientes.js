@@ -843,4 +843,22 @@
   if (emptyCreateIngredientBtn) {
     emptyCreateIngredientBtn.addEventListener('click', () => openIngredientForm());
   }
+
+  window.laJamoneraIngredientesAPI = {
+    openIngredientForm: async (initial = null, draft = null) => {
+      await window.laJamoneraReady;
+      await fetchIngredientes();
+      return openIngredientForm(initial, draft);
+    },
+    getIngredientesSnapshot: async () => {
+      await window.laJamoneraReady;
+      await fetchIngredientes();
+      return {
+        familias: safeObject(state.ingredientes.familias),
+        items: safeObject(state.ingredientes.items),
+        measures: getMeasures()
+      };
+    }
+  };
+
 })();
