@@ -6,6 +6,7 @@
 
   const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
   const DRAFT_KEY = 'laJamoneraInformeDraft';
+  const EMAIL_PREFS_KEY = 'laJamoneraInformeEmailPrefs';
   const USER_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
   const informesLoading = document.getElementById('informesLoading');
