@@ -641,6 +641,11 @@
     const safeAttachments = Array.isArray(attachments) ? attachments : [];
     const imageAttachments = safeAttachments.filter((item) => item?.type === 'image' && normalizeValue(item?.url));
     const docAttachments = safeAttachments.filter((item) => item?.type !== 'image' && normalizeValue(item?.url));
+    const creatorName = escapeHtml(report.userName || 'Usuario');
+    const creatorEmail = normalizeValue(report.userEmail || '');
+    const replyMailto = creatorEmail
+      ? `mailto:${encodeURIComponent(creatorEmail)}?subject=${encodeURIComponent(`Consulta sobre informe de ${report.userName || 'usuario'}`)}`
+      : '';
 
     const attachmentItems = docAttachments.length
       ? docAttachments.map((item) => `<li style="margin:0 0 6px;"><a href="${escapeHtml(item.url || '')}" target="_blank" rel="noopener noreferrer" style="color:#1c64d1;text-decoration:none;">${escapeHtml(item.name || 'Adjunto')}</a></li>`).join('')
@@ -659,7 +664,8 @@
       <div style="font-family:Inter,Arial,sans-serif;background:#f4f7ff;padding:18px;">
         <div style="max-width:720px;margin:0 auto;background:#fff;border:1px solid #dbe4fb;border-radius:18px;padding:18px;">
           <h2 style="margin:0 0 6px;color:#2351a0;">Nuevo informe bromatológico</h2>
-          <p style="margin:0 0 14px;color:#4f638c;">Creador: <strong>${escapeHtml(report.userName || 'Usuario')}</strong> · Fecha: ${getDateLabel(report.createdAt)}</p>
+          <p style="margin:0 0 14px;color:#4f638c;">Creador: <strong>${creatorName}</strong> · Fecha: ${getDateLabel(report.createdAt)}</p>
+          ${creatorEmail ? `<p style="margin:0 0 12px;"><a href="${replyMailto}" style="display:inline-block;background:#1f7ae8;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:12px;font-weight:700;">Responder email a ${creatorName}</a></p>` : ''}
           <div style="border:1px solid #e2e8fb;border-radius:14px;padding:12px;background:#fbfdff;">${report.html || '<p>Sin contenido</p>'}</div>
           <h3 style="margin:14px 0 8px;color:#2d4f91;font-size:15px;">Imágenes adjuntas</h3>
           <div style="display:grid;gap:10px;">${imageBlocks}</div>
