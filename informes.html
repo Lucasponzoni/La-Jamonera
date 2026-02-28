@@ -152,6 +152,30 @@
                   </div>
                 </div>
 
+
+                <div class="report-notify-wrap">
+                  <div class="report-notify-head">
+                    <h6 class="report-notify-title">Notificaciones por email</h6>
+                    <button id="saveNotifyPreferenceBtn" type="button" class="btn ios-btn ios-btn-secondary report-notify-save-btn">
+                      <img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner-login d-none" id="saveNotifyPreferenceSpinner">
+                      <i class="fa-solid fa-floppy-disk" id="saveNotifyPreferenceIcon"></i>
+                      <span>Guardar preferencia</span>
+                    </button>
+                  </div>
+
+                  <label class="report-notify-check">
+                    <input id="notifyAllUsersCheckbox" type="checkbox">
+                    <span>Notificar nuevo informe a todos los usuarios</span>
+                  </label>
+
+                  <label class="report-notify-check">
+                    <input id="notifySpecificUsersCheckbox" type="checkbox">
+                    <span>Notificar a usuarios específicos</span>
+                  </label>
+
+                  <div id="notifySpecificUsersList" class="notify-specific-users-list d-none"></div>
+                </div>
+
                 <div class="editor-wrap">
                   <div class="editor-toolbar-scroll">
                     <div class="editor-toolbar" role="toolbar" aria-label="Herramientas de edición">
@@ -315,6 +339,8 @@
   <script src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.10/build/vfs_fonts.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html-to-pdfmake@2.5.21/browser.js"></script>
   <script src="./JS/firebase-init.js"></script>
+  <script src="./JS/Notificaciones.js"></script>
+  <script src="./JS/email_sender.js"></script>
   <script src="./JS/app.js"></script>
   <script src="./JS/Informes.js"></script>
 </body>
