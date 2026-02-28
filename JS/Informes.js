@@ -66,7 +66,8 @@
     viewerImages: [],
     reportsLoaded: false,
     reopenViewerReportId: '',
-    notifySpecificUserIds: []
+    notifySpecificUserIds: [],
+    emailPrefs: {}
   };
 
   let datePicker = null;
@@ -548,21 +549,9 @@
     }
   };
 
-  const readEmailPrefsMap = () => {
-    try {
-      const raw = localStorage.getItem(EMAIL_PREFS_KEY);
-      if (!raw) return {};
-      const parsed = JSON.parse(raw);
-      return parsed && typeof parsed === 'object' ? parsed : {};
-    } catch (error) {
-      return {};
-    }
-  };
-
   const readEmailPreferences = (userId) => {
-    const map = readEmailPrefsMap();
     const selectedId = String(userId || '');
-    const value = selectedId ? map[selectedId] : null;
+    const value = selectedId ? state.emailPrefs[selectedId] : null;
     return {
       notifyAll: Boolean(value?.notifyAll),
       notifySpecific: Boolean(value?.notifySpecific),
@@ -570,7 +559,7 @@
     };
   };
 
-  const writeEmailPreferences = (userId, prefs) => {
+  const writeEmailPreferences = async (userId, prefs) => {
     let selectedId = String(userId || '');
     let payload = prefs;
 
@@ -581,14 +570,15 @@
 
     if (!selectedId || !payload || typeof payload !== 'object') return;
 
-    const map = readEmailPrefsMap();
-    map[selectedId] = {
+    const entry = {
       notifyAll: Boolean(payload.notifyAll),
       notifySpecific: Boolean(payload.notifySpecific),
-      selectedUserIds: Array.isArray(payload.selectedUserIds) ? payload.selectedUserIds : []
+      selectedUserIds: Array.isArray(payload.selectedUserIds) ? payload.selectedUserIds : [],
+      updatedAt: Date.now()
     };
 
-    localStorage.setItem(EMAIL_PREFS_KEY, JSON.stringify(map));
+    state.emailPrefs[selectedId] = entry;
+    await window.dbLaJamoneraRest.write(`/informes/email_preferences/${selectedId}`, entry);
   };
 
   const applyEmailPreferencesToUi = (prefs) => {
@@ -948,7 +938,9 @@
     try {
       await window.laJamoneraReady;
       const users = await window.dbLaJamoneraRest.read('/informes/users');
+      const emailPrefs = await window.dbLaJamoneraRest.read('/informes/email_preferences');
       state.users = users && typeof users === 'object' ? users : {};
+      state.emailPrefs = emailPrefs && typeof emailPrefs === 'object' ? emailPrefs : {};
       renderUsers();
       renderAttachments();
       showState('data');
@@ -2382,7 +2374,7 @@
     saveNotifyPreferenceIcon?.classList.add('d-none');
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    writeEmailPreferences(selectedUserId, {
+    await writeEmailPreferences(selectedUserId, {
       notifyAll: Boolean(notifyAllUsersCheckbox?.checked),
       notifySpecific: Boolean(notifySpecificUsersCheckbox?.checked),
       selectedUserIds: state.notifySpecificUserIds
