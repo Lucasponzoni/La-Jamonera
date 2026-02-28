@@ -548,27 +548,40 @@
     }
   };
 
-  const readEmailPreferences = () => {
+  const readEmailPrefsMap = () => {
     try {
       const raw = localStorage.getItem(EMAIL_PREFS_KEY);
-      if (!raw) return { notifyAll: false, notifySpecific: false, selectedUserIds: [] };
-      const value = JSON.parse(raw);
-      return {
-        notifyAll: Boolean(value.notifyAll),
-        notifySpecific: Boolean(value.notifySpecific),
-        selectedUserIds: Array.isArray(value.selectedUserIds) ? value.selectedUserIds : []
-      };
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
     } catch (error) {
-      return { notifyAll: false, notifySpecific: false, selectedUserIds: [] };
+      return {};
     }
   };
 
-  const writeEmailPreferences = (prefs) => {
-    localStorage.setItem(EMAIL_PREFS_KEY, JSON.stringify({
+  const readEmailPreferences = (userId) => {
+    const map = readEmailPrefsMap();
+    const selectedId = String(userId || '');
+    const value = selectedId ? map[selectedId] : null;
+    return {
+      notifyAll: Boolean(value?.notifyAll),
+      notifySpecific: Boolean(value?.notifySpecific),
+      selectedUserIds: Array.isArray(value?.selectedUserIds) ? value.selectedUserIds : []
+    };
+  };
+
+  const writeEmailPreferences = (userId, prefs) => {
+    const selectedId = String(userId || '');
+    if (!selectedId) return;
+
+    const map = readEmailPrefsMap();
+    map[selectedId] = {
       notifyAll: Boolean(prefs.notifyAll),
       notifySpecific: Boolean(prefs.notifySpecific),
       selectedUserIds: Array.isArray(prefs.selectedUserIds) ? prefs.selectedUserIds : []
-    }));
+    };
+
+    localStorage.setItem(EMAIL_PREFS_KEY, JSON.stringify(map));
   };
 
   const applyEmailPreferencesToUi = (prefs) => {
@@ -932,7 +945,7 @@
 
     initialLoadPromise = (async () => {
       await loadData();
-      applyEmailPreferencesToUi(readEmailPreferences());
+      applyEmailPreferencesToUi(readEmailPreferences(informeUserSelect.value));
       await restoreDraft();
       state.reportsLoaded = true;
       updateMainScrollHint();
@@ -1318,6 +1331,9 @@
     const attachments = Array.isArray(report.attachments) ? report.attachments : [];
     const imageAttachments = attachments.filter((item) => item.type === 'image');
     const lastUpdatedAt = Number(report.updatedAt || 0);
+    const users = Object.values(state.users).sort((a, b) => String(a.fullName).localeCompare(String(b.fullName)));
+    const commentUserOptions = ['<option value="">Seleccioná un usuario</option>', ...users.map((user) => `<option value="${user.id}">${escapeHtml(user.fullName)}</option>`), '<option value="create">Crear nuevo usuario</option>'].join('');
+
     const attachmentHtml = attachments.length
       ? attachments.map((item, index) => {
         if (item.type === 'image') {
@@ -1344,14 +1360,46 @@
           <section class="report-comments-wrap">
             <div class="report-comments-head">
               <h6><i class="fa-regular fa-comments"></i> <span class="report-comments-title-text">Comentarios</span></h6>
-              <button type="button" class="btn ios-btn ios-btn-secondary report-add-comment-btn" data-comment-from-viewer="1">Comentar</button>
             </div>
-            ${buildCommentsPanel(report)}
+
+            <div class="report-inline-comment-form">
+              <div class="report-inline-comment-reply d-none" id="inlineReplyLabel"></div>
+              <select id="inlineCommentUser" class="form-select ios-input mb-2">${commentUserOptions}</select>
+              <textarea id="inlineCommentText" class="swal2-textarea ios-input" placeholder="Escribí un comentario"></textarea>
+              <input id="inlineCommentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false">
+              <div class="d-flex justify-content-end gap-2">
+                <button type="button" class="btn ios-btn ios-btn-secondary d-none" id="inlineCancelReplyBtn">Cancelar respuesta</button>
+                <button type="button" class="btn ios-btn ios-btn-primary" id="inlineSendCommentBtn">
+                  <img src="./IMG/Meta-ai-logo.webp" alt="Enviando" class="meta-spinner-login d-none" id="inlineSendCommentSpinner">
+                  <i class="fa-solid fa-paper-plane" id="inlineSendCommentIcon"></i>
+                  <span>Enviar comentario</span>
+                </button>
+              </div>
+            </div>
+
+            <div id="reportCommentsBody">${buildCommentsPanel(report)}</div>
           </section>
         </div>
       `,
       confirmButtonText: 'Cerrar',
       didOpen: (popup) => {
+        const commentsBody = popup.querySelector('#reportCommentsBody');
+        const userSelect = popup.querySelector('#inlineCommentUser');
+        const textArea = popup.querySelector('#inlineCommentText');
+        const pinInput = popup.querySelector('#inlineCommentPin');
+        const sendBtn = popup.querySelector('#inlineSendCommentBtn');
+        const spinner = popup.querySelector('#inlineSendCommentSpinner');
+        const icon = popup.querySelector('#inlineSendCommentIcon');
+        const replyLabel = popup.querySelector('#inlineReplyLabel');
+        const cancelReplyBtn = popup.querySelector('#inlineCancelReplyBtn');
+
+        let activeReplyCommentId = '';
+
+        const refreshComments = () => {
+          const latest = findReportById(report.id) || report;
+          commentsBody.innerHTML = buildCommentsPanel(latest);
+        };
+
         popup.querySelectorAll('[data-open-report-image]').forEach((node) => {
           node.addEventListener('click', (event) => {
             const idx = Number(event.currentTarget.dataset.openReportImage);
@@ -1365,38 +1413,95 @@
           });
         });
 
-        const addCommentBtn = popup.querySelector('[data-comment-from-viewer]');
-        addCommentBtn?.addEventListener('click', async () => {
-          Swal.close();
-          await addCommentToReport(report, null, { returnToViewer: true });
+        userSelect?.addEventListener('change', async (event) => {
+          if (event.target.value !== 'create') return;
+          const id = await openUserForm();
+          if (!id) {
+            event.target.value = '';
+            return;
+          }
+          const extra = document.createElement('option');
+          extra.value = id;
+          extra.textContent = state.users[id] ? state.users[id].fullName : 'Usuario';
+          event.target.insertBefore(extra, event.target.querySelector('option[value="create"]'));
+          event.target.value = id;
+          renderUsers();
         });
 
-        popup.querySelectorAll('[data-reply-comment]').forEach((node) => {
-          node.addEventListener('click', async (event) => {
-            const commentId = String(event.currentTarget.dataset.replyComment || '');
-            Swal.close();
-            await addCommentToReport(report, commentId, { returnToViewer: true });
-          });
+        cancelReplyBtn?.addEventListener('click', () => {
+          activeReplyCommentId = '';
+          replyLabel?.classList.add('d-none');
+          replyLabel.textContent = '';
+          cancelReplyBtn.classList.add('d-none');
         });
 
-        popup.querySelectorAll('[data-edit-comment]').forEach((node) => {
-          node.addEventListener('click', async (event) => {
-            const commentId = String(event.currentTarget.dataset.editComment || '');
-            Swal.close();
-            await editCommentInReport(report, commentId);
+        sendBtn?.addEventListener('click', async () => {
+          const userId = normalizeValue(userSelect?.value);
+          const text = normalizeValue(textArea?.value);
+          const pin = normalizeValue(pinInput?.value);
+
+          sendBtn.setAttribute('disabled', 'disabled');
+          spinner?.classList.remove('d-none');
+          icon?.classList.add('d-none');
+
+          const updatedReport = await addCommentToReport(report, activeReplyCommentId || null, {
+            inlineData: { userId, text, pin },
+            sourceReport: findReportById(report.id) || report,
+            reloadBoard: false
           });
+
+          spinner?.classList.add('d-none');
+          icon?.classList.remove('d-none');
+          sendBtn.removeAttribute('disabled');
+
+          if (!updatedReport) {
+            return;
+          }
+
+          textArea.value = '';
+          pinInput.value = '';
+          activeReplyCommentId = '';
+          replyLabel?.classList.add('d-none');
+          replyLabel.textContent = '';
+          cancelReplyBtn.classList.add('d-none');
+          refreshComments();
         });
 
-        popup.querySelectorAll('[data-delete-comment]').forEach((node) => {
-          node.addEventListener('click', async (event) => {
-            const commentId = String(event.currentTarget.dataset.deleteComment || '');
-            Swal.close();
-            await deleteCommentFromReport(report, commentId);
-          });
+        commentsBody?.addEventListener('click', async (event) => {
+          const replyBtn = event.target.closest('[data-reply-comment]');
+          if (replyBtn) {
+            activeReplyCommentId = String(replyBtn.dataset.replyComment || '');
+            const commentNode = replyBtn.closest('.report-comment-item');
+            const author = commentNode?.querySelector('.report-comment-head strong')?.textContent || 'usuario';
+            replyLabel.textContent = `Respondiendo a ${author}`;
+            replyLabel.classList.remove('d-none');
+            cancelReplyBtn.classList.remove('d-none');
+            textArea?.focus();
+            return;
+          }
+
+          const editBtn = event.target.closest('[data-edit-comment]');
+          if (editBtn) {
+            const commentId = String(editBtn.dataset.editComment || '');
+            await editCommentInReport(findReportById(report.id) || report, commentId);
+            refreshComments();
+            return;
+          }
+
+          const delBtn = event.target.closest('[data-delete-comment]');
+          if (delBtn) {
+            const commentId = String(delBtn.dataset.deleteComment || '');
+            await deleteCommentFromReport(findReportById(report.id) || report, commentId);
+            refreshComments();
+          }
         });
+      },
+      willClose: async () => {
+        await loadReportsBoard();
       }
     });
   };
+
 
   const editReport = async (report) => {
     const allowed = await verifyReportCreatorPin(report);
@@ -1679,7 +1784,7 @@
     return true;
   };
 
-  const persistReportFromViewer = async (report, partial = {}) => {
+  const persistReportFromViewer = async (report, partial = {}, options = {}) => {
     const path = getReportPath(report);
     const updatedAt = Date.now();
     const updated = { ...report, ...partial, updatedAt };
@@ -1695,7 +1800,14 @@
       commentsCount: getCommentsCount(updated),
       updatedAt
     });
-    await loadReportsBoard();
+
+    state.reports = (state.reports || []).map((item) => (item.id === updated.id ? { ...item, ...updated } : item));
+
+    if (options.reloadBoard !== false) {
+      await loadReportsBoard();
+    }
+
+    return updated;
   };
 
   const editCommentInReport = async (report, commentId) => {
@@ -1735,8 +1847,7 @@
       return acc;
     }, {});
 
-    await persistReportFromViewer(report, { comments: commentsObject });
-    await reopenReportViewerById(report.id);
+    await persistReportFromViewer(report, { comments: commentsObject }, { reloadBoard: false });
   };
 
   const deleteCommentFromReport = async (report, commentId) => {
@@ -1767,80 +1878,107 @@
       return acc;
     }, {});
 
-    await persistReportFromViewer(report, { comments: commentsObject });
-    await reopenReportViewerById(report.id);
+    await persistReportFromViewer(report, { comments: commentsObject }, { reloadBoard: false });
   };
 
   const addCommentToReport = async (report, parentCommentId = null, options = {}) => {
-    const canContinue = await ensureUsersAvailableForComment();
-    if (!canContinue) return;
-    const users = Object.values(state.users);
-    const optionsHtml = [
-      '<option value="">Seleccioná un usuario</option>',
-      ...users.map((user) => `<option value="${user.id}">${escapeHtml(user.fullName)}</option>`),
-      '<option value="create">Crear nuevo usuario</option>'
-    ].join('');
-    const commentPrompt = await openIosSwal({
-      title: parentCommentId ? 'Responder comentario' : 'Nuevo comentario',
-      html: `<div class="text-start report-comment-form"><label>Usuario</label><select id="commentUser" class="form-select ios-input mb-2">${optionsHtml}</select><label>Comentario</label><textarea id="commentText" class="swal2-textarea ios-input" placeholder="Escribí tu comentario"></textarea><label>Clave</label><input id="commentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"></div>`,
-      showCancelButton: true,
-      confirmButtonText: 'Continuar',
-      cancelButtonText: 'Cancelar',
-      didOpen: (popup) => {
-        const userSelect = popup.querySelector('#commentUser');
-        userSelect?.addEventListener('change', async (event) => {
-          if (event.target.value !== 'create') return;
-          const id = await openUserForm();
-          if (!id) {
-            event.target.value = '';
-            return;
+    const sourceReport = options.sourceReport || report;
+
+    let userId = '';
+    let text = '';
+
+    if (options.inlineData) {
+      userId = normalizeValue(options.inlineData.userId);
+      text = normalizeValue(options.inlineData.text);
+      const pin = normalizeValue(options.inlineData.pin);
+
+      if (!userId || !state.users[userId]) {
+        window.laJamoneraNotify?.show({ type: 'warning', title: 'Falta usuario', message: 'Seleccioná un usuario válido.' });
+        return null;
+      }
+      if (!text) {
+        window.laJamoneraNotify?.show({ type: 'warning', title: 'Falta comentario', message: 'Escribí un comentario para continuar.' });
+        return null;
+      }
+      if (!/^\d{4}$/.test(pin) || pin !== String(state.users[userId].pin || '')) {
+        window.laJamoneraNotify?.show({ type: 'error', title: 'Clave incorrecta', message: 'La clave no coincide con el usuario seleccionado.' });
+        return null;
+      }
+    } else {
+      const canContinue = await ensureUsersAvailableForComment();
+      if (!canContinue) return null;
+      const users = Object.values(state.users);
+      const optionsHtml = [
+        '<option value="">Seleccioná un usuario</option>',
+        ...users.map((user) => `<option value="${user.id}">${escapeHtml(user.fullName)}</option>`),
+        '<option value="create">Crear nuevo usuario</option>'
+      ].join('');
+
+      const commentPrompt = await openIosSwal({
+        title: parentCommentId ? 'Responder comentario' : 'Nuevo comentario',
+        html: `<div class="text-start report-comment-form"><label>Usuario</label><select id="commentUser" class="form-select ios-input mb-2">${optionsHtml}</select><label>Comentario</label><textarea id="commentText" class="swal2-textarea ios-input" placeholder="Escribí tu comentario"></textarea><label>Clave</label><input id="commentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"></div>`,
+        showCancelButton: true,
+        confirmButtonText: 'Continuar',
+        cancelButtonText: 'Cancelar',
+        didOpen: (popup) => {
+          const userSelect = popup.querySelector('#commentUser');
+          userSelect?.addEventListener('change', async (event) => {
+            if (event.target.value !== 'create') return;
+            const id = await openUserForm();
+            if (!id) {
+              event.target.value = '';
+              return;
+            }
+            const extra = document.createElement('option');
+            extra.value = id;
+            extra.textContent = state.users[id] ? state.users[id].fullName : 'Usuario';
+            event.target.insertBefore(extra, event.target.querySelector('option[value="create"]'));
+            event.target.value = id;
+          });
+        },
+        preConfirm: () => {
+          const localUserId = normalizeValue(document.getElementById('commentUser').value);
+          const localText = normalizeValue(document.getElementById('commentText').value);
+          const pin = normalizeValue(document.getElementById('commentPin').value);
+          if (!localUserId || !state.users[localUserId]) {
+            Swal.showValidationMessage('Seleccioná un usuario.');
+            return false;
           }
-          const extra = document.createElement('option');
-          extra.value = id;
-          extra.textContent = state.users[id] ? state.users[id].fullName : 'Usuario';
-          event.target.insertBefore(extra, event.target.querySelector('option[value="create"]'));
-          event.target.value = id;
-        });
-      },
-      preConfirm: () => {
-        const userId = normalizeValue(document.getElementById('commentUser').value);
-        const text = normalizeValue(document.getElementById('commentText').value);
-        const pin = normalizeValue(document.getElementById('commentPin').value);
-        if (!userId || !state.users[userId]) {
-          Swal.showValidationMessage('Seleccioná un usuario.');
-          return false;
+          if (!localText) {
+            Swal.showValidationMessage('Escribí un comentario.');
+            return false;
+          }
+          if (!/^\d{4}$/.test(pin)) {
+            Swal.showValidationMessage('Ingresá una clave válida de 4 dígitos.');
+            return false;
+          }
+          if (pin !== String(state.users[localUserId].pin || '')) {
+            Swal.showValidationMessage('Clave incorrecta. Volvé a intentarlo.');
+            return false;
+          }
+          return { userId: localUserId, text: localText };
         }
-        if (!text) {
-          Swal.showValidationMessage('Escribí un comentario.');
-          return false;
+      });
+
+      if (!commentPrompt.isConfirmed) {
+        if (options.returnToViewer) {
+          await reopenReportViewerById(sourceReport.id);
         }
-        if (!/^\d{4}$/.test(pin)) {
-          Swal.showValidationMessage('Ingresá una clave válida de 4 dígitos.');
-          return false;
-        }
-        if (pin !== String(state.users[userId].pin || '')) {
-          Swal.showValidationMessage('Clave incorrecta. Volvé a intentarlo.');
-          return false;
-        }
-        return { userId, text, pin };
+        return null;
       }
-    });
-    if (!commentPrompt.isConfirmed) {
-      if (options.returnToViewer) {
-        await reopenReportViewerById(report.id);
-      }
-      return;
+
+      userId = commentPrompt.value.userId;
+      text = commentPrompt.value.text;
     }
 
-    const author = state.users[commentPrompt.value.userId];
-
-    const comments = sortComments(getCommentList(report));
+    const author = state.users[userId];
+    const comments = sortComments(getCommentList(sourceReport));
     const commentId = makeId('cmt');
     const newComment = {
       id: commentId,
       userId: author.id,
       userName: author.fullName,
-      text: commentPrompt.value.text,
+      text,
       createdAt: Date.now(),
       replies: []
     };
@@ -1864,24 +2002,27 @@
       return acc;
     }, {});
 
-    const updated = { ...report, comments: commentsObject };
-    await persistReportFromViewer(report, { comments: commentsObject, importance: updated.importance, attachments: updated.attachments });
+    await persistReportFromViewer(sourceReport, {
+      comments: commentsObject,
+      importance: sourceReport.importance,
+      attachments: sourceReport.attachments
+    }, { reloadBoard: options.reloadBoard !== false });
 
     const recipientsByEmail = new Map();
-    const addRecipientByUserId = (userId) => {
-      const user = state.users[userId];
+    const addRecipientByUserId = (targetUserId) => {
+      const user = state.users[targetUserId];
       if (!user) return;
       const emailKey = normalizeValue(user.email).toLowerCase();
       if (!emailKey) return;
-      if (String(user.id) === String(author.id)) return;
       if (!recipientsByEmail.has(emailKey)) {
         recipientsByEmail.set(emailKey, user);
       }
     };
 
-    addRecipientByUserId(report.userId);
+    addRecipientByUserId(sourceReport.userId);
     if (repliedCommentAuthorId) {
       addRecipientByUserId(repliedCommentAuthorId);
+      addRecipientByUserId(author.id);
     }
 
     if (recipientsByEmail.size) {
@@ -1890,7 +2031,7 @@
         <div style="font-family:Inter,Arial,sans-serif;background:#f4f7ff;padding:18px;">
           <div style="max-width:720px;margin:0 auto;background:#fff;border:1px solid #dbe4fb;border-radius:18px;padding:18px;">
             <h2 style="margin:0 0 6px;color:#2351a0;">Nueva actividad en informe</h2>
-            <p style="margin:0 0 14px;color:#4f638c;">Informe de <strong>${escapeHtml(report.userName || 'Usuario')}</strong> · ${getDateLabel(report.createdAt)}</p>
+            <p style="margin:0 0 14px;color:#4f638c;">Informe de <strong>${escapeHtml(sourceReport.userName || 'Usuario')}</strong> · ${getDateLabel(sourceReport.createdAt)}</p>
             <div style="border:1px solid #e2e8fb;border-radius:14px;padding:12px;background:#fbfdff;">
               <p style="margin:0 0 8px;color:#2f4f8b;"><strong>${escapeHtml(author.fullName || 'Usuario')}</strong> dejó este comentario:</p>
               <p style="margin:0;color:#4a5f87;">${escapeHtml(newComment.text || '').replaceAll('\n', '<br>')}</p>
@@ -1903,17 +2044,20 @@
 
       await sendEmailBatch(Array.from(recipientsByEmail.values()), (target) => ({
         name: 'La Jamonera',
-        subject: `Nuevo comentario en informe · ${report.userName || 'La Jamonera'}`,
+        subject: `Nuevo comentario en informe · ${sourceReport.userName || 'La Jamonera'}`,
         html: emailHtml,
         nombre: target.fullName,
         email: target.email
       }));
     }
 
-    if (options.returnToViewer) {
-      await reopenReportViewerById(report.id);
+    const latest = findReportById(sourceReport.id);
+    if (options.returnToViewer && !options.inlineData) {
+      await reopenReportViewerById(sourceReport.id);
     }
+    return latest || { ...sourceReport, comments: commentsObject };
   };
+
 
   const updatePreview = () => {
     const hasContent = normalizeValue(informeEditor?.textContent || '');
@@ -2067,6 +2211,7 @@
       informeEditor.innerHTML = draft.editorHtml || '';
       importanceRange.value = String(normalizeImportance(draft.importance, 50));
       if (draft.userId && state.users[draft.userId]) informeUserSelect.value = draft.userId;
+      applyEmailPreferencesToUi(readEmailPreferences(informeUserSelect.value));
       if (draft.date && datePicker) datePicker.setDate(draft.date, true, 'd/m/Y');
       if (draft.fontSize) fontSizeSelect.value = draft.fontSize;
       if (draft.formatBlock) formatBlockSelect.value = draft.formatBlock;
@@ -2174,6 +2319,57 @@
         informeUserSelect.value = '';
       }
     }
+
+    applyEmailPreferencesToUi(readEmailPreferences(informeUserSelect.value));
+  });
+
+  notifyAllUsersCheckbox?.addEventListener('change', () => {
+    if (notifyAllUsersCheckbox.checked && notifySpecificUsersCheckbox) {
+      notifySpecificUsersCheckbox.checked = false;
+    }
+    updateNotifySpecificVisibility();
+  });
+
+  notifySpecificUsersCheckbox?.addEventListener('change', () => {
+    if (notifySpecificUsersCheckbox.checked && notifyAllUsersCheckbox) {
+      notifyAllUsersCheckbox.checked = false;
+    }
+    updateNotifySpecificVisibility();
+  });
+
+  notifySpecificUsersList?.addEventListener('change', (event) => {
+    const input = event.target.closest('[data-notify-user-id]');
+    if (!input) return;
+    const userId = String(input.dataset.notifyUserId || '');
+    if (!userId) return;
+    const set = new Set(state.notifySpecificUserIds);
+    if (input.checked) set.add(userId);
+    else set.delete(userId);
+    state.notifySpecificUserIds = Array.from(set);
+  });
+
+  saveNotifyPreferenceBtn?.addEventListener('click', async () => {
+    const selectedUserId = normalizeValue(informeUserSelect.value);
+    if (!selectedUserId || !state.users[selectedUserId]) {
+      window.laJamoneraNotify?.show({ type: 'warning', title: 'Seleccioná un usuario', message: 'Primero elegí un usuario para guardar su preferencia.' });
+      return;
+    }
+
+    saveNotifyPreferenceBtn.setAttribute('disabled', 'disabled');
+    saveNotifyPreferenceSpinner?.classList.remove('d-none');
+    saveNotifyPreferenceIcon?.classList.add('d-none');
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    writeEmailPreferences(selectedUserId, {
+      notifyAll: Boolean(notifyAllUsersCheckbox?.checked),
+      notifySpecific: Boolean(notifySpecificUsersCheckbox?.checked),
+      selectedUserIds: state.notifySpecificUserIds
+    });
+
+    saveNotifyPreferenceSpinner?.classList.add('d-none');
+    saveNotifyPreferenceIcon?.classList.remove('d-none');
+    saveNotifyPreferenceBtn.removeAttribute('disabled');
+    window.laJamoneraNotify?.show({ type: 'success', title: 'Preferencia guardada', message: `Se guardó la configuración para ${state.users[selectedUserId].fullName}.` });
   });
 
   notifyAllUsersCheckbox?.addEventListener('change', () => {

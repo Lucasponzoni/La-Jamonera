@@ -2480,6 +2480,33 @@ html.login-protected.auth-ok body {
   color: #415174;
 }
 
+
+.report-inline-comment-form {
+  margin: 10px 0 12px;
+  display: grid;
+  gap: 8px;
+  border: 1px solid #d8e3f8;
+  border-radius: 14px;
+  padding: 10px;
+  background: #f9fbff;
+}
+
+.report-inline-comment-form .swal2-textarea,
+.report-inline-comment-form .swal2-input {
+  margin: 0;
+}
+
+.report-inline-comment-reply {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #355288;
+}
+
+#inlineSendCommentBtn .meta-spinner-login {
+  width: 18px;
+  height: 18px;
+}
+
 .report-comment-form label {
   margin-bottom: 6px;
   color: #4f5f84;
