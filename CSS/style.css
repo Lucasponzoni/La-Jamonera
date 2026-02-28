@@ -2670,7 +2670,7 @@ html.login-protected.auth-ok body {
 
 
 .recetas-modal .ios-modal-body {
-  max-height: min(82vh, 900px);
+  max-height: min(74vh, 760px);
   position: relative;
 }
 
@@ -2728,6 +2728,7 @@ html.login-protected.auth-ok body {
   grid-template-columns: auto 1fr;
   align-items: center;
   gap: 12px;
+  padding: 4px 2px 2px;
 }
 
 .recetas-editor-kicker {
@@ -2771,6 +2772,27 @@ html.login-protected.auth-ok body {
 .recipe-description-lg {
   min-height: 92px;
   resize: vertical;
+}
+
+.recipe-step-card.step-block {
+  border-top: 0;
+  padding-top: 12px;
+}
+
+.recipe-highlight-field {
+  border: 1px solid #cfe0ff;
+  border-radius: 12px;
+  background: #f4f8ff;
+  padding: 10px;
+}
+
+.recipe-highlight-field .form-label {
+  font-weight: 700;
+  color: #2f57b0;
+}
+
+.recipe-highlight-field .form-label i {
+  margin-right: 6px;
 }
 
 .recipe-table-wrap {

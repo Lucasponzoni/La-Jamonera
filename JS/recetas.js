@@ -1,6 +1,7 @@
 (function recetasModule() {
   const IA_WORKER_BASE = 'https://worker.lucasponzoninovogar.workers.dev';
   const IA_ICON_SRC = './IMG/ia-unscreen.gif';
+  const RECIPE_PLACEHOLDER_ICON = '<i class="fa-solid fa-burger"></i>';
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -28,7 +29,8 @@
     view: 'list',
     activeRecipeId: '',
     editor: null,
-    editorEventsBound: false
+    editorEventsBound: false,
+    resumeEditor: null
   };
 
   const normalizeValue = (value) => String(value || '').trim();
@@ -36,6 +38,7 @@
   const capitalize = (value) => normalizeLower(value).replace(/(^|\s)\S/g, (letter) => letter.toUpperCase());
   const safeObject = (value) => (value && typeof value === 'object' ? value : {});
   const makeId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const NEW_MEASURE_VALUE = '__new_measure__';
 
   const blurActiveElement = () => document.activeElement?.blur?.();
   const openIosSwal = (options) => Swal.fire({
@@ -74,6 +77,23 @@
       value: normalizeLower(item.name),
       label: `${capitalize(item.name)} (${normalizeValue(item.abbr) || 'S/A'})`
     }));
+  };
+
+  const getMeasureSelectOptionsHtml = (selected = '') => {
+    const opts = getMeasureOptions();
+    return `${opts.map((item) => `<option value="${item.value}" ${normalizeLower(selected) === item.value ? 'selected' : ''}>${item.label}</option>`).join('')}<option value="${NEW_MEASURE_VALUE}">+ Agregar nueva medida</option>`;
+  };
+
+  const persistNewMeasure = async (name, abbr) => {
+    const norm = normalizeLower(name);
+    if (!norm) return '';
+    const exists = state.measures.some((item) => normalizeLower(item.name) === norm);
+    if (!exists) {
+      state.measures.push({ name: norm, abbr: normalizeValue(abbr) || 'S/A' });
+      await window.laJamoneraReady;
+      await window.dbLaJamoneraRest.write('/ingredientes/config/measures', state.measures);
+    }
+    return norm;
   };
 
   const formatDate = (value) => {
@@ -169,7 +189,7 @@
     showState('data');
   };
 
-  const getPlaceholderCircle = () => '<span class="image-placeholder-circle"><i class="fa-regular fa-image"></i></span>';
+  const getPlaceholderCircle = () => `<span class="image-placeholder-circle-2">${RECIPE_PLACEHOLDER_ICON}</span>`;
   const buildImageStepHtml = (prefix, initialImage) => `
     <section class="step-block recipe-step-card">
       <h6 class="step-title"><span class="recipe-step-number">3</span> Imagen de receta</h6>
@@ -179,77 +199,121 @@
           <button type="button" class="btn image-method-btn" data-image-method="upload"><i class="fa-solid fa-upload"></i>Subir</button>
           <button type="button" class="btn image-method-btn is-active" data-image-method="ai"><img src="${IA_ICON_SRC}" alt="" aria-hidden="true">IA</button>
         </div>
-        <input type="hidden" id="${prefix}_imageMethod" value="ai">
-        <div class="recipe-image-layout">
-          <div id="${prefix}_preview" class="image-preview-circle recipe-image-preview">${initialImage ? `<img src="${initialImage}" alt="Vista previa">` : getPlaceholderCircle()}</div>
-          <div class="recipe-image-inputs">
-            <div id="${prefix}_urlWrap">
-              <label class="form-label" for="${prefix}_imageUrl">URL de imagen</label>
-              <input id="${prefix}_imageUrl" class="swal2-input ios-input" placeholder="https://..." value="${initialImage || ''}">
-            </div>
-            <div id="${prefix}_uploadWrap" class="d-none">
-              <label class="form-label" for="${prefix}_imageFile">Subir imagen</label>
-              <input id="${prefix}_imageFile" type="file" class="form-control image-file-input" accept="image/*">
-            </div>
-            <div id="${prefix}_aiWrap" class="d-none">
-              <label class="form-label" for="${prefix}_imagePrompt">Prompt IA</label>
-              <div class="ios-input-group input-with-icon">
-                <img src="${IA_ICON_SRC}" alt="" aria-hidden="true">
-                <input id="${prefix}_imagePrompt" class="swal2-input ios-input" placeholder="Ej: foto realista del producto terminado">
-              </div>
-            </div>
-          </div>
+        <input type="hidden" id="${prefix}_method" value="ai">
+
+        <div id="${prefix}_preview" class="image-preview-circle">${initialImage ? `<img src="${initialImage}" alt="Vista previa">` : getPlaceholderCircle()}</div>
+
+        <div id="${prefix}_urlWrap">
+          <label for="${prefix}_imageUrl">Link de imagen</label>
+          <input id="${prefix}_imageUrl" class="swal2-input ios-input" placeholder="https://..." value="${initialImage || ''}">
+        </div>
+
+        <div id="${prefix}_uploadWrap" class="d-none">
+          <label for="${prefix}_imageFile">Subir imagen</label>
+          <input id="${prefix}_imageFile" type="file" class="form-control image-file-input" accept="image/*">
+        </div>
+
+        <div id="${prefix}_aiWrap" class="d-none">
+          <label for="${prefix}_aiPrompt">Prompt corto para IA</label>
+          <input id="${prefix}_aiPrompt" class="swal2-input ios-input" placeholder="Ej: carne de cerdo">
+          <button id="${prefix}_aiGenerate" type="button" class="ai-generate-btn mt-2">
+            <img src="${IA_ICON_SRC}" alt="" aria-hidden="true">
+            <span>Generar imagen con IA</span>
+          </button>
+          <div id="${prefix}_aiError" class="ai-alert-note d-none mt-2"></div>
         </div>
       </div>
     </section>`;
 
   const wireImageStep = (prefix, stateImage) => {
-    const methodInput = document.getElementById(`${prefix}_imageMethod`);
+    const methodInput = document.getElementById(`${prefix}_method`);
     const methodButtons = Array.from(document.querySelectorAll(`#${prefix}_methodButtons [data-image-method]`));
-    const preview = document.getElementById(`${prefix}_preview`);
     const urlWrap = document.getElementById(`${prefix}_urlWrap`);
     const uploadWrap = document.getElementById(`${prefix}_uploadWrap`);
     const aiWrap = document.getElementById(`${prefix}_aiWrap`);
-    const urlInput = document.getElementById(`${prefix}_imageUrl`);
-    const fileInput = document.getElementById(`${prefix}_imageFile`);
-    const promptInput = document.getElementById(`${prefix}_imagePrompt`);
+    const preview = document.getElementById(`${prefix}_preview`);
+    const imageUrlInput = document.getElementById(`${prefix}_imageUrl`);
+    const imageFileInput = document.getElementById(`${prefix}_imageFile`);
+    const aiPromptInput = document.getElementById(`${prefix}_aiPrompt`);
+    const aiGenerateBtn = document.getElementById(`${prefix}_aiGenerate`);
+    const aiError = document.getElementById(`${prefix}_aiError`);
 
     const setPreview = (url) => { if (preview) preview.innerHTML = url ? `<img src="${url}" alt="Vista previa">` : getPlaceholderCircle(); };
-    const applyMethod = (method) => {
+    const toggleMethod = (method) => {
       methodInput.value = method;
       methodButtons.forEach((button) => button.classList.toggle('is-active', button.dataset.imageMethod === method));
-      urlWrap?.classList.toggle('d-none', method !== 'url');
-      uploadWrap?.classList.toggle('d-none', method !== 'upload');
-      aiWrap?.classList.toggle('d-none', method !== 'ai');
-      stateImage.method = method;
-      if (method === 'url') setPreview(normalizeValue(urlInput?.value));
-      if (method === 'upload' && !stateImage.file) setPreview('');
+      urlWrap.classList.toggle('d-none', method !== 'url');
+      uploadWrap.classList.toggle('d-none', method !== 'upload');
+      aiWrap.classList.toggle('d-none', method !== 'ai');
+      aiError.classList.add('d-none');
+      if (method === 'ai' && !stateImage.generatedFile && !normalizeValue(imageUrlInput.value)) setPreview('');
     };
 
-    methodButtons.forEach((button) => button.addEventListener('click', () => applyMethod(button.dataset.imageMethod)));
-    urlInput?.addEventListener('input', () => { stateImage.url = urlInput.value; if (stateImage.method === 'url') setPreview(normalizeValue(stateImage.url)); });
-    fileInput?.addEventListener('change', () => {
-      stateImage.file = fileInput.files?.[0] || null;
-      if (!stateImage.file) return setPreview('');
-      const reader = new FileReader();
-      reader.onload = () => setPreview(reader.result || '');
-      reader.readAsDataURL(stateImage.file);
-    });
-    promptInput?.addEventListener('input', () => { stateImage.prompt = promptInput.value; });
+    methodButtons.forEach((button) => button.addEventListener('click', () => toggleMethod(button.dataset.imageMethod)));
+    toggleMethod(normalizeValue(imageUrlInput.value) ? 'url' : (stateImage.method || 'ai'));
 
-    applyMethod(normalizeValue(urlInput?.value) ? 'url' : 'ai');
+    imageUrlInput.addEventListener('input', () => { stateImage.url = imageUrlInput.value; if (methodInput.value === 'url') setPreview(normalizeValue(imageUrlInput.value)); });
+    imageFileInput.addEventListener('change', () => {
+      const file = imageFileInput.files?.[0];
+      const msg = validateImageFile(file);
+      if (msg) {
+        aiError.textContent = `Archivo no admitido: ${msg}`;
+        aiError.classList.remove('d-none');
+        imageFileInput.value = '';
+        setPreview('');
+        stateImage.file = null;
+        return;
+      }
+      stateImage.file = file;
+      aiError.classList.add('d-none');
+      setPreview(URL.createObjectURL(file));
+      stateImage.generatedFile = null;
+    });
+
+    aiGenerateBtn.addEventListener('click', async () => {
+      const prompt = normalizeValue(aiPromptInput.value);
+      if (!prompt) {
+        aiError.textContent = 'Ingresá un prompt para generar la imagen.';
+        aiError.classList.remove('d-none');
+        return;
+      }
+      aiGenerateBtn.disabled = true;
+      aiError.classList.add('d-none');
+      try {
+        const file = await generateImageWithIA(prompt);
+        stateImage.generatedFile = file;
+        stateImage.prompt = prompt;
+        setPreview(URL.createObjectURL(file));
+      } catch (error) {
+        aiError.textContent = error.message || 'No se pudo generar la imagen con IA.';
+        aiError.classList.remove('d-none');
+      } finally {
+        aiGenerateBtn.disabled = false;
+      }
+    });
+
+    aiPromptInput.addEventListener('input', () => { stateImage.prompt = aiPromptInput.value; });
   };
 
   const getIngredientRows = () => state.editor.rows.filter((row) => row.type === 'ingredient');
   const ensureIngredientRow = () => {
     if (!getIngredientRows().length) {
-      state.editor.rows.push({ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: state.editor.measureOptions[0]?.value || '' });
+      state.editor.rows.push({ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: getMeasureOptions()[0]?.value || '' });
     }
   };
 
   const clearSuggestions = () => {
     document.querySelectorAll('.recipe-suggest-floating').forEach((node) => node.remove());
     state.editor && (state.editor.activeSuggestRowId = '');
+  };
+
+  const snapshotEditorDraft = () => {
+    if (state.view !== 'editor' || !state.editor) return;
+    state.resumeEditor = {
+      activeRecipeId: state.activeRecipeId,
+      data: JSON.parse(JSON.stringify(state.editor)),
+      title: recipeEditorTitle.textContent
+    };
   };
 
   const renderRows = () => {
@@ -268,17 +332,9 @@
       return `
         <tr data-row-id="${row.id}" draggable="${state.editor.orderMode === 'custom'}">
           <td><i class="fa-solid fa-grip-lines"></i></td>
-          <td>
-            <div class="recipe-ing-autocomplete">
-              <input class="form-control ios-input" data-ing-input="${row.id}" value="${row.ingredientName || ''}" placeholder="Buscar ingrediente...">
-            </div>
-          </td>
+          <td><div class="recipe-ing-autocomplete"><input class="form-control ios-input" data-ing-input="${row.id}" value="${row.ingredientName || ''}" placeholder="Buscar ingrediente..."></div></td>
           <td><input class="form-control ios-input" data-qty-input="${row.id}" value="${row.quantity || ''}" placeholder="0,00"></td>
-          <td>
-            <select class="form-select ios-input" data-unit-input="${row.id}">
-              ${state.editor.measureOptions.map((item) => `<option value="${item.value}" ${normalizeLower(row.unit) === item.value ? 'selected' : ''}>${item.label}</option>`).join('')}
-            </select>
-          </td>
+          <td><select class="form-select ios-input" data-unit-input="${row.id}">${getMeasureSelectOptionsHtml(row.unit)}</select></td>
           <td><button type="button" class="btn family-manage-btn" data-remove-row="${row.id}"><i class="fa-solid fa-trash"></i></button></td>
         </tr>`;
     }).join('');
@@ -295,7 +351,7 @@
       .slice(0, 10);
 
     const dropdown = document.createElement('div');
-    dropdown.className = 'recipe-suggest-list recipe-suggest-floating';
+    dropdown.className = 'recipe-suggest-floating';
     dropdown.innerHTML = `${source.map((item) => `
       <button type="button" class="recipe-suggest-item" data-pick-ingredient="${rowId}" data-ing-id="${item.id}">
         <img class="recipe-suggest-avatar" src="${item.imageUrl || './IMG/La Jamonera Cerdito.webp'}" alt="${capitalize(item.name)}">
@@ -311,122 +367,172 @@
     dropdown.style.top = `${inputRect.bottom - containerRect.top + 6}px`;
     dropdown.style.left = `${inputRect.left - containerRect.left}px`;
     dropdown.style.width = `${inputRect.width}px`;
-    state.editor.activeSuggestRowId = rowId;
   };
 
   const bindEditorEvents = () => {
-    if (!state.editor) return;
-    const rowsBody = recipeEditorForm.querySelector('#recipeRowsBody');
-    let draggingId = '';
-
-    if (!state.editorEventsBound) recipeEditorForm.addEventListener('click', async (event) => {
-      const addIngredientBtn = event.target.closest('[data-add-ingredient-row]');
-      if (addIngredientBtn) {
-        state.editor.rows.push({ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: state.editor.measureOptions[0]?.value || '' });
-        renderRows();
-        return;
-      }
-
-      const addCommentBtn = event.target.closest('[data-add-comment-row]');
-      if (addCommentBtn) {
-        state.editor.rows.push({ id: makeId('row'), type: 'comment', comment: '' });
-        renderRows();
-        return;
-      }
-
-      const removeBtn = event.target.closest('[data-remove-row]');
-      if (removeBtn) {
-        state.editor.rows = state.editor.rows.filter((row) => row.id !== removeBtn.dataset.removeRow);
-        ensureIngredientRow();
-        renderRows();
-        clearSuggestions();
-        return;
-      }
-
-      const pickBtn = event.target.closest('[data-pick-ingredient]');
-      if (pickBtn) {
-        const row = state.editor.rows.find((item) => item.id === pickBtn.dataset.pickIngredient);
-        const ingredient = state.ingredientes[pickBtn.dataset.ingId];
-        if (row && ingredient) {
-          row.ingredientId = ingredient.id;
-          row.ingredientName = ingredient.name;
+    if (!state.editorEventsBound) {
+      recipeEditorForm.addEventListener('click', async (event) => {
+        const addIngredientBtn = event.target.closest('[data-add-ingredient-row]');
+        if (addIngredientBtn) {
+          state.editor.rows.push({ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: getMeasureOptions()[0]?.value || '' });
+          renderRows();
+          return;
+        }
+        const addCommentBtn = event.target.closest('[data-add-comment-row]');
+        if (addCommentBtn) {
+          state.editor.rows.push({ id: makeId('row'), type: 'comment', comment: '' });
+          renderRows();
+          return;
+        }
+        const removeBtn = event.target.closest('[data-remove-row]');
+        if (removeBtn) {
+          state.editor.rows = state.editor.rows.filter((row) => row.id !== removeBtn.dataset.removeRow);
+          ensureIngredientRow();
           renderRows();
           clearSuggestions();
         }
-        return;
-      }
+      });
 
-      const createInlineBtn = event.target.closest('[data-create-ingredient-inline]');
-      if (createInlineBtn) {
-        const rowId = createInlineBtn.dataset.createIngredientInline;
-        const row = state.editor.rows.find((item) => item.id === rowId);
-        const draft = row ? { name: row.ingredientName } : null;
-        clearSuggestions();
-        const ingredientId = await window.laJamoneraIngredientesAPI?.openIngredientForm?.(null, draft);
-        await fetchIngredientesData();
-        if (ingredientId && state.ingredientes[ingredientId]) {
-          const target = state.editor.rows.find((item) => item.id === rowId);
-          if (target) {
-            target.ingredientId = ingredientId;
-            target.ingredientName = state.ingredientes[ingredientId].name;
-          } else {
-            state.editor.rows.push({
-              id: makeId('row'), type: 'ingredient', ingredientId,
-              ingredientName: state.ingredientes[ingredientId].name,
-              quantity: '', unit: state.editor.measureOptions[0]?.value || ''
+      recipeEditorForm.addEventListener('input', (event) => {
+        const input = event.target;
+        if (input.matches('[data-ing-input]')) {
+          const row = state.editor.rows.find((item) => item.id === input.dataset.ingInput);
+          if (!row) return;
+          row.ingredientName = input.value;
+          row.ingredientId = '';
+          showSuggestions(input, row.id, input.value);
+          return;
+        }
+        if (input.matches('[data-qty-input]')) {
+          const row = state.editor.rows.find((item) => item.id === input.dataset.qtyInput);
+          if (row) row.quantity = input.value;
+          return;
+        }
+        if (input.matches('[data-comment-input]')) {
+          const row = state.editor.rows.find((item) => item.id === input.dataset.commentInput);
+          if (row) row.comment = input.value;
+        }
+      });
+
+      recipeEditorForm.addEventListener('change', async (event) => {
+        const select = event.target;
+        if (select.matches('[data-unit-input]')) {
+          const row = state.editor.rows.find((item) => item.id === select.dataset.unitInput);
+          if (!row) return;
+          if (select.value === NEW_MEASURE_VALUE) {
+            const res = await openIosSwal({
+              title: 'Nueva medida',
+              showCancelButton: true,
+              confirmButtonText: 'Guardar medida',
+              cancelButtonText: 'Cancelar',
+              html: '<input id="recipeNewMeasureName" class="swal2-input ios-input" placeholder="Nombre (ej: cucharadas)"><input id="recipeNewMeasureAbbr" class="swal2-input ios-input" placeholder="Abreviatura (ej: cdas)">',
+              preConfirm: () => {
+                const name = normalizeValue(document.getElementById('recipeNewMeasureName')?.value);
+                const abbr = normalizeValue(document.getElementById('recipeNewMeasureAbbr')?.value);
+                if (!name) {
+                  Swal.showValidationMessage('Ingresá un nombre de medida.');
+                  return false;
+                }
+                return { name, abbr };
+              }
             });
+            if (res.isConfirmed && res.value) {
+              row.unit = await persistNewMeasure(res.value.name, res.value.abbr);
+              renderRows();
+              const yieldSelect = recipeEditorForm.querySelector('#recipeYieldUnit');
+              if (yieldSelect) {
+                const current = yieldSelect.value;
+                yieldSelect.innerHTML = getMeasureSelectOptionsHtml(current);
+              }
+            } else {
+              select.value = row.unit || '';
+            }
+            return;
           }
+          row.unit = select.value;
+          return;
+        }
+        if (select.id === 'recipeYieldUnit' && select.value === NEW_MEASURE_VALUE) {
+          select.value = '';
+          const res = await openIosSwal({
+            title: 'Nueva medida',
+            showCancelButton: true,
+            confirmButtonText: 'Guardar medida',
+            cancelButtonText: 'Cancelar',
+            html: '<input id="recipeNewMeasureNameY" class="swal2-input ios-input" placeholder="Nombre (ej: litros)"><input id="recipeNewMeasureAbbrY" class="swal2-input ios-input" placeholder="Abreviatura (ej: l)">',
+            preConfirm: () => {
+              const name = normalizeValue(document.getElementById('recipeNewMeasureNameY')?.value);
+              const abbr = normalizeValue(document.getElementById('recipeNewMeasureAbbrY')?.value);
+              if (!name) {
+                Swal.showValidationMessage('Ingresá un nombre de medida.');
+                return false;
+              }
+              return { name, abbr };
+            }
+          });
+          if (res.isConfirmed && res.value) {
+            const val = await persistNewMeasure(res.value.name, res.value.abbr);
+            select.innerHTML = getMeasureSelectOptionsHtml(val);
+            select.value = val;
+            renderRows();
+          }
+        }
+        if (select.id === 'recipeOrderModeEditor') {
+          state.editor.orderMode = normalizeLower(select.value);
           renderRows();
         }
-      }
-    });
+      });
 
-    if (!state.editorEventsBound) recipeEditorForm.addEventListener('input', (event) => {
-      const input = event.target;
-      if (input.matches('[data-ing-input]')) {
-        const row = state.editor.rows.find((item) => item.id === input.dataset.ingInput);
-        if (!row) return;
-        row.ingredientName = input.value;
-        row.ingredientId = '';
-        showSuggestions(input, row.id, input.value);
-        return;
-      }
-      if (input.matches('[data-qty-input]')) {
-        const row = state.editor.rows.find((item) => item.id === input.dataset.qtyInput);
-        if (row) row.quantity = input.value;
-        return;
-      }
-      if (input.matches('[data-comment-input]')) {
-        const row = state.editor.rows.find((item) => item.id === input.dataset.commentInput);
-        if (row) row.comment = input.value;
-      }
-    });
+      recipeEditorForm.addEventListener('focusin', (event) => {
+        const input = event.target;
+        if (input.matches('[data-ing-input]')) showSuggestions(input, input.dataset.ingInput, input.value);
+      });
 
-    if (!state.editorEventsBound) recipeEditorForm.addEventListener('change', (event) => {
-      const select = event.target;
-      if (select.matches('[data-unit-input]')) {
-        const row = state.editor.rows.find((item) => item.id === select.dataset.unitInput);
-        if (row) row.unit = select.value;
-      }
-      if (select.id === 'recipeOrderModeEditor') {
-        state.editor.orderMode = normalizeLower(select.value);
-        renderRows();
-      }
-    });
+      recetasEditor.addEventListener('click', async (event) => {
+        const pickBtn = event.target.closest('[data-pick-ingredient]');
+        if (pickBtn) {
+          const row = state.editor?.rows.find((item) => item.id === pickBtn.dataset.pickIngredient);
+          const ingredient = state.ingredientes[pickBtn.dataset.ingId];
+          if (row && ingredient) {
+            row.ingredientId = ingredient.id;
+            row.ingredientName = ingredient.name;
+            renderRows();
+            clearSuggestions();
+          }
+          return;
+        }
+        const createInlineBtn = event.target.closest('[data-create-ingredient-inline]');
+        if (createInlineBtn) {
+          const rowId = createInlineBtn.dataset.createIngredientInline;
+          const row = state.editor?.rows.find((item) => item.id === rowId);
+          const draft = row ? { name: row.ingredientName } : null;
+          clearSuggestions();
+          const ingredientId = await window.laJamoneraIngredientesAPI?.openIngredientForm?.(null, draft);
+          await fetchIngredientesData();
+          if (ingredientId && state.ingredientes[ingredientId]) {
+            const target = state.editor.rows.find((item) => item.id === rowId);
+            if (target) {
+              target.ingredientId = ingredientId;
+              target.ingredientName = state.ingredientes[ingredientId].name;
+            } else {
+              state.editor.rows.push({ id: makeId('row'), type: 'ingredient', ingredientId, ingredientName: state.ingredientes[ingredientId].name, quantity: '', unit: getMeasureOptions()[0]?.value || '' });
+            }
+            renderRows();
+          }
+        }
+      });
 
-    if (!state.editorEventsBound) recipeEditorForm.addEventListener('focusin', (event) => {
-      const input = event.target;
-      if (input.matches('[data-ing-input]')) showSuggestions(input, input.dataset.ingInput, input.value);
-    });
+      document.addEventListener('click', (event) => {
+        if (!recetasEditor.classList.contains('d-none') && !event.target.closest('.recipe-ing-autocomplete') && !event.target.closest('.recipe-suggest-floating')) {
+          clearSuggestions();
+        }
+      });
 
-    if (!state.editorEventsBound) document.addEventListener('click', (event) => {
-      if (!recetasEditor.classList.contains('d-none') && !event.target.closest('.recipe-ing-autocomplete') && !event.target.closest('.recipe-suggest-list')) {
-        clearSuggestions();
-      }
-    });
+      state.editorEventsBound = true;
+    }
 
-    state.editorEventsBound = true;
-
+    const rowsBody = recipeEditorForm.querySelector('#recipeRowsBody');
+    let draggingId = '';
     rowsBody.addEventListener('dragstart', (event) => {
       const rowEl = event.target.closest('tr[data-row-id]');
       if (!rowEl || state.editor.orderMode !== 'custom') return;
@@ -458,19 +564,15 @@
     });
   };
 
-  const renderEditor = async (initial = null) => {
+  const renderEditor = async (initial = null, editorSeed = null) => {
     await fetchIngredientesData();
-    const measureOptions = getMeasureOptions();
-    const rowsSeed = Array.isArray(initial?.rows) && initial.rows.length
-      ? initial.rows.map((row) => ({ ...row, id: row.id || makeId('row') }))
-      : [{ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: measureOptions[0]?.value || '' }];
 
-    state.editor = {
-      image: { method: 'ai', url: initial?.imageUrl || '', prompt: '', file: null },
-      rows: rowsSeed,
-      orderMode: initial?.orderMode || 'desc',
-      measureOptions,
-      activeSuggestRowId: ''
+    state.editor = editorSeed || {
+      image: { method: 'ai', url: initial?.imageUrl || '', prompt: '', file: null, generatedFile: null },
+      rows: Array.isArray(initial?.rows) && initial.rows.length
+        ? initial.rows.map((row) => ({ ...row, id: row.id || makeId('row') }))
+        : [{ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: getMeasureOptions()[0]?.value || '' }],
+      orderMode: initial?.orderMode || 'desc'
     };
 
     recipeEditorTitle.textContent = initial ? 'Editar receta' : 'Nueva receta';
@@ -479,24 +581,24 @@
       <section class="step-block recipe-step-card">
         <h6 class="step-title"><span class="recipe-step-number">1</span> Datos principales</h6>
         <div class="step-content row g-3">
-          <div class="col-md-6">
+          <div class="col-12">
             <label class="form-label" for="recipeTitle">Título *</label>
             <input id="recipeTitle" class="form-control ios-input" value="${initial?.title || ''}" placeholder="Ej: Chorizo parrillero">
           </div>
-          <div class="col-md-6">
+          <div class="col-12">
             <label class="form-label" for="recipeDescription">Descripción (opcional)</label>
             <textarea id="recipeDescription" class="form-control ios-input recipe-description-lg" placeholder="Detalle amplio de la receta">${initial?.description || ''}</textarea>
           </div>
-          <div class="col-md-4">
-            <label class="form-label" for="recipeYieldQty">Cantidad final obtenida *</label>
+          <div class="col-md-6 recipe-highlight-field">
+            <label class="form-label" for="recipeYieldQty"><i class="fa-solid fa-weight-hanging"></i> Cantidad final obtenida *</label>
             <input id="recipeYieldQty" class="form-control ios-input" value="${initial?.yieldQuantity || ''}" placeholder="Ej: 10,50">
           </div>
-          <div class="col-md-4">
+          <div class="col-md-6">
             <label class="form-label" for="recipeYieldUnit">Unidad de medida *</label>
-            <select id="recipeYieldUnit" class="form-select ios-input">${measureOptions.map((item) => `<option value="${item.value}" ${normalizeLower(initial?.yieldUnit) === item.value ? 'selected' : ''}>${item.label}</option>`).join('')}</select>
+            <select id="recipeYieldUnit" class="form-select ios-input">${getMeasureSelectOptionsHtml(initial?.yieldUnit)}</select>
           </div>
-          <div class="col-md-4">
-            <label class="form-label" for="recipeOrderModeEditor">Orden de ingredientes</label>
+          <div class="col-md-6 recipe-highlight-field">
+            <label class="form-label" for="recipeOrderModeEditor"><i class="fa-solid fa-arrow-down-short-wide"></i> Orden de ingredientes</label>
             <select id="recipeOrderModeEditor" class="form-select ios-input">
               <option value="desc" ${state.editor.orderMode === 'desc' ? 'selected' : ''}>De mayor a menor</option>
               <option value="asc" ${state.editor.orderMode === 'asc' ? 'selected' : ''}>De menor a mayor</option>
@@ -511,9 +613,7 @@
         <div class="step-content">
           <div class="recipe-table-wrap">
             <table class="recipe-table">
-              <thead>
-                <tr><th style="width:36px">↕</th><th>Ingrediente / Comentario</th><th style="width:130px">Cantidad</th><th style="width:240px">Unidad</th><th style="width:68px">Acción</th></tr>
-              </thead>
+              <thead><tr><th style="width:36px">↕</th><th>Ingrediente / Comentario</th><th style="width:130px">Cantidad</th><th style="width:240px">Unidad</th><th style="width:68px">Acción</th></tr></thead>
               <tbody id="recipeRowsBody"></tbody>
             </table>
           </div>
@@ -525,10 +625,7 @@
       </section>
 
       ${buildImageStepHtml('recipeImage', initial?.imageUrl || '')}
-
-      <div class="recipe-editor-actions">
-        <button type="submit" class="btn ios-btn ios-btn-success"><i class="fa-solid fa-floppy-disk"></i><span>${initial ? 'Guardar receta' : 'Crear receta'}</span></button>
-      </div>`;
+      <div class="recipe-editor-actions"><button type="submit" class="btn ios-btn ios-btn-success"><i class="fa-solid fa-floppy-disk"></i><span>${initial ? 'Guardar receta' : 'Crear receta'}</span></button></div>`;
 
     renderRows();
     wireImageStep('recipeImage', state.editor.image);
@@ -545,7 +642,7 @@
 
     if (!title) throw new Error('El título es obligatorio.');
     if (!yieldQuantity) throw new Error('Completá la cantidad obtenida.');
-    if (!yieldUnit) throw new Error('Seleccioná una unidad de medida.');
+    if (!yieldUnit || yieldUnit === NEW_MEASURE_VALUE) throw new Error('Seleccioná una unidad de medida válida.');
 
     const rows = state.editor.rows
       .map((row) => row.type === 'comment'
@@ -556,14 +653,19 @@
     if (!rows.length) throw new Error('Agregá al menos una fila válida en la receta.');
 
     let imageUrl = normalizeValue(state.editor.image.url || '');
-    if (state.editor.image.method === 'upload' && state.editor.image.file) {
+    const method = normalizeLower(document.getElementById('recipeImage_method')?.value || state.editor.image.method || 'ai');
+    if (method === 'upload' && state.editor.image.file) {
       const msg = validateImageFile(state.editor.image.file);
       if (msg) throw new Error(msg);
       imageUrl = await uploadImageToStorage(state.editor.image.file, 'recetas/uploads');
     }
-    if (state.editor.image.method === 'ai' && normalizeValue(state.editor.image.prompt)) {
-      const aiFile = await generateImageWithIA(normalizeValue(state.editor.image.prompt));
-      imageUrl = await uploadImageToStorage(aiFile, 'recetas/ia');
+    if (method === 'ai') {
+      if (state.editor.image.generatedFile) {
+        imageUrl = await uploadImageToStorage(state.editor.image.generatedFile, 'recetas/ia');
+      } else if (normalizeValue(state.editor.image.prompt)) {
+        const aiFile = await generateImageWithIA(normalizeValue(state.editor.image.prompt));
+        imageUrl = await uploadImageToStorage(aiFile, 'recetas/ia');
+      }
     }
 
     return { title, description, yieldQuantity, yieldUnit, orderMode, rows, imageUrl };
@@ -589,7 +691,13 @@
       await fetchIngredientesData();
       await fetchRecetas();
       renderRecetas();
-      setView(getRecetasArray().length ? 'list' : 'empty');
+      if (state.resumeEditor?.data) {
+        const recipe = state.resumeEditor.activeRecipeId ? state.recetas[state.resumeEditor.activeRecipeId] : null;
+        await renderEditor(recipe || null, state.resumeEditor.data);
+        recipeEditorTitle.textContent = state.resumeEditor.title || (recipe ? 'Editar receta' : 'Nueva receta');
+      } else {
+        setView(getRecetasArray().length ? 'list' : 'empty');
+      }
     } catch (error) {
       showState('empty');
       await openIosSwal({ title: 'No se pudo cargar', html: '<p>Error leyendo recetas desde Firebase.</p>', icon: 'error', confirmButtonText: 'Entendido' });
@@ -604,6 +712,7 @@
       const prev = state.recetas[id] || {};
       state.recetas[id] = { id, ...payload, createdAt: prev.createdAt || Date.now(), updatedAt: Date.now() };
       await persistRecetas();
+      state.resumeEditor = null;
       renderRecetas();
       setView('list');
     } catch (error) {
@@ -614,14 +723,16 @@
   recipeBackBtn?.addEventListener('click', () => {
     state.activeRecipeId = '';
     state.editor = null;
+    state.resumeEditor = null;
     setView(getRecetasArray().length ? 'list' : 'empty');
   });
 
-  recetasModal.addEventListener('hide.bs.modal', blurActiveElement);
+  recetasModal.addEventListener('hide.bs.modal', () => {
+    snapshotEditorDraft();
+    blurActiveElement();
+  });
   recetasModal.addEventListener('hidden.bs.modal', () => {
     clearSuggestions();
-    state.editor = null;
-    state.activeRecipeId = '';
     blurActiveElement();
   });
   recetasModal.addEventListener('show.bs.modal', loadRecetas);
