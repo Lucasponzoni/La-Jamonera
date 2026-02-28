@@ -1085,7 +1085,18 @@ html.login-protected.auth-ok body {
   color: #fff;
 }
 
+.ios-btn-warning {
+  background: #ff9f0a;
+  color: #fff;
+}
+
+.ios-btn-warning:hover {
+  background: #e88f05;
+  color: #fff;
+}
+
 .ios-btn-secondary {
+
   width: 100%;
   max-width: 320px;
   background: #e6ebfa;
@@ -2505,6 +2516,17 @@ html.login-protected.auth-ok body {
 #inlineSendCommentBtn .meta-spinner-login {
   width: 18px;
   height: 18px;
+}
+
+
+.report-resend-btn {
+  width: auto;
+  max-width: none;
+  margin-top: 6px;
+}
+
+.report-resend-wrap .swal2-textarea {
+  margin: 0;
 }
 
 .report-comment-form label {

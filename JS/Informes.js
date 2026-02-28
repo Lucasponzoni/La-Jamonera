@@ -676,6 +676,95 @@
     `;
   };
 
+  const openResendReportEmailPrompt = async (report) => {
+    const usersWithEmail = Object.values(state.users || {})
+      .filter((user) => normalizeValue(user.email))
+      .sort((a, b) => String(a.fullName || '').localeCompare(String(b.fullName || '')));
+
+    const usersHtml = usersWithEmail.length
+      ? usersWithEmail.map((user) => `
+        <label class="notify-user-card">
+          <div class="notify-user-main">
+            ${renderUserAvatar(user)}
+            <div class="notify-user-text">
+              <strong>${escapeHtml(user.fullName || 'Usuario')}</strong>
+              <small>${escapeHtml(user.email || '')}</small>
+            </div>
+          </div>
+          <input type="checkbox" data-resend-user-email="${escapeHtml(user.email || '')}" data-resend-user-name="${escapeHtml(user.fullName || '')}">
+        </label>
+      `).join('')
+      : '<div class="informes-empty">No hay usuarios con email cargado.</div>';
+
+    const response = await openIosSwal({
+      title: 'Reenviar informe por email',
+      width: 760,
+      showCancelButton: true,
+      confirmButtonText: 'Reenviar',
+      cancelButtonText: 'Cancelar',
+      html: `
+        <div class="text-start report-resend-wrap">
+          <p class="mb-2">Seleccioná usuarios del listado o escribí emails nuevos (separados por coma).</p>
+          <div id="resendUsersList" class="notify-specific-users-list">${usersHtml}</div>
+          <label class="form-label mt-3" for="resendExtraEmails">Emails adicionales</label>
+          <textarea id="resendExtraEmails" class="swal2-textarea ios-input" placeholder="ejemplo@dominio.com, otro@dominio.com"></textarea>
+        </div>
+      `,
+      didOpen: () => {
+        prepareThumbLoaders('#resendUsersList .js-user-photo');
+      },
+      preConfirm: () => {
+        const selectedNodes = Array.from(document.querySelectorAll('[data-resend-user-email]:checked'));
+        const selected = selectedNodes.map((node) => ({
+          email: normalizeValue(node.dataset.resendUserEmail),
+          name: normalizeValue(node.dataset.resendUserName) || 'Usuario'
+        })).filter((item) => item.email);
+
+        const extraRaw = normalizeValue(document.getElementById('resendExtraEmails')?.value || '');
+        const extraEmails = extraRaw
+          ? extraRaw.split(',').map((item) => normalizeValue(item)).filter(Boolean)
+          : [];
+
+        const invalid = extraEmails.find((item) => !/^\S+@\S+\.\S+$/.test(item));
+        if (invalid) {
+          Swal.showValidationMessage(`Email inválido: ${invalid}`);
+          return false;
+        }
+
+        const recipientsByEmail = new Map();
+        selected.forEach((item) => {
+          const key = item.email.toLowerCase();
+          if (!recipientsByEmail.has(key)) recipientsByEmail.set(key, item);
+        });
+        extraEmails.forEach((email) => {
+          const key = email.toLowerCase();
+          if (!recipientsByEmail.has(key)) recipientsByEmail.set(key, { email, name: email });
+        });
+
+        const recipients = Array.from(recipientsByEmail.values());
+        if (!recipients.length) {
+          Swal.showValidationMessage('Seleccioná al menos un destinatario o escribí un email.');
+          return false;
+        }
+
+        return recipients;
+      }
+    });
+
+    if (!response.isConfirmed) return;
+
+    const latestReport = findReportById(report.id) || report;
+    const emailHtml = buildReportEmailHtml(latestReport, latestReport.attachments || []);
+    await sendEmailBatch(response.value || [], (target) => ({
+      name: 'La Jamonera',
+      subject: `Reenvío de informe bromatológico · ${latestReport.userName || 'La Jamonera'}`,
+      html: emailHtml,
+      nombre: target.name || target.email,
+      email: target.email
+    }));
+  };
+
+
   const buildCommentThreadHtml = (comment, depth = 0) => {
     const replies = Array.isArray(comment?.replies) ? comment.replies : [];
     const margin = depth * 14;
@@ -1374,6 +1463,7 @@
             <p><strong>Email:</strong> ${escapeHtml(report.userEmail || '-')}</p>
             <p><strong>Fecha:</strong> ${getDateLabel(report.createdAt)}</p>
             <p><strong>Última actualización:</strong> ${lastUpdatedAt ? getDateLabel(lastUpdatedAt) : 'Sin actualizaciones'}</p>
+            <button type="button" class="btn ios-btn ios-btn-warning report-resend-btn" data-resend-report-email="1"><i class="fa-regular fa-paper-plane"></i><span>Reenviar por email</span></button>
           </div>
           <div class="report-viewer-content-wrap"><div class="report-viewer-content">${report.html || ''}</div></div>
           <div class="attachments-grid">${attachmentHtml}</div>
@@ -1485,6 +1575,11 @@
           replyLabel.textContent = '';
           cancelReplyBtn.classList.add('d-none');
           refreshComments();
+        });
+
+        const resendBtn = popup.querySelector('[data-resend-report-email]');
+        resendBtn?.addEventListener('click', async () => {
+          await openResendReportEmailPrompt(findReportById(report.id) || report);
         });
 
         commentsBody?.addEventListener('click', async (event) => {
