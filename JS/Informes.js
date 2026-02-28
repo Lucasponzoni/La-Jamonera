@@ -2372,6 +2372,49 @@
     window.laJamoneraNotify?.show({ type: 'success', title: 'Preferencia guardada', message: `Se guardó la configuración para ${state.users[selectedUserId].fullName}.` });
   });
 
+  notifyAllUsersCheckbox?.addEventListener('change', () => {
+    if (notifyAllUsersCheckbox.checked && notifySpecificUsersCheckbox) {
+      notifySpecificUsersCheckbox.checked = false;
+    }
+    updateNotifySpecificVisibility();
+  });
+
+  notifySpecificUsersCheckbox?.addEventListener('change', () => {
+    if (notifySpecificUsersCheckbox.checked && notifyAllUsersCheckbox) {
+      notifyAllUsersCheckbox.checked = false;
+    }
+    updateNotifySpecificVisibility();
+  });
+
+  notifySpecificUsersList?.addEventListener('change', (event) => {
+    const input = event.target.closest('[data-notify-user-id]');
+    if (!input) return;
+    const userId = String(input.dataset.notifyUserId || '');
+    if (!userId) return;
+    const set = new Set(state.notifySpecificUserIds);
+    if (input.checked) set.add(userId);
+    else set.delete(userId);
+    state.notifySpecificUserIds = Array.from(set);
+  });
+
+  saveNotifyPreferenceBtn?.addEventListener('click', async () => {
+    saveNotifyPreferenceBtn.setAttribute('disabled', 'disabled');
+    saveNotifyPreferenceSpinner?.classList.remove('d-none');
+    saveNotifyPreferenceIcon?.classList.add('d-none');
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    writeEmailPreferences({
+      notifyAll: Boolean(notifyAllUsersCheckbox?.checked),
+      notifySpecific: Boolean(notifySpecificUsersCheckbox?.checked),
+      selectedUserIds: state.notifySpecificUserIds
+    });
+
+    saveNotifyPreferenceSpinner?.classList.add('d-none');
+    saveNotifyPreferenceIcon?.classList.remove('d-none');
+    saveNotifyPreferenceBtn.removeAttribute('disabled');
+    window.laJamoneraNotify?.show({ type: 'success', title: 'Preferencia guardada', message: 'Se guardó la configuración de notificación por email.' });
+  });
+
   document.querySelectorAll('.editor-btn[data-cmd]').forEach((button) => {
     button.addEventListener('click', () => applyEditorCommand(button.dataset.cmd, button.dataset.value || null));
   });
