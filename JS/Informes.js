@@ -751,7 +751,7 @@
       }
     });
 
-    if (!response.isConfirmed) return;
+    if (!response.isConfirmed) return false;
 
     const latestReport = findReportById(report.id) || report;
     const emailHtml = buildReportEmailHtml(latestReport, latestReport.attachments || []);
@@ -1506,6 +1506,7 @@
         const cancelReplyBtn = popup.querySelector('#inlineCancelReplyBtn');
 
         let activeReplyCommentId = '';
+        let hasViewerChanges = false;
 
         const refreshComments = () => {
           const latest = findReportById(report.id) || report;
@@ -1570,6 +1571,7 @@
             return;
           }
 
+          hasViewerChanges = true;
           textArea.value = '';
           pinInput.value = '';
           activeReplyCommentId = '';
@@ -1600,7 +1602,8 @@
           const editBtn = event.target.closest('[data-edit-comment]');
           if (editBtn) {
             const commentId = String(editBtn.dataset.editComment || '');
-            await editCommentInReport(findReportById(report.id) || report, commentId);
+            const edited = await editCommentInReport(findReportById(report.id) || report, commentId);
+            if (edited) hasViewerChanges = true;
             refreshComments();
             return;
           }
@@ -1608,13 +1611,16 @@
           const delBtn = event.target.closest('[data-delete-comment]');
           if (delBtn) {
             const commentId = String(delBtn.dataset.deleteComment || '');
-            await deleteCommentFromReport(findReportById(report.id) || report, commentId);
+            const removed = await deleteCommentFromReport(findReportById(report.id) || report, commentId);
+            if (removed) hasViewerChanges = true;
             refreshComments();
           }
         });
       },
       willClose: async () => {
-        await loadReportsBoard();
+        if (hasViewerChanges) {
+          await loadReportsBoard();
+        }
       }
     });
   };
@@ -1849,7 +1855,7 @@
       confirmButtonText: 'Borrar',
       cancelButtonText: 'Cancelar'
     });
-    if (!confirmation.isConfirmed) return;
+    if (!confirmation.isConfirmed) return false;
     const path = getReportPath(report);
     await window.dbLaJamoneraRest.write(path, null);
     await window.dbLaJamoneraRest.write(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, null);
@@ -1932,11 +1938,11 @@
     const target = findCommentById(comments, commentId);
     if (!target) {
       await openIosSwal({ title: 'Comentario no encontrado', html: '<p>No se encontró el comentario seleccionado.</p>', icon: 'error', confirmButtonText: 'Entendido' });
-      return;
+      return false;
     }
 
     const allowed = await verifyCommentAuthorPin(target);
-    if (!allowed) return;
+    if (!allowed) return false;
 
     const response = await openIosSwal({
       title: 'Editar comentario',
@@ -1954,7 +1960,7 @@
       }
     });
 
-    if (!response.isConfirmed) return;
+    if (!response.isConfirmed) return false;
 
     target.text = response.value.text;
     target.updatedAt = Date.now();
@@ -1965,6 +1971,7 @@
     }, {});
 
     await persistReportFromViewer(report, { comments: commentsObject }, { reloadBoard: false });
+    return true;
   };
 
   const deleteCommentFromReport = async (report, commentId) => {
@@ -1972,11 +1979,11 @@
     const target = findCommentById(comments, commentId);
     if (!target) {
       await openIosSwal({ title: 'Comentario no encontrado', html: '<p>No se encontró el comentario seleccionado.</p>', icon: 'error', confirmButtonText: 'Entendido' });
-      return;
+      return false;
     }
 
     const allowed = await verifyCommentAuthorPin(target);
-    if (!allowed) return;
+    if (!allowed) return false;
 
     const confirmation = await openIosSwal({
       title: 'Eliminar comentario',
@@ -1987,7 +1994,7 @@
       cancelButtonText: 'Cancelar'
     });
 
-    if (!confirmation.isConfirmed) return;
+    if (!confirmation.isConfirmed) return false;
 
     const cleaned = removeCommentById(comments, commentId);
     const commentsObject = cleaned.reduce((acc, item) => {
@@ -1996,6 +2003,7 @@
     }, {});
 
     await persistReportFromViewer(report, { comments: commentsObject }, { reloadBoard: false });
+    return true;
   };
 
   const addCommentToReport = async (report, parentCommentId = null, options = {}) => {
