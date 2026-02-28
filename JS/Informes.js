@@ -648,9 +648,22 @@
   };
 
   const buildReportEmailHtml = (report, attachments = []) => {
-    const attachmentItems = attachments.length
-      ? attachments.map((item) => `<li style="margin:0 0 6px;"><a href="${escapeHtml(item.url || '')}" target="_blank" rel="noopener noreferrer" style="color:#1c64d1;text-decoration:none;">${escapeHtml(item.name || 'Adjunto')}</a></li>`).join('')
-      : '<li>Sin adjuntos</li>';
+    const safeAttachments = Array.isArray(attachments) ? attachments : [];
+    const imageAttachments = safeAttachments.filter((item) => item?.type === 'image' && normalizeValue(item?.url));
+    const docAttachments = safeAttachments.filter((item) => item?.type !== 'image' && normalizeValue(item?.url));
+
+    const attachmentItems = docAttachments.length
+      ? docAttachments.map((item) => `<li style="margin:0 0 6px;"><a href="${escapeHtml(item.url || '')}" target="_blank" rel="noopener noreferrer" style="color:#1c64d1;text-decoration:none;">${escapeHtml(item.name || 'Adjunto')}</a></li>`).join('')
+      : '<li>Sin documentos adjuntos</li>';
+
+    const imageBlocks = imageAttachments.length
+      ? imageAttachments.map((item) => `
+        <figure style="margin:0;border:1px solid #dce5fb;border-radius:12px;overflow:hidden;background:#ffffff;">
+          <img src="${escapeHtml(item.url || '')}" alt="${escapeHtml(item.name || 'Imagen adjunta')}" style="display:block;width:100%;height:auto;max-height:420px;object-fit:contain;background:#f6f9ff;">
+          <figcaption style="padding:8px 10px;font-size:12px;color:#526a97;">${escapeHtml(item.name || 'Imagen adjunta')}</figcaption>
+        </figure>
+      `).join('')
+      : '<p style="margin:0;color:#5f729b;">Sin imágenes adjuntas.</p>';
 
     return `
       <div style="font-family:Inter,Arial,sans-serif;background:#f4f7ff;padding:18px;">
@@ -658,7 +671,9 @@
           <h2 style="margin:0 0 6px;color:#2351a0;">Nuevo informe bromatológico</h2>
           <p style="margin:0 0 14px;color:#4f638c;">Creador: <strong>${escapeHtml(report.userName || 'Usuario')}</strong> · Fecha: ${getDateLabel(report.createdAt)}</p>
           <div style="border:1px solid #e2e8fb;border-radius:14px;padding:12px;background:#fbfdff;">${report.html || '<p>Sin contenido</p>'}</div>
-          <h3 style="margin:14px 0 6px;color:#2d4f91;font-size:15px;">Adjuntos</h3>
+          <h3 style="margin:14px 0 8px;color:#2d4f91;font-size:15px;">Imágenes adjuntas</h3>
+          <div style="display:grid;gap:10px;">${imageBlocks}</div>
+          <h3 style="margin:14px 0 6px;color:#2d4f91;font-size:15px;">Documentos y enlaces</h3>
           <ul style="margin:0;padding-left:18px;color:#4b5f89;">${attachmentItems}</ul>
         </div>
       </div>
