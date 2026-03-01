@@ -253,6 +253,7 @@
   };
 
   const getPlaceholderCircle = () => `<span class="image-placeholder-circle-2">${RECIPE_PLACEHOLDER_ICON}</span>`;
+  const getSmallPlaceholder = (icon = 'fa-solid fa-bowl-food') => `<span class="recipe-small-placeholder"><i class="${icon}"></i></span>`;
   const buildImageStepHtml = (prefix, initialImage) => `
     <section class="step-block recipe-step-card">
       <h6 class="step-title">3) Imagen</h6>
@@ -382,7 +383,7 @@
 
   const ingredientAvatarHtml = (ingredient) => ingredient?.imageUrl
     ? `<span class="recipe-inline-avatar-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-recipe-inline-thumb" src="${ingredient.imageUrl}" alt="${capitalize(ingredient.name)}" loading="lazy"></span>`
-    : `<span class="recipe-inline-avatar-wrap recipe-inline-avatar-fallback">${getPlaceholderCircle()}</span>`;
+    : `<span class="recipe-inline-avatar-wrap recipe-inline-avatar-fallback">${getSmallPlaceholder('fa-solid fa-seedling')}</span>`;
 
   const prepareInlineThumbLoaders = () => {
     recipeEditorForm.querySelectorAll('.js-recipe-inline-thumb').forEach((image) => {
@@ -393,7 +394,7 @@
         loading?.classList.add('d-none');
       };
       const showFallback = () => {
-        if (wrapper) wrapper.innerHTML = getPlaceholderCircle();
+        if (wrapper) wrapper.innerHTML = getSmallPlaceholder('fa-solid fa-seedling');
       };
       if (image.complete && image.naturalWidth > 0) {
         showImage();
@@ -445,7 +446,7 @@
       <button type="button" class="recipe-suggest-item" data-pick-ingredient="${rowId}" data-ing-id="${item.id}">
         <span class="recipe-suggest-avatar-wrap">${item.imageUrl
           ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-suggest-avatar js-recipe-suggest-thumb" src="${item.imageUrl}" alt="${capitalize(item.name)}" loading="lazy">`
-          : getPlaceholderCircle()}</span>
+          : getSmallPlaceholder('fa-solid fa-seedling')}</span>
         <span>${capitalize(item.name)}</span>
       </button>`).join('')}
       <button type="button" class="recipe-suggest-item recipe-suggest-create" data-create-ingredient-inline="${rowId}">
@@ -472,7 +473,7 @@
         loading?.classList.add('d-none');
       };
       const showFallback = () => {
-        if (wrapper) wrapper.innerHTML = getPlaceholderCircle();
+        if (wrapper) wrapper.innerHTML = getSmallPlaceholder('fa-solid fa-seedling');
       };
       if (image.complete && image.naturalWidth > 0) {
         showImage();
@@ -718,21 +719,21 @@
     recipeEditorForm.innerHTML = `
       <section class="step-block recipe-step-card recipe-main-step">
         <h6 class="step-title"><span class="recipe-step-number">1</span> Datos generales</h6>
-        <div class="step-content row g-3">
-          <div class="col-12">
+        <div class="step-content recipe-fields-flex">
+          <div class="recipe-field recipe-field-full">
             <label class="form-label" for="recipeTitle">Título *</label>
             <input id="recipeTitle" class="form-control ios-input" value="${initial?.title || ''}" placeholder="Ej: Chorizo parrillero">
           </div>
-          <div class="col-12">
+          <div class="recipe-field recipe-field-full">
             <label class="form-label" for="recipeDescription">Descripción (opcional)</label>
             <textarea id="recipeDescription" class="form-control ios-input recipe-description-lg" placeholder="Detalle amplio de la receta">${initial?.description || ''}</textarea>
           </div>
-          <div class="col-12"><p class="recipe-subsection-title">Rendimiento / producción</p></div>
-          <div class="col-md-6 recipe-highlight-field">
+          <div class="recipe-field recipe-field-full"><p class="recipe-subsection-title">Rendimiento / producción</p></div>
+          <div class="recipe-field recipe-field-half recipe-highlight-field">
             <label class="form-label" for="recipeYieldQty"><i class="fa-solid fa-weight-hanging"></i> Cantidad final obtenida *</label>
             <input id="recipeYieldQty" class="form-control ios-input" value="${initial?.yieldQuantity || ''}" placeholder="Ej: 10,50">
           </div>
-          <div class="col-md-6">
+          <div class="recipe-field recipe-field-half recipe-highlight-field">
             <label class="form-label" for="recipeYieldUnit">Unidad de medida *</label>
             <div class="recipe-highlight-field recipe-highlight-field-soft">
               <select id="recipeYieldUnit" class="form-select ios-input">${getMeasureSelectOptionsHtml(initial?.yieldUnit)}</select>
@@ -742,7 +743,11 @@
             <label class="form-label" for="recipeShelfLifeDays"><i class="fa-regular fa-calendar-days"></i> Caducidad (días) *</label>
             <input id="recipeShelfLifeDays" type="number" min="1" step="1" class="form-control ios-input" value="${initial?.shelfLifeDays || ''}" placeholder="Ej: 3">
           </div>
-          <div class="col-md-6 recipe-highlight-field">
+          <div class="recipe-field recipe-field-half recipe-highlight-field">
+            <label class="form-label" for="recipeShelfLifeDays"><i class="fa-regular fa-calendar-days"></i> Caducidad (días) *</label>
+            <input id="recipeShelfLifeDays" type="number" min="1" step="1" class="form-control ios-input" value="${initial?.shelfLifeDays || ''}" placeholder="Ej: 3">
+          </div>
+          <div class="recipe-field recipe-field-half recipe-highlight-field">
             <label class="form-label" for="recipeOrderModeEditor"><i class="fa-solid fa-arrow-down-short-wide"></i> Orden de ingredientes</label>
             <select id="recipeOrderModeEditor" class="form-select ios-input">
               <option value="desc" ${state.editor.orderMode === 'desc' ? 'selected' : ''}>De mayor a menor</option>
