@@ -1,7 +1,7 @@
 (function recetasModule() {
   const IA_WORKER_BASE = 'https://worker.lucasponzoninovogar.workers.dev';
   const IA_ICON_SRC = './IMG/ia-unscreen.gif';
-  const RECIPE_PLACEHOLDER_ICON = '<i class="bi bi-egg-fried"></i>';
+  const RECIPE_PLACEHOLDER_ICON = '<i class="fa-solid fa-hotdog"></i>';
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -637,13 +637,8 @@
           const row = state.editor?.rows.find((item) => item.id === rowId);
           const draft = row ? { name: row.ingredientName } : null;
           clearSuggestions();
-          recetasModal.setAttribute('inert', '');
           let ingredientId = '';
-          try {
-            ingredientId = await window.laJamoneraIngredientesAPI?.openIngredientForm?.(null, draft);
-          } finally {
-            recetasModal.removeAttribute('inert');
-          }
+          ingredientId = await window.laJamoneraIngredientesAPI?.openIngredientForm?.(null, draft);
           await fetchIngredientesData();
           if (ingredientId && state.ingredientes[ingredientId]) {
             const target = state.editor.rows.find((item) => item.id === rowId);
@@ -738,10 +733,6 @@
             <div class="recipe-highlight-field recipe-highlight-field-soft">
               <select id="recipeYieldUnit" class="form-select ios-input">${getMeasureSelectOptionsHtml(initial?.yieldUnit)}</select>
             </div>
-          </div>
-          <div class="col-md-6 recipe-highlight-field">
-            <label class="form-label" for="recipeShelfLifeDays"><i class="fa-regular fa-calendar-days"></i> Caducidad (días) *</label>
-            <input id="recipeShelfLifeDays" type="number" min="1" step="1" class="form-control ios-input" value="${initial?.shelfLifeDays || ''}" placeholder="Ej: 3">
           </div>
           <div class="recipe-field recipe-field-half recipe-highlight-field">
             <label class="form-label" for="recipeShelfLifeDays"><i class="fa-regular fa-calendar-days"></i> Caducidad (días) *</label>

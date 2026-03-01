@@ -1587,6 +1587,14 @@
           await openResendReportEmailPrompt(findReportById(report.id) || report);
         });
 
+        const reopenCurrentViewer = () => {
+          Swal.close();
+          setTimeout(async () => {
+            const latest = findReportById(report.id) || report;
+            await openReportViewer(latest);
+          }, 80);
+        };
+
         commentsBody?.addEventListener('click', async (event) => {
           const replyBtn = event.target.closest('[data-reply-comment]');
           if (replyBtn) {
@@ -1604,7 +1612,11 @@
           if (editBtn) {
             const commentId = String(editBtn.dataset.editComment || '');
             const edited = await editCommentInReport(findReportById(report.id) || report, commentId);
-            if (edited) hasViewerChanges = true;
+            if (edited) {
+              hasViewerChanges = true;
+              reopenCurrentViewer();
+              return;
+            }
             refreshComments();
             return;
           }
@@ -1613,7 +1625,11 @@
           if (delBtn) {
             const commentId = String(delBtn.dataset.deleteComment || '');
             const removed = await deleteCommentFromReport(findReportById(report.id) || report, commentId);
-            if (removed) hasViewerChanges = true;
+            if (removed) {
+              hasViewerChanges = true;
+              reopenCurrentViewer();
+              return;
+            }
             refreshComments();
           }
         });
