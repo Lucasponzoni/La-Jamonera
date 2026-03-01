@@ -638,8 +638,15 @@
           const draft = row ? { name: row.ingredientName } : null;
           clearSuggestions();
           blurActiveElement();
+          recetasModal.setAttribute('inert', '');
           let ingredientId = '';
-          ingredientId = await window.laJamoneraIngredientesAPI?.openIngredientForm?.(null, draft);
+          try {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            ingredientId = await window.laJamoneraIngredientesAPI?.openIngredientForm?.(null, draft);
+          } finally {
+            recetasModal.removeAttribute('inert');
+            blurActiveElement();
+          }
           await fetchIngredientesData();
           if (ingredientId && state.ingredientes[ingredientId]) {
             const target = state.editor.rows.find((item) => item.id === rowId);
@@ -729,7 +736,7 @@
             <label class="form-label" for="recipeYieldQty"><i class="fa-solid fa-weight-hanging"></i> Cantidad final obtenida *</label>
             <input id="recipeYieldQty" class="form-control ios-input" value="${initial?.yieldQuantity || ''}" placeholder="Ej: 10,50">
           </div>
-          <div class="recipe-field recipe-field-half">
+          <div class="recipe-field recipe-field-half recipe-highlight-field">
             <label class="form-label" for="recipeYieldUnit">Unidad de medida *</label>
             <div class="recipe-highlight-field recipe-highlight-field-soft">
               <select id="recipeYieldUnit" class="form-select ios-input">${getMeasureSelectOptionsHtml(initial?.yieldUnit)}</select>

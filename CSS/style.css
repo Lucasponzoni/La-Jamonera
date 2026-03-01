@@ -2885,13 +2885,15 @@ html.login-protected.auth-ok body {
 .recipe-table-wrap {
   border: 1px solid #cfdcf8;
   border-radius: 14px;
-  overflow: visible;
+  overflow: hidden;
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
 
 .recipe-table {
   width: 100%;
   font-size: 0.92rem;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .recipe-table th,
@@ -2905,6 +2907,14 @@ html.login-protected.auth-ok body {
   background: #eef4ff;
   color: #294f9f;
   font-weight: 800;
+}
+
+.recipe-table thead th:first-child {
+  border-top-left-radius: 12px;
+}
+
+.recipe-table thead th:last-child {
+  border-top-right-radius: 12px;
 }
 
 .recipe-table tbody tr {
