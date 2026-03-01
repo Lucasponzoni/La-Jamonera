@@ -1819,46 +1819,60 @@
       return;
     }
 
-    const path = getReportPath(report);
-    const uploadedMap = new Map();
-    for (const item of localUploads) {
-      const folder = getFileCategory(item.file) === 'image' ? 'images' : 'docs';
-      const storagePath = `informes/${report.year}/${report.month}/${report.day}/${report.id}/${folder}`;
-      const url = await uploadToStorage(item.file, storagePath);
-      uploadedMap.set(item.tmpId, url);
+    Swal.fire({
+      title: 'Guardando cambios...',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner-login"></div>',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      customClass: { popup: 'ios-alert informes-alert informes-saving-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' }
+    });
+
+    try {
+      const path = getReportPath(report);
+      const uploadedMap = new Map();
+      for (const item of localUploads) {
+        const folder = getFileCategory(item.file) === 'image' ? 'images' : 'docs';
+        const storagePath = `informes/${report.year}/${report.month}/${report.day}/${report.id}/${folder}`;
+        const url = await uploadToStorage(item.file, storagePath);
+        uploadedMap.set(item.tmpId, url);
+      }
+
+      const finalAttachments = currentAttachments.map((item) => {
+        if (!item.isLocal) return item;
+        const source = localUploads.find((upload) => upload.tmpId === item.id);
+        return {
+          name: item.name,
+          type: item.type,
+          mime: item.mime || source?.file?.type || '',
+          size: item.size || source?.file?.size || 0,
+          url: uploadedMap.get(item.id) || item.url
+        };
+      });
+
+      const updatedAt = Date.now();
+      const updated = { ...report, html: answer.value.html, importance: normalizeImportance(answer.value.importance, 50), attachments: finalAttachments, updatedAt };
+      await window.dbLaJamoneraRest.write(path, updated);
+      await window.dbLaJamoneraRest.write(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, {
+        id: report.id,
+        reportDate: report.reportDate,
+        userId: report.userId,
+        userName: report.userName,
+        importance: normalizeImportance(updated.importance, 50),
+        createdAt: Number(report.createdAt || Date.now()),
+        attachmentsCount: finalAttachments.length,
+        commentsCount: getCommentsCount(updated),
+        updatedAt
+      });
+      await loadReportsBoard();
+    } catch (error) {
+      await openIosSwal({ title: 'Error al guardar cambios', html: '<p>No se pudieron guardar los cambios del informe. Reintentá.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+    } finally {
+      currentAttachments.forEach((item) => {
+        if (item.isLocal && item.url) URL.revokeObjectURL(item.url);
+      });
+      Swal.close();
     }
-
-    const finalAttachments = currentAttachments.map((item) => {
-      if (!item.isLocal) return item;
-      const source = localUploads.find((upload) => upload.tmpId === item.id);
-      return {
-        name: item.name,
-        type: item.type,
-        mime: item.mime || source?.file?.type || '',
-        size: item.size || source?.file?.size || 0,
-        url: uploadedMap.get(item.id) || item.url
-      };
-    });
-
-    currentAttachments.forEach((item) => {
-      if (item.isLocal && item.url) URL.revokeObjectURL(item.url);
-    });
-
-    const updatedAt = Date.now();
-    const updated = { ...report, html: answer.value.html, importance: normalizeImportance(answer.value.importance, 50), attachments: finalAttachments, updatedAt };
-    await window.dbLaJamoneraRest.write(path, updated);
-    await window.dbLaJamoneraRest.write(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, {
-      id: report.id,
-      reportDate: report.reportDate,
-      userId: report.userId,
-      userName: report.userName,
-      importance: normalizeImportance(updated.importance, 50),
-      createdAt: Number(report.createdAt || Date.now()),
-      attachmentsCount: finalAttachments.length,
-      commentsCount: getCommentsCount(updated),
-      updatedAt
-    });
-    await loadReportsBoard();
   };
 
   const deleteReport = async (report) => {
