@@ -3037,6 +3037,85 @@ html.login-protected.auth-ok body {
   gap: 8px;
 }
 
+.recipe-nutrition-ai-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.recipe-nutrition-ai-btn {
+  width: 100%;
+  max-width: none;
+}
+
+.recipe-nutrition-ai-btn img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.recipe-nutrition-ai-stale {
+  color: #b45309;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.recipe-nutrition-ai-preview {
+  margin-top: 8px;
+  border: 1px dashed #cdbaf8;
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.recipe-nutrition-ai-empty {
+  margin: 0;
+  color: #66739a;
+}
+
+.recipe-nutrition-product-meta h6 {
+  margin: 0;
+  color: #223a71;
+  font-weight: 800;
+}
+
+.recipe-nutrition-product-meta p {
+  margin: 4px 0 10px;
+  color: #4f5f86;
+}
+
+.recipe-nutrition-front-labels h6 {
+  margin: 12px 0 8px;
+  color: #223a71;
+  font-weight: 800;
+}
+
+.recipe-octagons-wrap {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.recipe-octagon {
+  width: 96px;
+  min-height: 96px;
+  clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);
+  background: #000;
+  color: #fff;
+  padding: 10px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.recipe-nutrition-front-empty {
+  margin: 0;
+  color: #5d6b90;
+}
+
 .recipe-image-layout {
   display: grid;
   grid-template-columns: 120px 1fr;

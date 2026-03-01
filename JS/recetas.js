@@ -37,6 +37,12 @@
   const normalizeValue = (value) => String(value || '').trim();
   const normalizeLower = (value) => normalizeValue(value).toLowerCase();
   const capitalize = (value) => normalizeLower(value).replace(/(^|\s)\S/g, (letter) => letter.toUpperCase());
+  const escapeHtml = (value) => String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
   const safeObject = (value) => (value && typeof value === 'object' ? value : {});
   const makeId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const NEW_MEASURE_VALUE = '__new_measure__';
@@ -73,6 +79,17 @@
     { value: 'pote', singular: 'pote', plural: 'potes' },
     { value: 'paquete', singular: 'paquete', plural: 'paquetes' }
   ];
+
+  const FRONT_LABELS_ALLOWED = [
+    'EXCESO EN AZÚCARES',
+    'EXCESO EN SODIO',
+    'EXCESO EN GRASAS TOTALES',
+    'EXCESO EN GRASAS SATURADAS',
+    'EXCESO EN CALORÍAS',
+    'EXCESO EN EDULCORANTES',
+    'EXCESO EN CAFEÍNA'
+  ];
+
 
   const blurActiveElement = () => document.activeElement?.blur?.();
   const openIosSwal = (options) => {
@@ -553,6 +570,282 @@
     return [...ingredients.map((item) => item.row), ...comments, ...monography];
   };
 
+
+  const getNutritionGenerationSnapshot = () => {
+    const title = normalizeValue(recipeEditorForm.querySelector('#recipeTitle')?.value || state.editor?.title || '');
+    const description = normalizeValue(recipeEditorForm.querySelector('#recipeDescription')?.value || state.editor?.description || '');
+    const declarationUnit = normalizeLower(recipeEditorForm.querySelector('#recipeNutritionDeclarationUnit')?.value || state.editor?.nutrition?.declarationUnit || '');
+    const declarationAmount = normalizeValue(recipeEditorForm.querySelector('#recipeNutritionDeclarationAmount')?.value || state.editor?.nutrition?.declarationAmount || '');
+    const servingsPerPackage = normalizeValue(recipeEditorForm.querySelector('#recipeNutritionServingsPerPackage')?.value || state.editor?.nutrition?.servingsPerPackage || '');
+    const productType = normalizeLower(recipeEditorForm.querySelector('#recipeNutritionProductType')?.value || state.editor?.nutrition?.productType || '');
+    const category = normalizeLower(recipeEditorForm.querySelector('#recipeNutritionCategory')?.value || state.editor?.nutrition?.category || '');
+    const subcategory = normalizeLower(recipeEditorForm.querySelector('#recipeNutritionSubcategory')?.value || state.editor?.nutrition?.subcategory || '');
+    const householdMeasure = normalizeLower(recipeEditorForm.querySelector('#recipeNutritionHouseholdMeasure')?.value || state.editor?.nutrition?.householdMeasure || '');
+    const householdAmount = normalizeValue(recipeEditorForm.querySelector('#recipeNutritionHouseholdAmount')?.value || state.editor?.nutrition?.householdAmount || '');
+
+    const ingredients = (state.editor?.rows || [])
+      .filter((row) => row.type === 'ingredient' && normalizeValue(row.ingredientName))
+      .map((row) => ({
+        ingredientName: normalizeValue(row.ingredientName),
+        quantity: normalizeValue(row.quantity),
+        unit: normalizeLower(row.unit)
+      }));
+
+    return {
+      title,
+      description,
+      ingredients,
+      nutrition: {
+        productType,
+        category,
+        subcategory,
+        declarationUnit,
+        declarationAmount,
+        servingsPerPackage,
+        householdMeasure,
+        householdAmount
+      }
+    };
+  };
+
+  const getNutritionGenerationHash = () => JSON.stringify(getNutritionGenerationSnapshot());
+
+  const hasNutritionFieldsForAI = () => {
+    const snapshot = getNutritionGenerationSnapshot();
+    const n = snapshot.nutrition || {};
+    return Boolean(
+      snapshot.title &&
+      snapshot.description &&
+      snapshot.ingredients.length &&
+      n.productType &&
+      n.category &&
+      n.subcategory &&
+      n.declarationUnit &&
+      n.declarationAmount &&
+      n.householdMeasure &&
+      n.householdAmount &&
+      n.servingsPerPackage
+    );
+  };
+
+  const buildFrontLabelsHtml = (labels = []) => {
+    const clean = Array.isArray(labels)
+      ? labels.map((item) => normalizeValue(item).toUpperCase()).filter((item) => FRONT_LABELS_ALLOWED.includes(item))
+      : [];
+    if (!clean.length) return '<p class="recipe-nutrition-front-empty">Sin sellos de advertencia.</p>';
+    return `<div class="recipe-octagons-wrap">${clean.map((item) => `<span class="recipe-octagon">${item}</span>`).join('')}</div>`;
+  };
+
+  const parseAiJsonFromText = (text) => {
+    const raw = String(text || '').trim();
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch (error) {
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (!match) return null;
+      try {
+        return JSON.parse(match[0]);
+      } catch (nestedError) {
+        return null;
+      }
+    }
+  };
+
+  const renderNutritionAiPreview = () => {
+    const wrapper = recipeEditorForm.querySelector('#recipeNutritionAiPreview');
+    const staleFlag = recipeEditorForm.querySelector('#recipeNutritionAiStale');
+    const button = recipeEditorForm.querySelector('#generateNutritionAiBtn');
+    if (!wrapper || !button) return;
+
+    const canGenerate = hasNutritionFieldsForAI();
+    button.toggleAttribute('disabled', !canGenerate);
+
+    const ai = state.editor?.nutrition?.ai;
+    if (!ai?.tableHtml) {
+      wrapper.innerHTML = '<p class="recipe-nutrition-ai-empty">Completá los datos y generá la tabla nutricional con IA.</p>';
+      staleFlag?.classList.add('d-none');
+      button.querySelector('.js-generate-label').textContent = 'Generar tabla nutricional con IA';
+      return;
+    }
+
+    const stale = ai.inputHash && ai.inputHash !== getNutritionGenerationHash();
+    staleFlag?.classList.toggle('d-none', !stale);
+    button.querySelector('.js-generate-label').textContent = stale ? 'Rehacer tabla nutricional con IA' : 'Regenerar tabla nutricional con IA';
+
+    wrapper.innerHTML = `
+      <div class="recipe-nutrition-product-meta">
+        <h6>${escapeHtml(normalizeValue(recipeEditorForm.querySelector('#recipeTitle')?.value || 'Producto'))}</h6>
+        <p>${escapeHtml(normalizeValue(recipeEditorForm.querySelector('#recipeDescription')?.value || ''))}</p>
+      </div>
+      <div class="recipe-nutrition-ai-table">${ai.tableHtml}</div>
+      <div class="recipe-nutrition-front-labels">
+        <h6>Etiquetado frontal (Argentina)</h6>
+        ${buildFrontLabelsHtml(ai.frontLabels)}
+      </div>
+    `;
+  };
+
+  const markNutritionAiAsStaleIfNeeded = () => {
+    if (!state.editor?.nutrition?.ai?.tableHtml) {
+      renderNutritionAiPreview();
+      return;
+    }
+    renderNutritionAiPreview();
+  };
+
+  const generateNutritionTableWithIA = async () => {
+    if (!hasNutritionFieldsForAI()) {
+      await openIosSwal({ title: 'Faltan datos', html: '<p>Completá todos los campos nutricionales y datos base de receta para generar la tabla.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+      return;
+    }
+
+    Swal.fire({
+      title: 'Generando tabla nutricional...',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/ia-unscreen.gif" alt="Generando" class="meta-spinner-login"></div>',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      customClass: { popup: 'ios-alert ingredientes-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' }
+    });
+
+    try {
+      await window.laJamoneraReady;
+      const keyNode = await window.dbLaJamoneraRest.read('/deepseek/apiKey');
+      const apiKey = typeof keyNode === 'string' ? normalizeValue(keyNode) : normalizeValue(keyNode?.apiKey);
+      if (!apiKey) throw new Error('No se encontró /deepseek/apiKey en Firebase.');
+
+      const snapshot = getNutritionGenerationSnapshot();
+      const prompt = `Sos especialista en rotulado nutricional argentino. Devolvé SOLO JSON válido con estructura: {"tableHtml":"...","frontLabels":["..."]}.
+
+Datos: ${JSON.stringify(snapshot)}
+
+Requisitos: 1) tableHtml debe ser una tabla nutricional en HTML lista para renderizar (sin markdown), con estilo visual similar a etiqueta clásica. 2) incluir nombre y descripción de producto. 3) frontLabels debe contener solo advertencias de esta lista: ${FRONT_LABELS_ALLOWED.join(', ')}. 4) Si no hay advertencias, devolver array vacío.`;
+
+      const response = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages: [
+            { role: 'system', content: 'Respondé únicamente con JSON válido sin texto adicional.' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.2
+        })
+      });
+
+      if (!response.ok) {
+        const msg = await response.text();
+        throw new Error(`DeepSeek ${response.status}: ${msg}`);
+      }
+
+      const data = await response.json();
+      const content = data?.choices?.[0]?.message?.content || '';
+      const parsed = parseAiJsonFromText(content);
+      if (!parsed?.tableHtml) {
+        throw new Error('La IA no devolvió un JSON válido con tableHtml.');
+      }
+
+      state.editor.nutrition = state.editor.nutrition || {};
+      state.editor.nutrition.ai = {
+        tableHtml: String(parsed.tableHtml),
+        frontLabels: Array.isArray(parsed.frontLabels) ? parsed.frontLabels : [],
+        inputHash: getNutritionGenerationHash(),
+        updatedAt: Date.now()
+      };
+      markEditorDirty();
+      renderNutritionAiPreview();
+    } catch (error) {
+      await openIosSwal({ title: 'No se pudo generar', html: `<p>${escapeHtml(error.message || 'Error generando tabla nutricional.')}</p>`, icon: 'error', confirmButtonText: 'Entendido' });
+    } finally {
+      Swal.close();
+    }
+  };
+
+  const getHouseholdMeasureOptionsHtml = (selected = '', amount = 1) => {
+    const selectedNorm = normalizeLower(selected);
+    const qty = Number(String(amount || '1').replace(',', '.'));
+    const singular = Number.isFinite(qty) && qty <= 1;
+    return HOUSEHOLD_MEASURES.map((item) => `<option value="${item.value}" ${selectedNorm === item.value ? 'selected' : ''}>${singular ? item.singular : item.plural}</option>`).join('');
+  };
+
+  const getCategoryOptionsHtml = (selected = '') => {
+    const selectedNorm = normalizeLower(selected);
+    return Object.keys(FOOD_CATEGORIES_AR).map((key) => `<option value="${key}" ${selectedNorm === key ? 'selected' : ''}>${capitalize(key.replaceAll('-', ' '))}</option>`).join('');
+  };
+
+  const getSubcategoryOptionsHtml = (category = '', selected = '') => {
+    const categoryKey = normalizeLower(category);
+    const selectedNorm = normalizeLower(selected);
+    const list = FOOD_CATEGORIES_AR[categoryKey] || [];
+    return list.length
+      ? list.map((item) => {
+        const value = normalizeLower(item);
+        return `<option value="${value}" ${value === selectedNorm ? 'selected' : ''}>${item}</option>`;
+      }).join('')
+      : '<option value="">Seleccioná una categoría primero</option>';
+  };
+
+  const renderNutritionSubcategories = (selected = '') => {
+    const categorySelect = recipeEditorForm.querySelector('#recipeNutritionCategory');
+    const subcategorySelect = recipeEditorForm.querySelector('#recipeNutritionSubcategory');
+    if (!categorySelect || !subcategorySelect) return;
+    const nextValue = normalizeLower(selected || state.editor?.nutrition?.subcategory || '');
+    subcategorySelect.innerHTML = getSubcategoryOptionsHtml(categorySelect.value, nextValue);
+    if (nextValue) {
+      subcategorySelect.value = nextValue;
+    }
+  };
+
+  const renderHouseholdMeasureOptions = () => {
+    const measureSelect = recipeEditorForm.querySelector('#recipeNutritionHouseholdMeasure');
+    const amountInput = recipeEditorForm.querySelector('#recipeNutritionHouseholdAmount');
+    if (!measureSelect || !amountInput) return;
+    const currentValue = normalizeLower(measureSelect.value || state.editor?.nutrition?.householdMeasure || 'unidad');
+    const amount = amountInput.value || '1';
+    measureSelect.innerHTML = getHouseholdMeasureOptionsHtml(currentValue, amount);
+    measureSelect.value = currentValue;
+  };
+
+  const sortRowsByOrderMode = (rows, orderMode) => {
+    const mode = normalizeLower(orderMode);
+    if (mode === 'custom') {
+      const nonMonography = rows.filter((row) => row.type !== MONOGRAPHY_ROW_TYPE);
+      const monography = rows.filter((row) => row.type === MONOGRAPHY_ROW_TYPE);
+      return [...nonMonography, ...monography];
+    }
+
+    const ingredients = rows.filter((row) => row.type === 'ingredient').map((row, index) => {
+      const dimension = getUnitDimension(row.unit);
+      const comparable = toComparableQuantity(row.quantity, row.unit);
+      return { row, index, dimension, comparable, hasNumeric: Number.isFinite(comparable) };
+    });
+
+    const comments = rows.filter((row) => row.type === 'comment');
+    const monography = rows.filter((row) => row.type === MONOGRAPHY_ROW_TYPE);
+
+    const dimensionRank = { mass: 0, volume: 1, other: 2 };
+    const direction = mode === 'asc' ? 1 : -1;
+
+    ingredients.sort((a, b) => {
+      const dimDiff = (dimensionRank[a.dimension] ?? 9) - (dimensionRank[b.dimension] ?? 9);
+      if (dimDiff !== 0) return dimDiff;
+      if (a.hasNumeric && b.hasNumeric && a.comparable !== b.comparable) {
+        return (a.comparable - b.comparable) * direction;
+      }
+      if (a.hasNumeric !== b.hasNumeric) {
+        return a.hasNumeric ? -1 : 1;
+      }
+      return a.index - b.index;
+    });
+
+    return [...ingredients.map((item) => item.row), ...comments, ...monography];
+  };
+
   const clearSuggestions = () => {
     document.querySelectorAll('.recipe-suggest-floating').forEach((node) => node.remove());
     state.editor && (state.editor.activeSuggestRowId = '');
@@ -709,10 +1002,17 @@
   const bindEditorEvents = () => {
     if (!state.editorEventsBound) {
       recipeEditorForm.addEventListener('click', async (event) => {
+        const generateNutritionBtn = event.target.closest('#generateNutritionAiBtn');
+        if (generateNutritionBtn) {
+          await generateNutritionTableWithIA();
+          return;
+        }
+
         const addIngredientBtn = event.target.closest('[data-add-ingredient-row]');
         if (addIngredientBtn) {
           pushRowBeforeMonography({ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: getMeasureOptions()[0]?.value || '' });
           markEditorDirty();
+          markNutritionAiAsStaleIfNeeded();
           renderRows();
           return;
         }
@@ -720,6 +1020,7 @@
         if (addCommentBtn) {
           pushRowBeforeMonography({ id: makeId('row'), type: 'comment', comment: '' });
           markEditorDirty();
+          markNutritionAiAsStaleIfNeeded();
           renderRows();
           return;
         }
@@ -757,6 +1058,7 @@
           state.editor.rows = state.editor.rows.filter((row) => row.id !== removeBtn.dataset.removeRow);
           ensureIngredientRow();
           markEditorDirty();
+          markNutritionAiAsStaleIfNeeded();
           renderRows();
           clearSuggestions();
         }
@@ -770,6 +1072,7 @@
           row.ingredientName = input.value;
           row.ingredientId = '';
           markEditorDirty();
+          markNutritionAiAsStaleIfNeeded();
           showSuggestions(input, row.id, input.value);
           return;
         }
@@ -778,6 +1081,7 @@
           if (row) {
             row.quantity = input.value;
             markEditorDirty();
+            markNutritionAiAsStaleIfNeeded();
           }
           return;
         }
@@ -829,6 +1133,7 @@
             if (res.isConfirmed && res.value) {
               row.unit = await persistNewMeasure(res.value.name, res.value.abbr);
               markEditorDirty();
+              markNutritionAiAsStaleIfNeeded();
               renderRows();
               const yieldSelect = recipeEditorForm.querySelector('#recipeYieldUnit');
               if (yieldSelect) {
@@ -842,6 +1147,7 @@
           }
           row.unit = select.value;
           markEditorDirty();
+          markNutritionAiAsStaleIfNeeded();
           return;
         }
         if (select.id === 'recipeYieldUnit' && select.value === NEW_MEASURE_VALUE) {
@@ -882,30 +1188,35 @@
           state.editor.nutrition.subcategory = '';
           renderNutritionSubcategories('');
           markEditorDirty();
+          markNutritionAiAsStaleIfNeeded();
           return;
         }
         if (select.id === 'recipeNutritionSubcategory') {
           state.editor.nutrition = state.editor.nutrition || {};
           state.editor.nutrition.subcategory = normalizeLower(select.value);
           markEditorDirty();
+          markNutritionAiAsStaleIfNeeded();
           return;
         }
         if (select.id === 'recipeNutritionProductType') {
           state.editor.nutrition = state.editor.nutrition || {};
           state.editor.nutrition.productType = normalizeLower(select.value);
           markEditorDirty();
+          markNutritionAiAsStaleIfNeeded();
           return;
         }
         if (select.id === 'recipeNutritionDeclarationUnit') {
           state.editor.nutrition = state.editor.nutrition || {};
           state.editor.nutrition.declarationUnit = normalizeLower(select.value);
           markEditorDirty();
+          markNutritionAiAsStaleIfNeeded();
           return;
         }
         if (select.id === 'recipeNutritionHouseholdMeasure') {
           state.editor.nutrition = state.editor.nutrition || {};
           state.editor.nutrition.householdMeasure = normalizeLower(select.value);
           markEditorDirty();
+          markNutritionAiAsStaleIfNeeded();
         }
       });
 
@@ -917,15 +1228,31 @@
         if (input.id === 'recipeAgingDays') {
           state.editor.agingDays = normalizeValue(input.value);
           markEditorDirty();
+          markNutritionAiAsStaleIfNeeded();
           return;
         }
         if (input.id === 'recipeNutritionDeclarationAmount') {
           state.editor.nutrition.declarationAmount = normalizeValue(input.value);
           markEditorDirty();
+          markNutritionAiAsStaleIfNeeded();
           return;
         }
         if (input.id === 'recipeNutritionHouseholdAmount') {
           state.editor.nutrition.householdAmount = normalizeValue(input.value);
+          renderHouseholdMeasureOptions();
+          markEditorDirty();
+          markNutritionAiAsStaleIfNeeded();
+          return;
+        }
+        if (input.id === 'recipeTitle' || input.id === 'recipeDescription') {
+          markEditorDirty();
+          markNutritionAiAsStaleIfNeeded();
+          return;
+        }
+        if (input.id === 'recipeNutritionServingsPerPackage') {
+          state.editor.nutrition.servingsPerPackage = normalizeValue(input.value);
+          markEditorDirty();
+          markNutritionAiAsStaleIfNeeded();
           return;
         }
       });
@@ -947,6 +1274,7 @@
             row.ingredientName = ingredient.name;
             row.unit = getPreferredUnitForIngredient(ingredient);
             markEditorDirty();
+            markNutritionAiAsStaleIfNeeded();
             renderRows();
             clearSuggestions();
           }
@@ -982,6 +1310,7 @@
               target.ingredientName = state.ingredientes[ingredientId].name;
               target.unit = getPreferredUnitForIngredient(state.ingredientes[ingredientId]);
               markEditorDirty();
+              markNutritionAiAsStaleIfNeeded();
             } else {
               pushRowBeforeMonography({
                 id: makeId('row'),
@@ -993,6 +1322,7 @@
               });
               markEditorDirty();
             }
+            markNutritionAiAsStaleIfNeeded();
             renderRows();
           }
           return;
@@ -1063,8 +1393,10 @@
         subcategory: normalizeLower(initial?.nutrition?.subcategory || ''),
         declarationUnit: normalizeLower(initial?.nutrition?.declarationUnit || 'g'),
         declarationAmount: normalizeValue(initial?.nutrition?.declarationAmount || ''),
+        servingsPerPackage: normalizeValue(initial?.nutrition?.servingsPerPackage || ''),
         householdMeasure: normalizeLower(initial?.nutrition?.householdMeasure || 'unidad'),
-        householdAmount: normalizeValue(initial?.nutrition?.householdAmount || '1')
+        householdAmount: normalizeValue(initial?.nutrition?.householdAmount || '1'),
+        ai: safeObject(initial?.nutrition?.ai)
       }
     };
     state.editor.nutrition = {
@@ -1073,8 +1405,10 @@
       subcategory: normalizeLower(state.editor.nutrition?.subcategory || ''),
       declarationUnit: normalizeLower(state.editor.nutrition?.declarationUnit || 'g'),
       declarationAmount: normalizeValue(state.editor.nutrition?.declarationAmount || ''),
+      servingsPerPackage: normalizeValue(state.editor.nutrition?.servingsPerPackage || ''),
       householdMeasure: normalizeLower(state.editor.nutrition?.householdMeasure || 'unidad'),
-      householdAmount: normalizeValue(state.editor.nutrition?.householdAmount || '1')
+      householdAmount: normalizeValue(state.editor.nutrition?.householdAmount || '1'),
+      ai: safeObject(state.editor.nutrition?.ai)
     };
     state.editor.agingDays = normalizeValue(state.editor.agingDays);
     ensureMonographyAtEnd();
@@ -1171,12 +1505,26 @@
               <input id="recipeNutritionDeclarationAmount" type="number" min="0" step="0.01" class="form-control ios-input" value="${state.editor.nutrition.declarationAmount || ''}" placeholder="Cantidad">
             </div>
           </div>
+          <div class="recipe-field recipe-field-half recipe-highlight-field recipe-highlight-field-nutrition">
+            <label class="form-label" for="recipeNutritionServingsPerPackage">Porciones por envase</label>
+            <input id="recipeNutritionServingsPerPackage" type="number" min="0" step="0.01" class="form-control ios-input" value="${state.editor.nutrition.servingsPerPackage || ''}" placeholder="Ej: 3">
+          </div>
           <div class="recipe-field recipe-field-full recipe-highlight-field recipe-highlight-field-nutrition">
             <label class="form-label" for="recipeNutritionHouseholdMeasure">Medida casera</label>
             <div class="recipe-nutrition-household-grid">
               <input id="recipeNutritionHouseholdAmount" type="number" min="0" step="0.01" class="form-control ios-input" value="${state.editor.nutrition.householdAmount || '1'}" placeholder="Ej: 0,5">
               <select id="recipeNutritionHouseholdMeasure" class="form-select ios-input">${getHouseholdMeasureOptionsHtml(state.editor.nutrition.householdMeasure, state.editor.nutrition.householdAmount || 1)}</select>
             </div>
+          </div>
+          <div class="recipe-field recipe-field-full recipe-highlight-field recipe-highlight-field-nutrition">
+            <div class="recipe-nutrition-ai-actions">
+              <button id="generateNutritionAiBtn" type="button" class="btn ios-btn ios-btn-secondary recipe-nutrition-ai-btn" disabled>
+                <img src="${IA_ICON_SRC}" alt="" aria-hidden="true">
+                <span class="js-generate-label">Generar tabla nutricional con IA</span>
+              </button>
+              <span id="recipeNutritionAiStale" class="recipe-nutrition-ai-stale d-none">⚠️ Cambiaron datos: rehacé la tabla nutricional.</span>
+            </div>
+            <div id="recipeNutritionAiPreview" class="recipe-nutrition-ai-preview"></div>
           </div>
         </div>
       </section>
@@ -1188,6 +1536,7 @@
     wireImageStep('recipeImage', state.editor.image);
     renderNutritionSubcategories(state.editor.nutrition.subcategory);
     renderHouseholdMeasureOptions();
+    renderNutritionAiPreview();
     bindEditorEvents();
     setView('editor');
   };
@@ -1239,8 +1588,10 @@
       subcategory: normalizeLower(recipeEditorForm.querySelector('#recipeNutritionSubcategory')?.value),
       declarationUnit: normalizeLower(recipeEditorForm.querySelector('#recipeNutritionDeclarationUnit')?.value),
       declarationAmount: normalizeValue(recipeEditorForm.querySelector('#recipeNutritionDeclarationAmount')?.value),
+      servingsPerPackage: normalizeValue(recipeEditorForm.querySelector('#recipeNutritionServingsPerPackage')?.value),
       householdMeasure: normalizeLower(recipeEditorForm.querySelector('#recipeNutritionHouseholdMeasure')?.value),
-      householdAmount: normalizeValue(recipeEditorForm.querySelector('#recipeNutritionHouseholdAmount')?.value)
+      householdAmount: normalizeValue(recipeEditorForm.querySelector('#recipeNutritionHouseholdAmount')?.value),
+      ai: safeObject(state.editor?.nutrition?.ai)
     };
 
     let imageUrl = normalizeValue(state.editor.image.url || '');
