@@ -41,6 +41,39 @@
   const makeId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const NEW_MEASURE_VALUE = '__new_measure__';
 
+  const MONOGRAPHY_ROW_TYPE = 'monography';
+  const FOOD_CATEGORIES_AR = {
+    'carnes-y-derivados': ['Carnes frescas', 'Chacinados embutidos', 'Fiambres y cocidos', 'Menudencias y vísceras'],
+    lacteos: ['Leche fluida', 'Leche en polvo', 'Quesos', 'Yogures y fermentados'],
+    panificados: ['Panificados', 'Pastas frescas', 'Galletitas y crackers'],
+    conservas: ['Conservas vegetales', 'Conservas cárnicas', 'Semiconservas'],
+    bebidas: ['Sin alcohol', 'Con alcohol', 'Infusiones'],
+    'aditivos-e-ingredientes': ['Condimentos', 'Aditivos', 'Premezclas', 'Ingredientes funcionales']
+  };
+  const PRODUCT_TYPES = [
+    { value: 'solido', label: 'Sólido' },
+    { value: 'liquido', label: 'Líquido' },
+    { value: 'semisolido', label: 'Semisólido' },
+    { value: 'polvo', label: 'Polvo' },
+    { value: 'concentrado', label: 'Concentrado' }
+  ];
+  const DECLARATION_UNITS = [
+    { value: 'g', label: 'g' },
+    { value: 'ml', label: 'ml' },
+    { value: 'unidad', label: 'unidad' }
+  ];
+  const HOUSEHOLD_MEASURES = [
+    { value: 'unidad', singular: 'unidad', plural: 'unidades' },
+    { value: 'taza', singular: 'taza', plural: 'tazas' },
+    { value: 'vaso', singular: 'vaso', plural: 'vasos' },
+    { value: 'cucharada', singular: 'cucharada', plural: 'cucharadas' },
+    { value: 'cucharadita', singular: 'cucharadita', plural: 'cucharaditas' },
+    { value: 'feta', singular: 'feta', plural: 'fetas' },
+    { value: 'rodaja', singular: 'rodaja', plural: 'rodajas' },
+    { value: 'pote', singular: 'pote', plural: 'potes' },
+    { value: 'paquete', singular: 'paquete', plural: 'paquetes' }
+  ];
+
   const blurActiveElement = () => document.activeElement?.blur?.();
   const openIosSwal = (options) => {
     blurActiveElement();
@@ -103,7 +136,21 @@
 
   const getMeasureSelectOptionsHtml = (selected = '') => {
     const opts = getMeasureOptions();
-    return `${opts.map((item) => `<option value="${item.value}" ${normalizeLower(selected) === item.value ? 'selected' : ''}>${item.label}</option>`).join('')}<option value="${NEW_MEASURE_VALUE}">+ Agregar nueva medida</option>`;
+    const selectedNorm = normalizeLower(selected);
+    const hasSelectedInOptions = selectedNorm && opts.some((item) => item.value === selectedNorm);
+    const selectedFallbackOption = selectedNorm && !hasSelectedInOptions
+      ? `<option value="${selectedNorm}" selected>${capitalize(selectedNorm)}</option>`
+      : '';
+    return `${selectedFallbackOption}${opts.map((item) => `<option value="${item.value}" ${selectedNorm === item.value ? 'selected' : ''}>${item.label}</option>`).join('')}<option value="${NEW_MEASURE_VALUE}">+ Agregar nueva medida</option>`;
+  };
+
+  const getPreferredUnitForIngredient = (ingredient) => {
+    const ingredientMeasure = normalizeLower(ingredient?.measure);
+    if (ingredientMeasure) {
+      return ingredientMeasure;
+    }
+    const available = getMeasureOptions().map((item) => item.value);
+    return available[0] || '';
   };
 
   const persistNewMeasure = async (name, abbr) => {
@@ -361,15 +408,176 @@
   };
 
   const getIngredientRows = () => state.editor.rows.filter((row) => row.type === 'ingredient');
+
+  const getUnitDimension = (unit) => {
+    const value = normalizeLower(unit);
+    if (['kg', 'kilo', 'kilos', 'kilogramo', 'kilogramos', 'g', 'gr', 'gramo', 'gramos', 'mg', 'miligramo', 'miligramos'].includes(value)) return 'mass';
+    if (['l', 'lt', 'litro', 'litros', 'ml', 'mililitro', 'mililitros', 'cc'].includes(value)) return 'volume';
+    return 'other';
+  };
+
+  const toComparableQuantity = (quantityRaw, unitRaw) => {
+    const quantity = Number(String(quantityRaw || '').replace(',', '.'));
+    if (!Number.isFinite(quantity)) return Number.NaN;
+    const unit = normalizeLower(unitRaw);
+    const map = {
+      kg: 1000,
+      kilo: 1000,
+      kilos: 1000,
+      kilogramo: 1000,
+      kilogramos: 1000,
+      g: 1,
+      gr: 1,
+      gramo: 1,
+      gramos: 1,
+      mg: 0.001,
+      miligramo: 0.001,
+      miligramos: 0.001,
+      l: 1000,
+      lt: 1000,
+      litro: 1000,
+      litros: 1000,
+      ml: 1,
+      mililitro: 1,
+      mililitros: 1,
+      cc: 1
+    };
+    const factor = map[unit] ?? 1;
+    return quantity * factor;
+  };
+
+  const ensureMonographyAtEnd = () => {
+    if (!state.editor?.rows?.length) return;
+    const monoRows = state.editor.rows.filter((row) => row.type === MONOGRAPHY_ROW_TYPE);
+    const withoutMono = state.editor.rows.filter((row) => row.type !== MONOGRAPHY_ROW_TYPE);
+    if (!monoRows.length) {
+      state.editor.rows = withoutMono;
+      return;
+    }
+    const kept = monoRows[monoRows.length - 1];
+    state.editor.rows = [...withoutMono, kept];
+  };
+
+  const pushRowBeforeMonography = (row) => {
+    const index = state.editor.rows.findIndex((item) => item.type === MONOGRAPHY_ROW_TYPE);
+    if (index === -1) {
+      state.editor.rows.push(row);
+      return;
+    }
+    state.editor.rows.splice(index, 0, row);
+  };
+
   const ensureIngredientRow = () => {
     if (!getIngredientRows().length) {
-      state.editor.rows.push({ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: getMeasureOptions()[0]?.value || '' });
+      pushRowBeforeMonography({ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: getMeasureOptions()[0]?.value || '' });
     }
+  };
+
+  const getHouseholdMeasureOptionsHtml = (selected = '', amount = 1) => {
+    const selectedNorm = normalizeLower(selected);
+    const qty = Number(String(amount || '1').replace(',', '.'));
+    const singular = Number.isFinite(qty) && qty <= 1;
+    return HOUSEHOLD_MEASURES.map((item) => `<option value="${item.value}" ${selectedNorm === item.value ? 'selected' : ''}>${singular ? item.singular : item.plural}</option>`).join('');
+  };
+
+  const getCategoryOptionsHtml = (selected = '') => {
+    const selectedNorm = normalizeLower(selected);
+    return Object.keys(FOOD_CATEGORIES_AR).map((key) => `<option value="${key}" ${selectedNorm === key ? 'selected' : ''}>${capitalize(key.replaceAll('-', ' '))}</option>`).join('');
+  };
+
+  const getSubcategoryOptionsHtml = (category = '', selected = '') => {
+    const categoryKey = normalizeLower(category);
+    const selectedNorm = normalizeLower(selected);
+    const list = FOOD_CATEGORIES_AR[categoryKey] || [];
+    return list.length
+      ? list.map((item) => {
+        const value = normalizeLower(item);
+        return `<option value="${value}" ${value === selectedNorm ? 'selected' : ''}>${item}</option>`;
+      }).join('')
+      : '<option value="">Seleccioná una categoría primero</option>';
+  };
+
+  const renderNutritionSubcategories = (selected = '') => {
+    const categorySelect = recipeEditorForm.querySelector('#recipeNutritionCategory');
+    const subcategorySelect = recipeEditorForm.querySelector('#recipeNutritionSubcategory');
+    if (!categorySelect || !subcategorySelect) return;
+    const nextValue = normalizeLower(selected || state.editor?.nutrition?.subcategory || '');
+    subcategorySelect.innerHTML = getSubcategoryOptionsHtml(categorySelect.value, nextValue);
+    if (nextValue) {
+      subcategorySelect.value = nextValue;
+    }
+  };
+
+  const renderHouseholdMeasureOptions = () => {
+    const measureSelect = recipeEditorForm.querySelector('#recipeNutritionHouseholdMeasure');
+    const amountInput = recipeEditorForm.querySelector('#recipeNutritionHouseholdAmount');
+    if (!measureSelect || !amountInput) return;
+    const currentValue = normalizeLower(measureSelect.value || state.editor?.nutrition?.householdMeasure || 'unidad');
+    const amount = amountInput.value || '1';
+    measureSelect.innerHTML = getHouseholdMeasureOptionsHtml(currentValue, amount);
+    measureSelect.value = currentValue;
+  };
+
+  const sortRowsByOrderMode = (rows, orderMode) => {
+    const mode = normalizeLower(orderMode);
+    if (mode === 'custom') {
+      const nonMonography = rows.filter((row) => row.type !== MONOGRAPHY_ROW_TYPE);
+      const monography = rows.filter((row) => row.type === MONOGRAPHY_ROW_TYPE);
+      return [...nonMonography, ...monography];
+    }
+
+    const ingredients = rows.filter((row) => row.type === 'ingredient').map((row, index) => {
+      const dimension = getUnitDimension(row.unit);
+      const comparable = toComparableQuantity(row.quantity, row.unit);
+      return { row, index, dimension, comparable, hasNumeric: Number.isFinite(comparable) };
+    });
+
+    const comments = rows.filter((row) => row.type === 'comment');
+    const monography = rows.filter((row) => row.type === MONOGRAPHY_ROW_TYPE);
+
+    const dimensionRank = { mass: 0, volume: 1, other: 2 };
+    const direction = mode === 'asc' ? 1 : -1;
+
+    ingredients.sort((a, b) => {
+      const dimDiff = (dimensionRank[a.dimension] ?? 9) - (dimensionRank[b.dimension] ?? 9);
+      if (dimDiff !== 0) return dimDiff;
+      if (a.hasNumeric && b.hasNumeric && a.comparable !== b.comparable) {
+        return (a.comparable - b.comparable) * direction;
+      }
+      if (a.hasNumeric !== b.hasNumeric) {
+        return a.hasNumeric ? -1 : 1;
+      }
+      return a.index - b.index;
+    });
+
+    return [...ingredients.map((item) => item.row), ...comments, ...monography];
   };
 
   const clearSuggestions = () => {
     document.querySelectorAll('.recipe-suggest-floating').forEach((node) => node.remove());
     state.editor && (state.editor.activeSuggestRowId = '');
+  };
+
+  const findIngredientInputByRowId = (rowId) => recipeEditorForm.querySelector(`[data-ing-input="${rowId}"]`);
+
+  const positionSuggestionDropdown = (dropdown, input) => {
+    if (!dropdown || !input) return;
+    const inputRect = input.getBoundingClientRect();
+    dropdown.style.position = 'fixed';
+    dropdown.style.top = `${inputRect.bottom + 6}px`;
+    dropdown.style.left = `${inputRect.left}px`;
+    dropdown.style.width = `${Math.max(inputRect.width, 220)}px`;
+  };
+
+  const repositionActiveSuggestions = () => {
+    if (!state.editor?.activeSuggestRowId) return;
+    const dropdown = document.querySelector('.recipe-suggest-floating');
+    const input = findIngredientInputByRowId(state.editor.activeSuggestRowId);
+    if (!dropdown || !input) {
+      clearSuggestions();
+      return;
+    }
+    positionSuggestionDropdown(dropdown, input);
   };
 
   const snapshotEditorDraft = () => {
@@ -409,12 +617,35 @@
     const rowsBody = recipeEditorForm.querySelector('#recipeRowsBody');
     if (!rowsBody || !state.editor) return;
 
+    ensureMonographyAtEnd();
+    if (state.editor.orderMode !== 'custom') {
+      state.editor.rows = sortRowsByOrderMode(state.editor.rows, state.editor.orderMode);
+    }
+
     rowsBody.innerHTML = state.editor.rows.map((row) => {
       if (row.type === 'comment') {
         return `
           <tr class="is-comment" data-row-id="${row.id}" draggable="${state.editor.orderMode === 'custom'}">
             <td><i class="fa-solid fa-grip-lines"></i></td>
             <td colspan="3"><input class="form-control ios-input" data-comment-input="${row.id}" value="${row.comment || ''}" placeholder="Comentario visual (no afecta receta)"></td>
+            <td><button type="button" class="btn family-manage-btn" data-remove-row="${row.id}"><i class="fa-solid fa-trash"></i></button></td>
+          </tr>`;
+      }
+      if (row.type === MONOGRAPHY_ROW_TYPE) {
+        return `
+          <tr class="is-monography" data-row-id="${row.id}" draggable="false">
+            <td><i class="fa-solid fa-scroll"></i></td>
+            <td colspan="3">
+              <div class="editor-toolbar report-edit-toolbar recipe-monography-toolbar" role="toolbar" aria-label="Herramientas de monografía">
+                <button type="button" class="editor-btn" data-mono-cmd="bold" data-mono-row="${row.id}"><i class="fa-solid fa-bold"></i></button>
+                <button type="button" class="editor-btn" data-mono-cmd="italic" data-mono-row="${row.id}"><i class="fa-solid fa-italic"></i></button>
+                <button type="button" class="editor-btn" data-mono-cmd="underline" data-mono-row="${row.id}"><i class="fa-solid fa-underline"></i></button>
+                <button type="button" class="editor-btn" data-mono-cmd="insertUnorderedList" data-mono-row="${row.id}"><i class="fa-solid fa-list-ul"></i></button>
+                <button type="button" class="editor-btn" data-mono-cmd="justifyLeft" data-mono-row="${row.id}"><i class="fa-solid fa-align-left"></i></button>
+                <button type="button" class="editor-btn" data-mono-cmd="justifyCenter" data-mono-row="${row.id}"><i class="fa-solid fa-align-center"></i></button>
+              </div>
+              <div class="recipe-monography-editor informe-editor" data-monography-input="${row.id}" contenteditable="true" data-placeholder="Proceso de fabricación / monografía">${row.html || ''}</div>
+            </td>
             <td><button type="button" class="btn family-manage-btn" data-remove-row="${row.id}"><i class="fa-solid fa-trash"></i></button></td>
           </tr>`;
       }
@@ -453,17 +684,9 @@
         <i class="fa-solid fa-plus"></i><span>Crear ingrediente</span>
       </button>`;
 
-    const autoWrap = input.closest('.recipe-ing-autocomplete');
-    if (autoWrap) {
-      autoWrap.appendChild(dropdown);
-    } else {
-      recetasEditor.appendChild(dropdown);
-      const inputRect = input.getBoundingClientRect();
-      const containerRect = recetasEditor.getBoundingClientRect();
-      dropdown.style.top = `${inputRect.bottom - containerRect.top + 6}px`;
-      dropdown.style.left = `${inputRect.left - containerRect.left}px`;
-      dropdown.style.width = `${inputRect.width}px`;
-    }
+    document.body.appendChild(dropdown);
+    positionSuggestionDropdown(dropdown, input);
+    state.editor.activeSuggestRowId = rowId;
 
     dropdown.querySelectorAll('.js-recipe-suggest-thumb').forEach((image) => {
       const wrapper = image.closest('.recipe-suggest-avatar-wrap');
@@ -489,18 +712,47 @@
       recipeEditorForm.addEventListener('click', async (event) => {
         const addIngredientBtn = event.target.closest('[data-add-ingredient-row]');
         if (addIngredientBtn) {
-          state.editor.rows.push({ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: getMeasureOptions()[0]?.value || '' });
+          pushRowBeforeMonography({ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: getMeasureOptions()[0]?.value || '' });
           markEditorDirty();
           renderRows();
           return;
         }
         const addCommentBtn = event.target.closest('[data-add-comment-row]');
         if (addCommentBtn) {
-          state.editor.rows.push({ id: makeId('row'), type: 'comment', comment: '' });
+          pushRowBeforeMonography({ id: makeId('row'), type: 'comment', comment: '' });
           markEditorDirty();
           renderRows();
           return;
         }
+        const addMonographyBtn = event.target.closest('[data-add-monography-row]');
+        if (addMonographyBtn) {
+          const existing = state.editor.rows.find((row) => row.type === MONOGRAPHY_ROW_TYPE);
+          if (existing) {
+            const editor = recipeEditorForm.querySelector(`[data-monography-input="${existing.id}"]`);
+            editor?.focus();
+          } else {
+            state.editor.rows.push({ id: makeId('row'), type: MONOGRAPHY_ROW_TYPE, html: '' });
+            markEditorDirty();
+            renderRows();
+            const editor = recipeEditorForm.querySelector('[data-monography-input]');
+            editor?.focus();
+          }
+          return;
+        }
+        const monoCmdBtn = event.target.closest('[data-mono-cmd]');
+        if (monoCmdBtn) {
+          const rowId = monoCmdBtn.dataset.monoRow;
+          const editor = recipeEditorForm.querySelector(`[data-monography-input="${rowId}"]`);
+          editor?.focus();
+          document.execCommand(monoCmdBtn.dataset.monoCmd, false, null);
+          const row = state.editor.rows.find((item) => item.id === rowId);
+          if (row) {
+            row.html = normalizeValue(editor?.innerHTML || '');
+            markEditorDirty();
+          }
+          return;
+        }
+
         const removeBtn = event.target.closest('[data-remove-row]');
         if (removeBtn) {
           state.editor.rows = state.editor.rows.filter((row) => row.id !== removeBtn.dataset.removeRow);
@@ -536,6 +788,20 @@
             row.comment = input.value;
             markEditorDirty();
           }
+          return;
+        }
+        if (input.matches('[data-monography-input]')) {
+          const row = state.editor.rows.find((item) => item.id === input.dataset.monographyInput);
+          if (row) {
+            row.html = normalizeValue(input.innerHTML);
+            markEditorDirty();
+          }
+          return;
+        }
+        if (input.id === 'recipeNutritionHouseholdAmount') {
+          renderHouseholdMeasureOptions();
+          markEditorDirty();
+          return;
         }
       });
 
@@ -609,6 +875,59 @@
           state.editor.orderMode = normalizeLower(select.value);
           markEditorDirty();
           renderRows();
+          return;
+        }
+        if (select.id === 'recipeNutritionCategory') {
+          state.editor.nutrition = state.editor.nutrition || {};
+          state.editor.nutrition.category = normalizeLower(select.value);
+          state.editor.nutrition.subcategory = '';
+          renderNutritionSubcategories('');
+          markEditorDirty();
+          return;
+        }
+        if (select.id === 'recipeNutritionSubcategory') {
+          state.editor.nutrition = state.editor.nutrition || {};
+          state.editor.nutrition.subcategory = normalizeLower(select.value);
+          markEditorDirty();
+          return;
+        }
+        if (select.id === 'recipeNutritionProductType') {
+          state.editor.nutrition = state.editor.nutrition || {};
+          state.editor.nutrition.productType = normalizeLower(select.value);
+          markEditorDirty();
+          return;
+        }
+        if (select.id === 'recipeNutritionDeclarationUnit') {
+          state.editor.nutrition = state.editor.nutrition || {};
+          state.editor.nutrition.declarationUnit = normalizeLower(select.value);
+          markEditorDirty();
+          return;
+        }
+        if (select.id === 'recipeNutritionHouseholdMeasure') {
+          state.editor.nutrition = state.editor.nutrition || {};
+          state.editor.nutrition.householdMeasure = normalizeLower(select.value);
+          markEditorDirty();
+        }
+      });
+
+
+      recipeEditorForm.addEventListener('input', (event) => {
+        const input = event.target;
+        if (!state.editor) return;
+        state.editor.nutrition = state.editor.nutrition || {};
+        if (input.id === 'recipeAgingDays') {
+          state.editor.agingDays = normalizeValue(input.value);
+          markEditorDirty();
+          return;
+        }
+        if (input.id === 'recipeNutritionDeclarationAmount') {
+          state.editor.nutrition.declarationAmount = normalizeValue(input.value);
+          markEditorDirty();
+          return;
+        }
+        if (input.id === 'recipeNutritionHouseholdAmount') {
+          state.editor.nutrition.householdAmount = normalizeValue(input.value);
+          return;
         }
       });
 
@@ -617,7 +936,9 @@
         if (input.matches('[data-ing-input]')) showSuggestions(input, input.dataset.ingInput, input.value);
       });
 
-      recetasEditor.addEventListener('click', async (event) => {
+      document.addEventListener('click', async (event) => {
+        if (recetasEditor.classList.contains('d-none')) return;
+
         const pickBtn = event.target.closest('[data-pick-ingredient]');
         if (pickBtn) {
           const row = state.editor?.rows.find((item) => item.id === pickBtn.dataset.pickIngredient);
@@ -625,12 +946,14 @@
           if (row && ingredient) {
             row.ingredientId = ingredient.id;
             row.ingredientName = ingredient.name;
+            row.unit = getPreferredUnitForIngredient(ingredient);
             markEditorDirty();
             renderRows();
             clearSuggestions();
           }
           return;
         }
+
         const createInlineBtn = event.target.closest('[data-create-ingredient-inline]');
         if (createInlineBtn) {
           const rowId = createInlineBtn.dataset.createIngredientInline;
@@ -658,13 +981,22 @@
             if (target) {
               target.ingredientId = ingredientId;
               target.ingredientName = state.ingredientes[ingredientId].name;
+              target.unit = getPreferredUnitForIngredient(state.ingredientes[ingredientId]);
               markEditorDirty();
             } else {
-              state.editor.rows.push({ id: makeId('row'), type: 'ingredient', ingredientId, ingredientName: state.ingredientes[ingredientId].name, quantity: '', unit: getMeasureOptions()[0]?.value || '' });
+              pushRowBeforeMonography({
+                id: makeId('row'),
+                type: 'ingredient',
+                ingredientId,
+                ingredientName: state.ingredientes[ingredientId].name,
+                quantity: '',
+                unit: getPreferredUnitForIngredient(state.ingredientes[ingredientId])
+              });
               markEditorDirty();
             }
             renderRows();
           }
+          return;
         }
       });
 
@@ -673,6 +1005,11 @@
           clearSuggestions();
         }
       });
+
+      const modalBody = recetasModal.querySelector('.modal-body');
+      modalBody?.addEventListener('scroll', repositionActiveSuggestions);
+      window.addEventListener('resize', repositionActiveSuggestions);
+      window.addEventListener('scroll', repositionActiveSuggestions, true);
 
       state.editorEventsBound = true;
     }
@@ -692,20 +1029,21 @@
     });
     rowsBody.addEventListener('dragover', (event) => {
       const rowEl = event.target.closest('tr[data-row-id]');
-      if (!rowEl || state.editor.orderMode !== 'custom') return;
+      if (!rowEl || state.editor.orderMode !== 'custom' || rowEl.classList.contains('is-monography')) return;
       event.preventDefault();
       rowsBody.querySelectorAll('.drag-over').forEach((node) => node.classList.remove('drag-over'));
       rowEl.classList.add('drag-over');
     });
     rowsBody.addEventListener('drop', (event) => {
       const rowEl = event.target.closest('tr[data-row-id]');
-      if (!rowEl || !draggingId || state.editor.orderMode !== 'custom') return;
+      if (!rowEl || !draggingId || state.editor.orderMode !== 'custom' || rowEl.classList.contains('is-monography')) return;
       event.preventDefault();
       const from = state.editor.rows.findIndex((row) => row.id === draggingId);
       const to = state.editor.rows.findIndex((row) => row.id === rowEl.dataset.rowId);
       if (from < 0 || to < 0) return;
       const [moved] = state.editor.rows.splice(from, 1);
       state.editor.rows.splice(to, 0, moved);
+      ensureMonographyAtEnd();
       renderRows();
     });
   };
@@ -718,8 +1056,29 @@
       rows: Array.isArray(initial?.rows) && initial.rows.length
         ? initial.rows.map((row) => ({ ...row, id: row.id || makeId('row') }))
         : [{ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: getMeasureOptions()[0]?.value || '' }],
-      orderMode: initial?.orderMode || 'desc'
+      orderMode: initial?.orderMode || 'desc',
+      agingDays: normalizeValue(initial?.agingDays),
+      nutrition: {
+        productType: normalizeLower(initial?.nutrition?.productType || ''),
+        category: normalizeLower(initial?.nutrition?.category || ''),
+        subcategory: normalizeLower(initial?.nutrition?.subcategory || ''),
+        declarationUnit: normalizeLower(initial?.nutrition?.declarationUnit || 'g'),
+        declarationAmount: normalizeValue(initial?.nutrition?.declarationAmount || ''),
+        householdMeasure: normalizeLower(initial?.nutrition?.householdMeasure || 'unidad'),
+        householdAmount: normalizeValue(initial?.nutrition?.householdAmount || '1')
+      }
     };
+    state.editor.nutrition = {
+      productType: normalizeLower(state.editor.nutrition?.productType || ''),
+      category: normalizeLower(state.editor.nutrition?.category || ''),
+      subcategory: normalizeLower(state.editor.nutrition?.subcategory || ''),
+      declarationUnit: normalizeLower(state.editor.nutrition?.declarationUnit || 'g'),
+      declarationAmount: normalizeValue(state.editor.nutrition?.declarationAmount || ''),
+      householdMeasure: normalizeLower(state.editor.nutrition?.householdMeasure || 'unidad'),
+      householdAmount: normalizeValue(state.editor.nutrition?.householdAmount || '1')
+    };
+    state.editor.agingDays = normalizeValue(state.editor.agingDays);
+    ensureMonographyAtEnd();
     state.editorDirty = false;
 
     recipeEditorTitle.textContent = initial ? 'Editar receta' : 'Nueva receta';
@@ -750,6 +1109,10 @@
             <input id="recipeShelfLifeDays" type="number" min="1" step="1" class="form-control ios-input" value="${initial?.shelfLifeDays || ''}" placeholder="Ej: 3">
           </div>
           <div class="recipe-field recipe-field-half recipe-highlight-field">
+            <label class="form-label" for="recipeAgingDays"><i class="fa-solid fa-hourglass-half"></i> Días de estacionado</label>
+            <input id="recipeAgingDays" type="number" min="0" step="1" class="form-control ios-input" value="${state.editor.agingDays || ''}" placeholder="Ej: 15">
+          </div>
+          <div class="recipe-field recipe-field-half recipe-highlight-field">
             <label class="form-label" for="recipeOrderModeEditor"><i class="fa-solid fa-arrow-down-short-wide"></i> Orden de ingredientes</label>
             <select id="recipeOrderModeEditor" class="form-select ios-input">
               <option value="desc" ${state.editor.orderMode === 'desc' ? 'selected' : ''}>De mayor a menor</option>
@@ -774,6 +1137,47 @@
           <div class="recipe-table-actions">
             <button type="button" class="btn recipe-table-action-btn recipe-table-action-btn-primary" data-add-ingredient-row><i class="fa-solid fa-plus"></i><span>Agregar fila</span></button>
             <button type="button" class="btn recipe-table-action-btn recipe-table-action-btn-neutral" data-add-comment-row><i class="fa-regular fa-message"></i><span>Comentario</span></button>
+            <button type="button" class="btn recipe-table-action-btn recipe-table-action-btn-monography" data-add-monography-row><i class="fa-solid fa-scroll"></i><span>Monografía</span></button>
+          </div>
+        </div>
+      </section>
+
+      <section class="step-block recipe-step-card recipe-nutrition-step">
+        <h6 class="step-title"><span class="recipe-step-number">4</span> Información nutricional (opcional)</h6>
+        <div class="step-content recipe-fields-flex">
+          <div class="recipe-field recipe-field-half recipe-highlight-field recipe-highlight-field-nutrition">
+            <label class="form-label" for="recipeNutritionProductType">Tipo de producto</label>
+            <select id="recipeNutritionProductType" class="form-select ios-input">
+              <option value="">Seleccionar</option>
+              ${PRODUCT_TYPES.map((item) => `<option value="${item.value}" ${state.editor.nutrition.productType === item.value ? 'selected' : ''}>${item.label}</option>`).join('')}
+            </select>
+          </div>
+          <div class="recipe-field recipe-field-half recipe-highlight-field recipe-highlight-field-nutrition">
+            <label class="form-label" for="recipeNutritionCategory">Categoría de alimento (Argentina)</label>
+            <select id="recipeNutritionCategory" class="form-select ios-input">
+              <option value="">Seleccionar</option>
+              ${getCategoryOptionsHtml(state.editor.nutrition.category)}
+            </select>
+          </div>
+          <div class="recipe-field recipe-field-half recipe-highlight-field recipe-highlight-field-nutrition">
+            <label class="form-label" for="recipeNutritionSubcategory">Subcategoría</label>
+            <select id="recipeNutritionSubcategory" class="form-select ios-input">${getSubcategoryOptionsHtml(state.editor.nutrition.category, state.editor.nutrition.subcategory)}</select>
+          </div>
+          <div class="recipe-field recipe-field-half recipe-highlight-field recipe-highlight-field-nutrition">
+            <label class="form-label" for="recipeNutritionDeclarationUnit">Unidad de declaración</label>
+            <div class="recipe-nutrition-declaration-grid">
+              <select id="recipeNutritionDeclarationUnit" class="form-select ios-input">
+                ${DECLARATION_UNITS.map((item) => `<option value="${item.value}" ${state.editor.nutrition.declarationUnit === item.value ? 'selected' : ''}>${item.label}</option>`).join('')}
+              </select>
+              <input id="recipeNutritionDeclarationAmount" type="number" min="0" step="0.01" class="form-control ios-input" value="${state.editor.nutrition.declarationAmount || ''}" placeholder="Cantidad">
+            </div>
+          </div>
+          <div class="recipe-field recipe-field-full recipe-highlight-field recipe-highlight-field-nutrition">
+            <label class="form-label" for="recipeNutritionHouseholdMeasure">Medida casera</label>
+            <div class="recipe-nutrition-household-grid">
+              <input id="recipeNutritionHouseholdAmount" type="number" min="1" step="1" class="form-control ios-input" value="${state.editor.nutrition.householdAmount || '1'}" placeholder="Cantidad">
+              <select id="recipeNutritionHouseholdMeasure" class="form-select ios-input">${getHouseholdMeasureOptionsHtml(state.editor.nutrition.householdMeasure, state.editor.nutrition.householdAmount || 1)}</select>
+            </div>
           </div>
         </div>
       </section>
@@ -783,6 +1187,8 @@
 
     renderRows();
     wireImageStep('recipeImage', state.editor.image);
+    renderNutritionSubcategories(state.editor.nutrition.subcategory);
+    renderHouseholdMeasureOptions();
     bindEditorEvents();
     setView('editor');
   };
@@ -793,22 +1199,50 @@
     const yieldQuantity = normalizeValue(recipeEditorForm.querySelector('#recipeYieldQty')?.value).replaceAll('.', ',');
     const yieldUnit = normalizeLower(recipeEditorForm.querySelector('#recipeYieldUnit')?.value);
     const shelfLifeDays = Number(normalizeValue(recipeEditorForm.querySelector('#recipeShelfLifeDays')?.value));
+    const agingDaysRaw = normalizeValue(recipeEditorForm.querySelector('#recipeAgingDays')?.value);
+    const agingDays = agingDaysRaw ? Number(agingDaysRaw) : 0;
     const orderMode = normalizeLower(recipeEditorForm.querySelector('#recipeOrderModeEditor')?.value);
 
     if (!title) throw new Error('El título es obligatorio.');
     if (!yieldQuantity) throw new Error('Completá la cantidad obtenida.');
     if (!yieldUnit || yieldUnit === NEW_MEASURE_VALUE) throw new Error('Seleccioná una unidad de medida válida.');
     if (!Number.isFinite(shelfLifeDays) || shelfLifeDays <= 0) throw new Error('Ingresá la caducidad en días con un número mayor a 0.');
+    if (!Number.isFinite(agingDays) || agingDays < 0) throw new Error('Ingresá los días de estacionado con un número válido (0 o mayor).');
 
     const rows = state.editor.rows
-      .map((row) => row.type === 'comment'
-        ? { id: row.id, type: 'comment', comment: normalizeValue(row.comment) }
-        : { id: row.id, type: 'ingredient', ingredientId: normalizeValue(row.ingredientId), ingredientName: normalizeValue(row.ingredientName), quantity: normalizeValue(row.quantity).replaceAll('.', ','), unit: normalizeLower(row.unit) })
-      .filter((row) => row.type === 'comment' ? row.comment : row.ingredientName);
+      .map((row) => {
+        if (row.type === 'comment') {
+          return { id: row.id, type: 'comment', comment: normalizeValue(row.comment) };
+        }
+        if (row.type === MONOGRAPHY_ROW_TYPE) {
+          return { id: row.id, type: MONOGRAPHY_ROW_TYPE, html: normalizeValue(row.html) };
+        }
+        return {
+          id: row.id,
+          type: 'ingredient',
+          ingredientId: normalizeValue(row.ingredientId),
+          ingredientName: normalizeValue(row.ingredientName),
+          quantity: normalizeValue(row.quantity).replaceAll('.', ','),
+          unit: normalizeLower(row.unit)
+        };
+      })
+      .filter((row) => row.type === 'comment' ? row.comment : (row.type === MONOGRAPHY_ROW_TYPE ? row.html : row.ingredientName));
 
     if (!rows.length) throw new Error('Agregá al menos una fila válida en la receta.');
     const invalidIngredientRow = rows.find((row) => row.type === 'ingredient' && (!row.ingredientId || !row.quantity || !row.unit || row.unit === NEW_MEASURE_VALUE));
     if (invalidIngredientRow) throw new Error('Todas las filas de ingredientes deben tener ingrediente, cantidad y medida.');
+
+    const sortedRows = sortRowsByOrderMode(rows, orderMode);
+
+    const nutrition = {
+      productType: normalizeLower(recipeEditorForm.querySelector('#recipeNutritionProductType')?.value),
+      category: normalizeLower(recipeEditorForm.querySelector('#recipeNutritionCategory')?.value),
+      subcategory: normalizeLower(recipeEditorForm.querySelector('#recipeNutritionSubcategory')?.value),
+      declarationUnit: normalizeLower(recipeEditorForm.querySelector('#recipeNutritionDeclarationUnit')?.value),
+      declarationAmount: normalizeValue(recipeEditorForm.querySelector('#recipeNutritionDeclarationAmount')?.value),
+      householdMeasure: normalizeLower(recipeEditorForm.querySelector('#recipeNutritionHouseholdMeasure')?.value),
+      householdAmount: normalizeValue(recipeEditorForm.querySelector('#recipeNutritionHouseholdAmount')?.value)
+    };
 
     let imageUrl = normalizeValue(state.editor.image.url || '');
     const method = normalizeLower(document.getElementById('recipeImage_method')?.value || state.editor.image.method || 'ai');
@@ -826,7 +1260,7 @@
       }
     }
 
-    return { title, description, yieldQuantity, yieldUnit, shelfLifeDays, orderMode, rows, imageUrl };
+    return { title, description, yieldQuantity, yieldUnit, shelfLifeDays, agingDays, orderMode, rows: sortedRows, nutrition, imageUrl };
   };
 
   const removeRecipe = async (recipeId) => {
@@ -867,6 +1301,16 @@
 
   recipeEditorForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
+
+    Swal.fire({
+      title: 'Guardando receta...',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner-login"></div>',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      customClass: { popup: 'ios-alert ingredientes-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' }
+    });
+
     try {
       const payload = await collectEditorPayload();
       const id = state.activeRecipeId || makeId('rec');
@@ -878,7 +1322,11 @@
       renderRecetas();
       setView('list');
     } catch (error) {
+      Swal.close();
       await openIosSwal({ title: 'Revisá los datos', html: `<p>${error.message || 'No se pudo guardar la receta.'}</p>`, icon: 'warning', confirmButtonText: 'Entendido' });
+      return;
+    } finally {
+      Swal.close();
     }
   });
 

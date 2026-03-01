@@ -661,15 +661,15 @@ html.login-protected.auth-ok body {
 .ingredientes-list.has-scroll-hint::after {
   content: '↓ Deslizá para ver más ingredientes';
   position: sticky;
-  bottom: 0;
+  bottom: -10px;
   left: 0;
   right: 0;
   display: block;
   text-align: center;
   font-size: 0.78rem;
   font-weight: 600;
-  color: #516089;
-  background: linear-gradient(to bottom, rgba(242, 245, 252, 0), rgba(242, 245, 252, 1));
+  color: #7048e9;
+  background: linear-gradient(to bottom, rgba(242, 245, 252, 0), rgb(236 231 255));
   padding: 10px 0 4px;
   margin-top: -28px;
   pointer-events: none;
@@ -2085,6 +2085,10 @@ html.login-protected.auth-ok body {
 }
 
 @media (max-width: 768px) {
+  .barra-vertical {
+    display: none;
+  }
+
   .topbar-divider-item {
     display: none;
   }
@@ -2885,7 +2889,7 @@ html.login-protected.auth-ok body {
 .recipe-table-wrap {
   border: 1px solid #cfdcf8;
   border-radius: 14px 14px 0 0;
-  overflow: hidden;
+  overflow: visible;
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
 
@@ -2936,6 +2940,26 @@ html.login-protected.auth-ok body {
   background: #fff5e8;
 }
 
+.recipe-table tbody tr.is-monography {
+  background: #ffeef0;
+}
+
+.recipe-monography-toolbar {
+  margin-bottom: 8px;
+}
+
+.recipe-monography-editor {
+  min-height: 140px;
+  border: 1px solid #f2cfd6;
+  border-radius: 12px;
+  background: #fff8f9;
+}
+
+.recipe-monography-editor:empty::before {
+  content: attr(data-placeholder);
+  color: #9c6a74;
+}
+
 .recipe-table tbody tr.is-dragging {
   opacity: 0.55;
 }
@@ -2983,6 +3007,33 @@ html.login-protected.auth-ok body {
 
 .recipe-table-action-btn-neutral:hover {
   background: #e4ecff;
+}
+
+.recipe-table-action-btn-monography {
+  background: #ffeef0;
+  border-color: #f3ccd3;
+  color: #b3475a;
+}
+
+.recipe-table-action-btn-monography:hover {
+  background: #ffe3e7;
+}
+
+.recipe-nutrition-step {
+  border-color: #e7dcff;
+  background: #fcf9ff;
+}
+
+.recipe-highlight-field-nutrition {
+  border-color: #dfd1ff;
+  background: #f7f1ff;
+}
+
+.recipe-nutrition-declaration-grid,
+.recipe-nutrition-household-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 
 .recipe-image-layout {
@@ -3173,6 +3224,11 @@ html.login-protected.auth-ok body {
 
   .recipe-table-action-btn {
     width: 100%;
+  }
+
+  .recipe-nutrition-declaration-grid,
+  .recipe-nutrition-household-grid {
+    grid-template-columns: 1fr;
   }
 
   .recipe-ing-autocomplete .recipe-suggest-floating {
