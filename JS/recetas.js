@@ -294,10 +294,10 @@
           <div class="ingrediente-main receta-main">
             <h6 class="ingrediente-name receta-name">${capitalize(item.title || 'Sin título')}</h6>
             ${hasNutritionLabel ? '<span class="receta-nutrition-badge"><i class="fa-solid fa-circle-check"></i>Etiquetados disponibles</span>' : ''}
-            <div class="receta-print-actions">
-              <button type="button" class="btn receta-print-btn" data-receta-print-nutrition="${item.id}"><i class="fa-solid fa-print"></i><span>Tabla nutricional</span></button>
-              <button type="button" class="btn receta-print-btn receta-print-btn-front" data-receta-print-front="${item.id}"><i class="fa-solid fa-octagon-exclamation"></i><span>Etiquetado frontal</span></button>
-            </div>
+            ${(hasNutritionLabel || frontLabels.length) ? `<div class="receta-print-actions">
+              ${hasNutritionLabel ? `<button type="button" class="btn receta-print-btn" data-receta-print-nutrition="${item.id}"><i class="fa-solid fa-print"></i><span>Tabla nutricional</span></button>` : ''}
+              ${frontLabels.length ? `<button type="button" class="btn receta-print-btn receta-print-btn-front" data-receta-print-front="${item.id}"><i class="fa-solid fa-octagon-exclamation"></i><span>Etiquetado frontal</span></button>` : ''}
+            </div>` : ''}
             <p class="ingrediente-meta receta-card-meta">Rinde: ${item.yieldQuantity || '0'} ${label || ''}</p>
             <p class="ingrediente-meta receta-card-ingredients">Ingredientes: ${recipeIngredients.length ? recipeIngredients.join(' · ') : 'Sin ingredientes vinculados.'}</p>
             ${item.description ? `<p class="ingrediente-description">${capitalize(item.description)}</p>` : '<p class="ingrediente-description"><em>Sin descripción</em></p>'}
@@ -685,7 +685,7 @@
     return Array.from({ length: copies }, () => `<article class="print-block">${html}</article>`).join('');
   };
 
-  const openPrintWindow = ({ title, paper, mode, contentType, html, copies }) => {
+  const buildPrintDocumentMarkup = ({ title, paper, contentType, html, copies }) => {
     const isA4 = paper === 'a4';
     const isFront = contentType === 'front';
     const repeated = repeatPrintableBlocks(html, isA4 ? 4 : copies);
@@ -693,6 +693,74 @@
     const gridTemplate = isA4
       ? 'grid-template-columns: 1fr 1fr; gap: 10mm;'
       : 'grid-template-columns: 1fr; gap: 4mm;';
+
+    return `
+      <style>
+        @page { size: ${pageSize}; margin: 8mm; }
+        * { box-sizing: border-box; }
+        .recipe-print-root { font-family: Inter, Arial, sans-serif; color: #1f2a44; background: #fff; }
+        .recipe-print-head { margin-bottom: 6mm; }
+        .recipe-print-head h1 { margin: 0; font-size: 16px; }
+        .recipe-print-head p { margin: 4px 0 0; font-size: 12px; color: #4f5f86; }
+        .recipe-print-grid { display: grid; ${gridTemplate} align-items: start; }
+        .print-block { break-inside: avoid; page-break-inside: avoid; width: 100%; }
+        .print-block .recipe-nutrition-label-card { width: 100% !important; max-width: 100% !important; }
+        .print-block .recipe-octagons-wrap,
+        .print-block .recipe-front-rectangles { justify-content: center; }
+        .print-block table { width: 100%; }
+      </style>
+      <section class="recipe-print-root">
+        <header class="recipe-print-head">
+          <h1>${escapeHtml(title)}</h1>
+          <p>Formato: ${isA4 ? 'A4 (4 por hoja)' : 'Zebra 10x15'} · Contenido: ${isFront ? 'Etiquetado frontal' : 'Tabla nutricional'}</p>
+        </header>
+        <section class="recipe-print-grid">${repeated}</section>
+      </section>
+    `;
+  };
+
+  const openPrintWindow = ({ title, paper, mode, contentType, html, copies }) => {
+    const printMarkup = buildPrintDocumentMarkup({ title, paper, contentType, html, copies });
+    const fileBase = normalizeValue(title || 'receta').replace(/\s+/g, '-').toLowerCase();
+    const fileName = `${fileBase}-${contentType}-${paper}.pdf`;
+    const isA4 = paper === 'a4';
+
+    if (mode === 'pdf' && window.html2pdf) {
+      const holder = document.createElement('div');
+      holder.style.position = 'fixed';
+      holder.style.left = '-9999px';
+      holder.style.top = '0';
+      holder.style.width = isA4 ? '210mm' : '100mm';
+      holder.innerHTML = printMarkup;
+      document.body.appendChild(holder);
+
+      const target = holder.querySelector('.recipe-print-root') || holder;
+      const options = {
+        margin: 0,
+        filename: fileName,
+        html2canvas: { scale: 2, useCORS: true },
+        pagebreak: { mode: ['css', 'legacy'] },
+        jsPDF: {
+          unit: 'mm',
+          format: isA4 ? 'a4' : [100, 150],
+          orientation: 'portrait'
+        }
+      };
+
+      window.html2pdf().set(options).from(target).save().finally(() => holder.remove());
+      return;
+    }
+
+    if (window.printJS) {
+      window.printJS({
+        printable: printMarkup,
+        type: 'raw-html',
+        scanStyles: true,
+        documentTitle: title,
+        targetStyles: ['*']
+      });
+      return;
+    }
 
     const popup = window.open('', '_blank', 'noopener,noreferrer,width=1100,height=850');
     if (!popup) {
@@ -712,41 +780,11 @@
       return;
     }
 
-    const modeLabel = mode === 'pdf' ? 'Descargar PDF' : 'Imprimir';
-    popup.document.write(`<!doctype html>
-<html lang="es">
-<head>
-<meta charset="utf-8">
-<title>${escapeHtml(title)} · ${escapeHtml(modeLabel)}</title>
-<style>
-  @page { size: ${pageSize}; margin: 8mm; }
-  * { box-sizing: border-box; }
-  body { font-family: Inter, Arial, sans-serif; margin: 0; padding: 8mm; color: #1f2a44; background: #fff; }
-  .print-head { margin-bottom: 6mm; }
-  .print-head h1 { margin: 0; font-size: 16px; }
-  .print-head p { margin: 4px 0 0; font-size: 12px; color: #4f5f86; }
-  .print-grid { display: grid; ${gridTemplate} align-items: start; }
-  .print-block { break-inside: avoid; page-break-inside: avoid; width: 100%; }
-  .print-block .recipe-nutrition-label-card { width: 100% !important; max-width: 100% !important; }
-  .print-block .recipe-octagons-wrap,
-  .print-block .recipe-front-rectangles { justify-content: center; }
-  .print-block table { width: 100%; }
-  .print-help { margin-top: 6mm; font-size: 11px; color: #5d6b90; }
-  @media print { .print-help { display: none; } body { padding: 0; } }
-</style>
-</head>
-<body>
-  <header class="print-head">
-    <h1>${escapeHtml(title)}</h1>
-    <p>Formato: ${isA4 ? 'A4 (4 por hoja)' : 'Zebra 10x15'} · Contenido: ${isFront ? 'Etiquetado frontal' : 'Tabla nutricional'}</p>
-  </header>
-  <section class="print-grid">${repeated}</section>
-  <p class="print-help">${mode === 'pdf' ? 'En el diálogo del navegador elegí destino “Guardar como PDF”.' : 'Usá tu impresora o cambiá a “Guardar como PDF” si querés descargarlo.'}</p>
-</body>
-</html>`);
+    popup.document.open();
+    popup.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head><body>${printMarkup}</body></html>`);
     popup.document.close();
     popup.focus();
-    popup.print();
+    setTimeout(() => popup.print(), 300);
   };
 
   const openRecipePrintPanel = async (recipe, contentType = 'nutrition') => {
