@@ -766,6 +766,86 @@ Requisitos: 1) tableHtml debe ser una tabla nutricional en HTML lista para rende
     }
   };
 
+  const getHouseholdMeasureOptionsHtml = (selected = '', amount = 1) => {
+    const selectedNorm = normalizeLower(selected);
+    const qty = Number(String(amount || '1').replace(',', '.'));
+    const singular = Number.isFinite(qty) && qty <= 1;
+    return HOUSEHOLD_MEASURES.map((item) => `<option value="${item.value}" ${selectedNorm === item.value ? 'selected' : ''}>${singular ? item.singular : item.plural}</option>`).join('');
+  };
+
+  const getCategoryOptionsHtml = (selected = '') => {
+    const selectedNorm = normalizeLower(selected);
+    return Object.keys(FOOD_CATEGORIES_AR).map((key) => `<option value="${key}" ${selectedNorm === key ? 'selected' : ''}>${capitalize(key.replaceAll('-', ' '))}</option>`).join('');
+  };
+
+  const getSubcategoryOptionsHtml = (category = '', selected = '') => {
+    const categoryKey = normalizeLower(category);
+    const selectedNorm = normalizeLower(selected);
+    const list = FOOD_CATEGORIES_AR[categoryKey] || [];
+    return list.length
+      ? list.map((item) => {
+        const value = normalizeLower(item);
+        return `<option value="${value}" ${value === selectedNorm ? 'selected' : ''}>${item}</option>`;
+      }).join('')
+      : '<option value="">Seleccioná una categoría primero</option>';
+  };
+
+  const renderNutritionSubcategories = (selected = '') => {
+    const categorySelect = recipeEditorForm.querySelector('#recipeNutritionCategory');
+    const subcategorySelect = recipeEditorForm.querySelector('#recipeNutritionSubcategory');
+    if (!categorySelect || !subcategorySelect) return;
+    const nextValue = normalizeLower(selected || state.editor?.nutrition?.subcategory || '');
+    subcategorySelect.innerHTML = getSubcategoryOptionsHtml(categorySelect.value, nextValue);
+    if (nextValue) {
+      subcategorySelect.value = nextValue;
+    }
+  };
+
+  const renderHouseholdMeasureOptions = () => {
+    const measureSelect = recipeEditorForm.querySelector('#recipeNutritionHouseholdMeasure');
+    const amountInput = recipeEditorForm.querySelector('#recipeNutritionHouseholdAmount');
+    if (!measureSelect || !amountInput) return;
+    const currentValue = normalizeLower(measureSelect.value || state.editor?.nutrition?.householdMeasure || 'unidad');
+    const amount = amountInput.value || '1';
+    measureSelect.innerHTML = getHouseholdMeasureOptionsHtml(currentValue, amount);
+    measureSelect.value = currentValue;
+  };
+
+  const sortRowsByOrderMode = (rows, orderMode) => {
+    const mode = normalizeLower(orderMode);
+    if (mode === 'custom') {
+      const nonMonography = rows.filter((row) => row.type !== MONOGRAPHY_ROW_TYPE);
+      const monography = rows.filter((row) => row.type === MONOGRAPHY_ROW_TYPE);
+      return [...nonMonography, ...monography];
+    }
+
+    const ingredients = rows.filter((row) => row.type === 'ingredient').map((row, index) => {
+      const dimension = getUnitDimension(row.unit);
+      const comparable = toComparableQuantity(row.quantity, row.unit);
+      return { row, index, dimension, comparable, hasNumeric: Number.isFinite(comparable) };
+    });
+
+    const comments = rows.filter((row) => row.type === 'comment');
+    const monography = rows.filter((row) => row.type === MONOGRAPHY_ROW_TYPE);
+
+    const dimensionRank = { mass: 0, volume: 1, other: 2 };
+    const direction = mode === 'asc' ? 1 : -1;
+
+    ingredients.sort((a, b) => {
+      const dimDiff = (dimensionRank[a.dimension] ?? 9) - (dimensionRank[b.dimension] ?? 9);
+      if (dimDiff !== 0) return dimDiff;
+      if (a.hasNumeric && b.hasNumeric && a.comparable !== b.comparable) {
+        return (a.comparable - b.comparable) * direction;
+      }
+      if (a.hasNumeric !== b.hasNumeric) {
+        return a.hasNumeric ? -1 : 1;
+      }
+      return a.index - b.index;
+    });
+
+    return [...ingredients.map((item) => item.row), ...comments, ...monography];
+  };
+
   const clearSuggestions = () => {
     document.querySelectorAll('.recipe-suggest-floating').forEach((node) => node.remove());
     state.editor && (state.editor.activeSuggestRowId = '');
