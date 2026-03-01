@@ -3680,14 +3680,7 @@ html.login-protected.auth-ok body {
 .recipe-print-preview-grid {
   display: grid;
   gap: 8px;
-}
-
-.recipe-print-preview-grid.is-a4 {
-  grid-template-columns: 1fr 1fr;
-}
-
-.recipe-print-preview-grid.is-zebra {
-  grid-template-columns: 1fr;
+  --preview-density: 1;
 }
 
 .recipe-print-preview .print-block {
@@ -3695,17 +3688,50 @@ html.login-protected.auth-ok body {
   border-radius: 10px;
   padding: 8px;
   background: #fff;
-  zoom: var(--preview-scale, 1);
+  overflow: hidden;
 }
 
 .recipe-print-preview .recipe-nutrition-label-card {
   width: 100% !important;
+  max-width: 100% !important;
+  border-width: 1px;
+  padding: calc(10px * var(--preview-density));
 }
+
+.recipe-print-preview .recipe-nutrition-label-card h3 { font-size: calc(1rem * var(--preview-density)); }
+.recipe-print-preview .recipe-nutrition-product-name,
+.recipe-print-preview .recipe-nutrition-serving,
+.recipe-print-preview .recipe-nutrition-subtitle,
+.recipe-print-preview .recipe-nutrition-dv,
+.recipe-print-preview .recipe-nutrition-table-fixed,
+.recipe-print-preview .recipe-nutrition-micros,
+.recipe-print-preview .recipe-nutrition-footnote { font-size: calc(0.96rem * var(--preview-density)); }
 
 .recipe-print-preview .recipe-octagons-wrap,
 .recipe-print-preview .recipe-front-rectangles {
   justify-content: center;
+  gap: calc(10px * var(--preview-density));
 }
+
+.recipe-print-preview .recipe-octagon {
+  width: calc(112px * var(--preview-density));
+  min-width: calc(112px * var(--preview-density));
+  height: calc(112px * var(--preview-density));
+  min-height: calc(112px * var(--preview-density));
+}
+
+.recipe-print-preview .recipe-front-rectangle {
+  min-width: calc(236px * var(--preview-density));
+  min-height: calc(78px * var(--preview-density));
+  padding: calc(8px * var(--preview-density));
+}
+
+.recipe-print-preview .recipe-octagon-title,
+.recipe-print-preview .recipe-front-rectangle-title { font-size: calc(0.95rem * var(--preview-density)); }
+
+.recipe-print-preview .recipe-octagon-ministry,
+.recipe-print-preview .recipe-front-rectangle .recipe-octagon-ministry,
+.recipe-print-preview .recipe-front-rectangle .recipe-front-rectangle-ministry { font-size: calc(0.58rem * var(--preview-density)); }
 
 @media (max-width: 768px) {
   .recetas-editor,
