@@ -301,9 +301,9 @@
 
   const getPlaceholderCircle = () => `<span class="image-placeholder-circle-2">${RECIPE_PLACEHOLDER_ICON}</span>`;
   const getSmallPlaceholder = (icon = 'fa-solid fa-bowl-food') => `<span class="recipe-small-placeholder"><i class="${icon}"></i></span>`;
-  const buildImageStepHtml = (prefix, initialImage) => `
+  const buildImageStepHtml = (prefix, initialImage, stepNumber = 4) => `
     <section class="step-block recipe-step-card">
-      <h6 class="step-title"><span class="recipe-step-number">3</span> Imagen</h6>
+      <h6 class="step-title"><span class="recipe-step-number">${stepNumber}</span> Imagen</h6>
       <div class="step-content">
         <div class="image-method-buttons" id="${prefix}_methodButtons">
           <button type="button" class="btn image-method-btn" data-image-method="url"><i class="fa-solid fa-link"></i>Link</button>
@@ -634,8 +634,7 @@
       if (row.type === MONOGRAPHY_ROW_TYPE) {
         return `
           <tr class="is-monography" data-row-id="${row.id}" draggable="false">
-            <td><i class="fa-solid fa-scroll"></i></td>
-            <td colspan="3">
+            <td colspan="4">
               <div class="editor-toolbar report-edit-toolbar recipe-monography-toolbar" role="toolbar" aria-label="Herramientas de monografía">
                 <button type="button" class="editor-btn" data-mono-cmd="bold" data-mono-row="${row.id}"><i class="fa-solid fa-bold"></i></button>
                 <button type="button" class="editor-btn" data-mono-cmd="italic" data-mono-row="${row.id}"><i class="fa-solid fa-italic"></i></button>
@@ -1143,7 +1142,7 @@
       </section>
 
       <section class="step-block recipe-step-card recipe-nutrition-step">
-        <h6 class="step-title"><span class="recipe-step-number">4</span> Información nutricional (opcional)</h6>
+        <h6 class="step-title"><span class="recipe-step-number">3</span> Información nutricional (opcional)</h6>
         <div class="step-content recipe-fields-flex">
           <div class="recipe-field recipe-field-half recipe-highlight-field recipe-highlight-field-nutrition">
             <label class="form-label" for="recipeNutritionProductType">Tipo de producto</label>
@@ -1182,7 +1181,7 @@
         </div>
       </section>
 
-      ${buildImageStepHtml('recipeImage', initial?.imageUrl || '')}
+      ${buildImageStepHtml('recipeImage', initial?.imageUrl || '', 4)}
       <div class="recipe-editor-actions"><button type="submit" class="btn ios-btn ios-btn-success"><i class="fa-solid fa-floppy-disk"></i><span>${initial ? 'Guardar receta' : 'Crear receta'}</span></button></div>`;
 
     renderRows();
