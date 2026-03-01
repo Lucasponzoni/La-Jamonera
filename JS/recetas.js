@@ -293,7 +293,10 @@
           </div>
           <div class="ingrediente-main receta-main">
             <h6 class="ingrediente-name receta-name">${capitalize(item.title || 'Sin título')}</h6>
-            ${hasNutritionLabel ? '<span class="receta-nutrition-badge"><i class="fa-solid fa-circle-check"></i>Etiquetados disponibles</span>' : ''}
+            ${(hasNutritionLabel || frontLabels.length) ? `<div class="receta-print-actions">
+              ${hasNutritionLabel ? `<button type="button" class="btn receta-print-btn" data-receta-print-nutrition="${item.id}"><i class="fa-solid fa-print"></i><span>Tabla nutricional</span></button>` : ''}
+              ${frontLabels.length ? `<button type="button" class="btn receta-print-btn receta-print-btn-front" data-receta-print-front="${item.id}"><i class="fa-solid fa-octagon-exclamation"></i><span>Etiquetado frontal</span></button>` : ''}
+            </div>` : ''}
             <p class="ingrediente-meta receta-card-meta">Rinde: ${item.yieldQuantity || '0'} ${label || ''}</p>
             <p class="ingrediente-meta receta-card-ingredients">Ingredientes: ${recipeIngredients.length ? recipeIngredients.join(' · ') : 'Sin ingredientes vinculados.'}</p>
             ${item.description ? `<p class="ingrediente-description">${capitalize(item.description)}</p>` : '<p class="ingrediente-description"><em>Sin descripción</em></p>'}
@@ -664,6 +667,306 @@
         return `<span class="recipe-front-rectangle"><span class="recipe-front-rectangle-title">${escapeHtml(config.text).replaceAll('\n', '<br>')}</span><span class="recipe-octagon-ministry">Ministerio<br>de Salud</span></span>`;
       }).join('')}</div>` : ''}
     `;
+  };
+
+  const getPrintableFrontLabelsHtml = (recipe) => {
+    const labels = Array.isArray(recipe?.nutrition?.ai?.frontLabels) ? recipe.nutrition.ai.frontLabels : [];
+    return buildFrontLabelsHtml(labels);
+  };
+
+  const getPrintableNutritionHtml = (recipe) => {
+    const html = normalizeValue(recipe?.nutrition?.ai?.tableHtml || '');
+    return html || '<p class="recipe-nutrition-ai-empty">Esta receta no tiene tabla nutricional generada.</p>';
+  };
+
+  const repeatPrintableBlocks = (html, amount) => {
+    const copies = Math.max(1, Number(amount) || 1);
+    return Array.from({ length: copies }, () => `<article class="print-block">${html}</article>`).join('');
+  };
+
+  const clampNumber = (value, min, max) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return min;
+    return Math.min(max, Math.max(min, Math.round(numeric)));
+  };
+
+  const getPrintConfig = (contentType, paper) => {
+    const isFront = contentType === 'front';
+    const isA4 = paper === 'a4';
+
+    if (isFront && isA4) {
+      return {
+        pageSize: 'A4 portrait',
+        maxCopies: 18,
+        defaultCopies: 4,
+        gridColumns: 2,
+        formatLabel: 'A4',
+        helper: 'A4 dividido en 4. Podés subir hasta 18 etiquetas (se reparten en más páginas).'
+      };
+    }
+
+    if (isFront && !isA4) {
+      return {
+        pageSize: '200mm 150mm',
+        maxCopies: 6,
+        defaultCopies: 4,
+        gridColumns: 2,
+        formatLabel: 'Zebra 20x15',
+        helper: 'En Zebra 20x15 para frontal se colocan hasta 4 por hoja. Máximo total: 6.'
+      };
+    }
+
+    if (!isFront && isA4) {
+      return {
+        pageSize: 'A4 portrait',
+        maxCopies: 9,
+        defaultCopies: 4,
+        gridColumns: 2,
+        formatLabel: 'A4',
+        helper: 'A4 dividido en 4 por defecto. Podés subir hasta 9 tablas (se reparten en más páginas).'
+      };
+    }
+
+    return {
+      pageSize: '200mm 150mm',
+      maxCopies: 4,
+      defaultCopies: 1,
+      gridColumns: 1,
+      formatLabel: 'Zebra 20x15',
+      helper: 'En Zebra 20x15 la tabla nutricional va 1 por hoja. Máximo total: 4.'
+    };
+  };
+
+  const getPrintScale = (copies, maxCopies) => {
+    const safeMax = Math.max(1, Number(maxCopies) || 1);
+    const safeCopies = clampNumber(copies, 1, safeMax);
+    const ratio = safeMax <= 1 ? 0 : (safeCopies - 1) / (safeMax - 1);
+    return (1 - (ratio * 0.28)).toFixed(3);
+  };
+
+  const buildPrintDocumentMarkup = ({ title, paper, contentType, html, copies }) => {
+    const isFront = contentType === 'front';
+    const config = getPrintConfig(contentType, paper);
+    const finalCopies = clampNumber(copies, 1, config.maxCopies);
+    const repeated = repeatPrintableBlocks(html, finalCopies);
+    const scale = getPrintScale(finalCopies, config.maxCopies);
+    const gridTemplate = config.gridColumns === 2
+      ? 'grid-template-columns: 1fr 1fr; gap: 8mm;'
+      : 'grid-template-columns: 1fr; gap: 5mm;';
+
+    return `
+      <style>
+        @page { size: ${config.pageSize}; margin: 8mm; }
+        * { box-sizing: border-box; }
+        .recipe-print-root {
+          --print-scale: ${scale};
+          font-family: Inter, Arial, sans-serif;
+          color: #1f2a44;
+          background: #fff;
+        }
+        .recipe-print-head { margin-bottom: 6mm; }
+        .recipe-print-head h1 { margin: 0; font-size: 16px; }
+        .recipe-print-head p { margin: 4px 0 0; font-size: 12px; color: #4f5f86; }
+        .recipe-print-grid { display: grid; ${gridTemplate} align-items: start; }
+        .print-block {
+          break-inside: avoid;
+          page-break-inside: avoid;
+          width: 100%;
+          zoom: var(--print-scale);
+        }
+        .print-block .recipe-nutrition-label-card { width: 100% !important; max-width: 100% !important; }
+        .print-block .recipe-octagons-wrap,
+        .print-block .recipe-front-rectangles { justify-content: center; }
+        .print-block table { width: 100%; }
+        .print-block .recipe-octagon {
+          width: calc(112px * var(--print-scale));
+          min-width: calc(112px * var(--print-scale));
+          height: calc(112px * var(--print-scale));
+          min-height: calc(112px * var(--print-scale));
+        }
+        .print-block .recipe-front-rectangle {
+          min-width: calc(236px * var(--print-scale));
+          min-height: calc(78px * var(--print-scale));
+        }
+      </style>
+      <section class="recipe-print-root">
+        <header class="recipe-print-head">
+          <h1>${escapeHtml(title)}</h1>
+          <p>Formato: ${config.formatLabel} · Contenido: ${isFront ? 'Etiquetado frontal' : 'Tabla nutricional'} · Cantidad: ${finalCopies}</p>
+        </header>
+        <section class="recipe-print-grid">${repeated}</section>
+      </section>
+    `;
+  };
+
+  const openPrintWindow = ({ title, paper, mode, contentType, html, copies }) => {
+    const config = getPrintConfig(contentType, paper);
+    const finalCopies = clampNumber(copies, 1, config.maxCopies);
+    const printMarkup = buildPrintDocumentMarkup({ title, paper, contentType, html, copies: finalCopies });
+    const fileBase = normalizeValue(title || 'receta').replace(/\s+/g, '-').toLowerCase();
+    const fileName = `${fileBase}-${contentType}-${paper}.pdf`;
+    const isA4 = paper === 'a4';
+
+    if (mode === 'pdf' && window.html2pdf) {
+      const holder = document.createElement('div');
+      holder.style.position = 'fixed';
+      holder.style.left = '-9999px';
+      holder.style.top = '0';
+      holder.style.width = isA4 ? '210mm' : '200mm';
+      holder.innerHTML = printMarkup;
+      document.body.appendChild(holder);
+
+      const target = holder.querySelector('.recipe-print-root') || holder;
+      const options = {
+        margin: 0,
+        filename: fileName,
+        html2canvas: { scale: 2, useCORS: true },
+        pagebreak: { mode: ['css', 'legacy'] },
+        jsPDF: {
+          unit: 'mm',
+          format: isA4 ? 'a4' : [200, 150],
+          orientation: 'landscape'
+        }
+      };
+
+      window.html2pdf().set(options).from(target).save().finally(() => holder.remove());
+      return;
+    }
+
+    if (window.printJS) {
+      window.printJS({
+        printable: printMarkup,
+        type: 'raw-html',
+        scanStyles: true,
+        documentTitle: title,
+        targetStyles: ['*']
+      });
+      return;
+    }
+
+    const popup = window.open('', '_blank', 'noopener,noreferrer,width=1100,height=850');
+    if (!popup) {
+      Swal.fire({
+        title: 'No se pudo abrir la impresión',
+        html: '<p>Permití popups para continuar con la impresión o descarga PDF.</p>',
+        icon: 'warning',
+        confirmButtonText: 'Entendido',
+        customClass: {
+          popup: 'ios-alert recetas-alert',
+          title: 'ios-alert-title',
+          htmlContainer: 'ios-alert-text',
+          confirmButton: 'ios-btn ios-btn-primary'
+        },
+        buttonsStyling: false
+      });
+      return;
+    }
+
+    popup.document.open();
+    popup.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head><body>${printMarkup}</body></html>`);
+    popup.document.close();
+    popup.focus();
+    setTimeout(() => popup.print(), 320);
+  };
+
+  const openRecipePrintPanel = async (recipe, contentType = 'nutrition') => {
+    const hasNutrition = Boolean(normalizeValue(recipe?.nutrition?.ai?.tableHtml));
+    const hasFront = Array.isArray(recipe?.nutrition?.ai?.frontLabels) && recipe.nutrition.ai.frontLabels.length;
+
+    if (contentType === 'nutrition' && !hasNutrition) {
+      await openIosSwal({
+        title: 'Tabla no disponible',
+        html: '<p>Esta receta todavía no tiene tabla nutricional generada.</p>',
+        icon: 'info',
+        confirmButtonText: 'Entendido'
+      });
+      return;
+    }
+
+    if (contentType === 'front' && !hasFront) {
+      await openIosSwal({
+        title: 'Etiquetado no disponible',
+        html: '<p>Esta receta no tiene sellos frontales generados.</p>',
+        icon: 'info',
+        confirmButtonText: 'Entendido'
+      });
+      return;
+    }
+
+    const initialPaper = 'a4';
+    const initialConfig = getPrintConfig(contentType, initialPaper);
+    const initialHtml = contentType === 'front' ? getPrintableFrontLabelsHtml(recipe) : getPrintableNutritionHtml(recipe);
+
+    await openIosSwal({
+      title: 'Panel de impresión',
+      html: `
+        <div class="swal-stack-fields recipe-print-panel">
+          <p class="recipe-print-panel-help">Elegí formato, cantidad y acción. La vista previa refleja cómo se acomoda la hoja.</p>
+
+          <label class="swal-field-label" for="recipePrintPaper"><i class="fa-regular fa-file-lines"></i> Formato de salida</label>
+          <select id="recipePrintPaper" class="swal2-input ios-input">
+            <option value="a4">A4</option>
+            <option value="zebra">Zebra 20x15</option>
+          </select>
+
+          <label class="swal-field-label" for="recipePrintMode"><i class="fa-solid fa-print"></i> Acción</label>
+          <select id="recipePrintMode" class="swal2-input ios-input">
+            <option value="print">Imprimir ahora</option>
+            <option value="pdf">Descargar PDF</option>
+          </select>
+
+          <label class="swal-field-label" for="recipePrintCopies"><i class="fa-solid fa-layer-group"></i> Cantidad de etiquetas/bloques</label>
+          <input id="recipePrintCopies" type="number" min="1" max="${initialConfig.maxCopies}" value="${initialConfig.defaultCopies}" class="swal2-input ios-input">
+
+          <p id="recipePrintLimits" class="recipe-print-limits"></p>
+
+          <label class="swal-field-label"><i class="fa-regular fa-eye"></i> Vista previa</label>
+          <div id="recipePrintPreview" class="recipe-print-preview"></div>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'Continuar',
+      cancelButtonText: 'Cancelar',
+      didOpen: () => {
+        const paperSelect = document.getElementById('recipePrintPaper');
+        const copiesInput = document.getElementById('recipePrintCopies');
+        const preview = document.getElementById('recipePrintPreview');
+        const limits = document.getElementById('recipePrintLimits');
+
+        const renderPreview = () => {
+          const paper = paperSelect?.value || initialPaper;
+          const config = getPrintConfig(contentType, paper);
+          copiesInput.max = String(config.maxCopies);
+          const normalizedCopies = clampNumber(copiesInput.value || config.defaultCopies, 1, config.maxCopies);
+          copiesInput.value = String(normalizedCopies);
+          const scale = getPrintScale(normalizedCopies, config.maxCopies);
+          const previewMarkup = `<div class="recipe-print-preview-grid ${config.gridColumns === 2 ? 'is-a4' : 'is-zebra'}" style="--preview-scale:${scale}">${repeatPrintableBlocks(initialHtml, normalizedCopies)}</div>`;
+          preview.innerHTML = previewMarkup;
+          limits.textContent = `${config.helper} Máximo habilitado: ${config.maxCopies}.`;
+        };
+
+        paperSelect?.addEventListener('change', renderPreview);
+        copiesInput?.addEventListener('input', renderPreview);
+        renderPreview();
+      },
+      preConfirm: () => {
+        const paper = document.getElementById('recipePrintPaper')?.value || initialPaper;
+        const mode = document.getElementById('recipePrintMode')?.value || 'print';
+        const config = getPrintConfig(contentType, paper);
+        const copies = clampNumber(document.getElementById('recipePrintCopies')?.value || config.defaultCopies, 1, config.maxCopies);
+        return { paper, mode, copies };
+      }
+    }).then((result) => {
+      if (!result.isConfirmed || !result.value) return;
+      openPrintWindow({
+        title: `Receta: ${capitalize(recipe.title || 'Sin título')}`,
+        paper: result.value.paper,
+        mode: result.value.mode,
+        copies: result.value.copies,
+        contentType: contentType === 'front' ? 'front' : 'nutrition',
+        html: initialHtml
+      });
+    });
   };
 
   const isNutritionAiStale = () => {
@@ -1787,7 +2090,20 @@
   recetasData?.addEventListener('click', async (event) => {
     const editBtn = event.target.closest('[data-receta-edit]');
     if (editBtn) return renderEditor(state.recetas[editBtn.dataset.recetaEdit]);
+
     const deleteBtn = event.target.closest('[data-receta-delete]');
     if (deleteBtn) return removeRecipe(deleteBtn.dataset.recetaDelete);
+
+    const printNutritionBtn = event.target.closest('[data-receta-print-nutrition]');
+    if (printNutritionBtn) {
+      const recipe = state.recetas[printNutritionBtn.dataset.recetaPrintNutrition];
+      if (recipe) return openRecipePrintPanel(recipe, 'nutrition');
+    }
+
+    const printFrontBtn = event.target.closest('[data-receta-print-front]');
+    if (printFrontBtn) {
+      const recipe = state.recetas[printFrontBtn.dataset.recetaPrintFront];
+      if (recipe) return openRecipePrintPanel(recipe, 'front');
+    }
   });
 })();
