@@ -661,15 +661,15 @@ html.login-protected.auth-ok body {
 .ingredientes-list.has-scroll-hint::after {
   content: '↓ Deslizá para ver más ingredientes';
   position: sticky;
-  bottom: 0;
+  bottom: -10px;
   left: 0;
   right: 0;
   display: block;
   text-align: center;
   font-size: 0.78rem;
   font-weight: 600;
-  color: #516089;
-  background: linear-gradient(to bottom, rgba(242, 245, 252, 0), rgba(242, 245, 252, 1));
+  color: #7048e9;
+  background: linear-gradient(to bottom, rgba(242, 245, 252, 0), rgb(236 231 255));
   padding: 10px 0 4px;
   margin-top: -28px;
   pointer-events: none;
@@ -2085,6 +2085,10 @@ html.login-protected.auth-ok body {
 }
 
 @media (max-width: 768px) {
+  .barra-vertical {
+    display: none;
+  }
+
   .topbar-divider-item {
     display: none;
   }
@@ -2885,7 +2889,7 @@ html.login-protected.auth-ok body {
 .recipe-table-wrap {
   border: 1px solid #cfdcf8;
   border-radius: 14px 14px 0 0;
-  overflow: hidden;
+  overflow: visible;
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
 
@@ -2936,6 +2940,26 @@ html.login-protected.auth-ok body {
   background: #fff5e8;
 }
 
+.recipe-table tbody tr.is-monography {
+  background: #ffeef0;
+}
+
+.recipe-monography-toolbar {
+  margin-bottom: 8px;
+}
+
+.recipe-monography-editor {
+  min-height: 140px;
+  border: 1px solid #f2cfd6;
+  border-radius: 12px;
+  background: #fff8f9;
+}
+
+.recipe-monography-editor:empty::before {
+  content: attr(data-placeholder);
+  color: #9c6a74;
+}
+
 .recipe-table tbody tr.is-dragging {
   opacity: 0.55;
 }
@@ -2983,6 +3007,332 @@ html.login-protected.auth-ok body {
 
 .recipe-table-action-btn-neutral:hover {
   background: #e4ecff;
+}
+
+.recipe-table-action-btn-monography {
+  background: #ffeef0;
+  border-color: #f3ccd3;
+  color: #b3475a;
+}
+
+.recipe-table-action-btn-monography:hover {
+  background: #ffe3e7;
+}
+
+/* =========================================
+   RECETAS · NUTRICIÓN IA
+========================================= */
+.recipe-nutrition-step {
+  border-color: #e7dcff;
+  background: #fcf9ff;
+}
+
+.recipe-highlight-field-nutrition {
+  border-color: #dfd1ff;
+  background: #f7f1ff;
+}
+
+.recipe-nutrition-declaration-grid,
+.recipe-nutrition-household-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.recipe-nutrition-ai-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.recipe-nutrition-ai-btn {
+  width: 100%;
+  max-width: none;
+}
+
+.recipe-nutrition-ai-btn img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+
+.recipe-nutrition-ai-disclaimer {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #eef4ff;
+  border: 1px solid #c8dafd;
+  color: #28457f;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.recipe-nutrition-ai-stale {
+  color: #b91c1c;
+  font-weight: 800;
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.recipe-nutrition-ai-preview.is-stale {
+  border-color: #dc2626;
+  background: #fff5f5;
+}
+
+.recipe-nutrition-ai-preview.is-disabled {
+  opacity: 0.95;
+}
+
+.recipe-nutrition-ai-table {
+  border-radius: 10px;
+}
+
+.recipe-nutrition-ai-table[contenteditable="true"] {
+  outline: 2px dashed #d7dff2;
+  outline-offset: 4px;
+}
+
+.recipe-nutrition-ai-table.is-locked {
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.recipe-nutrition-ai-help {
+  margin: 8px 0 0;
+  color: #51628d;
+  font-size: 0.82rem;
+}
+
+.recipe-nutrition-ai-preview {
+  margin-top: 8px;
+  border: 1px dashed #cdbaf8;
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.recipe-nutrition-ai-empty {
+  margin: 0;
+  color: #66739a;
+}
+
+.recipe-nutrition-product-meta h6 {
+  margin: 0;
+  color: #223a71;
+  font-weight: 800;
+}
+
+.recipe-nutrition-product-meta p {
+  margin: 4px 0 10px;
+  color: #4f5f86;
+}
+
+.recipe-nutrition-front-labels h6 {
+  margin: 12px 0 8px;
+  color: #223a71;
+  font-weight: 800;
+}
+
+/* =========================================
+   RECETAS · ETIQUETADO FRONTAL
+========================================= */
+.recipe-octagons-wrap {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.recipe-front-rectangles {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.recipe-octagon,
+.recipe-front-rectangle {
+  border: 3px solid #ffffff;
+  outline: 2px solid #1d1d1d;
+  background: #101015;
+  color: #fff;
+  text-align: center;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18);
+}
+
+.recipe-octagon {
+  width: 112px;
+  min-height: 112px;
+  padding: 10px 8px;
+}
+
+.recipe-front-rectangle {
+  min-width: 236px;
+  min-height: 78px;
+  padding: 8px 12px;
+}
+
+.recipe-octagon-title,
+.recipe-front-rectangle-title {
+  font-size: 0.66rem;
+  line-height: 1.06;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+}
+
+.recipe-octagon-ministry {
+  margin-top: 4px;
+  font-size: 0.6rem;
+  line-height: 1.05;
+  font-weight: 600;
+}
+
+.recipe-octagons-wrap.is-compact {
+  gap: 6px;
+}
+
+.recipe-octagons-wrap.is-compact .recipe-octagon {
+  width: 88px;
+  min-height: 88px;
+  padding: 7px 6px;
+}
+
+.recipe-front-rectangles.is-compact {
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.recipe-front-rectangles.is-compact .recipe-front-rectangle {
+  min-width: 174px;
+  min-height: 60px;
+  padding: 6px 8px;
+}
+
+.recipe-octagons-wrap.is-compact .recipe-octagon-title,
+.recipe-front-rectangles.is-compact .recipe-front-rectangle-title {
+  font-size: 0.52rem;
+}
+
+.recipe-octagons-wrap.is-compact .recipe-octagon-ministry {
+  font-size: 0.44rem;
+}
+
+.recipe-nutrition-front-empty {
+  margin: 0;
+  color: #5d6b90;
+}
+
+.recipe-ai-static-gif {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  animation: none !important;
+}
+
+/* =========================================
+   RECETAS · TARJETA NUTRICIONAL
+========================================= */
+.recipe-nutrition-label-card {
+  width: min(340px, 100%);
+  margin: 0 auto;
+  border: 2px solid #2f2f2f;
+  padding: 10px;
+  background: #ffffff;
+  font-family: 'Roboto', 'Arial', sans-serif;
+  color: #1f1f1f;
+}
+
+.recipe-nutrition-label-card h3 {
+  margin: 0 0 4px;
+  text-align: center;
+  letter-spacing: 0.14em;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.recipe-nutrition-product-name {
+  margin: 0 0 8px;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.recipe-nutrition-serving,
+.recipe-nutrition-subtitle,
+.recipe-nutrition-dv,
+.recipe-nutrition-micros,
+.recipe-nutrition-footnote {
+  margin: 0;
+}
+
+.recipe-nutrition-serving {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.recipe-nutrition-bar {
+  height: 12px;
+  background: #000;
+  margin: 8px 0;
+}
+
+.recipe-nutrition-subtitle {
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
+.recipe-nutrition-two-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 0.98rem;
+}
+
+.recipe-nutrition-rule {
+  border-top: 2px solid #4b4b4b;
+  margin: 8px 0;
+}
+
+.recipe-nutrition-dv {
+  text-align: right;
+  font-weight: 700;
+}
+
+.recipe-nutrition-table-fixed {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 1rem;
+}
+
+.recipe-nutrition-table-fixed td {
+  border-top: 1px solid #848484;
+  padding: 4px 0;
+}
+
+.recipe-nutrition-table-fixed td:last-child {
+  text-align: right;
+  font-weight: 700;
+}
+
+.recipe-nutrition-table-fixed .indent {
+  padding-left: 18px;
+}
+
+.recipe-nutrition-micros {
+  margin-top: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.recipe-nutrition-footnote {
+  margin-top: 8px;
+  font-size: 0.82rem;
+  line-height: 1.3;
 }
 
 .recipe-image-layout {
@@ -3175,6 +3525,11 @@ html.login-protected.auth-ok body {
     width: 100%;
   }
 
+  .recipe-nutrition-declaration-grid,
+  .recipe-nutrition-household-grid {
+    grid-template-columns: 1fr;
+  }
+
   .recipe-ing-autocomplete .recipe-suggest-floating {
     width: max(100%, 240px);
     min-width: 240px;
@@ -3185,4 +3540,23 @@ html.login-protected.auth-ok body {
 .recipe-row-actions {
   display: flex;
   gap: 6px;
+}
+
+
+.receta-nutrition-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #e8f7ee;
+  color: #1e7a46;
+  border: 1px solid #bde8ce;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin: 6px 0 8px;
+}
+
+.receta-front-inline {
+  margin-top: 6px;
 }
