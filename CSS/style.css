@@ -280,7 +280,7 @@ html.login-protected.auth-ok body {
 }
 
 .footer-main {
-  width: 1200px;
+  width: min(1200px, 100%);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -2699,6 +2699,11 @@ html.login-protected.auth-ok body {
   position: relative;
 }
 
+.recetas-modal .modal-dialog {
+  width: min(100%, calc(100vw - 24px));
+  margin-inline: auto;
+}
+
 .recetas-list {
   display: grid;
   gap: 12px;
@@ -3576,6 +3581,26 @@ html.login-protected.auth-ok body {
 }
 
 @media (max-width: 768px) {
+  .recetas-modal .modal-dialog {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+  }
+
+  .recetas-modal .modal-content {
+    border-radius: 0;
+    border-inline: 0;
+  }
+
+  .recetas-modal .ios-modal-header,
+  .recetas-modal .ios-modal-body {
+    padding-inline: 12px;
+  }
+
+  .recetas-modal .ios-modal-body {
+    overflow-x: hidden;
+  }
+
   .recipe-field-half {
     flex: 1 1 100%;
   }
