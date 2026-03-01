@@ -989,7 +989,19 @@ html.login-protected.auth-ok body {
 }
 
 .image-placeholder-circle-2 i {
-  font-size: 3rem;
+  font-size: 2.5rem;
+}
+
+.image-placeholder-circle-2 {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ece6ff;
+  color: #6f46eb;
+  border: 1px solid #d8ccff;
 }
 
 .image-placeholder-circle-2 {
@@ -2885,7 +2897,7 @@ html.login-protected.auth-ok body {
 .recipe-table-wrap {
   border: 1px solid #cfdcf8;
   border-radius: 14px;
-  overflow: hidden;
+  overflow: visible;
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
 
@@ -3002,6 +3014,7 @@ html.login-protected.auth-ok body {
 
 .recipe-ing-autocomplete {
   position: relative;
+  z-index: 30;
 }
 
 /* =========================================
@@ -3014,7 +3027,7 @@ html.login-protected.auth-ok body {
   border: 1px solid #d7e2f7;
   border-radius: 12px;
   background: #fff;
-  z-index: 1056;
+  z-index: 1200;
 }
 
 .recipe-ing-autocomplete .recipe-suggest-floating {

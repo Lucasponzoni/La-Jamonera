@@ -639,6 +639,11 @@
           clearSuggestions();
           blurActiveElement();
           recetasModal.setAttribute('inert', '');
+          document.querySelectorAll('.modal[aria-hidden="true"]').forEach((node) => {
+            if (node.contains(document.activeElement)) {
+              document.activeElement?.blur?.();
+            }
+          });
           let ingredientId = '';
           try {
             await new Promise((resolve) => setTimeout(resolve, 0));
