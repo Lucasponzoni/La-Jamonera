@@ -106,6 +106,15 @@
     return `${opts.map((item) => `<option value="${item.value}" ${normalizeLower(selected) === item.value ? 'selected' : ''}>${item.label}</option>`).join('')}<option value="${NEW_MEASURE_VALUE}">+ Agregar nueva medida</option>`;
   };
 
+  const getPreferredUnitForIngredient = (ingredient) => {
+    const available = getMeasureOptions().map((item) => item.value);
+    const ingredientMeasure = normalizeLower(ingredient?.measure);
+    if (ingredientMeasure && available.includes(ingredientMeasure)) {
+      return ingredientMeasure;
+    }
+    return available[0] || '';
+  };
+
   const persistNewMeasure = async (name, abbr) => {
     const norm = normalizeLower(name);
     if (!norm) return '';
@@ -641,6 +650,7 @@
           if (row && ingredient) {
             row.ingredientId = ingredient.id;
             row.ingredientName = ingredient.name;
+            row.unit = getPreferredUnitForIngredient(ingredient);
             markEditorDirty();
             renderRows();
             clearSuggestions();
@@ -675,9 +685,17 @@
             if (target) {
               target.ingredientId = ingredientId;
               target.ingredientName = state.ingredientes[ingredientId].name;
+              target.unit = getPreferredUnitForIngredient(state.ingredientes[ingredientId]);
               markEditorDirty();
             } else {
-              state.editor.rows.push({ id: makeId('row'), type: 'ingredient', ingredientId, ingredientName: state.ingredientes[ingredientId].name, quantity: '', unit: getMeasureOptions()[0]?.value || '' });
+              state.editor.rows.push({
+                id: makeId('row'),
+                type: 'ingredient',
+                ingredientId,
+                ingredientName: state.ingredientes[ingredientId].name,
+                quantity: '',
+                unit: getPreferredUnitForIngredient(state.ingredientes[ingredientId])
+              });
               markEditorDirty();
             }
             renderRows();
