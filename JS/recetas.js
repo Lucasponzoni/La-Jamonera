@@ -1,7 +1,7 @@
 (function recetasModule() {
   const IA_WORKER_BASE = 'https://worker.lucasponzoninovogar.workers.dev';
   const IA_ICON_SRC = './IMG/ia-unscreen.gif';
-  const RECIPE_PLACEHOLDER_ICON = '<i class="fa-solid fa-burger"></i>';
+  const RECIPE_PLACEHOLDER_ICON = '<i class="bi bi-egg-fried"></i>';
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -41,8 +41,16 @@
   const NEW_MEASURE_VALUE = '__new_measure__';
 
   const blurActiveElement = () => document.activeElement?.blur?.();
-  const openIosSwal = (options) => Swal.fire({
+  const openIosSwal = (options) => {
+    blurActiveElement();
+    recetasModal.setAttribute('inert', '');
+    return Swal.fire({
     ...options,
+    returnFocus: false,
+    willClose: () => {
+      recetasModal.removeAttribute('inert');
+      if (typeof options.willClose === 'function') options.willClose();
+    },
     customClass: {
       popup: `ios-alert ingredientes-alert ${options?.customClass?.popup || ''}`.trim(),
       title: 'ios-alert-title',
@@ -53,6 +61,7 @@
     },
     buttonsStyling: false
   });
+  };
 
   const showState = (key) => {
     recetasLoading.classList.toggle('d-none', key !== 'loading');
@@ -60,8 +69,16 @@
     recetasData.classList.toggle('d-none', key !== 'data');
   };
 
+  const updateListScrollHint = () => {
+    if (!recetasList) return;
+    const hasOverflow = recetasList.scrollHeight > recetasList.clientHeight + 4;
+    const isAtEnd = recetasList.scrollTop + recetasList.clientHeight >= recetasList.scrollHeight - 4;
+    recetasList.classList.toggle('has-scroll-hint', hasOverflow && !isAtEnd);
+  };
+
   const setView = (view) => {
     state.view = view;
+    recetasLoading?.classList.add('d-none');
     recetasEditor?.classList.toggle('d-none', view !== 'editor');
     recetasData?.classList.toggle('d-none', view !== 'list');
     recetasEmpty?.classList.toggle('d-none', view !== 'empty');
@@ -118,10 +135,10 @@
   };
 
   const generateImageWithIA = async (prompt) => {
-    const response = await fetch(`${IA_WORKER_BASE}/api/ia/imagen`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt })
+    const response = await fetch(`${IA_WORKER_BASE}/emoji`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, mode: 'fast' })
     });
-    if (!response.ok) throw new Error('No se pudo generar la imagen con IA.');
+    if (!response.ok) throw new Error(`No se pudo generar la imagen con IA (${response.status}).`);
     const blob = await response.blob();
     if (!blob?.size) throw new Error('La IA no devolvió una imagen válida.');
     return new File([blob], `receta_${Date.now()}.png`, { type: blob.type || 'image/png' });
@@ -160,6 +177,7 @@
 
     if (!source.length) {
       recetasList.innerHTML = '<div class="ingrediente-empty-list">No encontramos recetas con ese filtro.</div>';
+      updateListScrollHint();
       showState(getRecetasArray().length ? 'data' : 'empty');
       return;
     }
@@ -167,14 +185,22 @@
     const measureMap = new Map(getMeasureOptions().map((item) => [item.value, item.label]));
     recetasList.innerHTML = source.map((item) => {
       const label = measureMap.get(normalizeLower(item.yieldUnit)) || capitalize(item.yieldUnit || '');
+      const recipeIngredients = (Array.isArray(item.rows) ? item.rows : [])
+        .filter((row) => row.type === 'ingredient' && normalizeValue(row.ingredientName))
+        .map((row) => capitalize(row.ingredientName));
       return `
         <article class="receta-card" data-receta-id="${item.id}">
           <div class="receta-card-head">
             <div class="receta-card-info">
-              <img class="receta-thumb" src="${item.imageUrl || './IMG/La Jamonera Cerdito.webp'}" alt="${capitalize(item.title || 'Receta')}">
+              <div class="receta-thumb-wrap">
+                ${item.imageUrl
+                  ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="receta-thumb js-receta-thumb" src="${item.imageUrl}" alt="${capitalize(item.title || 'Receta')}" loading="lazy">`
+                  : getPlaceholderCircle()}
+              </div>
               <div>
                 <h6 class="mb-1">${capitalize(item.title || 'Sin título')}</h6>
                 <div class="receta-card-meta">Rinde: ${item.yieldQuantity || '0'} ${label || ''}</div>
+                <div class="receta-card-ingredients">${recipeIngredients.length ? `Ingredientes: ${recipeIngredients.join(' · ')}` : 'Sin ingredientes vinculados.'}</div>
               </div>
             </div>
             <div class="recipe-row-actions">
@@ -186,18 +212,36 @@
           <small class="receta-card-meta">Actualizada: ${formatDate(item.updatedAt)}</small>
         </article>`;
     }).join('');
+    document.querySelectorAll('.js-receta-thumb').forEach((image) => {
+      const wrapper = image.closest('.receta-thumb-wrap');
+      const loading = wrapper?.querySelector('.thumb-loading');
+      const showImage = () => {
+        image.classList.add('is-loaded');
+        loading?.classList.add('d-none');
+      };
+      const showFallback = () => {
+        if (wrapper) wrapper.innerHTML = getPlaceholderCircle();
+      };
+      if (image.complete && image.naturalWidth > 0) {
+        showImage();
+      } else {
+        image.addEventListener('load', showImage, { once: true });
+        image.addEventListener('error', showFallback, { once: true });
+      }
+    });
+    updateListScrollHint();
     showState('data');
   };
 
   const getPlaceholderCircle = () => `<span class="image-placeholder-circle-2">${RECIPE_PLACEHOLDER_ICON}</span>`;
   const buildImageStepHtml = (prefix, initialImage) => `
     <section class="step-block recipe-step-card">
-      <h6 class="step-title"><span class="recipe-step-number">3</span> Imagen de receta</h6>
+      <h6 class="step-title">3) Imagen</h6>
       <div class="step-content">
         <div class="image-method-buttons" id="${prefix}_methodButtons">
           <button type="button" class="btn image-method-btn" data-image-method="url"><i class="fa-solid fa-link"></i>Link</button>
           <button type="button" class="btn image-method-btn" data-image-method="upload"><i class="fa-solid fa-upload"></i>Subir</button>
-          <button type="button" class="btn image-method-btn is-active" data-image-method="ai"><img src="${IA_ICON_SRC}" alt="" aria-hidden="true">IA</button>
+          <button type="button" class="btn image-method-btn is-active" data-image-method="ai"><img src="${IA_ICON_SRC}" alt="" aria-hidden="true"> IA</button>
         </div>
         <input type="hidden" id="${prefix}_method" value="ai">
 
@@ -215,7 +259,7 @@
 
         <div id="${prefix}_aiWrap" class="d-none">
           <label for="${prefix}_aiPrompt">Prompt corto para IA</label>
-          <input id="${prefix}_aiPrompt" class="swal2-input ios-input" placeholder="Ej: carne de cerdo">
+          <input id="${prefix}_aiPrompt" class="swal2-input ios-input recipe-ai-input" placeholder="Ej: carne de cerdo">
           <button id="${prefix}_aiGenerate" type="button" class="ai-generate-btn mt-2">
             <img src="${IA_ICON_SRC}" alt="" aria-hidden="true">
             <span>Generar imagen con IA</span>
@@ -279,6 +323,7 @@
       }
       aiGenerateBtn.disabled = true;
       aiError.classList.add('d-none');
+      preview.innerHTML = `<span class="image-preview-overlay"><img src="${IA_ICON_SRC}" alt="Generando"></span>`;
       try {
         const file = await generateImageWithIA(prompt);
         stateImage.generatedFile = file;
@@ -316,6 +361,30 @@
     };
   };
 
+  const ingredientAvatarHtml = (ingredient) => ingredient?.imageUrl
+    ? `<span class="recipe-inline-avatar-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-recipe-inline-thumb" src="${ingredient.imageUrl}" alt="${capitalize(ingredient.name)}" loading="lazy"></span>`
+    : `<span class="recipe-inline-avatar-wrap recipe-inline-avatar-fallback">${getPlaceholderCircle()}</span>`;
+
+  const prepareInlineThumbLoaders = () => {
+    recipeEditorForm.querySelectorAll('.js-recipe-inline-thumb').forEach((image) => {
+      const wrapper = image.closest('.recipe-inline-avatar-wrap');
+      const loading = wrapper?.querySelector('.thumb-loading');
+      const showImage = () => {
+        image.classList.add('is-loaded');
+        loading?.classList.add('d-none');
+      };
+      const showFallback = () => {
+        if (wrapper) wrapper.innerHTML = getPlaceholderCircle();
+      };
+      if (image.complete && image.naturalWidth > 0) {
+        showImage();
+      } else {
+        image.addEventListener('load', showImage, { once: true });
+        image.addEventListener('error', showFallback, { once: true });
+      }
+    });
+  };
+
   const renderRows = () => {
     const rowsBody = recipeEditorForm.querySelector('#recipeRowsBody');
     if (!rowsBody || !state.editor) return;
@@ -332,12 +401,13 @@
       return `
         <tr data-row-id="${row.id}" draggable="${state.editor.orderMode === 'custom'}">
           <td><i class="fa-solid fa-grip-lines"></i></td>
-          <td><div class="recipe-ing-autocomplete"><input class="form-control ios-input" data-ing-input="${row.id}" value="${row.ingredientName || ''}" placeholder="Buscar ingrediente..."></div></td>
+          <td><div class="recipe-ing-autocomplete"><div class="recipe-ing-input-wrap">${ingredientAvatarHtml(state.ingredientes[row.ingredientId])}<input class="form-control ios-input" data-ing-input="${row.id}" value="${row.ingredientName || ''}" placeholder="Buscar ingrediente..."></div></div></td>
           <td><input class="form-control ios-input" data-qty-input="${row.id}" value="${row.quantity || ''}" placeholder="0,00"></td>
           <td><select class="form-select ios-input" data-unit-input="${row.id}">${getMeasureSelectOptionsHtml(row.unit)}</select></td>
           <td><button type="button" class="btn family-manage-btn" data-remove-row="${row.id}"><i class="fa-solid fa-trash"></i></button></td>
         </tr>`;
     }).join('');
+    prepareInlineThumbLoaders();
   };
 
   const showSuggestions = (input, rowId, query) => {
@@ -354,7 +424,9 @@
     dropdown.className = 'recipe-suggest-floating';
     dropdown.innerHTML = `${source.map((item) => `
       <button type="button" class="recipe-suggest-item" data-pick-ingredient="${rowId}" data-ing-id="${item.id}">
-        <img class="recipe-suggest-avatar" src="${item.imageUrl || './IMG/La Jamonera Cerdito.webp'}" alt="${capitalize(item.name)}">
+        <span class="recipe-suggest-avatar-wrap">${item.imageUrl
+          ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-suggest-avatar js-recipe-suggest-thumb" src="${item.imageUrl}" alt="${capitalize(item.name)}" loading="lazy">`
+          : getPlaceholderCircle()}</span>
         <span>${capitalize(item.name)}</span>
       </button>`).join('')}
       <button type="button" class="recipe-suggest-item recipe-suggest-create" data-create-ingredient-inline="${rowId}">
@@ -367,6 +439,24 @@
     dropdown.style.top = `${inputRect.bottom - containerRect.top + 6}px`;
     dropdown.style.left = `${inputRect.left - containerRect.left}px`;
     dropdown.style.width = `${inputRect.width}px`;
+
+    dropdown.querySelectorAll('.js-recipe-suggest-thumb').forEach((image) => {
+      const wrapper = image.closest('.recipe-suggest-avatar-wrap');
+      const loading = wrapper?.querySelector('.thumb-loading');
+      const showImage = () => {
+        image.classList.add('is-loaded');
+        loading?.classList.add('d-none');
+      };
+      const showFallback = () => {
+        if (wrapper) wrapper.innerHTML = getPlaceholderCircle();
+      };
+      if (image.complete && image.naturalWidth > 0) {
+        showImage();
+      } else {
+        image.addEventListener('load', showImage, { once: true });
+        image.addEventListener('error', showFallback, { once: true });
+      }
+    });
   };
 
   const bindEditorEvents = () => {
@@ -507,7 +597,13 @@
           const row = state.editor?.rows.find((item) => item.id === rowId);
           const draft = row ? { name: row.ingredientName } : null;
           clearSuggestions();
-          const ingredientId = await window.laJamoneraIngredientesAPI?.openIngredientForm?.(null, draft);
+          recetasModal.setAttribute('inert', '');
+          let ingredientId = '';
+          try {
+            ingredientId = await window.laJamoneraIngredientesAPI?.openIngredientForm?.(null, draft);
+          } finally {
+            recetasModal.removeAttribute('inert');
+          }
           await fetchIngredientesData();
           if (ingredientId && state.ingredientes[ingredientId]) {
             const target = state.editor.rows.find((item) => item.id === rowId);
@@ -578,7 +674,7 @@
     recipeEditorTitle.textContent = initial ? 'Editar receta' : 'Nueva receta';
     state.activeRecipeId = initial?.id || '';
     recipeEditorForm.innerHTML = `
-      <section class="step-block recipe-step-card">
+      <section class="step-block recipe-step-card recipe-main-step">
         <h6 class="step-title"><span class="recipe-step-number">1</span> Datos principales</h6>
         <div class="step-content row g-3">
           <div class="col-12">
@@ -596,6 +692,10 @@
           <div class="col-md-6">
             <label class="form-label" for="recipeYieldUnit">Unidad de medida *</label>
             <select id="recipeYieldUnit" class="form-select ios-input">${getMeasureSelectOptionsHtml(initial?.yieldUnit)}</select>
+          </div>
+          <div class="col-md-6 recipe-highlight-field">
+            <label class="form-label" for="recipeShelfLifeDays"><i class="fa-regular fa-calendar-days"></i> Caducidad (días) *</label>
+            <input id="recipeShelfLifeDays" type="number" min="1" step="1" class="form-control ios-input" value="${initial?.shelfLifeDays || ''}" placeholder="Ej: 3">
           </div>
           <div class="col-md-6 recipe-highlight-field">
             <label class="form-label" for="recipeOrderModeEditor"><i class="fa-solid fa-arrow-down-short-wide"></i> Orden de ingredientes</label>
@@ -618,8 +718,8 @@
             </table>
           </div>
           <div class="recipe-table-actions">
-            <button type="button" class="btn ios-btn ios-btn-secondary recipe-table-action-btn" data-add-ingredient-row><i class="fa-solid fa-plus"></i><span>Agregar fila</span></button>
-            <button type="button" class="btn ios-btn ios-btn-secondary recipe-table-action-btn" data-add-comment-row><i class="fa-regular fa-message"></i><span>Comentario</span></button>
+            <button type="button" class="btn recipe-table-action-btn recipe-table-action-btn-primary" data-add-ingredient-row><i class="fa-solid fa-plus"></i><span>Agregar fila</span></button>
+            <button type="button" class="btn recipe-table-action-btn recipe-table-action-btn-neutral" data-add-comment-row><i class="fa-regular fa-message"></i><span>Comentario</span></button>
           </div>
         </div>
       </section>
@@ -638,11 +738,13 @@
     const description = normalizeValue(recipeEditorForm.querySelector('#recipeDescription')?.value);
     const yieldQuantity = normalizeValue(recipeEditorForm.querySelector('#recipeYieldQty')?.value).replaceAll('.', ',');
     const yieldUnit = normalizeLower(recipeEditorForm.querySelector('#recipeYieldUnit')?.value);
+    const shelfLifeDays = Number(normalizeValue(recipeEditorForm.querySelector('#recipeShelfLifeDays')?.value));
     const orderMode = normalizeLower(recipeEditorForm.querySelector('#recipeOrderModeEditor')?.value);
 
     if (!title) throw new Error('El título es obligatorio.');
     if (!yieldQuantity) throw new Error('Completá la cantidad obtenida.');
     if (!yieldUnit || yieldUnit === NEW_MEASURE_VALUE) throw new Error('Seleccioná una unidad de medida válida.');
+    if (!Number.isFinite(shelfLifeDays) || shelfLifeDays <= 0) throw new Error('Ingresá la caducidad en días con un número mayor a 0.');
 
     const rows = state.editor.rows
       .map((row) => row.type === 'comment'
@@ -651,6 +753,8 @@
       .filter((row) => row.type === 'comment' ? row.comment : row.ingredientName);
 
     if (!rows.length) throw new Error('Agregá al menos una fila válida en la receta.');
+    const invalidIngredientRow = rows.find((row) => row.type === 'ingredient' && (!row.ingredientId || !row.quantity || !row.unit || row.unit === NEW_MEASURE_VALUE));
+    if (invalidIngredientRow) throw new Error('Todas las filas de ingredientes deben tener ingrediente, cantidad y medida.');
 
     let imageUrl = normalizeValue(state.editor.image.url || '');
     const method = normalizeLower(document.getElementById('recipeImage_method')?.value || state.editor.image.method || 'ai');
@@ -668,7 +772,7 @@
       }
     }
 
-    return { title, description, yieldQuantity, yieldUnit, orderMode, rows, imageUrl };
+    return { title, description, yieldQuantity, yieldUnit, shelfLifeDays, orderMode, rows, imageUrl };
   };
 
   const removeRecipe = async (recipeId) => {
@@ -687,6 +791,9 @@
 
   const loadRecetas = async () => {
     showState('loading');
+    recetasEditor?.classList.add('d-none');
+    recetasData?.classList.add('d-none');
+    recetasEmpty?.classList.add('d-none');
     try {
       await fetchIngredientesData();
       await fetchRecetas();
@@ -734,8 +841,11 @@
   recetasModal.addEventListener('hidden.bs.modal', () => {
     clearSuggestions();
     blurActiveElement();
+    recetasModal.removeAttribute('inert');
   });
   recetasModal.addEventListener('show.bs.modal', loadRecetas);
+
+  recetasList?.addEventListener('scroll', updateListScrollHint);
 
   recetasSearchInput?.addEventListener('input', (event) => {
     state.search = normalizeLower(event.target.value);
