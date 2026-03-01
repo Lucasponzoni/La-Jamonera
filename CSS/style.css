@@ -2885,7 +2885,7 @@ html.login-protected.auth-ok body {
 .recipe-table-wrap {
   border: 1px solid #cfdcf8;
   border-radius: 14px 14px 0 0;
-  overflow: visible;
+  overflow: hidden;
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
 
@@ -2897,7 +2897,7 @@ html.login-protected.auth-ok body {
 
 .recipe-table {
   width: 100%;
-  min-width: 650px;
+  min-width: 100%;
   font-size: 0.92rem;
   border-collapse: separate;
   border-spacing: 0;
@@ -3163,7 +3163,7 @@ html.login-protected.auth-ok body {
     flex: 1 1 100%;
   }
 
-  .recipe-table {
+  .recipe-table-scroll .recipe-table {
     min-width: 720px;
   }
 
