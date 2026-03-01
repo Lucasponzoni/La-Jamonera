@@ -2883,10 +2883,10 @@ html.login-protected.auth-ok body {
 }
 
 .recipe-table-wrap {
-  border: 1px solid #d9e3f8;
+  border: 1px solid #cfdcf8;
   border-radius: 14px;
   overflow: visible;
-  background: #fff;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
 
 .recipe-table {
@@ -2899,6 +2899,20 @@ html.login-protected.auth-ok body {
   border-bottom: 1px solid #ecf1ff;
   padding: 8px;
   vertical-align: middle;
+}
+
+.recipe-table thead th {
+  background: #eef4ff;
+  color: #294f9f;
+  font-weight: 800;
+}
+
+.recipe-table tbody tr {
+  background: #ffffff;
+}
+
+.recipe-table tbody tr:nth-child(even) {
+  background: #f7faff;
 }
 
 .recipe-table tbody tr.is-comment {

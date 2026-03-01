@@ -1,7 +1,7 @@
 (function recetasModule() {
   const IA_WORKER_BASE = 'https://worker.lucasponzoninovogar.workers.dev';
   const IA_ICON_SRC = './IMG/ia-unscreen.gif';
-  const RECIPE_PLACEHOLDER_ICON = '<i class="fa-solid fa-hotdog"></i>';
+  const RECIPE_PLACEHOLDER_ICON = '<i class="fa-solid fa-bowl-food"></i>';
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -256,7 +256,7 @@
   const getSmallPlaceholder = (icon = 'fa-solid fa-bowl-food') => `<span class="recipe-small-placeholder"><i class="${icon}"></i></span>`;
   const buildImageStepHtml = (prefix, initialImage) => `
     <section class="step-block recipe-step-card">
-      <h6 class="step-title">3) Imagen</h6>
+      <h6 class="step-title"><span class="recipe-step-number">3</span> Imagen</h6>
       <div class="step-content">
         <div class="image-method-buttons" id="${prefix}_methodButtons">
           <button type="button" class="btn image-method-btn" data-image-method="url"><i class="fa-solid fa-link"></i>Link</button>
@@ -383,7 +383,7 @@
 
   const ingredientAvatarHtml = (ingredient) => ingredient?.imageUrl
     ? `<span class="recipe-inline-avatar-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-recipe-inline-thumb" src="${ingredient.imageUrl}" alt="${capitalize(ingredient.name)}" loading="lazy"></span>`
-    : `<span class="recipe-inline-avatar-wrap recipe-inline-avatar-fallback">${getSmallPlaceholder('fa-solid fa-seedling')}</span>`;
+    : `<span class="recipe-inline-avatar-wrap recipe-inline-avatar-fallback">${getSmallPlaceholder('fa-solid fa-bowl-food')}</span>`;
 
   const prepareInlineThumbLoaders = () => {
     recipeEditorForm.querySelectorAll('.js-recipe-inline-thumb').forEach((image) => {
@@ -394,7 +394,7 @@
         loading?.classList.add('d-none');
       };
       const showFallback = () => {
-        if (wrapper) wrapper.innerHTML = getSmallPlaceholder('fa-solid fa-seedling');
+        if (wrapper) wrapper.innerHTML = getSmallPlaceholder('fa-solid fa-bowl-food');
       };
       if (image.complete && image.naturalWidth > 0) {
         showImage();
@@ -446,7 +446,7 @@
       <button type="button" class="recipe-suggest-item" data-pick-ingredient="${rowId}" data-ing-id="${item.id}">
         <span class="recipe-suggest-avatar-wrap">${item.imageUrl
           ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-suggest-avatar js-recipe-suggest-thumb" src="${item.imageUrl}" alt="${capitalize(item.name)}" loading="lazy">`
-          : getSmallPlaceholder('fa-solid fa-seedling')}</span>
+          : getSmallPlaceholder('fa-solid fa-bowl-food')}</span>
         <span>${capitalize(item.name)}</span>
       </button>`).join('')}
       <button type="button" class="recipe-suggest-item recipe-suggest-create" data-create-ingredient-inline="${rowId}">
@@ -473,7 +473,7 @@
         loading?.classList.add('d-none');
       };
       const showFallback = () => {
-        if (wrapper) wrapper.innerHTML = getSmallPlaceholder('fa-solid fa-seedling');
+        if (wrapper) wrapper.innerHTML = getSmallPlaceholder('fa-solid fa-bowl-food');
       };
       if (image.complete && image.naturalWidth > 0) {
         showImage();
@@ -637,6 +637,7 @@
           const row = state.editor?.rows.find((item) => item.id === rowId);
           const draft = row ? { name: row.ingredientName } : null;
           clearSuggestions();
+          blurActiveElement();
           let ingredientId = '';
           ingredientId = await window.laJamoneraIngredientesAPI?.openIngredientForm?.(null, draft);
           await fetchIngredientesData();
@@ -728,7 +729,7 @@
             <label class="form-label" for="recipeYieldQty"><i class="fa-solid fa-weight-hanging"></i> Cantidad final obtenida *</label>
             <input id="recipeYieldQty" class="form-control ios-input" value="${initial?.yieldQuantity || ''}" placeholder="Ej: 10,50">
           </div>
-          <div class="recipe-field recipe-field-half recipe-highlight-field">
+          <div class="recipe-field recipe-field-half">
             <label class="form-label" for="recipeYieldUnit">Unidad de medida *</label>
             <div class="recipe-highlight-field recipe-highlight-field-soft">
               <select id="recipeYieldUnit" class="form-select ios-input">${getMeasureSelectOptionsHtml(initial?.yieldUnit)}</select>
