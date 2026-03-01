@@ -3158,43 +3158,29 @@ html.login-protected.auth-ok body {
 }
 
 .recipe-octagon {
-  width: 104px;
-  min-height: 104px;
+  width: 112px;
+  min-height: 112px;
   clip-path: polygon(31% 0, 69% 0, 100% 31%, 100% 69%, 69% 100%, 31% 100%, 0 69%, 0 31%);
-  padding: 8px 6px;
+  padding: 10px 8px;
 }
 
 .recipe-front-rectangle {
-  min-width: 214px;
-  min-height: 74px;
-  padding: 8px 10px;
+  min-width: 236px;
+  min-height: 78px;
+  padding: 8px 12px;
 }
 
 .recipe-octagon-title,
 .recipe-front-rectangle-title {
-  font-size: 0.56rem;
+  font-size: 0.66rem;
   line-height: 1.06;
   font-weight: 900;
-  letter-spacing: 0.02em;
-}
-
-.recipe-octagon-product,
-.recipe-front-rectangle-product {
-  margin-top: 2px;
-  font-size: 0.45rem;
-  line-height: 1.05;
-  font-weight: 700;
-  opacity: 0.88;
-  text-transform: uppercase;
-  max-width: 95%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  letter-spacing: 0.01em;
 }
 
 .recipe-octagon-ministry {
-  margin-top: 2px;
-  font-size: 0.48rem;
+  margin-top: 4px;
+  font-size: 0.6rem;
   line-height: 1.05;
   font-weight: 600;
 }
@@ -3204,9 +3190,9 @@ html.login-protected.auth-ok body {
 }
 
 .recipe-octagons-wrap.is-compact .recipe-octagon {
-  width: 72px;
-  min-height: 72px;
-  padding: 5px 4px;
+  width: 86px;
+  min-height: 86px;
+  padding: 7px 5px;
 }
 
 .recipe-front-rectangles.is-compact {
@@ -3215,20 +3201,18 @@ html.login-protected.auth-ok body {
 }
 
 .recipe-front-rectangles.is-compact .recipe-front-rectangle {
-  min-width: 156px;
-  min-height: 56px;
+  min-width: 174px;
+  min-height: 60px;
   padding: 6px 8px;
 }
 
 .recipe-octagons-wrap.is-compact .recipe-octagon-title,
 .recipe-front-rectangles.is-compact .recipe-front-rectangle-title {
-  font-size: 0.43rem;
+  font-size: 0.52rem;
 }
 
-.recipe-octagons-wrap.is-compact .recipe-octagon-product,
-.recipe-front-rectangles.is-compact .recipe-front-rectangle-product,
 .recipe-octagons-wrap.is-compact .recipe-octagon-ministry {
-  font-size: 0.36rem;
+  font-size: 0.44rem;
 }
 
 .recipe-nutrition-front-empty {
@@ -3254,11 +3238,19 @@ html.login-protected.auth-ok body {
 }
 
 .recipe-nutrition-label-card h3 {
-  margin: 0 0 8px;
+  margin: 0 0 4px;
   text-align: center;
   letter-spacing: 0.14em;
   font-size: 1rem;
   font-weight: 800;
+}
+
+.recipe-nutrition-product-name {
+  margin: 0 0 8px;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .recipe-nutrition-serving,

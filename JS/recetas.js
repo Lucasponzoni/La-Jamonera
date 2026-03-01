@@ -297,7 +297,7 @@
             <p class="ingrediente-meta receta-card-meta">Rinde: ${item.yieldQuantity || '0'} ${label || ''}</p>
             <p class="ingrediente-meta receta-card-ingredients">Ingredientes: ${recipeIngredients.length ? recipeIngredients.join(' · ') : 'Sin ingredientes vinculados.'}</p>
             ${item.description ? `<p class="ingrediente-description">${capitalize(item.description)}</p>` : '<p class="ingrediente-description"><em>Sin descripción</em></p>'}
-            ${frontLabels.length ? `<div class="receta-front-inline">${buildFrontLabelsHtml(frontLabels, { productTitle: item.title || 'Producto', compact: true })}</div>` : ''}
+            ${frontLabels.length ? `<div class="receta-front-inline">${buildFrontLabelsHtml(frontLabels, { compact: true })}</div>` : ''}
             <p class="ingrediente-dates receta-card-dates">
               <span><i class="fa-regular fa-calendar-plus" aria-hidden="true"></i> Alta: ${formatDateLabel(item.createdAt)}</span>
               <span><i class="fa-regular fa-calendar-check" aria-hidden="true"></i> Mod: ${formatDateLabel(item.updatedAt)}</span>
@@ -648,7 +648,6 @@
       : [];
     if (!clean.length) return '<p class="recipe-nutrition-front-empty">Sin sellos de advertencia.</p>';
     const unique = Array.from(new Set(clean));
-    const productTitle = capitalize(options.productTitle || 'Producto sin título');
     const compact = options.compact ? ' is-compact' : '';
     const octagons = unique.filter((item) => FRONT_LABEL_CONFIG[item]?.type === 'octagon');
     const rectangles = unique.filter((item) => FRONT_LABEL_CONFIG[item]?.type === 'rectangle');
@@ -657,12 +656,12 @@
       <div class="recipe-octagons-wrap${compact}">
         ${octagons.map((item) => {
           const config = FRONT_LABEL_CONFIG[item] || { text: item };
-          return `<span class="recipe-octagon"><span class="recipe-octagon-title">${escapeHtml(config.text).replaceAll('\n', '<br>')}</span><span class="recipe-octagon-product">${escapeHtml(productTitle)}</span><span class="recipe-octagon-ministry">Ministerio<br>de Salud</span></span>`;
+          return `<span class="recipe-octagon"><span class="recipe-octagon-title">${escapeHtml(config.text).replaceAll('\n', '<br>')}</span><span class="recipe-octagon-ministry">Ministerio<br>de Salud</span></span>`;
         }).join('')}
       </div>
       ${rectangles.length ? `<div class="recipe-front-rectangles${compact}">${rectangles.map((item) => {
         const config = FRONT_LABEL_CONFIG[item] || { text: item };
-        return `<span class="recipe-front-rectangle"><span class="recipe-front-rectangle-title">${escapeHtml(config.text).replaceAll('\n', '<br>')}</span><span class="recipe-front-rectangle-product">${escapeHtml(productTitle)}</span><span class="recipe-octagon-ministry">Ministerio<br>de Salud</span></span>`;
+        return `<span class="recipe-front-rectangle"><span class="recipe-front-rectangle-title">${escapeHtml(config.text).replaceAll('\n', '<br>')}</span><span class="recipe-octagon-ministry">Ministerio<br>de Salud</span></span>`;
       }).join('')}</div>` : ''}
     `;
   };
@@ -732,6 +731,7 @@
     return `
       <div class="recipe-nutrition-label-card">
         <h3>INFORMACIÓN NUTRICIONAL</h3>
+        <p class="recipe-nutrition-product-name">${escapeHtml(snapshot?.title || 'Producto')}</p>
         <p class="recipe-nutrition-serving">Tamaño de la porción ${escapeHtml(formatSmart(servingAmount, 2))}${escapeHtml(servingUnit)} · ${escapeHtml(formatSmart(servings, 2))} porciones por envase</p>
         <div class="recipe-nutrition-bar"></div>
         <p class="recipe-nutrition-subtitle">Cantidad por porción</p>
@@ -784,14 +784,13 @@
 
     wrapper.innerHTML = `
       <div class="recipe-nutrition-product-meta">
-        <h6>${escapeHtml(normalizeValue(recipeEditorForm.querySelector('#recipeTitle')?.value || 'Producto'))}</h6>
         <p>${escapeHtml(normalizeValue(recipeEditorForm.querySelector('#recipeDescription')?.value || ''))}</p>
       </div>
       <div id="recipeNutritionAiTableEditable" class="recipe-nutrition-ai-table ${stale ? 'is-locked' : ''}" contenteditable="${stale ? 'false' : 'true'}">${ai.tableHtml}</div>
       <p class="recipe-nutrition-ai-help">Podés editar manualmente la tabla nutricional si querés ajustar el diseño o valores.</p>
       <div class="recipe-nutrition-front-labels">
         <h6>Etiquetado frontal (Argentina)</h6>
-        ${buildFrontLabelsHtml(ai.frontLabels, { productTitle: recipeEditorForm.querySelector('#recipeTitle')?.value || 'Producto' })}
+        ${buildFrontLabelsHtml(ai.frontLabels)}
       </div>
     `;
     syncSaveButtonWithNutritionState();
