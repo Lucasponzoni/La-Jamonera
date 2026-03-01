@@ -280,7 +280,7 @@ html.login-protected.auth-ok body {
 }
 
 .footer-main {
-  width: 1200px;
+  width: min(1200px, 100%);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -2699,6 +2699,11 @@ html.login-protected.auth-ok body {
   position: relative;
 }
 
+.recetas-modal .modal-dialog {
+  width: min(100%, calc(100vw - 24px));
+  margin-inline: auto;
+}
+
 .recetas-list {
   display: grid;
   gap: 12px;
@@ -3087,6 +3092,31 @@ html.login-protected.auth-ok body {
 
 .recipe-nutrition-ai-table {
   border-radius: 10px;
+  width: 100%;
+  max-width: 100%;
+}
+
+.recipe-nutrition-ai-table,
+.recipe-nutrition-ai-table * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.recipe-nutrition-ai-table table {
+  width: 100% !important;
+  table-layout: fixed;
+}
+
+.recipe-nutrition-ai-table td,
+.recipe-nutrition-ai-table th,
+.recipe-nutrition-ai-table p,
+.recipe-nutrition-ai-table span {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.recipe-nutrition-ai-table img {
+  height: auto;
 }
 
 .recipe-nutrition-ai-table[contenteditable="true"] {
@@ -3115,6 +3145,7 @@ html.login-protected.auth-ok body {
   background: #fff;
   border-radius: 12px;
   padding: 12px;
+  overflow-x: hidden;
 }
 
 .recipe-nutrition-ai-empty {
@@ -3576,6 +3607,36 @@ html.login-protected.auth-ok body {
 }
 
 @media (max-width: 768px) {
+  .recetas-editor,
+  .recetas-editor-form,
+  .recipe-step-card,
+  .recipe-highlight-field,
+  .recipe-field,
+  .recipe-nutrition-ai-preview,
+  .recipe-nutrition-ai-table {
+    min-width: 0;
+  }
+
+  .recetas-modal .modal-dialog {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+  }
+
+  .recetas-modal .modal-content {
+    border-radius: 0;
+    border-inline: 0;
+  }
+
+  .recetas-modal .ios-modal-header,
+  .recetas-modal .ios-modal-body {
+    padding-inline: 12px;
+  }
+
+  .recetas-modal .ios-modal-body {
+    overflow-x: hidden;
+  }
+
   .recipe-field-half {
     flex: 1 1 100%;
   }
@@ -3593,8 +3654,15 @@ html.login-protected.auth-ok body {
   }
 
   .recipe-nutrition-declaration-grid,
-  .recipe-nutrition-household-grid {
+  .recipe-nutrition-household-grid,
+  .recipe-nutrition-two-cols {
     grid-template-columns: 1fr;
+  }
+
+  .recipe-nutrition-label-card {
+    width: 100%;
+    max-width: 100%;
+    padding: 8px;
   }
 
   .recipe-ing-autocomplete .recipe-suggest-floating {
