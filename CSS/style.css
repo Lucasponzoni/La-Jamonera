@@ -2768,6 +2768,43 @@ html.login-protected.auth-ok body {
   margin: 0;
 }
 
+.receta-print-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 4px;
+}
+
+.receta-print-btn {
+  border-radius: 999px;
+  border: 1px solid #cfdcf8;
+  background: #eef4ff;
+  color: #234b9b;
+  min-height: 32px;
+  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.receta-print-btn:hover {
+  background: #dce9ff;
+  color: #1b3f8c;
+}
+
+.receta-print-btn-front {
+  background: #fff0f2;
+  border-color: #f3ccd3;
+  color: #aa3f53;
+}
+
+.receta-print-btn-front:hover {
+  background: #ffe4e8;
+  color: #943145;
+}
+
 .receta-card-ingredients {
   margin-top: 2px;
   color: #687ca8;
@@ -3610,6 +3647,49 @@ html.login-protected.auth-ok body {
   gap: 10px;
 }
 
+.recipe-print-panel .swal2-input {
+  width: 100%;
+  margin: 0;
+}
+
+.recipe-print-preview {
+  border: 1px dashed #cfdcf8;
+  border-radius: 12px;
+  padding: 10px;
+  background: #f9fbff;
+  max-height: 48vh;
+  overflow: auto;
+}
+
+.recipe-print-preview-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.recipe-print-preview-grid.is-a4 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.recipe-print-preview-grid.is-zebra {
+  grid-template-columns: 1fr;
+}
+
+.recipe-print-preview .print-block {
+  border: 1px solid #e2e9fb;
+  border-radius: 10px;
+  padding: 8px;
+  background: #fff;
+}
+
+.recipe-print-preview .recipe-nutrition-label-card {
+  width: 100% !important;
+}
+
+.recipe-print-preview .recipe-octagons-wrap,
+.recipe-print-preview .recipe-front-rectangles {
+  justify-content: center;
+}
+
 @media (max-width: 768px) {
   .recetas-editor,
   .recetas-editor-form,
@@ -3643,6 +3723,16 @@ html.login-protected.auth-ok body {
 
   .recipe-field-half {
     flex: 1 1 100%;
+  }
+
+  .receta-print-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .receta-print-btn {
+    width: 100%;
+    justify-content: center;
   }
 
   .recipe-table-wrap,
