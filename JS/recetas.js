@@ -631,7 +631,9 @@
         if (input.matches('[data-ing-input]')) showSuggestions(input, input.dataset.ingInput, input.value);
       });
 
-      recetasEditor.addEventListener('click', async (event) => {
+      document.addEventListener('click', async (event) => {
+        if (recetasEditor.classList.contains('d-none')) return;
+
         const pickBtn = event.target.closest('[data-pick-ingredient]');
         if (pickBtn) {
           const row = state.editor?.rows.find((item) => item.id === pickBtn.dataset.pickIngredient);
@@ -645,6 +647,7 @@
           }
           return;
         }
+
         const createInlineBtn = event.target.closest('[data-create-ingredient-inline]');
         if (createInlineBtn) {
           const rowId = createInlineBtn.dataset.createIngredientInline;
@@ -679,6 +682,7 @@
             }
             renderRows();
           }
+          return;
         }
       });
 
