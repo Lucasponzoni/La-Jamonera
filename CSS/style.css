@@ -2737,6 +2737,19 @@ html.login-protected.auth-ok body {
   position: relative;
 }
 
+.receta-thumb-wrap {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid #d8e1f6;
+  background: #edf2fd;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
 .receta-thumb {
   width: 52px;
   height: 52px;
@@ -2772,6 +2785,13 @@ html.login-protected.auth-ok body {
 
 .receta-name {
   margin-bottom: 2px;
+}
+
+.receta-card-ingredients {
+  margin-top: 4px;
+  color: #687ca8;
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .recetas-editor {
