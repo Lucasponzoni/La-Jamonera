@@ -2085,6 +2085,10 @@ html.login-protected.auth-ok body {
 }
 
 @media (max-width: 768px) {
+  .barra-vertical {
+    display: none;
+  }
+
   .topbar-divider-item {
     display: none;
   }
@@ -2885,7 +2889,7 @@ html.login-protected.auth-ok body {
 .recipe-table-wrap {
   border: 1px solid #cfdcf8;
   border-radius: 14px 14px 0 0;
-  overflow: hidden;
+  overflow: visible;
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
 
