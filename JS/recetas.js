@@ -372,6 +372,28 @@
     state.editor && (state.editor.activeSuggestRowId = '');
   };
 
+  const findIngredientInputByRowId = (rowId) => recipeEditorForm.querySelector(`[data-ing-input="${rowId}"]`);
+
+  const positionSuggestionDropdown = (dropdown, input) => {
+    if (!dropdown || !input) return;
+    const inputRect = input.getBoundingClientRect();
+    dropdown.style.position = 'fixed';
+    dropdown.style.top = `${inputRect.bottom + 6}px`;
+    dropdown.style.left = `${inputRect.left}px`;
+    dropdown.style.width = `${Math.max(inputRect.width, 220)}px`;
+  };
+
+  const repositionActiveSuggestions = () => {
+    if (!state.editor?.activeSuggestRowId) return;
+    const dropdown = document.querySelector('.recipe-suggest-floating');
+    const input = findIngredientInputByRowId(state.editor.activeSuggestRowId);
+    if (!dropdown || !input) {
+      clearSuggestions();
+      return;
+    }
+    positionSuggestionDropdown(dropdown, input);
+  };
+
   const snapshotEditorDraft = () => {
     if (state.view !== 'editor' || !state.editor) return;
     state.resumeEditor = {
@@ -453,17 +475,9 @@
         <i class="fa-solid fa-plus"></i><span>Crear ingrediente</span>
       </button>`;
 
-    const autoWrap = input.closest('.recipe-ing-autocomplete');
-    if (autoWrap) {
-      autoWrap.appendChild(dropdown);
-    } else {
-      recetasEditor.appendChild(dropdown);
-      const inputRect = input.getBoundingClientRect();
-      const containerRect = recetasEditor.getBoundingClientRect();
-      dropdown.style.top = `${inputRect.bottom - containerRect.top + 6}px`;
-      dropdown.style.left = `${inputRect.left - containerRect.left}px`;
-      dropdown.style.width = `${inputRect.width}px`;
-    }
+    document.body.appendChild(dropdown);
+    positionSuggestionDropdown(dropdown, input);
+    state.editor.activeSuggestRowId = rowId;
 
     dropdown.querySelectorAll('.js-recipe-suggest-thumb').forEach((image) => {
       const wrapper = image.closest('.recipe-suggest-avatar-wrap');
@@ -673,6 +687,11 @@
           clearSuggestions();
         }
       });
+
+      const modalBody = recetasModal.querySelector('.modal-body');
+      modalBody?.addEventListener('scroll', repositionActiveSuggestions);
+      window.addEventListener('resize', repositionActiveSuggestions);
+      window.addEventListener('scroll', repositionActiveSuggestions, true);
 
       state.editorEventsBound = true;
     }
