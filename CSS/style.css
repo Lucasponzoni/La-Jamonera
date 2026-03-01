@@ -2893,15 +2893,19 @@ html.login-protected.auth-ok body {
 }
 
 .recipe-table-wrap {
+  width: 100%;
+  max-width: 100%;
   border: 1px solid #cfdcf8;
   border-radius: 14px 14px 0 0;
-  overflow: visible;
+  overflow: hidden;
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
 
 .recipe-table-scroll {
+  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
-  overflow-y: visible;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -3641,16 +3645,26 @@ html.login-protected.auth-ok body {
     flex: 1 1 100%;
   }
 
+  .recipe-table-wrap,
+  .recipe-table-scroll,
+  .recipe-table-actions {
+    min-width: 0;
+  }
+
   .recipe-table-scroll .recipe-table {
     min-width: 720px;
   }
 
   .recipe-table-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
     justify-content: stretch;
   }
 
   .recipe-table-action-btn {
     width: 100%;
+    min-width: 0;
   }
 
   .recipe-nutrition-declaration-grid,
