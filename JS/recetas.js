@@ -103,7 +103,21 @@
 
   const getMeasureSelectOptionsHtml = (selected = '') => {
     const opts = getMeasureOptions();
-    return `${opts.map((item) => `<option value="${item.value}" ${normalizeLower(selected) === item.value ? 'selected' : ''}>${item.label}</option>`).join('')}<option value="${NEW_MEASURE_VALUE}">+ Agregar nueva medida</option>`;
+    const selectedNorm = normalizeLower(selected);
+    const hasSelectedInOptions = selectedNorm && opts.some((item) => item.value === selectedNorm);
+    const selectedFallbackOption = selectedNorm && !hasSelectedInOptions
+      ? `<option value="${selectedNorm}" selected>${capitalize(selectedNorm)}</option>`
+      : '';
+    return `${selectedFallbackOption}${opts.map((item) => `<option value="${item.value}" ${selectedNorm === item.value ? 'selected' : ''}>${item.label}</option>`).join('')}<option value="${NEW_MEASURE_VALUE}">+ Agregar nueva medida</option>`;
+  };
+
+  const getPreferredUnitForIngredient = (ingredient) => {
+    const ingredientMeasure = normalizeLower(ingredient?.measure);
+    if (ingredientMeasure) {
+      return ingredientMeasure;
+    }
+    const available = getMeasureOptions().map((item) => item.value);
+    return available[0] || '';
   };
 
   const persistNewMeasure = async (name, abbr) => {
@@ -372,6 +386,28 @@
     state.editor && (state.editor.activeSuggestRowId = '');
   };
 
+  const findIngredientInputByRowId = (rowId) => recipeEditorForm.querySelector(`[data-ing-input="${rowId}"]`);
+
+  const positionSuggestionDropdown = (dropdown, input) => {
+    if (!dropdown || !input) return;
+    const inputRect = input.getBoundingClientRect();
+    dropdown.style.position = 'fixed';
+    dropdown.style.top = `${inputRect.bottom + 6}px`;
+    dropdown.style.left = `${inputRect.left}px`;
+    dropdown.style.width = `${Math.max(inputRect.width, 220)}px`;
+  };
+
+  const repositionActiveSuggestions = () => {
+    if (!state.editor?.activeSuggestRowId) return;
+    const dropdown = document.querySelector('.recipe-suggest-floating');
+    const input = findIngredientInputByRowId(state.editor.activeSuggestRowId);
+    if (!dropdown || !input) {
+      clearSuggestions();
+      return;
+    }
+    positionSuggestionDropdown(dropdown, input);
+  };
+
   const snapshotEditorDraft = () => {
     if (state.view !== 'editor' || !state.editor) return;
     state.resumeEditor = {
@@ -453,17 +489,9 @@
         <i class="fa-solid fa-plus"></i><span>Crear ingrediente</span>
       </button>`;
 
-    const autoWrap = input.closest('.recipe-ing-autocomplete');
-    if (autoWrap) {
-      autoWrap.appendChild(dropdown);
-    } else {
-      recetasEditor.appendChild(dropdown);
-      const inputRect = input.getBoundingClientRect();
-      const containerRect = recetasEditor.getBoundingClientRect();
-      dropdown.style.top = `${inputRect.bottom - containerRect.top + 6}px`;
-      dropdown.style.left = `${inputRect.left - containerRect.left}px`;
-      dropdown.style.width = `${inputRect.width}px`;
-    }
+    document.body.appendChild(dropdown);
+    positionSuggestionDropdown(dropdown, input);
+    state.editor.activeSuggestRowId = rowId;
 
     dropdown.querySelectorAll('.js-recipe-suggest-thumb').forEach((image) => {
       const wrapper = image.closest('.recipe-suggest-avatar-wrap');
@@ -617,7 +645,9 @@
         if (input.matches('[data-ing-input]')) showSuggestions(input, input.dataset.ingInput, input.value);
       });
 
-      recetasEditor.addEventListener('click', async (event) => {
+      document.addEventListener('click', async (event) => {
+        if (recetasEditor.classList.contains('d-none')) return;
+
         const pickBtn = event.target.closest('[data-pick-ingredient]');
         if (pickBtn) {
           const row = state.editor?.rows.find((item) => item.id === pickBtn.dataset.pickIngredient);
@@ -625,12 +655,14 @@
           if (row && ingredient) {
             row.ingredientId = ingredient.id;
             row.ingredientName = ingredient.name;
+            row.unit = getPreferredUnitForIngredient(ingredient);
             markEditorDirty();
             renderRows();
             clearSuggestions();
           }
           return;
         }
+
         const createInlineBtn = event.target.closest('[data-create-ingredient-inline]');
         if (createInlineBtn) {
           const rowId = createInlineBtn.dataset.createIngredientInline;
@@ -658,13 +690,22 @@
             if (target) {
               target.ingredientId = ingredientId;
               target.ingredientName = state.ingredientes[ingredientId].name;
+              target.unit = getPreferredUnitForIngredient(state.ingredientes[ingredientId]);
               markEditorDirty();
             } else {
-              state.editor.rows.push({ id: makeId('row'), type: 'ingredient', ingredientId, ingredientName: state.ingredientes[ingredientId].name, quantity: '', unit: getMeasureOptions()[0]?.value || '' });
+              state.editor.rows.push({
+                id: makeId('row'),
+                type: 'ingredient',
+                ingredientId,
+                ingredientName: state.ingredientes[ingredientId].name,
+                quantity: '',
+                unit: getPreferredUnitForIngredient(state.ingredientes[ingredientId])
+              });
               markEditorDirty();
             }
             renderRows();
           }
+          return;
         }
       });
 
@@ -673,6 +714,11 @@
           clearSuggestions();
         }
       });
+
+      const modalBody = recetasModal.querySelector('.modal-body');
+      modalBody?.addEventListener('scroll', repositionActiveSuggestions);
+      window.addEventListener('resize', repositionActiveSuggestions);
+      window.addEventListener('scroll', repositionActiveSuggestions, true);
 
       state.editorEventsBound = true;
     }
