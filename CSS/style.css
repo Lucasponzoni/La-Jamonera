@@ -2947,6 +2947,7 @@ html.login-protected.auth-ok body {
 .recipe-table tbody tr.drag-over {
   outline: 2px dashed #4d74cf;
   outline-offset: -2px;
+  background-color: #a8d2fb;
 }
 
 .recipe-table-actions {
