@@ -112,11 +112,11 @@
   };
 
   const getPreferredUnitForIngredient = (ingredient) => {
-    const available = getMeasureOptions().map((item) => item.value);
     const ingredientMeasure = normalizeLower(ingredient?.measure);
-    if (ingredientMeasure && available.includes(ingredientMeasure)) {
+    if (ingredientMeasure) {
       return ingredientMeasure;
     }
+    const available = getMeasureOptions().map((item) => item.value);
     return available[0] || '';
   };
 
