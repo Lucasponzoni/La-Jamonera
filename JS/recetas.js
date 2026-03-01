@@ -1174,7 +1174,7 @@
           <div class="recipe-field recipe-field-full recipe-highlight-field recipe-highlight-field-nutrition">
             <label class="form-label" for="recipeNutritionHouseholdMeasure">Medida casera</label>
             <div class="recipe-nutrition-household-grid">
-              <input id="recipeNutritionHouseholdAmount" type="number" min="1" step="1" class="form-control ios-input" value="${state.editor.nutrition.householdAmount || '1'}" placeholder="Cantidad">
+              <input id="recipeNutritionHouseholdAmount" type="number" min="0" step="0.01" class="form-control ios-input" value="${state.editor.nutrition.householdAmount || '1'}" placeholder="Ej: 0,5">
               <select id="recipeNutritionHouseholdMeasure" class="form-select ios-input">${getHouseholdMeasureOptionsHtml(state.editor.nutrition.householdMeasure, state.editor.nutrition.householdAmount || 1)}</select>
             </div>
           </div>
