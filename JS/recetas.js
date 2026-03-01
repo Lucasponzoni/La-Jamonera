@@ -30,7 +30,8 @@
     activeRecipeId: '',
     editor: null,
     editorEventsBound: false,
-    resumeEditor: null
+    resumeEditor: null,
+    editorDirty: false
   };
 
   const normalizeValue = (value) => String(value || '').trim();
@@ -67,6 +68,10 @@
     recetasLoading.classList.toggle('d-none', key !== 'loading');
     recetasEmpty.classList.toggle('d-none', key !== 'empty');
     recetasData.classList.toggle('d-none', key !== 'data');
+  };
+
+  const markEditorDirty = () => {
+    state.editorDirty = true;
   };
 
   const updateListScrollHint = () => {
@@ -116,6 +121,12 @@
   const formatDate = (value) => {
     const date = new Date(value || Date.now());
     return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  const formatDateLabel = (timestamp) => {
+    const date = new Date(Number(timestamp || 0));
+    if (Number.isNaN(date.getTime())) return 'S/D';
+    return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
   };
 
   const validateImageFile = (file) => {
@@ -209,7 +220,10 @@
             </div>
           </div>
           <p class="mb-1">${item.description ? capitalize(item.description) : '<em>Sin descripción</em>'}</p>
-          <small class="receta-card-meta">Actualizada: ${formatDate(item.updatedAt)}</small>
+          <div class="receta-card-dates">
+            <span><i class="fa-regular fa-calendar-plus" aria-hidden="true"></i> Alta: ${formatDateLabel(item.createdAt)}</span>
+            <span><i class="fa-regular fa-calendar-check" aria-hidden="true"></i> Mod: ${formatDateLabel(item.updatedAt)}</span>
+          </div>
         </article>`;
     }).join('');
     document.querySelectorAll('.js-receta-thumb').forEach((image) => {
@@ -247,19 +261,19 @@
 
         <div id="${prefix}_preview" class="image-preview-circle">${initialImage ? `<img src="${initialImage}" alt="Vista previa">` : getPlaceholderCircle()}</div>
 
-        <div id="${prefix}_urlWrap">
+        <div id="${prefix}_urlWrap" class="image-field-block">
           <label for="${prefix}_imageUrl">Link de imagen</label>
-          <input id="${prefix}_imageUrl" class="swal2-input ios-input" placeholder="https://..." value="${initialImage || ''}">
+          <input id="${prefix}_imageUrl" class="form-control ios-input" placeholder="https://..." value="${initialImage || ''}">
         </div>
 
-        <div id="${prefix}_uploadWrap" class="d-none">
+        <div id="${prefix}_uploadWrap" class="d-none image-field-block">
           <label for="${prefix}_imageFile">Subir imagen</label>
           <input id="${prefix}_imageFile" type="file" class="form-control image-file-input" accept="image/*">
         </div>
 
-        <div id="${prefix}_aiWrap" class="d-none">
+        <div id="${prefix}_aiWrap" class="d-none image-field-block">
           <label for="${prefix}_aiPrompt">Prompt corto para IA</label>
-          <input id="${prefix}_aiPrompt" class="swal2-input ios-input recipe-ai-input" placeholder="Ej: carne de cerdo">
+          <input id="${prefix}_aiPrompt" class="form-control ios-input recipe-ai-input" placeholder="Ej: carne de cerdo">
           <button id="${prefix}_aiGenerate" type="button" class="ai-generate-btn mt-2">
             <img src="${IA_ICON_SRC}" alt="" aria-hidden="true">
             <span>Generar imagen con IA</span>
@@ -323,7 +337,7 @@
       }
       aiGenerateBtn.disabled = true;
       aiError.classList.add('d-none');
-      preview.innerHTML = `<span class="image-preview-overlay"><img src="${IA_ICON_SRC}" alt="Generando"></span>`;
+      preview.innerHTML = '<span class="image-preview-overlay"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Generando"></span>';
       try {
         const file = await generateImageWithIA(prompt);
         stateImage.generatedFile = file;
@@ -433,12 +447,17 @@
         <i class="fa-solid fa-plus"></i><span>Crear ingrediente</span>
       </button>`;
 
-    recetasEditor.appendChild(dropdown);
-    const inputRect = input.getBoundingClientRect();
-    const containerRect = recetasEditor.getBoundingClientRect();
-    dropdown.style.top = `${inputRect.bottom - containerRect.top + 6}px`;
-    dropdown.style.left = `${inputRect.left - containerRect.left}px`;
-    dropdown.style.width = `${inputRect.width}px`;
+    const autoWrap = input.closest('.recipe-ing-autocomplete');
+    if (autoWrap) {
+      autoWrap.appendChild(dropdown);
+    } else {
+      recetasEditor.appendChild(dropdown);
+      const inputRect = input.getBoundingClientRect();
+      const containerRect = recetasEditor.getBoundingClientRect();
+      dropdown.style.top = `${inputRect.bottom - containerRect.top + 6}px`;
+      dropdown.style.left = `${inputRect.left - containerRect.left}px`;
+      dropdown.style.width = `${inputRect.width}px`;
+    }
 
     dropdown.querySelectorAll('.js-recipe-suggest-thumb').forEach((image) => {
       const wrapper = image.closest('.recipe-suggest-avatar-wrap');
@@ -465,12 +484,14 @@
         const addIngredientBtn = event.target.closest('[data-add-ingredient-row]');
         if (addIngredientBtn) {
           state.editor.rows.push({ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: getMeasureOptions()[0]?.value || '' });
+          markEditorDirty();
           renderRows();
           return;
         }
         const addCommentBtn = event.target.closest('[data-add-comment-row]');
         if (addCommentBtn) {
           state.editor.rows.push({ id: makeId('row'), type: 'comment', comment: '' });
+          markEditorDirty();
           renderRows();
           return;
         }
@@ -478,6 +499,7 @@
         if (removeBtn) {
           state.editor.rows = state.editor.rows.filter((row) => row.id !== removeBtn.dataset.removeRow);
           ensureIngredientRow();
+          markEditorDirty();
           renderRows();
           clearSuggestions();
         }
@@ -490,17 +512,24 @@
           if (!row) return;
           row.ingredientName = input.value;
           row.ingredientId = '';
+          markEditorDirty();
           showSuggestions(input, row.id, input.value);
           return;
         }
         if (input.matches('[data-qty-input]')) {
           const row = state.editor.rows.find((item) => item.id === input.dataset.qtyInput);
-          if (row) row.quantity = input.value;
+          if (row) {
+            row.quantity = input.value;
+            markEditorDirty();
+          }
           return;
         }
         if (input.matches('[data-comment-input]')) {
           const row = state.editor.rows.find((item) => item.id === input.dataset.commentInput);
-          if (row) row.comment = input.value;
+          if (row) {
+            row.comment = input.value;
+            markEditorDirty();
+          }
         }
       });
 
@@ -515,7 +544,7 @@
               showCancelButton: true,
               confirmButtonText: 'Guardar medida',
               cancelButtonText: 'Cancelar',
-              html: '<input id="recipeNewMeasureName" class="swal2-input ios-input" placeholder="Nombre (ej: cucharadas)"><input id="recipeNewMeasureAbbr" class="swal2-input ios-input" placeholder="Abreviatura (ej: cdas)">',
+              html: '<div class="swal-stack-fields"><input id="recipeNewMeasureName" class="swal2-input ios-input" placeholder="Nombre (ej: cucharadas)"><input id="recipeNewMeasureAbbr" class="swal2-input ios-input" placeholder="Abreviatura (ej: cdas)"></div>',
               preConfirm: () => {
                 const name = normalizeValue(document.getElementById('recipeNewMeasureName')?.value);
                 const abbr = normalizeValue(document.getElementById('recipeNewMeasureAbbr')?.value);
@@ -528,6 +557,7 @@
             });
             if (res.isConfirmed && res.value) {
               row.unit = await persistNewMeasure(res.value.name, res.value.abbr);
+              markEditorDirty();
               renderRows();
               const yieldSelect = recipeEditorForm.querySelector('#recipeYieldUnit');
               if (yieldSelect) {
@@ -540,6 +570,7 @@
             return;
           }
           row.unit = select.value;
+          markEditorDirty();
           return;
         }
         if (select.id === 'recipeYieldUnit' && select.value === NEW_MEASURE_VALUE) {
@@ -549,7 +580,7 @@
             showCancelButton: true,
             confirmButtonText: 'Guardar medida',
             cancelButtonText: 'Cancelar',
-            html: '<input id="recipeNewMeasureNameY" class="swal2-input ios-input" placeholder="Nombre (ej: litros)"><input id="recipeNewMeasureAbbrY" class="swal2-input ios-input" placeholder="Abreviatura (ej: l)">',
+            html: '<div class="swal-stack-fields"><input id="recipeNewMeasureNameY" class="swal2-input ios-input" placeholder="Nombre (ej: litros)"><input id="recipeNewMeasureAbbrY" class="swal2-input ios-input" placeholder="Abreviatura (ej: l)"></div>',
             preConfirm: () => {
               const name = normalizeValue(document.getElementById('recipeNewMeasureNameY')?.value);
               const abbr = normalizeValue(document.getElementById('recipeNewMeasureAbbrY')?.value);
@@ -564,11 +595,13 @@
             const val = await persistNewMeasure(res.value.name, res.value.abbr);
             select.innerHTML = getMeasureSelectOptionsHtml(val);
             select.value = val;
+            markEditorDirty();
             renderRows();
           }
         }
         if (select.id === 'recipeOrderModeEditor') {
           state.editor.orderMode = normalizeLower(select.value);
+          markEditorDirty();
           renderRows();
         }
       });
@@ -586,6 +619,7 @@
           if (row && ingredient) {
             row.ingredientId = ingredient.id;
             row.ingredientName = ingredient.name;
+            markEditorDirty();
             renderRows();
             clearSuggestions();
           }
@@ -610,8 +644,10 @@
             if (target) {
               target.ingredientId = ingredientId;
               target.ingredientName = state.ingredientes[ingredientId].name;
+              markEditorDirty();
             } else {
               state.editor.rows.push({ id: makeId('row'), type: 'ingredient', ingredientId, ingredientName: state.ingredientes[ingredientId].name, quantity: '', unit: getMeasureOptions()[0]?.value || '' });
+              markEditorDirty();
             }
             renderRows();
           }
@@ -670,6 +706,7 @@
         : [{ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: getMeasureOptions()[0]?.value || '' }],
       orderMode: initial?.orderMode || 'desc'
     };
+    state.editorDirty = false;
 
     recipeEditorTitle.textContent = initial ? 'Editar receta' : 'Nueva receta';
     state.activeRecipeId = initial?.id || '';
@@ -691,7 +728,13 @@
           </div>
           <div class="col-md-6">
             <label class="form-label" for="recipeYieldUnit">Unidad de medida *</label>
-            <select id="recipeYieldUnit" class="form-select ios-input">${getMeasureSelectOptionsHtml(initial?.yieldUnit)}</select>
+            <div class="recipe-highlight-field recipe-highlight-field-soft">
+              <select id="recipeYieldUnit" class="form-select ios-input">${getMeasureSelectOptionsHtml(initial?.yieldUnit)}</select>
+            </div>
+          </div>
+          <div class="col-md-6 recipe-highlight-field">
+            <label class="form-label" for="recipeShelfLifeDays"><i class="fa-regular fa-calendar-days"></i> Caducidad (días) *</label>
+            <input id="recipeShelfLifeDays" type="number" min="1" step="1" class="form-control ios-input" value="${initial?.shelfLifeDays || ''}" placeholder="Ej: 3">
           </div>
           <div class="col-md-6 recipe-highlight-field">
             <label class="form-label" for="recipeShelfLifeDays"><i class="fa-regular fa-calendar-days"></i> Caducidad (días) *</label>
@@ -820,6 +863,7 @@
       state.recetas[id] = { id, ...payload, createdAt: prev.createdAt || Date.now(), updatedAt: Date.now() };
       await persistRecetas();
       state.resumeEditor = null;
+      state.editorDirty = false;
       renderRecetas();
       setView('list');
     } catch (error) {
@@ -827,16 +871,29 @@
     }
   });
 
-  recipeBackBtn?.addEventListener('click', () => {
+  recipeBackBtn?.addEventListener('click', async () => {
+    if (state.editorDirty) {
+      const leave = await openIosSwal({
+        title: '¿Abandonar cambios?',
+        html: '<p>Tenés cambios sin guardar en la receta.</p><p class="mb-0">Si volvés atrás, se perderán.</p>',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Abandonar',
+        cancelButtonText: 'Seguir editando'
+      });
+      if (!leave.isConfirmed) return;
+    }
     state.activeRecipeId = '';
     state.editor = null;
     state.resumeEditor = null;
+    state.editorDirty = false;
     setView(getRecetasArray().length ? 'list' : 'empty');
   });
 
   recetasModal.addEventListener('hide.bs.modal', () => {
     snapshotEditorDraft();
     blurActiveElement();
+    state.editorDirty = false;
   });
   recetasModal.addEventListener('hidden.bs.modal', () => {
     clearSuggestions();

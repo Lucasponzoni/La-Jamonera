@@ -641,6 +641,7 @@
             customAbbr: document.getElementById('ingredientMeasureCustomAbbr').value
           };
 
+          Swal.close();
           const familyId = await openFamilyForm();
           if (!familyId) {
             await openIngredientForm(initial, draftState);

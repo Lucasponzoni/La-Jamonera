@@ -649,9 +649,10 @@ html.login-protected.auth-ok body {
   width: 100%;
   display: grid;
   gap: 10px;
-  max-height: 40vh;
+  max-height: 46vh;
   overflow-y: auto;
-  padding-right: 4px;
+  padding-right: 6px;
+  padding-bottom: 8px;
 }
 
 
@@ -668,6 +669,7 @@ html.login-protected.auth-ok body {
   color: #516089;
   background: linear-gradient(to bottom, rgba(242, 245, 252, 0), rgba(242, 245, 252, 1));
   padding: 10px 0 4px;
+  margin-top: -28px;
   pointer-events: none;
 }
 
@@ -984,6 +986,18 @@ html.login-protected.auth-ok body {
 
 .image-placeholder-circle-2 i {
   font-size: 3rem;
+}
+
+.image-placeholder-circle-2 {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ece6ff;
+  color: #6f46eb;
+  border: 1px solid #d8ccff;
 }
 
 
@@ -2946,6 +2960,12 @@ html.login-protected.auth-ok body {
   z-index: 1056;
 }
 
+.recipe-ing-autocomplete .recipe-suggest-floating {
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+}
+
 .recipe-suggest-item {
   display: flex;
   align-items: center;
@@ -3045,6 +3065,16 @@ html.login-protected.auth-ok body {
 
 .recipe-ai-input {
   margin-top: 4px;
+}
+
+.image-field-block {
+  display: grid;
+  gap: 6px;
+}
+
+.swal-stack-fields {
+  display: grid;
+  gap: 10px;
 }
 
 .recipe-row-actions {
