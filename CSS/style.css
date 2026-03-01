@@ -2884,7 +2884,7 @@ html.login-protected.auth-ok body {
 
 .recipe-table-wrap {
   border: 1px solid #cfdcf8;
-  border-radius: 14px;
+  border-radius: 14px 14px 0 0;
   overflow: visible;
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
