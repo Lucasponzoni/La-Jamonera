@@ -3662,6 +3662,24 @@ html.login-protected.auth-ok body {
   padding: 8px 10px;
 }
 
+.recipe-print-panel {
+  text-align: right;
+}
+
+.recipe-print-panel .swal-field-label,
+.recipe-print-limits {
+  display: block;
+  text-align: right;
+}
+
+.recipe-print-panel .swal2-input {
+  text-align: right;
+}
+
+.recipe-print-panel-help {
+  text-align: left;
+}
+
 .recipe-print-limits {
   margin: 0;
   font-size: 0.78rem;
@@ -3689,13 +3707,16 @@ html.login-protected.auth-ok body {
   padding: 8px;
   background: #fff;
   overflow: hidden;
+  position: relative;
 }
 
 .recipe-print-preview .recipe-nutrition-label-card {
-  width: 100% !important;
-  max-width: 100% !important;
+  width: calc(100% / var(--preview-density)) !important;
+  max-width: none !important;
   border-width: 1px;
-  padding: calc(10px * var(--preview-density));
+  padding: 10px;
+  transform: scale(var(--preview-density));
+  transform-origin: top left;
 }
 
 .recipe-print-preview .recipe-nutrition-label-card h3 { font-size: calc(1rem * var(--preview-density)); }

@@ -295,7 +295,7 @@
             <h6 class="ingrediente-name receta-name">${capitalize(item.title || 'Sin título')}</h6>
             ${(hasNutritionLabel || frontLabels.length) ? `<div class="receta-print-actions">
               ${hasNutritionLabel ? `<button type="button" class="btn receta-print-btn" data-receta-print-nutrition="${item.id}"><i class="fa-solid fa-print"></i><span>Tabla nutricional</span></button>` : ''}
-              ${frontLabels.length ? `<button type="button" class="btn receta-print-btn receta-print-btn-front" data-receta-print-front="${item.id}"><i class="fa-solid fa-octagon-exclamation"></i><span>Etiquetado frontal</span></button>` : ''}
+              ${frontLabels.length ? `<button type="button" class="btn receta-print-btn receta-print-btn-front" data-receta-print-front="${item.id}"><i class="fa-solid fa-print"></i><span>Etiquetado frontal</span></button>` : ''}
             </div>` : ''}
             <p class="ingrediente-meta receta-card-meta">Rinde: ${item.yieldQuantity || '0'} ${label || ''}</p>
             <p class="ingrediente-meta receta-card-ingredients">Ingredientes: ${recipeIngredients.length ? recipeIngredients.join(' · ') : 'Sin ingredientes vinculados.'}</p>
@@ -725,7 +725,7 @@
     const safeMax = Math.max(1, Number(blocksMax) || 1);
     const safeBlocks = clampNumber(blocksPerPage, 1, safeMax);
     const ratio = safeMax <= 1 ? 0 : (safeBlocks - 1) / (safeMax - 1);
-    return Number((1 - ratio * 0.34).toFixed(3));
+    return Number((1 - ratio * 0.55).toFixed(3));
   };
 
   const buildPrintPagesHtml = (html, blocksPerPage, pages) => {
@@ -844,6 +844,18 @@
       return;
     }
 
+    if (mode === 'print' && window.printJS) {
+      window.printJS({
+        printable: `<div>${printMarkup}</div>`,
+        type: 'raw-html',
+        scanStyles: false,
+        style: '',
+        documentTitle: title,
+        targetStyles: ['*']
+      });
+      return;
+    }
+
     const popup = window.open('', '_blank', 'noopener,noreferrer,width=1100,height=850');
     if (!popup) {
       Swal.fire({
@@ -866,7 +878,7 @@
     popup.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head><body>${printMarkup}</body></html>`);
     popup.document.close();
     popup.focus();
-    popup.onload = () => setTimeout(() => popup.print(), 200);
+    setTimeout(() => { popup.print(); }, 350);
   };
 
   const openRecipePrintPanel = async (recipe, contentType = 'nutrition') => {
@@ -901,7 +913,7 @@
       title: 'Panel de impresión',
       html: `
         <div class="swal-stack-fields recipe-print-panel">
-          <p class="recipe-print-panel-help">1) Elegí formato · 2) Bloques por hoja · 3) Cantidad de hojas · 4) Imprimir o PDF.</p>
+          <p class="recipe-print-panel-help">Paso 1: elegí formato. Paso 2: bloques por hoja. Paso 3: cantidad de hojas. Paso 4: imprimir o PDF.</p>
 
           <label class="swal-field-label" for="recipePrintPaper"><i class="fa-regular fa-file-lines"></i> Formato</label>
           <select id="recipePrintPaper" class="swal2-input ios-input">
