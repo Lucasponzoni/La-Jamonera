@@ -913,6 +913,16 @@
 
   recipeEditorForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
+
+    Swal.fire({
+      title: 'Guardando receta...',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner-login"></div>',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      customClass: { popup: 'ios-alert ingredientes-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' }
+    });
+
     try {
       const payload = await collectEditorPayload();
       const id = state.activeRecipeId || makeId('rec');
@@ -924,7 +934,11 @@
       renderRecetas();
       setView('list');
     } catch (error) {
+      Swal.close();
       await openIosSwal({ title: 'Revisá los datos', html: `<p>${error.message || 'No se pudo guardar la receta.'}</p>`, icon: 'warning', confirmButtonText: 'Entendido' });
+      return;
+    } finally {
+      Swal.close();
     }
   });
 
