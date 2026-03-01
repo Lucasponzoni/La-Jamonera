@@ -52,8 +52,23 @@
     }
   };
 
+  const releaseAriaHiddenFocus = () => {
+    const active = document.activeElement;
+    if (!active || active === document.body) return;
+    let node = active;
+    while (node && node !== document.body) {
+      if (node.getAttribute && node.getAttribute('aria-hidden') === 'true') {
+        blurActiveElement();
+        document.body.focus?.();
+        break;
+      }
+      node = node.parentElement;
+    }
+  };
+
   const openIosSwal = (options) => {
     blurActiveElement();
+    releaseAriaHiddenFocus();
     ingredientesModal.setAttribute('inert', '');
     return Swal.fire({
       ...options,
@@ -642,10 +657,12 @@
           };
 
           blurActiveElement();
+          releaseAriaHiddenFocus();
           Swal.close();
           ingredientesModal.removeAttribute('inert');
-          await new Promise((resolve) => setTimeout(resolve, 0));
+          await new Promise((resolve) => setTimeout(resolve, 30));
           blurActiveElement();
+          releaseAriaHiddenFocus();
           const familyId = await openFamilyForm();
           if (!familyId) {
             await openIngredientForm(initial, draftState);
