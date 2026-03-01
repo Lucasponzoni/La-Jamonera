@@ -103,7 +103,21 @@
 
   const getMeasureSelectOptionsHtml = (selected = '') => {
     const opts = getMeasureOptions();
-    return `${opts.map((item) => `<option value="${item.value}" ${normalizeLower(selected) === item.value ? 'selected' : ''}>${item.label}</option>`).join('')}<option value="${NEW_MEASURE_VALUE}">+ Agregar nueva medida</option>`;
+    const selectedNorm = normalizeLower(selected);
+    const hasSelectedInOptions = selectedNorm && opts.some((item) => item.value === selectedNorm);
+    const selectedFallbackOption = selectedNorm && !hasSelectedInOptions
+      ? `<option value="${selectedNorm}" selected>${capitalize(selectedNorm)}</option>`
+      : '';
+    return `${selectedFallbackOption}${opts.map((item) => `<option value="${item.value}" ${selectedNorm === item.value ? 'selected' : ''}>${item.label}</option>`).join('')}<option value="${NEW_MEASURE_VALUE}">+ Agregar nueva medida</option>`;
+  };
+
+  const getPreferredUnitForIngredient = (ingredient) => {
+    const ingredientMeasure = normalizeLower(ingredient?.measure);
+    if (ingredientMeasure) {
+      return ingredientMeasure;
+    }
+    const available = getMeasureOptions().map((item) => item.value);
+    return available[0] || '';
   };
 
   const getPreferredUnitForIngredient = (ingredient) => {
