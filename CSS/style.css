@@ -3053,10 +3053,51 @@ html.login-protected.auth-ok body {
   object-fit: contain;
 }
 
+
+.recipe-nutrition-ai-disclaimer {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #eef4ff;
+  border: 1px solid #c8dafd;
+  color: #28457f;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
 .recipe-nutrition-ai-stale {
-  color: #b45309;
-  font-weight: 700;
-  font-size: 0.85rem;
+  color: #b91c1c;
+  font-weight: 800;
+  font-size: 0.88rem;
+}
+
+.recipe-nutrition-ai-preview.is-stale {
+  border-color: #dc2626;
+  background: #fff5f5;
+}
+
+.recipe-nutrition-ai-preview.is-disabled {
+  opacity: 0.95;
+}
+
+.recipe-nutrition-ai-table {
+  border-radius: 10px;
+}
+
+.recipe-nutrition-ai-table[contenteditable="true"] {
+  outline: 2px dashed #d7dff2;
+  outline-offset: 4px;
+}
+
+.recipe-nutrition-ai-table.is-locked {
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.recipe-nutrition-ai-help {
+  margin: 8px 0 0;
+  color: #51628d;
+  font-size: 0.82rem;
 }
 
 .recipe-nutrition-ai-preview {
@@ -3091,24 +3132,103 @@ html.login-protected.auth-ok body {
 
 .recipe-octagons-wrap {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
-.recipe-octagon {
-  width: 96px;
-  min-height: 96px;
-  clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);
-  background: #000;
+.recipe-front-rectangles {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.recipe-octagon,
+.recipe-front-rectangle {
+  border: 3px solid #ffffff;
+  outline: 2px solid #1d1d1d;
+  background: #101015;
   color: #fff;
-  padding: 10px 8px;
+  text-align: center;
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  text-align: center;
-  font-size: 0.72rem;
-  font-weight: 800;
-  line-height: 1.2;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18);
+}
+
+.recipe-octagon {
+  width: 104px;
+  min-height: 104px;
+  clip-path: polygon(31% 0, 69% 0, 100% 31%, 100% 69%, 69% 100%, 31% 100%, 0 69%, 0 31%);
+  padding: 8px 6px;
+}
+
+.recipe-front-rectangle {
+  min-width: 214px;
+  min-height: 74px;
+  padding: 8px 10px;
+}
+
+.recipe-octagon-title,
+.recipe-front-rectangle-title {
+  font-size: 0.56rem;
+  line-height: 1.06;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+.recipe-octagon-product,
+.recipe-front-rectangle-product {
+  margin-top: 2px;
+  font-size: 0.45rem;
+  line-height: 1.05;
+  font-weight: 700;
+  opacity: 0.88;
+  text-transform: uppercase;
+  max-width: 95%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recipe-octagon-ministry {
+  margin-top: 2px;
+  font-size: 0.48rem;
+  line-height: 1.05;
+  font-weight: 600;
+}
+
+.recipe-octagons-wrap.is-compact {
+  gap: 6px;
+}
+
+.recipe-octagons-wrap.is-compact .recipe-octagon {
+  width: 72px;
+  min-height: 72px;
+  padding: 5px 4px;
+}
+
+.recipe-front-rectangles.is-compact {
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.recipe-front-rectangles.is-compact .recipe-front-rectangle {
+  min-width: 156px;
+  min-height: 56px;
+  padding: 6px 8px;
+}
+
+.recipe-octagons-wrap.is-compact .recipe-octagon-title,
+.recipe-front-rectangles.is-compact .recipe-front-rectangle-title {
+  font-size: 0.43rem;
+}
+
+.recipe-octagons-wrap.is-compact .recipe-octagon-product,
+.recipe-front-rectangles.is-compact .recipe-front-rectangle-product,
+.recipe-octagons-wrap.is-compact .recipe-octagon-ministry {
+  font-size: 0.36rem;
 }
 
 .recipe-nutrition-front-empty {
@@ -3420,4 +3540,23 @@ html.login-protected.auth-ok body {
 .recipe-row-actions {
   display: flex;
   gap: 6px;
+}
+
+
+.receta-nutrition-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #e8f7ee;
+  color: #1e7a46;
+  border: 1px solid #bde8ce;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin: 6px 0 8px;
+}
+
+.receta-front-inline {
+  margin-top: 6px;
 }

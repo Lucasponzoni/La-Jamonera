@@ -90,6 +90,16 @@
     'EXCESO EN CAFEÍNA'
   ];
 
+  const FRONT_LABEL_CONFIG = {
+    'EXCESO EN AZÚCARES': { type: 'octagon', text: 'EXCESO EN\nAZÚCARES' },
+    'EXCESO EN SODIO': { type: 'octagon', text: 'EXCESO EN\nSODIO' },
+    'EXCESO EN GRASAS TOTALES': { type: 'octagon', text: 'EXCESO EN\nGRASAS\nTOTALES' },
+    'EXCESO EN GRASAS SATURADAS': { type: 'octagon', text: 'EXCESO EN\nGRASAS\nSATURADAS' },
+    'EXCESO EN CALORÍAS': { type: 'octagon', text: 'EXCESO EN\nCALORÍAS' },
+    'EXCESO EN EDULCORANTES': { type: 'rectangle', text: 'CONTIENE EDULCORANTES,\nNO RECOMENDABLE EN NIÑOS/AS.' },
+    'EXCESO EN CAFEÍNA': { type: 'rectangle', text: 'CONTIENE CAFEÍNA.\nEVITAR EN NIÑOS/AS.' }
+  };
+
 
   const blurActiveElement = () => document.activeElement?.blur?.();
   const openIosSwal = (options) => {
@@ -272,6 +282,8 @@
       const recipeIngredients = (Array.isArray(item.rows) ? item.rows : [])
         .filter((row) => row.type === 'ingredient' && normalizeValue(row.ingredientName))
         .map((row) => capitalize(row.ingredientName));
+      const frontLabels = Array.isArray(item.nutrition?.ai?.frontLabels) ? item.nutrition.ai.frontLabels : [];
+      const hasNutritionLabel = Boolean(normalizeValue(item.nutrition?.ai?.tableHtml));
       return `
         <article class="ingrediente-card receta-card" data-receta-id="${item.id}">
           <div class="ingrediente-avatar receta-thumb-wrap">
@@ -281,9 +293,11 @@
           </div>
           <div class="ingrediente-main receta-main">
             <h6 class="ingrediente-name receta-name">${capitalize(item.title || 'Sin título')}</h6>
+            ${hasNutritionLabel ? '<span class="receta-nutrition-badge"><i class="fa-solid fa-circle-check"></i>Etiqueta nutricional disponible</span>' : ''}
             <p class="ingrediente-meta receta-card-meta">Rinde: ${item.yieldQuantity || '0'} ${label || ''}</p>
             <p class="ingrediente-meta receta-card-ingredients">Ingredientes: ${recipeIngredients.length ? recipeIngredients.join(' · ') : 'Sin ingredientes vinculados.'}</p>
             ${item.description ? `<p class="ingrediente-description">${capitalize(item.description)}</p>` : '<p class="ingrediente-description"><em>Sin descripción</em></p>'}
+            ${frontLabels.length ? `<div class="receta-front-inline">${buildFrontLabelsHtml(frontLabels, { productTitle: item.title || 'Producto', compact: true })}</div>` : ''}
             <p class="ingrediente-dates receta-card-dates">
               <span><i class="fa-regular fa-calendar-plus" aria-hidden="true"></i> Alta: ${formatDateLabel(item.createdAt)}</span>
               <span><i class="fa-regular fa-calendar-check" aria-hidden="true"></i> Mod: ${formatDateLabel(item.updatedAt)}</span>
@@ -628,12 +642,43 @@
     );
   };
 
-  const buildFrontLabelsHtml = (labels = []) => {
+  const buildFrontLabelsHtml = (labels = [], options = {}) => {
     const clean = Array.isArray(labels)
       ? labels.map((item) => normalizeValue(item).toUpperCase()).filter((item) => FRONT_LABELS_ALLOWED.includes(item))
       : [];
     if (!clean.length) return '<p class="recipe-nutrition-front-empty">Sin sellos de advertencia.</p>';
-    return `<div class="recipe-octagons-wrap">${clean.map((item) => `<span class="recipe-octagon">${item}</span>`).join('')}</div>`;
+    const unique = Array.from(new Set(clean));
+    const productTitle = capitalize(options.productTitle || 'Producto sin título');
+    const compact = options.compact ? ' is-compact' : '';
+    const octagons = unique.filter((item) => FRONT_LABEL_CONFIG[item]?.type === 'octagon');
+    const rectangles = unique.filter((item) => FRONT_LABEL_CONFIG[item]?.type === 'rectangle');
+
+    return `
+      <div class="recipe-octagons-wrap${compact}">
+        ${octagons.map((item) => {
+          const config = FRONT_LABEL_CONFIG[item] || { text: item };
+          return `<span class="recipe-octagon"><span class="recipe-octagon-title">${escapeHtml(config.text).replaceAll('\n', '<br>')}</span><span class="recipe-octagon-product">${escapeHtml(productTitle)}</span><span class="recipe-octagon-ministry">Ministerio<br>de Salud</span></span>`;
+        }).join('')}
+      </div>
+      ${rectangles.length ? `<div class="recipe-front-rectangles${compact}">${rectangles.map((item) => {
+        const config = FRONT_LABEL_CONFIG[item] || { text: item };
+        return `<span class="recipe-front-rectangle"><span class="recipe-front-rectangle-title">${escapeHtml(config.text).replaceAll('\n', '<br>')}</span><span class="recipe-front-rectangle-product">${escapeHtml(productTitle)}</span><span class="recipe-octagon-ministry">Ministerio<br>de Salud</span></span>`;
+      }).join('')}</div>` : ''}
+    `;
+  };
+
+  const isNutritionAiStale = () => {
+    const ai = state.editor?.nutrition?.ai;
+    if (!ai?.tableHtml) return false;
+    return Boolean(ai.inputHash && ai.inputHash !== getNutritionGenerationHash());
+  };
+
+  const syncSaveButtonWithNutritionState = () => {
+    const submitButton = recipeEditorForm.querySelector('.recipe-editor-actions button[type="submit"]');
+    if (!submitButton) return;
+    const stale = isNutritionAiStale();
+    submitButton.toggleAttribute('disabled', stale);
+    submitButton.title = stale ? 'Rehacé la tabla nutricional para poder guardar.' : '';
   };
 
   const parseAiJsonFromText = (text) => {
@@ -725,24 +770,31 @@
       wrapper.innerHTML = '<p class="recipe-nutrition-ai-empty">Completá los datos y generá la tabla nutricional con IA.</p>';
       staleFlag?.classList.add('d-none');
       button.querySelector('.js-generate-label').textContent = 'Generar tabla nutricional con IA';
+      wrapper.classList.remove('is-stale', 'is-disabled');
+      syncSaveButtonWithNutritionState();
       return;
     }
 
-    const stale = ai.inputHash && ai.inputHash !== getNutritionGenerationHash();
+    const stale = isNutritionAiStale();
     staleFlag?.classList.toggle('d-none', !stale);
+    staleFlag.textContent = stale ? 'Se modificaron los datos base. Rehacé la tabla nutricional para continuar.' : '';
     button.querySelector('.js-generate-label').textContent = stale ? 'Rehacer tabla nutricional con IA' : 'Regenerar tabla nutricional con IA';
+    wrapper.classList.toggle('is-stale', stale);
+    wrapper.classList.toggle('is-disabled', stale);
 
     wrapper.innerHTML = `
       <div class="recipe-nutrition-product-meta">
         <h6>${escapeHtml(normalizeValue(recipeEditorForm.querySelector('#recipeTitle')?.value || 'Producto'))}</h6>
         <p>${escapeHtml(normalizeValue(recipeEditorForm.querySelector('#recipeDescription')?.value || ''))}</p>
       </div>
-      <div class="recipe-nutrition-ai-table">${ai.tableHtml}</div>
+      <div id="recipeNutritionAiTableEditable" class="recipe-nutrition-ai-table ${stale ? 'is-locked' : ''}" contenteditable="${stale ? 'false' : 'true'}">${ai.tableHtml}</div>
+      <p class="recipe-nutrition-ai-help">Podés editar manualmente la tabla nutricional si querés ajustar el diseño o valores.</p>
       <div class="recipe-nutrition-front-labels">
         <h6>Etiquetado frontal (Argentina)</h6>
-        ${buildFrontLabelsHtml(ai.frontLabels)}
+        ${buildFrontLabelsHtml(ai.frontLabels, { productTitle: recipeEditorForm.querySelector('#recipeTitle')?.value || 'Producto' })}
       </div>
     `;
+    syncSaveButtonWithNutritionState();
   };
 
   const markNutritionAiAsStaleIfNeeded = () => {
@@ -1107,6 +1159,13 @@
         if (input.id === 'recipeNutritionHouseholdAmount') {
           renderHouseholdMeasureOptions();
           markEditorDirty();
+          return;
+        }
+        if (input.id === 'recipeNutritionAiTableEditable') {
+          if (state.editor?.nutrition?.ai) {
+            state.editor.nutrition.ai.tableHtml = normalizeValue(input.innerHTML);
+            markEditorDirty();
+          }
           return;
         }
       });
@@ -1525,6 +1584,7 @@
                 <img src="${IA_ICON_SRC}" alt="" aria-hidden="true">
                 <span class="js-generate-label">Generar tabla nutricional con IA</span>
               </button>
+              <p class="recipe-nutrition-ai-disclaimer">La IA trabaja sobre tus datos reales de receta. No inventa información nutricional: genera una propuesta de diseño editable para la gráfica.</p>
               <span id="recipeNutritionAiStale" class="recipe-nutrition-ai-stale d-none">⚠️ Cambiaron datos: rehacé la tabla nutricional.</span>
             </div>
             <div id="recipeNutritionAiPreview" class="recipe-nutrition-ai-preview"></div>
@@ -1559,6 +1619,7 @@
     if (!yieldUnit || yieldUnit === NEW_MEASURE_VALUE) throw new Error('Seleccioná una unidad de medida válida.');
     if (!Number.isFinite(shelfLifeDays) || shelfLifeDays <= 0) throw new Error('Ingresá la caducidad en días con un número mayor a 0.');
     if (!Number.isFinite(agingDays) || agingDays < 0) throw new Error('Ingresá los días de estacionado con un número válido (0 o mayor).');
+    if (isNutritionAiStale()) throw new Error('Se modificaron datos nutricionales. Rehacé la tabla nutricional con IA antes de guardar.');
 
     const rows = state.editor.rows
       .map((row) => {
