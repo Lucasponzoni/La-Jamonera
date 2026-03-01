@@ -300,12 +300,12 @@
             <h6 class="ingrediente-name receta-name">${capitalize(item.title || 'Sin título')}</h6>
             <div class="receta-print-actions">
               <button type="button" class="btn ios-btn ios-btn-secondary receta-print-btn" data-receta-print="nutrition" data-receta-id="${item.id}" ${hasNutritionLabel ? '' : 'disabled'}>
-                <i class="fa-solid fa-table"></i>
-                <span>Imprimir tabla nutricional</span>
+                <i class="fa-solid fa-print"></i>
+                <span>Tabla nutricional</span>
               </button>
               <button type="button" class="btn ios-btn ios-btn-secondary receta-print-btn" data-receta-print="front" data-receta-id="${item.id}" ${hasFrontLabels ? '' : 'disabled'}>
-                <i class="fa-solid fa-octagon-exclamation"></i>
-                <span>Imprimir etiquetado frontal</span>
+                <i class="fa-solid fa-print"></i>
+                <span>Etiquetado frontal</span>
               </button>
             </div>
             <p class="ingrediente-meta receta-card-meta">Rinde: ${item.yieldQuantity || '0'} ${label || ''}</p>
@@ -530,11 +530,15 @@
 
     await openIosSwal({
       title: loadingTitle,
-      html: '<p>Estamos preparando la base de impresión.</p>',
+      html: `
+        <div class="recipe-print-loading">
+          <p>Estamos preparando la base de impresión.</p>
+          <img src="./IMG/Meta-ai-logo.webp" alt="Procesando" class="meta-spinner-login recipe-print-loader">
+        </div>
+      `,
       allowOutsideClick: false,
       allowEscapeKey: false,
-      showConfirmButton: false,
-      didOpen: () => Swal.showLoading()
+      showConfirmButton: false
     });
 
     let sourceImage;

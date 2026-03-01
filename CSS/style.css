@@ -3702,11 +3702,16 @@ html.login-protected.auth-ok body {
 }
 
 .receta-print-btn {
-  border-radius: 12px;
-  min-height: 36px;
-  padding: 6px 10px;
-  font-size: 0.76rem;
-  line-height: 1.2;
+  border-radius: 10px;
+  min-height: 30px;
+  padding: 4px 8px;
+  font-size: 0.69rem;
+  line-height: 1.1;
+  gap: 6px;
+}
+
+.receta-print-btn i {
+  font-size: 0.72rem;
 }
 
 .receta-print-btn[disabled] {
@@ -3747,6 +3752,23 @@ html.login-protected.auth-ok body {
 .recipe-print-panel {
   display: grid;
   gap: 12px;
+}
+
+
+.recipe-print-loading {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  text-align: center;
+}
+
+.recipe-print-loading p {
+  margin: 0;
+}
+
+.recipe-print-loader {
+  width: 54px;
+  height: 54px;
 }
 
 .recipe-print-controls {
