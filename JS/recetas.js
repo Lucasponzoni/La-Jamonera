@@ -652,6 +652,65 @@
     }
   };
 
+  const parseNumber = (value, fallback = 0) => {
+    const parsed = Number(String(value ?? '').replace(',', '.'));
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+
+  const formatSmart = (value, decimals = 1) => {
+    const num = parseNumber(value, 0);
+    return Number.isInteger(num) ? String(num) : num.toFixed(decimals).replace('.', ',');
+  };
+
+  const normalizeFrontLabels = (labels = [], nutrients = {}) => {
+    const fromAi = Array.isArray(labels)
+      ? labels.map((item) => normalizeValue(item).toUpperCase()).filter((item) => FRONT_LABELS_ALLOWED.includes(item))
+      : [];
+    if (fromAi.length) return Array.from(new Set(fromAi));
+
+    const inferred = [];
+    if (parseNumber(nutrients.sodioMg, 0) >= 400) inferred.push('EXCESO EN SODIO');
+    if (parseNumber(nutrients.azucaresG, 0) >= 10) inferred.push('EXCESO EN AZÚCARES');
+    if (parseNumber(nutrients.grasasSaturadasG, 0) >= 4) inferred.push('EXCESO EN GRASAS SATURADAS');
+    if (parseNumber(nutrients.grasasTotalesG, 0) >= 15) inferred.push('EXCESO EN GRASAS TOTALES');
+    if (parseNumber(nutrients.caloriasKcal, 0) >= 275) inferred.push('EXCESO EN CALORÍAS');
+    return inferred;
+  };
+
+  const buildNutritionTableHtmlFromData = (aiData, snapshot) => {
+    const n = safeObject(aiData?.nutrients);
+    const vitamins = safeObject(aiData?.vitamins);
+    const servingUnit = snapshot?.nutrition?.declarationUnit || 'g';
+    const servingAmount = snapshot?.nutrition?.declarationAmount || '100';
+    const servings = snapshot?.nutrition?.servingsPerPackage || '1';
+
+    return `
+      <div class="recipe-nutrition-label-card">
+        <h3>INFORMACIÓN NUTRICIONAL</h3>
+        <p class="recipe-nutrition-serving">Tamaño de la porción ${escapeHtml(formatSmart(servingAmount, 2))}${escapeHtml(servingUnit)} · ${escapeHtml(formatSmart(servings, 2))} porciones por envase</p>
+        <div class="recipe-nutrition-bar"></div>
+        <p class="recipe-nutrition-subtitle">Cantidad por porción</p>
+        <div class="recipe-nutrition-two-cols"><span>Calorías ${escapeHtml(formatSmart(n.caloriasKcal, 0))}</span><span>Calorías de grasa ${escapeHtml(formatSmart(n.caloriasGrasaKcal, 0))}</span></div>
+        <div class="recipe-nutrition-rule"></div>
+        <p class="recipe-nutrition-dv">% Valor Diario</p>
+        <table class="recipe-nutrition-table-fixed">
+          <tr><td>Grasa total ${escapeHtml(formatSmart(n.grasasTotalesG, 1))}g</td><td>${escapeHtml(formatSmart(n.grasasTotalesDv, 0))}%</td></tr>
+          <tr><td class="indent">Grasa saturada ${escapeHtml(formatSmart(n.grasasSaturadasG, 1))}g</td><td>${escapeHtml(formatSmart(n.grasasSaturadasDv, 0))}%</td></tr>
+          <tr><td class="indent">Grasas trans ${escapeHtml(formatSmart(n.grasasTransG, 1))}g</td><td>-</td></tr>
+          <tr><td>Colesterol ${escapeHtml(formatSmart(n.colesterolMg, 0))}mg</td><td>${escapeHtml(formatSmart(n.colesterolDv, 0))}%</td></tr>
+          <tr><td>Sodio ${escapeHtml(formatSmart(n.sodioMg, 0))}mg</td><td>${escapeHtml(formatSmart(n.sodioDv, 0))}%</td></tr>
+          <tr><td>Carbohidratos totales ${escapeHtml(formatSmart(n.carbohidratosG, 1))}g</td><td>${escapeHtml(formatSmart(n.carbohidratosDv, 0))}%</td></tr>
+          <tr><td class="indent">Fibra dietética ${escapeHtml(formatSmart(n.fibraG, 1))}g</td><td>${escapeHtml(formatSmart(n.fibraDv, 0))}%</td></tr>
+          <tr><td class="indent">Azúcares ${escapeHtml(formatSmart(n.azucaresG, 1))}g</td><td>-</td></tr>
+          <tr><td>Proteínas ${escapeHtml(formatSmart(n.proteinasG, 1))}g</td><td>-</td></tr>
+        </table>
+        <div class="recipe-nutrition-bar"></div>
+        <p class="recipe-nutrition-micros">Vitamina A ${escapeHtml(formatSmart(vitamins.vitaminaA, 0))}% • Vitamina C ${escapeHtml(formatSmart(vitamins.vitaminaC, 0))}%<br>Calcio ${escapeHtml(formatSmart(vitamins.calcio, 0))}% • Hierro ${escapeHtml(formatSmart(vitamins.hierro, 0))}%</p>
+        <p class="recipe-nutrition-footnote">(*) Valores diarios con base a una dieta de 2000 kcal u 8400 kJ. Sus valores diarios pueden ser mayores o menores dependiendo de sus necesidades energéticas.<br>Ingredientes: ${escapeHtml(snapshot.ingredients.map((item) => item.ingredientName).join(', '))}</p>
+      </div>
+    `;
+  };
+
   const renderNutritionAiPreview = () => {
     const wrapper = recipeEditorForm.querySelector('#recipeNutritionAiPreview');
     const staleFlag = recipeEditorForm.querySelector('#recipeNutritionAiStale');
@@ -687,11 +746,36 @@
   };
 
   const markNutritionAiAsStaleIfNeeded = () => {
-    if (!state.editor?.nutrition?.ai?.tableHtml) {
-      renderNutritionAiPreview();
-      return;
-    }
     renderNutritionAiPreview();
+  };
+
+  const callDeepseekWithFallback = async (payload, apiKey, corsConfig) => {
+    const direct = async () => fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify(payload)
+    });
+
+    const proxyUrl = normalizeValue(corsConfig?.url || corsConfig?.url_corsh || '');
+    const proxyKey = normalizeValue(corsConfig?.key || corsConfig?.cosh_api_key || '');
+
+    try {
+      const res = await direct();
+      if (res.ok) return res;
+      const txt = await res.text();
+      throw new Error(`DeepSeek ${res.status}: ${txt}`);
+    } catch (error) {
+      if (!proxyUrl) throw error;
+      const endpoint = `${proxyUrl}${proxyUrl.endsWith('/') ? '' : '/'}https://api.deepseek.com/chat/completions`;
+      const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` };
+      if (proxyKey) headers['x-cors-api-key'] = proxyKey;
+      const proxyRes = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(payload) });
+      if (!proxyRes.ok) {
+        const txt = await proxyRes.text();
+        throw new Error(`CORS proxy ${proxyRes.status}: ${txt}`);
+      }
+      return proxyRes;
+    }
   };
 
   const generateNutritionTableWithIA = async () => {
@@ -702,7 +786,7 @@
 
     Swal.fire({
       title: 'Generando tabla nutricional...',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/ia-unscreen.gif" alt="Generando" class="meta-spinner-login"></div>',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/ia-unscreen.gif" alt="Generando" class="recipe-ai-static-gif"></div>',
       allowOutsideClick: false,
       allowEscapeKey: false,
       showConfirmButton: false,
@@ -715,45 +799,44 @@
       const apiKey = typeof keyNode === 'string' ? normalizeValue(keyNode) : normalizeValue(keyNode?.apiKey);
       if (!apiKey) throw new Error('No se encontró /deepseek/apiKey en Firebase.');
 
+      const corsConfigNode = await window.dbLaJamoneraRest.read('/deepseek');
+      const corsConfig = {
+        cosh_api_key: normalizeValue(corsConfigNode?.cosh_api_key),
+        url_corsh: normalizeValue(corsConfigNode?.url_corsh)
+      };
+
       const snapshot = getNutritionGenerationSnapshot();
-      const prompt = `Sos especialista en rotulado nutricional argentino. Devolvé SOLO JSON válido con estructura: {"tableHtml":"...","frontLabels":["..."]}.
+      const payload = {
+        model: 'deepseek-chat',
+        messages: [
+          {
+            role: 'system',
+            content: 'Sos nutricionista especializado en etiquetado argentino. Respondé SOLO JSON válido.'
+          },
+          {
+            role: 'user',
+            content: `Calculá información nutricional por porción para este producto y devolvé SOLO JSON con esta estructura exacta: {"nutrients":{"caloriasKcal":0,"caloriasGrasaKcal":0,"grasasTotalesG":0,"grasasTotalesDv":0,"grasasSaturadasG":0,"grasasSaturadasDv":0,"grasasTransG":0,"colesterolMg":0,"colesterolDv":0,"sodioMg":0,"sodioDv":0,"carbohidratosG":0,"carbohidratosDv":0,"fibraG":0,"fibraDv":0,"azucaresG":0,"proteinasG":0},"vitamins":{"vitaminaA":0,"vitaminaC":0,"calcio":0,"hierro":0},"frontLabels":[]}. No uses null ni strings vacíos para nutrientes; siempre números. Etiquetas frontales solo de esta lista: ${FRONT_LABELS_ALLOWED.join(', ')}. Datos base: ${JSON.stringify(snapshot)}`
+          }
+        ],
+        temperature: 0.1
+      };
 
-Datos: ${JSON.stringify(snapshot)}
-
-Requisitos: 1) tableHtml debe ser una tabla nutricional en HTML lista para renderizar (sin markdown), con estilo visual similar a etiqueta clásica. 2) incluir nombre y descripción de producto. 3) frontLabels debe contener solo advertencias de esta lista: ${FRONT_LABELS_ALLOWED.join(', ')}. 4) Si no hay advertencias, devolver array vacío.`;
-
-      const response = await fetch('https://api.deepseek.com/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: 'deepseek-chat',
-          messages: [
-            { role: 'system', content: 'Respondé únicamente con JSON válido sin texto adicional.' },
-            { role: 'user', content: prompt }
-          ],
-          temperature: 0.2
-        })
-      });
-
-      if (!response.ok) {
-        const msg = await response.text();
-        throw new Error(`DeepSeek ${response.status}: ${msg}`);
-      }
-
+      const response = await callDeepseekWithFallback(payload, apiKey, corsConfig);
       const data = await response.json();
       const content = data?.choices?.[0]?.message?.content || '';
       const parsed = parseAiJsonFromText(content);
-      if (!parsed?.tableHtml) {
-        throw new Error('La IA no devolvió un JSON válido con tableHtml.');
+      if (!parsed?.nutrients) {
+        throw new Error('La IA no devolvió nutrientes en formato válido.');
       }
+
+      const normalizedFront = normalizeFrontLabels(parsed.frontLabels, parsed.nutrients);
+      const tableHtml = buildNutritionTableHtmlFromData(parsed, snapshot);
 
       state.editor.nutrition = state.editor.nutrition || {};
       state.editor.nutrition.ai = {
-        tableHtml: String(parsed.tableHtml),
-        frontLabels: Array.isArray(parsed.frontLabels) ? parsed.frontLabels : [],
+        tableHtml,
+        raw: parsed,
+        frontLabels: normalizedFront,
         inputHash: getNutritionGenerationHash(),
         updatedAt: Date.now()
       };
