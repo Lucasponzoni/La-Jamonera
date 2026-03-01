@@ -1452,6 +1452,8 @@
       }).join('')
       : '<div class="informes-empty">Sin adjuntos</div>';
 
+    let hasViewerChanges = false;
+
     await openIosSwal({
       title: 'Informe completo',
       width: 980,
@@ -1506,7 +1508,6 @@
         const cancelReplyBtn = popup.querySelector('#inlineCancelReplyBtn');
 
         let activeReplyCommentId = '';
-        let hasViewerChanges = false;
 
         const refreshComments = () => {
           const latest = findReportById(report.id) || report;
