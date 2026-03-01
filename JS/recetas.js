@@ -764,10 +764,12 @@
         <h6 class="step-title"><span class="recipe-step-number">2</span> Ingredientes</h6>
         <div class="step-content">
           <div class="recipe-table-wrap">
-            <table class="recipe-table">
-              <thead><tr><th style="width:36px">↕</th><th>Ingrediente / Comentario</th><th style="width:130px">Cantidad</th><th style="width:240px">Unidad</th><th style="width:68px">Acción</th></tr></thead>
-              <tbody id="recipeRowsBody"></tbody>
-            </table>
+            <div class="recipe-table-scroll" aria-label="Tabla de ingredientes desplazable horizontalmente">
+              <table class="recipe-table">
+                <thead><tr><th style="width:40px">↕</th><th style="min-width:220px">Ingrediente / Comentario</th><th style="width:140px">Cantidad</th><th style="width:190px">Unidad</th><th style="width:72px">Acción</th></tr></thead>
+                <tbody id="recipeRowsBody"></tbody>
+              </table>
+            </div>
           </div>
           <div class="recipe-table-actions">
             <button type="button" class="btn recipe-table-action-btn recipe-table-action-btn-primary" data-add-ingredient-row><i class="fa-solid fa-plus"></i><span>Agregar fila</span></button>
