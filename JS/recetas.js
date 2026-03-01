@@ -735,7 +735,13 @@
           </div>
           <div class="recipe-field recipe-field-half recipe-highlight-field">
             <label class="form-label" for="recipeYieldUnit">Unidad de medida *</label>
-            <select id="recipeYieldUnit" class="form-select ios-input">${getMeasureSelectOptionsHtml(initial?.yieldUnit)}</select>
+            <div class="recipe-highlight-field recipe-highlight-field-soft">
+              <select id="recipeYieldUnit" class="form-select ios-input">${getMeasureSelectOptionsHtml(initial?.yieldUnit)}</select>
+            </div>
+          </div>
+          <div class="col-md-6 recipe-highlight-field">
+            <label class="form-label" for="recipeShelfLifeDays"><i class="fa-regular fa-calendar-days"></i> Caducidad (días) *</label>
+            <input id="recipeShelfLifeDays" type="number" min="1" step="1" class="form-control ios-input" value="${initial?.shelfLifeDays || ''}" placeholder="Ej: 3">
           </div>
           <div class="recipe-field recipe-field-half recipe-highlight-field">
             <label class="form-label" for="recipeShelfLifeDays"><i class="fa-regular fa-calendar-days"></i> Caducidad (días) *</label>
