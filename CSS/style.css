@@ -2967,6 +2967,7 @@ html.login-protected.auth-ok body {
 .recipe-table tbody tr.drag-over {
   outline: 2px dashed #4d74cf;
   outline-offset: -2px;
+  background-color: #a8d2fb;
 }
 
 .recipe-table-actions {
@@ -3021,7 +3022,6 @@ html.login-protected.auth-ok body {
 
 /* =========================================
    RECETAS · NUTRICIÓN IA
-========================================= */
 .recipe-nutrition-step {
   border-color: #e7dcff;
   background: #fcf9ff;
@@ -3135,7 +3135,6 @@ html.login-protected.auth-ok body {
 
 /* =========================================
    RECETAS · ETIQUETADO FRONTAL
-========================================= */
 .recipe-octagons-wrap {
   display: flex;
   gap: 10px;
@@ -3234,7 +3233,6 @@ html.login-protected.auth-ok body {
 
 /* =========================================
    RECETAS · TARJETA NUTRICIONAL
-========================================= */
 .recipe-nutrition-label-card {
   width: min(340px, 100%);
   margin: 0 auto;
