@@ -52,8 +52,44 @@
     }
   };
 
+  const parkFocusOutsideHiddenContainers = () => {
+    let node = document.getElementById('focusParkingNode');
+    if (!node) {
+      node = document.createElement('button');
+      node.id = 'focusParkingNode';
+      node.type = 'button';
+      node.setAttribute('aria-hidden', 'true');
+      node.tabIndex = -1;
+      node.style.position = 'fixed';
+      node.style.opacity = '0';
+      node.style.pointerEvents = 'none';
+      node.style.width = '1px';
+      node.style.height = '1px';
+      node.style.left = '-9999px';
+      node.style.top = '-9999px';
+      document.body.appendChild(node);
+    }
+    node.focus({ preventScroll: true });
+  };
+
+  const releaseAriaHiddenFocus = () => {
+    const active = document.activeElement;
+    if (!active || active === document.body) return;
+    let node = active;
+    while (node && node !== document.body) {
+      if (node.getAttribute && node.getAttribute('aria-hidden') === 'true') {
+        blurActiveElement();
+        document.body.focus?.();
+        break;
+      }
+      node = node.parentElement;
+    }
+  };
+
   const openIosSwal = (options) => {
     blurActiveElement();
+    releaseAriaHiddenFocus();
+    parkFocusOutsideHiddenContainers();
     ingredientesModal.setAttribute('inert', '');
     return Swal.fire({
       ...options,
@@ -641,6 +677,15 @@
             customAbbr: document.getElementById('ingredientMeasureCustomAbbr').value
           };
 
+          blurActiveElement();
+          releaseAriaHiddenFocus();
+          Swal.close();
+          ingredientesModal.removeAttribute('inert');
+          parkFocusOutsideHiddenContainers();
+          await new Promise((resolve) => setTimeout(resolve, 30));
+          blurActiveElement();
+          releaseAriaHiddenFocus();
+          parkFocusOutsideHiddenContainers();
           const familyId = await openFamilyForm();
           if (!familyId) {
             await openIngredientForm(initial, draftState);
