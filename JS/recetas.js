@@ -293,7 +293,7 @@
           </div>
           <div class="ingrediente-main receta-main">
             <h6 class="ingrediente-name receta-name">${capitalize(item.title || 'Sin título')}</h6>
-            ${hasNutritionLabel ? '<span class="receta-nutrition-badge"><i class="fa-solid fa-circle-check"></i>Etiqueta nutricional disponible</span>' : ''}
+            ${hasNutritionLabel ? '<span class="receta-nutrition-badge"><i class="fa-solid fa-circle-check"></i>Etiquetados disponibles</span>' : ''}
             <p class="ingrediente-meta receta-card-meta">Rinde: ${item.yieldQuantity || '0'} ${label || ''}</p>
             <p class="ingrediente-meta receta-card-ingredients">Ingredientes: ${recipeIngredients.length ? recipeIngredients.join(' · ') : 'Sin ingredientes vinculados.'}</p>
             ${item.description ? `<p class="ingrediente-description">${capitalize(item.description)}</p>` : '<p class="ingrediente-description"><em>Sin descripción</em></p>'}
