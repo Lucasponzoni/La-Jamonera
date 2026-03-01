@@ -641,6 +641,11 @@
             customAbbr: document.getElementById('ingredientMeasureCustomAbbr').value
           };
 
+          blurActiveElement();
+          Swal.close();
+          ingredientesModal.removeAttribute('inert');
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          blurActiveElement();
           const familyId = await openFamilyForm();
           if (!familyId) {
             await openIngredientForm(initial, draftState);
