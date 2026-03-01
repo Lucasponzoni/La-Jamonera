@@ -149,7 +149,16 @@
     const response = await fetch(`${IA_WORKER_BASE}/emoji`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, mode: 'fast' })
     });
-    if (!response.ok) throw new Error(`No se pudo generar la imagen con IA (${response.status}).`);
+    if (!response.ok) {
+      let details = `${response.status} ${response.statusText}`;
+      try {
+        const payload = await response.json();
+        if (payload?.error) details = payload.error;
+      } catch (_) {
+        // noop: fallback a status text
+      }
+      throw new Error(`No se pudo generar la imagen con IA (${details}).`);
+    }
     const blob = await response.blob();
     if (!blob?.size) throw new Error('La IA no devolvió una imagen válida.');
     return new File([blob], `receta_${Date.now()}.png`, { type: blob.type || 'image/png' });
@@ -200,29 +209,25 @@
         .filter((row) => row.type === 'ingredient' && normalizeValue(row.ingredientName))
         .map((row) => capitalize(row.ingredientName));
       return `
-        <article class="receta-card" data-receta-id="${item.id}">
-          <div class="receta-card-head">
-            <div class="receta-card-info">
-              <div class="receta-thumb-wrap">
-                ${item.imageUrl
-                  ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="receta-thumb js-receta-thumb" src="${item.imageUrl}" alt="${capitalize(item.title || 'Receta')}" loading="lazy">`
-                  : getPlaceholderCircle()}
-              </div>
-              <div>
-                <h6 class="mb-1">${capitalize(item.title || 'Sin título')}</h6>
-                <div class="receta-card-meta">Rinde: ${item.yieldQuantity || '0'} ${label || ''}</div>
-                <div class="receta-card-ingredients">${recipeIngredients.length ? `Ingredientes: ${recipeIngredients.join(' · ')}` : 'Sin ingredientes vinculados.'}</div>
-              </div>
-            </div>
-            <div class="recipe-row-actions">
-              <button type="button" class="btn family-manage-btn" data-receta-edit="${item.id}" title="Editar"><i class="fa-solid fa-pen"></i></button>
-              <button type="button" class="btn family-manage-btn" data-receta-delete="${item.id}" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
-            </div>
+        <article class="ingrediente-card receta-card" data-receta-id="${item.id}">
+          <div class="ingrediente-avatar receta-thumb-wrap">
+            ${item.imageUrl
+              ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="receta-thumb js-receta-thumb" src="${item.imageUrl}" alt="${capitalize(item.title || 'Receta')}" loading="lazy">`
+              : getPlaceholderCircle()}
           </div>
-          <p class="mb-1">${item.description ? capitalize(item.description) : '<em>Sin descripción</em>'}</p>
-          <div class="receta-card-dates">
-            <span><i class="fa-regular fa-calendar-plus" aria-hidden="true"></i> Alta: ${formatDateLabel(item.createdAt)}</span>
-            <span><i class="fa-regular fa-calendar-check" aria-hidden="true"></i> Mod: ${formatDateLabel(item.updatedAt)}</span>
+          <div class="ingrediente-main receta-main">
+            <h6 class="ingrediente-name receta-name">${capitalize(item.title || 'Sin título')}</h6>
+            <p class="ingrediente-meta receta-card-meta">Rinde: ${item.yieldQuantity || '0'} ${label || ''}</p>
+            <p class="ingrediente-meta receta-card-ingredients">Ingredientes: ${recipeIngredients.length ? recipeIngredients.join(' · ') : 'Sin ingredientes vinculados.'}</p>
+            ${item.description ? `<p class="ingrediente-description">${capitalize(item.description)}</p>` : '<p class="ingrediente-description"><em>Sin descripción</em></p>'}
+            <p class="ingrediente-dates receta-card-dates">
+              <span><i class="fa-regular fa-calendar-plus" aria-hidden="true"></i> Alta: ${formatDateLabel(item.createdAt)}</span>
+              <span><i class="fa-regular fa-calendar-check" aria-hidden="true"></i> Mod: ${formatDateLabel(item.updatedAt)}</span>
+            </p>
+          </div>
+          <div class="ingrediente-actions recipe-row-actions">
+            <button type="button" class="btn family-manage-btn" data-receta-edit="${item.id}" title="Editar"><i class="fa-solid fa-pen"></i></button>
+            <button type="button" class="btn family-manage-btn" data-receta-delete="${item.id}" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
           </div>
         </article>`;
     }).join('');
@@ -337,7 +342,7 @@
       }
       aiGenerateBtn.disabled = true;
       aiError.classList.add('d-none');
-      preview.innerHTML = '<span class="image-preview-overlay"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Generando"></span>';
+      preview.innerHTML = `<span class="image-preview-overlay"><img src="${IA_ICON_SRC}" alt="Generando"></span>`;
       try {
         const file = await generateImageWithIA(prompt);
         stateImage.generatedFile = file;
@@ -712,7 +717,7 @@
     state.activeRecipeId = initial?.id || '';
     recipeEditorForm.innerHTML = `
       <section class="step-block recipe-step-card recipe-main-step">
-        <h6 class="step-title"><span class="recipe-step-number">1</span> Datos principales</h6>
+        <h6 class="step-title"><span class="recipe-step-number">1</span> Datos generales</h6>
         <div class="step-content row g-3">
           <div class="col-12">
             <label class="form-label" for="recipeTitle">Título *</label>
@@ -722,6 +727,7 @@
             <label class="form-label" for="recipeDescription">Descripción (opcional)</label>
             <textarea id="recipeDescription" class="form-control ios-input recipe-description-lg" placeholder="Detalle amplio de la receta">${initial?.description || ''}</textarea>
           </div>
+          <div class="col-12"><p class="recipe-subsection-title">Rendimiento / producción</p></div>
           <div class="col-md-6 recipe-highlight-field">
             <label class="form-label" for="recipeYieldQty"><i class="fa-solid fa-weight-hanging"></i> Cantidad final obtenida *</label>
             <input id="recipeYieldQty" class="form-control ios-input" value="${initial?.yieldQuantity || ''}" placeholder="Ej: 10,50">
@@ -731,10 +737,6 @@
             <div class="recipe-highlight-field recipe-highlight-field-soft">
               <select id="recipeYieldUnit" class="form-select ios-input">${getMeasureSelectOptionsHtml(initial?.yieldUnit)}</select>
             </div>
-          </div>
-          <div class="col-md-6 recipe-highlight-field">
-            <label class="form-label" for="recipeShelfLifeDays"><i class="fa-regular fa-calendar-days"></i> Caducidad (días) *</label>
-            <input id="recipeShelfLifeDays" type="number" min="1" step="1" class="form-control ios-input" value="${initial?.shelfLifeDays || ''}" placeholder="Ej: 3">
           </div>
           <div class="col-md-6 recipe-highlight-field">
             <label class="form-label" for="recipeShelfLifeDays"><i class="fa-regular fa-calendar-days"></i> Caducidad (días) *</label>
@@ -752,7 +754,7 @@
       </section>
 
       <section class="step-block recipe-step-card">
-        <h6 class="step-title"><span class="recipe-step-number">2</span> Ingredientes y comentarios</h6>
+        <h6 class="step-title"><span class="recipe-step-number">2</span> Ingredientes</h6>
         <div class="step-content">
           <div class="recipe-table-wrap">
             <table class="recipe-table">

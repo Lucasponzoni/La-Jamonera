@@ -645,6 +645,9 @@ html.login-protected.auth-ok body {
   box-shadow: none;
 }
 
+/* =========================================
+   MODAL INGREDIENTES (LISTADO / SCROLL)
+========================================= */
 .ingredientes-list {
   width: 100%;
   display: grid;
@@ -808,10 +811,12 @@ html.login-protected.auth-ok body {
   object-fit: cover;
 }
 
+/* =========================================
+   SELECTOR / PREVIEW DE IMAGEN
+========================================= */
 .image-preview-overlay {
   position: absolute;
   inset: 0;
-  backdrop-filter: blur(4px);
   background: rgba(248, 250, 255, 0.72);
   display: flex;
   align-items: center;
@@ -2683,6 +2688,9 @@ html.login-protected.auth-ok body {
 }
 
 
+/* =========================================
+   MODAL RECETAS
+========================================= */
 .recetas-modal .ios-modal-body {
   max-height: min(74vh, 760px);
   position: relative;
@@ -2697,37 +2705,36 @@ html.login-protected.auth-ok body {
 }
 
 .recetas-list.has-scroll-hint::after {
-  content: '';
+  content: '↓ Deslizá para ver más recetas';
   position: sticky;
   bottom: 0;
   display: block;
   width: 100%;
-  height: 26px;
-  margin-top: -26px;
+  height: 34px;
+  margin-top: -34px;
   pointer-events: none;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #516089;
   background: linear-gradient(180deg, rgba(244, 247, 255, 0) 0%, rgba(244, 247, 255, .95) 78%);
 }
 
 .receta-card {
-  border: 1px solid #d7e1f7;
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 12px;
-  display: grid;
-  gap: 8px;
+  align-items: flex-start;
 }
 
-.receta-card-head {
-  display: flex;
+.receta-thumb-wrap {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid #d8e1f6;
+  background: #edf2fd;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.receta-card-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
 }
 
 .receta-thumb-wrap {
@@ -2762,6 +2769,22 @@ html.login-protected.auth-ok body {
 .receta-card-meta {
   color: #5b6f9a;
   font-size: 0.85rem;
+  margin: 0;
+}
+
+.receta-card-ingredients {
+  margin-top: 2px;
+  color: #687ca8;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.receta-card-dates {
+  margin-top: 4px;
+}
+
+.receta-name {
+  margin-bottom: 2px;
 }
 
 .receta-card-ingredients {
@@ -2828,7 +2851,7 @@ html.login-protected.auth-ok body {
 }
 
 .recipe-step-card.step-block {
-  border-top: 0;
+  border-top: 1px solid #dbe4f8;
   padding-top: 12px;
 }
 
@@ -2841,6 +2864,23 @@ html.login-protected.auth-ok body {
   border-radius: 12px;
   background: #f4f8ff;
   padding: 10px;
+}
+
+.recipe-highlight-field-soft {
+  padding: 10px;
+}
+
+.recipe-highlight-field-soft .form-select {
+  min-height: 44px;
+}
+
+.recipe-subsection-title {
+  margin: 0;
+  color: #4762a7;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  font-weight: 700;
 }
 
 .recipe-highlight-field .form-label {
@@ -2950,6 +2990,9 @@ html.login-protected.auth-ok body {
   position: relative;
 }
 
+/* =========================================
+   SUGERENCIAS Y AUTOCOMPLETE (RECETAS)
+========================================= */
 .recipe-suggest-floating {
   position: absolute;
   max-height: 220px;
