@@ -486,6 +486,11 @@
     }
   };
 
+  const withTimeout = (promise, timeoutMs, message) => Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), timeoutMs))
+  ]);
+
   const renderHtmlToImage = async ({ html, mode, frontLabels }) => {
     if (mode === 'front') {
       return renderFrontLabelsToImage(frontLabels);
@@ -504,13 +509,19 @@
       const target = host.querySelector('.recipe-print-render-root');
       await new Promise((resolve) => requestAnimationFrame(resolve));
 
-      const canvas = await window.html2canvas(target, {
-        backgroundColor: '#ffffff',
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        logging: false
-      });
+      const scale = window.innerWidth <= 768 ? 1.35 : 2;
+      const canvas = await withTimeout(
+        window.html2canvas(target, {
+          backgroundColor: '#ffffff',
+          scale,
+          useCORS: true,
+          allowTaint: true,
+          imageTimeout: 12000,
+          logging: false
+        }),
+        18000,
+        'Tiempo de espera agotado al generar la imagen de impresión.'
+      );
 
       if (!canvas || !canvas.width || !canvas.height) {
         throw new Error('No se pudo renderizar el diseño de impresión.');
@@ -669,7 +680,7 @@
 
     let sourceImage;
     try {
-      sourceImage = await renderHtmlToImage(payload);
+      sourceImage = await withTimeout(renderHtmlToImage(payload), 20000, "Tiempo de espera agotado al generar la tabla para impresión.");
     } finally {
       Swal.close();
     }
