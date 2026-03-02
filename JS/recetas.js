@@ -31,7 +31,11 @@
     editor: null,
     editorEventsBound: false,
     resumeEditor: null,
-    editorDirty: false
+    editorDirty: false,
+    print: {
+      cssText: '',
+      cssPromise: null
+    }
   };
 
   const normalizeValue = (value) => String(value || '').trim();
