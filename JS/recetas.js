@@ -31,7 +31,11 @@
     editor: null,
     editorEventsBound: false,
     resumeEditor: null,
-    editorDirty: false
+    editorDirty: false,
+    print: {
+      cssText: '',
+      cssPromise: null
+    }
   };
 
   const normalizeValue = (value) => String(value || '').trim();
@@ -284,6 +288,7 @@
         .map((row) => capitalize(row.ingredientName));
       const frontLabels = Array.isArray(item.nutrition?.ai?.frontLabels) ? item.nutrition.ai.frontLabels : [];
       const hasNutritionLabel = Boolean(normalizeValue(item.nutrition?.ai?.tableHtml));
+      const hasFrontLabels = frontLabels.length > 0;
       return `
         <article class="ingrediente-card receta-card" data-receta-id="${item.id}">
           <div class="ingrediente-avatar receta-thumb-wrap">
@@ -293,7 +298,16 @@
           </div>
           <div class="ingrediente-main receta-main">
             <h6 class="ingrediente-name receta-name">${capitalize(item.title || 'Sin título')}</h6>
-            ${hasNutritionLabel ? '<span class="receta-nutrition-badge"><i class="fa-solid fa-circle-check"></i>Etiquetados disponibles</span>' : ''}
+            <div class="receta-print-actions">
+              <button type="button" class="btn ios-btn ios-btn-secondary receta-print-btn" data-receta-print="nutrition" data-receta-id="${item.id}" ${hasNutritionLabel ? '' : 'disabled'}>
+                <i class="fa-solid fa-print"></i>
+                <span>Tabla nutricional</span>
+              </button>
+              <button type="button" class="btn ios-btn ios-btn-secondary receta-print-btn" data-receta-print="front" data-receta-id="${item.id}" ${hasFrontLabels ? '' : 'disabled'}>
+                <i class="fa-solid fa-print"></i>
+                <span>Etiquetado frontal</span>
+              </button>
+            </div>
             <p class="ingrediente-meta receta-card-meta">Rinde: ${item.yieldQuantity || '0'} ${label || ''}</p>
             <p class="ingrediente-meta receta-card-ingredients">Ingredientes: ${recipeIngredients.length ? recipeIngredients.join(' · ') : 'Sin ingredientes vinculados.'}</p>
             ${item.description ? `<p class="ingrediente-description">${capitalize(item.description)}</p>` : '<p class="ingrediente-description"><em>Sin descripción</em></p>'}
@@ -331,6 +345,397 @@
   };
 
   const getPlaceholderCircle = () => `<span class="image-placeholder-circle-2">${RECIPE_PLACEHOLDER_ICON}</span>`;
+
+  const ensurePrintCss = async () => {
+    if (state.print.cssText) return state.print.cssText;
+    if (state.print.cssPromise) return state.print.cssPromise;
+
+    state.print.cssPromise = fetch('./CSS/style.css')
+      .then((response) => {
+        if (!response.ok) throw new Error('No se pudo cargar style.css');
+        return response.text();
+      })
+      .then((textCss) => {
+        state.print.cssText = String(textCss || '');
+        return state.print.cssText;
+      })
+      .finally(() => {
+        state.print.cssPromise = null;
+      });
+
+    return state.print.cssPromise;
+  };
+
+  const getPrintPayload = (recipe, mode) => {
+    const title = capitalize(recipe?.title || 'Receta');
+
+    if (mode === 'nutrition') {
+      const tableHtml = normalizeValue(recipe?.nutrition?.ai?.tableHtml);
+      if (!tableHtml) {
+        throw new Error('La receta no tiene tabla nutricional generada.');
+      }
+      return {
+        title,
+        mode,
+        html: `<div class="recipe-print-nutrition">${tableHtml}</div>`
+      };
+    }
+
+    const frontLabels = Array.isArray(recipe?.nutrition?.ai?.frontLabels) ? recipe.nutrition.ai.frontLabels : [];
+    if (!frontLabels.length) {
+      throw new Error('La receta no tiene sellos de etiquetado frontal.');
+    }
+
+    return {
+      title,
+      mode,
+      html: `<div class="recipe-print-front">${buildFrontLabelsHtml(frontLabels)}</div>`
+    };
+  };
+
+  const renderHtmlToImage = async ({ html, mode }) => {
+    const cssText = await ensurePrintCss();
+    const host = document.createElement('div');
+    host.className = 'recipe-print-render-host';
+    host.innerHTML = `<div class="recipe-print-render-root mode-${mode}">${html}</div>`;
+    document.body.appendChild(host);
+
+    const target = host.querySelector('.recipe-print-render-root');
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    const bounds = target.getBoundingClientRect();
+    const width = Math.max(240, Math.ceil(bounds.width));
+    const height = Math.max(240, Math.ceil(bounds.height));
+    const scale = 2;
+
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${width * scale}" height="${height * scale}" viewBox="0 0 ${width} ${height}">
+        <foreignObject x="0" y="0" width="100%" height="100%">
+          <div xmlns="http://www.w3.org/1999/xhtml" style="width:${width}px;height:${height}px;overflow:hidden;background:#ffffff;">
+            <style>${cssText}</style>
+            <div class="recipe-print-render-root mode-${mode}" style="width:${width}px;height:${height}px;">${html}</div>
+          </div>
+        </foreignObject>
+      </svg>
+    `;
+
+    const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    const image = new Image();
+
+    const dataUrl = await new Promise((resolve, reject) => {
+      image.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = width * scale;
+        canvas.height = height * scale;
+        const context = canvas.getContext('2d');
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      image.onerror = () => reject(new Error('No se pudo renderizar el diseño de impresión.'));
+      image.src = url;
+    });
+
+    URL.revokeObjectURL(url);
+    host.remove();
+
+    return {
+      dataUrl,
+      width: width * scale,
+      height: height * scale
+    };
+  };
+
+  const getPrintSheetConfig = (sheet) => {
+    if (sheet === 'a4') {
+      return { widthMm: 210, heightMm: 297, label: 'A4' };
+    }
+
+    return { widthMm: 100, heightMm: 140, label: 'Zebra 10x14' };
+  };
+
+  const getGridConfig = (sheet, perSheet) => {
+    const count = Math.max(1, Number(perSheet) || 1);
+
+    if (sheet === 'zebra') {
+      if (count === 1) return { rows: 1, cols: 1 };
+      if (count === 2) return { rows: 1, cols: 2 };
+      if (count === 3) return { rows: 1, cols: 3 };
+      return { rows: 4, cols: 1 };
+    }
+
+    const ratio = 210 / 297;
+    const cols = Math.max(1, Math.ceil(Math.sqrt(count * ratio)));
+    const rows = Math.max(1, Math.ceil(count / cols));
+    return { rows, cols };
+  };
+
+  const buildSheetCanvas = ({ imageDataUrl, imageWidth, imageHeight, sheet, perSheet }) => {
+    const size = getPrintSheetConfig(sheet);
+    const pageWidth = Math.round(size.widthMm * 12);
+    const pageHeight = Math.round(size.heightMm * 12);
+    const canvas = document.createElement('canvas');
+    canvas.width = pageWidth;
+    canvas.height = pageHeight;
+
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, pageWidth, pageHeight);
+
+    const margin = Math.round(Math.min(pageWidth, pageHeight) * 0.035);
+    const gap = Math.round(Math.min(pageWidth, pageHeight) * 0.02);
+    const contentWidth = pageWidth - margin * 2;
+    const contentHeight = pageHeight - margin * 2;
+    const { rows, cols } = getGridConfig(sheet, perSheet);
+    const cellWidth = (contentWidth - gap * (cols - 1)) / cols;
+    const cellHeight = (contentHeight - gap * (rows - 1)) / rows;
+
+    const sourceRatio = imageWidth / imageHeight;
+    const slots = Math.max(1, Number(perSheet) || 1);
+    const image = new Image();
+    image.src = imageDataUrl;
+
+    for (let index = 0; index < slots; index += 1) {
+      const row = Math.floor(index / cols);
+      const col = index % cols;
+      if (row >= rows) break;
+
+      const x = margin + col * (cellWidth + gap);
+      const y = margin + row * (cellHeight + gap);
+      const targetRatio = cellWidth / cellHeight;
+      let drawWidth = cellWidth;
+      let drawHeight = cellHeight;
+
+      if (sourceRatio > targetRatio) {
+        drawHeight = drawWidth / sourceRatio;
+      } else {
+        drawWidth = drawHeight * sourceRatio;
+      }
+
+      const drawX = x + (cellWidth - drawWidth) / 2;
+      const drawY = y + (cellHeight - drawHeight) / 2;
+      context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+    }
+
+    return canvas;
+  };
+
+  const openPrintConfigurator = async (recipe, mode) => {
+    const payload = getPrintPayload(recipe, mode);
+    const loadingTitle = mode === 'nutrition'
+      ? 'Generando imagen de tabla nutricional...'
+      : 'Generando imagen de etiquetado frontal...';
+
+    openIosSwal({
+      title: loadingTitle,
+      html: `
+        <div class="recipe-print-loading">
+          <p>Estamos preparando la base de impresión.</p>
+          <img src="./IMG/Meta-ai-logo.webp" alt="Procesando" class="meta-spinner-login recipe-print-loader">
+        </div>
+      `,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      customClass: {
+        htmlContainer: 'recipe-print-loading-container'
+      }
+    });
+
+    let sourceImage;
+    try {
+      sourceImage = await renderHtmlToImage(payload);
+    } finally {
+      Swal.close();
+    }
+
+    const result = await openIosSwal({
+      title: `Impresión · ${mode === 'nutrition' ? 'Tabla nutricional' : 'Etiquetado frontal'}`,
+      width: 820,
+      html: `
+        <div class="recipe-print-panel">
+          <div class="recipe-print-controls">
+            <label class="recipe-print-field">
+              <span>Tipo de hoja</span>
+              <select id="printSheetType" class="form-select ios-input">
+                <option value="zebra">Zebra 10x14</option>
+                <option value="a4">A4</option>
+              </select>
+            </label>
+            <label class="recipe-print-field">
+              <span>Cantidad por hoja</span>
+              <input id="printPerSheet" type="number" min="1" step="1" value="1" class="form-control ios-input">
+            </label>
+            <label class="recipe-print-field">
+              <span>Cantidad de hojas</span>
+              <input id="printSheetCount" type="number" min="1" step="1" value="1" class="form-control ios-input">
+            </label>
+          </div>
+          <div class="recipe-print-meta" id="printLayoutMeta"></div>
+          <div class="recipe-print-preview-wrap">
+            <canvas id="printPreviewCanvas" class="recipe-print-preview-canvas" width="420" height="590"></canvas>
+          </div>
+        </div>
+      `,
+      showCancelButton: true,
+      cancelButtonText: 'Cerrar',
+      showDenyButton: true,
+      denyButtonText: 'Descargar',
+      confirmButtonText: 'Imprimir',
+      didOpen: (popup) => {
+        const panel = popup.querySelector('.recipe-print-panel');
+        const sheetTypeNode = panel.querySelector('#printSheetType');
+        const perSheetNode = panel.querySelector('#printPerSheet');
+        const sheetCountNode = panel.querySelector('#printSheetCount');
+        const canvas = panel.querySelector('#printPreviewCanvas');
+        const meta = panel.querySelector('#printLayoutMeta');
+
+        const panelState = {
+          sheet: 'zebra',
+          perSheet: 1,
+          sheetCount: 1
+        };
+
+        const normalizePanel = () => {
+          panelState.sheet = sheetTypeNode.value === 'a4' ? 'a4' : 'zebra';
+          const max = panelState.sheet === 'zebra' ? 4 : Number.MAX_SAFE_INTEGER;
+          panelState.perSheet = Math.min(max, Math.max(1, Math.floor(Number(perSheetNode.value) || 1)));
+          panelState.sheetCount = Math.max(1, Math.floor(Number(sheetCountNode.value) || 1));
+
+          if (panelState.sheet === 'zebra') {
+            perSheetNode.max = '4';
+          } else {
+            perSheetNode.removeAttribute('max');
+          }
+
+          perSheetNode.value = String(panelState.perSheet);
+          sheetCountNode.value = String(panelState.sheetCount);
+          panel.dataset.sheet = panelState.sheet;
+          panel.dataset.perSheet = String(panelState.perSheet);
+          panel.dataset.sheetCount = String(panelState.sheetCount);
+        };
+
+        const drawPreview = () => {
+          const composed = buildSheetCanvas({
+            imageDataUrl: sourceImage.dataUrl,
+            imageWidth: sourceImage.width,
+            imageHeight: sourceImage.height,
+            sheet: panelState.sheet,
+            perSheet: panelState.perSheet
+          });
+
+          canvas.width = composed.width;
+          canvas.height = composed.height;
+          const context = canvas.getContext('2d');
+          context.clearRect(0, 0, canvas.width, canvas.height);
+          context.drawImage(composed, 0, 0);
+
+          const { rows, cols } = getGridConfig(panelState.sheet, panelState.perSheet);
+          const size = getPrintSheetConfig(panelState.sheet);
+          meta.innerHTML = `
+            <strong>${escapeHtml(payload.title)}</strong>
+            <span>Formato: ${size.label}</span>
+            <span>Disposición: ${rows} fila(s) × ${cols} columna(s)</span>
+            <span>Cantidad por hoja: ${panelState.perSheet}</span>
+            <span>Cantidad de hojas: ${panelState.sheetCount}</span>
+          `;
+        };
+
+        sheetTypeNode.addEventListener('change', () => {
+          perSheetNode.value = sheetTypeNode.value === 'a4' ? '4' : '1';
+          normalizePanel();
+          drawPreview();
+        });
+        perSheetNode.addEventListener('input', () => {
+          normalizePanel();
+          drawPreview();
+        });
+        sheetCountNode.addEventListener('input', () => {
+          normalizePanel();
+          drawPreview();
+        });
+
+        normalizePanel();
+        drawPreview();
+      },
+      preConfirm: () => {
+        const panel = Swal.getPopup().querySelector('.recipe-print-panel');
+        return {
+          action: 'print',
+          sheet: panel.dataset.sheet,
+          perSheet: Number(panel.dataset.perSheet),
+          sheetCount: Number(panel.dataset.sheetCount)
+        };
+      },
+      preDeny: () => {
+        const panel = Swal.getPopup().querySelector('.recipe-print-panel');
+        return {
+          action: 'download',
+          sheet: panel.dataset.sheet,
+          perSheet: Number(panel.dataset.perSheet),
+          sheetCount: Number(panel.dataset.sheetCount)
+        };
+      }
+    });
+
+    if (!result.isConfirmed && !result.isDenied) return;
+
+    const config = result.value || {};
+    const canvases = Array.from({ length: Math.max(1, config.sheetCount || 1) }, () => buildSheetCanvas({
+      imageDataUrl: sourceImage.dataUrl,
+      imageWidth: sourceImage.width,
+      imageHeight: sourceImage.height,
+      sheet: config.sheet,
+      perSheet: config.perSheet
+    }));
+
+    if (config.action === 'download') {
+      canvases.forEach((canvas, index) => {
+        const link = document.createElement('a');
+        link.href = canvas.toDataURL('image/png');
+        link.download = `${normalizeLower(payload.title).replace(/[^a-z0-9]+/g, '-') || 'receta'}-${mode}-${index + 1}.png`;
+        link.click();
+      });
+      window.laJamoneraNotify?.show({ type: 'success', title: 'Descarga lista', message: 'Se descargaron las hojas renderizadas en PNG.' });
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1024,height=900');
+    if (!printWindow) {
+      window.laJamoneraNotify?.show({ type: 'error', title: 'Bloqueado', message: 'Permití ventanas emergentes para imprimir.' });
+      return;
+    }
+
+    const pagesHtml = canvases
+      .map((canvas) => `<img src="${canvas.toDataURL('image/png')}" class="recipe-print-page" alt="Hoja de impresión">`)
+      .join('');
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8">
+        <title>Impresión de receta</title>
+        <style>
+          body { margin: 0; background: #f2f4fa; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+          .recipe-print-page { width: min(92vw, 860px); display: block; margin: 0 auto 16px; border: 1px solid #dbe0ef; background: #fff; }
+          @media print {
+            body { background: #fff; padding: 0; }
+            .recipe-print-page { width: 100%; margin: 0; border: 0; page-break-after: always; }
+            .recipe-print-page:last-child { page-break-after: auto; }
+          }
+        </style>
+      </head>
+      <body>${pagesHtml}</body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => printWindow.print(), 220);
+  };
+
   const getSmallPlaceholder = (icon = 'fa-solid fa-bowl-food') => `<span class="recipe-small-placeholder"><i class="${icon}"></i></span>`;
   const buildImageStepHtml = (prefix, initialImage, stepNumber = 4) => `
     <section class="step-block recipe-step-card">
@@ -1785,6 +2190,23 @@
   emptyCreateRecipeBtn?.addEventListener('click', () => renderEditor());
 
   recetasData?.addEventListener('click', async (event) => {
+    const printBtn = event.target.closest('[data-receta-print]');
+    if (printBtn) {
+      const recipe = state.recetas[printBtn.dataset.recetaId];
+      if (!recipe) return;
+      try {
+        await openPrintConfigurator(recipe, printBtn.dataset.recetaPrint);
+      } catch (error) {
+        await openIosSwal({
+          title: 'No se pudo imprimir',
+          html: `<p>${escapeHtml(error.message || 'Error preparando la impresión.')}</p>`,
+          icon: 'error',
+          confirmButtonText: 'Entendido'
+        });
+      }
+      return;
+    }
+
     const editBtn = event.target.closest('[data-receta-edit]');
     if (editBtn) return renderEditor(state.recetas[editBtn.dataset.recetaEdit]);
     const deleteBtn = event.target.closest('[data-receta-delete]');
