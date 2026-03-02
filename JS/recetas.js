@@ -122,6 +122,7 @@
       htmlContainer: 'ios-alert-text',
       confirmButton: 'ios-btn ios-btn-primary',
       cancelButton: 'ios-btn ios-btn-secondary',
+      denyButton: 'ios-btn ios-btn-secondary',
       ...options.customClass
     },
     buttonsStyling: false
@@ -392,6 +393,7 @@
         scale: 2,
         useCORS: true,
         allowTaint: true,
+        foreignObjectRendering: true,
         logging: false
       });
 
@@ -416,7 +418,7 @@
       return { widthMm: 210, heightMm: 297, label: 'A4' };
     }
 
-    return { widthMm: 100, heightMm: 140, label: 'Zebra 10x14' };
+    return { widthMm: 100, heightMm: 150, label: 'Zebra 10x15' };
   };
 
   const getGridConfig = (sheet, perSheet) => {
@@ -425,8 +427,8 @@
     if (sheet === 'zebra') {
       if (count === 1) return { rows: 1, cols: 1 };
       if (count === 2) return { rows: 1, cols: 2 };
-      if (count === 3) return { rows: 1, cols: 3 };
-      return { rows: 4, cols: 1 };
+      if (count === 3) return { rows: 3, cols: 1 };
+      return { rows: 2, cols: 2 };
     }
 
     const ratio = 210 / 297;
@@ -492,6 +494,28 @@
     return canvas;
   };
 
+  const buildPdfFromCanvases = (canvases, sheet) => {
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+      throw new Error('No se pudo cargar la librería PDF.');
+    }
+
+    const size = getPrintSheetConfig(sheet);
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({
+      orientation: size.widthMm > size.heightMm ? 'landscape' : 'portrait',
+      unit: 'mm',
+      format: [size.widthMm, size.heightMm]
+    });
+
+    canvases.forEach((canvas, index) => {
+      if (index > 0) pdf.addPage([size.widthMm, size.heightMm], size.widthMm > size.heightMm ? 'landscape' : 'portrait');
+      const dataUrl = canvas.toDataURL('image/png');
+      pdf.addImage(dataUrl, 'PNG', 0, 0, size.widthMm, size.heightMm, undefined, 'FAST');
+    });
+
+    return pdf;
+  };
+
   const openPrintConfigurator = async (recipe, mode) => {
     const payload = getPrintPayload(recipe, mode);
     const loadingTitle = mode === 'nutrition'
@@ -532,13 +556,13 @@
             <label class="recipe-print-field">
               <span>Tipo de hoja</span>
               <select id="printSheetType" class="form-select ios-input">
-                <option value="zebra">Zebra 10x14</option>
+                <option value="zebra">Zebra 10x15</option>
                 <option value="a4">A4</option>
               </select>
             </label>
             <label class="recipe-print-field">
               <span>Cantidad por hoja</span>
-              <input id="printPerSheet" type="number" min="1" step="1" value="1" class="form-control ios-input">
+              <input id="printPerSheet" type="number" min="1" step="1" value="${mode === 'front' ? 4 : 1}" class="form-control ios-input">
             </label>
             <label class="recipe-print-field">
               <span>Cantidad de hojas</span>
@@ -564,9 +588,11 @@
         const canvas = panel.querySelector('#printPreviewCanvas');
         const meta = panel.querySelector('#printLayoutMeta');
 
+        const defaultPerSheet = mode === 'front' ? 4 : 1;
+
         const panelState = {
           sheet: 'zebra',
-          perSheet: 1,
+          perSheet: defaultPerSheet,
           sheetCount: 1
         };
 
@@ -614,7 +640,7 @@
         };
 
         sheetTypeNode.addEventListener('change', () => {
-          perSheetNode.value = sheetTypeNode.value === 'a4' ? '4' : '1';
+          perSheetNode.value = sheetTypeNode.value === 'a4' ? '4' : (mode === 'front' ? '4' : '1');
           normalizePanel();
           drawPreview().catch(() => {});
         });
@@ -659,51 +685,31 @@
       perSheet: config.perSheet
     }));
 
+    const pdf = buildPdfFromCanvases(canvases, config.sheet);
+    const safeName = `${normalizeLower(payload.title).replace(/[^a-z0-9]+/g, '-') || 'receta'}-${mode}-${config.sheet}`;
+
     if (config.action === 'download') {
-      canvases.forEach((canvas, index) => {
-        const link = document.createElement('a');
-        link.href = canvas.toDataURL('image/png');
-        link.download = `${normalizeLower(payload.title).replace(/[^a-z0-9]+/g, '-') || 'receta'}-${mode}-${index + 1}.png`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-      });
-      window.laJamoneraNotify?.show({ type: 'success', title: 'Descarga lista', message: 'Se descargaron las hojas renderizadas en PNG.' });
+      pdf.save(`${safeName}.pdf`);
+      window.laJamoneraNotify?.show({ type: 'success', title: 'Descarga lista', message: 'Se descargó el PDF de impresión.' });
       return;
     }
 
-    const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1024,height=900');
+    const pdfBlob = pdf.output('blob');
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    const printWindow = window.open(pdfUrl, '_blank');
     if (!printWindow) {
+      URL.revokeObjectURL(pdfUrl);
       window.laJamoneraNotify?.show({ type: 'error', title: 'Bloqueado', message: 'Permití ventanas emergentes para imprimir.' });
       return;
     }
 
-    const pagesHtml = canvases
-      .map((canvas) => `<img src="${canvas.toDataURL('image/png')}" class="recipe-print-page" alt="Hoja de impresión">`)
-      .join('');
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html lang="es">
-      <head>
-        <meta charset="UTF-8">
-        <title>Impresión de receta</title>
-        <style>
-          body { margin: 0; background: #f2f4fa; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-          .recipe-print-page { width: min(92vw, 860px); display: block; margin: 0 auto 16px; border: 1px solid #dbe0ef; background: #fff; }
-          @media print {
-            body { background: #fff; padding: 0; }
-            .recipe-print-page { width: 100%; margin: 0; border: 0; page-break-after: always; }
-            .recipe-print-page:last-child { page-break-after: auto; }
-          }
-        </style>
-      </head>
-      <body>${pagesHtml}</body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => printWindow.print(), 220);
+    const releaseUrl = () => setTimeout(() => URL.revokeObjectURL(pdfUrl), 60000);
+    printWindow.addEventListener('load', () => {
+      setTimeout(() => {
+        try { printWindow.focus(); printWindow.print(); } catch (e) {}
+        releaseUrl();
+      }, 600);
+    }, { once: true });
   };
 
   const getSmallPlaceholder = (icon = 'fa-solid fa-bowl-food') => `<span class="recipe-small-placeholder"><i class="${icon}"></i></span>`;
