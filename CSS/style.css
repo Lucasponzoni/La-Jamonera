@@ -3725,10 +3725,11 @@ html.login-protected.auth-ok body {
 
 .recipe-print-render-host {
   position: fixed;
-  left: -10000px;
+  left: 0;
   top: 0;
   opacity: 0;
   pointer-events: none;
+  z-index: -1;
 }
 
 .recipe-print-render-root {

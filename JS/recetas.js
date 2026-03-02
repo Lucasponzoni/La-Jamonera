@@ -393,7 +393,6 @@
         scale: 2,
         useCORS: true,
         allowTaint: true,
-        foreignObjectRendering: true,
         logging: false
       });
 
@@ -580,6 +579,9 @@
       showDenyButton: true,
       denyButtonText: 'Descargar',
       confirmButtonText: 'Imprimir',
+      customClass: {
+        denyButton: 'ios-btn ios-btn-success'
+      },
       didOpen: (popup) => {
         const panel = popup.querySelector('.recipe-print-panel');
         const sheetTypeNode = panel.querySelector('#printSheetType');
