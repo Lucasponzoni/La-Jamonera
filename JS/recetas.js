@@ -346,6 +346,33 @@
 
   const getPlaceholderCircle = () => `<span class="image-placeholder-circle-2">${RECIPE_PLACEHOLDER_ICON}</span>`;
 
+  const getPrintPayload = (recipe, mode) => {
+    const title = capitalize(recipe?.title || 'Receta');
+
+    if (mode === 'nutrition') {
+      const tableHtml = normalizeValue(recipe?.nutrition?.ai?.tableHtml);
+      if (!tableHtml) {
+        throw new Error('La receta no tiene tabla nutricional generada.');
+      }
+      return {
+        title,
+        mode,
+        html: `<div class="recipe-print-nutrition">${tableHtml}</div>`
+      };
+    }
+
+    const frontLabels = Array.isArray(recipe?.nutrition?.ai?.frontLabels) ? recipe.nutrition.ai.frontLabels : [];
+    if (!frontLabels.length) {
+      throw new Error('La receta no tiene sellos de etiquetado frontal.');
+    }
+
+    return {
+      title,
+      mode,
+      html: `<div class="recipe-print-front">${buildFrontLabelsHtml(frontLabels)}</div>`
+    };
+  };
+
   const renderHtmlToImage = async ({ html, mode }) => {
     if (typeof window.html2canvas !== 'function') {
       throw new Error('No se pudo cargar la librería de renderizado.');
