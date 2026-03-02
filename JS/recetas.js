@@ -560,7 +560,7 @@
     image.src = dataUrl;
   });
 
-  const buildSheetCanvas = ({ imageElement, sheet, perSheet }) => {
+  const buildSheetCanvas = ({ imageElement, sheet, perSheet, mode }) => {
     const size = getPrintSheetConfig(sheet);
     const pageWidth = Math.round(size.widthMm * 12);
     const pageHeight = Math.round(size.heightMm * 12);
@@ -584,6 +584,9 @@
     const sourceHeight = Number(imageElement?.naturalHeight || imageElement?.height || 1);
     const sourceRatio = sourceWidth / sourceHeight;
     const slots = Math.max(1, Number(perSheet) || 1);
+    const shouldRotateZebraNutrition = sheet === 'zebra'
+      && mode === 'nutrition'
+      && (Number(perSheet) === 2 || Number(perSheet) === 3);
 
     for (let index = 0; index < slots; index += 1) {
       const row = Math.floor(index / cols);
@@ -592,19 +595,29 @@
 
       const x = margin + col * (cellWidth + gap);
       const y = margin + row * (cellHeight + gap);
+      const ratioForFit = shouldRotateZebraNutrition ? (1 / sourceRatio) : sourceRatio;
       const targetRatio = cellWidth / cellHeight;
       let drawWidth = cellWidth;
       let drawHeight = cellHeight;
 
-      if (sourceRatio > targetRatio) {
-        drawHeight = drawWidth / sourceRatio;
+      if (ratioForFit > targetRatio) {
+        drawHeight = drawWidth / ratioForFit;
       } else {
-        drawWidth = drawHeight * sourceRatio;
+        drawWidth = drawHeight * ratioForFit;
       }
 
       const drawX = x + (cellWidth - drawWidth) / 2;
       const drawY = y + (cellHeight - drawHeight) / 2;
-      context.drawImage(imageElement, drawX, drawY, drawWidth, drawHeight);
+
+      if (shouldRotateZebraNutrition) {
+        context.save();
+        context.translate(drawX + (drawWidth / 2), drawY + (drawHeight / 2));
+        context.rotate(-Math.PI / 2);
+        context.drawImage(imageElement, -drawHeight / 2, -drawWidth / 2, drawHeight, drawWidth);
+        context.restore();
+      } else {
+        context.drawImage(imageElement, drawX, drawY, drawWidth, drawHeight);
+      }
     }
 
     return canvas;
@@ -739,7 +752,8 @@
           const composed = buildSheetCanvas({
             imageElement: sourceCanvasImage,
             sheet: panelState.sheet,
-            perSheet: panelState.perSheet
+            perSheet: panelState.perSheet,
+            mode
           });
 
           canvas.width = composed.width;
@@ -802,7 +816,8 @@
     const canvases = Array.from({ length: Math.max(1, config.sheetCount || 1) }, () => buildSheetCanvas({
       imageElement: sourceCanvasImage,
       sheet: config.sheet,
-      perSheet: config.perSheet
+      perSheet: config.perSheet,
+      mode
     }));
 
     const pdf = buildPdfFromCanvases(canvases, config.sheet);
