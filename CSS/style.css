@@ -858,6 +858,15 @@ html.login-protected.auth-ok body {
 
 
 /* SweetAlert layout fix */
+
+.ingredientes-saving-alert .swal2-html-container,
+.swal2-html-container.ingredientes-saving-html {
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  max-height: none !important;
+}
+
 .swal2-popup.ingredientes-alert .swal2-html-container {
   width: 100%;
 }
