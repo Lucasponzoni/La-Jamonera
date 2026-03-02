@@ -528,7 +528,7 @@
       ? 'Generando imagen de tabla nutricional...'
       : 'Generando imagen de etiquetado frontal...';
 
-    await openIosSwal({
+    openIosSwal({
       title: loadingTitle,
       html: `
         <div class="recipe-print-loading">
@@ -538,7 +538,10 @@
       `,
       allowOutsideClick: false,
       allowEscapeKey: false,
-      showConfirmButton: false
+      showConfirmButton: false,
+      customClass: {
+        htmlContainer: 'recipe-print-loading-container'
+      }
     });
 
     let sourceImage;

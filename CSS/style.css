@@ -3696,7 +3696,8 @@ html.login-protected.auth-ok body {
 ========================================= */
 .receta-print-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: 8px;
   margin: 6px 0 8px;
 }
@@ -3704,6 +3705,9 @@ html.login-protected.auth-ok body {
 .receta-print-btn {
   border-radius: 10px;
   min-height: 30px;
+  width: fit-content;
+  flex: 0 0 auto;
+  white-space: nowrap;
   padding: 4px 8px;
   font-size: 0.69rem;
   line-height: 1.1;
@@ -3764,6 +3768,13 @@ html.login-protected.auth-ok body {
 
 .recipe-print-loading p {
   margin: 0;
+}
+
+.recipe-print-loading-container {
+  margin: 0 auto !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  max-height: none !important;
 }
 
 .recipe-print-loader {
