@@ -118,6 +118,7 @@
       htmlContainer: 'ios-alert-text',
       confirmButton: 'ios-btn ios-btn-primary',
       cancelButton: 'ios-btn ios-btn-secondary',
+      denyButton: 'ios-btn ios-btn-secondary',
       ...options.customClass
     },
     buttonsStyling: false
@@ -284,6 +285,7 @@
         .map((row) => capitalize(row.ingredientName));
       const frontLabels = Array.isArray(item.nutrition?.ai?.frontLabels) ? item.nutrition.ai.frontLabels : [];
       const hasNutritionLabel = Boolean(normalizeValue(item.nutrition?.ai?.tableHtml));
+      const hasFrontLabels = frontLabels.length > 0;
       return `
         <article class="ingrediente-card receta-card" data-receta-id="${item.id}">
           <div class="ingrediente-avatar receta-thumb-wrap">
@@ -293,7 +295,16 @@
           </div>
           <div class="ingrediente-main receta-main">
             <h6 class="ingrediente-name receta-name">${capitalize(item.title || 'Sin título')}</h6>
-            ${hasNutritionLabel ? '<span class="receta-nutrition-badge"><i class="fa-solid fa-circle-check"></i>Etiquetados disponibles</span>' : ''}
+            <div class="receta-print-actions">
+              <button type="button" class="btn ios-btn ios-btn-secondary receta-print-btn" data-receta-print="nutrition" data-receta-id="${item.id}" ${hasNutritionLabel ? '' : 'disabled'}>
+                <i class="fa-solid fa-print"></i>
+                <span>Tabla nutricional</span>
+              </button>
+              <button type="button" class="btn ios-btn ios-btn-secondary receta-print-btn" data-receta-print="front" data-receta-id="${item.id}" ${hasFrontLabels ? '' : 'disabled'}>
+                <i class="fa-solid fa-print"></i>
+                <span>Etiquetado frontal</span>
+              </button>
+            </div>
             <p class="ingrediente-meta receta-card-meta">Rinde: ${item.yieldQuantity || '0'} ${label || ''}</p>
             <p class="ingrediente-meta receta-card-ingredients">Ingredientes: ${recipeIngredients.length ? recipeIngredients.join(' · ') : 'Sin ingredientes vinculados.'}</p>
             ${item.description ? `<p class="ingrediente-description">${capitalize(item.description)}</p>` : '<p class="ingrediente-description"><em>Sin descripción</em></p>'}
@@ -331,6 +342,374 @@
   };
 
   const getPlaceholderCircle = () => `<span class="image-placeholder-circle-2">${RECIPE_PLACEHOLDER_ICON}</span>`;
+
+  const getPrintPayload = (recipe, mode) => {
+    const title = capitalize(recipe?.title || 'Receta');
+
+    if (mode === 'nutrition') {
+      const tableHtml = normalizeValue(recipe?.nutrition?.ai?.tableHtml);
+      if (!tableHtml) {
+        throw new Error('La receta no tiene tabla nutricional generada.');
+      }
+      return {
+        title,
+        mode,
+        html: `<div class="recipe-print-nutrition">${tableHtml}</div>`
+      };
+    }
+
+    const frontLabels = Array.isArray(recipe?.nutrition?.ai?.frontLabels) ? recipe.nutrition.ai.frontLabels : [];
+    if (!frontLabels.length) {
+      throw new Error('La receta no tiene sellos de etiquetado frontal.');
+    }
+
+    return {
+      title,
+      mode,
+      html: `<div class="recipe-print-front">${buildFrontLabelsHtml(frontLabels)}</div>`
+    };
+  };
+
+  const renderHtmlToImage = async ({ html, mode }) => {
+    if (typeof window.html2canvas !== 'function') {
+      throw new Error('No se pudo cargar la librería de renderizado.');
+    }
+
+    const host = document.createElement('div');
+    host.className = 'recipe-print-render-host';
+    host.innerHTML = `<div class="recipe-print-render-root mode-${mode}">${html}</div>`;
+    document.body.appendChild(host);
+
+    try {
+      const target = host.querySelector('.recipe-print-render-root');
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+
+      const canvas = await window.html2canvas(target, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false
+      });
+
+      if (!canvas || !canvas.width || !canvas.height) {
+        throw new Error('No se pudo renderizar el diseño de impresión.');
+      }
+
+      return {
+        dataUrl: canvas.toDataURL('image/png'),
+        width: canvas.width,
+        height: canvas.height
+      };
+    } catch (error) {
+      throw new Error('No se pudo renderizar el diseño de impresión.');
+    } finally {
+      host.remove();
+    }
+  };
+
+  const getPrintSheetConfig = (sheet) => {
+    if (sheet === 'a4') {
+      return { widthMm: 210, heightMm: 297, label: 'A4' };
+    }
+
+    return { widthMm: 100, heightMm: 150, label: 'Zebra 10x15' };
+  };
+
+  const getGridConfig = (sheet, perSheet) => {
+    const count = Math.max(1, Number(perSheet) || 1);
+
+    if (sheet === 'zebra') {
+      if (count === 1) return { rows: 1, cols: 1 };
+      if (count === 2) return { rows: 1, cols: 2 };
+      if (count === 3) return { rows: 3, cols: 1 };
+      return { rows: 2, cols: 2 };
+    }
+
+    const ratio = 210 / 297;
+    const cols = Math.max(1, Math.ceil(Math.sqrt(count * ratio)));
+    const rows = Math.max(1, Math.ceil(count / cols));
+    return { rows, cols };
+  };
+
+  const loadCanvasImage = (dataUrl) => new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('No se pudo preparar la imagen para impresión.'));
+    image.src = dataUrl;
+  });
+
+  const buildSheetCanvas = ({ imageElement, sheet, perSheet }) => {
+    const size = getPrintSheetConfig(sheet);
+    const pageWidth = Math.round(size.widthMm * 12);
+    const pageHeight = Math.round(size.heightMm * 12);
+    const canvas = document.createElement('canvas');
+    canvas.width = pageWidth;
+    canvas.height = pageHeight;
+
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, pageWidth, pageHeight);
+
+    const margin = Math.round(Math.min(pageWidth, pageHeight) * 0.035);
+    const gap = Math.round(Math.min(pageWidth, pageHeight) * 0.02);
+    const contentWidth = pageWidth - margin * 2;
+    const contentHeight = pageHeight - margin * 2;
+    const { rows, cols } = getGridConfig(sheet, perSheet);
+    const cellWidth = (contentWidth - gap * (cols - 1)) / cols;
+    const cellHeight = (contentHeight - gap * (rows - 1)) / rows;
+
+    const sourceWidth = Number(imageElement?.naturalWidth || imageElement?.width || 1);
+    const sourceHeight = Number(imageElement?.naturalHeight || imageElement?.height || 1);
+    const sourceRatio = sourceWidth / sourceHeight;
+    const slots = Math.max(1, Number(perSheet) || 1);
+
+    for (let index = 0; index < slots; index += 1) {
+      const row = Math.floor(index / cols);
+      const col = index % cols;
+      if (row >= rows) break;
+
+      const x = margin + col * (cellWidth + gap);
+      const y = margin + row * (cellHeight + gap);
+      const targetRatio = cellWidth / cellHeight;
+      let drawWidth = cellWidth;
+      let drawHeight = cellHeight;
+
+      if (sourceRatio > targetRatio) {
+        drawHeight = drawWidth / sourceRatio;
+      } else {
+        drawWidth = drawHeight * sourceRatio;
+      }
+
+      const drawX = x + (cellWidth - drawWidth) / 2;
+      const drawY = y + (cellHeight - drawHeight) / 2;
+      context.drawImage(imageElement, drawX, drawY, drawWidth, drawHeight);
+    }
+
+    return canvas;
+  };
+
+  const buildPdfFromCanvases = (canvases, sheet) => {
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+      throw new Error('No se pudo cargar la librería PDF.');
+    }
+
+    const size = getPrintSheetConfig(sheet);
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({
+      orientation: size.widthMm > size.heightMm ? 'landscape' : 'portrait',
+      unit: 'mm',
+      format: [size.widthMm, size.heightMm]
+    });
+
+    canvases.forEach((canvas, index) => {
+      if (index > 0) pdf.addPage([size.widthMm, size.heightMm], size.widthMm > size.heightMm ? 'landscape' : 'portrait');
+      const dataUrl = canvas.toDataURL('image/png');
+      pdf.addImage(dataUrl, 'PNG', 0, 0, size.widthMm, size.heightMm, undefined, 'FAST');
+    });
+
+    return pdf;
+  };
+
+  const openPrintConfigurator = async (recipe, mode) => {
+    const payload = getPrintPayload(recipe, mode);
+    const loadingTitle = mode === 'nutrition'
+      ? 'Generando imagen de tabla nutricional...'
+      : 'Generando imagen de etiquetado frontal...';
+
+    openIosSwal({
+      title: loadingTitle,
+      html: `
+        <div class="recipe-print-loading">
+          <p>Estamos preparando la base de impresión.</p>
+          <img src="./IMG/Meta-ai-logo.webp" alt="Procesando" class="meta-spinner-login recipe-print-loader">
+        </div>
+      `,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      customClass: {
+        htmlContainer: 'recipe-print-loading-container'
+      }
+    });
+
+    let sourceImage;
+    try {
+      sourceImage = await renderHtmlToImage(payload);
+    } finally {
+      Swal.close();
+    }
+
+    const sourceCanvasImage = await loadCanvasImage(sourceImage.dataUrl);
+
+    const result = await openIosSwal({
+      title: `Impresión · ${mode === 'nutrition' ? 'Tabla nutricional' : 'Etiquetado frontal'}`,
+      width: 820,
+      html: `
+        <div class="recipe-print-panel">
+          <div class="recipe-print-controls">
+            <label class="recipe-print-field">
+              <span>Tipo de hoja</span>
+              <select id="printSheetType" class="form-select ios-input">
+                <option value="zebra">Zebra 10x15</option>
+                <option value="a4">A4</option>
+              </select>
+            </label>
+            <label class="recipe-print-field">
+              <span>Cantidad por hoja</span>
+              <input id="printPerSheet" type="number" min="1" step="1" value="${mode === 'front' ? 4 : 1}" class="form-control ios-input">
+            </label>
+            <label class="recipe-print-field">
+              <span>Cantidad de hojas</span>
+              <input id="printSheetCount" type="number" min="1" step="1" value="1" class="form-control ios-input">
+            </label>
+          </div>
+          <div class="recipe-print-meta" id="printLayoutMeta"></div>
+          <div class="recipe-print-preview-wrap">
+            <canvas id="printPreviewCanvas" class="recipe-print-preview-canvas" width="420" height="590"></canvas>
+          </div>
+        </div>
+      `,
+      showCancelButton: true,
+      cancelButtonText: 'Cerrar',
+      showDenyButton: true,
+      denyButtonText: 'Descargar',
+      confirmButtonText: 'Imprimir',
+      customClass: {
+        denyButton: 'ios-btn ios-btn-success'
+      },
+      didOpen: (popup) => {
+        const panel = popup.querySelector('.recipe-print-panel');
+        const sheetTypeNode = panel.querySelector('#printSheetType');
+        const perSheetNode = panel.querySelector('#printPerSheet');
+        const sheetCountNode = panel.querySelector('#printSheetCount');
+        const canvas = panel.querySelector('#printPreviewCanvas');
+        const meta = panel.querySelector('#printLayoutMeta');
+
+        const defaultPerSheet = mode === 'front' ? 4 : 1;
+
+        const panelState = {
+          sheet: 'zebra',
+          perSheet: defaultPerSheet,
+          sheetCount: 1
+        };
+
+        const normalizePanel = () => {
+          panelState.sheet = sheetTypeNode.value === 'a4' ? 'a4' : 'zebra';
+          const max = panelState.sheet === 'zebra' ? 4 : Number.MAX_SAFE_INTEGER;
+          panelState.perSheet = Math.min(max, Math.max(1, Math.floor(Number(perSheetNode.value) || 1)));
+          panelState.sheetCount = Math.max(1, Math.floor(Number(sheetCountNode.value) || 1));
+
+          if (panelState.sheet === 'zebra') {
+            perSheetNode.max = '4';
+          } else {
+            perSheetNode.removeAttribute('max');
+          }
+
+          perSheetNode.value = String(panelState.perSheet);
+          sheetCountNode.value = String(panelState.sheetCount);
+          panel.dataset.sheet = panelState.sheet;
+          panel.dataset.perSheet = String(panelState.perSheet);
+          panel.dataset.sheetCount = String(panelState.sheetCount);
+        };
+
+        const drawPreview = async () => {
+          const composed = buildSheetCanvas({
+            imageElement: sourceCanvasImage,
+            sheet: panelState.sheet,
+            perSheet: panelState.perSheet
+          });
+
+          canvas.width = composed.width;
+          canvas.height = composed.height;
+          const context = canvas.getContext('2d');
+          context.clearRect(0, 0, canvas.width, canvas.height);
+          context.drawImage(composed, 0, 0);
+
+          const { rows, cols } = getGridConfig(panelState.sheet, panelState.perSheet);
+          const size = getPrintSheetConfig(panelState.sheet);
+          meta.innerHTML = `
+            <strong>${escapeHtml(payload.title)}</strong>
+            <span>Formato: ${size.label}</span>
+            <span>Disposición: ${rows} fila(s) × ${cols} columna(s)</span>
+            <span>Cantidad por hoja: ${panelState.perSheet}</span>
+            <span>Cantidad de hojas: ${panelState.sheetCount}</span>
+          `;
+        };
+
+        sheetTypeNode.addEventListener('change', () => {
+          perSheetNode.value = sheetTypeNode.value === 'a4' ? '4' : (mode === 'front' ? '4' : '1');
+          normalizePanel();
+          drawPreview().catch(() => {});
+        });
+        perSheetNode.addEventListener('input', () => {
+          normalizePanel();
+          drawPreview().catch(() => {});
+        });
+        sheetCountNode.addEventListener('input', () => {
+          normalizePanel();
+          drawPreview().catch(() => {});
+        });
+
+        normalizePanel();
+        drawPreview().catch(() => {});
+      },
+      preConfirm: () => {
+        const panel = Swal.getPopup().querySelector('.recipe-print-panel');
+        return {
+          action: 'print',
+          sheet: panel.dataset.sheet,
+          perSheet: Number(panel.dataset.perSheet),
+          sheetCount: Number(panel.dataset.sheetCount)
+        };
+      },
+      preDeny: () => {
+        const panel = Swal.getPopup().querySelector('.recipe-print-panel');
+        return {
+          action: 'download',
+          sheet: panel.dataset.sheet,
+          perSheet: Number(panel.dataset.perSheet),
+          sheetCount: Number(panel.dataset.sheetCount)
+        };
+      }
+    });
+
+    if (!result.isConfirmed && !result.isDenied) return;
+
+    const config = result.value || {};
+    const canvases = Array.from({ length: Math.max(1, config.sheetCount || 1) }, () => buildSheetCanvas({
+      imageElement: sourceCanvasImage,
+      sheet: config.sheet,
+      perSheet: config.perSheet
+    }));
+
+    const pdf = buildPdfFromCanvases(canvases, config.sheet);
+    const safeName = `${normalizeLower(payload.title).replace(/[^a-z0-9]+/g, '-') || 'receta'}-${mode}-${config.sheet}`;
+
+    if (config.action === 'download') {
+      pdf.save(`${safeName}.pdf`);
+      window.laJamoneraNotify?.show({ type: 'success', title: 'Descarga lista', message: 'Se descargó el PDF de impresión.' });
+      return;
+    }
+
+    const pdfBlob = pdf.output('blob');
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    const printWindow = window.open(pdfUrl, '_blank');
+    if (!printWindow) {
+      URL.revokeObjectURL(pdfUrl);
+      window.laJamoneraNotify?.show({ type: 'error', title: 'Bloqueado', message: 'Permití ventanas emergentes para imprimir.' });
+      return;
+    }
+
+    const releaseUrl = () => setTimeout(() => URL.revokeObjectURL(pdfUrl), 60000);
+    printWindow.addEventListener('load', () => {
+      setTimeout(() => {
+        try { printWindow.focus(); printWindow.print(); } catch (e) {}
+        releaseUrl();
+      }, 600);
+    }, { once: true });
+  };
+
   const getSmallPlaceholder = (icon = 'fa-solid fa-bowl-food') => `<span class="recipe-small-placeholder"><i class="${icon}"></i></span>`;
   const buildImageStepHtml = (prefix, initialImage, stepNumber = 4) => `
     <section class="step-block recipe-step-card">
@@ -1785,6 +2164,23 @@
   emptyCreateRecipeBtn?.addEventListener('click', () => renderEditor());
 
   recetasData?.addEventListener('click', async (event) => {
+    const printBtn = event.target.closest('[data-receta-print]');
+    if (printBtn) {
+      const recipe = state.recetas[printBtn.dataset.recetaId];
+      if (!recipe) return;
+      try {
+        await openPrintConfigurator(recipe, printBtn.dataset.recetaPrint);
+      } catch (error) {
+        await openIosSwal({
+          title: 'No se pudo imprimir',
+          html: `<p>${escapeHtml(error.message || 'Error preparando la impresión.')}</p>`,
+          icon: 'error',
+          confirmButtonText: 'Entendido'
+        });
+      }
+      return;
+    }
+
     const editBtn = event.target.closest('[data-receta-edit]');
     if (editBtn) return renderEditor(state.recetas[editBtn.dataset.recetaEdit]);
     const deleteBtn = event.target.closest('[data-receta-delete]');

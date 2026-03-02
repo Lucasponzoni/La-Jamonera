@@ -3691,19 +3691,148 @@ html.login-protected.auth-ok body {
   gap: 6px;
 }
 
-
-.receta-nutrition-badge {
-  display: inline-flex;
+/* =========================================
+   RECETAS / IMPRESION
+========================================= */
+.receta-print-actions {
+  display: flex;
+  flex-wrap: nowrap;
   align-items: center;
+  gap: 8px;
+  margin: 6px 0 8px;
+}
+
+.receta-print-btn {
+  border-radius: 10px;
+  min-height: 30px;
+  width: fit-content;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  padding: 4px 8px;
+  font-size: 0.69rem;
+  line-height: 1.1;
   gap: 6px;
-  background: #e8f7ee;
-  color: #1e7a46;
-  border: 1px solid #bde8ce;
+}
+
+.receta-print-btn i {
+  font-size: 0.72rem;
+}
+
+.receta-print-btn[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.recipe-print-render-host {
+  position: fixed;
+  left: 0;
+  top: 0;
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.recipe-print-render-root {
+  background: #ffffff;
+  border: 1px solid #e4e8f4;
+  border-radius: 12px;
+  padding: 12px;
+  width: 380px;
+}
+
+.recipe-print-render-root.mode-front {
+  width: 420px;
+}
+
+.recipe-print-nutrition .recipe-nutrition-label-card {
+  width: 100%;
+  max-width: 100%;
+}
+
+.recipe-print-front .recipe-octagons-wrap,
+.recipe-print-front .recipe-front-rectangles {
+  justify-content: center;
+}
+
+.recipe-print-panel {
+  display: grid;
+  gap: 12px;
+}
+
+
+.recipe-print-loading {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  text-align: center;
+}
+
+.recipe-print-loading p {
+  margin: 0;
+}
+
+.recipe-print-loading-container {
+  margin: 0 auto !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  max-height: none !important;
+}
+
+.recipe-print-loader {
+  width: 54px;
+  height: 54px;
+}
+
+.recipe-print-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.recipe-print-field {
+  display: grid;
+  gap: 6px;
+  text-align: left;
+}
+
+.recipe-print-field span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #455681;
+}
+
+.recipe-print-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  text-align: left;
+}
+
+.recipe-print-meta strong,
+.recipe-print-meta span {
+  background: #eef2ff;
+  border: 1px solid #d4dcf4;
   border-radius: 999px;
   padding: 4px 10px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  margin: 6px 0 8px;
+  font-size: 0.73rem;
+  color: #3b4b73;
+}
+
+.recipe-print-preview-wrap {
+  border: 1px solid #dbe0ef;
+  border-radius: 16px;
+  background: #f7f9ff;
+  padding: 10px;
+  max-height: 58vh;
+  overflow: auto;
+}
+
+.recipe-print-preview-canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 10px;
+  background: #ffffff;
 }
 
 .receta-front-inline {
