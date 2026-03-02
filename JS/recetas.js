@@ -346,24 +346,24 @@
 
   const getPlaceholderCircle = () => `<span class="image-placeholder-circle-2">${RECIPE_PLACEHOLDER_ICON}</span>`;
 
-  const ensurePrintCss = async () => {
-    if (state.print.cssText) return state.print.cssText;
-    if (state.print.cssPromise) return state.print.cssPromise;
+  const cloneNodeWithInlineStyles = (sourceNode) => {
+    const clone = sourceNode.cloneNode(true);
+    const sourceWalker = document.createTreeWalker(sourceNode, NodeFilter.SHOW_ELEMENT);
+    const cloneWalker = document.createTreeWalker(clone, NodeFilter.SHOW_ELEMENT);
 
-    state.print.cssPromise = fetch('./CSS/style.css')
-      .then((response) => {
-        if (!response.ok) throw new Error('No se pudo cargar style.css');
-        return response.text();
-      })
-      .then((textCss) => {
-        state.print.cssText = String(textCss || '');
-        return state.print.cssText;
-      })
-      .finally(() => {
-        state.print.cssPromise = null;
-      });
+    const copyStyles = (sourceElement, cloneElement) => {
+      const computed = window.getComputedStyle(sourceElement);
+      const css = Array.from(computed).map((prop) => `${prop}:${computed.getPropertyValue(prop)};`).join('');
+      cloneElement.setAttribute('style', `${css}${cloneElement.getAttribute('style') || ''}`);
+    };
 
-    return state.print.cssPromise;
+    copyStyles(sourceNode, clone);
+
+    while (sourceWalker.nextNode() && cloneWalker.nextNode()) {
+      copyStyles(sourceWalker.currentNode, cloneWalker.currentNode);
+    }
+
+    return clone;
   };
 
   const getPrintPayload = (recipe, mode) => {
@@ -394,58 +394,61 @@
   };
 
   const renderHtmlToImage = async ({ html, mode }) => {
-    const cssText = await ensurePrintCss();
     const host = document.createElement('div');
     host.className = 'recipe-print-render-host';
     host.innerHTML = `<div class="recipe-print-render-root mode-${mode}">${html}</div>`;
     document.body.appendChild(host);
 
-    const target = host.querySelector('.recipe-print-render-root');
-    await new Promise((resolve) => requestAnimationFrame(resolve));
+    try {
+      const target = host.querySelector('.recipe-print-render-root');
+      await new Promise((resolve) => requestAnimationFrame(resolve));
 
-    const bounds = target.getBoundingClientRect();
-    const width = Math.max(240, Math.ceil(bounds.width));
-    const height = Math.max(240, Math.ceil(bounds.height));
-    const scale = 2;
+      const bounds = target.getBoundingClientRect();
+      const width = Math.max(240, Math.ceil(bounds.width));
+      const height = Math.max(240, Math.ceil(bounds.height));
+      const scale = 2;
 
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="${width * scale}" height="${height * scale}" viewBox="0 0 ${width} ${height}">
-        <foreignObject x="0" y="0" width="100%" height="100%">
-          <div xmlns="http://www.w3.org/1999/xhtml" style="width:${width}px;height:${height}px;overflow:hidden;background:#ffffff;">
-            <style>${cssText}</style>
-            <div class="recipe-print-render-root mode-${mode}" style="width:${width}px;height:${height}px;">${html}</div>
-          </div>
-        </foreignObject>
-      </svg>
-    `;
+      const styledClone = cloneNodeWithInlineStyles(target);
+      styledClone.style.width = `${width}px`;
+      styledClone.style.height = `${height}px`;
 
-    const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
-    const image = new Image();
+      const svg = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="${width * scale}" height="${height * scale}" viewBox="0 0 ${width} ${height}">
+          <foreignObject x="0" y="0" width="100%" height="100%">
+            <div xmlns="http://www.w3.org/1999/xhtml" style="width:${width}px;height:${height}px;overflow:hidden;background:#ffffff;">${styledClone.outerHTML}</div>
+          </foreignObject>
+        </svg>
+      `;
 
-    const dataUrl = await new Promise((resolve, reject) => {
-      image.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = width * scale;
-        canvas.height = height * scale;
-        const context = canvas.getContext('2d');
-        context.fillStyle = '#ffffff';
-        context.fillRect(0, 0, canvas.width, canvas.height);
-        context.drawImage(image, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/png'));
+      const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+      const image = new Image();
+
+      const dataUrl = await new Promise((resolve, reject) => {
+        image.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = width * scale;
+          canvas.height = height * scale;
+          const context = canvas.getContext('2d');
+          context.fillStyle = '#ffffff';
+          context.fillRect(0, 0, canvas.width, canvas.height);
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/png'));
+        };
+        image.onerror = () => reject(new Error('No se pudo renderizar el diseño de impresión.'));
+        image.src = url;
+      });
+
+      URL.revokeObjectURL(url);
+
+      return {
+        dataUrl,
+        width: width * scale,
+        height: height * scale
       };
-      image.onerror = () => reject(new Error('No se pudo renderizar el diseño de impresión.'));
-      image.src = url;
-    });
-
-    URL.revokeObjectURL(url);
-    host.remove();
-
-    return {
-      dataUrl,
-      width: width * scale,
-      height: height * scale
-    };
+    } finally {
+      host.remove();
+    }
   };
 
   const getPrintSheetConfig = (sheet) => {
