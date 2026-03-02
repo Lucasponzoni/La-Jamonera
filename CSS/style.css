@@ -3848,7 +3848,7 @@ html.login-protected.auth-ok body {
   position: relative;
 }
 
-.recipe-print-alert .swal2-actions .ios-btn:not(:first-child)::before {
+.recipe-print-alert .swal2-actions .ios-btn:last-child::before {
   content: '';
   position: absolute;
   left: -7px;

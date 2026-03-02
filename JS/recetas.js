@@ -394,17 +394,17 @@
     const octagons = unique.filter((item) => FRONT_LABEL_CONFIG[item]?.type === 'octagon');
     const rectangles = unique.filter((item) => FRONT_LABEL_CONFIG[item]?.type === 'rectangle');
 
-    const gap = 12;
-    const octSize = 112;
-    const rectW = 236;
-    const rectH = 78;
+    const gap = 10;
+    const octSize = 156;
+    const rectW = 300;
+    const rectH = 96;
     const cols = 2;
     const octRows = Math.max(1, Math.ceil(octagons.length / cols));
     const rectRows = Math.max(0, Math.ceil(rectangles.length / cols));
-    const width = 520;
+    const width = 360;
     const octSectionH = octRows * octSize + Math.max(0, octRows - 1) * gap;
     const rectSectionH = rectRows ? (rectRows * rectH + Math.max(0, rectRows - 1) * gap + gap) : 0;
-    const height = Math.max(160, 36 + octSectionH + rectSectionH + 36);
+    const height = Math.max(180, 12 + octSectionH + rectSectionH + 12);
 
     const centerRowX = (itemWidth, colIndex) => {
       const totalRowWidth = itemWidth * cols + gap * (cols - 1);
@@ -419,7 +419,7 @@
       const row = Math.floor(index / cols);
       const col = index % cols;
       const x = centerRowX(octSize, col);
-      const y = 20 + row * (octSize + gap);
+      const y = 8 + row * (octSize + gap);
       const text = escapeSvgText((FRONT_LABEL_CONFIG[label]?.text || label)).replaceAll('\n', '</tspan><tspan x="50" dy="12">');
       octSvg += `
         <g transform="translate(${x},${y}) scale(${octSize / 100})">
@@ -440,7 +440,7 @@
       const row = Math.floor(index / cols);
       const col = index % cols;
       const x = centerRowX(rectW, col);
-      const y = 20 + octSectionH + gap + row * (rectH + gap);
+      const y = 8 + octSectionH + gap + row * (rectH + gap);
       const text = escapeSvgText((FRONT_LABEL_CONFIG[label]?.text || label)).replaceAll('\n', '</tspan><tspan x="50%" dy="12">');
       rectSvg += `
         <g transform="translate(${x},${y})">
@@ -541,7 +541,7 @@
 
     if (sheet === 'zebra') {
       if (count <= 1) return { rows: 1, cols: 1 };
-      if (count === 2) return { rows: 2, cols: 1 };
+      if (count === 2) return { rows: 1, cols: 2 };
       if (count === 3) return { rows: 3, cols: 1 };
       if (count === 4) return { rows: 2, cols: 2 };
       return { rows: 3, cols: 2 };
