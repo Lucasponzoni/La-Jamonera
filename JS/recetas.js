@@ -586,7 +586,7 @@
     const slots = Math.max(1, Number(perSheet) || 1);
     const shouldRotateZebraNutrition = sheet === 'zebra'
       && mode === 'nutrition'
-      && (Number(perSheet) === 2 || Number(perSheet) === 3);
+      && Number(perSheet) === 3;
 
     for (let index = 0; index < slots; index += 1) {
       const row = Math.floor(index / cols);
