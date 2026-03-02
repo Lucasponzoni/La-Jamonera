@@ -346,54 +346,11 @@
 
   const getPlaceholderCircle = () => `<span class="image-placeholder-circle-2">${RECIPE_PLACEHOLDER_ICON}</span>`;
 
-  const cloneNodeWithInlineStyles = (sourceNode) => {
-    const clone = sourceNode.cloneNode(true);
-    const sourceWalker = document.createTreeWalker(sourceNode, NodeFilter.SHOW_ELEMENT);
-    const cloneWalker = document.createTreeWalker(clone, NodeFilter.SHOW_ELEMENT);
-
-    const copyStyles = (sourceElement, cloneElement) => {
-      const computed = window.getComputedStyle(sourceElement);
-      const css = Array.from(computed).map((prop) => `${prop}:${computed.getPropertyValue(prop)};`).join('');
-      cloneElement.setAttribute('style', `${css}${cloneElement.getAttribute('style') || ''}`);
-    };
-
-    copyStyles(sourceNode, clone);
-
-    while (sourceWalker.nextNode() && cloneWalker.nextNode()) {
-      copyStyles(sourceWalker.currentNode, cloneWalker.currentNode);
-    }
-
-    return clone;
-  };
-
-  const getPrintPayload = (recipe, mode) => {
-    const title = capitalize(recipe?.title || 'Receta');
-
-    if (mode === 'nutrition') {
-      const tableHtml = normalizeValue(recipe?.nutrition?.ai?.tableHtml);
-      if (!tableHtml) {
-        throw new Error('La receta no tiene tabla nutricional generada.');
-      }
-      return {
-        title,
-        mode,
-        html: `<div class="recipe-print-nutrition">${tableHtml}</div>`
-      };
-    }
-
-    const frontLabels = Array.isArray(recipe?.nutrition?.ai?.frontLabels) ? recipe.nutrition.ai.frontLabels : [];
-    if (!frontLabels.length) {
-      throw new Error('La receta no tiene sellos de etiquetado frontal.');
-    }
-
-    return {
-      title,
-      mode,
-      html: `<div class="recipe-print-front">${buildFrontLabelsHtml(frontLabels)}</div>`
-    };
-  };
-
   const renderHtmlToImage = async ({ html, mode }) => {
+    if (typeof window.html2canvas !== 'function') {
+      throw new Error('No se pudo cargar la librería de renderizado.');
+    }
+
     const host = document.createElement('div');
     host.className = 'recipe-print-render-host';
     host.innerHTML = `<div class="recipe-print-render-root mode-${mode}">${html}</div>`;
@@ -403,49 +360,25 @@
       const target = host.querySelector('.recipe-print-render-root');
       await new Promise((resolve) => requestAnimationFrame(resolve));
 
-      const bounds = target.getBoundingClientRect();
-      const width = Math.max(240, Math.ceil(bounds.width));
-      const height = Math.max(240, Math.ceil(bounds.height));
-      const scale = 2;
-
-      const styledClone = cloneNodeWithInlineStyles(target);
-      styledClone.style.width = `${width}px`;
-      styledClone.style.height = `${height}px`;
-
-      const svg = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="${width * scale}" height="${height * scale}" viewBox="0 0 ${width} ${height}">
-          <foreignObject x="0" y="0" width="100%" height="100%">
-            <div xmlns="http://www.w3.org/1999/xhtml" style="width:${width}px;height:${height}px;overflow:hidden;background:#ffffff;">${styledClone.outerHTML}</div>
-          </foreignObject>
-        </svg>
-      `;
-
-      const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(svgBlob);
-      const image = new Image();
-
-      const dataUrl = await new Promise((resolve, reject) => {
-        image.onload = () => {
-          const canvas = document.createElement('canvas');
-          canvas.width = width * scale;
-          canvas.height = height * scale;
-          const context = canvas.getContext('2d');
-          context.fillStyle = '#ffffff';
-          context.fillRect(0, 0, canvas.width, canvas.height);
-          context.drawImage(image, 0, 0, canvas.width, canvas.height);
-          resolve(canvas.toDataURL('image/png'));
-        };
-        image.onerror = () => reject(new Error('No se pudo renderizar el diseño de impresión.'));
-        image.src = url;
+      const canvas = await window.html2canvas(target, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false
       });
 
-      URL.revokeObjectURL(url);
+      if (!canvas || !canvas.width || !canvas.height) {
+        throw new Error('No se pudo renderizar el diseño de impresión.');
+      }
 
       return {
-        dataUrl,
-        width: width * scale,
-        height: height * scale
+        dataUrl: canvas.toDataURL('image/png'),
+        width: canvas.width,
+        height: canvas.height
       };
+    } catch (error) {
+      throw new Error('No se pudo renderizar el diseño de impresión.');
     } finally {
       host.remove();
     }
