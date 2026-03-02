@@ -2085,7 +2085,7 @@
             <select id="recipeNutritionSubcategory" class="form-select ios-input">${getSubcategoryOptionsHtml(state.editor.nutrition.category, state.editor.nutrition.subcategory)}</select>
           </div>
           <div class="recipe-field recipe-field-half recipe-highlight-field recipe-highlight-field-nutrition">
-            <label class="form-label" for="recipeNutritionDeclarationUnit">Unidad de declaración</label>
+            <label class="form-label" for="recipeNutritionDeclarationUnit">Unidad de declaración + Porcion Sugerida</label>
             <div class="recipe-nutrition-declaration-grid">
               <select id="recipeNutritionDeclarationUnit" class="form-select ios-input">
                 ${DECLARATION_UNITS.map((item) => `<option value="${item.value}" ${state.editor.nutrition.declarationUnit === item.value ? 'selected' : ''}>${item.label}</option>`).join('')}
