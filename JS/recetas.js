@@ -435,7 +435,14 @@
     return { rows, cols };
   };
 
-  const buildSheetCanvas = ({ imageDataUrl, imageWidth, imageHeight, sheet, perSheet }) => {
+  const loadCanvasImage = (dataUrl) => new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('No se pudo preparar la imagen para impresión.'));
+    image.src = dataUrl;
+  });
+
+  const buildSheetCanvas = ({ imageElement, sheet, perSheet }) => {
     const size = getPrintSheetConfig(sheet);
     const pageWidth = Math.round(size.widthMm * 12);
     const pageHeight = Math.round(size.heightMm * 12);
@@ -455,10 +462,10 @@
     const cellWidth = (contentWidth - gap * (cols - 1)) / cols;
     const cellHeight = (contentHeight - gap * (rows - 1)) / rows;
 
-    const sourceRatio = imageWidth / imageHeight;
+    const sourceWidth = Number(imageElement?.naturalWidth || imageElement?.width || 1);
+    const sourceHeight = Number(imageElement?.naturalHeight || imageElement?.height || 1);
+    const sourceRatio = sourceWidth / sourceHeight;
     const slots = Math.max(1, Number(perSheet) || 1);
-    const image = new Image();
-    image.src = imageDataUrl;
 
     for (let index = 0; index < slots; index += 1) {
       const row = Math.floor(index / cols);
@@ -479,7 +486,7 @@
 
       const drawX = x + (cellWidth - drawWidth) / 2;
       const drawY = y + (cellHeight - drawHeight) / 2;
-      context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+      context.drawImage(imageElement, drawX, drawY, drawWidth, drawHeight);
     }
 
     return canvas;
@@ -513,6 +520,8 @@
     } finally {
       Swal.close();
     }
+
+    const sourceCanvasImage = await loadCanvasImage(sourceImage.dataUrl);
 
     const result = await openIosSwal({
       title: `Impresión · ${mode === 'nutrition' ? 'Tabla nutricional' : 'Etiquetado frontal'}`,
@@ -580,11 +589,9 @@
           panel.dataset.sheetCount = String(panelState.sheetCount);
         };
 
-        const drawPreview = () => {
+        const drawPreview = async () => {
           const composed = buildSheetCanvas({
-            imageDataUrl: sourceImage.dataUrl,
-            imageWidth: sourceImage.width,
-            imageHeight: sourceImage.height,
+            imageElement: sourceCanvasImage,
             sheet: panelState.sheet,
             perSheet: panelState.perSheet
           });
@@ -609,19 +616,19 @@
         sheetTypeNode.addEventListener('change', () => {
           perSheetNode.value = sheetTypeNode.value === 'a4' ? '4' : '1';
           normalizePanel();
-          drawPreview();
+          drawPreview().catch(() => {});
         });
         perSheetNode.addEventListener('input', () => {
           normalizePanel();
-          drawPreview();
+          drawPreview().catch(() => {});
         });
         sheetCountNode.addEventListener('input', () => {
           normalizePanel();
-          drawPreview();
+          drawPreview().catch(() => {});
         });
 
         normalizePanel();
-        drawPreview();
+        drawPreview().catch(() => {});
       },
       preConfirm: () => {
         const panel = Swal.getPopup().querySelector('.recipe-print-panel');
@@ -647,9 +654,7 @@
 
     const config = result.value || {};
     const canvases = Array.from({ length: Math.max(1, config.sheetCount || 1) }, () => buildSheetCanvas({
-      imageDataUrl: sourceImage.dataUrl,
-      imageWidth: sourceImage.width,
-      imageHeight: sourceImage.height,
+      imageElement: sourceCanvasImage,
       sheet: config.sheet,
       perSheet: config.perSheet
     }));
@@ -659,7 +664,9 @@
         const link = document.createElement('a');
         link.href = canvas.toDataURL('image/png');
         link.download = `${normalizeLower(payload.title).replace(/[^a-z0-9]+/g, '-') || 'receta'}-${mode}-${index + 1}.png`;
+        document.body.appendChild(link);
         link.click();
+        link.remove();
       });
       window.laJamoneraNotify?.show({ type: 'success', title: 'Descarga lista', message: 'Se descargaron las hojas renderizadas en PNG.' });
       return;
