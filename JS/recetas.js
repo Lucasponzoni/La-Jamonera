@@ -370,11 +370,127 @@
     return {
       title,
       mode,
+      frontLabels,
       html: `<div class="recipe-print-front">${buildFrontLabelsHtml(frontLabels)}</div>`
     };
   };
 
-  const renderHtmlToImage = async ({ html, mode }) => {
+  const escapeSvgText = (value) => String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+
+  const renderFrontLabelsToImage = async (labels = []) => {
+    const clean = Array.isArray(labels)
+      ? labels.map((item) => normalizeValue(item).toUpperCase()).filter((item) => FRONT_LABELS_ALLOWED.includes(item))
+      : [];
+    const unique = Array.from(new Set(clean));
+    if (!unique.length) {
+      throw new Error('La receta no tiene sellos de etiquetado frontal.');
+    }
+
+    const octagons = unique.filter((item) => FRONT_LABEL_CONFIG[item]?.type === 'octagon');
+    const rectangles = unique.filter((item) => FRONT_LABEL_CONFIG[item]?.type === 'rectangle');
+
+    const gap = 12;
+    const octSize = 112;
+    const rectW = 236;
+    const rectH = 78;
+    const cols = 2;
+    const octRows = Math.max(1, Math.ceil(octagons.length / cols));
+    const rectRows = Math.max(0, Math.ceil(rectangles.length / cols));
+    const width = 520;
+    const octSectionH = octRows * octSize + Math.max(0, octRows - 1) * gap;
+    const rectSectionH = rectRows ? (rectRows * rectH + Math.max(0, rectRows - 1) * gap + gap) : 0;
+    const height = Math.max(160, 36 + octSectionH + rectSectionH + 36);
+
+    const centerRowX = (itemWidth, colIndex) => {
+      const totalRowWidth = itemWidth * cols + gap * (cols - 1);
+      const start = (width - totalRowWidth) / 2;
+      return start + colIndex * (itemWidth + gap);
+    };
+
+    const octagonPath = 'M26,0 L74,0 L100,26 L100,74 L74,100 L26,100 L0,74 L0,26 Z';
+
+    let octSvg = '';
+    octagons.forEach((label, index) => {
+      const row = Math.floor(index / cols);
+      const col = index % cols;
+      const x = centerRowX(octSize, col);
+      const y = 20 + row * (octSize + gap);
+      const text = escapeSvgText((FRONT_LABEL_CONFIG[label]?.text || label)).replaceAll('\n', '</tspan><tspan x="50" dy="12">');
+      octSvg += `
+        <g transform="translate(${x},${y}) scale(${octSize / 100})">
+          <path d="${octagonPath}" fill="#111" />
+          <text x="50" y="36" text-anchor="middle" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="900" letter-spacing="-0.2">
+            <tspan x="50" dy="0">${text}</tspan>
+          </text>
+          <text x="50" y="82" text-anchor="middle" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="8.5" font-weight="700">
+            <tspan x="50" dy="0">Ministerio</tspan>
+            <tspan x="50" dy="9">de Salud</tspan>
+          </text>
+        </g>
+      `;
+    });
+
+    let rectSvg = '';
+    rectangles.forEach((label, index) => {
+      const row = Math.floor(index / cols);
+      const col = index % cols;
+      const x = centerRowX(rectW, col);
+      const y = 20 + octSectionH + gap + row * (rectH + gap);
+      const text = escapeSvgText((FRONT_LABEL_CONFIG[label]?.text || label)).replaceAll('\n', '</tspan><tspan x="50%" dy="12">');
+      rectSvg += `
+        <g transform="translate(${x},${y})">
+          <rect x="0" y="0" width="${rectW}" height="${rectH}" fill="#111" stroke="#fff" stroke-width="3" />
+          <text x="50%" y="30" text-anchor="middle" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="900">
+            <tspan x="50%" dy="0">${text}</tspan>
+          </text>
+          <text x="50%" y="62" text-anchor="middle" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="8.5" font-weight="700">
+            <tspan x="50%" dy="0">Ministerio de Salud</tspan>
+          </text>
+        </g>
+      `;
+    });
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${octSvg}${rectSvg}</svg>`;
+    const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+
+    try {
+      const image = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('No se pudo renderizar sellos frontales.'));
+        img.src = url;
+      });
+
+      const canvas = document.createElement('canvas');
+      const scale = 2;
+      canvas.width = width * scale;
+      canvas.height = height * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+      return {
+        dataUrl: canvas.toDataURL('image/png'),
+        width: canvas.width,
+        height: canvas.height
+      };
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  const renderHtmlToImage = async ({ html, mode, frontLabels }) => {
+    if (mode === 'front') {
+      return renderFrontLabelsToImage(frontLabels);
+    }
+
     if (typeof window.html2canvas !== 'function') {
       throw new Error('No se pudo cargar la librería de renderizado.');
     }
@@ -424,10 +540,11 @@
     const count = Math.max(1, Number(perSheet) || 1);
 
     if (sheet === 'zebra') {
-      if (count === 1) return { rows: 1, cols: 1 };
-      if (count === 2) return { rows: 1, cols: 2 };
+      if (count <= 1) return { rows: 1, cols: 1 };
+      if (count === 2) return { rows: 2, cols: 1 };
       if (count === 3) return { rows: 3, cols: 1 };
-      return { rows: 2, cols: 2 };
+      if (count === 4) return { rows: 2, cols: 2 };
+      return { rows: 3, cols: 2 };
     }
 
     const ratio = 210 / 297;
@@ -549,6 +666,10 @@
     const result = await openIosSwal({
       title: `Impresión · ${mode === 'nutrition' ? 'Tabla nutricional' : 'Etiquetado frontal'}`,
       width: 820,
+      customClass: {
+        popup: 'recipe-print-alert',
+        denyButton: 'ios-btn ios-btn-success'
+      },
       html: `
         <div class="recipe-print-panel">
           <div class="recipe-print-controls">
@@ -561,7 +682,7 @@
             </label>
             <label class="recipe-print-field">
               <span>Cantidad por hoja</span>
-              <input id="printPerSheet" type="number" min="1" step="1" value="${mode === 'front' ? 4 : 1}" class="form-control ios-input">
+              <input id="printPerSheet" type="number" min="1" step="1" value="${mode === 'front' ? 6 : 1}" class="form-control ios-input">
             </label>
             <label class="recipe-print-field">
               <span>Cantidad de hojas</span>
@@ -579,9 +700,6 @@
       showDenyButton: true,
       denyButtonText: 'Descargar',
       confirmButtonText: 'Imprimir',
-      customClass: {
-        denyButton: 'ios-btn ios-btn-success'
-      },
       didOpen: (popup) => {
         const panel = popup.querySelector('.recipe-print-panel');
         const sheetTypeNode = panel.querySelector('#printSheetType');
@@ -590,7 +708,7 @@
         const canvas = panel.querySelector('#printPreviewCanvas');
         const meta = panel.querySelector('#printLayoutMeta');
 
-        const defaultPerSheet = mode === 'front' ? 4 : 1;
+        const defaultPerSheet = mode === 'front' ? 6 : 1;
 
         const panelState = {
           sheet: 'zebra',
@@ -600,12 +718,12 @@
 
         const normalizePanel = () => {
           panelState.sheet = sheetTypeNode.value === 'a4' ? 'a4' : 'zebra';
-          const max = panelState.sheet === 'zebra' ? 4 : Number.MAX_SAFE_INTEGER;
+          const max = panelState.sheet === 'zebra' ? (mode === 'front' ? 6 : 4) : Number.MAX_SAFE_INTEGER;
           panelState.perSheet = Math.min(max, Math.max(1, Math.floor(Number(perSheetNode.value) || 1)));
           panelState.sheetCount = Math.max(1, Math.floor(Number(sheetCountNode.value) || 1));
 
           if (panelState.sheet === 'zebra') {
-            perSheetNode.max = '4';
+            perSheetNode.max = mode === 'front' ? '6' : '4';
           } else {
             perSheetNode.removeAttribute('max');
           }
@@ -642,7 +760,7 @@
         };
 
         sheetTypeNode.addEventListener('change', () => {
-          perSheetNode.value = sheetTypeNode.value === 'a4' ? '4' : (mode === 'front' ? '4' : '1');
+          perSheetNode.value = sheetTypeNode.value === 'a4' ? (mode === 'front' ? '12' : '4') : (mode === 'front' ? '6' : '1');
           normalizePanel();
           drawPreview().catch(() => {});
         });

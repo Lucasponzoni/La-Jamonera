@@ -3838,3 +3838,23 @@ html.login-protected.auth-ok body {
 .receta-front-inline {
   margin-top: 6px;
 }
+
+
+.recipe-print-alert .swal2-actions {
+  gap: 12px;
+}
+
+.recipe-print-alert .swal2-actions .ios-btn {
+  position: relative;
+}
+
+.recipe-print-alert .swal2-actions .ios-btn:not(:first-child)::before {
+  content: '';
+  position: absolute;
+  left: -7px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 24px;
+  background: #c8d2ef;
+}
