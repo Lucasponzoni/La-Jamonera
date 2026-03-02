@@ -648,8 +648,8 @@
   const openPrintConfigurator = async (recipe, mode) => {
     const payload = getPrintPayload(recipe, mode);
     const loadingTitle = mode === 'nutrition'
-      ? 'Generando imagen de tabla nutricional...'
-      : 'Generando imagen de etiquetado frontal...';
+      ? 'Generando tabla nutricional...'
+      : 'Generando etiquetado frontal...';
 
     openIosSwal({
       title: loadingTitle,
