@@ -515,9 +515,9 @@
       allowEscapeKey: false,
       showConfirmButton: false,
       customClass: {
-        popup: 'ios-alert ingredientes-alert',
+        popup: 'ios-alert ingredientes-alert ingredientes-saving-alert',
         title: 'ios-alert-title',
-        htmlContainer: 'ios-alert-text'
+        htmlContainer: 'ios-alert-text ingredientes-saving-html'
       },
       willClose: () => {
         ingredientesModal.removeAttribute('inert');
