@@ -117,6 +117,17 @@
               <i class="fa-solid fa-utensils icon-orangered" aria-hidden="true"></i>
               <span>Recetas</span>
             </button>
+
+            <button
+              id="openInventarioModal"
+              type="button"
+              class="btn btn-light home-action-btn"
+              data-bs-toggle="modal"
+              data-bs-target="#inventarioModal"
+            >
+              <i class="fa-solid fa-boxes-stacked icon-orange" aria-hidden="true"></i>
+              <span>Inventario</span>
+            </button>
           </div>
         </div>
         <div class="home-content">
@@ -152,7 +163,7 @@
                   </div>
                   <button id="createIngredientBtn" type="button" class="btn ios-btn ios-btn-success">
                     <i class="fa-solid fa-plus"></i>
-                    <span>Crear ingrediente</span>
+                    <span>+Ingrediente</span>
                   </button>
                 </div>
 
@@ -218,6 +229,69 @@
       </div>
       <!-- // FIN MODAL RECETAS -->
 
+
+      <!-- // MODAL INVENTARIO -->
+      <div class="modal fade" id="inventarioModal" tabindex="-1" aria-labelledby="inventarioModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content ios-modal recetas-modal inventario-modal">
+            <div class="modal-header ios-modal-header">
+              <h5 class="modal-title ios-modal-title" id="inventarioModalLabel">Inventario</h5>
+              <button type="button" class="btn-close ios-modal-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body ios-modal-body">
+              <div id="inventarioLoading" class="ingredientes-loading" aria-live="polite">
+                <img src="./IMG/Meta-ai-logo.webp" alt="Cargando inventario" class="meta-spinner-login">
+              </div>
+
+              <div id="inventarioEmpty" class="ingredientes-empty d-none" aria-live="polite">
+                <p class="ingredientes-empty-text">No hay ingredientes cargados para inventario.</p>
+                <button id="inventarioCreateIngredientBtn" type="button" class="btn ios-btn ios-btn-secondary">Crear ingrediente</button>
+              </div>
+
+              <div id="inventarioData" class="recetas-data d-none" aria-live="polite">
+                <div class="inventario-toolbar">
+                  <div class="input-group ios-input-group ingredientes-search-group">
+                    <span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+                    <input id="inventarioSearchInput" type="search" class="form-control ios-input ingredientes-search-input" placeholder="Buscar ingrediente">
+                  </div>
+                  <div class="inventario-toolbar-actions">
+                    <button id="inventarioConfigBtn" type="button" class="btn ios-btn ios-btn-secondary" title="Configurar stock bajo">
+                      <i class="fa-solid fa-gear"></i>
+                    </button>
+                    <button id="inventarioToolbarStockBtn" type="button" class="btn ios-btn ios-btn-success" disabled>
+                      <i class="fa-solid fa-plus"></i>
+                      <span>+ Stock</span>
+                    </button>
+                    <button id="inventarioToolbarCreateIngredientBtn" type="button" class="btn ios-btn ios-btn-secondary">
+                      <i class="fa-solid fa-carrot"></i>
+                      <span>+Ingrediente</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div id="inventarioList" class="recetas-list inventario-list"></div>
+              </div>
+
+              <div id="inventarioEditor" class="recetas-editor d-none" aria-live="polite">
+                <div class="recetas-editor-header">
+                  <button id="inventarioBackBtn" type="button" class="btn ios-btn ios-btn-secondary recetas-back-btn">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    <span>Volver</span>
+                  </button>
+                  <div>
+                    <p class="recetas-editor-kicker">Inventario</p>
+                    <h6 id="inventarioEditorTitle" class="recetas-editor-title mb-0">Ingresar stock</h6>
+                  </div>
+                </div>
+                <form id="inventarioEditorForm" class="recetas-editor-form" novalidate></form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- // FIN MODAL INVENTARIO -->
+
       <footer class="app-footer app-footer-white">
         <div class="footer-main">
           <div class="footer-brand-block">
@@ -273,6 +347,7 @@
   <script src="./JS/firebase-init.js"></script>
   <script src="./JS/ingredientes.js"></script>
   <script src="./JS/recetas.js"></script>
+  <script src="./JS/inventario.js"></script>
   <script src="./JS/app.js"></script>
 </body>
 </html>
