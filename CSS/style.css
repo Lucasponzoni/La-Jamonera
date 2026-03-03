@@ -3964,6 +3964,11 @@ html.login-protected.auth-ok body {
   flex-wrap: wrap;
 }
 
+.inventario-actions-row .ios-btn {
+  width: fit-content;
+  max-width: none;
+}
+
 .inventario-threshold-btn {
   min-height: 34px;
   padding: 6px 10px;
@@ -4085,3 +4090,241 @@ html.login-protected.auth-ok body {
 
 /* =========================================
    INVENTARIO AJUSTES V2
+========================================= */
+#inventarioToolbarCreateIngredientBtn {
+  background: #ff8a2a;
+  color: #fff;
+}
+
+#inventarioToolbarCreateIngredientBtn:hover {
+  background: #f07c1b;
+  color: #fff;
+}
+
+#inventarioToolbarCreateIngredientBtn span {
+  letter-spacing: 0.01em;
+}
+
+#inventarioToolbarCreateIngredientBtn i {
+  margin-right: 2px;
+}
+
+.inventario-stock-line.is-zero strong {
+  color: #cc3f52;
+}
+
+.inventario-threshold-btn {
+  width: fit-content;
+  max-width: none;
+}
+
+.inventario-view-btn {
+  width: fit-content;
+  max-width: none;
+}
+
+.inventario-product-head-v2 {
+  border: 1px dashed #cdd9f2;
+  border-radius: 18px;
+  padding: 14px;
+  background: #f8faff;
+}
+
+.inventario-product-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.inventario-editor-kicker {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.75rem;
+  color: #6e7fa5;
+}
+
+.inventario-editor-photo .ingrediente-avatar {
+  width: 96px;
+  height: 96px;
+  border: 1px solid #d0dbf3;
+}
+
+.inventario-editor-name {
+  font-size: 1.45rem;
+  color: #1f3e8a;
+}
+
+.inventario-editor-meta {
+  margin: 0;
+}
+
+.inventario-editor-measure {
+  margin: 0;
+  color: #6c7ea8;
+  font-size: 0.88rem;
+}
+
+.inventario-stat-card.is-danger strong {
+  color: #cc3f52;
+}
+
+.inventario-check-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.inventario-check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #36507f;
+  font-weight: 600;
+}
+
+.inventario-check-row input {
+  width: 18px;
+  height: 18px;
+}
+
+.inventario-inline-fields {
+  margin-top: 8px;
+}
+
+.inventario-token-placeholder {
+  border: 1px dashed #cbd8f3;
+  border-radius: 12px;
+  color: #657ca8;
+  padding: 10px;
+  width: 100%;
+  text-align: center;
+}
+
+.inventario-token-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: grab;
+}
+
+.inventario-token-chip.drag-over {
+  border: 1px dashed #7da1ea;
+  background: #eef4ff;
+}
+
+.inventario-config-badge.is-muted {
+  background: #eff3ff;
+  color: #6b7ea9;
+}
+
+.inventario-table-head.enhanced {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.inventario-table-range {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inventario-pagination.enhanced {
+  margin-top: 10px;
+  border-top: 1px solid #d9e2f6;
+  padding-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.inventario-period-board {
+  margin-top: 14px;
+  border: 1px solid #dbe4f7;
+  border-radius: 16px;
+  padding: 12px;
+  background: #fbfcff;
+}
+
+.inventario-period-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 991.98px) {
+  .inventario-pagination.enhanced {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+
+.inventario-head-action {
+  flex: 1;
+  width: 100%;
+  max-width: none;
+}
+
+.inventario-product-head-stats {
+  display: grid;
+  gap: 8px;
+}
+
+.inventario-collapse-head-styled {
+  width: 100%;
+  border: 1px solid #d6def3;
+  border-radius: 14px;
+  background: #f4f7ff;
+  color: #2a3f70;
+  min-height: 44px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.inventario-collapse-summary {
+  color: #6c7ea9;
+  font-size: 0.9rem;
+}
+
+.inventario-lot-section {
+  border: 1px solid #dce4f8;
+  border-radius: 16px;
+}
+
+.inventario-day-kg {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 1px;
+  background: #2e7fe6;
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.56rem;
+  line-height: 1;
+  padding: 2px 5px;
+  pointer-events: none;
+}
+
+.flatpickr-day {
+  position: relative;
+}
+
+.inventario-period-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+#inventarioGlobalLoading {
+  min-height: 150px;
+}
+
+.swal2-popup.ios-alert .swal2-deny {
+  background: #e6ebfa !important;
+  color: #2a4ea3 !important;
+}
