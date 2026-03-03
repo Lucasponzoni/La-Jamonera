@@ -260,18 +260,19 @@
                     <button id="inventarioConfigBtn" type="button" class="btn ios-btn ios-btn-secondary" title="Configurar stock bajo">
                       <i class="fa-solid fa-gear"></i>
                     </button>
-                    <button id="inventarioToolbarCreateIngredientBtn" type="button" class="btn ios-btn ios-btn-secondary">
-                      <i class="fa-solid fa-plus"></i>
-                      <span>Ingrediente</span>
-                    </button>
                     <button id="inventarioOpenPeriodFilterBtn" type="button" class="btn ios-btn ios-btn-secondary">
                       <i class="fa-solid fa-calendar-days"></i>
                       <span>Filtrar</span>
+                    </button>
+                    <button id="inventarioToolbarCreateIngredientBtn" type="button" class="btn ios-btn ios-btn-secondary">
+                      <i class="fa-solid fa-plus"></i>
+                      <span>Ingrediente</span>
                     </button>
                   </div>
                 </div>
 
                 <div id="inventarioFamilies" class="familias-circles inventario-families"></div>
+                <div id="inventarioStatusFilters" class="inventario-status-filters" aria-label="Filtrar por estado de stock"></div>
                 <div id="inventarioList" class="recetas-list inventario-list"></div>
 
                 <section id="inventarioPeriodView" class="inventario-period-board d-none" aria-live="polite">
@@ -307,6 +308,30 @@
         </div>
       </div>
       <!-- // FIN MODAL INVENTARIO -->
+
+      <div class="modal fade" id="imageViewerModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
+          <div class="modal-content ios-modal image-viewer-modal">
+            <div class="modal-header ios-modal-header">
+              <h5 class="modal-title ios-modal-title">Vista de imagen</h5>
+              <button type="button" class="btn-close ios-modal-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body ios-modal-body">
+              <div class="image-viewer-controls image-viewer-controls-inventario">
+                <button id="viewerBackBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button>
+                <button id="viewerPrevBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-chevron-left"></i></button>
+                <button id="viewerZoomOutBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                <button id="viewerZoomInBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                <button id="viewerNextBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-chevron-right"></i></button>
+              </div>
+              <div id="viewerStage" class="viewer-stage">
+                <span id="viewerStageSpinner" class="thumb-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"></span>
+                <img id="viewerImage" src="" alt="Imagen adjunta">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <footer class="app-footer app-footer-white">
         <div class="footer-main">
