@@ -48,6 +48,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <link rel="stylesheet" href="./CSS/style.css">
 </head>
 <body>
@@ -259,10 +260,6 @@
                     <button id="inventarioConfigBtn" type="button" class="btn ios-btn ios-btn-secondary" title="Configurar stock bajo">
                       <i class="fa-solid fa-gear"></i>
                     </button>
-                    <button id="inventarioToolbarStockBtn" type="button" class="btn ios-btn ios-btn-success" disabled>
-                      <i class="fa-solid fa-plus"></i>
-                      <span>+ Stock</span>
-                    </button>
                     <button id="inventarioToolbarCreateIngredientBtn" type="button" class="btn ios-btn ios-btn-secondary">
                       <i class="fa-solid fa-carrot"></i>
                       <span>+Ingrediente</span>
@@ -270,6 +267,7 @@
                   </div>
                 </div>
 
+                <div id="inventarioFamilies" class="familias-circles inventario-families"></div>
                 <div id="inventarioList" class="recetas-list inventario-list"></div>
               </div>
 
@@ -343,6 +341,8 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
   <script src="./JS/swal-a11y-guard.js"></script>
   <script src="./JS/firebase-init.js"></script>
   <script src="./JS/ingredientes.js"></script>
