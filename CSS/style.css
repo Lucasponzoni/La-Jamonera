@@ -3867,3 +3867,218 @@ html.login-protected.auth-ok body {
   height: 24px;
   background: #c8d2ef;
 }
+
+/* =========================================
+   INVENTARIO
+========================================= */
+.inventario-toolbar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.inventario-toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inventario-list.has-scroll-hint::after {
+  content: '↓ Deslizá para ver más ingredientes';
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: block;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #7048e9;
+  background: linear-gradient(to bottom, rgba(242, 245, 252, 0), rgb(236 231 255));
+  padding: 10px 0 4px;
+  margin-top: -28px;
+  pointer-events: none;
+}
+
+.inventario-card {
+  align-items: flex-start;
+}
+
+.inventario-card.is-selected {
+  border-color: #99b3ea;
+}
+
+.inventario-card.status-never {
+  background: #f1f3f8;
+  border-color: #d6dbe8;
+}
+
+.inventario-card.status-empty {
+  background: #fff2f2;
+  border-color: #ffc8c8;
+}
+
+.inventario-card.status-low {
+  background: #fff5e8;
+  border-color: #ffd7a6;
+}
+
+.inventario-card.status-good {
+  background: #f5fbf5;
+  border-color: #cceacc;
+}
+
+.inventario-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.inventario-status-badge {
+  font-size: 0.74rem;
+  border-radius: 999px;
+  border: 1px solid #cfdaef;
+  padding: 4px 10px;
+  color: #2a4f9b;
+  background: #edf2ff;
+}
+
+.inventario-stock-line {
+  margin: 6px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: #4c5e86;
+}
+
+.inventario-stock-line strong {
+  color: #1f4ea5;
+}
+
+.inventario-actions-row {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.inventario-threshold-btn {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  border-radius: 10px;
+}
+
+.inventario-threshold-btn i {
+  font-size: 0.76rem;
+}
+
+.inventario-editor-product {
+  text-align: center;
+}
+
+.inventario-editor-photo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.inventario-editor-photo .ingrediente-avatar {
+  width: 88px;
+  height: 88px;
+}
+
+.inventario-editor-name {
+  color: #ff8a2a;
+  font-weight: 800;
+  margin: 0;
+}
+
+.inventario-editor-meta {
+  margin: 4px 0 10px;
+  color: #58709d;
+}
+
+.inventario-lot-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, auto) 1fr;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.inventario-lot-separator {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.inventario-lot-separator select {
+  max-width: 120px;
+}
+
+.inventario-lot-subtitle {
+  margin: 10px 0 6px;
+  font-size: 0.84rem;
+  color: #516898;
+  font-weight: 700;
+}
+
+.inventario-lot-order {
+  min-height: 42px;
+  border: 1px dashed #cfdaf2;
+  border-radius: 12px;
+  background: #f8faff;
+  padding: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inventario-token-chip {
+  border: 1px solid #c6d8ff;
+  background: #edf3ff;
+  color: #355baf;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.inventario-token-chip.is-dragging {
+  opacity: 0.6;
+}
+
+.inventario-lot-preview-wrap {
+  margin-top: 10px;
+}
+
+.inventario-lot-preview {
+  display: block;
+  border: 1px solid #d5e0f7;
+  background: #f5f8ff;
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: #24468e;
+}
+
+/* =========================================
+   RESPONSIVE INVENTARIO
+========================================= */
+@media (max-width: 991.98px) {
+  .inventario-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .inventario-toolbar-actions {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .inventario-lot-grid {
+    grid-template-columns: 1fr;
+  }
+}
