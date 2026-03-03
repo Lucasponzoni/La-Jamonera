@@ -293,10 +293,42 @@
         img.classList.add('is-loaded');
         loader?.classList.add('d-none');
       };
+      const fail = () => loader?.classList.add('d-none');
       img.addEventListener('load', done, { once: true });
-      img.addEventListener('error', () => loader?.classList.add('d-none'), { once: true });
-      if (img.complete) done();
+      img.addEventListener('error', fail, { once: true });
+      if (img.complete && img.naturalWidth > 0) {
+        done();
+      } else if (img.complete) {
+        fail();
+      } else {
+        setTimeout(() => {
+          if (!img.classList.contains('is-loaded')) {
+            fail();
+          }
+        }, 7000);
+      }
     });
+  };
+
+  const getGeneralPassword = async () => {
+    await window.laJamoneraReady;
+    const value = await window.dbLaJamoneraRest.read('/passGeneral/pass');
+    return normalizeValue(value);
+  };
+
+  const waitPrintAssets = async (printWindow) => {
+    const images = [...(printWindow?.document?.images || [])];
+    await Promise.all(images.map((image) => {
+      if (image.complete && image.naturalWidth > 0) {
+        return Promise.resolve();
+      }
+      return new Promise((resolve) => {
+        const done = () => resolve();
+        image.addEventListener('load', done, { once: true });
+        image.addEventListener('error', done, { once: true });
+        setTimeout(resolve, 6000);
+      });
+    }));
   };
 
   const renderStatusFilters = () => {
@@ -450,9 +482,9 @@
         </table>
       </div>
       <div class="inventario-pagination enhanced">
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-global-page="prev" ${state.globalTablePage <= 1 ? 'disabled' : ''}>Anterior</button>
+        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-global-page="prev" ${state.globalTablePage <= 1 ? 'disabled' : ''} aria-label="Página anterior"><i class="fa-solid fa-chevron-left"></i></button>
         <span>Página ${state.globalTablePage} de ${pages}</span>
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-global-page="next" ${state.globalTablePage >= pages ? 'disabled' : ''}>Siguiente</button>
+        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-global-page="next" ${state.globalTablePage >= pages ? 'disabled' : ''} aria-label="Página siguiente"><i class="fa-solid fa-chevron-right"></i></button>
       </div>`;
   };
 
@@ -649,8 +681,8 @@
     if (!uniqueUrls.length) return;
 
     await openIosSwal({
-      title: 'Preparando impresión',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Procesando" class="meta-spinner"><p class="mt-2 mb-0">Procesando imágenes...</p></div>',
+      title: 'Preparando impresión...',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Preparando impresión" class="meta-spinner-login"></div>',
       allowOutsideClick: false,
       showConfirmButton: false,
       didOpen: async () => {
@@ -671,11 +703,11 @@
       html: '<p>¿Querés incluir imágenes adjuntas en la impresión?</p>',
       showCancelButton: true,
       showDenyButton: true,
-      confirmButtonText: 'Sí, incluir imágenes',
-      denyButtonText: 'No incluir imágenes',
+      confirmButtonText: 'Incluir',
+      denyButtonText: 'No incluir',
       cancelButtonText: 'Cancelar',
       customClass: {
-        confirmButton: 'ios-btn ios-btn-primary',
+        confirmButton: 'ios-btn ios-btn-success',
         denyButton: 'ios-btn ios-btn-danger',
         cancelButton: 'ios-btn ios-btn-secondary'
       }
@@ -730,6 +762,7 @@
       </html>`);
     printWindow.document.close();
     printWindow.focus();
+    await waitPrintAssets(printWindow);
     printWindow.print();
   };
 
@@ -740,11 +773,11 @@
       html: '<p>¿Querés incluir imágenes adjuntas?</p>',
       showCancelButton: true,
       showDenyButton: true,
-      confirmButtonText: 'Sí',
-      denyButtonText: 'No',
+      confirmButtonText: 'Incluir',
+      denyButtonText: 'No incluir',
       cancelButtonText: 'Cancelar',
       customClass: {
-        confirmButton: 'ios-btn ios-btn-primary',
+        confirmButton: 'ios-btn ios-btn-success',
         denyButton: 'ios-btn ios-btn-danger',
         cancelButton: 'ios-btn ios-btn-secondary'
       }
@@ -780,7 +813,7 @@
             });
           });
         });
-        initThumbLoading(document);
+        initThumbLoading(Swal.getHtmlContainer() || document);
       },
       preConfirm: () => {
         const mode = document.querySelector('input[name="printScope"]:checked')?.value || 'all';
@@ -824,7 +857,100 @@
     win.document.write(`<html><head><title>${title}</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}</style></head><body><h1>${title}</h1>${content || '<p>Sin datos.</p>'}${imagesHtml}</body></html>`);
     win.document.close();
     win.focus();
+    await waitPrintAssets(win);
     win.print();
+  };
+
+  const openEntriesDateFilter = async () => {
+    const result = await openIosSwal({
+      title: 'Filtrar historial',
+      html: `<div class="swal-stack-fields"><input id="inventarioEntriesRangePicker" class="swal2-input ios-input" placeholder="Seleccionar rango" value="${escapeHtml(state.tableDateRange)}"></div>`,
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: 'Aplicar',
+      denyButtonText: 'Limpiar',
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        confirmButton: 'ios-btn ios-btn-success',
+        denyButton: 'ios-btn ios-btn-danger',
+        cancelButton: 'ios-btn ios-btn-secondary'
+      },
+      didOpen: () => {
+        if (!window.flatpickr) return;
+        const locale = window.flatpickr.l10ns?.es || undefined;
+        window.flatpickr('#inventarioEntriesRangePicker', {
+          locale,
+          mode: 'range',
+          dateFormat: 'Y-m-d',
+          allowInput: true,
+          defaultDate: state.tableDateRange ? state.tableDateRange.split(' to ') : null
+        });
+      },
+      preConfirm: () => normalizeValue(document.getElementById('inventarioEntriesRangePicker')?.value)
+    });
+    if (result.isDenied) {
+      state.tableDateRange = '';
+      state.tablePage = 1;
+      return true;
+    }
+    if (!result.isConfirmed) return false;
+    state.tableDateRange = normalizeValue(result.value);
+    state.tablePage = 1;
+    return true;
+  };
+
+  const removeEntryWithSecurity = async (ingredientId, entryId) => {
+    const confirm = await openIosSwal({
+      title: 'Eliminar ingreso',
+      html: '<p>Esta acción quitará la fila del historial y descontará su stock.</p>',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Continuar',
+      cancelButtonText: 'Cancelar'
+    });
+    if (!confirm.isConfirmed) return false;
+
+    const auth = await openIosSwal({
+      title: 'Confirmación de seguridad',
+      html: '<input id="entryDeletePass" type="password" class="swal2-input ios-input" placeholder="Contraseña general">',
+      showCancelButton: true,
+      confirmButtonText: 'Eliminar',
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        confirmButton: 'ios-btn ios-btn-danger',
+        cancelButton: 'ios-btn ios-btn-secondary'
+      },
+      preConfirm: async () => {
+        const enteredPass = normalizeValue(document.getElementById('entryDeletePass')?.value);
+        if (!enteredPass) {
+          Swal.showValidationMessage('Ingresá la contraseña.');
+          return false;
+        }
+        const firebasePass = await getGeneralPassword();
+        if (!firebasePass || enteredPass !== firebasePass) {
+          Swal.showValidationMessage('Contraseña incorrecta.');
+          return false;
+        }
+        return true;
+      }
+    });
+
+    if (!auth.isConfirmed) return false;
+
+    const record = getRecord(ingredientId);
+    const entries = Array.isArray(record.entries) ? [...record.entries] : [];
+    const entry = entries.find((item) => item.id === entryId);
+    if (!entry) return false;
+
+    record.entries = entries.filter((item) => item.id !== entryId);
+    const nextStock = Number(record.stockKg || 0) - Number(entry.qtyKg || 0);
+    record.stockKg = Number(Math.max(0, nextStock).toFixed(4));
+    record.hasEntries = record.entries.length > 0;
+
+    state.inventario.items[ingredientId] = record;
+    rebuildInventarioIndexes();
+    await persistInventario();
+    return true;
   };
 
 
@@ -844,7 +970,12 @@
         <td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td>
         <td>${escapeHtml(entry.invoiceNumber || '-')}</td>
         <td>${entry.invoiceImageUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-invoice-image="${entry.id}"><i class="fa-regular fa-image"></i><span>Ver</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin foto</button>'}</td>
-        <td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-print-entry="${entry.id}" aria-label="Imprimir ingreso"><i class="fa-solid fa-print"></i></button></td>
+        <td>
+          <div class="inventario-entry-actions">
+            <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-print-entry="${entry.id}" aria-label="Imprimir ingreso"><i class="fa-solid fa-print"></i></button>
+            <button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn inventario-icon-only-btn" data-delete-entry="${entry.id}" aria-label="Eliminar ingreso"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </td>
       </tr>`).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos para mostrar.</td></tr>';
 
     return `
@@ -852,7 +983,7 @@
         <div class="inventario-table-head enhanced">
           <input id="inventarioEntriesSearch" class="form-control ios-input" autocomplete="off" placeholder="Buscar en ingresos" value="${escapeHtml(state.tableSearch)}">
           <div class="inventario-table-range">
-            <input id="inventarioEntriesRange" class="form-control ios-input" autocomplete="off" placeholder="Rango de fechas" value="${escapeHtml(state.tableDateRange)}">
+            <button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" id="inventarioEntriesFilterBtn"><i class="fa-solid fa-filter"></i><span>Filtrar</span></button>
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioPrintFilteredBtn"><i class="fa-solid fa-print"></i><span>Imprimir filtro</span></button>
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioPrintAllBtn"><i class="fa-solid fa-print"></i><span>Imprimir total</span></button>
           </div>
@@ -864,9 +995,9 @@
           </table>
         </div>
         <div class="inventario-pagination enhanced">
-          <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-entry-page="prev" ${state.tablePage <= 1 ? 'disabled' : ''}>Anterior</button>
+          <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-entry-page="prev" ${state.tablePage <= 1 ? 'disabled' : ''} aria-label="Página anterior"><i class="fa-solid fa-chevron-left"></i></button>
           <span>Página ${state.tablePage} de ${pages}</span>
-          <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-entry-page="next" ${state.tablePage >= pages ? 'disabled' : ''}>Siguiente</button>
+          <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-entry-page="next" ${state.tablePage >= pages ? 'disabled' : ''} aria-label="Página siguiente"><i class="fa-solid fa-chevron-right"></i></button>
         </div>
       </div>`;
   };
@@ -978,7 +1109,7 @@
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryInvoiceNumber">Número de factura/remito</label>
-            <input id="inventoryInvoiceNumber" class="form-control ios-input" value="${escapeHtml(state.editorDraft.invoiceNumber)}" placeholder="Ej: A-000123" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" data-lpignore="true">
+            <input id="inventoryInvoiceNumber" name="invoice_code" class="form-control ios-input" value="${escapeHtml(state.editorDraft.invoiceNumber)}" placeholder="Ej: A-000123" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" data-lpignore="true" data-form-type="other" aria-autocomplete="none">
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryInvoiceImage">Adjuntar foto de factura/remito</label>
@@ -1176,10 +1307,11 @@
       state.tablePage = 1;
       renderEditor(ingredientId, state.editorDraft);
     });
-    nodes.editorForm.querySelector('#inventarioEntriesRange')?.addEventListener('change', (event) => {
-      state.tableDateRange = event.target.value;
-      state.tablePage = 1;
-      renderEditor(ingredientId, state.editorDraft);
+    nodes.editorForm.querySelector('#inventarioEntriesFilterBtn')?.addEventListener('click', async () => {
+      const changed = await openEntriesDateFilter();
+      if (changed) {
+        renderEditor(ingredientId, state.editorDraft);
+      }
     });
 
     nodes.editorForm.querySelector('#inventarioPrintFilteredBtn')?.addEventListener('click', async () => {
@@ -1205,6 +1337,16 @@
       });
     });
 
+    nodes.editorForm.querySelectorAll('[data-delete-entry]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const deleted = await removeEntryWithSecurity(ingredientId, btn.dataset.deleteEntry);
+        if (!deleted) return;
+        state.tablePage = 1;
+        await loadData();
+        renderEditor(ingredientId, state.editorDraft);
+      });
+    });
+
     nodes.editorForm.querySelectorAll('[data-open-invoice-image]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const entryId = btn.dataset.openInvoiceImage;
@@ -1219,23 +1361,6 @@
       const locale = window.flatpickr.l10ns?.es || undefined;
       window.flatpickr(nodes.editorForm.querySelector('#inventoryEntryDate'), { locale, dateFormat: 'Y-m-d', allowInput: true });
       window.flatpickr(nodes.editorForm.querySelector('#inventoryExpiryDate'), { locale, dateFormat: 'Y-m-d', allowInput: true, minDate: 'today' });
-      const dayMap = getDayKgMap(Array.isArray(record.entries) ? record.entries : []);
-      window.flatpickr(nodes.editorForm.querySelector('#inventarioEntriesRange'), {
-        locale,
-        mode: 'range',
-        dateFormat: 'Y-m-d',
-        allowInput: true,
-        onDayCreate: (_dObj, _dStr, fp, dayElem) => {
-          const date = dayElem.dateObj ? dayElem.dateObj.toISOString().slice(0, 10) : '';
-          const kg = dayMap[date];
-          if (kg) {
-            const bubble = document.createElement('span');
-            bubble.className = 'inventario-day-kg';
-            bubble.textContent = `${kg}kg`;
-            dayElem.appendChild(bubble);
-          }
-        }
-      });
     }
 
     wireTokenDrag();
