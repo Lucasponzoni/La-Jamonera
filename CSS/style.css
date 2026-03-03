@@ -4328,3 +4328,120 @@ html.login-protected.auth-ok body {
   background: #e6ebfa !important;
   color: #2a4ea3 !important;
 }
+
+
+.inventario-card.status-never .inventario-status-badge {
+  background: #eceff7;
+  border-color: #d5dcec;
+  color: #516187;
+}
+
+.inventario-card.status-empty .inventario-status-badge {
+  background: #ffecef;
+  border-color: #ffc4cc;
+  color: #c4314f;
+}
+
+.inventario-card.status-low .inventario-status-badge {
+  background: #fff3e2;
+  border-color: #ffd7a1;
+  color: #b86a08;
+}
+
+.inventario-card.status-good .inventario-status-badge {
+  background: #e7f8ee;
+  border-color: #b8eac8;
+  color: #128a43;
+}
+
+.inventario-save-inline {
+  margin-top: 12px;
+  justify-content: flex-end;
+}
+
+#saveInventorySpinner {
+  width: 22px;
+  height: 22px;
+}
+
+.inventario-product-head-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.inventario-product-head-stats .inventario-stat-card {
+  min-width: 180px;
+}
+
+.inventario-head-action {
+  width: fit-content;
+  max-width: none;
+  flex: 0 0 auto;
+}
+
+.inventario-table-range {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.inventario-table-range #inventarioEntriesRange {
+  border-color: #9cb3e7;
+  background: #f7f9ff;
+}
+
+.inventario-table-head.enhanced #inventarioEntriesSearch {
+  border-color: #d2d8e8;
+  background: #f2f4fa;
+}
+
+.inventario-collapse-summary {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.inventario-config-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #cddaf5;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  color: #31579f;
+  background: #edf3ff;
+  white-space: nowrap;
+}
+
+.inventario-day-kg {
+  bottom: -3px;
+  background: #d93a4f;
+}
+
+#inventarioOpenPeriodFilterBtn span {
+  white-space: nowrap;
+}
+
+.swal2-popup .swal-stack-fields .swal2-input + .swal2-input {
+  margin-top: 10px;
+}
+
+.ios-btn-danger {
+  background: #ff3b30;
+  color: #fff;
+}
+
+.ios-btn-danger:hover {
+  background: #e02c22;
+  color: #fff;
+}
+
+@media (max-width: 991.98px) {
+  .inventario-table-range {
+    grid-template-columns: 1fr;
+  }
+}

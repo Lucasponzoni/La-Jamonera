@@ -283,7 +283,7 @@
   const parseRangeValue = (value) => {
     const raw = normalizeValue(value);
     if (!raw) return { from: '', to: '' };
-    const parts = raw.split('to').map((item) => normalizeValue(item));
+    const parts = raw.split(/\s+to\s+|\s+a\s+/i).map((item) => normalizeValue(item));
     return {
       from: parts[0] || '',
       to: parts[1] || parts[0] || ''
@@ -328,7 +328,7 @@
         <td>${row.qtyKg.toFixed(2)} kg</td>
         <td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td>
         <td>${escapeHtml(row.invoiceNumber)}</td>
-        <td>${row.invoiceImageUrl ? '<i class="fa-solid fa-image"></i>' : '-'}</td>
+        <td>${row.invoiceImageUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-global-image="${row.invoiceImageUrl}"><i class="fa-regular fa-image"></i><span>Ver</span></button>` : '-'}</td>
       </tr>`).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos en ese rango.</td></tr>';
     nodes.globalTableWrap.innerHTML = `
       <div class="table-responsive inventario-global-table">
@@ -454,6 +454,55 @@
     return Number.isNaN(date.getTime()) ? null : date;
   };
 
+  const formatDateTime = (value) => {
+    const date = new Date(Number(value || 0));
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleString('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const openAttachmentViewer = async (entries, startIndex = 0, title = 'Adjuntos') => {
+    const images = entries.filter((item) => item?.invoiceImageUrl);
+    if (!images.length) return;
+    let index = Math.min(Math.max(0, startIndex), images.length - 1);
+
+    const render = () => `
+      <div class="image-viewer-controls">
+        <button type="button" class="btn ios-btn ios-btn-secondary" data-viewer-prev><i class="fa-solid fa-chevron-left"></i></button>
+        <span>${index + 1} / ${images.length}</span>
+        <button type="button" class="btn ios-btn ios-btn-secondary" data-viewer-next><i class="fa-solid fa-chevron-right"></i></button>
+      </div>
+      <div class="viewer-stage">
+        <img src="${images[index].invoiceImageUrl}" alt="Adjunto" class="attachment-image is-loaded" />
+      </div>`;
+
+    await openIosSwal({
+      title,
+      width: 980,
+      html: render(),
+      confirmButtonText: 'Cerrar',
+      didOpen: () => {
+        const box = Swal.getHtmlContainer();
+        if (!box) return;
+        box.addEventListener('click', (event) => {
+          if (event.target.closest('[data-viewer-prev]')) {
+            index = (index - 1 + images.length) % images.length;
+            box.innerHTML = render();
+          }
+          if (event.target.closest('[data-viewer-next]')) {
+            index = (index + 1) % images.length;
+            box.innerHTML = render();
+          }
+        });
+      }
+    });
+  };
+
   const inDateRange = (value, from, to) => {
     const date = parseIsoDate(value);
     if (!date) return false;
@@ -487,9 +536,9 @@
       cancelButtonText: 'Cancelar',
       customClass: {
         confirmButton: 'ios-btn ios-btn-primary',
-        denyButton: 'ios-btn ios-btn-secondary',
+        denyButton: 'ios-btn ios-btn-danger',
         cancelButton: 'ios-btn ios-btn-secondary'
-      },
+      }
     });
     if (!ask.isConfirmed && !ask.isDenied) return;
 
@@ -497,16 +546,18 @@
     const rows = entries.map((entry) => `
       <tr>
         <td>${escapeHtml(entry.entryDate || '-')}</td>
+        <td>${formatDateTime(entry.createdAt)}</td>
         <td>${escapeHtml(entry.expiryDate || '-')}</td>
         <td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td>
         <td>${escapeHtml(entry.invoiceNumber || '-')}</td>
-        <td>${includeImages
-          ? (entry.invoiceImageUrl ? `<img src="${entry.invoiceImageUrl}" alt="Adjunto" style="max-width:120px;max-height:90px;object-fit:cover;border-radius:8px;border:1px solid #d7def2;"/>` : 'Sin imagen')
-          : (entry.invoiceImageUrl ? 'Posee imagen adjunta' : 'Sin imagen')}
-        </td>
+        <td>${includeImages ? (entry.invoiceImageUrl ? 'Ver bloque de imágenes' : 'Sin imagen') : (entry.invoiceImageUrl ? 'Posee imagen adjunta' : 'Sin imagen')}</td>
       </tr>`).join('');
 
-    const printWindow = window.open('', '_blank', 'width=1200,height=800');
+    const imagesHtml = includeImages
+      ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${entries.filter((e) => e.invoiceImageUrl).map((entry) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><img src="${entry.invoiceImageUrl}" style="width:100%;max-height:320px;object-fit:contain;border-radius:10px;"/><figcaption style="font-size:12px;color:#4b5f8e;margin-top:6px;">${escapeHtml(entry.invoiceNumber || '-')} · ${escapeHtml(entry.entryDate || '-')}</figcaption></figure>`).join('')}</div></section>`
+      : '';
+
+    const printWindow = window.open('', '_blank', 'width=1300,height=900');
     if (!printWindow) return;
     printWindow.document.write(`
       <html>
@@ -523,15 +574,17 @@
         <body>
           <h1>${escapeHtml(capitalize(ingredient.name))} · Historial de ingresos</h1>
           <table>
-            <thead><tr><th>Fecha ingreso</th><th>Fecha caducidad</th><th>Cantidad</th><th>N° factura/remito</th><th>Imagen</th></tr></thead>
-            <tbody>${rows || '<tr><td colspan="5">Sin datos</td></tr>'}</tbody>
+            <thead><tr><th>Fecha ingreso</th><th>Hora carga</th><th>Fecha caducidad</th><th>Cantidad</th><th>N° factura/remito</th><th>Imagen</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody>
           </table>
+          ${imagesHtml}
         </body>
       </html>`);
     printWindow.document.close();
     printWindow.focus();
     printWindow.print();
   };
+
 
   const openPrintGlobalPeriod = async (rows) => {
     const ask = await openIosSwal({
@@ -544,9 +597,9 @@
       cancelButtonText: 'Cancelar',
       customClass: {
         confirmButton: 'ios-btn ios-btn-primary',
-        denyButton: 'ios-btn ios-btn-secondary',
+        denyButton: 'ios-btn ios-btn-danger',
         cancelButton: 'ios-btn ios-btn-secondary'
-      },
+      }
     });
     if (!ask.isConfirmed && !ask.isDenied) return;
     const includeImages = ask.isConfirmed;
@@ -557,15 +610,21 @@
         <td>${row.qtyKg.toFixed(2)} kg</td>
         <td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td>
         <td>${escapeHtml(row.invoiceNumber)}</td>
-        <td>${includeImages ? (row.invoiceImageUrl ? `<img src="${row.invoiceImageUrl}" style="max-width:90px;max-height:70px;"/>` : 'Sin imagen') : (row.invoiceImageUrl ? 'Posee imagen adjunta' : 'Sin imagen')}</td>
+        <td>${includeImages ? (row.invoiceImageUrl ? 'Ver bloque de imágenes' : 'Sin imagen') : (row.invoiceImageUrl ? 'Posee imagen adjunta' : 'Sin imagen')}</td>
       </tr>`).join('');
-    const win = window.open('', '_blank', 'width=1200,height=800');
+
+    const imagesHtml = includeImages
+      ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas del período</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${rows.filter((r) => r.invoiceImageUrl).map((row) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><img src="${row.invoiceImageUrl}" style="width:100%;max-height:320px;object-fit:contain;border-radius:10px;"/><figcaption style="font-size:12px;color:#4b5f8e;margin-top:6px;">${escapeHtml(row.ingredientName)} · ${escapeHtml(row.entryDate)}</figcaption></figure>`).join('')}</div></section>`
+      : '';
+
+    const win = window.open('', '_blank', 'width=1300,height=900');
     if (!win) return;
-    win.document.write(`<html><head><title>Inventario por período</title><style>body{font-family:Inter,Arial;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:8px;font-size:12px}th{background:#eef3ff}</style></head><body><h1>Ingresos por período</h1><table><thead><tr><th>Fecha</th><th>Producto</th><th>Kilos</th><th>Cantidad</th><th>N° factura/remito</th><th>Imagen</th></tr></thead><tbody>${content || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table></body></html>`);
+    win.document.write(`<html><head><title>Inventario por período</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:8px;font-size:12px}th{background:#eef3ff}</style></head><body><h1>Ingresos por período</h1><table><thead><tr><th>Fecha</th><th>Producto</th><th>Kilos</th><th>Cantidad</th><th>N° factura/remito</th><th>Imagen</th></tr></thead><tbody>${content || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
     win.document.close();
     win.focus();
     win.print();
   };
+
 
   const renderEntryTable = (record) => {
     const source = Array.isArray(record.entries) ? [...record.entries] : [];
@@ -579,12 +638,13 @@
     const rowsHtml = pageRows.length ? pageRows.map((entry) => `
       <tr>
         <td>${entry.entryDate || '-'}</td>
+        <td>${formatDateTime(entry.createdAt)}</td>
         <td>${entry.expiryDate || '-'}</td>
         <td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td>
         <td>${escapeHtml(entry.invoiceNumber || '-')}</td>
         <td>${entry.invoiceImageUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-invoice-image="${entry.id}"><i class="fa-regular fa-image"></i><span>Ver</span></button>` : '-'}</td>
         <td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-print-entry="${entry.id}"><i class="fa-solid fa-print"></i><span>Imprimir</span></button></td>
-      </tr>`).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos para mostrar.</td></tr>';
+      </tr>`).join('') : '<tr><td colspan="7" class="text-center">Sin ingresos para mostrar.</td></tr>';
 
     return `
       <div class="inventario-table-wrap">
@@ -598,7 +658,7 @@
         </div>
         <div class="table-responsive">
           <table class="table recipe-table mb-0">
-            <thead><tr><th>Fecha ingreso</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura/remito</th><th>Imagen</th><th>Acción</th></tr></thead>
+            <thead><tr><th>Fecha ingreso</th><th>Hora carga</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura/remito</th><th>Imagen</th><th>Acción</th></tr></thead>
             <tbody>${rowsHtml}</tbody>
           </table>
         </div>
@@ -623,7 +683,7 @@
       qty: '',
       unit: 'kilos',
       entryDate: new Date().toISOString().slice(0, 10),
-      expiryDate: '',
+      expiryDate: new Date(Date.now() + (5 * 86400000)).toISOString().slice(0, 10),
       invoiceNumber: '',
       invoiceImageFile: null,
       tokens: [...record.lotConfig.tokens],
@@ -717,11 +777,19 @@
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryInvoiceNumber">Número de factura/remito</label>
-            <input id="inventoryInvoiceNumber" class="form-control ios-input" value="${escapeHtml(state.editorDraft.invoiceNumber)}" placeholder="Ej: A-000123" autocomplete="off" spellcheck="false" inputmode="text">
+            <input id="inventoryInvoiceNumber" class="form-control ios-input" value="${escapeHtml(state.editorDraft.invoiceNumber)}" placeholder="Ej: A-000123" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text">
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryInvoiceImage">Adjuntar foto de factura/remito</label>
             <input id="inventoryInvoiceImage" class="form-control image-file-input" autocomplete="off" type="file" accept="image/*">
+          </div>
+        </div>
+          <div class="recipe-table-actions inventario-save-inline">
+            <button type="submit" id="saveInventoryBtn" class="btn ios-btn ios-btn-success recipe-table-action-btn recipe-table-action-btn-primary">
+              <img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner d-none" id="saveInventorySpinner">
+              <i class="fa-solid fa-floppy-disk" id="saveInventoryIcon"></i>
+              <span>Guardar ingreso</span>
+            </button>
           </div>
         </div>
       </section>
@@ -729,15 +797,7 @@
       <section class="recipe-step-card step-block">
         <h6 class="step-title"><span class="recipe-step-number">3</span> Historial de ingresos</h6>
         ${renderEntryTable(record)}
-      </section>
-
-      <div class="recipe-table-actions">
-        <button type="submit" id="saveInventoryBtn" class="btn ios-btn ios-btn-success recipe-table-action-btn recipe-table-action-btn-primary">
-          <img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner-login d-none" id="saveInventorySpinner">
-          <i class="fa-solid fa-floppy-disk" id="saveInventoryIcon"></i>
-          <span>Guardar ingreso</span>
-        </button>
-      </div>`;
+      </section>`;
 
     const syncDraft = () => {
       state.editorDraft.qty = nodes.editorForm.querySelector('#inventoryQty')?.value || '';
@@ -849,7 +909,7 @@
       }
       const result = await openIosSwal({
         title: 'Agregar medida',
-        html: '<input id="newMeasureName" class="swal2-input ios-input" placeholder="Nombre"><input id="newMeasureAbbr" class="swal2-input ios-input" placeholder="Abreviatura">',
+        html: '<div class="swal-stack-fields"><input id="newMeasureName" class="swal2-input ios-input" placeholder="Nombre"><input id="newMeasureAbbr" class="swal2-input ios-input" placeholder="Abreviatura"></div>',
         showCancelButton: true,
         confirmButtonText: 'Guardar',
         cancelButtonText: 'Cancelar',
@@ -913,14 +973,10 @@
     nodes.editorForm.querySelectorAll('[data-open-invoice-image]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const entryId = btn.dataset.openInvoiceImage;
-        const entry = (record.entries || []).find((item) => item.id === entryId);
-        if (!entry?.invoiceImageUrl) return;
-        await openIosSwal({
-          title: 'Factura / Remito',
-          width: 860,
-          html: `<div class="image-viewer-wrap"><img src="${entry.invoiceImageUrl}" alt="Factura o remito" class="attachment-image is-loaded"></div>`,
-          confirmButtonText: 'Cerrar'
-        });
+        const entriesWithImage = (record.entries || []).filter((item) => item.invoiceImageUrl);
+        const idx = entriesWithImage.findIndex((item) => item.id === entryId);
+        if (idx < 0) return;
+        await openAttachmentViewer(entriesWithImage, idx, 'Factura / Remito');
       });
     });
 
@@ -1059,7 +1115,7 @@
         ...state.editorDraft,
         qty: '',
         invoiceNumber: '',
-        expiryDate: '',
+        expiryDate: new Date(Date.now() + (5 * 86400000)).toISOString().slice(0, 10),
         entryDate: new Date().toISOString().slice(0, 10)
       });
     } finally {
@@ -1193,6 +1249,11 @@
   });
   nodes.globalPrintBtn?.addEventListener('click', async () => {
     await openPrintGlobalPeriod(getGlobalFilteredEntries());
+  });
+  nodes.globalTableWrap?.addEventListener('click', async (event) => {
+    const btn = event.target.closest('[data-open-global-image]');
+    if (!btn) return;
+    await openAttachmentViewer([{ invoiceImageUrl: btn.dataset.openGlobalImage }], 0, 'Imagen del ingreso');
   });
 
   inventarioModal.addEventListener('hide.bs.modal', snapshotEditorDraft);
