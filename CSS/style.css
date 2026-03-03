@@ -4505,9 +4505,14 @@ html.login-protected.auth-ok body {
   align-items: center;
 }
 
-.inventario-table-range #inventarioEntriesRange {
-  border-color: #9cb3e7;
-  background: #f7f9ff;
+.inventario-page-btn {
+  min-width: 44px;
+  padding-inline: 12px;
+}
+
+.inventario-entry-actions {
+  display: inline-flex;
+  gap: 6px;
 }
 
 .inventario-table-head.enhanced #inventarioEntriesSearch {
@@ -4562,6 +4567,38 @@ html.login-protected.auth-ok body {
 .inventario-day-kg {
   bottom: -3px;
   background: #d93a4f;
+}
+
+#inventarioEditor {
+  overflow-x: hidden;
+}
+
+#inventarioEditor .inventario-table-compact {
+  min-width: 100%;
+  table-layout: fixed;
+}
+
+#inventarioEditor .inventario-table-compact th,
+#inventarioEditor .inventario-table-compact td {
+  white-space: normal;
+  word-break: break-word;
+}
+
+.inventario-product-head-stats .inventario-stat-card:first-child {
+  border-color: #8fb3ff;
+  background: linear-gradient(140deg, #edf3ff 0%, #deebff 100%);
+}
+
+.inventario-product-head-stats .inventario-stat-card:first-child small {
+  font-size: 0.8rem;
+  letter-spacing: 0.03em;
+  color: #244c99;
+  font-weight: 800;
+}
+
+.inventario-product-head-stats .inventario-stat-card:first-child strong {
+  font-size: 1.22rem;
+  color: #173b80;
 }
 
 #inventarioOpenPeriodFilterBtn span {
