@@ -4229,6 +4229,7 @@ html.login-protected.auth-ok body {
 .inventario-check-grid {
   display: grid;
   gap: 8px;
+  margin-top: 10px;
 }
 
 .inventario-check-row {
