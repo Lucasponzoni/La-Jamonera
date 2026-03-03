@@ -363,27 +363,6 @@
     });
   };
 
-  const getGeneralPassword = async () => {
-    await window.laJamoneraReady;
-    const value = await window.dbLaJamoneraRest.read('/passGeneral/pass');
-    return normalizeValue(value);
-  };
-
-  const waitPrintAssets = async (printWindow) => {
-    const images = [...(printWindow?.document?.images || [])];
-    await Promise.all(images.map((image) => {
-      if (image.complete && image.naturalWidth > 0) {
-        return Promise.resolve();
-      }
-      return new Promise((resolve) => {
-        const done = () => resolve();
-        image.addEventListener('load', done, { once: true });
-        image.addEventListener('error', done, { once: true });
-        setTimeout(resolve, 6000);
-      });
-    }));
-  };
-
   const renderStatusFilters = () => {
     if (!nodes.statusFilters) return;
     const allIngredients = Object.values(state.ingredientes);
