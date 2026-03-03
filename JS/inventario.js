@@ -1012,6 +1012,28 @@
       state.editorDirty = true;
     };
 
+    const hasDuplicateInvoice = () => {
+      const invoice = normalizeLower(nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value);
+      if (!invoice) return false;
+      const indexed = state.inventario.indexes?.invoiceByIngredient?.[ingredientId]?.[invoice];
+      return Boolean(indexed);
+    };
+
+    const renderInvoiceFeedback = () => {
+      const feedback = nodes.editorForm.querySelector('#inventoryInvoiceFeedback');
+      const saveBtn = nodes.editorForm.querySelector('#saveInventoryBtn');
+      if (!feedback || !saveBtn) return;
+      if (!hasDuplicateInvoice()) {
+        feedback.textContent = '';
+        feedback.classList.remove('is-error');
+        saveBtn.removeAttribute('disabled');
+        return;
+      }
+      feedback.textContent = 'Ya existe un ingreso para este producto con ese número de factura/remito.';
+      feedback.classList.add('is-error');
+      saveBtn.setAttribute('disabled', 'disabled');
+    };
+
     const renderPattern = () => {
       const separator = state.editorDraft.includeSeparator ? state.editorDraft.separator : '';
       const pattern = state.editorDraft.tokens.map((token) => '${' + lotTokenLabelFor(token, state.editorDraft.customAcronym).replaceAll(' ', '_') + '}').join(separator);
