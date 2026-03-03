@@ -287,15 +287,79 @@
 
   const initThumbLoading = (scope = document) => {
     scope.querySelectorAll('.js-inventario-thumb').forEach((img) => {
-      const parent = img.closest('.ingrediente-avatar, .family-circle-thumb, .recipe-inline-avatar-wrap, .receta-thumb-wrap, .recipe-suggest-avatar-wrap');
+      const parent = img.closest('.ingrediente-avatar, .family-circle-thumb, .recipe-inline-avatar-wrap, .receta-thumb-wrap, .recipe-suggest-avatar-wrap, .inventario-print-photo-wrap');
       const loader = parent?.querySelector('.thumb-loading');
       const done = () => {
         img.classList.add('is-loaded');
         loader?.classList.add('d-none');
       };
+      const fail = () => loader?.classList.add('d-none');
       img.addEventListener('load', done, { once: true });
-      img.addEventListener('error', () => loader?.classList.add('d-none'), { once: true });
-      if (img.complete) done();
+      img.addEventListener('error', fail, { once: true });
+      if (img.complete && img.naturalWidth > 0) {
+        done();
+      } else if (img.complete) {
+        fail();
+      } else {
+        setTimeout(() => {
+          if (!img.classList.contains('is-loaded')) {
+            fail();
+          }
+        }, 7000);
+      }
+    });
+  };
+
+  const getGeneralPassword = async () => {
+    await window.laJamoneraReady;
+    const value = await window.dbLaJamoneraRest.read('/passGeneral/pass');
+    return normalizeValue(value);
+  };
+
+  const waitPrintAssets = async (printWindow) => {
+    const images = [...(printWindow?.document?.images || [])];
+    await Promise.all(images.map((image) => {
+      if (image.complete && image.naturalWidth > 0) {
+        return Promise.resolve();
+      }
+      return new Promise((resolve) => {
+        const done = () => resolve();
+        image.addEventListener('load', done, { once: true });
+        image.addEventListener('error', done, { once: true });
+        setTimeout(resolve, 6000);
+      });
+    }));
+  };
+
+
+  const entryImageUrls = (entry) => {
+    if (Array.isArray(entry?.invoiceImageUrls) && entry.invoiceImageUrls.length) {
+      return entry.invoiceImageUrls.filter(Boolean);
+    }
+    if (entry?.invoiceImageUrl) {
+      return [entry.invoiceImageUrl];
+    }
+    return [];
+  };
+
+  const rerenderEditorKeepViewport = (ingredientId, draft, focusSelector = '') => {
+    const modalBody = inventarioModal.querySelector('.modal-body');
+    const scrollTop = modalBody?.scrollTop || 0;
+    const active = focusSelector ? nodes.editorForm?.querySelector(focusSelector) : null;
+    const selStart = active && typeof active.selectionStart === 'number' ? active.selectionStart : null;
+    const selEnd = active && typeof active.selectionEnd === 'number' ? active.selectionEnd : null;
+    renderEditor(ingredientId, draft);
+    requestAnimationFrame(() => {
+      if (modalBody) {
+        modalBody.scrollTop = scrollTop;
+      }
+      if (focusSelector) {
+        const next = nodes.editorForm?.querySelector(focusSelector);
+        next?.focus({ preventScroll: true });
+        if (next && selStart != null && typeof next.setSelectionRange === 'function') {
+          next.setSelectionRange(selStart, selEnd ?? selStart);
+        }
+      }
     });
   };
 
@@ -413,7 +477,8 @@
           qty: Number(entry.qty || 0),
           unit: entry.unit || '',
           invoiceNumber: entry.invoiceNumber || '-',
-          invoiceImageUrl: entry.invoiceImageUrl || ''
+          invoiceImageUrls: entryImageUrls(entry),
+          invoiceImageUrl: entryImageUrls(entry)[0] || ''
         });
       });
     });
@@ -445,14 +510,14 @@
     nodes.globalTableWrap.innerHTML = `
       <div class="table-responsive inventario-global-table inventario-table-compact-wrap">
         <table class="table recipe-table inventario-table-compact mb-0">
-          <thead><tr><th>Fecha</th><th>Producto</th><th>Kilos</th><th>Cantidad</th><th>N° factura/remito</th><th>Imagen</th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Producto</th><th>Kilos</th><th>Cantidad</th><th>N° factura</th><th>Imagen</th></tr></thead>
           <tbody>${htmlRows}</tbody>
         </table>
       </div>
       <div class="inventario-pagination enhanced">
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-global-page="prev" ${state.globalTablePage <= 1 ? 'disabled' : ''}>Anterior</button>
+        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-global-page="prev" ${state.globalTablePage <= 1 ? 'disabled' : ''} aria-label="Página anterior"><i class="fa-solid fa-chevron-left"></i></button>
         <span>Página ${state.globalTablePage} de ${pages}</span>
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-global-page="next" ${state.globalTablePage >= pages ? 'disabled' : ''}>Siguiente</button>
+        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-global-page="next" ${state.globalTablePage >= pages ? 'disabled' : ''} aria-label="Página siguiente"><i class="fa-solid fa-chevron-right"></i></button>
       </div>`;
   };
 
@@ -559,10 +624,14 @@
       return '<span class="inventario-config-badge is-muted">Sin configuración</span>';
     }
 
-    const badges = tokens.map((token) => `<span class="inventario-config-badge">${lotTokenLabelFor(token, customAcronym)}</span>`);
-    if (lotConfig?.includeSeparator) {
-      badges.push(`<span class="inventario-config-badge">Separador: ${escapeHtml(lotConfig.separator || '-')}</span>`);
-    }
+    const separatorBadge = `<span class="inventario-config-badge is-secondary">Separador: ${escapeHtml(lotConfig?.separator || '-')}</span>`;
+    const badges = [];
+    tokens.forEach((token, index) => {
+      badges.push(`<span class="inventario-config-badge">${lotTokenLabelFor(token, customAcronym)}</span>`);
+      if (lotConfig?.includeSeparator && index < tokens.length - 1) {
+        badges.push(separatorBadge);
+      }
+    });
     return badges.join('');
   };
 
@@ -606,11 +675,11 @@
     if (!item || !nodes.viewerImage) return;
     nodes.viewerStageSpinner?.classList.remove('d-none');
     nodes.viewerImage.classList.remove('is-loaded');
-    nodes.viewerImage.src = item.invoiceImageUrl;
+    nodes.viewerImage.src = item.src;
   };
 
   const openAttachmentViewer = async (entries, startIndex = 0, title = 'Adjuntos') => {
-    const images = entries.filter((item) => item?.invoiceImageUrl);
+    const images = entries.flatMap((item) => entryImageUrls(item).map((url) => ({ src: url })));
     if (!images.length) return;
     ensureImageViewerModal();
     if (!imageViewerModal) return;
@@ -649,8 +718,8 @@
     if (!uniqueUrls.length) return;
 
     await openIosSwal({
-      title: 'Preparando impresión',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Procesando" class="meta-spinner"><p class="mt-2 mb-0">Procesando imágenes...</p></div>',
+      title: 'Preparando impresión...',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Preparando impresión" class="meta-spinner-login"></div>',
       allowOutsideClick: false,
       showConfirmButton: false,
       didOpen: async () => {
@@ -671,12 +740,12 @@
       html: '<p>¿Querés incluir imágenes adjuntas en la impresión?</p>',
       showCancelButton: true,
       showDenyButton: true,
-      confirmButtonText: 'Sí, incluir imágenes',
-      denyButtonText: 'No incluir imágenes',
+      confirmButtonText: 'Incluir',
+      denyButtonText: 'No incluir',
       cancelButtonText: 'Cancelar',
       customClass: {
-        confirmButton: 'ios-btn ios-btn-primary',
-        denyButton: 'ios-btn ios-btn-danger',
+        confirmButton: 'ios-btn ios-btn-success',
+        denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical',
         cancelButton: 'ios-btn ios-btn-secondary'
       }
     });
@@ -684,7 +753,7 @@
 
     const includeImages = ask.isConfirmed;
     if (includeImages) {
-      await preloadImages(entries.map((entry) => entry.invoiceImageUrl).concat([ingredient.imageUrl]));
+      await preloadImages(entries.flatMap((entry) => entryImageUrls(entry)).concat([ingredient.imageUrl]));
     }
     const rows = entries.map((entry) => `
       <tr>
@@ -692,11 +761,11 @@
         <td>${escapeHtml(entry.expiryDate || '-')}</td>
         <td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td>
         <td>${escapeHtml(entry.invoiceNumber || '-')}</td>
-        <td>${includeImages ? (entry.invoiceImageUrl ? 'Ver bloque de imágenes' : 'Sin imagen') : (entry.invoiceImageUrl ? 'Posee imagen adjunta' : 'Sin imagen')}</td>
+        <td>${includeImages ? (entryImageUrls(entry).length ? `Ver bloque de imágenes (${entryImageUrls(entry).length})` : 'Sin imagen') : (entryImageUrls(entry).length ? `Posee ${entryImageUrls(entry).length} imagen/es` : 'Sin imagen')}</td>
       </tr>`).join('');
 
     const imagesHtml = includeImages
-      ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${entries.filter((e) => e.invoiceImageUrl).map((entry) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><img src="${entry.invoiceImageUrl}" style="width:100%;max-height:320px;object-fit:contain;border-radius:10px;"/><figcaption style="font-size:12px;color:#4b5f8e;margin-top:6px;">${escapeHtml(entry.invoiceNumber || '-')} · ${escapeHtml(entry.entryDate || '-')}</figcaption></figure>`).join('')}</div></section>`
+      ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${entries.flatMap((entry) => entryImageUrls(entry).map((url, idx) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><img src="${url}" style="width:100%;max-height:320px;object-fit:contain;border-radius:10px;"/><figcaption style="font-size:12px;color:#4b5f8e;margin-top:6px;">${escapeHtml(entry.invoiceNumber || '-')} · ${escapeHtml(entry.entryDate || '-')} · ${idx + 1}</figcaption></figure>`)).join('')}</div></section>`
       : '';
 
     const printWindow = window.open('', '_blank', 'width=1300,height=900');
@@ -722,7 +791,7 @@
             </div>
           </section>
           <table>
-            <thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>N° factura/remito</th><th>Imagen</th></tr></thead>
+            <thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>N° factura</th><th>Imagen</th></tr></thead>
             <tbody>${rows || '<tr><td colspan="5">Sin datos</td></tr>'}</tbody>
           </table>
           ${imagesHtml}
@@ -730,6 +799,7 @@
       </html>`);
     printWindow.document.close();
     printWindow.focus();
+    await waitPrintAssets(printWindow);
     printWindow.print();
   };
 
@@ -740,12 +810,12 @@
       html: '<p>¿Querés incluir imágenes adjuntas?</p>',
       showCancelButton: true,
       showDenyButton: true,
-      confirmButtonText: 'Sí',
-      denyButtonText: 'No',
+      confirmButtonText: 'Incluir',
+      denyButtonText: 'No incluir',
       cancelButtonText: 'Cancelar',
       customClass: {
-        confirmButton: 'ios-btn ios-btn-primary',
-        denyButton: 'ios-btn ios-btn-danger',
+        confirmButton: 'ios-btn ios-btn-success',
+        denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical',
         cancelButton: 'ios-btn ios-btn-secondary'
       }
     });
@@ -780,7 +850,7 @@
             });
           });
         });
-        initThumbLoading(document);
+        initThumbLoading(Swal.getHtmlContainer() || document);
       },
       preConfirm: () => {
         const mode = document.querySelector('input[name="printScope"]:checked')?.value || 'all';
@@ -797,7 +867,7 @@
     const excluded = new Set(selector.value.mode === 'exclude' ? selector.value.selected : []);
     const scopedRows = rows.filter((row) => !excluded.has(row.ingredientId));
     if (includeImages) {
-      await preloadImages(scopedRows.map((row) => row.invoiceImageUrl).concat(scopedRows.map((row) => row.ingredientImageUrl)));
+      await preloadImages(scopedRows.flatMap((row) => row.invoiceImageUrls || []).concat(scopedRows.map((row) => row.ingredientImageUrl)));
     }
 
     const grouped = scopedRows.reduce((acc, row) => {
@@ -809,12 +879,12 @@
     const content = Object.keys(grouped).map((ingredientId) => {
       const productRows = grouped[ingredientId];
       const head = productRows[0];
-      const tableRows = productRows.map((row) => `<tr><td>${escapeHtml(row.entryDate)}</td><td>${formatTimeOnly(row.createdAt)}</td><td>${row.qtyKg.toFixed(2)} kg</td><td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td><td>${escapeHtml(row.invoiceNumber)}</td><td>${includeImages ? (row.invoiceImageUrl ? 'Ver bloque de imágenes' : 'Sin imagen') : (row.invoiceImageUrl ? 'Posee imagen adjunta' : 'Sin imagen')}</td></tr>`).join('');
-      return `<section style="margin-bottom:14px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">${head.ingredientImageUrl ? `<img src="${head.ingredientImageUrl}" style="width:62px;height:62px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<div><h2 style="margin:0;font-size:18px;">${escapeHtml(head.ingredientName)}</h2><p style="margin:0;color:#55607f;font-size:12px;">${escapeHtml(head.ingredientDescription)}</p></div></div><table><thead><tr><th>Fecha</th><th>Hora</th><th>Kilos</th><th>Cantidad</th><th>N° factura/remito</th><th>Imagen</th></tr></thead><tbody>${tableRows}</tbody></table></section>`;
+      const tableRows = productRows.map((row) => `<tr><td>${escapeHtml(row.entryDate)}</td><td>${formatTimeOnly(row.createdAt)}</td><td>${row.qtyKg.toFixed(2)} kg</td><td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td><td>${escapeHtml(row.invoiceNumber)}</td><td>${includeImages ? (row.invoiceImageUrls?.length ? `Ver bloque de imágenes (${row.invoiceImageUrls.length})` : 'Sin imagen') : (row.invoiceImageUrls?.length ? `Posee ${row.invoiceImageUrls.length} imagen/es` : 'Sin imagen')}</td></tr>`).join('');
+      return `<section style="margin-bottom:14px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">${head.ingredientImageUrl ? `<img src="${head.ingredientImageUrl}" style="width:62px;height:62px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<div><h2 style="margin:0;font-size:18px;">${escapeHtml(head.ingredientName)}</h2><p style="margin:0;color:#55607f;font-size:12px;">${escapeHtml(head.ingredientDescription)}</p></div></div><table><thead><tr><th>Fecha</th><th>Hora</th><th>Kilos</th><th>Cantidad</th><th>N° factura</th><th>Imagen</th></tr></thead><tbody>${tableRows}</tbody></table></section>`;
     }).join('');
 
     const imagesHtml = includeImages
-      ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas del período</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${scopedRows.filter((r) => r.invoiceImageUrl).map((row) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><img src="${row.invoiceImageUrl}" style="width:100%;max-height:320px;object-fit:contain;border-radius:10px;"/><figcaption style="font-size:12px;color:#4b5f8e;margin-top:6px;">${escapeHtml(row.ingredientName)} · ${escapeHtml(row.entryDate)}</figcaption></figure>`).join('')}</div></section>`
+      ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas del período</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${scopedRows.flatMap((row) => (row.invoiceImageUrls || []).map((url, idx) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><img src="${url}" style="width:100%;max-height:320px;object-fit:contain;border-radius:10px;"/><figcaption style="font-size:12px;color:#4b5f8e;margin-top:6px;">${escapeHtml(row.ingredientName)} · ${escapeHtml(row.entryDate)} · ${idx + 1}</figcaption></figure>`)).join('')}</div></section>`
       : '';
 
     const win = window.open('', '_blank', 'width=1300,height=900');
@@ -824,7 +894,62 @@
     win.document.write(`<html><head><title>${title}</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}</style></head><body><h1>${title}</h1>${content || '<p>Sin datos.</p>'}${imagesHtml}</body></html>`);
     win.document.close();
     win.focus();
+    await waitPrintAssets(win);
     win.print();
+  };
+
+  const removeEntryWithSecurity = async (ingredientId, entryId) => {
+    const confirm = await openIosSwal({
+      title: 'Eliminar ingreso',
+      html: '<p>Esta acción quitará la fila del historial y descontará su stock.</p>',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Continuar',
+      cancelButtonText: 'Cancelar'
+    });
+    if (!confirm.isConfirmed) return false;
+
+    const auth = await openIosSwal({
+      title: 'Confirmación de seguridad',
+      html: '<input id="entryDeletePass" type="password" class="swal2-input ios-input" placeholder="Contraseña general">',
+      showCancelButton: true,
+      confirmButtonText: 'Eliminar',
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        confirmButton: 'ios-btn ios-btn-danger',
+        cancelButton: 'ios-btn ios-btn-secondary'
+      },
+      preConfirm: async () => {
+        const enteredPass = normalizeValue(document.getElementById('entryDeletePass')?.value);
+        if (!enteredPass) {
+          Swal.showValidationMessage('Ingresá la contraseña.');
+          return false;
+        }
+        const firebasePass = await getGeneralPassword();
+        if (!firebasePass || enteredPass !== firebasePass) {
+          Swal.showValidationMessage('Contraseña incorrecta.');
+          return false;
+        }
+        return true;
+      }
+    });
+
+    if (!auth.isConfirmed) return false;
+
+    const record = getRecord(ingredientId);
+    const entries = Array.isArray(record.entries) ? [...record.entries] : [];
+    const entry = entries.find((item) => item.id === entryId);
+    if (!entry) return false;
+
+    record.entries = entries.filter((item) => item.id !== entryId);
+    const nextStock = Number(record.stockKg || 0) - Number(entry.qtyKg || 0);
+    record.stockKg = Number(Math.max(0, nextStock).toFixed(4));
+    record.hasEntries = record.entries.length > 0;
+
+    state.inventario.items[ingredientId] = record;
+    rebuildInventarioIndexes();
+    await persistInventario();
+    return true;
   };
 
 
@@ -843,30 +968,36 @@
         <td>${entry.expiryDate || '-'}</td>
         <td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td>
         <td>${escapeHtml(entry.invoiceNumber || '-')}</td>
-        <td>${entry.invoiceImageUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-invoice-image="${entry.id}"><i class="fa-regular fa-image"></i><span>Ver</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin foto</button>'}</td>
-        <td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-print-entry="${entry.id}" aria-label="Imprimir ingreso"><i class="fa-solid fa-print"></i></button></td>
+        <td>${entryImageUrls(entry).length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-invoice-image="${entry.id}"><i class="fa-regular fa-image"></i><span>Ver (${entryImageUrls(entry).length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin foto</button>'}</td>
+        <td>
+          <div class="inventario-entry-actions">
+            <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-print-entry="${entry.id}" aria-label="Imprimir ingreso"><i class="fa-solid fa-print"></i></button>
+            <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn inventario-icon-only-btn" data-delete-entry="${entry.id}" aria-label="Eliminar ingreso"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </td>
       </tr>`).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos para mostrar.</td></tr>';
 
     return `
       <div class="inventario-table-wrap">
         <div class="inventario-table-head enhanced">
-          <input id="inventarioEntriesSearch" class="form-control ios-input" autocomplete="off" placeholder="Buscar en ingresos" value="${escapeHtml(state.tableSearch)}">
+          <input id="inventarioEntriesSearch" type="search" class="form-control ios-input" autocomplete="off" placeholder="Buscar en ingresos" value="${escapeHtml(state.tableSearch)}">
           <div class="inventario-table-range">
             <input id="inventarioEntriesRange" class="form-control ios-input" autocomplete="off" placeholder="Rango de fechas" value="${escapeHtml(state.tableDateRange)}">
+            <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn ${state.tableDateRange ? '' : 'd-none'}" id="inventarioClearFilterBtn"><i class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></button>
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioPrintFilteredBtn"><i class="fa-solid fa-print"></i><span>Imprimir filtro</span></button>
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioPrintAllBtn"><i class="fa-solid fa-print"></i><span>Imprimir total</span></button>
           </div>
         </div>
         <div class="table-responsive inventario-table-compact-wrap">
           <table class="table recipe-table inventario-table-compact mb-0">
-            <thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura/remito</th><th>Imagen</th><th>Acción</th></tr></thead>
+            <thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura</th><th>Imagen</th><th>Acción</th></tr></thead>
             <tbody>${rowsHtml}</tbody>
           </table>
         </div>
         <div class="inventario-pagination enhanced">
-          <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-entry-page="prev" ${state.tablePage <= 1 ? 'disabled' : ''}>Anterior</button>
+          <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-entry-page="prev" ${state.tablePage <= 1 ? 'disabled' : ''} aria-label="Página anterior"><i class="fa-solid fa-chevron-left"></i></button>
           <span>Página ${state.tablePage} de ${pages}</span>
-          <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-entry-page="next" ${state.tablePage >= pages ? 'disabled' : ''}>Siguiente</button>
+          <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-entry-page="next" ${state.tablePage >= pages ? 'disabled' : ''} aria-label="Página siguiente"><i class="fa-solid fa-chevron-right"></i></button>
         </div>
       </div>`;
   };
@@ -925,13 +1056,17 @@
           </div>
         </div>
         <div class="inventario-product-head-stats">
-          <div class="inventario-stat-card ${(Number(record.stockKg) || 0) <= 0 ? 'is-danger' : ''}">
-            <small>Stock total actual</small>
-            <strong>${(Number(record.stockKg) || 0).toFixed(2)} kg</strong>
+          <div class="inventario-stat-row">
+            <div class="inventario-stat-card ${(Number(record.stockKg) || 0) <= 0 ? 'is-danger' : ''}>
+              <small>Stock total actual</small>
+              <strong>${(Number(record.stockKg) || 0).toFixed(2)} kg</strong>
+            </div>
+            ${shouldShowExpiring ? `<div class="inventario-stat-card is-alert"><small>Próximos a caducar (${expiringDays} días)</small><strong>${expiringKg.toFixed(2)} kg</strong></div>` : ''}
           </div>
-          ${shouldShowExpiring ? `<div class="inventario-stat-card is-alert"><small>Próximos a caducar (${expiringDays} días)</small><strong>${expiringKg.toFixed(2)} kg</strong></div>` : ''}
-          <button type="button" class="btn ios-btn ios-btn-secondary inventario-head-action" id="inventarioProductThresholdBtn"><i class="fa-solid fa-sliders"></i><span>Configurar umbrales</span></button>
-          <button type="button" id="inventarioEditIngredientBtn" class="btn ios-btn ios-btn-success inventario-head-action"><i class="fa-solid fa-pen"></i><span>Editar ingrediente</span></button>
+          <div class="inventario-head-actions-row">
+            <button type="button" class="btn ios-btn ios-btn-secondary inventario-head-action" id="inventarioProductThresholdBtn"><i class="fa-solid fa-sliders"></i><span>Configurar umbrales</span></button>
+            <button type="button" id="inventarioEditIngredientBtn" class="btn ios-btn ios-btn-success inventario-head-action"><i class="fa-solid fa-pen"></i><span>Editar ingrediente</span></button>
+          </div>
         </div>
       </section>
 
@@ -978,11 +1113,11 @@
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryInvoiceNumber">Número de factura/remito</label>
-            <input id="inventoryInvoiceNumber" class="form-control ios-input" value="${escapeHtml(state.editorDraft.invoiceNumber)}" placeholder="Ej: A-000123" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" data-lpignore="true">
+            <textarea id="inventoryInvoiceNumber" name="inventory_code_free" class="form-control ios-input inventario-invoice-textarea" rows="1" placeholder="Ej: A-000123" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text">${escapeHtml(state.editorDraft.invoiceNumber)}</textarea>
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryInvoiceImage">Adjuntar foto de factura/remito</label>
-            <input id="inventoryInvoiceImage" class="form-control image-file-input" autocomplete="off" type="file" accept="image/*">
+            <label class="form-label" for="inventoryInvoiceImage">Adjuntar foto(s) de factura/remito</label>
+            <input id="inventoryInvoiceImage" class="form-control image-file-input" autocomplete="off" type="file" accept="image/*" multiple>
           </div>
         </div>
           <div class="recipe-table-actions inventario-save-inline">
@@ -1174,12 +1309,40 @@
     nodes.editorForm.querySelector('#inventarioEntriesSearch')?.addEventListener('input', (event) => {
       state.tableSearch = event.target.value;
       state.tablePage = 1;
-      renderEditor(ingredientId, state.editorDraft);
+      rerenderEditorKeepViewport(ingredientId, state.editorDraft, '#inventarioEntriesSearch');
     });
-    nodes.editorForm.querySelector('#inventarioEntriesRange')?.addEventListener('change', (event) => {
-      state.tableDateRange = event.target.value;
+
+    if (window.flatpickr) {
+      const locale = window.flatpickr.l10ns?.es || undefined;
+      const dayMap = getDayKgMap(Array.isArray(record.entries) ? record.entries : []);
+      window.flatpickr(nodes.editorForm.querySelector('#inventarioEntriesRange'), {
+        locale,
+        mode: 'range',
+        dateFormat: 'Y-m-d',
+        allowInput: true,
+        defaultDate: state.tableDateRange ? state.tableDateRange.split(' to ') : null,
+        onDayCreate: (_dObj, _dStr, _fp, dayElem) => {
+          const date = dayElem.dateObj ? dayElem.dateObj.toISOString().slice(0, 10) : '';
+          const kg = dayMap[date];
+          if (kg) {
+            const bubble = document.createElement('span');
+            bubble.className = 'inventario-day-kg';
+            bubble.textContent = `${kg}kg`;
+            dayElem.appendChild(bubble);
+          }
+        },
+        onClose: (_selectedDates, dateStr) => {
+          state.tableDateRange = normalizeValue(dateStr);
+          state.tablePage = 1;
+          rerenderEditorKeepViewport(ingredientId, state.editorDraft, '#inventarioEntriesSearch');
+        }
+      });
+    }
+
+    nodes.editorForm.querySelector('#inventarioClearFilterBtn')?.addEventListener('click', () => {
+      state.tableDateRange = '';
       state.tablePage = 1;
-      renderEditor(ingredientId, state.editorDraft);
+      rerenderEditorKeepViewport(ingredientId, state.editorDraft, '#inventarioEntriesSearch');
     });
 
     nodes.editorForm.querySelector('#inventarioPrintFilteredBtn')?.addEventListener('click', async () => {
@@ -1205,13 +1368,22 @@
       });
     });
 
+    nodes.editorForm.querySelectorAll('[data-delete-entry]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const deleted = await removeEntryWithSecurity(ingredientId, btn.dataset.deleteEntry);
+        if (!deleted) return;
+        state.tablePage = 1;
+        await loadData();
+        renderEditor(ingredientId, state.editorDraft);
+      });
+    });
+
     nodes.editorForm.querySelectorAll('[data-open-invoice-image]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const entryId = btn.dataset.openInvoiceImage;
-        const entriesWithImage = (record.entries || []).filter((item) => item.invoiceImageUrl);
-        const idx = entriesWithImage.findIndex((item) => item.id === entryId);
-        if (idx < 0) return;
-        await openAttachmentViewer(entriesWithImage, idx, 'Factura / Remito');
+        const entry = (record.entries || []).find((item) => item.id === entryId);
+        if (!entry || !entryImageUrls(entry).length) return;
+        await openAttachmentViewer([entry], 0, 'Factura / Remito');
       });
     });
 
@@ -1219,23 +1391,6 @@
       const locale = window.flatpickr.l10ns?.es || undefined;
       window.flatpickr(nodes.editorForm.querySelector('#inventoryEntryDate'), { locale, dateFormat: 'Y-m-d', allowInput: true });
       window.flatpickr(nodes.editorForm.querySelector('#inventoryExpiryDate'), { locale, dateFormat: 'Y-m-d', allowInput: true, minDate: 'today' });
-      const dayMap = getDayKgMap(Array.isArray(record.entries) ? record.entries : []);
-      window.flatpickr(nodes.editorForm.querySelector('#inventarioEntriesRange'), {
-        locale,
-        mode: 'range',
-        dateFormat: 'Y-m-d',
-        allowInput: true,
-        onDayCreate: (_dObj, _dStr, fp, dayElem) => {
-          const date = dayElem.dateObj ? dayElem.dateObj.toISOString().slice(0, 10) : '';
-          const kg = dayMap[date];
-          if (kg) {
-            const bubble = document.createElement('span');
-            bubble.className = 'inventario-day-kg';
-            bubble.textContent = `${kg}kg`;
-            dayElem.appendChild(bubble);
-          }
-        }
-      });
     }
 
     wireTokenDrag();
@@ -1278,7 +1433,7 @@
     const entryDate = normalizeValue(nodes.editorForm.querySelector('#inventoryEntryDate')?.value);
     const expiryDate = normalizeValue(nodes.editorForm.querySelector('#inventoryExpiryDate')?.value);
     const invoiceNumber = normalizeValue(nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value);
-    const file = nodes.editorForm.querySelector('#inventoryInvoiceImage')?.files?.[0] || null;
+    const files = [...(nodes.editorForm.querySelector('#inventoryInvoiceImage')?.files || [])];
     const record = getRecord(ingredientId);
 
     if (!record.hasEntries && !state.editorDraft.tokens.length) {
@@ -1316,7 +1471,7 @@
       return;
     }
 
-    if (file) {
+    for (const file of files) {
       const message = validateImageFile(file);
       if (message) {
         await openIosSwal({ title: 'Imagen inválida', html: `<p>${message}</p>`, icon: 'warning', confirmButtonText: 'Entendido' });
@@ -1332,9 +1487,10 @@
     icon?.classList.add('d-none');
 
     try {
-      let invoiceImageUrl = '';
-      if (file) {
-        invoiceImageUrl = await uploadImageToStorage(file, 'inventario/facturas');
+      const invoiceImageUrls = [];
+      for (const file of files) {
+        const imageUrl = await uploadImageToStorage(file, 'inventario/facturas');
+        if (imageUrl) invoiceImageUrls.push(imageUrl);
       }
 
       const qtyKg = Number(convertToKg(qty, unit).toFixed(4));
@@ -1346,7 +1502,8 @@
         entryDate,
         expiryDate,
         invoiceNumber,
-        invoiceImageUrl,
+        invoiceImageUrl: invoiceImageUrls[0] || '',
+        invoiceImageUrls,
         createdAt: Date.now()
       };
 
@@ -1532,7 +1689,7 @@
     }
     const btn = event.target.closest('[data-open-global-image]');
     if (!btn) return;
-    await openAttachmentViewer([{ invoiceImageUrl: btn.dataset.openGlobalImage }], 0, 'Imagen del ingreso');
+    await openAttachmentViewer([{ invoiceImageUrls: [btn.dataset.openGlobalImage] }], 0, 'Imagen del ingreso');
   });
 
   nodes.viewerPrevBtn?.addEventListener('click', () => {
