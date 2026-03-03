@@ -4027,6 +4027,12 @@ html.login-protected.auth-ok body {
   padding: 4px 9px;
 }
 
+.inventario-icon-only-btn {
+  min-width: 36px;
+  width: 36px;
+  padding: 0;
+}
+
 .inventario-editor-product {
   text-align: center;
 }
@@ -4126,8 +4132,13 @@ html.login-protected.auth-ok body {
 
   .inventario-toolbar-actions {
     width: 100%;
-    justify-content: space-between;
+    justify-content: flex-start;
     flex-wrap: wrap;
+  }
+
+  .inventario-toolbar-actions .ios-btn {
+    width: fit-content;
+    max-width: none;
   }
 
   .inventario-lot-grid {
@@ -4312,11 +4323,33 @@ html.login-protected.auth-ok body {
   padding: 7px 8px;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  text-align: center;
+  font-weight: 800;
+  color: #284a93;
 }
 
 .inventario-table-compact td {
   font-size: 0.9rem;
   padding: 7px 8px;
+  text-align: center;
+  font-weight: 700;
+  color: #2f426d;
+}
+
+.inventario-table-compact tbody tr:nth-child(odd) {
+  background: #f6f9ff;
+}
+
+.inventario-table-compact tbody tr:nth-child(even) {
+  background: #edf3ff;
+}
+
+.inventario-table-compact tbody td:nth-child(3) {
+  color: #1f8a44;
+}
+
+.inventario-table-compact tbody td:nth-child(4) {
+  color: #2f5fb0;
 }
 
 .inventario-field-feedback {
@@ -4376,6 +4409,7 @@ html.login-protected.auth-ok body {
 .inventario-lot-section {
   border: 1px solid #dce4f8;
   border-radius: 16px;
+  margin-bottom: 12px;
 }
 
 .inventario-day-kg {
@@ -4486,6 +4520,31 @@ html.login-protected.auth-ok body {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
+  max-width: 60%;
+}
+
+.inventario-print-row {
+  align-items: center;
+}
+
+.inventario-print-photo-wrap {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid #d4def5;
+  background: #edf2fd;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 34px;
+  position: relative;
+}
+
+.inventario-print-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .inventario-config-badge {
@@ -4526,5 +4585,16 @@ html.login-protected.auth-ok body {
 @media (max-width: 991.98px) {
   .inventario-table-range {
     grid-template-columns: 1fr;
+  }
+
+  .inventario-collapse-head-styled {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .inventario-collapse-summary {
+    max-width: 100%;
+    justify-content: flex-start;
   }
 }

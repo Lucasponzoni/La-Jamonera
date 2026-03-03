@@ -66,6 +66,7 @@
     tableDateRange: '',
     dashboardDateRange: '',
     periodMode: false,
+    globalTablePage: 1,
     activeStockStatus: 'all',
     viewerImages: [],
     viewerIndex: 0,
@@ -428,7 +429,11 @@
   const renderGlobalPeriodTable = () => {
     if (!nodes.globalTableWrap) return;
     const rows = getGlobalFilteredEntries();
-    const htmlRows = rows.length ? rows.map((row) => `
+    const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+    state.globalTablePage = Math.min(Math.max(1, state.globalTablePage), pages);
+    const start = (state.globalTablePage - 1) * PAGE_SIZE;
+    const pageRows = rows.slice(start, start + PAGE_SIZE);
+    const htmlRows = pageRows.length ? pageRows.map((row) => `
       <tr>
         <td>${escapeHtml(row.entryDate)}</td>
         <td>${escapeHtml(row.ingredientName)}</td>
@@ -443,6 +448,11 @@
           <thead><tr><th>Fecha</th><th>Producto</th><th>Kilos</th><th>Cantidad</th><th>N° factura/remito</th><th>Imagen</th></tr></thead>
           <tbody>${htmlRows}</tbody>
         </table>
+      </div>
+      <div class="inventario-pagination enhanced">
+        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-global-page="prev" ${state.globalTablePage <= 1 ? 'disabled' : ''}>Anterior</button>
+        <span>Página ${state.globalTablePage} de ${pages}</span>
+        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-global-page="next" ${state.globalTablePage >= pages ? 'disabled' : ''}>Siguiente</button>
       </div>`;
   };
 
@@ -640,7 +650,7 @@
 
     await openIosSwal({
       title: 'Preparando impresión',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Procesando" class="meta-spinner-login"><p class="mt-2 mb-0">Procesando imágenes...</p></div>',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Procesando" class="meta-spinner"><p class="mt-2 mb-0">Procesando imágenes...</p></div>',
       allowOutsideClick: false,
       showConfirmButton: false,
       didOpen: async () => {
@@ -678,8 +688,7 @@
     }
     const rows = entries.map((entry) => `
       <tr>
-        <td>${escapeHtml(entry.entryDate || '-')}</td>
-        <td>${formatTimeOnly(entry.createdAt)}</td>
+        <td>${formatDateTime(entry.createdAt)}</td>
         <td>${escapeHtml(entry.expiryDate || '-')}</td>
         <td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td>
         <td>${escapeHtml(entry.invoiceNumber || '-')}</td>
@@ -713,8 +722,8 @@
             </div>
           </section>
           <table>
-            <thead><tr><th>Fecha ingreso</th><th>Hora carga</th><th>Fecha caducidad</th><th>Cantidad</th><th>N° factura/remito</th><th>Imagen</th></tr></thead>
-            <tbody>${rows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody>
+            <thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>N° factura/remito</th><th>Imagen</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="5">Sin datos</td></tr>'}</tbody>
           </table>
           ${imagesHtml}
         </body>
@@ -749,8 +758,8 @@
         <label class="inventario-check-row"><input type="radio" name="printScope" value="all" checked><span>Incluir todos los productos</span></label>
         <label class="inventario-check-row"><input type="radio" name="printScope" value="exclude"><span>Excluir algunos productos</span></label>
         <div id="printProductsScope" class="notify-specific-users-list d-none">
-          <div class="step-block"><strong>Familias</strong>${Object.values(state.familias).map((family) => `<label class="inventario-check-row">${family.imageUrl ? `<span class="recipe-inline-avatar-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb" src="${family.imageUrl}" alt="${escapeHtml(capitalize(family.name))}"></span>` : ''}<input type="checkbox" data-print-family value="${family.id}"><span>${escapeHtml(capitalize(family.name))}</span></label>`).join('')}</div>
-          <div class="step-block"><strong>Productos</strong>${Object.values(state.ingredientes).map((item) => `<label class="inventario-check-row">${item.imageUrl ? `<span class="recipe-inline-avatar-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb" src="${item.imageUrl}" alt="${escapeHtml(capitalize(item.name))}"></span>` : ''}<input type="checkbox" data-print-product data-family-id="${item.familyId || ''}" value="${item.id}"><span>${escapeHtml(capitalize(item.name))}</span></label>`).join('')}</div>
+          <div class="step-block"><strong>Familias</strong>${Object.values(state.familias).map((family) => `<label class="inventario-check-row inventario-print-row">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb inventario-print-photo" src="${family.imageUrl}" alt="${escapeHtml(capitalize(family.name))}"></span>` : ''}<input type="checkbox" data-print-family value="${family.id}"><span>${escapeHtml(capitalize(family.name))}</span></label>`).join('')}</div>
+          <div class="step-block"><strong>Productos</strong>${Object.values(state.ingredientes).map((item) => `<label class="inventario-check-row inventario-print-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb inventario-print-photo" src="${item.imageUrl}" alt="${escapeHtml(capitalize(item.name))}"></span>` : ''}<input type="checkbox" data-print-product data-family-id="${item.familyId || ''}" value="${item.id}"><span>${escapeHtml(capitalize(item.name))}</span></label>`).join('')}</div>
         </div>
       </div>`,
       showCancelButton: true,
@@ -805,7 +814,7 @@
     }).join('');
 
     const imagesHtml = includeImages
-      ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas del período</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${rows.filter((r) => r.invoiceImageUrl).map((row) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><img src="${row.invoiceImageUrl}" style="width:100%;max-height:320px;object-fit:contain;border-radius:10px;"/><figcaption style="font-size:12px;color:#4b5f8e;margin-top:6px;">${escapeHtml(row.ingredientName)} · ${escapeHtml(row.entryDate)}</figcaption></figure>`).join('')}</div></section>`
+      ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas del período</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${scopedRows.filter((r) => r.invoiceImageUrl).map((row) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><img src="${row.invoiceImageUrl}" style="width:100%;max-height:320px;object-fit:contain;border-radius:10px;"/><figcaption style="font-size:12px;color:#4b5f8e;margin-top:6px;">${escapeHtml(row.ingredientName)} · ${escapeHtml(row.entryDate)}</figcaption></figure>`).join('')}</div></section>`
       : '';
 
     const win = window.open('', '_blank', 'width=1300,height=900');
@@ -830,14 +839,13 @@
 
     const rowsHtml = pageRows.length ? pageRows.map((entry) => `
       <tr>
-        <td>${entry.entryDate || '-'}</td>
         <td>${formatDateTime(entry.createdAt)}</td>
         <td>${entry.expiryDate || '-'}</td>
         <td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td>
         <td>${escapeHtml(entry.invoiceNumber || '-')}</td>
         <td>${entry.invoiceImageUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-invoice-image="${entry.id}"><i class="fa-regular fa-image"></i><span>Ver</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin foto</button>'}</td>
-        <td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-print-entry="${entry.id}"><i class="fa-solid fa-print"></i><span>Imprimir</span></button></td>
-      </tr>`).join('') : '<tr><td colspan="7" class="text-center">Sin ingresos para mostrar.</td></tr>';
+        <td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-print-entry="${entry.id}" aria-label="Imprimir ingreso"><i class="fa-solid fa-print"></i></button></td>
+      </tr>`).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos para mostrar.</td></tr>';
 
     return `
       <div class="inventario-table-wrap">
@@ -851,7 +859,7 @@
         </div>
         <div class="table-responsive inventario-table-compact-wrap">
           <table class="table recipe-table inventario-table-compact mb-0">
-            <thead><tr><th>Fecha ingreso</th><th>Hora carga</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura/remito</th><th>Imagen</th><th>Acción</th></tr></thead>
+            <thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura/remito</th><th>Imagen</th><th>Acción</th></tr></thead>
             <tbody>${rowsHtml}</tbody>
           </table>
         </div>
@@ -970,8 +978,7 @@
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryInvoiceNumber">Número de factura/remito</label>
-            <input id="inventoryInvoiceNumber" class="form-control ios-input" value="${escapeHtml(state.editorDraft.invoiceNumber)}" placeholder="Ej: A-000123" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text">
-            <small id="inventoryInvoiceFeedback" class="inventario-field-feedback"></small>
+            <input id="inventoryInvoiceNumber" class="form-control ios-input" value="${escapeHtml(state.editorDraft.invoiceNumber)}" placeholder="Ej: A-000123" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" data-lpignore="true">
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryInvoiceImage">Adjuntar foto de factura/remito</label>
@@ -1151,7 +1158,18 @@
       el.addEventListener('input', syncDraft);
       el.addEventListener('change', syncDraft);
     });
-    nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.addEventListener('input', renderInvoiceFeedback);
+    nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.addEventListener('change', async () => {
+      const invoice = normalizeLower(nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value);
+      if (!invoice) return;
+      if (state.inventario.indexes?.invoiceByIngredient?.[ingredientId]?.[invoice]) {
+        await openIosSwal({
+          title: 'Ingreso duplicado',
+          html: '<p>Ya existe un ingreso para este producto con ese número de factura/remito.</p>',
+          icon: 'warning',
+          confirmButtonText: 'Entendido'
+        });
+      }
+    });
 
     nodes.editorForm.querySelector('#inventarioEntriesSearch')?.addEventListener('input', (event) => {
       state.tableSearch = event.target.value;
@@ -1222,7 +1240,6 @@
 
     wireTokenDrag();
     renderPattern();
-    renderInvoiceFeedback();
     initThumbLoading(nodes.editorForm);
   };
 
@@ -1421,7 +1438,9 @@
 
   const setPeriodMode = (enabled) => {
     state.periodMode = enabled;
+    nodes.searchInput?.closest('.inventario-toolbar')?.classList.toggle('d-none', enabled);
     nodes.families?.classList.toggle('d-none', enabled);
+    nodes.statusFilters?.classList.toggle('d-none', enabled);
     nodes.list?.classList.toggle('d-none', enabled);
     nodes.periodView?.classList.toggle('d-none', !enabled);
   };
@@ -1484,6 +1503,8 @@
   nodes.editorForm?.addEventListener('submit', saveEntry);
 
   nodes.openPeriodFilterBtn?.addEventListener('click', () => {
+    state.globalTablePage = 1;
+    renderGlobalPeriodTable();
     setPeriodMode(true);
   });
   nodes.periodBackBtn?.addEventListener('click', () => {
@@ -1491,6 +1512,7 @@
   });
   nodes.globalApplyBtn?.addEventListener('click', async () => {
     state.dashboardDateRange = normalizeValue(nodes.globalRange?.value);
+    state.globalTablePage = 1;
     nodes.globalLoading?.classList.remove('d-none');
     nodes.globalTableWrap?.classList.add('d-none');
     await new Promise((resolve) => setTimeout(resolve, 450));
@@ -1502,6 +1524,12 @@
     await openPrintGlobalPeriod(getGlobalFilteredEntries());
   });
   nodes.globalTableWrap?.addEventListener('click', async (event) => {
+    const pageBtn = event.target.closest('[data-global-page]');
+    if (pageBtn) {
+      state.globalTablePage += pageBtn.dataset.globalPage === 'next' ? 1 : -1;
+      renderGlobalPeriodTable();
+      return;
+    }
     const btn = event.target.closest('[data-open-global-image]');
     if (!btn) return;
     await openAttachmentViewer([{ invoiceImageUrl: btn.dataset.openGlobalImage }], 0, 'Imagen del ingreso');
