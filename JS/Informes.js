@@ -1585,6 +1585,10 @@
         const resendBtn = popup.querySelector('[data-resend-report-email]');
         resendBtn?.addEventListener('click', async () => {
           await openResendReportEmailPrompt(findReportById(report.id) || report);
+          const latest = findReportById(report.id) || report;
+          setTimeout(() => {
+            openReportViewer(latest);
+          }, 80);
         });
 
         const reopenCurrentViewer = () => {
