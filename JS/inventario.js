@@ -30,8 +30,12 @@
     editorForm: $('inventarioEditorForm'),
     editorTitle: $('inventarioEditorTitle'),
     backBtn: $('inventarioBackBtn'),
-    globalFrom: $('inventarioGlobalFrom'),
-    globalTo: $('inventarioGlobalTo'),
+    openPeriodFilterBtn: $('inventarioOpenPeriodFilterBtn'),
+    periodView: $('inventarioPeriodView'),
+    periodBackBtn: $('inventarioPeriodBackBtn'),
+    globalRange: $('inventarioGlobalRange'),
+    globalApplyBtn: $('inventarioGlobalApplyBtn'),
+    globalLoading: $('inventarioGlobalLoading'),
     globalPrintBtn: $('inventarioGlobalPrintBtn'),
     globalTableWrap: $('inventarioGlobalTableWrap')
   };
@@ -50,10 +54,9 @@
     resumeEditor: null,
     tablePage: 1,
     tableSearch: '',
-    tableDateFrom: '',
-    tableDateTo: '',
-    dashboardDateFrom: '',
-    dashboardDateTo: ''
+    tableDateRange: '',
+    dashboardDateRange: '',
+    periodMode: false
   };
 
   const safeObject = (value) => (value && typeof value === 'object' ? value : {});
@@ -252,7 +255,6 @@
     nodes.list.innerHTML = items.map((item) => {
       const record = getRecord(item.id);
       const status = stockStatusFor(record);
-      const threshold = currentThresholdFor(record);
       const stockClass = Number(record.stockKg) <= 0 ? 'is-zero' : '';
       return `
         <article class="ingrediente-card inventario-card ${status.className}" data-inventario-card="${item.id}">
@@ -264,10 +266,10 @@
             </div>
             <p class="ingrediente-meta">${capitalize(item.familyName)} · ${getMeasureLabel(item.measure || 'kilos')}</p>
             ${item.description ? `<p class="ingrediente-description">${item.description}</p>` : ''}
-            <p class="inventario-stock-line ${stockClass}"><strong>${(Number(record.stockKg) || 0).toFixed(2)} kg</strong><span>Umbral bajo: ${threshold.toFixed(2)} kg ${record.lowThresholdKg != null ? '(personalizado)' : '(global)'}</span></p>
+            <p class="inventario-stock-line ${stockClass}"><strong>${(Number(record.stockKg) || 0).toFixed(2)} kg</strong><span>Umbral bajo: ${record.lowThresholdKg != null ? record.lowThresholdKg.toFixed(2) : Number(state.inventario.config.globalLowThresholdKg || DEFAULT_LOW_THRESHOLD).toFixed(2)} kg ${record.lowThresholdKg != null ? '(personalizado)' : '(global)'}</span></p>
             <div class="inventario-actions-row">
               <button type="button" class="btn ios-btn ios-btn-success" data-inventario-open-editor="${item.id}"><i class="fa-solid fa-plus"></i><span>Ingresar stock</span></button>
-              <button type="button" class="btn ios-btn ios-btn-secondary" data-inventario-open-editor="${item.id}"><i class="fa-regular fa-eye"></i><span>Visualizar</span></button>
+              <button type="button" class="btn ios-btn ios-btn-secondary inventario-view-btn" data-inventario-open-editor="${item.id}"><i class="fa-regular fa-eye"></i><span>Visualizar</span></button>
               <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-inventario-config-item="${item.id}"><i class="fa-solid fa-sliders"></i><span>Umbral</span></button>
             </div>
           </div>
@@ -278,14 +280,23 @@
     renderGlobalPeriodTable();
   };
 
-  const getGlobalFilteredEntries = () => {
-    const from = normalizeValue(state.dashboardDateFrom);
-    const to = normalizeValue(state.dashboardDateTo);
+  const parseRangeValue = (value) => {
+    const raw = normalizeValue(value);
+    if (!raw) return { from: '', to: '' };
+    const parts = raw.split('to').map((item) => normalizeValue(item));
+    return {
+      from: parts[0] || '',
+      to: parts[1] || parts[0] || ''
+    };
+  };
+
+  const getGlobalFilteredEntries = (ignoreRange = false) => {
+    const range = parseRangeValue(state.dashboardDateRange);
     const rows = [];
     Object.values(state.ingredientes).forEach((ingredient) => {
       const record = getRecord(ingredient.id);
       (Array.isArray(record.entries) ? record.entries : []).forEach((entry) => {
-        if ((from || to) && !inDateRange(entry.entryDate, from, to)) return;
+        if (!ignoreRange && (range.from || range.to) && !inDateRange(entry.entryDate, range.from, range.to)) return;
         rows.push({
           ingredientId: ingredient.id,
           ingredientName: capitalize(ingredient.name),
@@ -300,6 +311,12 @@
     });
     return rows.sort((a, b) => String(a.entryDate).localeCompare(String(b.entryDate)));
   };
+
+  const getDayKgMap = (entries) => entries.reduce((acc, entry) => {
+    const key = String(entry.entryDate || '');
+    acc[key] = Number((acc[key] || 0) + (Number(entry.qtyKg) || 0)).toFixed(2);
+    return acc;
+  }, {});
 
   const renderGlobalPeriodTable = () => {
     if (!nodes.globalTableWrap) return;
@@ -448,14 +465,13 @@
 
   const getFilteredEntries = (entries) => {
     const search = normalizeLower(state.tableSearch);
-    const from = normalizeValue(state.tableDateFrom);
-    const to = normalizeValue(state.tableDateTo);
+    const range = parseRangeValue(state.tableDateRange);
     return entries.filter((entry) => {
       if (search) {
         const blob = [entry.entryDate, entry.expiryDate, entry.invoiceNumber, entry.qty, entry.unit].map(normalizeLower).join(' ');
         if (!blob.includes(search)) return false;
       }
-      if ((from || to) && !inDateRange(entry.entryDate, from, to)) return false;
+      if ((range.from || range.to) && !inDateRange(entry.entryDate, range.from, range.to)) return false;
       return true;
     });
   };
@@ -468,7 +484,12 @@
       showDenyButton: true,
       confirmButtonText: 'Sí, incluir imágenes',
       denyButtonText: 'No incluir imágenes',
-      cancelButtonText: 'Cancelar'
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        confirmButton: 'ios-btn ios-btn-primary',
+        denyButton: 'ios-btn ios-btn-secondary',
+        cancelButton: 'ios-btn ios-btn-secondary'
+      },
     });
     if (!ask.isConfirmed && !ask.isDenied) return;
 
@@ -520,7 +541,12 @@
       showDenyButton: true,
       confirmButtonText: 'Sí',
       denyButtonText: 'No',
-      cancelButtonText: 'Cancelar'
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        confirmButton: 'ios-btn ios-btn-primary',
+        denyButton: 'ios-btn ios-btn-secondary',
+        cancelButton: 'ios-btn ios-btn-secondary'
+      },
     });
     if (!ask.isConfirmed && !ask.isDenied) return;
     const includeImages = ask.isConfirmed;
@@ -563,10 +589,9 @@
     return `
       <div class="inventario-table-wrap">
         <div class="inventario-table-head enhanced">
-          <input id="inventarioEntriesSearch" class="form-control ios-input" placeholder="Buscar en ingresos" value="${escapeHtml(state.tableSearch)}">
+          <input id="inventarioEntriesSearch" class="form-control ios-input" autocomplete="off" placeholder="Buscar en ingresos" value="${escapeHtml(state.tableSearch)}">
           <div class="inventario-table-range">
-            <input id="inventarioEntriesFrom" class="form-control ios-input" placeholder="Desde" value="${escapeHtml(state.tableDateFrom)}">
-            <input id="inventarioEntriesTo" class="form-control ios-input" placeholder="Hasta" value="${escapeHtml(state.tableDateTo)}">
+            <input id="inventarioEntriesRange" class="form-control ios-input" autocomplete="off" placeholder="Rango de fechas" value="${escapeHtml(state.tableDateRange)}">
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioPrintFilteredBtn"><i class="fa-solid fa-print"></i><span>Imprimir filtro</span></button>
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioPrintAllBtn"><i class="fa-solid fa-print"></i><span>Imprimir total</span></button>
           </div>
@@ -644,13 +669,13 @@
             <strong>${(Number(record.stockKg) || 0).toFixed(2)} kg</strong>
           </div>
           ${shouldShowExpiring ? `<div class="inventario-stat-card is-alert"><small>Próximos a caducar (${expiringDays} días)</small><strong>${expiringKg.toFixed(2)} kg</strong></div>` : ''}
-          <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioProductThresholdBtn"><i class="fa-solid fa-sliders"></i><span>Configurar umbrales</span></button>
-          <button type="button" id="inventarioEditIngredientBtn" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-pen"></i><span>Editar ingrediente</span></button>
+          <button type="button" class="btn ios-btn ios-btn-secondary inventario-head-action" id="inventarioProductThresholdBtn"><i class="fa-solid fa-sliders"></i><span>Configurar umbrales</span></button>
+          <button type="button" id="inventarioEditIngredientBtn" class="btn ios-btn ios-btn-success inventario-head-action"><i class="fa-solid fa-pen"></i><span>Editar ingrediente</span></button>
         </div>
       </section>
 
       <section class="recipe-step-card step-block inventario-lot-section">
-        <button type="button" class="inventario-collapse-head" id="lotConfigToggleBtn" aria-expanded="${state.editorDraft.showLotConfig}">
+        <button type="button" class="inventario-collapse-head inventario-collapse-head-styled" id="lotConfigToggleBtn" aria-expanded="${state.editorDraft.showLotConfig}">
           <span><span class="recipe-step-number">1</span> Configuración de lote</span>
           <span class="inventario-collapse-summary">${buildLotSummaryBadges(state.editorDraft)}</span>
         </button>
@@ -673,30 +698,30 @@
         <div class="step-content recipe-fields-flex inventario-stock-grid">
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryQty">Cantidad a ingresar</label>
-            <input id="inventoryQty" class="form-control ios-input" type="number" min="0" step="0.01" value="${state.editorDraft.qty}">
+            <input id="inventoryQty" class="form-control ios-input" type="number" autocomplete="off" min="0" step="0.01" value="${state.editorDraft.qty}">
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryUnit">Unidad</label>
-            <select id="inventoryUnit" class="form-select ios-input">
+            <select id="inventoryUnit" class="form-select ios-input" autocomplete="off">
               ${state.measures.map((m) => `<option value="${escapeHtml(m.name)}" ${measureKey(m.name) === measureKey(state.editorDraft.unit) ? 'selected' : ''}>${escapeHtml(getMeasureLabel(m.name))}</option>`).join('')}
               <option value="add_measure">+ Agregar medida</option>
             </select>
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryEntryDate">Fecha de ingreso</label>
-            <input id="inventoryEntryDate" class="form-control ios-input" value="${escapeHtml(state.editorDraft.entryDate)}" placeholder="Seleccionar fecha">
+            <input id="inventoryEntryDate" class="form-control ios-input" autocomplete="off" value="${escapeHtml(state.editorDraft.entryDate)}" placeholder="Seleccionar fecha">
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryExpiryDate">Fecha de caducidad</label>
-            <input id="inventoryExpiryDate" class="form-control ios-input" value="${escapeHtml(state.editorDraft.expiryDate)}" placeholder="Seleccionar fecha" autocomplete="off">
+            <input id="inventoryExpiryDate" class="form-control ios-input" autocomplete="off" value="${escapeHtml(state.editorDraft.expiryDate)}" placeholder="Seleccionar fecha">
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryInvoiceNumber">Número de factura/remito</label>
-            <input id="inventoryInvoiceNumber" class="form-control ios-input" value="${escapeHtml(state.editorDraft.invoiceNumber)}" placeholder="Ej: A-000123">
+            <input id="inventoryInvoiceNumber" class="form-control ios-input" value="${escapeHtml(state.editorDraft.invoiceNumber)}" placeholder="Ej: A-000123" autocomplete="off" spellcheck="false" inputmode="text">
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryInvoiceImage">Adjuntar foto de factura/remito</label>
-            <input id="inventoryInvoiceImage" class="form-control image-file-input" type="file" accept="image/*">
+            <input id="inventoryInvoiceImage" class="form-control image-file-input" autocomplete="off" type="file" accept="image/*">
           </div>
         </div>
       </section>
@@ -856,13 +881,8 @@
       state.tablePage = 1;
       renderEditor(ingredientId, state.editorDraft);
     });
-    nodes.editorForm.querySelector('#inventarioEntriesFrom')?.addEventListener('change', (event) => {
-      state.tableDateFrom = event.target.value;
-      state.tablePage = 1;
-      renderEditor(ingredientId, state.editorDraft);
-    });
-    nodes.editorForm.querySelector('#inventarioEntriesTo')?.addEventListener('change', (event) => {
-      state.tableDateTo = event.target.value;
+    nodes.editorForm.querySelector('#inventarioEntriesRange')?.addEventListener('change', (event) => {
+      state.tableDateRange = event.target.value;
       state.tablePage = 1;
       renderEditor(ingredientId, state.editorDraft);
     });
@@ -908,8 +928,23 @@
       const locale = window.flatpickr.l10ns?.es || undefined;
       window.flatpickr(nodes.editorForm.querySelector('#inventoryEntryDate'), { locale, dateFormat: 'Y-m-d', allowInput: true });
       window.flatpickr(nodes.editorForm.querySelector('#inventoryExpiryDate'), { locale, dateFormat: 'Y-m-d', allowInput: true, minDate: 'today' });
-      window.flatpickr(nodes.editorForm.querySelector('#inventarioEntriesFrom'), { locale, dateFormat: 'Y-m-d', allowInput: true });
-      window.flatpickr(nodes.editorForm.querySelector('#inventarioEntriesTo'), { locale, dateFormat: 'Y-m-d', allowInput: true });
+      const dayMap = getDayKgMap(Array.isArray(record.entries) ? record.entries : []);
+      window.flatpickr(nodes.editorForm.querySelector('#inventarioEntriesRange'), {
+        locale,
+        mode: 'range',
+        dateFormat: 'Y-m-d',
+        allowInput: true,
+        onDayCreate: (_dObj, _dStr, fp, dayElem) => {
+          const date = dayElem.dateObj ? dayElem.dateObj.toISOString().slice(0, 10) : '';
+          const kg = dayMap[date];
+          if (kg) {
+            const bubble = document.createElement('span');
+            bubble.className = 'inventario-day-kg';
+            bubble.textContent = `${kg}kg`;
+            dayElem.appendChild(bubble);
+          }
+        }
+      });
     }
 
     wireTokenDrag();
@@ -1078,6 +1113,14 @@
     }
   };
 
+
+  const setPeriodMode = (enabled) => {
+    state.periodMode = enabled;
+    nodes.families?.classList.toggle('d-none', enabled);
+    nodes.list?.classList.toggle('d-none', enabled);
+    nodes.periodView?.classList.toggle('d-none', !enabled);
+  };
+
   const loadInventario = async () => {
     setStateView('loading');
     try {
@@ -1087,6 +1130,7 @@
         return;
       }
       setStateView('list');
+      setPeriodMode(false);
       if (state.resumeEditor?.ingredientId && state.ingredientes[state.resumeEditor.ingredientId]) {
         renderEditor(state.resumeEditor.ingredientId, state.resumeEditor.draft || null);
       } else {
@@ -1095,8 +1139,23 @@
       }
       if (window.flatpickr) {
         const locale = window.flatpickr.l10ns?.es || undefined;
-        window.flatpickr(nodes.globalFrom, { locale, dateFormat: 'Y-m-d', allowInput: true });
-        window.flatpickr(nodes.globalTo, { locale, dateFormat: 'Y-m-d', allowInput: true });
+        const dayMapGlobal = getDayKgMap(getGlobalFilteredEntries(true));
+        window.flatpickr(nodes.globalRange, {
+          locale,
+          mode: 'range',
+          dateFormat: 'Y-m-d',
+          allowInput: true,
+          onDayCreate: (_dObj, _dStr, fp, dayElem) => {
+            const date = dayElem.dateObj ? dayElem.dateObj.toISOString().slice(0, 10) : '';
+            const kg = dayMapGlobal[date];
+            if (kg) {
+              const bubble = document.createElement('span');
+              bubble.className = 'inventario-day-kg';
+              bubble.textContent = `${kg}kg`;
+              dayElem.appendChild(bubble);
+            }
+          }
+        });
       }
     } catch (error) {
       setStateView('empty');
@@ -1117,13 +1176,20 @@
   nodes.backBtn?.addEventListener('click', backToList);
   nodes.editorForm?.addEventListener('submit', saveEntry);
 
-  nodes.globalFrom?.addEventListener('change', (event) => {
-    state.dashboardDateFrom = event.target.value;
-    renderGlobalPeriodTable();
+  nodes.openPeriodFilterBtn?.addEventListener('click', () => {
+    setPeriodMode(true);
   });
-  nodes.globalTo?.addEventListener('change', (event) => {
-    state.dashboardDateTo = event.target.value;
+  nodes.periodBackBtn?.addEventListener('click', () => {
+    setPeriodMode(false);
+  });
+  nodes.globalApplyBtn?.addEventListener('click', async () => {
+    state.dashboardDateRange = normalizeValue(nodes.globalRange?.value);
+    nodes.globalLoading?.classList.remove('d-none');
+    nodes.globalTableWrap?.classList.add('d-none');
+    await new Promise((resolve) => setTimeout(resolve, 450));
     renderGlobalPeriodTable();
+    nodes.globalLoading?.classList.add('d-none');
+    nodes.globalTableWrap?.classList.remove('d-none');
   });
   nodes.globalPrintBtn?.addEventListener('click', async () => {
     await openPrintGlobalPeriod(getGlobalFilteredEntries());
