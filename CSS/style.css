@@ -4085,3 +4085,161 @@ html.login-protected.auth-ok body {
 
 /* =========================================
    INVENTARIO AJUSTES V2
+========================================= */
+#inventarioToolbarCreateIngredientBtn {
+  background: #ff8a2a;
+  color: #fff;
+}
+
+#inventarioToolbarCreateIngredientBtn:hover {
+  background: #f07c1b;
+  color: #fff;
+}
+
+#inventarioToolbarCreateIngredientBtn span {
+  letter-spacing: 0.01em;
+}
+
+.inventario-stock-line.is-zero strong {
+  color: #cc3f52;
+}
+
+.inventario-threshold-btn {
+  width: fit-content;
+}
+
+.inventario-product-head-v2 {
+  border: 1px dashed #cdd9f2;
+  border-radius: 18px;
+  padding: 14px;
+  background: #f8faff;
+}
+
+.inventario-product-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.inventario-editor-kicker {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.75rem;
+  color: #6e7fa5;
+}
+
+.inventario-editor-photo .ingrediente-avatar {
+  width: 96px;
+  height: 96px;
+  border: 1px solid #d0dbf3;
+}
+
+.inventario-editor-name {
+  font-size: 1.45rem;
+  color: #1f3e8a;
+}
+
+.inventario-editor-meta {
+  margin: 0;
+}
+
+.inventario-editor-measure {
+  margin: 0;
+  color: #6c7ea8;
+  font-size: 0.88rem;
+}
+
+.inventario-stat-card.is-danger strong {
+  color: #cc3f52;
+}
+
+.inventario-check-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.inventario-check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #36507f;
+  font-weight: 600;
+}
+
+.inventario-check-row input {
+  width: 18px;
+  height: 18px;
+}
+
+.inventario-inline-fields {
+  margin-top: 8px;
+}
+
+.inventario-token-placeholder {
+  border: 1px dashed #cbd8f3;
+  border-radius: 12px;
+  color: #657ca8;
+  padding: 10px;
+  width: 100%;
+  text-align: center;
+}
+
+.inventario-token-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: grab;
+}
+
+.inventario-token-chip.drag-over {
+  border: 1px dashed #7da1ea;
+  background: #eef4ff;
+}
+
+.inventario-config-badge.is-muted {
+  background: #eff3ff;
+  color: #6b7ea9;
+}
+
+.inventario-table-head.enhanced {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.inventario-table-range {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inventario-pagination.enhanced {
+  margin-top: 10px;
+  border-top: 1px solid #d9e2f6;
+  padding-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.inventario-period-board {
+  margin-top: 14px;
+  border: 1px solid #dbe4f7;
+  border-radius: 16px;
+  padding: 12px;
+  background: #fbfcff;
+}
+
+.inventario-period-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 991.98px) {
+  .inventario-pagination.enhanced {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

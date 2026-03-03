@@ -269,6 +269,15 @@
 
                 <div id="inventarioFamilies" class="familias-circles inventario-families"></div>
                 <div id="inventarioList" class="recetas-list inventario-list"></div>
+                <section class="inventario-period-board" id="inventarioPeriodBoard">
+                  <h6 class="step-title mb-2"><span class="recipe-step-number">4</span> Ingresos por período</h6>
+                  <div class="inventario-period-filters">
+                    <input id="inventarioGlobalFrom" class="form-control ios-input" placeholder="Desde">
+                    <input id="inventarioGlobalTo" class="form-control ios-input" placeholder="Hasta">
+                    <button id="inventarioGlobalPrintBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-print"></i><span>Imprimir período</span></button>
+                  </div>
+                  <div id="inventarioGlobalTableWrap"></div>
+                </section>
               </div>
 
               <div id="inventarioEditor" class="recetas-editor d-none" aria-live="polite">

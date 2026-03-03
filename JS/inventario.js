@@ -4,6 +4,13 @@
 
   const DEFAULT_LOW_THRESHOLD = 5;
   const DEFAULT_EXPIRING_SOON_DAYS = 2;
+  const LOT_TOKEN_OPTIONS = [
+    { key: 'remito_factura', label: 'Remito o Factura' },
+    { key: 'fecha_fabricacion', label: 'Fecha de fabricación' },
+    { key: 'fecha_hoy', label: 'Fecha de hoy' },
+    { key: 'siglas_personalizadas', label: 'Siglas personalizadas' }
+  ];
+  const LOT_SEPARATORS = ['.', '-', '_', ',', ';', '|'];
   const PAGE_SIZE = 20;
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
@@ -22,7 +29,11 @@
     editorWrap: $('inventarioEditor'),
     editorForm: $('inventarioEditorForm'),
     editorTitle: $('inventarioEditorTitle'),
-    backBtn: $('inventarioBackBtn')
+    backBtn: $('inventarioBackBtn'),
+    globalFrom: $('inventarioGlobalFrom'),
+    globalTo: $('inventarioGlobalTo'),
+    globalPrintBtn: $('inventarioGlobalPrintBtn'),
+    globalTableWrap: $('inventarioGlobalTableWrap')
   };
 
   const state = {
@@ -38,7 +49,11 @@
     editorDirty: false,
     resumeEditor: null,
     tablePage: 1,
-    tableSearch: ''
+    tableSearch: '',
+    tableDateFrom: '',
+    tableDateTo: '',
+    dashboardDateFrom: '',
+    dashboardDateTo: ''
   };
 
   const safeObject = (value) => (value && typeof value === 'object' ? value : {});
@@ -113,10 +128,14 @@
     hasEntries: false,
     entries: [],
     lowThresholdKg: null,
+    expiringSoonDays: null,
     lotConfig: {
       configured: false,
       collapsed: false,
-      tokens: ['fecha_ingreso', 'fecha_caducidad', 'cantidad', 'unidad']
+      tokens: [],
+      customAcronym: '',
+      includeSeparator: false,
+      separator: '-'
     }
   });
 
@@ -137,6 +156,13 @@
     return Number.isFinite(global) && global >= 0 ? global : DEFAULT_LOW_THRESHOLD;
   };
 
+  const currentExpiringDaysFor = (record) => {
+    const local = Number(record.expiringSoonDays);
+    if (Number.isFinite(local) && local >= 0) return local;
+    const global = Number(state.inventario.config.expiringSoonDays);
+    return Number.isFinite(global) && global >= 0 ? global : DEFAULT_EXPIRING_SOON_DAYS;
+  };
+
   const stockStatusFor = (record) => {
     const stockKg = Number(record.stockKg) || 0;
     if (!record.hasEntries) return { label: 'Nunca ingresó stock', className: 'status-never' };
@@ -145,8 +171,7 @@
     return { label: 'En stock', className: 'status-good' };
   };
 
-  const isEntryExpiringSoon = (entry) => {
-    const days = Number(state.inventario.config.expiringSoonDays || DEFAULT_EXPIRING_SOON_DAYS);
+  const isEntryExpiringSoon = (entry, days) => {
     const expiry = new Date(entry.expiryDate || '');
     if (Number.isNaN(expiry.getTime())) return false;
     const today = new Date();
@@ -157,7 +182,7 @@
   };
 
   const sumExpiringSoonKg = (record) => (Array.isArray(record.entries) ? record.entries : [])
-    .filter((entry) => isEntryExpiringSoon(entry))
+    .filter((entry) => isEntryExpiringSoon(entry, currentExpiringDaysFor(record)))
     .reduce((acc, entry) => acc + (Number(entry.qtyKg) || 0), 0);
 
   const persistInventario = async () => {
@@ -228,6 +253,7 @@
       const record = getRecord(item.id);
       const status = stockStatusFor(record);
       const threshold = currentThresholdFor(record);
+      const stockClass = Number(record.stockKg) <= 0 ? 'is-zero' : '';
       return `
         <article class="ingrediente-card inventario-card ${status.className}" data-inventario-card="${item.id}">
           ${ingredientAvatar(item)}
@@ -238,9 +264,10 @@
             </div>
             <p class="ingrediente-meta">${capitalize(item.familyName)} · ${getMeasureLabel(item.measure || 'kilos')}</p>
             ${item.description ? `<p class="ingrediente-description">${item.description}</p>` : ''}
-            <p class="inventario-stock-line"><strong>${(Number(record.stockKg) || 0).toFixed(2)} kg</strong><span>Umbral bajo: ${threshold.toFixed(2)} kg ${record.lowThresholdKg != null ? '(personalizado)' : '(global)'}</span></p>
+            <p class="inventario-stock-line ${stockClass}"><strong>${(Number(record.stockKg) || 0).toFixed(2)} kg</strong><span>Umbral bajo: ${threshold.toFixed(2)} kg ${record.lowThresholdKg != null ? '(personalizado)' : '(global)'}</span></p>
             <div class="inventario-actions-row">
-              <button type="button" class="btn ios-btn ios-btn-success" data-inventario-open-editor="${item.id}"><i class="fa-solid fa-plus"></i><span>Ingresar Stock</span></button>
+              <button type="button" class="btn ios-btn ios-btn-success" data-inventario-open-editor="${item.id}"><i class="fa-solid fa-plus"></i><span>Ingresar stock</span></button>
+              <button type="button" class="btn ios-btn ios-btn-secondary" data-inventario-open-editor="${item.id}"><i class="fa-regular fa-eye"></i><span>Visualizar</span></button>
               <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-inventario-config-item="${item.id}"><i class="fa-solid fa-sliders"></i><span>Umbral</span></button>
             </div>
           </div>
@@ -248,7 +275,54 @@
     }).join('');
 
     updateListScrollHint();
+    renderGlobalPeriodTable();
   };
+
+  const getGlobalFilteredEntries = () => {
+    const from = normalizeValue(state.dashboardDateFrom);
+    const to = normalizeValue(state.dashboardDateTo);
+    const rows = [];
+    Object.values(state.ingredientes).forEach((ingredient) => {
+      const record = getRecord(ingredient.id);
+      (Array.isArray(record.entries) ? record.entries : []).forEach((entry) => {
+        if ((from || to) && !inDateRange(entry.entryDate, from, to)) return;
+        rows.push({
+          ingredientId: ingredient.id,
+          ingredientName: capitalize(ingredient.name),
+          entryDate: entry.entryDate || '-',
+          qtyKg: Number(entry.qtyKg || 0),
+          qty: Number(entry.qty || 0),
+          unit: entry.unit || '',
+          invoiceNumber: entry.invoiceNumber || '-',
+          invoiceImageUrl: entry.invoiceImageUrl || ''
+        });
+      });
+    });
+    return rows.sort((a, b) => String(a.entryDate).localeCompare(String(b.entryDate)));
+  };
+
+  const renderGlobalPeriodTable = () => {
+    if (!nodes.globalTableWrap) return;
+    const rows = getGlobalFilteredEntries();
+    const htmlRows = rows.length ? rows.map((row) => `
+      <tr>
+        <td>${escapeHtml(row.entryDate)}</td>
+        <td>${escapeHtml(row.ingredientName)}</td>
+        <td>${row.qtyKg.toFixed(2)} kg</td>
+        <td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td>
+        <td>${escapeHtml(row.invoiceNumber)}</td>
+        <td>${row.invoiceImageUrl ? '<i class="fa-solid fa-image"></i>' : '-'}</td>
+      </tr>`).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos en ese rango.</td></tr>';
+    nodes.globalTableWrap.innerHTML = `
+      <div class="table-responsive inventario-global-table">
+        <table class="table recipe-table mb-0">
+          <thead><tr><th>Fecha</th><th>Producto</th><th>Kilos</th><th>Cantidad</th><th>N° factura/remito</th><th>Imagen</th></tr></thead>
+          <tbody>${htmlRows}</tbody>
+        </table>
+      </div>`;
+  };
+
+
 
   const openGlobalConfig = async () => {
     const result = await openIosSwal({
@@ -288,47 +362,188 @@
     const record = getRecord(ingredientId);
     const result = await openIosSwal({
       title: 'Umbral por producto',
-      html: `<div class="text-start"><label class="form-label" for="itemLowThresholdInput">Umbral (kg)</label><input id="itemLowThresholdInput" class="swal2-input ios-input" type="number" min="0" step="0.01" value="${record.lowThresholdKg ?? ''}" placeholder="Vacío = usar global"></div>`,
+      html: `
+        <div class="text-start">
+          <label class="form-label" for="itemLowThresholdInput">Umbral de stock (kg)</label>
+          <input id="itemLowThresholdInput" class="swal2-input ios-input" type="number" min="0" step="0.01" value="${record.lowThresholdKg ?? ''}" placeholder="Vacío = usar global">
+          <label class="form-label mt-2" for="itemExpiringSoonInput">Próximo a caducar (días)</label>
+          <input id="itemExpiringSoonInput" class="swal2-input ios-input" type="number" min="0" step="1" value="${record.expiringSoonDays ?? ''}" placeholder="Vacío = usar global">
+        </div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
       preConfirm: () => {
-        const raw = normalizeValue(document.getElementById('itemLowThresholdInput')?.value);
-        if (!raw) return null;
-        const num = parseNumber(raw);
-        if (!Number.isFinite(num) || num < 0) {
-          Swal.showValidationMessage('Ingresá un número válido.');
-          return false;
+        const lowRaw = normalizeValue(document.getElementById('itemLowThresholdInput')?.value);
+        const daysRaw = normalizeValue(document.getElementById('itemExpiringSoonInput')?.value);
+
+        let low = null;
+        if (lowRaw) {
+          low = parseNumber(lowRaw);
+          if (!Number.isFinite(low) || low < 0) {
+            Swal.showValidationMessage('Ingresá un umbral de stock válido.');
+            return false;
+          }
+          low = Number(low.toFixed(2));
         }
-        return Number(num.toFixed(2));
+
+        let days = null;
+        if (daysRaw) {
+          days = Number.parseInt(daysRaw, 10);
+          if (!Number.isFinite(days) || days < 0) {
+            Swal.showValidationMessage('Ingresá días válidos (0 o más).');
+            return false;
+          }
+        }
+
+        return { low, days };
       }
     });
     if (!result.isConfirmed) return;
     const next = getRecord(ingredientId);
-    next.lowThresholdKg = result.value;
+    next.lowThresholdKg = result.value.low;
+    next.expiringSoonDays = result.value.days;
     state.inventario.items[ingredientId] = next;
     await persistInventario();
     renderList();
+
+    if (state.selectedIngredientId === ingredientId && state.view === 'editor') {
+      renderEditor(ingredientId, state.editorDraft);
+    }
   };
 
-  const buildLotSummaryBadges = (tokens) => {
-    const labels = {
-      fecha_ingreso: 'Fecha ingreso',
-      fecha_caducidad: 'Fecha caducidad',
-      cantidad: 'Cantidad',
-      unidad: 'Unidad'
-    };
-    return tokens.map((token) => `<span class="inventario-config-badge">${labels[token] || token}</span>`).join('');
+  const lotTokenLabelFor = (token, customAcronym) => {
+    if (token === 'siglas_personalizadas') {
+      return customAcronym ? `Siglas (${escapeHtml(customAcronym)})` : 'Siglas';
+    }
+    return LOT_TOKEN_OPTIONS.find((item) => item.key === token)?.label || token;
+  };
+
+  const buildLotSummaryBadges = (lotConfig) => {
+    const tokens = Array.isArray(lotConfig?.tokens) ? lotConfig.tokens : [];
+    const customAcronym = normalizeValue(lotConfig?.customAcronym);
+    if (!tokens.length) {
+      return '<span class="inventario-config-badge is-muted">Sin configuración</span>';
+    }
+
+    const badges = tokens.map((token) => `<span class="inventario-config-badge">${lotTokenLabelFor(token, customAcronym)}</span>`);
+    if (lotConfig?.includeSeparator) {
+      badges.push(`<span class="inventario-config-badge">Separador: ${escapeHtml(lotConfig.separator || '-')}</span>`);
+    }
+    return badges.join('');
+  };
+
+  const parseIsoDate = (value) => {
+    const date = new Date(value || '');
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+
+  const inDateRange = (value, from, to) => {
+    const date = parseIsoDate(value);
+    if (!date) return false;
+    const dateIso = date.toISOString().slice(0, 10);
+    if (from && dateIso < from) return false;
+    if (to && dateIso > to) return false;
+    return true;
+  };
+
+  const getFilteredEntries = (entries) => {
+    const search = normalizeLower(state.tableSearch);
+    const from = normalizeValue(state.tableDateFrom);
+    const to = normalizeValue(state.tableDateTo);
+    return entries.filter((entry) => {
+      if (search) {
+        const blob = [entry.entryDate, entry.expiryDate, entry.invoiceNumber, entry.qty, entry.unit].map(normalizeLower).join(' ');
+        if (!blob.includes(search)) return false;
+      }
+      if ((from || to) && !inDateRange(entry.entryDate, from, to)) return false;
+      return true;
+    });
+  };
+
+  const openPrintEntries = async (ingredient, entries) => {
+    const ask = await openIosSwal({
+      title: 'Imprimir historial',
+      html: '<p>¿Querés incluir imágenes adjuntas en la impresión?</p>',
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: 'Sí, incluir imágenes',
+      denyButtonText: 'No incluir imágenes',
+      cancelButtonText: 'Cancelar'
+    });
+    if (!ask.isConfirmed && !ask.isDenied) return;
+
+    const includeImages = ask.isConfirmed;
+    const rows = entries.map((entry) => `
+      <tr>
+        <td>${escapeHtml(entry.entryDate || '-')}</td>
+        <td>${escapeHtml(entry.expiryDate || '-')}</td>
+        <td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td>
+        <td>${escapeHtml(entry.invoiceNumber || '-')}</td>
+        <td>${includeImages
+          ? (entry.invoiceImageUrl ? `<img src="${entry.invoiceImageUrl}" alt="Adjunto" style="max-width:120px;max-height:90px;object-fit:cover;border-radius:8px;border:1px solid #d7def2;"/>` : 'Sin imagen')
+          : (entry.invoiceImageUrl ? 'Posee imagen adjunta' : 'Sin imagen')}
+        </td>
+      </tr>`).join('');
+
+    const printWindow = window.open('', '_blank', 'width=1200,height=800');
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Historial inventario - ${escapeHtml(capitalize(ingredient.name))}</title>
+          <style>
+            body{font-family:Inter,Arial,sans-serif;padding:24px;color:#1f2a44}
+            h1{font-size:22px;margin:0 0 12px}
+            table{width:100%;border-collapse:collapse}
+            th,td{border:1px solid #d7def2;padding:8px;text-align:left;font-size:13px;vertical-align:top}
+            th{background:#eef3ff}
+          </style>
+        </head>
+        <body>
+          <h1>${escapeHtml(capitalize(ingredient.name))} · Historial de ingresos</h1>
+          <table>
+            <thead><tr><th>Fecha ingreso</th><th>Fecha caducidad</th><th>Cantidad</th><th>N° factura/remito</th><th>Imagen</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="5">Sin datos</td></tr>'}</tbody>
+          </table>
+        </body>
+      </html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
+  const openPrintGlobalPeriod = async (rows) => {
+    const ask = await openIosSwal({
+      title: 'Imprimir período',
+      html: '<p>¿Querés incluir imágenes adjuntas?</p>',
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: 'Sí',
+      denyButtonText: 'No',
+      cancelButtonText: 'Cancelar'
+    });
+    if (!ask.isConfirmed && !ask.isDenied) return;
+    const includeImages = ask.isConfirmed;
+    const content = rows.map((row) => `
+      <tr>
+        <td>${escapeHtml(row.entryDate)}</td>
+        <td>${escapeHtml(row.ingredientName)}</td>
+        <td>${row.qtyKg.toFixed(2)} kg</td>
+        <td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td>
+        <td>${escapeHtml(row.invoiceNumber)}</td>
+        <td>${includeImages ? (row.invoiceImageUrl ? `<img src="${row.invoiceImageUrl}" style="max-width:90px;max-height:70px;"/>` : 'Sin imagen') : (row.invoiceImageUrl ? 'Posee imagen adjunta' : 'Sin imagen')}</td>
+      </tr>`).join('');
+    const win = window.open('', '_blank', 'width=1200,height=800');
+    if (!win) return;
+    win.document.write(`<html><head><title>Inventario por período</title><style>body{font-family:Inter,Arial;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:8px;font-size:12px}th{background:#eef3ff}</style></head><body><h1>Ingresos por período</h1><table><thead><tr><th>Fecha</th><th>Producto</th><th>Kilos</th><th>Cantidad</th><th>N° factura/remito</th><th>Imagen</th></tr></thead><tbody>${content || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table></body></html>`);
+    win.document.close();
+    win.focus();
+    win.print();
   };
 
   const renderEntryTable = (record) => {
-    const search = normalizeLower(state.tableSearch);
     const source = Array.isArray(record.entries) ? [...record.entries] : [];
-    const filtered = source.filter((entry) => {
-      if (!search) return true;
-      const blob = [entry.entryDate, entry.expiryDate, entry.invoiceNumber, entry.qty, entry.unit].map(normalizeLower).join(' ');
-      return blob.includes(search);
-    });
+    const filtered = getFilteredEntries(source);
 
     const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
     state.tablePage = Math.min(Math.max(1, state.tablePage), pages);
@@ -342,20 +557,27 @@
         <td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td>
         <td>${escapeHtml(entry.invoiceNumber || '-')}</td>
         <td>${entry.invoiceImageUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-invoice-image="${entry.id}"><i class="fa-regular fa-image"></i><span>Ver</span></button>` : '-'}</td>
-      </tr>`).join('') : '<tr><td colspan="5" class="text-center">Sin ingresos para mostrar.</td></tr>';
+        <td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-print-entry="${entry.id}"><i class="fa-solid fa-print"></i><span>Imprimir</span></button></td>
+      </tr>`).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos para mostrar.</td></tr>';
 
     return `
       <div class="inventario-table-wrap">
-        <div class="inventario-table-head">
+        <div class="inventario-table-head enhanced">
           <input id="inventarioEntriesSearch" class="form-control ios-input" placeholder="Buscar en ingresos" value="${escapeHtml(state.tableSearch)}">
+          <div class="inventario-table-range">
+            <input id="inventarioEntriesFrom" class="form-control ios-input" placeholder="Desde" value="${escapeHtml(state.tableDateFrom)}">
+            <input id="inventarioEntriesTo" class="form-control ios-input" placeholder="Hasta" value="${escapeHtml(state.tableDateTo)}">
+            <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioPrintFilteredBtn"><i class="fa-solid fa-print"></i><span>Imprimir filtro</span></button>
+            <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioPrintAllBtn"><i class="fa-solid fa-print"></i><span>Imprimir total</span></button>
+          </div>
         </div>
         <div class="table-responsive">
           <table class="table recipe-table mb-0">
-            <thead><tr><th>Fecha ingreso</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura/remito</th><th>Imagen</th></tr></thead>
+            <thead><tr><th>Fecha ingreso</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura/remito</th><th>Imagen</th><th>Acción</th></tr></thead>
             <tbody>${rowsHtml}</tbody>
           </table>
         </div>
-        <div class="inventario-pagination">
+        <div class="inventario-pagination enhanced">
           <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-entry-page="prev" ${state.tablePage <= 1 ? 'disabled' : ''}>Anterior</button>
           <span>Página ${state.tablePage} de ${pages}</span>
           <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-entry-page="next" ${state.tablePage >= pages ? 'disabled' : ''}>Siguiente</button>
@@ -369,6 +591,7 @@
     const ingredient = state.ingredientes[ingredientId];
     if (!ingredient) return;
     const record = getRecord(ingredientId);
+    const expiringDays = currentExpiringDaysFor(record);
     const expiringKg = sumExpiringSoonKg(record);
 
     const baseDraft = {
@@ -378,7 +601,11 @@
       expiryDate: '',
       invoiceNumber: '',
       invoiceImageFile: null,
-      tokens: [...record.lotConfig.tokens]
+      tokens: [...record.lotConfig.tokens],
+      customAcronym: normalizeValue(record.lotConfig.customAcronym),
+      includeSeparator: Boolean(record.lotConfig.includeSeparator),
+      separator: record.lotConfig.separator || '-',
+      showLotConfig: !Boolean(record.lotConfig.configured || record.lotConfig.collapsed)
     };
     state.editorDraft = { ...baseDraft, ...(draft || {}) };
     state.selectedIngredientId = ingredientId;
@@ -386,50 +613,64 @@
     setStateView('editor');
     nodes.editorTitle.textContent = `Inventario · ${capitalize(ingredient.name)}`;
 
-    const configCollapsed = Boolean(record.lotConfig.configured || record.lotConfig.collapsed);
-    const tokenLabels = {
-      fecha_ingreso: 'Fecha de ingreso',
-      fecha_caducidad: 'Fecha de caducidad',
-      cantidad: 'Cantidad',
-      unidad: 'Unidad'
-    };
+    const shouldShowExpiring = expiringKg > 0;
+
+    const lotOptionRows = LOT_TOKEN_OPTIONS.map((option) => `
+      <label class="inventario-check-row">
+        <input type="checkbox" data-lot-check="${option.key}" ${state.editorDraft.tokens.includes(option.key) ? 'checked' : ''}>
+        <span>${option.label}</span>
+      </label>`).join('');
+
+    const tokensHtml = state.editorDraft.tokens.map((token) => `
+      <div class="inventario-token-chip" draggable="true" data-token="${token}">
+        <i class="fa-solid fa-grip-vertical"></i>
+        <span>${lotTokenLabelFor(token, state.editorDraft.customAcronym)}</span>
+      </div>`).join('');
 
     nodes.editorForm.innerHTML = `
-      <section class="inventario-product-head">
+      <section class="inventario-product-head inventario-product-head-v2">
         <div class="inventario-product-head-main">
-          ${ingredientAvatar(ingredient)}
-          <div>
+          <div class="inventario-editor-photo">${ingredientAvatar(ingredient)}</div>
+          <div class="inventario-product-copy">
+            <p class="inventario-editor-kicker">Inventario</p>
             <h6 class="inventario-editor-name">${capitalize(ingredient.name)}</h6>
-            <p class="inventario-editor-meta">${capitalize(ingredient.description || 'Sin descripción')} · ${getMeasureLabel(ingredient.measure || 'kilos')}</p>
-            <button type="button" id="inventarioEditIngredientBtn" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-pen"></i><span>Editar ingrediente</span></button>
+            <p class="inventario-editor-meta">${capitalize(ingredient.description || 'Sin descripción')}</p>
+            <p class="inventario-editor-measure">${getMeasureLabel(ingredient.measure || 'kilos')}</p>
           </div>
         </div>
         <div class="inventario-product-head-stats">
-          <div class="inventario-stat-card">
+          <div class="inventario-stat-card ${(Number(record.stockKg) || 0) <= 0 ? 'is-danger' : ''}">
             <small>Stock total actual</small>
             <strong>${(Number(record.stockKg) || 0).toFixed(2)} kg</strong>
           </div>
-          <div class="inventario-stat-card is-alert">
-            <small>Próximos a caducar (${state.inventario.config.expiringSoonDays} días)</small>
-            <strong>${expiringKg.toFixed(2)} kg</strong>
-          </div>
+          ${shouldShowExpiring ? `<div class="inventario-stat-card is-alert"><small>Próximos a caducar (${expiringDays} días)</small><strong>${expiringKg.toFixed(2)} kg</strong></div>` : ''}
+          <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioProductThresholdBtn"><i class="fa-solid fa-sliders"></i><span>Configurar umbrales</span></button>
+          <button type="button" id="inventarioEditIngredientBtn" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-pen"></i><span>Editar ingrediente</span></button>
         </div>
       </section>
 
-      <section class="recipe-step-card step-block">
-        <button type="button" class="inventario-collapse-head" id="lotConfigToggleBtn" aria-expanded="${!configCollapsed}">
+      <section class="recipe-step-card step-block inventario-lot-section">
+        <button type="button" class="inventario-collapse-head" id="lotConfigToggleBtn" aria-expanded="${state.editorDraft.showLotConfig}">
           <span><span class="recipe-step-number">1</span> Configuración de lote</span>
-          <span class="inventario-collapse-summary">${buildLotSummaryBadges(state.editorDraft.tokens)}</span>
+          <span class="inventario-collapse-summary">${buildLotSummaryBadges(state.editorDraft)}</span>
         </button>
-        <div id="lotConfigBody" class="step-content ${configCollapsed ? 'd-none' : ''}">
-          <div class="inventario-lot-order" id="lotTokenOrder"></div>
+        <div id="lotConfigBody" class="step-content ${state.editorDraft.showLotConfig ? '' : 'd-none'}">
+          <div class="inventario-check-grid">${lotOptionRows}</div>
+          <div class="inventario-inline-fields">
+            <input id="lotCustomAcronym" class="form-control ios-input" placeholder="Ej: JAM" value="${escapeHtml(state.editorDraft.customAcronym)}" ${state.editorDraft.tokens.includes('siglas_personalizadas') ? '' : 'disabled'}>
+          </div>
+          <label class="inventario-check-row"><input type="checkbox" id="lotIncludeSeparator" ${state.editorDraft.includeSeparator ? 'checked' : ''}><span>Incluir separadores</span></label>
+          <select id="lotSeparator" class="form-select ios-input" ${state.editorDraft.includeSeparator ? '' : 'disabled'}>
+            ${LOT_SEPARATORS.map((sep) => `<option value="${sep}" ${state.editorDraft.separator === sep ? 'selected' : ''}>${sep}</option>`).join('')}
+          </select>
+          <div class="inventario-lot-order" id="lotTokenOrder">${tokensHtml || '<div class="inventario-token-placeholder">Tildá opciones para generar badges.</div>'}</div>
           <code id="lotPatternPreview" class="inventario-lot-preview"></code>
         </div>
       </section>
 
       <section class="recipe-step-card step-block">
         <h6 class="step-title"><span class="recipe-step-number">2</span> Ingresar Stock</h6>
-        <div class="step-content recipe-fields-flex">
+        <div class="step-content recipe-fields-flex inventario-stock-grid">
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryQty">Cantidad a ingresar</label>
             <input id="inventoryQty" class="form-control ios-input" type="number" min="0" step="0.01" value="${state.editorDraft.qty}">
@@ -447,7 +688,7 @@
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryExpiryDate">Fecha de caducidad</label>
-            <input id="inventoryExpiryDate" class="form-control ios-input" value="${escapeHtml(state.editorDraft.expiryDate)}" placeholder="Seleccionar fecha">
+            <input id="inventoryExpiryDate" class="form-control ios-input" value="${escapeHtml(state.editorDraft.expiryDate)}" placeholder="Seleccionar fecha" autocomplete="off">
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryInvoiceNumber">Número de factura/remito</label>
@@ -455,7 +696,7 @@
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryInvoiceImage">Adjuntar foto de factura/remito</label>
-            <input id="inventoryInvoiceImage" class="form-control" type="file" accept="image/*">
+            <input id="inventoryInvoiceImage" class="form-control image-file-input" type="file" accept="image/*">
           </div>
         </div>
       </section>
@@ -479,12 +720,21 @@
       state.editorDraft.entryDate = nodes.editorForm.querySelector('#inventoryEntryDate')?.value || '';
       state.editorDraft.expiryDate = nodes.editorForm.querySelector('#inventoryExpiryDate')?.value || '';
       state.editorDraft.invoiceNumber = nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value || '';
+      state.editorDraft.customAcronym = nodes.editorForm.querySelector('#lotCustomAcronym')?.value || '';
+      state.editorDraft.includeSeparator = Boolean(nodes.editorForm.querySelector('#lotIncludeSeparator')?.checked);
+      state.editorDraft.separator = nodes.editorForm.querySelector('#lotSeparator')?.value || '-';
       state.editorDirty = true;
     };
 
-    const renderLotTokens = () => {
+    const renderPattern = () => {
+      const separator = state.editorDraft.includeSeparator ? state.editorDraft.separator : '';
+      const pattern = state.editorDraft.tokens.map((token) => '${' + lotTokenLabelFor(token, state.editorDraft.customAcronym).replaceAll(' ', '_') + '}').join(separator);
+      nodes.editorForm.querySelector('#lotPatternPreview').textContent = pattern || 'Sin patrón definido';
+      nodes.editorForm.querySelector('.inventario-collapse-summary').innerHTML = buildLotSummaryBadges(state.editorDraft);
+    };
+
+    const wireTokenDrag = () => {
       const box = nodes.editorForm.querySelector('#lotTokenOrder');
-      box.innerHTML = state.editorDraft.tokens.map((token) => `<button type="button" class="inventario-token-chip" draggable="true" data-token="${token}">${tokenLabels[token] || token}</button>`).join('');
       box.querySelectorAll('.inventario-token-chip').forEach((chip) => {
         chip.addEventListener('dragstart', (event) => {
           chip.classList.add('is-dragging');
@@ -515,21 +765,45 @@
           arr.splice(t, 0, src);
           state.editorDraft.tokens = arr;
           state.editorDirty = true;
-          renderLotTokens();
-          renderPattern();
+          renderEditor(ingredientId, state.editorDraft);
         });
       });
-    };
-
-    const renderPattern = () => {
-      nodes.editorForm.querySelector('#lotPatternPreview').textContent = state.editorDraft.tokens.map((token) => '${' + (tokenLabels[token] || token).replaceAll(' ', '_') + '}').join('');
-      nodes.editorForm.querySelector('.inventario-collapse-summary').innerHTML = buildLotSummaryBadges(state.editorDraft.tokens);
     };
 
     nodes.editorForm.querySelector('#lotConfigToggleBtn')?.addEventListener('click', () => {
       const body = nodes.editorForm.querySelector('#lotConfigBody');
       const hidden = body.classList.toggle('d-none');
+      state.editorDraft.showLotConfig = !hidden;
       nodes.editorForm.querySelector('#lotConfigToggleBtn').setAttribute('aria-expanded', String(!hidden));
+    });
+
+    nodes.editorForm.querySelector('#inventarioProductThresholdBtn')?.addEventListener('click', async () => {
+      await openProductThresholdConfig(ingredientId);
+    });
+
+    nodes.editorForm.querySelectorAll('[data-lot-check]').forEach((input) => {
+      input.addEventListener('change', () => {
+        const token = input.dataset.lotCheck;
+        const tokens = [...state.editorDraft.tokens];
+        const idx = tokens.indexOf(token);
+        if (input.checked && idx < 0) tokens.push(token);
+        if (!input.checked && idx >= 0) tokens.splice(idx, 1);
+        state.editorDraft.tokens = tokens;
+        const customField = nodes.editorForm.querySelector('#lotCustomAcronym');
+        customField.disabled = !tokens.includes('siglas_personalizadas');
+        state.editorDirty = true;
+        renderEditor(ingredientId, state.editorDraft);
+      });
+    });
+
+    nodes.editorForm.querySelector('#lotIncludeSeparator')?.addEventListener('change', () => {
+      nodes.editorForm.querySelector('#lotSeparator').disabled = !nodes.editorForm.querySelector('#lotIncludeSeparator').checked;
+      syncDraft();
+      renderPattern();
+    });
+    nodes.editorForm.querySelector('#lotSeparator')?.addEventListener('change', () => {
+      syncDraft();
+      renderPattern();
     });
 
     nodes.editorForm.querySelector('#inventarioEditIngredientBtn').addEventListener('click', async () => {
@@ -582,6 +856,32 @@
       state.tablePage = 1;
       renderEditor(ingredientId, state.editorDraft);
     });
+    nodes.editorForm.querySelector('#inventarioEntriesFrom')?.addEventListener('change', (event) => {
+      state.tableDateFrom = event.target.value;
+      state.tablePage = 1;
+      renderEditor(ingredientId, state.editorDraft);
+    });
+    nodes.editorForm.querySelector('#inventarioEntriesTo')?.addEventListener('change', (event) => {
+      state.tableDateTo = event.target.value;
+      state.tablePage = 1;
+      renderEditor(ingredientId, state.editorDraft);
+    });
+
+    nodes.editorForm.querySelector('#inventarioPrintFilteredBtn')?.addEventListener('click', async () => {
+      await openPrintEntries(ingredient, getFilteredEntries(Array.isArray(record.entries) ? record.entries : []));
+    });
+    nodes.editorForm.querySelector('#inventarioPrintAllBtn')?.addEventListener('click', async () => {
+      await openPrintEntries(ingredient, Array.isArray(record.entries) ? record.entries : []);
+    });
+
+    nodes.editorForm.querySelectorAll('[data-print-entry]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const entryId = btn.dataset.printEntry;
+        const entry = (record.entries || []).find((item) => item.id === entryId);
+        if (!entry) return;
+        await openPrintEntries(ingredient, [entry]);
+      });
+    });
 
     nodes.editorForm.querySelectorAll('[data-entry-page]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -607,10 +907,12 @@
     if (window.flatpickr) {
       const locale = window.flatpickr.l10ns?.es || undefined;
       window.flatpickr(nodes.editorForm.querySelector('#inventoryEntryDate'), { locale, dateFormat: 'Y-m-d', allowInput: true });
-      window.flatpickr(nodes.editorForm.querySelector('#inventoryExpiryDate'), { locale, dateFormat: 'Y-m-d', allowInput: true });
+      window.flatpickr(nodes.editorForm.querySelector('#inventoryExpiryDate'), { locale, dateFormat: 'Y-m-d', allowInput: true, minDate: 'today' });
+      window.flatpickr(nodes.editorForm.querySelector('#inventarioEntriesFrom'), { locale, dateFormat: 'Y-m-d', allowInput: true });
+      window.flatpickr(nodes.editorForm.querySelector('#inventarioEntriesTo'), { locale, dateFormat: 'Y-m-d', allowInput: true });
     }
 
-    renderLotTokens();
+    wireTokenDrag();
     renderPattern();
   };
 
@@ -706,9 +1008,12 @@
       record.stockKg = Number(((Number(record.stockKg) || 0) + qtyKg).toFixed(4));
       record.hasEntries = true;
       record.lotConfig = {
-        configured: true,
-        collapsed: true,
-        tokens: [...state.editorDraft.tokens]
+        configured: state.editorDraft.tokens.length > 0,
+        collapsed: state.editorDraft.tokens.length > 0,
+        tokens: [...state.editorDraft.tokens],
+        customAcronym: normalizeValue(state.editorDraft.customAcronym),
+        includeSeparator: Boolean(state.editorDraft.includeSeparator),
+        separator: normalizeValue(state.editorDraft.separator) || '-'
       };
 
       state.inventario.items[ingredientId] = record;
@@ -788,6 +1093,11 @@
         renderFamilies();
         renderList();
       }
+      if (window.flatpickr) {
+        const locale = window.flatpickr.l10ns?.es || undefined;
+        window.flatpickr(nodes.globalFrom, { locale, dateFormat: 'Y-m-d', allowInput: true });
+        window.flatpickr(nodes.globalTo, { locale, dateFormat: 'Y-m-d', allowInput: true });
+      }
     } catch (error) {
       setStateView('empty');
       await openIosSwal({ title: 'No se pudo cargar', html: '<p>Error leyendo inventario desde Firebase.</p>', icon: 'error', confirmButtonText: 'Entendido' });
@@ -806,6 +1116,18 @@
   nodes.toolbarCreateBtn?.addEventListener('click', openCreateIngredient);
   nodes.backBtn?.addEventListener('click', backToList);
   nodes.editorForm?.addEventListener('submit', saveEntry);
+
+  nodes.globalFrom?.addEventListener('change', (event) => {
+    state.dashboardDateFrom = event.target.value;
+    renderGlobalPeriodTable();
+  });
+  nodes.globalTo?.addEventListener('change', (event) => {
+    state.dashboardDateTo = event.target.value;
+    renderGlobalPeriodTable();
+  });
+  nodes.globalPrintBtn?.addEventListener('click', async () => {
+    await openPrintGlobalPeriod(getGlobalFilteredEntries());
+  });
 
   inventarioModal.addEventListener('hide.bs.modal', snapshotEditorDraft);
   inventarioModal.addEventListener('hidden.bs.modal', () => inventarioModal.removeAttribute('inert'));
