@@ -4442,9 +4442,14 @@ html.login-protected.auth-ok body {
   min-height: 150px;
 }
 
-.swal2-popup.ios-alert .swal2-deny {
+.swal2-popup.ios-alert .swal2-deny:not(.ios-btn-deny-critical) {
   background: #e6ebfa !important;
   color: #2a4ea3 !important;
+}
+
+.swal2-popup.ios-alert .swal2-deny.ios-btn-deny-critical {
+  background: #ff4d4f !important;
+  color: #fff !important;
 }
 
 
@@ -4501,7 +4506,7 @@ html.login-protected.auth-ok body {
 
 .inventario-table-range {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: minmax(220px, 1fr) auto auto auto;
   gap: 8px;
   align-items: center;
 }
@@ -4586,20 +4591,21 @@ html.login-protected.auth-ok body {
 }
 
 .inventario-product-head-stats .inventario-stat-card:first-child {
-  border-color: #8fb3ff;
-  background: linear-gradient(140deg, #edf3ff 0%, #deebff 100%);
+  border-color: #cfd9f1;
+  background: #f5f7fd;
 }
 
 .inventario-product-head-stats .inventario-stat-card:first-child small {
   font-size: 0.8rem;
-  letter-spacing: 0.03em;
-  color: #244c99;
-  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #4a5e8f;
+  font-weight: 700;
 }
 
 .inventario-product-head-stats .inventario-stat-card:first-child strong {
-  font-size: 1.22rem;
-  color: #173b80;
+  font-size: 1.35rem;
+  color: #1b3f8b;
+  font-weight: 800;
 }
 
 #inventarioOpenPeriodFilterBtn span {
@@ -4635,4 +4641,26 @@ html.login-protected.auth-ok body {
     max-width: 100%;
     justify-content: flex-start;
   }
+}
+
+
+.inventario-invoice-textarea {
+  min-height: 44px;
+  resize: vertical;
+}
+
+#inventarioEntriesRange {
+  border-color: #9cb3e7;
+  background: #f7f9ff;
+}
+
+.image-stage #viewerStageSpinner .meta-spinner-login {
+  width: 74px;
+  height: 74px;
+}
+
+.inventario-config-badge.is-secondary {
+  background: #eef1f8;
+  color: #6e7f9f;
+  border-color: #d9deeb;
 }
