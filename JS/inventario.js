@@ -972,7 +972,7 @@
         <td>
           <div class="inventario-entry-actions">
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-print-entry="${entry.id}" aria-label="Imprimir ingreso"><i class="fa-solid fa-print"></i></button>
-            <button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn inventario-icon-only-btn" data-delete-entry="${entry.id}" aria-label="Eliminar ingreso"><i class="fa-solid fa-trash"></i></button>
+            <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn inventario-icon-only-btn" data-delete-entry="${entry.id}" aria-label="Eliminar ingreso"><i class="fa-solid fa-trash"></i></button>
           </div>
         </td>
       </tr>`).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos para mostrar.</td></tr>';
@@ -980,7 +980,7 @@
     return `
       <div class="inventario-table-wrap">
         <div class="inventario-table-head enhanced">
-          <input id="inventarioEntriesSearch" class="form-control ios-input" autocomplete="off" placeholder="Buscar en ingresos" value="${escapeHtml(state.tableSearch)}">
+          <input id="inventarioEntriesSearch" type="search" class="form-control ios-input" autocomplete="off" placeholder="Buscar en ingresos" value="${escapeHtml(state.tableSearch)}">
           <div class="inventario-table-range">
             <input id="inventarioEntriesRange" class="form-control ios-input" autocomplete="off" placeholder="Rango de fechas" value="${escapeHtml(state.tableDateRange)}">
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn ${state.tableDateRange ? '' : 'd-none'}" id="inventarioClearFilterBtn"><i class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></button>
@@ -1056,13 +1056,17 @@
           </div>
         </div>
         <div class="inventario-product-head-stats">
-          <div class="inventario-stat-card ${(Number(record.stockKg) || 0) <= 0 ? 'is-danger' : ''}">
-            <small>Stock total actual</small>
-            <strong>${(Number(record.stockKg) || 0).toFixed(2)} kg</strong>
+          <div class="inventario-stat-row">
+            <div class="inventario-stat-card ${(Number(record.stockKg) || 0) <= 0 ? 'is-danger' : ''}>
+              <small>Stock total actual</small>
+              <strong>${(Number(record.stockKg) || 0).toFixed(2)} kg</strong>
+            </div>
+            ${shouldShowExpiring ? `<div class="inventario-stat-card is-alert"><small>Próximos a caducar (${expiringDays} días)</small><strong>${expiringKg.toFixed(2)} kg</strong></div>` : ''}
           </div>
-          ${shouldShowExpiring ? `<div class="inventario-stat-card is-alert"><small>Próximos a caducar (${expiringDays} días)</small><strong>${expiringKg.toFixed(2)} kg</strong></div>` : ''}
-          <button type="button" class="btn ios-btn ios-btn-secondary inventario-head-action" id="inventarioProductThresholdBtn"><i class="fa-solid fa-sliders"></i><span>Configurar umbrales</span></button>
-          <button type="button" id="inventarioEditIngredientBtn" class="btn ios-btn ios-btn-success inventario-head-action"><i class="fa-solid fa-pen"></i><span>Editar ingrediente</span></button>
+          <div class="inventario-head-actions-row">
+            <button type="button" class="btn ios-btn ios-btn-secondary inventario-head-action" id="inventarioProductThresholdBtn"><i class="fa-solid fa-sliders"></i><span>Configurar umbrales</span></button>
+            <button type="button" id="inventarioEditIngredientBtn" class="btn ios-btn ios-btn-success inventario-head-action"><i class="fa-solid fa-pen"></i><span>Editar ingrediente</span></button>
+          </div>
         </div>
       </section>
 
@@ -1310,12 +1314,23 @@
 
     if (window.flatpickr) {
       const locale = window.flatpickr.l10ns?.es || undefined;
+      const dayMap = getDayKgMap(Array.isArray(record.entries) ? record.entries : []);
       window.flatpickr(nodes.editorForm.querySelector('#inventarioEntriesRange'), {
         locale,
         mode: 'range',
         dateFormat: 'Y-m-d',
         allowInput: true,
         defaultDate: state.tableDateRange ? state.tableDateRange.split(' to ') : null,
+        onDayCreate: (_dObj, _dStr, _fp, dayElem) => {
+          const date = dayElem.dateObj ? dayElem.dateObj.toISOString().slice(0, 10) : '';
+          const kg = dayMap[date];
+          if (kg) {
+            const bubble = document.createElement('span');
+            bubble.className = 'inventario-day-kg';
+            bubble.textContent = `${kg}kg`;
+            dayElem.appendChild(bubble);
+          }
+        },
         onClose: (_selectedDates, dateStr) => {
           state.tableDateRange = normalizeValue(dateStr);
           state.tablePage = 1;
