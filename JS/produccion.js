@@ -35,11 +35,13 @@
     activeReservationId: '',
     reservationTick: null,
     editorPlan: null,
+    lotCollapseState: {},
     config: {
       globalMinKg: 1,
       recipeMinKg: {},
       lastProductionByRecipe: {},
       preferredManagers: [],
+      preferredManagersByRecipe: {},
       usersPreferences: {},
       idConfig: { prefix: 'PROD-LJ' }
     }
@@ -102,6 +104,12 @@
   };
 
   const formatQty = (value, unit = '', digits = 2) => `${Number(value || 0).toFixed(digits)} ${unit}`.trim();
+  const formatCompactQty = (value, unit = '') => {
+    const amount = Number(value || 0);
+    if (!Number.isFinite(amount)) return formatQty(0, unit, 2);
+    const digits = amount >= 10 ? 2 : 3;
+    return `${amount.toFixed(digits)} ${unit}`.trim();
+  };
   const toIsoDate = (value = nowTs()) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '';
@@ -118,6 +126,13 @@
     if (Number.isNaN(d.getTime())) return '-';
     return d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
+
+  const escapeHtml = (value) => String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 
   const initialsFromName = (value) => normalizeValue(value)
     .split(/\s+/)
@@ -309,7 +324,8 @@
 
     const minCoverage = Math.min(...requirements.map((item) => item.coverage));
     const maxKg = Math.max(0, minCoverage);
-    const progress = Math.max(0, Math.min(100, (maxKg / minKg) * 100));
+    const readyCount = requirements.filter((item) => item.missingForMin <= 0.0001).length;
+    const progress = Math.max(0, Math.min(100, (readyCount / Math.max(requirements.length, 1)) * 100));
     const canProduce = maxKg >= minKg;
     const missingForMin = requirements.filter((item) => item.missingForMin > 0.0001);
     const hasExpired = requirements.some((item) => item.hasExpired);
@@ -398,6 +414,7 @@
         ingredientName: requirement.name,
         ingredientUnit: requirement.unit,
         neededQty: Number(rowNeed.toFixed(4)),
+        availableQty: Number(requirement.available.toFixed(4)),
         missingQty: missing,
         lots
       });
@@ -534,6 +551,10 @@
     return own || null;
   };
 
+  const getOwnDrafts = () => Object.values(safeObject(state.drafts))
+    .filter((item) => item.ownerSessionId === sessionId && item.status === 'active' && item.recipeId)
+    .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+
   const getForeignDraftConflict = (recipeId) => Object.values(safeObject(state.drafts)).find((item) => item.recipeId === recipeId && item.ownerSessionId !== sessionId);
 
   const openGlobalMinConfig = async () => {
@@ -610,11 +631,23 @@
       return;
     }
 
-    nodes.list.innerHTML = list.map((recipe) => {
+    const buildCoverageChecksHtml = (analysis) => {
+      const available = analysis.requirements.filter((item) => item.missingForMin <= 0.0001).length;
+      return `
+        <div class="produccion-checks-head">${available}/${analysis.requirements.length} ingredientes listos</div>
+        <div class="produccion-checks-list">${analysis.requirements.map((item) => `
+          <span class="produccion-check-item ${item.missingForMin <= 0.0001 ? 'is-ok' : 'is-missing'}">
+            <i class="fa-solid ${item.missingForMin <= 0.0001 ? 'fa-circle-check' : 'fa-circle-xmark'}"></i>
+            <span>${item.name}</span>
+          </span>`).join('')}
+        </div>`;
+    };
+
+    const cardsHtml = list.map((recipe) => {
       const analysis = state.analysis[recipe.id] || analyzeRecipe(recipe);
       const statusClass = analysis.status === 'success' ? 'tone-success' : analysis.status === 'warning' ? 'tone-warning' : 'tone-danger';
       const action = analysis.canProduce
-        ? `<button type="button" class="btn ios-btn ios-btn-success produccion-main-btn" data-open-produccion="${recipe.id}"><i class="fa-solid fa-play"></i><span>Producir</span></button>`
+        ? `<button type="button" class="btn ios-btn ios-btn-success produccion-main-btn" data-open-produccion="${recipe.id}"><i class="bi bi-plus-lg"></i><span>Producir</span></button>`
         : `<button type="button" class="btn ios-btn produccion-to-inventario-btn" data-open-inventario="1"><i class="fa-solid fa-boxes-stacked"></i><span>Inventario</span></button>`;
 
       const foreignDraft = getForeignDraftConflict(recipe.id);
@@ -643,12 +676,23 @@
               <h6 class="ingrediente-name receta-name">${capitalize(recipe.title || 'Sin título')}</h6>
               <span class="produccion-chip ${statusClass}"><span class="produccion-semaforo"></span>${analysis.statusText}</span>
             </div>
-            <p class="ingrediente-meta receta-card-meta">Máximo producible: <strong>${analysis.maxKg.toFixed(2)} kg</strong> · Mínimo: <strong>${analysis.minKg.toFixed(2)} kg</strong></p>
+            <div class="produccion-stats-line">
+              <div class="produccion-stat-block">
+                <small>Máximo producible</small>
+                <strong>${analysis.maxKg.toFixed(2)} kg</strong>
+              </div>
+              <div class="produccion-stat-sep" aria-hidden="true"></div>
+              <div class="produccion-stat-block">
+                <small>Mínimo</small>
+                <strong>${analysis.minKg.toFixed(2)} kg</strong>
+              </div>
+            </div>
             <p class="produccion-last-line"><i class="fa-regular fa-clock"></i> Última producción: <strong>${formatDate(lastProductionAt)}</strong></p>
             <div class="produccion-progress-wrap">
               <div class="produccion-progress-bar"><span style="width:${analysis.progress.toFixed(1)}%"></span></div>
               <small>Cobertura del mínimo: ${analysis.progress.toFixed(0)}%</small>
             </div>
+            ${buildCoverageChecksHtml(analysis)}
             <div class="produccion-badges">${badges}</div>
             ${analysis.errors.length ? `<p class="produccion-error">${analysis.errors[0]}</p>` : missingHtml}
             <div class="produccion-actions-row">
@@ -658,6 +702,28 @@
           </div>
         </article>`;
     }).join('');
+
+    const drafts = getOwnDrafts();
+    const draftsHtml = drafts.length
+      ? `<section class="produccion-drafts-wrap">
+          <h6 class="step-title"><span class="recipe-step-number">B</span> Borradores</h6>
+          <div class="produccion-drafts-grid">${drafts.map((draft) => {
+            const recipe = state.recetas[draft.recipeId] || {};
+            return `<article class="produccion-draft-card">
+              <div>
+                <strong>${capitalize(recipe.title || 'Receta')}</strong>
+                <small>Actualizado: ${formatDateTime(draft.updatedAt)}</small>
+              </div>
+              <div class="produccion-draft-actions">
+                <button type="button" class="btn ios-btn ios-btn-secondary" data-open-draft="${draft.id}"><i class="fa-solid fa-pen"></i><span>Continuar</span></button>
+                <button type="button" class="btn ios-btn ios-btn-warning" data-delete-draft="${draft.id}"><i class="fa-solid fa-trash"></i><span>Descartar</span></button>
+              </div>
+            </article>`;
+          }).join('')}</div>
+        </section>`
+      : '';
+
+    nodes.list.innerHTML = `${draftsHtml}${cardsHtml}`;
 
     document.querySelectorAll('.js-produccion-thumb').forEach((image) => {
       const wrap = image.closest('.receta-thumb-wrap');
@@ -672,42 +738,61 @@
 
   const buildLotsBreakdownHtml = (plan) => {
     const mergeIcon = './IMG/Octicons-git-merge.svg';
-    return plan.ingredientPlans.map((row) => `
-      <article class="produccion-lote-group ${row.missingQty > 0 ? 'is-missing' : ''}">
+    const allExpanded = plan.ingredientPlans.every((row) => state.lotCollapseState[row.ingredientId] !== true);
+    const allCollapsed = plan.ingredientPlans.every((row) => state.lotCollapseState[row.ingredientId] === true);
+    const getExpiryBadge = (expiryDate) => {
+      const expiry = normalizeValue(expiryDate);
+      if (!expiry) return '<span class="produccion-expiry-badge is-unknown">Sin fecha</span>';
+      const days = Math.ceil((new Date(`${expiry}T00:00:00`).getTime() - new Date(`${plan.productionDate}T00:00:00`).getTime()) / 86400000);
+      if (days < 0) return `<span class="produccion-expiry-badge is-danger">Vencido ${Math.abs(days)}d</span>`;
+      if (days <= 2) return `<span class="produccion-expiry-badge is-danger">${days}d</span>`;
+      if (days <= 4) return `<span class="produccion-expiry-badge is-warning">${days}d</span>`;
+      return `<span class="produccion-expiry-badge is-ok">${days}d</span>`;
+    };
+
+    return `<div class="produccion-lote-global-actions">
+        <button type="button" class="btn ios-btn ios-btn-secondary" id="produccionCollapseAllBtn" ${allCollapsed ? 'disabled' : ''}>Colapsar todo</button>
+        <button type="button" class="btn ios-btn ios-btn-secondary" id="produccionExpandAllBtn" ${allExpanded ? 'disabled' : ''}>Descolapsar todo</button>
+      </div>` + plan.ingredientPlans.map((row) => `
+      <article class="produccion-lote-group ${row.missingQty > 0 ? 'is-missing' : ''}" data-lot-group="${row.ingredientId}">
         <header class="produccion-lote-head">
           <div class="produccion-lote-main">
             <img src="${state.ingredientes[row.ingredientId]?.imageUrl || FIAMBRES_IMAGE}" alt="${row.ingredientName}" class="produccion-lote-ingredient-image">
             <div>
               <h6>${row.ingredientName}</h6>
-              <p>Necesita: ${formatQty(row.neededQty, row.ingredientUnit)}${row.missingQty > 0 ? ` · Faltan: ${formatQty(row.missingQty, row.ingredientUnit)}` : ''}</p>
+              <p>
+                <span class="produccion-needs-label">Necesita</span>
+                <strong class="produccion-needs-value">${formatCompactQty(row.neededQty, row.ingredientUnit)}</strong>
+                <span class="produccion-available-value">· Disponible <strong>${formatCompactQty(row.availableQty, row.ingredientUnit)}</strong></span>
+                ${row.missingQty > 0 ? ` <em>· Faltan ${formatCompactQty(row.missingQty, row.ingredientUnit)}</em>` : ''}
+              </p>
             </div>
           </div>
-          <img src="${mergeIcon}" alt="Desglose" class="produccion-merge-icon" width="20" height="20" style="width:20px;height:20px;">
+          <div class="produccion-lote-head-actions">
+            <button type="button" class="btn ios-btn ios-btn-secondary produccion-lote-toggle-btn" data-lot-toggle="${row.ingredientId}">
+              <i class="fa-solid ${state.lotCollapseState[row.ingredientId] ? 'fa-chevron-down' : 'fa-chevron-up'}"></i>
+              <span>${state.lotCollapseState[row.ingredientId] ? 'Desplegar' : 'Colapsar'}</span>
+            </button>
+            <img src="${mergeIcon}" alt="Desglose" class="produccion-merge-icon" width="20" height="20" style="width:20px;height:20px;">
+          </div>
         </header>
-        ${row.lots.length ? `<div class="produccion-lote-rows">${row.lots.map((lot) => `
+        <div class="produccion-lote-rows ${state.lotCollapseState[row.ingredientId] ? 'is-collapsed' : ''}">
+          ${row.lots.length ? row.lots.map((lot) => `
           <div class="produccion-lote-row tone-${lot.status}">
-            <div><strong>Lote:</strong> ${lot.lotNumber}</div>
+            <div><strong class="produccion-lote-key">Lote:</strong> <span class="produccion-lote-value">${lot.lotNumber}</span></div>
             <div><strong>Ingreso:</strong> ${lot.entryDate || formatDateTime(lot.createdAt)}</div>
-            <div><strong>Vence:</strong> ${lot.expiryDate || '-'}</div>
-            <div><strong>Usar:</strong> ${formatQty(lot.takeQty, lot.unit)}</div>
-            <div><strong>Proveedor:</strong> ${lot.provider || '-'}</div>
+            <div><strong>Vence:</strong> ${lot.expiryDate || '-'} ${getExpiryBadge(lot.expiryDate)}</div>
+            <div><strong>Usar:</strong> ${formatCompactQty(lot.takeQty, lot.unit)}</div>
+            <div><strong class="produccion-provider-key">Proveedor:</strong> ${lot.provider || '-'}</div>
             <div><strong>Factura:</strong> ${lot.invoiceNumber || '-'}</div>
-            <div><strong>Adjuntos:</strong> ${lot.invoiceImageUrls.length ? `${lot.invoiceImageUrls.length} archivo/s` : 'Sin adjuntos'}</div>
-          </div>`).join('')}</div>` : '<p class="produccion-lote-empty">Sin lotes aptos para la fecha elegida.</p>'}
+            <div class="produccion-lote-adjuntos-row"><strong>Adjuntos:</strong> ${lot.invoiceImageUrls.length
+              ? `<button type="button" class="btn ios-btn ios-btn-secondary produccion-lote-adjuntos-btn" data-lot-images="${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Ver (${lot.invoiceImageUrls.length})</span></button>`
+              : '<span>Sin adjuntos</span>'}</div>
+          </div>`).join('<hr class="produccion-lote-separator">') : '<p class="produccion-lote-empty">Sin lotes aptos para la fecha elegida.</p>'}
+        </div>
       </article>
     `).join('');
   };
-
-  const buildProductionRows = (analysis, quantityKg) => analysis.requirements.map((item) => {
-    const needed = item.neededPerKg * quantityKg;
-    const missing = Math.max(0, needed - item.available);
-    return `
-      <div class="produccion-detail-row ${missing > 0.0001 ? 'is-missing' : ''}">
-        <strong>${item.name}</strong>
-        <span>Necesita: ${formatQty(needed, item.unit)} · Disponible: ${formatQty(item.available, item.unit)}</span>
-        <small>${missing > 0.0001 ? `Faltan ${formatQty(missing, item.unit)}` : 'Stock OK para esta cantidad'}</small>
-      </div>`;
-  }).join('');
 
   const saveEditorDraft = async () => {
     const recipe = state.recetas[state.activeRecipeId];
@@ -775,11 +860,15 @@
     }
 
     const ownDraft = getCurrentDraftForRecipe(recipe.id);
+    const preferredManagers = Array.isArray(state.config.preferredManagersByRecipe?.[recipe.id])
+      ? state.config.preferredManagersByRecipe[recipe.id]
+      : (Array.isArray(state.config.preferredManagers) ? state.config.preferredManagers : []);
     const initialQty = ownDraft ? parsePositive(ownDraft.quantityKg, analysis.minKg) : Math.max(analysis.minKg, 0.1);
     const initialDate = ownDraft?.productionDate || toIsoDate();
     const initialObs = ownDraft?.observations || '';
-    const initialManagers = Array.isArray(ownDraft?.managers) ? ownDraft.managers : [];
+    const initialManagers = Array.isArray(ownDraft?.managers) ? ownDraft.managers : preferredManagers;
 
+    state.lotCollapseState = {};
     state.editorPlan = buildPlanForRecipe(recipe, initialQty, initialDate);
     await ensureReservationForPlan(state.editorPlan);
     state.activeDraftId = ownDraft?.id || state.activeDraftId;
@@ -809,8 +898,8 @@
         </div>
       </section>
 
-      <section class="recipe-step-card">
-        <h6 class="step-title">Paso 1 · ¿Qué cantidad deseás producir?</h6>
+      <section class="recipe-step-card step-block">
+        <h6 class="step-title"><span class="recipe-step-number">1</span> ¿Qué cantidad deseás producir?</h6>
         <div class="produccion-qty-grid">
           <input id="produccionQtyInput" type="number" min="0.1" step="0.01" max="${analysis.maxKg.toFixed(2)}" value="${initialQty.toFixed(2)}" class="form-control ios-input">
           <button id="produccionQtyMaxBtn" type="button" class="btn ios-btn ios-btn-secondary">Usar máximo</button>
@@ -818,30 +907,32 @@
         <p id="produccionQtyHelp" class="produccion-qty-help"></p>
       </section>
 
-      <section class="recipe-step-card">
-        <h6 class="step-title">Paso 2 · Fecha de producción</h6>
+      <section class="recipe-step-card step-block">
+        <h6 class="step-title"><span class="recipe-step-number">2</span> Fecha de producción</h6>
         <input id="produccionDateInput" type="text" class="form-control ios-input" value="${initialDate}">
         <p class="produccion-qty-help">Si cambiás la fecha, recalculamos vencimientos y lotes (FEFO).</p>
       </section>
 
-      <section class="recipe-step-card">
-        <h6 class="step-title">Paso 3 · Encargados</h6>
+      <section class="recipe-step-card step-block">
+        <h6 class="step-title"><span class="recipe-step-number">3</span> Encargados</h6>
+        <div class="produccion-managers-actions">
+          <button id="produccionSaveManagersPrefBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-regular fa-bookmark"></i><span>Guardar preferencia</span></button>
+        </div>
         <div class="produccion-managers-grid">${buildManagersHtml(initialManagers)}</div>
       </section>
 
-      <section class="recipe-step-card">
-        <h6 class="step-title">Paso 4 · Observaciones</h6>
+      <section class="recipe-step-card step-block">
+        <h6 class="step-title"><span class="recipe-step-number">4</span> Observaciones</h6>
         <textarea id="produccionObsInput" class="form-control ios-input" rows="3" placeholder="Notas de producción, incidentes, reemplazos...">${initialObs}</textarea>
       </section>
 
-      <section class="recipe-step-card">
-        <h6 class="step-title">Paso 5 · Desglose por lotes (FEFO)</h6>
+      <section class="recipe-step-card step-block">
+        <h6 class="step-title"><span class="recipe-step-number">5</span> Desglose por lotes (FEFO)</h6>
+        <p class="produccion-fefo-note"><strong>FEFO:</strong> <span>First Expired, First Out</span> · primero vence, primero se usa.</p>
         <div id="produccionLotsBreakdown" class="produccion-lotes-wrap"></div>
       </section>
 
-      <section class="recipe-step-card">
-        <h6 class="step-title">Verificación proporcional</h6>
-        <div id="produccionDetailRows" class="produccion-detail-grid"></div>
+      <section class="recipe-step-card step-block">
         <div class="produccion-final-actions">
           <button id="produccionSaveDraftBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-floppy-disk"></i><span>Guardar borrador</span></button>
           <button id="produccionConfirmBtn" type="button" class="btn ios-btn ios-btn-success"><i class="fa-solid fa-check"></i><span>Confirmar producción</span></button>
@@ -851,7 +942,6 @@
     const qtyInput = nodes.editor.querySelector('#produccionQtyInput');
     const dateInput = nodes.editor.querySelector('#produccionDateInput');
     const qtyHelp = nodes.editor.querySelector('#produccionQtyHelp');
-    const rowsWrap = nodes.editor.querySelector('#produccionDetailRows');
     const lotsWrap = nodes.editor.querySelector('#produccionLotsBreakdown');
 
     const updateEditorPlan = async () => {
@@ -860,7 +950,6 @@
       qtyInput.value = qty.toFixed(2);
       const productionDate = normalizeValue(dateInput.value) || toIsoDate();
       state.editorPlan = buildPlanForRecipe(recipe, qty, productionDate);
-      rowsWrap.innerHTML = buildProductionRows(analysis, qty);
       lotsWrap.innerHTML = buildLotsBreakdownHtml(state.editorPlan);
       qtyHelp.textContent = state.editorPlan.isValid
         ? `Escala aplicada: ${qty.toFixed(2)} kg. Reserva temporal activa por 10 min.`
@@ -868,6 +957,48 @@
       await ensureReservationForPlan(state.editorPlan);
       await saveEditorDraft();
     };
+
+    nodes.editor.addEventListener('click', async (event) => {
+      const toggleBtn = event.target.closest('[data-lot-toggle]');
+      if (toggleBtn && state.editorPlan) {
+        const ingredientId = toggleBtn.dataset.lotToggle;
+        state.lotCollapseState[ingredientId] = !state.lotCollapseState[ingredientId];
+        lotsWrap.innerHTML = buildLotsBreakdownHtml(state.editorPlan);
+        return;
+      }
+
+      if (event.target.closest('#produccionCollapseAllBtn') && state.editorPlan) {
+        state.editorPlan.ingredientPlans.forEach((item) => {
+          state.lotCollapseState[item.ingredientId] = true;
+        });
+        lotsWrap.innerHTML = buildLotsBreakdownHtml(state.editorPlan);
+        return;
+      }
+
+      if (event.target.closest('#produccionExpandAllBtn') && state.editorPlan) {
+        state.editorPlan.ingredientPlans.forEach((item) => {
+          state.lotCollapseState[item.ingredientId] = false;
+        });
+        lotsWrap.innerHTML = buildLotsBreakdownHtml(state.editorPlan);
+        return;
+      }
+
+      const attachmentBtn = event.target.closest('[data-lot-images]');
+      if (attachmentBtn) {
+        const raw = decodeURIComponent(attachmentBtn.dataset.lotImages || '');
+        let urls = [];
+        try {
+          urls = JSON.parse(raw);
+        } catch (error) {
+          urls = [];
+        }
+        if (typeof window.laJamoneraOpenImageViewer === 'function') {
+          await window.laJamoneraOpenImageViewer([{ invoiceImageUrls: urls }], 0, 'Adjuntos de lote');
+        } else {
+          await openIosSwal({ title: 'Visor no disponible', html: '<p>No se pudo abrir el visor de imágenes.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+        }
+      }
+    });
 
     if (window.flatpickr) {
       const locale = window.flatpickr.l10ns?.es || undefined;
@@ -882,7 +1013,8 @@
       });
     }
 
-    qtyInput.addEventListener('input', async () => { await updateEditorPlan(); });
+    qtyInput.addEventListener('change', async () => { await updateEditorPlan(); });
+    qtyInput.addEventListener('blur', async () => { await updateEditorPlan(); });
     nodes.editor.querySelector('#produccionQtyMaxBtn').addEventListener('click', async () => {
       qtyInput.value = analysis.maxKg.toFixed(2);
       await updateEditorPlan();
@@ -892,12 +1024,25 @@
       input.addEventListener('change', async () => { await saveEditorDraft(); });
     });
 
+    nodes.editor.querySelector('#produccionSaveManagersPrefBtn')?.addEventListener('click', async () => {
+      const selected = [...nodes.editor.querySelectorAll('[data-manager-check]:checked')].map((node) => node.value).filter(Boolean);
+      state.config.preferredManagers = selected;
+      state.config.preferredManagersByRecipe = {
+        ...safeObject(state.config.preferredManagersByRecipe),
+        [recipe.id]: selected
+      };
+      await persistConfig();
+      await openIosSwal({ title: 'Preferencia guardada', html: '<p>Este/estos encargados se preseleccionarán en próximas producciones.</p>', icon: 'success', confirmButtonText: 'Entendido' });
+    });
+
     nodes.editor.querySelector('#produccionObsInput').addEventListener('input', async () => { await saveEditorDraft(); });
 
     nodes.editor.querySelector('#produccionSaveDraftBtn').addEventListener('click', async () => {
       await saveEditorDraft();
       await openIosSwal({ title: 'Borrador guardado', html: '<p>Podés retomarlo cuando quieras.</p>', icon: 'success', confirmButtonText: 'Entendido' });
     });
+
+    prepareThumbLoaders('.js-produccion-head-photo, .js-produccion-user-photo');
 
     const confirmProduction = async () => {
       const refreshBefore = await window.dbLaJamoneraRest.read('/inventario');
@@ -927,18 +1072,31 @@
       });
       if (!confirm.isConfirmed) return;
 
-      const registros = safeObject(await window.dbLaJamoneraRest.read(REGISTROS_PATH));
-      const sequence = Number(await window.dbLaJamoneraRest.read(SEQUENCE_PATH)) || 0;
-      const nextSequence = sequence + 1;
-      const dateToken = date.replaceAll('-', '');
-      const prefix = normalizeValue(state.config.idConfig?.prefix) || 'PROD-LJ';
-      const productionId = `${prefix}-${dateToken}-${String(nextSequence).padStart(4, '0')}`;
+      Swal.fire({
+        title: 'Cargando producción...',
+        html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando producción" class="meta-spinner-login"></div>',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        customClass: {
+          popup: 'ios-alert produccion-loading-alert',
+          title: 'ios-alert-title',
+          htmlContainer: 'ios-alert-text'
+        }
+      });
 
-      const managers = [...nodes.editor.querySelectorAll('[data-manager-check]:checked')].map((node) => node.value).filter(Boolean);
-      const observations = normalizeValue(nodes.editor.querySelector('#produccionObsInput')?.value);
+      try {
+        const registros = safeObject(await window.dbLaJamoneraRest.read(REGISTROS_PATH));
+        const sequence = Number(await window.dbLaJamoneraRest.read(SEQUENCE_PATH)) || 0;
+        const nextSequence = sequence + 1;
+        const dateToken = date.replaceAll('-', '');
+        const prefix = normalizeValue(state.config.idConfig?.prefix) || 'PROD-LJ';
+        const productionId = `${prefix}-${dateToken}-${String(nextSequence).padStart(4, '0')}`;
 
-      const inventarioNext = safeObject(state.inventario);
-      revalidated.ingredientPlans.forEach((item) => {
+        const managers = [...nodes.editor.querySelectorAll('[data-manager-check]:checked')].map((node) => node.value).filter(Boolean);
+        const observations = normalizeValue(nodes.editor.querySelector('#produccionObsInput')?.value);
+
+        const inventarioNext = safeObject(state.inventario);
+        revalidated.ingredientPlans.forEach((item) => {
         const record = safeObject(inventarioNext.items?.[item.ingredientId]);
         const nextEntries = Array.isArray(record.entries) ? [...record.entries] : [];
         item.lots.forEach((lot) => {
@@ -970,7 +1128,7 @@
         };
       });
 
-      const registro = {
+        const registro = {
         id: productionId,
         recipeId: recipe.id,
         recipeTitle: recipe.title,
@@ -985,17 +1143,22 @@
         reservationId: state.activeReservationId
       };
 
-      await window.dbLaJamoneraRest.write('/inventario', inventarioNext);
-      await window.dbLaJamoneraRest.write(SEQUENCE_PATH, nextSequence);
-      await window.dbLaJamoneraRest.write(REGISTROS_PATH, { ...registros, [productionId]: registro });
+        await window.dbLaJamoneraRest.write('/inventario', inventarioNext);
+        await window.dbLaJamoneraRest.write(SEQUENCE_PATH, nextSequence);
+        await window.dbLaJamoneraRest.write(REGISTROS_PATH, { ...registros, [productionId]: registro });
 
-      state.config.lastProductionByRecipe[recipe.id] = nowTs();
-      await persistConfig();
-      await releaseReservation('confirmed');
-      await discardDraft();
-      await refreshData();
-      renderList();
-      await openIosSwal({ title: 'Producción guardada', html: `<p>ID generado: <strong>${productionId}</strong></p>`, icon: 'success', confirmButtonText: 'Genial' });
+        state.config.lastProductionByRecipe[recipe.id] = nowTs();
+        await persistConfig();
+        await releaseReservation('confirmed');
+        await discardDraft();
+        await refreshData();
+        renderList();
+        Swal.close();
+        await openIosSwal({ title: 'Producción guardada', html: `<p>ID generado: <strong>${productionId}</strong></p>`, icon: 'success', confirmButtonText: 'Genial' });
+      } catch (error) {
+        Swal.close();
+        await openIosSwal({ title: 'No se pudo confirmar', html: '<p>Ocurrió un error al guardar la producción.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      }
     };
 
     nodes.editor.querySelector('#produccionConfirmBtn').addEventListener('click', confirmProduction);
@@ -1051,6 +1214,7 @@
       recipeMinKg: safeObject(config?.recipeMinKg),
       lastProductionByRecipe: safeObject(config?.lastProductionByRecipe),
       preferredManagers: Array.isArray(config?.preferredManagers) ? config.preferredManagers : [],
+      preferredManagersByRecipe: safeObject(config?.preferredManagersByRecipe),
       usersPreferences: safeObject(config?.usersPreferences),
       idConfig: { prefix: normalizeValue(config?.idConfig?.prefix) || 'PROD-LJ' }
     };
@@ -1078,10 +1242,47 @@
   });
 
   nodes.list.addEventListener('click', async (event) => {
+    const openDraftBtn = event.target.closest('[data-open-draft]');
+    if (openDraftBtn) {
+      const draftId = openDraftBtn.dataset.openDraft;
+      const draft = state.drafts[draftId];
+      if (draft?.recipeId) {
+        state.activeRecipeId = draft.recipeId;
+        await renderEditor(draft.recipeId);
+      }
+      return;
+    }
+
+    const deleteDraftBtn = event.target.closest('[data-delete-draft]');
+    if (deleteDraftBtn) {
+      const draftId = deleteDraftBtn.dataset.deleteDraft;
+      const next = { ...state.drafts };
+      delete next[draftId];
+      await window.dbLaJamoneraRest.write(DRAFTS_PATH, next);
+      state.drafts = next;
+      renderList();
+      return;
+    }
+
     const produceBtn = event.target.closest('[data-open-produccion]');
     if (produceBtn) {
       state.activeRecipeId = produceBtn.dataset.openProduccion;
-      await renderEditor(state.activeRecipeId);
+      Swal.fire({
+        title: 'Cargando producción...',
+        html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando producción" class="meta-spinner-login"></div>',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        customClass: {
+          popup: 'ios-alert produccion-loading-alert',
+          title: 'ios-alert-title',
+          htmlContainer: 'ios-alert-text'
+        }
+      });
+      try {
+        await renderEditor(state.activeRecipeId);
+      } finally {
+        Swal.close();
+      }
       return;
     }
     if (event.target.closest('[data-open-inventario]')) {
@@ -1104,24 +1305,6 @@
     try {
       await refreshData();
       renderList();
-      const ownDraft = Object.values(state.drafts).find((item) => item.ownerSessionId === sessionId && item.status === 'active');
-      if (ownDraft?.recipeId) {
-        const prompt = await openIosSwal({
-          title: 'Borrador recuperado',
-          html: '<p>Encontramos un borrador activo. ¿Querés retomarlo?</p>',
-          icon: 'question',
-          showCancelButton: true,
-          confirmButtonText: 'Continuar borrador',
-          cancelButtonText: 'Descartar'
-        });
-        if (prompt.isConfirmed) {
-          state.activeRecipeId = ownDraft.recipeId;
-          await renderEditor(ownDraft.recipeId);
-        } else {
-          state.activeDraftId = ownDraft.id;
-          await discardDraft();
-        }
-      }
     } catch (error) {
       nodes.empty.querySelector('.ingredientes-empty-text').textContent = 'No se pudo cargar producción desde Firebase.';
       setStateView('empty');
