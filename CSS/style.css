@@ -5270,3 +5270,214 @@ html.login-protected.auth-ok body {
 
 /* =========================================
    PRODUCCIÓN ETAPA 2
+========================================= */
+.produccion-reserva-timer {
+  margin: 4px 0 0;
+  color: #9a5a11;
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.produccion-managers-grid {
+  display: grid;
+  gap: 8px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.produccion-user-check {
+  border: 1px solid #d9e3f8;
+  border-radius: 12px;
+  background: #f8fbff;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #334b7b;
+  font-weight: 600;
+}
+
+.produccion-user-check input {
+  width: 18px;
+  height: 18px;
+}
+
+.produccion-empty-users {
+  margin: 0;
+  color: #627497;
+}
+
+.produccion-lotes-wrap {
+  display: grid;
+  gap: 10px;
+}
+
+.produccion-lote-group {
+  border: 1px solid #d8e2f7;
+  border-radius: 14px;
+  background: #f8fbff;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.produccion-lote-group.is-missing {
+  border-color: #f2c2c9;
+  background: #fff7f8;
+}
+
+.produccion-lote-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.produccion-lote-main {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.produccion-lote-main h6 {
+  margin: 0;
+  color: #2b416f;
+}
+
+.produccion-lote-main p {
+  margin: 2px 0 0;
+  color: #5a6f97;
+  font-size: 0.82rem;
+}
+
+.produccion-lote-ingredient-image {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid #d2dcf2;
+  object-fit: cover;
+  background: #eff3ff;
+}
+
+.produccion-merge-icon {
+  width: 20px;
+  height: 20px;
+  filter: invert(39%) sepia(63%) saturate(980%) hue-rotate(193deg) brightness(91%) contrast(88%);
+}
+
+.produccion-lote-rows {
+  display: grid;
+  gap: 6px;
+}
+
+.produccion-lote-row {
+  border: 1px solid #dce5f8;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 6px 10px;
+  font-size: 0.78rem;
+  color: #425684;
+}
+
+.produccion-lote-row.tone-soon {
+  border-color: #f2d5ab;
+  background: #fff9ef;
+}
+
+.produccion-lote-empty {
+  margin: 0;
+  color: #7c8db2;
+  font-size: 0.82rem;
+}
+
+.produccion-final-actions {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.produccion-final-actions .ios-btn {
+  width: fit-content;
+  max-width: none;
+}
+
+@media (max-width: 768px) {
+  .produccion-final-actions .ios-btn {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+/* =========================================
+   PRODUCCIÓN ETAPA 2 FIXES UI
+========================================= */
+.produccion-editor .recipe-step-card {
+  margin-bottom: 12px;
+}
+
+.produccion-editor .recipe-step-card:last-child {
+  margin-bottom: 0;
+}
+
+.produccion-user-check {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+}
+
+.produccion-user-check .user-avatar-thumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid #d2dcf2;
+  background: #eef2fd;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.produccion-user-check .user-avatar-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.produccion-user-text {
+  display: grid;
+  gap: 1px;
+  line-height: 1.2;
+}
+
+.produccion-user-text strong {
+  color: #2b416f;
+}
+
+.produccion-user-text small {
+  color: #627497;
+  font-size: 0.76rem;
+}
+
+.produccion-lote-group,
+.produccion-lote-row,
+.produccion-lote-head,
+.produccion-lote-main {
+  width: 100%;
+  max-width: 100%;
+}
+
+.produccion-merge-icon {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px;
+  min-height: 20px;
+  flex-shrink: 0;
+  object-fit: contain;
+  display: inline-block;
+}
