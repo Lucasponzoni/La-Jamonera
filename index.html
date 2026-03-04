@@ -129,6 +129,17 @@
               <i class="fa-solid fa-boxes-stacked icon-orange" aria-hidden="true"></i>
               <span>Inventario</span>
             </button>
+
+            <button
+              id="openProduccionModal"
+              type="button"
+              class="btn btn-light home-action-btn home-action-btn-success"
+              data-bs-toggle="modal"
+              data-bs-target="#produccionModal"
+            >
+              <i class="fa-solid fa-industry icon-green" aria-hidden="true"></i>
+              <span>Producir</span>
+            </button>
           </div>
         </div>
         <div class="home-content">
@@ -313,6 +324,63 @@
       </div>
       <!-- // FIN MODAL INVENTARIO -->
 
+      <!-- MODAL PRODUCCION -->
+      <div class="modal fade" id="produccionModal" tabindex="-1" aria-labelledby="produccionModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content ios-modal recetas-modal produccion-modal">
+            <div class="modal-header ios-modal-header">
+              <h5 class="modal-title ios-modal-title" id="produccionModalLabel">Producción</h5>
+              <button type="button" class="btn-close ios-modal-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body ios-modal-body">
+              <div id="produccionLoading" class="recetas-loading" aria-live="polite">
+                <img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login">
+                <p>Cargando recetas y analizando inventario...</p>
+              </div>
+
+              <div id="produccionData" class="recetas-data d-none">
+                <div class="produccion-toolbar">
+                  <div class="ingredientes-search-group">
+                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                    <input id="produccionSearchInput" type="search" class="form-control ios-input" placeholder="Buscar receta o ingrediente..." autocomplete="off">
+                  </div>
+                  <div class="produccion-toolbar-actions">
+                    <button id="produccionConfigBtn" type="button" class="btn ios-btn ios-btn-secondary">
+                      <i class="fa-solid fa-sliders"></i>
+                      <span>Configuración</span>
+                    </button>
+                    <button id="produccionOpenListBtn" type="button" class="btn ios-btn ios-btn-secondary">
+                      <i class="fa-solid fa-table-list"></i>
+                      <span>Producciones</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div id="produccionListView" class="produccion-list" aria-live="polite"></div>
+
+                <div id="produccionEditor" class="recetas-editor d-none" aria-live="polite">
+                  <div class="recetas-editor-header">
+                    <button id="produccionBackBtn" type="button" class="btn ios-btn ios-btn-secondary recetas-back-btn">
+                      <i class="fa-solid fa-arrow-left"></i>
+                      <span>Atrás</span>
+                    </button>
+                    <div>
+                      <p class="recetas-editor-kicker">Producción</p>
+                      <h6 id="produccionEditorTitle" class="recetas-editor-title mb-0">Nueva producción</h6>
+                    </div>
+                  </div>
+                  <form id="produccionEditorForm" class="recetas-editor-form" novalidate autocomplete="off"></form>
+                </div>
+
+                <div id="produccionHistoryView" class="d-none"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- // FIN MODAL PRODUCCION -->
+
       <div class="modal fade" id="imageViewerModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-xl">
           <div class="modal-content ios-modal image-viewer-modal">
@@ -396,6 +464,7 @@
   <script src="./JS/ingredientes.js"></script>
   <script src="./JS/recetas.js"></script>
   <script src="./JS/inventario.js"></script>
+  <script src="./JS/produccion.js"></script>
   <script src="./JS/app.js"></script>
 </body>
 </html>
