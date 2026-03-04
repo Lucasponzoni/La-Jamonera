@@ -4370,7 +4370,7 @@ html.login-protected.auth-ok body {
 .inventario-table-compact td {
   font-size: 0.9rem;
   padding: 7px 8px;
-  text-align: center;
+  text-align: start;
   font-weight: 700;
   color: #2f426d;
   white-space: nowrap;
