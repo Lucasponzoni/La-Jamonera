@@ -4326,6 +4326,14 @@ html.login-protected.auth-ok body {
   margin-bottom: 10px;
 }
 
+.inventario-period-divider {
+  width: 1px;
+  height: 30px;
+  background: #ccd7ef;
+  align-self: center;
+  margin-left: auto;
+}
+
 .inventario-table-compact-wrap {
   overflow-x: auto;
 }
@@ -4521,9 +4529,14 @@ html.login-protected.auth-ok body {
 
 .inventario-table-range {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto auto auto;
+  grid-template-columns: minmax(220px, 1fr) auto;
   gap: 8px;
   align-items: center;
+}
+
+.inventario-history-toolbar {
+  display: grid;
+  gap: 8px;
 }
 
 .inventario-page-btn {
@@ -4550,7 +4563,57 @@ html.login-protected.auth-ok body {
 }
 
 .inventario-print-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   align-items: center;
+  justify-content: flex-end;
+}
+
+.inventario-expand-btn {
+  background: #ff8a2a;
+  border: 1px solid #ff8a2a;
+  color: #fff;
+}
+
+.inventario-expand-btn:hover {
+  background: #ef7c1e;
+  border-color: #ef7c1e;
+  color: #fff;
+}
+
+.inventario-step-icon {
+  margin-right: 6px;
+  color: #4a5f8f;
+  font-size: 0.92rem;
+}
+
+.inventario-stock-grid {
+  border: 1px solid #dbe4f8;
+  border-radius: 14px;
+  background: #fbfcff;
+  padding: 12px;
+}
+
+.inventario-stock-grid .form-label {
+  color: #425681;
+  font-weight: 700;
+}
+
+.inventario-row-tone:nth-child(odd) {
+  background: #f7faff;
+}
+
+.inventario-row-tone:nth-child(even) {
+  background: #eef3ff;
+}
+
+#imageViewerModal {
+  z-index: 3200;
+}
+
+.modal-backdrop.inventory-image-backdrop {
+  z-index: 3190;
 }
 
 .inventario-print-photo-wrap {
@@ -4645,6 +4708,14 @@ html.login-protected.auth-ok body {
     grid-template-columns: 1fr;
   }
 
+  .inventario-history-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .inventario-print-row {
+    justify-content: flex-start;
+  }
+
   .inventario-collapse-head-styled {
     flex-direction: column;
     align-items: flex-start;
@@ -4654,6 +4725,14 @@ html.login-protected.auth-ok body {
   .inventario-collapse-summary {
     max-width: 100%;
     justify-content: flex-start;
+  }
+
+  .inventario-expand-btn {
+    display: none;
+  }
+
+  .inventario-period-divider {
+    display: none;
   }
 }
 
@@ -4722,7 +4801,3 @@ html.login-protected.auth-ok body {
   align-items: flex-start;
   gap: 10px;
 }
-
-
-/* =========================================
-   INVENTARIO · HOTFIX UX FINAL
