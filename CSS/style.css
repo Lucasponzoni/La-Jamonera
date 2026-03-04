@@ -4604,14 +4604,6 @@ html.login-protected.auth-ok body {
   font-weight: 700;
 }
 
-.inventario-row-tone:nth-child(odd) {
-  background: #f7faff;
-}
-
-.inventario-row-tone:nth-child(even) {
-  background: #eef3ff;
-}
-
 #imageViewerModal {
   z-index: 3200;
 }
@@ -4644,12 +4636,12 @@ html.login-protected.auth-ok body {
   font-size: 0.72rem;
 }
 
-.inventario-row-tone:nth-child(odd) {
-  background: #f7faff;
+.inventario-row-tone.is-even-row {
+  background: #f7faff !important;
 }
 
-.inventario-row-tone:nth-child(even) {
-  background: #eef3ff;
+.inventario-row-tone.is-odd-row {
+  background: #eaf1ff !important;
 }
 
 #imageViewerModal {

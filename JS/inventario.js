@@ -87,6 +87,50 @@
   };
   const makeId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
+  const AR_TIMEZONE = 'America/Argentina/Buenos_Aires';
+
+  const getDateParts = (date, timeZone = AR_TIMEZONE) => {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    const parts = formatter.formatToParts(date);
+    const map = parts.reduce((acc, part) => {
+      if (part.type !== 'literal') acc[part.type] = part.value;
+      return acc;
+    }, {});
+    return {
+      year: Number(map.year),
+      month: Number(map.month),
+      day: Number(map.day)
+    };
+  };
+
+  const toIsoDate = ({ year, month, day }) => `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+  const getArgentinaIsoDate = (date = new Date()) => toIsoDate(getDateParts(date, AR_TIMEZONE));
+
+  const addDaysToIso = (isoDate, days) => {
+    const match = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(String(isoDate || ''));
+    if (!match) return '';
+    const utc = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+    utc.setUTCDate(utc.getUTCDate() + Number(days || 0));
+    return toIsoDate({
+      year: utc.getUTCFullYear(),
+      month: utc.getUTCMonth() + 1,
+      day: utc.getUTCDate()
+    });
+  };
+
+  const normalizeIsoDate = (value) => {
+    const text = normalizeValue(value);
+    const match = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(text);
+    if (!match) return '';
+    return `${match[1]}-${match[2]}-${match[3]}`;
+  };
+
   const parseNumber = (value) => {
     const parsed = Number(normalizeValue(value).replace(',', '.'));
     return Number.isFinite(parsed) ? parsed : NaN;
@@ -462,6 +506,13 @@
     };
   };
 
+  const getDefaultRangeDates = (value) => {
+    const { from, to } = parseRangeValue(value);
+    if (from && to) return [from, to];
+    if (from) return [from];
+    return null;
+  };
+
   const getGlobalFilteredEntries = (ignoreRange = false) => {
     const range = parseRangeValue(state.dashboardDateRange);
     const rows = [];
@@ -501,8 +552,8 @@
     state.globalTablePage = Math.min(Math.max(1, state.globalTablePage), pages);
     const start = (state.globalTablePage - 1) * PAGE_SIZE;
     const pageRows = rows.slice(start, start + PAGE_SIZE);
-    const htmlRows = pageRows.length ? pageRows.map((row) => `
-      <tr class="inventario-row-tone">
+    const htmlRows = pageRows.length ? pageRows.map((row, index) => `
+      <tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
         <td>${escapeHtml(row.entryDate)}</td>
         <td>${escapeHtml(row.ingredientName)}</td>
         <td>${row.qtyKg.toFixed(2)} kg</td>
@@ -638,15 +689,11 @@
     return badges.join('');
   };
 
-  const parseIsoDate = (value) => {
-    const date = new Date(value || '');
-    return Number.isNaN(date.getTime()) ? null : date;
-  };
-
   const formatDateTime = (value) => {
     const date = new Date(Number(value || 0));
     if (Number.isNaN(date.getTime())) return '-';
     return date.toLocaleString('es-AR', {
+      timeZone: AR_TIMEZONE,
       day: '2-digit',
       month: '2-digit',
       year: '2-digit',
@@ -658,7 +705,7 @@
   const formatTimeOnly = (value) => {
     const date = new Date(Number(value || 0));
     if (Number.isNaN(date.getTime())) return '-';
-    return date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString('es-AR', { timeZone: AR_TIMEZONE, hour: '2-digit', minute: '2-digit' });
   };
 
   let imageViewerModal = null;
@@ -698,9 +745,8 @@
   };
 
   const inDateRange = (value, from, to) => {
-    const date = parseIsoDate(value);
-    if (!date) return false;
-    const dateIso = date.toISOString().slice(0, 10);
+    const dateIso = normalizeIsoDate(value);
+    if (!dateIso) return false;
     if (from && dateIso < from) return false;
     if (to && dateIso > to) return false;
     return true;
@@ -968,8 +1014,8 @@
     const start = (state.tablePage - 1) * PAGE_SIZE;
     const pageRows = filtered.slice(start, start + PAGE_SIZE);
 
-    const rowsHtml = pageRows.length ? pageRows.map((entry) => `
-      <tr class="inventario-row-tone">
+    const rowsHtml = pageRows.length ? pageRows.map((entry, index) => `
+      <tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
         <td>${formatDateTime(entry.createdAt)}</td>
         <td>${entry.expiryDate || '-'}</td>
         <td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td>
@@ -1168,8 +1214,8 @@
     const baseDraft = {
       qty: '',
       unit: 'kilos',
-      entryDate: new Date().toISOString().slice(0, 10),
-      expiryDate: new Date(Date.now() + (5 * 86400000)).toISOString().slice(0, 10),
+      entryDate: getArgentinaIsoDate(),
+      expiryDate: addDaysToIso(getArgentinaIsoDate(), 5),
       invoiceNumber: '',
       invoiceImageFile: null,
       tokens: [...record.lotConfig.tokens],
@@ -1474,9 +1520,9 @@
         mode: 'range',
         dateFormat: 'Y-m-d',
         allowInput: true,
-        defaultDate: state.tableDateRange ? state.tableDateRange.split(' to ') : null,
+        defaultDate: getDefaultRangeDates(state.tableDateRange),
         onDayCreate: (_dObj, _dStr, _fp, dayElem) => {
-          const date = dayElem.dateObj ? dayElem.dateObj.toISOString().slice(0, 10) : '';
+          const date = dayElem.dateObj ? getArgentinaIsoDate(dayElem.dateObj) : '';
           const kg = dayMap[date];
           if (kg) {
             const bubble = document.createElement('span');
@@ -1485,8 +1531,11 @@
             dayElem.appendChild(bubble);
           }
         },
-        onClose: (_selectedDates, dateStr) => {
-          state.tableDateRange = normalizeValue(dateStr);
+        onClose: (_selectedDates, dateStr, instance) => {
+          const from = instance.selectedDates[0] ? getArgentinaIsoDate(instance.selectedDates[0]) : '';
+          const to = instance.selectedDates[1] ? getArgentinaIsoDate(instance.selectedDates[1]) : '';
+          const nextRange = from && to ? `${from} a ${to}` : (from || normalizeValue(dateStr));
+          state.tableDateRange = normalizeValue(nextRange);
           state.tablePage = 1;
           rerenderEditorKeepViewport(ingredientId, state.editorDraft, '#inventarioEntriesSearch');
         }
@@ -1711,8 +1760,8 @@
         ...state.editorDraft,
         qty: '',
         invoiceNumber: '',
-        expiryDate: new Date(Date.now() + (5 * 86400000)).toISOString().slice(0, 10),
-        entryDate: new Date().toISOString().slice(0, 10)
+        expiryDate: addDaysToIso(getArgentinaIsoDate(), 5),
+        entryDate: getArgentinaIsoDate()
       });
     } finally {
       saveBtn.removeAttribute('disabled');
@@ -1812,8 +1861,9 @@
           mode: 'range',
           dateFormat: 'Y-m-d',
           allowInput: true,
+          defaultDate: getDefaultRangeDates(state.dashboardDateRange),
           onDayCreate: (_dObj, _dStr, fp, dayElem) => {
-            const date = dayElem.dateObj ? dayElem.dateObj.toISOString().slice(0, 10) : '';
+            const date = dayElem.dateObj ? getArgentinaIsoDate(dayElem.dateObj) : '';
             const kg = dayMapGlobal[date];
             if (kg) {
               const bubble = document.createElement('span');
@@ -1821,6 +1871,11 @@
               bubble.textContent = `${kg}kg`;
               dayElem.appendChild(bubble);
             }
+          },
+          onClose: (_selectedDates, _dateStr, instance) => {
+            const from = instance.selectedDates[0] ? getArgentinaIsoDate(instance.selectedDates[0]) : '';
+            const to = instance.selectedDates[1] ? getArgentinaIsoDate(instance.selectedDates[1]) : '';
+            nodes.globalRange.value = from && to ? `${from} a ${to}` : from;
           }
         });
       }
