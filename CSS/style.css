@@ -4393,8 +4393,20 @@ html.login-protected.auth-ok body {
 
 @media (max-width: 991.98px) {
   .inventario-pagination.enhanced {
-    flex-direction: column;
+    flex-direction: row;
+    justify-content: center;
     gap: 8px;
+    flex-wrap: nowrap;
+  }
+
+  .inventario-pagination.enhanced span {
+    min-width: 120px;
+    text-align: center;
+  }
+
+  .inventario-pagination.enhanced .inventario-page-btn {
+    min-width: 40px;
+    padding-inline: 10px;
   }
 }
 
