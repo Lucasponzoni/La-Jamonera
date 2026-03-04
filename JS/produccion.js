@@ -12,6 +12,7 @@
     historyView: document.getElementById('produccionPeriodView'),
     historyBackBtn: document.getElementById('produccionPeriodBackBtn'),
     historyRange: document.getElementById('produccionGlobalRange'),
+    historyApplyBtn: document.getElementById('produccionGlobalApplyBtn'),
     historySearch: document.getElementById('produccionHistorySearch'),
     historyExpandBtn: document.getElementById('produccionGlobalExpandBtn'),
     historyExcelBtn: document.getElementById('produccionGlobalExcelBtn'),
@@ -692,7 +693,7 @@
 
   const openGlobalMinConfig = async () => {
     const result = await openIosSwal({
-      title: 'Umbral por producto',
+      title: 'Configuración global de inventario',
       html: `<div class="text-start">
           <label class="form-label" for="produccionGlobalMinInput">Umbral global de stock bajo (kg)</label>
           <input id="produccionGlobalMinInput" type="number" min="0" step="0.01" class="swal2-input ios-input" value="${Number(state.config.globalMinKg || 1).toFixed(2)}">
@@ -708,8 +709,7 @@
           return false;
         }
         return n;
-      },
-      customClass: { popup: 'produccion-umbral-alert' }
+      }
     });
     if (!result.isConfirmed) return;
     state.config.globalMinKg = Number(result.value.toFixed(2));
@@ -738,8 +738,7 @@
           return false;
         }
         return n;
-      },
-      customClass: { popup: 'produccion-umbral-alert' }
+      }
     });
     if (!result.isConfirmed) return;
     if (result.value == null) {
@@ -753,14 +752,35 @@
   };
 
 
+  const getUserByManagerToken = (token) => {
+    const key = normalizeValue(token);
+    if (!key) return null;
+    const users = Object.values(safeObject(state.users));
+    return users.find((user) => {
+      const options = [
+        user?.id,
+        user?.email,
+        user?.fullName,
+        user?.name
+      ].map(normalizeLower).filter(Boolean);
+      return options.includes(normalizeLower(key));
+    }) || null;
+  };
+
+  const getManagerDisplay = (token) => {
+    const user = getUserByManagerToken(token);
+    const raw = normalizeValue(token);
+    const fallbackName = raw && !raw.startsWith('usr_') ? raw : 'Sin responsable';
+    return {
+      name: normalizeValue(user?.fullName || user?.name) || fallbackName,
+      role: normalizeValue(user?.position || user?.role || user?.sector) || 'Encargado'
+    };
+  };
+
   const getManagerLabel = (item) => {
     const managers = Array.isArray(item?.managers) ? item.managers : [];
-    const first = managers[0] || item?.createdBy || 'Sin responsable';
-    const user = Object.values(safeObject(state.users)).find((u) => normalizeLower(u?.fullName || u?.email) === normalizeLower(first));
-    return {
-      name: user?.fullName || first,
-      role: user?.role || user?.position || user?.sector || 'Encargado'
-    };
+    const first = managers[0] || item?.createdBy || '';
+    return getManagerDisplay(first);
   };
 
   const getHistoryRows = () => {
@@ -909,81 +929,65 @@
   };
 
   const renderTraceabilityTree = (registro) => {
-    const lines = (registro.lots || []).map((item) => {
-      const lotsHtml = (item.lots || []).map((lot) => {
-        const available = Number(lot.availableQty || 0);
-        const used = Number(lot.takeQty || 0);
-        const pct = available > 0 ? (used / available) * 100 : 0;
-        const remaining = Math.max(0, available - used);
-        return `<article class="produccion-trace-node">
-          <div class="produccion-trace-node-head">Lote ${escapeHtml(lot.entryId || '-')}</div>
-          <p class="m-0"><strong>Tomado:</strong> ${used.toFixed(2)} ${escapeHtml(lot.unit || '')} · <strong>Uso:</strong> ${pct.toFixed(1)}%</p>
-          <p class="m-0"><strong>Quedó:</strong> ${remaining.toFixed(2)} ${escapeHtml(lot.unit || '')}</p>
-          <p class="m-0"><strong>Proveedor:</strong> ${escapeHtml(lot.provider || '-')} · <strong>Factura:</strong> ${escapeHtml(lot.invoiceNumber || '-')}</p>
-          <p class="m-0"><strong>Ingreso/Vence:</strong> ${escapeHtml(lot.entryDate || '-')} / ${escapeHtml(lot.expiryDate || '-')}</p>
-          ${Array.isArray(lot.invoiceImageUrls) && lot.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn mt-2" data-prod-trace-images="${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Ver adjuntos (${lot.invoiceImageUrls.length})</span></button>` : ''}
+    const managerBadges = (Array.isArray(registro.managers) ? registro.managers : [])
+      .map((token) => {
+        const manager = getManagerDisplay(token);
+        return `<span class="produccion-trace-chip"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span>`;
+      }).join('');
+
+    const ingredients = (registro.lots || []).map((item) => {
+      const lotCards = (item.lots || []).map((lot) => {
+        const takenQty = Number(lot.takeQty || 0);
+        const availableQty = Number(lot.availableQty || 0);
+        const remainingQty = Math.max(0, availableQty - takenQty);
+        return `<article class="produccion-trace-lot-card">
+          <div class="produccion-trace-lot-head">
+            <strong>Lote ${escapeHtml(lot.lotNumber || lot.entryId || '-')}</strong>
+            <span class="produccion-expiry-badge is-${escapeHtml(lot.status || 'unknown')}">${escapeHtml((lot.expiryDate || 'Sin vencimiento').replaceAll('-', '/'))}</span>
+          </div>
+          <div class="produccion-trace-grid">
+            <p><strong>Usado</strong><span>${formatCompactQty(takenQty, lot.unit || item.unit || '')}</span></p>
+            <p><strong>Disponible</strong><span>${formatCompactQty(availableQty, lot.unit || item.unit || '')}</span></p>
+            <p><strong>Remanente</strong><span>${formatCompactQty(remainingQty, lot.unit || item.unit || '')}</span></p>
+            <p><strong>Proveedor</strong><span>${escapeHtml(lot.provider || 'Sin proveedor')}</span></p>
+            <p><strong>Factura</strong><span>${escapeHtml(lot.invoiceNumber || '-')}</span></p>
+            <p><strong>Ingreso</strong><span>${escapeHtml(lot.entryDate || '-')}</span></p>
+          </div>
+          ${Array.isArray(lot.invoiceImageUrls) && lot.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Adjuntos (${lot.invoiceImageUrls.length})</span></button>` : ''}
         </article>`;
       }).join('');
-      return `<div class="produccion-trace-row">
-        <article class="produccion-trace-node">
-          <div class="produccion-trace-node-head">${escapeHtml(item.ingredientName || item.ingredientId)}</div>
-          <p class="m-0">Producción: <strong>${escapeHtml(registro.id)}</strong></p>
-          <p class="m-0">Fecha/Hora: <strong>${escapeHtml(formatDateTime(registro.createdAt))}</strong></p>
-          <p class="m-0">Cantidad total: <strong>${Number(item.requiredQty || 0).toFixed(2)} ${escapeHtml(item.unit || '')}</strong></p>
-        </article>
-        <div class="produccion-trace-arrow"><img src="./IMG/Octicons-git-merge.svg" alt="Merge" width="20" height="20"></div>
-        <div class="produccion-trace-lot-grid">${lotsHtml || '<p class="m-0">Sin lotes</p>'}</div>
-      </div>`;
+
+      return `<article class="produccion-trace-ingredient">
+        <header>
+          <h6>${escapeHtml(item.ingredientName || item.ingredientId || 'Ingrediente')}</h6>
+          <small>Necesario: ${formatCompactQty(item.requiredQty, item.unit || '')}</small>
+        </header>
+        <div class="produccion-trace-lots">${lotCards || '<p class="m-0">Sin lotes asociados.</p>'}</div>
+      </article>`;
     }).join('');
 
-    return `<div class="produccion-trace-tree" id="produccionTraceTree">
-      <div class="produccion-trace-canvas" id="produccionTraceCanvas">
-        <article class="produccion-trace-node mb-3">
-          <div class="produccion-trace-node-head">Producción ${escapeHtml(registro.id)}</div>
-          <p class="m-0"><strong>Producto:</strong> ${escapeHtml(registro.recipeTitle || '-')} · <strong>Cantidad:</strong> ${Number(registro.quantityKg || 0).toFixed(2)} kg</p>
-          <p class="m-0"><strong>Responsables:</strong> ${escapeHtml((registro.managers || []).join(', ') || registro.createdBy || '-')}</p>
-        </article>
-        ${lines || '<p>Sin desglose disponible</p>'}
-      </div>
-    </div>
-    <div class="image-viewer-controls mt-2">
-      <button id="prodTraceZoomOutBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
-      <button id="prodTraceZoomInBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
-    </div>`;
+    return `<section class="produccion-trace-v2">
+      <article class="produccion-trace-summary">
+        <h6>Producción ${escapeHtml(registro.id)}</h6>
+        <div class="produccion-trace-grid">
+          <p><strong>Producto</strong><span>${escapeHtml(registro.recipeTitle || '-')}</span></p>
+          <p><strong>Cantidad</strong><span>${Number(registro.quantityKg || 0).toFixed(2)} kg</span></p>
+          <p><strong>Fecha</strong><span>${escapeHtml(formatDateTime(registro.createdAt))}</span></p>
+          <p><strong>Estado</strong><span>${escapeHtml(registro.status || '-')}</span></p>
+        </div>
+        <div class="produccion-trace-managers">${managerBadges || '<span class="produccion-trace-chip"><strong>Sin responsable</strong><small>Encargado</small></span>'}</div>
+      </article>
+      <div class="produccion-trace-ingredients">${ingredients || '<p class="m-0">Sin desglose de lotes para esta producción.</p>'}</div>
+    </section>`;
   };
 
   const openTraceability = async (registro) => {
-    state.historyTraceZoom = 1;
     await openIosSwal({
       title: `Trazabilidad ${registro.id}`,
       html: renderTraceabilityTree(registro),
       width: '94vw',
       confirmButtonText: 'Cerrar',
       didOpen: (popup) => {
-        const canvas = popup.querySelector('#produccionTraceCanvas');
-        const apply = () => { if (canvas) canvas.style.transform = `scale(${state.historyTraceZoom})`; };
-        popup.querySelector('#prodTraceZoomOutBtn')?.addEventListener('click', () => { state.historyTraceZoom = Math.max(0.6, state.historyTraceZoom - 0.1); apply(); });
-        popup.querySelector('#prodTraceZoomInBtn')?.addEventListener('click', () => { state.historyTraceZoom = Math.min(2.2, state.historyTraceZoom + 0.1); apply(); });
-
-        const tree = popup.querySelector('#produccionTraceTree');
-        let dragging = false;
-        let startX = 0;
-        let scrollLeft = 0;
-        tree?.addEventListener('mousedown', (event) => {
-          dragging = true;
-          startX = event.pageX - tree.offsetLeft;
-          scrollLeft = tree.scrollLeft;
-        });
-        tree?.addEventListener('mouseleave', () => { dragging = false; });
-        tree?.addEventListener('mouseup', () => { dragging = false; });
-        tree?.addEventListener('mousemove', (event) => {
-          if (!dragging) return;
-          event.preventDefault();
-          const x = event.pageX - tree.offsetLeft;
-          const walk = (x - startX) * 1.2;
-          tree.scrollLeft = scrollLeft - walk;
-        });
-
         popup.querySelectorAll('[data-prod-trace-images]').forEach((btn) => {
           btn.addEventListener('click', async () => {
             const urls = JSON.parse(decodeURIComponent(btn.dataset.prodTraceImages || '[]'));
@@ -1014,24 +1018,20 @@
         <td>${Number(item.quantityKg || 0).toFixed(2)} kg</td>
         <td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td>
         <td>${escapeHtml(item.status || '-')}</td>
+        <td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${item.id}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td>
         <td>
-          <div class="report-comment-actions">
-            <button type="button" class="report-comment-reply-btn" data-prod-report="${item.id}">Informe</button>
-            <button type="button" class="report-comment-reply-btn" data-prod-trace="${item.id}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"> Trazabilidad</button>
-            <button type="button" class="report-comment-reply-btn" data-prod-print="${item.id}">Imprimir</button>
-            <button type="button" class="report-comment-reply-btn" data-prod-excel="${item.id}">Excel</button>
-            <button type="button" class="report-comment-reply-btn" data-prod-pdf="${item.id}">PDF</button>
-            <button type="button" class="report-comment-reply-btn" data-prod-edit="${item.id}">Editar</button>
-            <button type="button" class="report-comment-reply-btn is-danger" data-prod-cancel="${item.id}">Anular</button>
+          <div class="inventario-entry-actions">
+            <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-prod-print="${item.id}" title="Imprimir"><i class="fa-solid fa-print"></i></button>
+            <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn inventario-icon-only-btn" data-prod-cancel="${item.id}" title="Anular"><i class="fa-solid fa-trash"></i></button>
           </div>
         </td>
       </tr>`;
-    }).join('') : '<tr><td colspan="7" class="text-center">Sin producciones en ese rango.</td></tr>';
+    }).join('') : '<tr><td colspan="8" class="text-center">Sin producciones en ese rango.</td></tr>';
 
     nodes.historyTableWrap.innerHTML = `
       <div class="table-responsive inventario-global-table inventario-table-compact-wrap">
         <table class="table recipe-table inventario-table-compact mb-0">
-          <thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad fabricada</th><th>Responsable</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad fabricada</th><th>Responsable</th><th>Estado</th><th>Trazabilidad</th><th>Acciones</th></tr></thead>
           <tbody>${htmlRows}</tbody>
         </table>
       </div>
@@ -1802,8 +1802,15 @@
     setHistoryMode(false);
   });
 
+  nodes.historySearch?.setAttribute('autocomplete', 'new-password');
+
   nodes.historySearch?.addEventListener('input', (event) => {
     state.historySearch = event.target.value;
+    state.historyPage = 1;
+    renderHistoryTable();
+  });
+
+  nodes.historyApplyBtn?.addEventListener('click', () => {
     state.historyPage = 1;
     renderHistoryTable();
   });
@@ -1883,12 +1890,6 @@
       return;
     }
     const getRegistro = (key) => state.registros[key];
-    const reportBtn = event.target.closest('[data-prod-report]');
-    if (reportBtn) {
-      const reg = getRegistro(reportBtn.dataset.prodReport);
-      if (reg) await openIosSwal({ title: `Informe ${reg.id}`, html: reportHtml(reg), width: '92vw', confirmButtonText: 'Cerrar' });
-      return;
-    }
     const traceBtn = event.target.closest('[data-prod-trace]');
     if (traceBtn) {
       const reg = getRegistro(traceBtn.dataset.prodTrace);
@@ -1899,24 +1900,6 @@
     if (printBtn) {
       const reg = getRegistro(printBtn.dataset.prodPrint);
       if (reg) await printReport(reg);
-      return;
-    }
-    const excelBtn = event.target.closest('[data-prod-excel]');
-    if (excelBtn) {
-      const reg = getRegistro(excelBtn.dataset.prodExcel);
-      if (reg) await exportProductionExcel(reg);
-      return;
-    }
-    const pdfBtn = event.target.closest('[data-prod-pdf]');
-    if (pdfBtn) {
-      const reg = getRegistro(pdfBtn.dataset.prodPdf);
-      if (reg) await exportProductionPdf(reg);
-      return;
-    }
-    const editBtn = event.target.closest('[data-prod-edit]');
-    if (editBtn) {
-      const reg = getRegistro(editBtn.dataset.prodEdit);
-      if (reg) await editProduction(reg);
       return;
     }
     const cancelBtn = event.target.closest('[data-prod-cancel]');
@@ -1956,7 +1939,6 @@
             state.historyRange = from && to ? `${from} a ${to}` : from;
             nodes.historyRange.value = state.historyRange;
             state.historyPage = 1;
-            renderHistoryTable();
           }
         });
       }

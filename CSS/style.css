@@ -4995,9 +4995,19 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-period-board .inventario-period-filters {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto auto auto auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
+}
+
+#produccionGlobalRange {
+  min-width: 220px;
+  flex: 1 1 240px;
+}
+
+#produccionHistorySearch {
+  min-width: 220px;
+  flex: 1 1 240px;
 }
 
 .produccion-responsable-wrap {
@@ -5012,6 +5022,111 @@ html.login-protected.auth-ok body {
 .produccion-responsable-wrap small {
   color: #6a7a9d;
   font-size: 0.74rem;
+}
+
+.produccion-trace-v2 {
+  display: grid;
+  gap: 12px;
+  text-align: left;
+}
+
+.produccion-trace-summary,
+.produccion-trace-ingredient {
+  border: 1px solid #dbe4f8;
+  border-radius: 14px;
+  background: #f8fbff;
+  padding: 12px;
+}
+
+.produccion-trace-ingredients {
+  display: grid;
+  gap: 10px;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.produccion-trace-ingredient header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.produccion-trace-ingredient h6 {
+  margin: 0;
+  color: #2b416f;
+}
+
+.produccion-trace-ingredient small {
+  color: #5a6f97;
+}
+
+.produccion-trace-lots {
+  display: grid;
+  gap: 8px;
+}
+
+.produccion-trace-lot-card {
+  border: 1px solid #dce5f8;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.produccion-trace-lot-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.produccion-trace-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+.produccion-trace-grid p {
+  margin: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.produccion-trace-grid strong {
+  color: #5d7098;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+}
+
+.produccion-trace-grid span {
+  color: #27457d;
+  font-weight: 700;
+}
+
+.produccion-trace-managers {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.produccion-trace-chip {
+  border: 1px solid #d3ddf3;
+  border-radius: 999px;
+  background: #eef3ff;
+  color: #2f4f8b;
+  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.produccion-trace-chip small {
+  color: #6f80a6;
+  font-size: 0.72rem;
 }
 
 .produccion-trace-tree {
@@ -5062,7 +5177,8 @@ html.login-protected.auth-ok body {
 
 @media (max-width: 991.98px) {
   .produccion-period-board .inventario-period-filters {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .produccion-toolbar-actions {
@@ -5458,6 +5574,10 @@ html.login-protected.auth-ok body {
 }
 
 @media (max-width: 768px) {
+  .produccion-trace-grid {
+    grid-template-columns: 1fr;
+  }
+
   .produccion-stats-line {
     align-items: flex-start;
   }
