@@ -4606,6 +4606,11 @@ html.login-protected.auth-ok body {
   justify-content: flex-end;
 }
 
+.inventario-selector-row {
+  justify-content: flex-start;
+  width: 100%;
+}
+
 .inventario-expand-btn {
   background: #ff8a2a;
   border: 1px solid #ff8a2a;
@@ -4634,6 +4639,28 @@ html.login-protected.auth-ok body {
 .inventario-stock-grid .form-label {
   color: #425681;
   font-weight: 700;
+}
+
+.inventario-upload-dropzone {
+  width: 100%;
+  min-height: 64px;
+  border: 1px dashed #b8c9ee;
+  border-radius: 12px;
+  background: #f5f8ff;
+  color: #3b5da7;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-align: center;
+  padding: 12px;
+}
+
+.inventario-hidden-file-input {
+  display: none;
 }
 
 #imageViewerModal {

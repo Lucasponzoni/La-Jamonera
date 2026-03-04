@@ -79,6 +79,7 @@
   const safeObject = (value) => (value && typeof value === 'object' ? value : {});
   const normalizeValue = (value) => String(value || '').trim();
   const normalizeLower = (value) => normalizeValue(value).toLowerCase();
+  const normalizeUpper = (value) => normalizeValue(value).toUpperCase();
   const capitalize = (value) => normalizeLower(value).replace(/(^|\s)\S/g, (ch) => ch.toUpperCase());
   const sentenceCase = (value) => {
     const text = normalizeValue(value).toLowerCase();
@@ -135,6 +136,13 @@
     const parsed = Number(normalizeValue(value).replace(',', '.'));
     return Number.isFinite(parsed) ? parsed : NaN;
   };
+
+  const providerLabel = (value) => normalizeValue(value) || 'No indica';
+  const sortedProviders = () => [...(Array.isArray(state.inventario?.config?.providers) ? state.inventario.config.providers : [])]
+    .map((item) => normalizeUpper(item))
+    .filter(Boolean)
+    .filter((item, index, arr) => arr.indexOf(item) === index)
+    .sort((a, b) => a.localeCompare(b, 'es'));
 
   const measureKey = (value) => normalizeLower(value);
   const getMeasureLabel = (name) => {
@@ -312,7 +320,10 @@
     state.inventario = {
       config: {
         globalLowThresholdKg: Number(inv?.config?.globalLowThresholdKg) >= 0 ? Number(inv.config.globalLowThresholdKg) : DEFAULT_LOW_THRESHOLD,
-        expiringSoonDays: Number(inv?.config?.expiringSoonDays) >= 0 ? Number(inv.config.expiringSoonDays) : DEFAULT_EXPIRING_SOON_DAYS
+        expiringSoonDays: Number(inv?.config?.expiringSoonDays) >= 0 ? Number(inv.config.expiringSoonDays) : DEFAULT_EXPIRING_SOON_DAYS,
+        providers: Array.isArray(inv?.config?.providers)
+          ? inv.config.providers.map((item) => normalizeUpper(item)).filter(Boolean)
+          : []
       },
       items: safeObject(inv?.items)
     };
@@ -526,11 +537,13 @@
           ingredientDescription: sentenceCase(ingredient.description || 'Sin descripción'),
           ingredientImageUrl: ingredient.imageUrl || '',
           entryDate: entry.entryDate || '-',
+          entryDateTime: formatDateTime(entry.createdAt),
           createdAt: entry.createdAt,
           qtyKg: Number(entry.qtyKg || 0),
           qty: Number(entry.qty || 0),
           unit: entry.unit || '',
           invoiceNumber: entry.invoiceNumber || '-',
+          provider: providerLabel(entry.provider),
           invoiceImageUrls: entryImageUrls(entry),
           invoiceImageUrl: entryImageUrls(entry)[0] || ''
         });
@@ -554,17 +567,18 @@
     const pageRows = rows.slice(start, start + PAGE_SIZE);
     const htmlRows = pageRows.length ? pageRows.map((row, index) => `
       <tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
-        <td>${escapeHtml(row.entryDate)}</td>
+        <td>${escapeHtml(row.entryDateTime)}</td>
         <td>${escapeHtml(row.ingredientName)}</td>
         <td>${row.qtyKg.toFixed(2)} kg</td>
         <td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td>
         <td>${escapeHtml(row.invoiceNumber)}</td>
+        <td>${escapeHtml(row.provider)}</td>
         <td>${row.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-global-images="${encodeURIComponent(JSON.stringify(row.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Ver (${row.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>No posee foto</button>'}</td>
-      </tr>`).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos en ese rango.</td></tr>';
+      </tr>`).join('') : '<tr><td colspan="7" class="text-center">Sin ingresos en ese rango.</td></tr>';
     nodes.globalTableWrap.innerHTML = `
       <div class="table-responsive inventario-global-table inventario-table-compact-wrap">
         <table class="table recipe-table inventario-table-compact mb-0">
-          <thead><tr><th>Fecha</th><th>Producto</th><th>Kilos</th><th>Cantidad</th><th>N° factura</th><th>Imagen</th></tr></thead>
+          <thead><tr><th>Fecha y hora</th><th>Producto</th><th>Kilos</th><th>Cantidad</th><th>N° factura</th><th>Proveedor</th><th>Imagen</th></tr></thead>
           <tbody>${htmlRows}</tbody>
         </table>
       </div>
@@ -757,7 +771,7 @@
     const range = parseRangeValue(state.tableDateRange);
     return entries.filter((entry) => {
       if (search) {
-        const blob = [entry.entryDate, entry.expiryDate, entry.invoiceNumber, entry.qty, entry.unit].map(normalizeLower).join(' ');
+        const blob = [entry.entryDate, entry.expiryDate, entry.invoiceNumber, entry.provider, entry.qty, entry.unit].map(normalizeLower).join(' ');
         if (!blob.includes(search)) return false;
       }
       if ((range.from || range.to) && !inDateRange(entry.entryDate, range.from, range.to)) return false;
@@ -807,12 +821,13 @@
     if (includeImages) {
       await preloadImages(entries.flatMap((entry) => entryImageUrls(entry)).concat([ingredient.imageUrl]));
     }
-    const rows = entries.map((entry) => `
-      <tr class="inventario-row-tone">
+    const rows = entries.map((entry, index) => `
+      <tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
         <td>${formatDateTime(entry.createdAt)}</td>
         <td>${escapeHtml(entry.expiryDate || '-')}</td>
         <td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td>
         <td>${escapeHtml(entry.invoiceNumber || '-')}</td>
+        <td>${escapeHtml(providerLabel(entry.provider))}</td>
         <td>${includeImages ? (entryImageUrls(entry).length ? `Ver bloque de imágenes (${entryImageUrls(entry).length})` : 'Sin imagen') : (entryImageUrls(entry).length ? `Posee ${entryImageUrls(entry).length} imagen/es` : 'Sin imagen')}</td>
       </tr>`).join('');
 
@@ -843,8 +858,8 @@
             </div>
           </section>
           <table>
-            <thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>N° factura</th><th>Imagen</th></tr></thead>
-            <tbody>${rows || '<tr><td colspan="5">Sin datos</td></tr>'}</tbody>
+            <thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>N° factura</th><th>Proveedor</th><th>Imagen</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody>
           </table>
           ${imagesHtml}
         </body>
@@ -880,8 +895,8 @@
         <label class="inventario-check-row"><input type="radio" name="printScope" value="all" checked><span>Incluir todos los productos</span></label>
         <label class="inventario-check-row"><input type="radio" name="printScope" value="exclude"><span>Excluir algunos productos</span></label>
         <div id="printProductsScope" class="notify-specific-users-list d-none">
-          <div class="step-block"><strong>Familias</strong>${Object.values(state.familias).map((family) => `<label class="inventario-check-row inventario-print-row">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb inventario-print-photo" src="${family.imageUrl}" alt="${escapeHtml(capitalize(family.name))}"></span>` : ''}<input type="checkbox" data-print-family value="${family.id}"><span>${escapeHtml(capitalize(family.name))}</span></label>`).join('')}</div>
-          <div class="step-block"><strong>Productos</strong>${Object.values(state.ingredientes).map((item) => `<label class="inventario-check-row inventario-print-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb inventario-print-photo" src="${item.imageUrl}" alt="${escapeHtml(capitalize(item.name))}"></span>` : ''}<input type="checkbox" data-print-product data-family-id="${item.familyId || ''}" value="${item.id}"><span>${escapeHtml(capitalize(item.name))}</span></label>`).join('')}</div>
+          <div class="step-block"><strong>Familias</strong>${Object.values(state.familias).map((family) => `<label class="inventario-check-row inventario-selector-row">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb inventario-print-photo" src="${family.imageUrl}" alt="${escapeHtml(capitalize(family.name))}"></span>` : ''}<input type="checkbox" data-print-family value="${family.id}"><span>${escapeHtml(capitalize(family.name))}</span></label>`).join('')}</div>
+          <div class="step-block"><strong>Productos</strong>${Object.values(state.ingredientes).map((item) => `<label class="inventario-check-row inventario-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb inventario-print-photo" src="${item.imageUrl}" alt="${escapeHtml(capitalize(item.name))}"></span>` : ''}<input type="checkbox" data-print-product data-family-id="${item.familyId || ''}" value="${item.id}"><span>${escapeHtml(capitalize(item.name))}</span></label>`).join('')}</div>
         </div>
       </div>`,
       showCancelButton: true,
@@ -931,8 +946,8 @@
     const content = Object.keys(grouped).map((ingredientId) => {
       const productRows = grouped[ingredientId];
       const head = productRows[0];
-      const tableRows = productRows.map((row) => `<tr><td>${escapeHtml(row.entryDate)}</td><td>${formatTimeOnly(row.createdAt)}</td><td>${row.qtyKg.toFixed(2)} kg</td><td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td><td>${escapeHtml(row.invoiceNumber)}</td><td>${includeImages ? (row.invoiceImageUrls?.length ? `Ver bloque de imágenes (${row.invoiceImageUrls.length})` : 'Sin imagen') : (row.invoiceImageUrls?.length ? `Posee ${row.invoiceImageUrls.length} imagen/es` : 'Sin imagen')}</td></tr>`).join('');
-      return `<section style="margin-bottom:14px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">${head.ingredientImageUrl ? `<img src="${head.ingredientImageUrl}" style="width:62px;height:62px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<div><h2 style="margin:0;font-size:18px;">${escapeHtml(head.ingredientName)}</h2><p style="margin:0;color:#55607f;font-size:12px;">${escapeHtml(head.ingredientDescription)}</p></div></div><table><thead><tr><th>Fecha</th><th>Hora</th><th>Kilos</th><th>Cantidad</th><th>N° factura</th><th>Imagen</th></tr></thead><tbody>${tableRows}</tbody></table></section>`;
+      const tableRows = productRows.map((row) => `<tr><td>${escapeHtml(row.entryDateTime)}</td><td>${row.qtyKg.toFixed(2)} kg</td><td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td><td>${escapeHtml(row.invoiceNumber)}</td><td>${escapeHtml(row.provider)}</td><td>${includeImages ? (row.invoiceImageUrls?.length ? `Ver bloque de imágenes (${row.invoiceImageUrls.length})` : 'Sin imagen') : (row.invoiceImageUrls?.length ? `Posee ${row.invoiceImageUrls.length} imagen/es` : 'Sin imagen')}</td></tr>`).join('');
+      return `<section style="margin-bottom:14px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">${head.ingredientImageUrl ? `<img src="${head.ingredientImageUrl}" style="width:62px;height:62px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<div><h2 style="margin:0;font-size:18px;">${escapeHtml(head.ingredientName)}</h2><p style="margin:0;color:#55607f;font-size:12px;">${escapeHtml(head.ingredientDescription)}</p></div></div><table><thead><tr><th>Fecha y hora</th><th>Kilos</th><th>Cantidad</th><th>N° factura</th><th>Proveedor</th><th>Imagen</th></tr></thead><tbody>${tableRows}</tbody></table></section>`;
     }).join('');
 
     const imagesHtml = includeImages
@@ -1020,6 +1035,7 @@
         <td>${entry.expiryDate || '-'}</td>
         <td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td>
         <td>${escapeHtml(entry.invoiceNumber || '-')}</td>
+        <td>${escapeHtml(providerLabel(entry.provider))}</td>
         <td>${entryImageUrls(entry).length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-invoice-image="${entry.id}"><i class="fa-regular fa-image"></i><span>Ver (${entryImageUrls(entry).length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin foto</button>'}</td>
         <td>
           <div class="inventario-entry-actions">
@@ -1027,7 +1043,7 @@
             <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn inventario-icon-only-btn" data-delete-entry="${entry.id}" aria-label="Eliminar ingreso"><i class="fa-solid fa-trash"></i></button>
           </div>
         </td>
-      </tr>`).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos para mostrar.</td></tr>';
+      </tr>`).join('') : '<tr><td colspan="7" class="text-center">Sin ingresos para mostrar.</td></tr>';
 
     return `
       <div class="inventario-table-wrap">
@@ -1049,7 +1065,7 @@
         </div>
         <div class="table-responsive inventario-table-compact-wrap">
           <table class="table recipe-table inventario-table-compact mb-0">
-            <thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura</th><th>Imagen</th><th>Acción</th></tr></thead>
+            <thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura</th><th>Proveedor</th><th>Imagen</th><th>Acción</th></tr></thead>
             <tbody>${rowsHtml}</tbody>
           </table>
         </div>
@@ -1217,6 +1233,7 @@
       entryDate: getArgentinaIsoDate(),
       expiryDate: addDaysToIso(getArgentinaIsoDate(), 5),
       invoiceNumber: '',
+      provider: '',
       invoiceImageFile: null,
       tokens: [...record.lotConfig.tokens],
       customAcronym: normalizeValue(record.lotConfig.customAcronym),
@@ -1231,6 +1248,7 @@
     nodes.editorTitle.textContent = `Inventario · ${capitalize(ingredient.name)}`;
 
     const shouldShowExpiring = expiringKg > 0;
+    const providers = sortedProviders();
 
     const lotOptionRows = LOT_TOKEN_OPTIONS.map((option) => `
       <label class="inventario-check-row">
@@ -1316,8 +1334,20 @@
             <textarea id="inventoryInvoiceNumber" name="inventory_code_free" class="form-control ios-input inventario-invoice-textarea" rows="1" placeholder="Ej: A-000123" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text">${escapeHtml(state.editorDraft.invoiceNumber)}</textarea>
           </div>
           <div class="recipe-field recipe-field-half">
+            <label class="form-label" for="inventoryProvider"><i class="fa-solid fa-truck-field inventario-step-icon"></i> Proveedor</label>
+            <select id="inventoryProvider" class="form-select ios-input" autocomplete="off">
+              <option value="">Seleccionar proveedor (opcional)</option>
+              ${providers.map((provider) => `<option value="${escapeHtml(provider)}" ${normalizeUpper(state.editorDraft.provider) === provider ? 'selected' : ''}>${escapeHtml(provider)}</option>`).join('')}
+              <option value="add_provider">+ Agregar proveedor</option>
+            </select>
+          </div>
+          <div class="recipe-field recipe-field-full">
             <label class="form-label" for="inventoryInvoiceImage"><i class="fa-regular fa-images inventario-step-icon"></i> Adjuntar foto(s)</label>
-            <input id="inventoryInvoiceImage" class="form-control image-file-input" autocomplete="off" type="file" accept="image/*" multiple>
+            <label for="inventoryInvoiceImage" class="inventario-upload-dropzone">
+              <i class="fa-regular fa-images"></i>
+              <span>Arrastrá imágenes o hacé click para seleccionar</span>
+            </label>
+            <input id="inventoryInvoiceImage" class="form-control image-file-input inventario-hidden-file-input" autocomplete="off" type="file" accept="image/*" multiple>
           </div>
         </div>
           <div class="recipe-table-actions inventario-save-inline">
@@ -1341,6 +1371,7 @@
       state.editorDraft.entryDate = nodes.editorForm.querySelector('#inventoryEntryDate')?.value || '';
       state.editorDraft.expiryDate = nodes.editorForm.querySelector('#inventoryExpiryDate')?.value || '';
       state.editorDraft.invoiceNumber = nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value || '';
+      state.editorDraft.provider = nodes.editorForm.querySelector('#inventoryProvider')?.value || '';
       state.editorDraft.customAcronym = nodes.editorForm.querySelector('#lotCustomAcronym')?.value || '';
       state.editorDraft.includeSeparator = Boolean(nodes.editorForm.querySelector('#lotIncludeSeparator')?.checked);
       state.editorDraft.separator = nodes.editorForm.querySelector('#lotSeparator')?.value || '-';
@@ -1489,6 +1520,38 @@
       renderEditor(ingredientId, state.editorDraft);
     });
 
+    nodes.editorForm.querySelector('#inventoryProvider')?.addEventListener('change', async (event) => {
+      if (event.target.value !== 'add_provider') {
+        syncDraft();
+        return;
+      }
+
+      const result = await openIosSwal({
+        title: 'Agregar proveedor',
+        html: '<input id="newProviderName" class="swal2-input ios-input" placeholder="Nombre del proveedor">',
+        showCancelButton: true,
+        confirmButtonText: 'Guardar',
+        cancelButtonText: 'Cancelar',
+        preConfirm: () => {
+          const provider = normalizeUpper(document.getElementById('newProviderName')?.value);
+          if (!provider) {
+            Swal.showValidationMessage('Completá el nombre del proveedor.');
+            return false;
+          }
+          return provider;
+        }
+      });
+
+      if (result.isConfirmed) {
+        const merged = new Set([...(state.inventario.config.providers || []), result.value]);
+        state.inventario.config.providers = [...merged].map((item) => normalizeUpper(item)).filter(Boolean).sort((a, b) => a.localeCompare(b, 'es'));
+        state.editorDraft.provider = result.value;
+        await persistInventario();
+      }
+
+      renderEditor(ingredientId, state.editorDraft);
+    });
+
     nodes.editorForm.querySelectorAll('input:not([type="file"]),select,textarea').forEach((el) => {
       el.addEventListener('input', syncDraft);
       el.addEventListener('change', syncDraft);
@@ -1550,8 +1613,8 @@
 
     nodes.editorForm.querySelector('#inventarioExpandTableBtn')?.addEventListener('click', async () => {
       const fullRows = getFilteredEntries(Array.isArray(record.entries) ? record.entries : []);
-      const htmlRows = fullRows.length ? fullRows.map((entry) => `<tr><td>${formatDateTime(entry.createdAt)}</td><td>${entry.expiryDate || '-'}</td><td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td>${buildExpandedImageCell(entryImageUrls(entry))}</td></tr>`).join('') : '<tr><td colspan="5" class="text-center">Sin ingresos para mostrar.</td></tr>';
-      await openExpandedTable('Historial ampliado', `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura</th><th>Imagen</th></tr></thead><tbody>${htmlRows}</tbody></table></div>`);
+      const htmlRows = fullRows.length ? fullRows.map((entry, index) => `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${formatDateTime(entry.createdAt)}</td><td>${entry.expiryDate || '-'}</td><td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td>${escapeHtml(providerLabel(entry.provider))}</td><td>${buildExpandedImageCell(entryImageUrls(entry))}</td></tr>`).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos para mostrar.</td></tr>';
+      await openExpandedTable('Historial ampliado', `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura</th><th>Proveedor</th><th>Imagen</th></tr></thead><tbody>${htmlRows}</tbody></table></div>`);
     });
 
     nodes.editorForm.querySelector('#inventarioPrintFilteredBtn')?.addEventListener('click', async () => {
@@ -1571,6 +1634,7 @@
           'Fecha caducidad': entry.expiryDate || '-',
           Cantidad: `${Number(entry.qty || 0).toFixed(2)} ${entry.unit || ''}`,
           'N° factura': entry.invoiceNumber || '-',
+          Proveedor: providerLabel(entry.provider),
           Imágenes: links,
           __firstImage: urls[0] || ''
         };
@@ -1578,7 +1642,7 @@
       await makeWorkbook({
         fileName: `inventario_${normalizeLower(ingredient.name || 'producto')}_${Date.now()}.xlsx`,
         sheetName: 'Historial',
-        headers: ['Fecha', 'Fecha caducidad', 'Cantidad', 'N° factura', 'Imágenes'],
+        headers: ['Fecha', 'Fecha caducidad', 'Cantidad', 'N° factura', 'Proveedor', 'Imágenes'],
         rows: payload
       });
     });
@@ -1664,6 +1728,7 @@
     const entryDate = normalizeValue(nodes.editorForm.querySelector('#inventoryEntryDate')?.value);
     const expiryDate = normalizeValue(nodes.editorForm.querySelector('#inventoryExpiryDate')?.value);
     const invoiceNumber = normalizeValue(nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value);
+    const provider = normalizeUpper(nodes.editorForm.querySelector('#inventoryProvider')?.value);
     const files = [...(nodes.editorForm.querySelector('#inventoryInvoiceImage')?.files || [])];
     const record = getRecord(ingredientId);
 
@@ -1733,6 +1798,7 @@
         entryDate,
         expiryDate,
         invoiceNumber,
+        provider,
         invoiceImageUrl: invoiceImageUrls[0] || '',
         invoiceImageUrls,
         createdAt: Date.now()
@@ -1760,6 +1826,7 @@
         ...state.editorDraft,
         qty: '',
         invoiceNumber: '',
+        provider: '',
         expiryDate: addDaysToIso(getArgentinaIsoDate(), 5),
         entryDate: getArgentinaIsoDate()
       });
@@ -1928,8 +1995,8 @@
 
   nodes.globalExpandBtn?.addEventListener('click', async () => {
     const rows = getGlobalFilteredEntries();
-    const htmlRows = rows.length ? rows.map((row) => `<tr><td>${escapeHtml(row.entryDate)}</td><td>${escapeHtml(row.ingredientName)}</td><td>${row.qtyKg.toFixed(2)} kg</td><td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td><td>${escapeHtml(row.invoiceNumber)}</td><td>${buildExpandedImageCell(row.invoiceImageUrls)}</td></tr>`).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos en ese rango.</td></tr>';
-    await openExpandedTable('Ingresos por período (ampliado)', `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha</th><th>Producto</th><th>Kilos</th><th>Cantidad</th><th>N° factura</th><th>Imagen</th></tr></thead><tbody>${htmlRows}</tbody></table></div>`);
+    const htmlRows = rows.length ? rows.map((row, index) => `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(row.entryDateTime)}</td><td>${escapeHtml(row.ingredientName)}</td><td>${row.qtyKg.toFixed(2)} kg</td><td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td><td>${escapeHtml(row.invoiceNumber)}</td><td>${escapeHtml(row.provider)}</td><td>${buildExpandedImageCell(row.invoiceImageUrls)}</td></tr>`).join('') : '<tr><td colspan="7" class="text-center">Sin ingresos en ese rango.</td></tr>';
+    await openExpandedTable('Ingresos por período (ampliado)', `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha y hora</th><th>Producto</th><th>Kilos</th><th>Cantidad</th><th>N° factura</th><th>Proveedor</th><th>Imagen</th></tr></thead><tbody>${htmlRows}</tbody></table></div>`);
   });
 
   nodes.globalPrintBtn?.addEventListener('click', async () => {
@@ -1938,18 +2005,19 @@
   nodes.globalExcelBtn?.addEventListener('click', async () => {
     const rows = getGlobalFilteredEntries();
     const payload = rows.map((row) => ({
-      Fecha: row.entryDate,
+      'Fecha y hora': row.entryDateTime,
       Producto: row.ingredientName,
       Kilos: `${row.qtyKg.toFixed(2)} kg`,
       Cantidad: `${row.qty.toFixed(2)} ${row.unit}`,
       'N° factura': row.invoiceNumber,
+      Proveedor: row.provider,
       Imágenes: row.invoiceImageUrls.length ? row.invoiceImageUrls.map((_, index) => `LINK ${index + 1}`).join(', ') : '-',
       __firstImage: row.invoiceImageUrls[0] || ''
     }));
     await makeWorkbook({
       fileName: `inventario_periodo_${Date.now()}.xlsx`,
       sheetName: 'Periodo',
-      headers: ['Fecha', 'Producto', 'Kilos', 'Cantidad', 'N° factura', 'Imágenes'],
+      headers: ['Fecha y hora', 'Producto', 'Kilos', 'Cantidad', 'N° factura', 'Proveedor', 'Imágenes'],
       rows: payload
     });
   });
