@@ -4033,6 +4033,7 @@ html.login-protected.auth-ok body {
   padding: 6px 10px;
   font-size: 0.78rem;
   border-radius: 16px;
+  font-size: 16px;
 }
 
 .inventario-actions-row .inventario-threshold-btn:hover {
