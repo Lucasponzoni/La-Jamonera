@@ -4023,7 +4023,7 @@ html.login-protected.auth-ok body {
   min-height: 34px;
   padding: 6px 10px;
   font-size: 0.78rem;
-  border-radius: 10px;
+  border-radius: 5px;
 }
 
 .inventario-threshold-btn i {
@@ -4331,7 +4331,6 @@ html.login-protected.auth-ok body {
   height: 30px;
   background: #ccd7ef;
   align-self: center;
-  margin-left: auto;
 }
 
 .inventario-table-compact-wrap {
@@ -4636,9 +4635,7 @@ html.login-protected.auth-ok body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #eef3ff;
   color: #315aa6;
-  border: 1px solid #d6dff4;
   font-size: 0.72rem;
 }
 
@@ -4810,11 +4807,17 @@ html.login-protected.auth-ok body {
   background: #ffeef0;
   border-color: #f3ccd3;
   color: #b3475a;
+  min-height: 100% !important;
+  border-radius: 14px !important;
 }
 
 .inventario-delete-btn:hover {
   background: #ffe3e7;
   color: #b3475a;
+}
+
+.inventario-period-filters .inventario-delete-btn{
+  border-radius: 5px !important;
 }
 
 .inventario-stat-row {

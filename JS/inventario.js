@@ -995,6 +995,7 @@
             <div class="inventario-print-row">
               <button type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn" id="inventarioExpandTableBtn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar</span></button>
               <button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" id="inventarioExcelBtn"><i class="fa-solid fa-file-excel"></i><span>Excel</span></button>
+              <span class="inventario-period-divider" aria-hidden="true"></span>
               <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioPrintFilteredBtn"><i class="fa-solid fa-print"></i><span>Imprimir filtro</span></button>
               <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioPrintAllBtn"><i class="fa-solid fa-print"></i><span>Imprimir total</span></button>
             </div>
@@ -1269,7 +1270,7 @@
             <textarea id="inventoryInvoiceNumber" name="inventory_code_free" class="form-control ios-input inventario-invoice-textarea" rows="1" placeholder="Ej: A-000123" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text">${escapeHtml(state.editorDraft.invoiceNumber)}</textarea>
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryInvoiceImage"><i class="fa-regular fa-images inventario-step-icon"></i> Adjuntar foto(s) de factura/remito</label>
+            <label class="form-label" for="inventoryInvoiceImage"><i class="fa-regular fa-images inventario-step-icon"></i> Adjuntar foto(s)</label>
             <input id="inventoryInvoiceImage" class="form-control image-file-input" autocomplete="off" type="file" accept="image/*" multiple>
           </div>
         </div>
