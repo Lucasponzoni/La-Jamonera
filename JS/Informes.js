@@ -256,7 +256,74 @@
     return root.innerHTML;
   };
 
-  const buildPdfDefinition = (report) => {
+  const blobToDataUrl = (blob) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('file_reader_error'));
+    reader.readAsDataURL(blob);
+  });
+
+  const blobToSafePdfImageDataUrl = async (blob) => {
+    const mime = normalizeLower(blob?.type || '');
+    if (mime === 'image/png' || mime === 'image/jpeg' || mime === 'image/jpg') {
+      return blobToDataUrl(blob);
+    }
+
+    const objectUrl = URL.createObjectURL(blob);
+    try {
+      const image = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('image_decode_failed'));
+        img.src = objectUrl;
+      });
+
+      const width = Math.max(1, Number(image.naturalWidth || image.width || 1));
+      const height = Math.max(1, Number(image.naturalHeight || image.height || 1));
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('canvas_context_unavailable');
+      }
+      ctx.drawImage(image, 0, 0, width, height);
+      return canvas.toDataURL('image/png');
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  };
+
+  const imageUrlToDataUrl = async (url) => {
+    const response = await fetch(url, { mode: 'cors' });
+    if (!response.ok) {
+      throw new Error('image_fetch_failed');
+    }
+    const blob = await response.blob();
+    return blobToSafePdfImageDataUrl(blob);
+  };
+
+  const buildPdfEmbeddedImageBlocks = async (images) => {
+    if (!images.length) {
+      return [{ text: 'Sin imágenes adjuntas.', color: '#5a6482' }];
+    }
+
+    const blocks = [];
+    for (const item of images) {
+      const imageName = item.name || 'Imagen';
+      blocks.push({ text: imageName, bold: true, margin: [0, 8, 0, 4] });
+      try {
+        const dataUrl = await imageUrlToDataUrl(item.url);
+        blocks.push({ image: dataUrl, fit: [520, 320], margin: [0, 0, 0, 6] });
+      } catch (error) {
+        blocks.push({ text: `No se pudo incrustar la imagen. Link: ${item.url}`, link: item.url, color: '#1d4ed8', margin: [0, 0, 0, 6] });
+      }
+    }
+    return blocks;
+  };
+
+  const buildPdfDefinition = async (report, options = {}) => {
+    const includeAttachments = options.includeAttachments !== false;
     const attachments = Array.isArray(report?.attachments) ? report.attachments : [];
     const images = attachments.filter((item) => item.type === 'image' && item.url);
     const docs = attachments.filter((item) => item.type !== 'image' && item.url);
@@ -265,6 +332,10 @@
     const htmlContent = window.htmlToPdfmake
       ? window.htmlToPdfmake(safeHtml || '<p>Sin contenido</p>', { window })
       : [{ text: safeHtml || 'Sin contenido' }];
+
+    const imageBlocks = includeAttachments
+      ? await buildPdfEmbeddedImageBlocks(images)
+      : [{ text: 'No incluidas en esta impresión.', color: '#5a6482' }];
 
     return {
       pageSize: 'A4',
@@ -278,13 +349,13 @@
         { text: 'Contenido', style: 'sectionTitle' },
         ...(Array.isArray(htmlContent) ? htmlContent : [htmlContent]),
         { text: 'Imágenes adjuntas', style: 'sectionTitle', margin: [0, 14, 0, 6] },
-        images.length
-          ? { ul: images.map((item) => ({ text: `${item.name || 'Imagen'} - ${item.url}`, link: item.url, color: '#1d4ed8' })) }
-          : { text: 'Sin imágenes adjuntas.', color: '#5a6482' },
+        ...imageBlocks,
         { text: 'Otros adjuntos', style: 'sectionTitle', margin: [0, 14, 0, 6] },
-        docs.length
-          ? { ul: docs.map((item) => ({ text: `${item.name || 'Archivo'}${item.url ? ` - ${item.url}` : ''}`, link: item.url || undefined, color: item.url ? '#1d4ed8' : '#1f2a44' })) }
-          : { text: 'Sin archivos adjuntos.', color: '#5a6482' }
+        !includeAttachments
+          ? { text: 'No incluidos en esta impresión.', color: '#5a6482' }
+          : (docs.length
+            ? { ul: docs.map((item) => ({ text: `${item.name || 'Archivo'}${item.url ? ` - ${item.url}` : ''}`, link: item.url || undefined, color: item.url ? '#1d4ed8' : '#1f2a44' })) }
+            : { text: 'Sin archivos adjuntos.', color: '#5a6482' })
       ],
       styles: {
         title: { fontSize: 18, bold: true },
@@ -332,12 +403,12 @@
     };
   };
 
-  const buildReportPdfBlob = async (report) => {
+  const buildReportPdfBlob = async (report, options = {}) => {
     if (!window.pdfMake || !window.htmlToPdfmake) {
       throw new Error('pdf_lib_unavailable');
     }
 
-    const docDefinition = buildPdfDefinition(report);
+    const docDefinition = await buildPdfDefinition(report, options);
     return await new Promise((resolve, reject) => {
       try {
         window.pdfMake.createPdf(docDefinition).getBlob((blob) => resolve(blob));
@@ -380,6 +451,67 @@
     };
   });
 
+  const waitPrintWindowAssets = async (printWindow) => {
+    const images = [...(printWindow?.document?.images || [])];
+    if (!images.length) return;
+    await Promise.all(images.map((img) => new Promise((resolve) => {
+      if (img.complete) {
+        resolve();
+        return;
+      }
+      img.addEventListener('load', resolve, { once: true });
+      img.addEventListener('error', resolve, { once: true });
+    })));
+  };
+
+  const printReportDirect = async (report, includeAttachments) => {
+    const attachments = Array.isArray(report?.attachments) ? report.attachments : [];
+    const images = attachments.filter((item) => item.type === 'image' && item.url);
+    const docs = attachments.filter((item) => item.type !== 'image' && item.url);
+    const printWindow = window.open('', '_blank', 'width=1300,height=900');
+    if (!printWindow) return;
+
+    const attachmentsHtml = includeAttachments
+      ? `
+        <section style="margin-top:18px;">
+          <h2 style="margin:0 0 10px;font-size:18px;">Imágenes adjuntas</h2>
+          ${images.length
+    ? `<div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${images.map((item, idx) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><img src="${escapeHtml(item.url)}" style="width:100%;max-height:320px;object-fit:contain;border-radius:10px;"><figcaption style="font-size:12px;color:#4b5f8e;margin-top:6px;">${escapeHtml(item.name || `Adjunto ${idx + 1}`)}</figcaption></figure>`).join('')}</div>`
+    : '<p style="margin:0;color:#5a6482;">Sin imágenes adjuntas.</p>'}
+        </section>
+        <section style="margin-top:16px;">
+          <h2 style="margin:0 0 8px;font-size:18px;">Otros adjuntos</h2>
+          ${docs.length
+    ? `<ul style="margin:0;padding-left:18px;">${docs.map((item) => `<li><a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.name || 'Archivo adjunto')}</a></li>`).join('')}</ul>`
+    : '<p style="margin:0;color:#5a6482;">Sin archivos adjuntos.</p>'}
+        </section>`
+      : '<p style="margin-top:14px;color:#5a6482;">Adjuntos no incluidos en esta impresión.</p>';
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Informe ${escapeHtml(report.id || '')}</title>
+          <style>
+            body{font-family:Inter,Arial,sans-serif;padding:24px;color:#1f2a44}
+            h1{font-size:24px;margin:0 0 10px}
+            .meta{margin:0 0 16px;color:#55607f;font-size:14px}
+            .content{border:1px solid #d7def2;border-radius:12px;padding:12px;background:#fff}
+          </style>
+        </head>
+        <body>
+          <h1>Informe bromatológico</h1>
+          <p class="meta"><strong>Usuario:</strong> ${escapeHtml(report.userName || '-')} · <strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')} · <strong>Fecha:</strong> ${escapeHtml(getDateLabel(report.createdAt))}</p>
+          <section class="content">${report.html || '<p>Sin contenido</p>'}</section>
+          ${attachmentsHtml}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    await waitPrintWindowAssets(printWindow);
+    printWindow.print();
+  };
+
   const printReport = async (report) => {
     const choice = await openIosSwal({
       title: 'Imprimir informe',
@@ -395,19 +527,39 @@
       return;
     }
 
+    const attachmentsChoice = await openIosSwal({
+      title: 'Imprimir período',
+      html: '<p>¿Querés incluir imágenes adjuntas?</p>',
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: 'Incluir',
+      denyButtonText: 'No incluir',
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        confirmButton: 'ios-btn ios-btn-success',
+        denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical',
+        cancelButton: 'ios-btn ios-btn-secondary'
+      }
+    });
+
+    if (!attachmentsChoice.isConfirmed && !attachmentsChoice.isDenied) {
+      return;
+    }
+
+    const includeAttachments = attachmentsChoice.isConfirmed;
+
     try {
-      openProcessingAlert(choice.isConfirmed ? 'Leyendo informe desde Firebase y preparando PDF...' : 'Leyendo informe desde Firebase y generando PDF...');
+      openProcessingAlert(choice.isConfirmed ? 'Leyendo informe y preparando impresión...' : 'Leyendo informe desde Firebase y generando PDF...');
       const latestReport = await fetchLatestReportData(report);
       if (!normalizeValue(latestReport.html || '')) {
         throw new Error('empty_report_html');
       }
 
-      const blob = await buildReportPdfBlob(latestReport);
-      const filename = `informe_${latestReport.id || Date.now()}.pdf`;
-
       if (choice.isConfirmed) {
-        await printPdfBlob(blob);
+        await printReportDirect(latestReport, includeAttachments);
       } else {
+        const blob = await buildReportPdfBlob(latestReport, { includeAttachments });
+        const filename = `informe_${latestReport.id || Date.now()}.pdf`;
         downloadPdfBlob(blob, filename);
       }
     } catch (error) {
