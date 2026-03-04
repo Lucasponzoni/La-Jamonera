@@ -3619,7 +3619,7 @@ html.login-protected.auth-ok body {
 }
 
 .inventario-total-banner{
-  background-color: rgb(230 214 253);
+  background-color: rgb(244 238 254);
   padding: 5px 10px;
   border-radius: 5px;
 }
@@ -4547,6 +4547,11 @@ html.login-protected.auth-ok body {
   display: inline-flex;
   gap: 6px;
 }
+
+.inventario-entry-actions .inventario-delete-btn{
+  border-radius: 5px !important;
+}
+
 
 .inventario-table-head.enhanced #inventarioEntriesSearch {
   border-color: #d2d8e8;
