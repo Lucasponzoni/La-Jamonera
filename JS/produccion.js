@@ -119,6 +119,39 @@
     return d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
+  const initialsFromName = (value) => normalizeValue(value)
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((item) => item.charAt(0).toUpperCase())
+    .join('');
+
+  const renderUserAvatar = (user) => {
+    if (normalizeValue(user?.photoUrl)) {
+      return `<span class="user-avatar-thumb"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-user-photo" src="${user.photoUrl}" alt="${normalizeValue(user.fullName || user.email || 'Usuario')}"></span>`;
+    }
+    const initials = initialsFromName(user?.fullName || user?.email || '');
+    return `<span class="user-avatar-thumb user-avatar-initials">${initials || '<i class="bi bi-person-fill"></i>'}</span>`;
+  };
+
+  const prepareThumbLoaders = (selector) => {
+    const list = Array.from(document.querySelectorAll(selector));
+    list.forEach((img) => {
+      const parent = img.closest('.user-avatar-thumb, .receta-thumb-wrap, .produccion-hero-avatar');
+      const spinner = parent ? parent.querySelector('.thumb-loading') : null;
+      const done = () => {
+        img.classList.add('is-loaded');
+        spinner?.remove();
+      };
+      if (img.complete && img.naturalWidth > 0) {
+        done();
+      } else {
+        img.addEventListener('load', done, { once: true });
+        img.addEventListener('error', () => { spinner?.remove(); }, { once: true });
+      }
+    });
+  };
+
   const openIosSwal = (options) => Swal.fire({
     ...options,
     returnFocus: false,
@@ -628,20 +661,11 @@
 
     document.querySelectorAll('.js-produccion-thumb').forEach((image) => {
       const wrap = image.closest('.receta-thumb-wrap');
-      const loading = wrap?.querySelector('.thumb-loading');
-      const showImage = () => {
-        image.classList.add('is-loaded');
-        loading?.classList.add('d-none');
-      };
-      const showFallback = () => {
+      image.addEventListener('error', () => {
         if (wrap) wrap.innerHTML = getThumbPlaceholder();
-      };
-      if (image.complete && image.naturalWidth > 0) showImage();
-      else {
-        image.addEventListener('load', showImage, { once: true });
-        image.addEventListener('error', showFallback, { once: true });
-      }
+      }, { once: true });
     });
+    prepareThumbLoaders('.js-produccion-thumb');
 
     setStateView('list');
   };
@@ -658,7 +682,7 @@
               <p>Necesita: ${formatQty(row.neededQty, row.ingredientUnit)}${row.missingQty > 0 ? ` · Faltan: ${formatQty(row.missingQty, row.ingredientUnit)}` : ''}</p>
             </div>
           </div>
-          <img src="${mergeIcon}" alt="Desglose" class="produccion-merge-icon">
+          <img src="${mergeIcon}" alt="Desglose" class="produccion-merge-icon" width="20" height="20" style="width:20px;height:20px;">
         </header>
         ${row.lots.length ? `<div class="produccion-lote-rows">${row.lots.map((lot) => `
           <div class="produccion-lote-row tone-${lot.status}">
@@ -708,14 +732,19 @@
   };
 
   const buildManagersHtml = (selected = []) => {
-    const users = Object.entries(safeObject(state.users));
+    const users = Object.values(safeObject(state.users))
+      .sort((a, b) => String(a.fullName || a.email || '').localeCompare(String(b.fullName || b.email || '')));
     if (!users.length) return '<p class="produccion-empty-users">No hay usuarios cargados. Podés continuar sin asignar encargados.</p>';
-    return users.map(([id, user]) => `
-      <label class="produccion-user-check">
-        <input type="checkbox" data-manager-check value="${id}" ${selected.includes(id) ? 'checked' : ''}>
-        <span>${capitalize(user.name || user.email || id)}</span>
-      </label>
-    `).join('');
+    return users.map((user) => {
+      const fullName = normalizeValue(user.fullName || user.name || user.email || 'Usuario');
+      const userId = normalizeValue(user.id) || normalizeValue(user.email) || `user_${normalizeLower(fullName).replace(/[^a-z0-9]+/g, '_')}`;
+      const position = normalizeValue(user.position || user.role || 'Sin puesto');
+      return `<label class="produccion-user-check">
+        <input type="checkbox" data-manager-check value="${userId}" ${selected.includes(userId) ? 'checked' : ''}>
+        ${renderUserAvatar(user)}
+        <span class="produccion-user-text"><strong>${fullName}</strong><small>${position}</small></span>
+      </label>`;
+    }).join('');
   };
 
   const renderEditor = async (recipeId) => {
@@ -768,7 +797,7 @@
         <div class="produccion-hero-wrap">
           <img src="${FIAMBRES_IMAGE}" class="produccion-hero-bg" alt="Producción">
           <div class="produccion-hero-avatar">
-            <img id="produccionHeadImage" class="produccion-head-image" src="${FIAMBRES_IMAGE}" alt="${capitalize(recipe.title || 'Producto')}" loading="lazy">
+            <span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img id="produccionHeadImage" class="produccion-head-image js-produccion-head-photo" src="${normalizeValue(recipe.imageUrl) || FIAMBRES_IMAGE}" alt="${capitalize(recipe.title || 'Producto')}" loading="lazy">
           </div>
         </div>
         <div class="inventario-product-copy">
