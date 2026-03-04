@@ -256,7 +256,42 @@
     return root.innerHTML;
   };
 
-  const buildPdfDefinition = (report, options = {}) => {
+  const blobToDataUrl = (blob) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('file_reader_error'));
+    reader.readAsDataURL(blob);
+  });
+
+  const imageUrlToDataUrl = async (url) => {
+    const response = await fetch(url, { mode: 'cors' });
+    if (!response.ok) {
+      throw new Error('image_fetch_failed');
+    }
+    const blob = await response.blob();
+    return blobToDataUrl(blob);
+  };
+
+  const buildPdfEmbeddedImageBlocks = async (images) => {
+    if (!images.length) {
+      return [{ text: 'Sin imágenes adjuntas.', color: '#5a6482' }];
+    }
+
+    const blocks = [];
+    for (const item of images) {
+      const imageName = item.name || 'Imagen';
+      blocks.push({ text: imageName, bold: true, margin: [0, 8, 0, 4] });
+      try {
+        const dataUrl = await imageUrlToDataUrl(item.url);
+        blocks.push({ image: dataUrl, fit: [520, 320], margin: [0, 0, 0, 6] });
+      } catch (error) {
+        blocks.push({ text: `No se pudo incrustar la imagen. Link: ${item.url}`, link: item.url, color: '#1d4ed8', margin: [0, 0, 0, 6] });
+      }
+    }
+    return blocks;
+  };
+
+  const buildPdfDefinition = async (report, options = {}) => {
     const includeAttachments = options.includeAttachments !== false;
     const attachments = Array.isArray(report?.attachments) ? report.attachments : [];
     const images = attachments.filter((item) => item.type === 'image' && item.url);
@@ -266,6 +301,10 @@
     const htmlContent = window.htmlToPdfmake
       ? window.htmlToPdfmake(safeHtml || '<p>Sin contenido</p>', { window })
       : [{ text: safeHtml || 'Sin contenido' }];
+
+    const imageBlocks = includeAttachments
+      ? await buildPdfEmbeddedImageBlocks(images)
+      : [{ text: 'No incluidas en esta impresión.', color: '#5a6482' }];
 
     return {
       pageSize: 'A4',
@@ -279,11 +318,7 @@
         { text: 'Contenido', style: 'sectionTitle' },
         ...(Array.isArray(htmlContent) ? htmlContent : [htmlContent]),
         { text: 'Imágenes adjuntas', style: 'sectionTitle', margin: [0, 14, 0, 6] },
-        !includeAttachments
-          ? { text: 'No incluidas en esta impresión.', color: '#5a6482' }
-          : (images.length
-            ? { ul: images.map((item) => ({ text: `${item.name || 'Imagen'} - ${item.url}`, link: item.url, color: '#1d4ed8' })) }
-            : { text: 'Sin imágenes adjuntas.', color: '#5a6482' }),
+        ...imageBlocks,
         { text: 'Otros adjuntos', style: 'sectionTitle', margin: [0, 14, 0, 6] },
         !includeAttachments
           ? { text: 'No incluidos en esta impresión.', color: '#5a6482' }
@@ -342,7 +377,7 @@
       throw new Error('pdf_lib_unavailable');
     }
 
-    const docDefinition = buildPdfDefinition(report, options);
+    const docDefinition = await buildPdfDefinition(report, options);
     return await new Promise((resolve, reject) => {
       try {
         window.pdfMake.createPdf(docDefinition).getBlob((blob) => resolve(blob));
