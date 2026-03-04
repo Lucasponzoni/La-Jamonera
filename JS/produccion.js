@@ -14,19 +14,34 @@
   const FIAMBRES_IMAGE = 'https://i.postimg.cc/fyvNDdrt/FIambres.png';
   const BASE_ICON = '<i class="fa-solid fa-drumstick-bite"></i>';
   const CONFIG_PATH = '/produccion/config';
+  const RESERVAS_PATH = '/produccion/reservas';
+  const DRAFTS_PATH = '/produccion/drafts';
+  const REGISTROS_PATH = '/produccion/registros';
+  const SEQUENCE_PATH = '/produccion/sequence';
+  const RESERVE_TTL_MS = 10 * 60 * 1000;
 
   const state = {
     recetas: {},
     ingredientes: {},
     inventario: {},
+    users: {},
+    reservas: {},
+    drafts: {},
     search: '',
     view: 'loading',
     analysis: {},
     activeRecipeId: '',
+    activeDraftId: '',
+    activeReservationId: '',
+    reservationTick: null,
+    editorPlan: null,
     config: {
       globalMinKg: 1,
       recipeMinKg: {},
-      lastProductionByRecipe: {}
+      lastProductionByRecipe: {},
+      preferredManagers: [],
+      usersPreferences: {},
+      idConfig: { prefix: 'PROD-LJ' }
     }
   };
 
@@ -36,12 +51,25 @@
   const capitalize = (value) => normalizeLower(value).replace(/(^|\s)\S/g, (ch) => ch.toUpperCase());
   const parseNumber = (value) => {
     const parsed = Number(normalizeValue(value).replace(',', '.'));
-    return Number.isFinite(parsed) ? parsed : NaN;
+    return Number.isFinite(parsed) ? parsed : Number.NaN;
   };
   const parsePositive = (value, fallback = 1) => {
     const n = parseNumber(value);
     return Number.isFinite(n) && n > 0 ? n : fallback;
   };
+  const makeId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const nowTs = () => Date.now();
+
+  const sessionId = (() => {
+    const key = 'laJamoneraProduccionSessionId';
+    const current = normalizeValue(localStorage.getItem(key));
+    if (current) return current;
+    const next = makeId('prod_session');
+    localStorage.setItem(key, next);
+    return next;
+  })();
+
+  const getCurrentUserLabel = () => 'La Jamonera';
 
   const getUnitMeta = (unitRaw) => {
     const unit = normalizeLower(unitRaw);
@@ -74,13 +102,37 @@
   };
 
   const formatQty = (value, unit = '', digits = 2) => `${Number(value || 0).toFixed(digits)} ${unit}`.trim();
-  const todayIso = () => new Date().toISOString().slice(0, 10);
+  const toIsoDate = (value = nowTs()) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toISOString().slice(0, 10);
+  };
   const formatDate = (value) => {
     if (!value) return 'Nunca producida';
     const d = new Date(Number(value));
     if (Number.isNaN(d.getTime())) return 'Nunca producida';
     return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
+  const formatDateTime = (value) => {
+    const d = new Date(Number(value));
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  const openIosSwal = (options) => Swal.fire({
+    ...options,
+    returnFocus: false,
+    customClass: {
+      popup: `ios-alert ${options?.customClass?.popup || ''}`.trim(),
+      title: 'ios-alert-title',
+      htmlContainer: 'ios-alert-text',
+      confirmButton: 'ios-btn ios-btn-primary',
+      cancelButton: 'ios-btn ios-btn-secondary',
+      denyButton: 'ios-btn ios-btn-warning',
+      ...options.customClass
+    },
+    buttonsStyling: false
+  });
 
   const readMinKgForRecipe = (recipeId) => {
     const local = parseNumber(state.config.recipeMinKg?.[recipeId]);
@@ -93,7 +145,39 @@
     await window.dbLaJamoneraRest.write(CONFIG_PATH, state.config);
   };
 
-  const getInventoryAvailability = (ingredientId, targetUnit) => {
+  const setStateView = (view) => {
+    state.view = view;
+    nodes.loading.classList.toggle('d-none', view !== 'loading');
+    nodes.empty.classList.toggle('d-none', view !== 'empty');
+    nodes.data.classList.toggle('d-none', view !== 'list');
+    nodes.editor.classList.toggle('d-none', view !== 'editor');
+  };
+
+  const getRecipes = () => Object.values(safeObject(state.recetas));
+  const getThumbPlaceholder = () => `<span class="image-placeholder-circle-2">${BASE_ICON}</span>`;
+
+  const activeReservations = () => Object.values(safeObject(state.reservas))
+    .filter((item) => Number(item?.expiresAt || 0) > nowTs() && item.status !== 'released');
+
+  const reservedByOthersForEntry = (ingredientId, entryId, unit) => {
+    const baseUnit = normalizeLower(unit);
+    const baseMeta = getUnitMeta(baseUnit);
+    return activeReservations().reduce((acc, reservation) => {
+      if (reservation.ownerSessionId === sessionId) return acc;
+      const locks = Array.isArray(reservation?.locks) ? reservation.locks : [];
+      locks.forEach((lock) => {
+        if (lock.ingredientId !== ingredientId) return;
+        if (entryId && lock.entryId && lock.entryId !== entryId) return;
+        const lockMeta = getUnitMeta(lock.unit || baseUnit);
+        if (lockMeta.category !== baseMeta.category) return;
+        const lockBase = Number(lock.reservedBaseQty || toBase(lock.reservedQty, lock.unit || baseUnit) || 0);
+        acc += fromBase(lockBase, baseUnit);
+      });
+      return acc;
+    }, 0);
+  };
+
+  const getInventoryAvailability = (ingredientId, targetUnit, productionDateIso = toIsoDate()) => {
     const record = safeObject(state.inventario.items?.[ingredientId]);
     const entries = Array.isArray(record.entries) ? record.entries : [];
     const targetMeta = getUnitMeta(targetUnit);
@@ -101,11 +185,14 @@
     if (!entries.length && targetMeta.category === 'peso') {
       const stockKg = Number(record.stockKg || 0);
       const base = Number.isFinite(stockKg) ? stockKg * 1000 : 0;
+      const reserved = reservedByOthersForEntry(ingredientId, '', 'kg') * 1000;
+      const net = Math.max(0, base - reserved);
       return {
-        available: fromBase(base, targetUnit),
+        available: fromBase(net, targetUnit),
         total: fromBase(base, targetUnit),
         hasExpired: false,
-        incompatibleUnits: []
+        incompatibleUnits: [],
+        nextToExpire: null
       };
     }
 
@@ -113,33 +200,33 @@
       const qty = parseNumber(entry.qty);
       if (!Number.isFinite(qty) || qty <= 0) return acc;
       const entryMeta = getUnitMeta(entry.unit);
-      const baseQty = qty * entryMeta.factor;
-      const expired = normalizeValue(entry.expiryDate) && normalizeValue(entry.expiryDate) < todayIso();
+      const entryBase = qty * entryMeta.factor;
+      const reservedQty = reservedByOthersForEntry(ingredientId, entry.id, entry.unit);
+      const reservedBase = toBase(reservedQty, entry.unit);
+      const netBase = Math.max(0, entryBase - (Number.isFinite(reservedBase) ? reservedBase : 0));
+      const expiryIso = normalizeValue(entry.expiryDate);
+      const expiredForDate = expiryIso && expiryIso < productionDateIso;
       if (entryMeta.category === targetMeta.category) {
-        acc.totalBase += baseQty;
-        if (!expired) acc.usableBase += baseQty;
+        acc.totalBase += netBase;
+        if (!expiredForDate) acc.usableBase += netBase;
       } else {
         acc.incompatible.push(entry.unit || 'sin unidad');
       }
-      if (expired) acc.hasExpired = true;
+      if (expiredForDate) acc.hasExpired = true;
+      if (!acc.nextToExpire && expiryIso) acc.nextToExpire = expiryIso;
       return acc;
-    }, { totalBase: 0, usableBase: 0, incompatible: [], hasExpired: false });
-
-    if (!entries.length && targetMeta.category === 'peso') {
-      const stockKg = Number(record.stockKg || 0);
-      aggregate.totalBase = Math.max(aggregate.totalBase, stockKg * 1000);
-      aggregate.usableBase = Math.max(aggregate.usableBase, stockKg * 1000);
-    }
+    }, { totalBase: 0, usableBase: 0, incompatible: [], hasExpired: false, nextToExpire: null });
 
     return {
       available: fromBase(aggregate.usableBase, targetUnit),
       total: fromBase(aggregate.totalBase, targetUnit),
       hasExpired: aggregate.hasExpired,
-      incompatibleUnits: aggregate.incompatible
+      incompatibleUnits: aggregate.incompatible,
+      nextToExpire: aggregate.nextToExpire
     };
   };
 
-  const analyzeRecipe = (recipe) => {
+  const analyzeRecipe = (recipe, productionDateIso = toIsoDate()) => {
     const rows = (Array.isArray(recipe.rows) ? recipe.rows : []).filter((row) => row.type === 'ingredient');
     const yieldQty = parseNumber(recipe.yieldQuantity);
     const yieldMeta = getUnitMeta(recipe.yieldUnit);
@@ -162,10 +249,10 @@
       const unit = normalizeLower(row.unit);
       if (!row.ingredientId || !Number.isFinite(reqQty) || reqQty <= 0 || !unit) return;
       const neededPerKg = reqQty / yieldKg;
-      const availability = getInventoryAvailability(row.ingredientId, unit);
+      const availability = getInventoryAvailability(row.ingredientId, unit, productionDateIso);
       const coverage = neededPerKg > 0 ? Math.max(0, availability.available) / neededPerKg : 0;
       if (availability.incompatibleUnits.length) {
-        errors.push(`Revisá la configuración de unidades del ingrediente ${capitalize(row.ingredientName)}.`);
+        errors.push(`Esta receta contiene unidades incompatibles para cálculo automático. Revisá ${capitalize(row.ingredientName)}.`);
       }
       requirements.push({
         ingredientId: row.ingredientId,
@@ -207,19 +294,217 @@
     return { status, statusText, maxKg, progress, canProduce, errors, requirements, missingForMin, hasExpired, minKg };
   };
 
-  const setStateView = (view) => {
-    state.view = view;
-    nodes.loading.classList.toggle('d-none', view !== 'loading');
-    nodes.empty.classList.toggle('d-none', view !== 'empty');
-    nodes.data.classList.toggle('d-none', view !== 'list');
-    nodes.editor.classList.toggle('d-none', view !== 'editor');
+  const sortEntriesFEFO = (entries = []) => [...entries].sort((a, b) => {
+    const expiryA = normalizeValue(a.expiryDate) || '9999-12-31';
+    const expiryB = normalizeValue(b.expiryDate) || '9999-12-31';
+    if (expiryA !== expiryB) return expiryA.localeCompare(expiryB);
+    return Number(a.createdAt || 0) - Number(b.createdAt || 0);
+  });
+
+  const buildPlanForRecipe = (recipe, qtyKg, productionDateIso = toIsoDate()) => {
+    const analysis = analyzeRecipe(recipe, productionDateIso);
+    const ingredientPlans = [];
+    const conflicts = [];
+    const warnings = [];
+
+    analysis.requirements.forEach((requirement) => {
+      const rowNeed = requirement.neededPerKg * qtyKg;
+      let remaining = rowNeed;
+      const record = safeObject(state.inventario.items?.[requirement.ingredientId]);
+      const entries = sortEntriesFEFO(Array.isArray(record.entries) ? record.entries : []);
+      const lots = [];
+
+      entries.forEach((entry) => {
+        const entryUnit = normalizeLower(entry.unit || requirement.unit);
+        const entryMeta = getUnitMeta(entryUnit);
+        const reqMeta = getUnitMeta(requirement.unit);
+        if (entryMeta.category !== reqMeta.category) return;
+
+        const entryQty = parsePositive(entry.qty, 0);
+        const reservedByOther = reservedByOthersForEntry(requirement.ingredientId, entry.id, entryUnit);
+        const available = Math.max(0, entryQty - reservedByOther);
+        const expiryIso = normalizeValue(entry.expiryDate);
+        const status = !expiryIso || expiryIso >= productionDateIso ? 'ok' : 'expired';
+        const isSoon = expiryIso && expiryIso >= productionDateIso && expiryIso <= toIsoDate(new Date(productionDateIso).getTime() + 2 * 86400000);
+        if (isSoon) warnings.push(`${requirement.name}: lote próximo a vencer (${expiryIso}).`);
+        if (status === 'expired') return;
+
+        const availableInReqUnit = fromBase(toBase(available, entryUnit), requirement.unit);
+        const take = Math.min(remaining, availableInReqUnit);
+        if (take <= 0) return;
+
+        remaining = Number((remaining - take).toFixed(6));
+        const lotNumber = normalizeValue(entry.lotNumber) || normalizeValue(entry.invoiceNumber) || entry.id;
+        lots.push({
+          ingredientId: requirement.ingredientId,
+          ingredientName: requirement.name,
+          ingredientImage: state.ingredientes[requirement.ingredientId]?.imageUrl || '',
+          entryId: entry.id,
+          lotNumber,
+          entryDate: entry.entryDate || '',
+          createdAt: Number(entry.createdAt || 0),
+          expiryDate: expiryIso,
+          provider: normalizeValue(entry.provider) || '-',
+          invoiceNumber: normalizeValue(entry.invoiceNumber) || '-',
+          invoiceImageUrls: Array.isArray(entry.invoiceImageUrls) ? entry.invoiceImageUrls : (entry.invoiceImageUrl ? [entry.invoiceImageUrl] : []),
+          unit: requirement.unit,
+          takeQty: Number(take.toFixed(4)),
+          takeBaseQty: Number(toBase(take, requirement.unit).toFixed(6)),
+          entryAvailableQty: Number(available.toFixed(4)),
+          status: isSoon ? 'soon' : 'ok'
+        });
+      });
+
+      const missing = Math.max(0, Number(remaining.toFixed(4)));
+      if (missing > 0.0001) {
+        conflicts.push(`${requirement.name}: faltan ${formatQty(missing, requirement.unit)} para la fecha ${productionDateIso}.`);
+      }
+
+      ingredientPlans.push({
+        ingredientId: requirement.ingredientId,
+        ingredientName: requirement.name,
+        ingredientUnit: requirement.unit,
+        neededQty: Number(rowNeed.toFixed(4)),
+        missingQty: missing,
+        lots
+      });
+    });
+
+    const flatLocks = ingredientPlans.flatMap((item) => item.lots.map((lot) => ({
+      ingredientId: lot.ingredientId,
+      entryId: lot.entryId,
+      reservedQty: lot.takeQty,
+      reservedBaseQty: lot.takeBaseQty,
+      unit: lot.unit,
+      lotNumber: lot.lotNumber
+    })));
+
+    return {
+      recipeId: recipe.id,
+      qtyKg: Number(qtyKg.toFixed(2)),
+      productionDate: productionDateIso,
+      ingredientPlans,
+      locks: flatLocks,
+      warnings,
+      conflicts,
+      isValid: conflicts.length === 0
+    };
   };
 
-  const getRecipes = () => Object.values(safeObject(state.recetas));
-  const getThumbPlaceholder = () => `<span class="image-placeholder-circle-2">${BASE_ICON}</span>`;
+  const cleanupExpiredReservations = async () => {
+    const now = nowTs();
+    const reservas = safeObject(await window.dbLaJamoneraRest.read(RESERVAS_PATH));
+    const updates = { ...reservas };
+    let changed = false;
+    Object.entries(reservas).forEach(([id, reservation]) => {
+      if (!reservation) return;
+      if (Number(reservation.expiresAt || 0) <= now && reservation.status === 'active') {
+        updates[id] = { ...reservation, status: 'released', releasedAt: now, releasedReason: 'expired' };
+        changed = true;
+      }
+    });
+    if (changed) await window.dbLaJamoneraRest.write(RESERVAS_PATH, updates);
+    state.reservas = changed ? updates : reservas;
+  };
+
+  const releaseReservation = async (reason = 'manual') => {
+    if (!state.activeReservationId) return;
+    const reservation = safeObject(state.reservas[state.activeReservationId]);
+    if (!reservation || reservation.status !== 'active') {
+      state.activeReservationId = '';
+      return;
+    }
+    const next = {
+      ...reservation,
+      status: 'released',
+      releasedAt: nowTs(),
+      releasedReason: reason
+    };
+    const updated = { ...state.reservas, [state.activeReservationId]: next };
+    await window.dbLaJamoneraRest.write(RESERVAS_PATH, updated);
+    state.reservas = updated;
+    state.activeReservationId = '';
+    if (state.reservationTick) {
+      clearInterval(state.reservationTick);
+      state.reservationTick = null;
+    }
+  };
+
+  const ensureReservationForPlan = async (plan) => {
+    if (!plan?.locks?.length) return;
+    if (state.activeReservationId) await releaseReservation('refresh');
+    const reservationId = makeId('reserva');
+    const reservation = {
+      id: reservationId,
+      recipeId: plan.recipeId,
+      draftId: state.activeDraftId || '',
+      ownerSessionId: sessionId,
+      ownerLabel: getCurrentUserLabel(),
+      createdAt: nowTs(),
+      expiresAt: nowTs() + RESERVE_TTL_MS,
+      status: 'active',
+      locks: plan.locks
+    };
+    const next = { ...state.reservas, [reservationId]: reservation };
+    await window.dbLaJamoneraRest.write(RESERVAS_PATH, next);
+    state.reservas = next;
+    state.activeReservationId = reservationId;
+
+    if (state.reservationTick) clearInterval(state.reservationTick);
+    state.reservationTick = setInterval(async () => {
+      const remaining = Number(reservation.expiresAt || 0) - nowTs();
+      const badge = nodes.editor.querySelector('#produccionReservaTimer');
+      if (badge) {
+        const mins = Math.max(0, Math.ceil(remaining / 60000));
+        badge.textContent = `Reserva temporal: ${mins} min`;
+      }
+      if (remaining <= 0) {
+        await releaseReservation('expired');
+        await openIosSwal({
+          title: 'Reserva vencida',
+          html: '<p>La reserva temporal de stock venció. Recalculamos disponibilidad.</p>',
+          icon: 'warning',
+          confirmButtonText: 'Entendido'
+        });
+        await refreshData();
+        renderList();
+      }
+    }, 5000);
+  };
+
+  const persistDraft = async (payload) => {
+    const draftId = `${sessionId}_${payload.recipeId}`;
+    const draft = {
+      id: draftId,
+      ownerSessionId: sessionId,
+      ownerLabel: getCurrentUserLabel(),
+      updatedAt: nowTs(),
+      ...payload
+    };
+    const next = { ...state.drafts, [draftId]: draft };
+    await window.dbLaJamoneraRest.write(DRAFTS_PATH, next);
+    state.drafts = next;
+    state.activeDraftId = draftId;
+  };
+
+  const discardDraft = async () => {
+    if (!state.activeDraftId) return;
+    const next = { ...state.drafts };
+    delete next[state.activeDraftId];
+    await window.dbLaJamoneraRest.write(DRAFTS_PATH, next);
+    state.drafts = next;
+    state.activeDraftId = '';
+  };
+
+  const getCurrentDraftForRecipe = (recipeId) => {
+    const own = Object.values(safeObject(state.drafts)).find((item) => item.recipeId === recipeId && item.ownerSessionId === sessionId);
+    return own || null;
+  };
+
+  const getForeignDraftConflict = (recipeId) => Object.values(safeObject(state.drafts)).find((item) => item.recipeId === recipeId && item.ownerSessionId !== sessionId);
 
   const openGlobalMinConfig = async () => {
-    const result = await Swal.fire({
+    const result = await openIosSwal({
       title: 'Umbral por producto',
       html: `<div class="produccion-umbral-form">
           <label for="produccionGlobalMinInput">Umbral de stock (kg)</label>
@@ -237,11 +522,7 @@
         }
         return n;
       },
-      customClass: {
-        popup: 'ios-alert produccion-umbral-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text',
-        confirmButton: 'ios-btn ios-btn-primary', cancelButton: 'ios-btn ios-btn-secondary'
-      },
-      buttonsStyling: false
+      customClass: { popup: 'produccion-umbral-alert' }
     });
     if (!result.isConfirmed) return;
     state.config.globalMinKg = Number(result.value.toFixed(2));
@@ -252,7 +533,7 @@
 
   const openRecipeMinConfig = async (recipeId) => {
     const currentRaw = state.config.recipeMinKg?.[recipeId];
-    const result = await Swal.fire({
+    const result = await openIosSwal({
       title: 'Umbral por producto',
       html: `<div class="produccion-umbral-form">
           <label for="produccionRecipeMinInput">Umbral de stock (kg)</label>
@@ -271,11 +552,7 @@
         }
         return n;
       },
-      customClass: {
-        popup: 'ios-alert produccion-umbral-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text',
-        confirmButton: 'ios-btn ios-btn-primary', cancelButton: 'ios-btn ios-btn-secondary'
-      },
-      buttonsStyling: false
+      customClass: { popup: 'produccion-umbral-alert' }
     });
     if (!result.isConfirmed) return;
     if (result.value == null) {
@@ -304,13 +581,15 @@
       const analysis = state.analysis[recipe.id] || analyzeRecipe(recipe);
       const statusClass = analysis.status === 'success' ? 'tone-success' : analysis.status === 'warning' ? 'tone-warning' : 'tone-danger';
       const action = analysis.canProduce
-        ? `<button type="button" class="btn ios-btn ios-btn-success produccion-main-btn" data-open-produccion="${recipe.id}"><i class="fa-solid fa-plus"></i><span>Producir</span></button>`
-        : `<button type="button" class="btn ios-btn produccion-to-inventario-btn" data-open-inventario="1"><i class="fa-solid fa-plus"></i><span>Inventario</span></button>`;
+        ? `<button type="button" class="btn ios-btn ios-btn-success produccion-main-btn" data-open-produccion="${recipe.id}"><i class="fa-solid fa-play"></i><span>Producir</span></button>`
+        : `<button type="button" class="btn ios-btn produccion-to-inventario-btn" data-open-inventario="1"><i class="fa-solid fa-boxes-stacked"></i><span>Inventario</span></button>`;
 
+      const foreignDraft = getForeignDraftConflict(recipe.id);
       const badges = [
         analysis.missingForMin.length ? '<span class="produccion-badge">Faltan insumos</span>' : '',
         analysis.status === 'warning' ? '<span class="produccion-badge is-warning">Stock parcial</span>' : '',
-        analysis.hasExpired ? '<span class="produccion-badge is-danger">Vencido</span>' : ''
+        analysis.hasExpired ? '<span class="produccion-badge is-danger">Vencido</span>' : '',
+        foreignDraft ? '<span class="produccion-badge is-warning">Borrador en uso</span>' : ''
       ].filter(Boolean).join('');
 
       const missingHtml = analysis.missingForMin.length
@@ -367,6 +646,34 @@
     setStateView('list');
   };
 
+  const buildLotsBreakdownHtml = (plan) => {
+    const mergeIcon = './IMG/Octicons-git-merge.svg';
+    return plan.ingredientPlans.map((row) => `
+      <article class="produccion-lote-group ${row.missingQty > 0 ? 'is-missing' : ''}">
+        <header class="produccion-lote-head">
+          <div class="produccion-lote-main">
+            <img src="${state.ingredientes[row.ingredientId]?.imageUrl || FIAMBRES_IMAGE}" alt="${row.ingredientName}" class="produccion-lote-ingredient-image">
+            <div>
+              <h6>${row.ingredientName}</h6>
+              <p>Necesita: ${formatQty(row.neededQty, row.ingredientUnit)}${row.missingQty > 0 ? ` · Faltan: ${formatQty(row.missingQty, row.ingredientUnit)}` : ''}</p>
+            </div>
+          </div>
+          <img src="${mergeIcon}" alt="Desglose" class="produccion-merge-icon">
+        </header>
+        ${row.lots.length ? `<div class="produccion-lote-rows">${row.lots.map((lot) => `
+          <div class="produccion-lote-row tone-${lot.status}">
+            <div><strong>Lote:</strong> ${lot.lotNumber}</div>
+            <div><strong>Ingreso:</strong> ${lot.entryDate || formatDateTime(lot.createdAt)}</div>
+            <div><strong>Vence:</strong> ${lot.expiryDate || '-'}</div>
+            <div><strong>Usar:</strong> ${formatQty(lot.takeQty, lot.unit)}</div>
+            <div><strong>Proveedor:</strong> ${lot.provider || '-'}</div>
+            <div><strong>Factura:</strong> ${lot.invoiceNumber || '-'}</div>
+            <div><strong>Adjuntos:</strong> ${lot.invoiceImageUrls.length ? `${lot.invoiceImageUrls.length} archivo/s` : 'Sin adjuntos'}</div>
+          </div>`).join('')}</div>` : '<p class="produccion-lote-empty">Sin lotes aptos para la fecha elegida.</p>'}
+      </article>
+    `).join('');
+  };
+
   const buildProductionRows = (analysis, quantityKg) => analysis.requirements.map((item) => {
     const needed = item.neededPerKg * quantityKg;
     const missing = Math.max(0, needed - item.available);
@@ -378,12 +685,75 @@
       </div>`;
   }).join('');
 
-  const renderEditor = (recipeId) => {
+  const saveEditorDraft = async () => {
+    const recipe = state.recetas[state.activeRecipeId];
+    if (!recipe || !state.editorPlan) return;
+    const qty = parsePositive(nodes.editor.querySelector('#produccionQtyInput')?.value, state.editorPlan.qtyKg || 1);
+    const productionDate = normalizeValue(nodes.editor.querySelector('#produccionDateInput')?.value) || toIsoDate();
+    const observations = normalizeValue(nodes.editor.querySelector('#produccionObsInput')?.value);
+    const managers = [...nodes.editor.querySelectorAll('[data-manager-check]:checked')].map((node) => node.value).filter(Boolean);
+
+    await persistDraft({
+      recipeId: recipe.id,
+      quantityKg: qty,
+      productionDate,
+      managers,
+      observations,
+      locks: state.editorPlan.locks,
+      lotPlan: state.editorPlan,
+      reservationId: state.activeReservationId,
+      step: 'editor',
+      status: 'active'
+    });
+  };
+
+  const buildManagersHtml = (selected = []) => {
+    const users = Object.entries(safeObject(state.users));
+    if (!users.length) return '<p class="produccion-empty-users">No hay usuarios cargados. Podés continuar sin asignar encargados.</p>';
+    return users.map(([id, user]) => `
+      <label class="produccion-user-check">
+        <input type="checkbox" data-manager-check value="${id}" ${selected.includes(id) ? 'checked' : ''}>
+        <span>${capitalize(user.name || user.email || id)}</span>
+      </label>
+    `).join('');
+  };
+
+  const renderEditor = async (recipeId) => {
     const recipe = state.recetas[recipeId];
     const analysis = state.analysis[recipeId];
     if (!recipe || !analysis) return;
 
-    const defaultQty = Math.max(0.1, Math.min(Math.max(analysis.minKg, 0.1), Math.max(analysis.maxKg, 0.1)));
+    const foreignDraft = getForeignDraftConflict(recipe.id);
+    if (foreignDraft) {
+      const action = await openIosSwal({
+        title: 'Conflicto de borrador',
+        html: `<p>Existe un borrador en uso para esta receta por ${foreignDraft.ownerLabel || 'otro usuario'}.</p>`,
+        showCancelButton: true,
+        showDenyButton: true,
+        confirmButtonText: 'Cancelar borrador y continuar',
+        denyButtonText: 'Cargar borrador',
+        cancelButtonText: 'Volver'
+      });
+      if (action.isDismissed) return;
+      if (action.isDenied) {
+        state.activeDraftId = foreignDraft.id;
+      } else if (action.isConfirmed) {
+        const next = { ...state.drafts };
+        delete next[foreignDraft.id];
+        await window.dbLaJamoneraRest.write(DRAFTS_PATH, next);
+        state.drafts = next;
+      }
+    }
+
+    const ownDraft = getCurrentDraftForRecipe(recipe.id);
+    const initialQty = ownDraft ? parsePositive(ownDraft.quantityKg, analysis.minKg) : Math.max(analysis.minKg, 0.1);
+    const initialDate = ownDraft?.productionDate || toIsoDate();
+    const initialObs = ownDraft?.observations || '';
+    const initialManagers = Array.isArray(ownDraft?.managers) ? ownDraft.managers : [];
+
+    state.editorPlan = buildPlanForRecipe(recipe, initialQty, initialDate);
+    await ensureReservationForPlan(state.editorPlan);
+    state.activeDraftId = ownDraft?.id || state.activeDraftId;
 
     nodes.editor.innerHTML = `
       <div class="recetas-editor-header produccion-editor-header">
@@ -406,68 +776,218 @@
           <h3 class="inventario-editor-name">${capitalize(recipe.title || 'Sin título')}</h3>
           <p class="inventario-editor-meta">${capitalize(recipe.description || 'Sin descripción.')}</p>
           <p class="produccion-max-line">Máximo según inventario: <strong>${analysis.maxKg.toFixed(2)} kg</strong></p>
+          <p id="produccionReservaTimer" class="produccion-reserva-timer"></p>
         </div>
       </section>
 
       <section class="recipe-step-card">
         <h6 class="step-title">Paso 1 · ¿Qué cantidad deseás producir?</h6>
         <div class="produccion-qty-grid">
-          <input id="produccionQtyInput" type="number" min="0.1" step="0.01" max="${analysis.maxKg.toFixed(2)}" value="${defaultQty.toFixed(2)}" class="form-control ios-input">
+          <input id="produccionQtyInput" type="number" min="0.1" step="0.01" max="${analysis.maxKg.toFixed(2)}" value="${initialQty.toFixed(2)}" class="form-control ios-input">
           <button id="produccionQtyMaxBtn" type="button" class="btn ios-btn ios-btn-secondary">Usar máximo</button>
         </div>
-        <p id="produccionQtyHelp" class="produccion-qty-help">Permitido de 0,1 kg hasta ${analysis.maxKg.toFixed(2)} kg.</p>
+        <p id="produccionQtyHelp" class="produccion-qty-help"></p>
       </section>
 
       <section class="recipe-step-card">
-        <h6 class="step-title">Cálculo proporcional en tiempo real</h6>
+        <h6 class="step-title">Paso 2 · Fecha de producción</h6>
+        <input id="produccionDateInput" type="text" class="form-control ios-input" value="${initialDate}">
+        <p class="produccion-qty-help">Si cambiás la fecha, recalculamos vencimientos y lotes (FEFO).</p>
+      </section>
+
+      <section class="recipe-step-card">
+        <h6 class="step-title">Paso 3 · Encargados</h6>
+        <div class="produccion-managers-grid">${buildManagersHtml(initialManagers)}</div>
+      </section>
+
+      <section class="recipe-step-card">
+        <h6 class="step-title">Paso 4 · Observaciones</h6>
+        <textarea id="produccionObsInput" class="form-control ios-input" rows="3" placeholder="Notas de producción, incidentes, reemplazos...">${initialObs}</textarea>
+      </section>
+
+      <section class="recipe-step-card">
+        <h6 class="step-title">Paso 5 · Desglose por lotes (FEFO)</h6>
+        <div id="produccionLotsBreakdown" class="produccion-lotes-wrap"></div>
+      </section>
+
+      <section class="recipe-step-card">
+        <h6 class="step-title">Verificación proporcional</h6>
         <div id="produccionDetailRows" class="produccion-detail-grid"></div>
+        <div class="produccion-final-actions">
+          <button id="produccionSaveDraftBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-floppy-disk"></i><span>Guardar borrador</span></button>
+          <button id="produccionConfirmBtn" type="button" class="btn ios-btn ios-btn-success"><i class="fa-solid fa-check"></i><span>Confirmar producción</span></button>
+        </div>
       </section>`;
 
-    const image = nodes.editor.querySelector('#produccionHeadImage');
-    image.addEventListener('error', () => {
-      image.src = FIAMBRES_IMAGE;
-    }, { once: true });
-
     const qtyInput = nodes.editor.querySelector('#produccionQtyInput');
+    const dateInput = nodes.editor.querySelector('#produccionDateInput');
     const qtyHelp = nodes.editor.querySelector('#produccionQtyHelp');
     const rowsWrap = nodes.editor.querySelector('#produccionDetailRows');
+    const lotsWrap = nodes.editor.querySelector('#produccionLotsBreakdown');
 
-    const updateRows = () => {
-      let qty = parseNumber(qtyInput.value);
-      if (!Number.isFinite(qty) || qty <= 0) qty = 0.1;
+    const updateEditorPlan = async () => {
+      let qty = parsePositive(qtyInput.value, 0.1);
       if (qty > analysis.maxKg) qty = analysis.maxKg;
       qtyInput.value = qty.toFixed(2);
+      const productionDate = normalizeValue(dateInput.value) || toIsoDate();
+      state.editorPlan = buildPlanForRecipe(recipe, qty, productionDate);
       rowsWrap.innerHTML = buildProductionRows(analysis, qty);
-      qtyHelp.textContent = `Escala aplicada: ${qty.toFixed(2)} kg. Mínimo recomendado: ${analysis.minKg.toFixed(2)} kg.`;
+      lotsWrap.innerHTML = buildLotsBreakdownHtml(state.editorPlan);
+      qtyHelp.textContent = state.editorPlan.isValid
+        ? `Escala aplicada: ${qty.toFixed(2)} kg. Reserva temporal activa por 10 min.`
+        : `Hay conflictos de stock/lotes para ${productionDate}.`;
+      await ensureReservationForPlan(state.editorPlan);
+      await saveEditorDraft();
     };
 
-    qtyInput.addEventListener('input', updateRows);
-    nodes.editor.querySelector('#produccionQtyMaxBtn').addEventListener('click', () => {
+    if (window.flatpickr) {
+      const locale = window.flatpickr.l10ns?.es || undefined;
+      window.flatpickr(dateInput, {
+        locale,
+        dateFormat: 'Y-m-d',
+        defaultDate: initialDate,
+        allowInput: true,
+        onChange: async () => {
+          await updateEditorPlan();
+        }
+      });
+    }
+
+    qtyInput.addEventListener('input', async () => { await updateEditorPlan(); });
+    nodes.editor.querySelector('#produccionQtyMaxBtn').addEventListener('click', async () => {
       qtyInput.value = analysis.maxKg.toFixed(2);
-      updateRows();
+      await updateEditorPlan();
     });
 
-    nodes.editor.querySelector('#produccionBackBtn').addEventListener('click', async () => {
-      const result = await Swal.fire({
-        title: '¿Deseás abandonar esta producción?',
-        html: '<p>Volverás al listado de recetas disponibles.</p>',
+    nodes.editor.querySelectorAll('[data-manager-check]').forEach((input) => {
+      input.addEventListener('change', async () => { await saveEditorDraft(); });
+    });
+
+    nodes.editor.querySelector('#produccionObsInput').addEventListener('input', async () => { await saveEditorDraft(); });
+
+    nodes.editor.querySelector('#produccionSaveDraftBtn').addEventListener('click', async () => {
+      await saveEditorDraft();
+      await openIosSwal({ title: 'Borrador guardado', html: '<p>Podés retomarlo cuando quieras.</p>', icon: 'success', confirmButtonText: 'Entendido' });
+    });
+
+    const confirmProduction = async () => {
+      const refreshBefore = await window.dbLaJamoneraRest.read('/inventario');
+      state.inventario = safeObject(refreshBefore);
+      const qty = parsePositive(qtyInput.value, 0.1);
+      const date = normalizeValue(dateInput.value) || toIsoDate();
+      const revalidated = buildPlanForRecipe(recipe, qty, date);
+      if (!revalidated.isValid) {
+        await openIosSwal({
+          title: 'Stock cambió durante la edición',
+          html: `<p>Recalculamos y encontramos conflictos:</p><ul>${revalidated.conflicts.map((item) => `<li>${item}</li>`).join('')}</ul>`,
+          icon: 'warning',
+          confirmButtonText: 'Revisar'
+        });
+        state.editorPlan = revalidated;
+        lotsWrap.innerHTML = buildLotsBreakdownHtml(state.editorPlan);
+        return;
+      }
+
+      const confirm = await openIosSwal({
+        title: 'Confirmar producción final',
+        html: '<p>Se descontará stock real del inventario.</p>',
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: 'Sí, volver',
-        cancelButtonText: 'Seguir aquí',
-        customClass: {
-          popup: 'ios-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text',
-          confirmButton: 'ios-btn ios-btn-primary', cancelButton: 'ios-btn ios-btn-secondary'
-        },
-        buttonsStyling: false,
-        returnFocus: false
+        confirmButtonText: 'Confirmar',
+        cancelButtonText: 'Cancelar'
+      });
+      if (!confirm.isConfirmed) return;
+
+      const registros = safeObject(await window.dbLaJamoneraRest.read(REGISTROS_PATH));
+      const sequence = Number(await window.dbLaJamoneraRest.read(SEQUENCE_PATH)) || 0;
+      const nextSequence = sequence + 1;
+      const dateToken = date.replaceAll('-', '');
+      const prefix = normalizeValue(state.config.idConfig?.prefix) || 'PROD-LJ';
+      const productionId = `${prefix}-${dateToken}-${String(nextSequence).padStart(4, '0')}`;
+
+      const managers = [...nodes.editor.querySelectorAll('[data-manager-check]:checked')].map((node) => node.value).filter(Boolean);
+      const observations = normalizeValue(nodes.editor.querySelector('#produccionObsInput')?.value);
+
+      const inventarioNext = safeObject(state.inventario);
+      revalidated.ingredientPlans.forEach((item) => {
+        const record = safeObject(inventarioNext.items?.[item.ingredientId]);
+        const nextEntries = Array.isArray(record.entries) ? [...record.entries] : [];
+        item.lots.forEach((lot) => {
+          const index = nextEntries.findIndex((entry) => entry.id === lot.entryId);
+          if (index === -1) return;
+          const entry = { ...nextEntries[index] };
+          const entryQty = parsePositive(entry.qty, 0);
+          const takeInEntryUnit = fromBase(lot.takeBaseQty, entry.unit || lot.unit);
+          const nextQty = Math.max(0, Number((entryQty - takeInEntryUnit).toFixed(4)));
+          entry.qty = Number(nextQty.toFixed(2));
+          entry.qtyKg = Number((toBase(nextQty, entry.unit) / 1000).toFixed(4));
+          entry.lotStatus = nextQty <= 0 ? 'consumido_en_produccion' : 'disponible';
+          entry.productionMovements = Array.isArray(entry.productionMovements) ? entry.productionMovements : [];
+          entry.productionMovements.unshift({
+            type: 'consumo_produccion',
+            productionId,
+            qtyTaken: Number(takeInEntryUnit.toFixed(4)),
+            qtyTakenUnit: entry.unit || lot.unit,
+            createdAt: nowTs(),
+            productionDate: date
+          });
+          nextEntries[index] = entry;
+        });
+        const stockKg = nextEntries.reduce((acc, entry) => acc + (Number(entry.qtyKg || 0) || 0), 0);
+        inventarioNext.items[item.ingredientId] = {
+          ...record,
+          entries: nextEntries,
+          stockKg: Number(stockKg.toFixed(4))
+        };
+      });
+
+      const registro = {
+        id: productionId,
+        recipeId: recipe.id,
+        recipeTitle: recipe.title,
+        productionDate: date,
+        quantityKg: qty,
+        managers,
+        observations,
+        lots: revalidated.ingredientPlans,
+        createdBy: getCurrentUserLabel(),
+        createdAt: nowTs(),
+        status: 'confirmada',
+        reservationId: state.activeReservationId
+      };
+
+      await window.dbLaJamoneraRest.write('/inventario', inventarioNext);
+      await window.dbLaJamoneraRest.write(SEQUENCE_PATH, nextSequence);
+      await window.dbLaJamoneraRest.write(REGISTROS_PATH, { ...registros, [productionId]: registro });
+
+      state.config.lastProductionByRecipe[recipe.id] = nowTs();
+      await persistConfig();
+      await releaseReservation('confirmed');
+      await discardDraft();
+      await refreshData();
+      renderList();
+      await openIosSwal({ title: 'Producción guardada', html: `<p>ID generado: <strong>${productionId}</strong></p>`, icon: 'success', confirmButtonText: 'Genial' });
+    };
+
+    nodes.editor.querySelector('#produccionConfirmBtn').addEventListener('click', confirmProduction);
+
+    nodes.editor.querySelector('#produccionBackBtn').addEventListener('click', async () => {
+      const result = await openIosSwal({
+        title: '¿Deseás abandonar esta producción?',
+        html: '<p>Se guardará borrador y se liberará la reserva temporal.</p>',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Abandonar',
+        cancelButtonText: 'Seguir'
       });
       if (!result.isConfirmed) return;
+      await saveEditorDraft();
+      await releaseReservation('abandoned');
       state.activeRecipeId = '';
       setStateView('list');
     });
 
-    updateRows();
+    await updateEditorPlan();
     setStateView('editor');
   };
 
@@ -481,20 +1001,32 @@
   const refreshData = async () => {
     setStateView('loading');
     await window.laJamoneraReady;
-    const [recetas, ingredientes, inventario, config] = await Promise.all([
+    const [recetas, ingredientes, inventario, config, reservas, drafts, users] = await Promise.all([
       window.dbLaJamoneraRest.read('/recetas'),
       window.dbLaJamoneraRest.read('/ingredientes/items'),
       window.dbLaJamoneraRest.read('/inventario'),
-      window.dbLaJamoneraRest.read(CONFIG_PATH)
+      window.dbLaJamoneraRest.read(CONFIG_PATH),
+      window.dbLaJamoneraRest.read(RESERVAS_PATH),
+      window.dbLaJamoneraRest.read(DRAFTS_PATH),
+      window.dbLaJamoneraRest.read('/informes/users')
     ]);
+
     state.recetas = safeObject(recetas);
     state.ingredientes = safeObject(ingredientes);
     state.inventario = safeObject(inventario);
+    state.reservas = safeObject(reservas);
+    state.drafts = safeObject(drafts);
+    state.users = safeObject(users);
     state.config = {
       globalMinKg: parsePositive(config?.globalMinKg, 1),
       recipeMinKg: safeObject(config?.recipeMinKg),
-      lastProductionByRecipe: safeObject(config?.lastProductionByRecipe)
+      lastProductionByRecipe: safeObject(config?.lastProductionByRecipe),
+      preferredManagers: Array.isArray(config?.preferredManagers) ? config.preferredManagers : [],
+      usersPreferences: safeObject(config?.usersPreferences),
+      idConfig: { prefix: normalizeValue(config?.idConfig?.prefix) || 'PROD-LJ' }
     };
+
+    await cleanupExpiredReservations();
     recomputeAnalysis();
   };
 
@@ -520,7 +1052,7 @@
     const produceBtn = event.target.closest('[data-open-produccion]');
     if (produceBtn) {
       state.activeRecipeId = produceBtn.dataset.openProduccion;
-      renderEditor(state.activeRecipeId);
+      await renderEditor(state.activeRecipeId);
       return;
     }
     if (event.target.closest('[data-open-inventario]')) {
@@ -543,16 +1075,43 @@
     try {
       await refreshData();
       renderList();
+      const ownDraft = Object.values(state.drafts).find((item) => item.ownerSessionId === sessionId && item.status === 'active');
+      if (ownDraft?.recipeId) {
+        const prompt = await openIosSwal({
+          title: 'Borrador recuperado',
+          html: '<p>Encontramos un borrador activo. ¿Querés retomarlo?</p>',
+          icon: 'question',
+          showCancelButton: true,
+          confirmButtonText: 'Continuar borrador',
+          cancelButtonText: 'Descartar'
+        });
+        if (prompt.isConfirmed) {
+          state.activeRecipeId = ownDraft.recipeId;
+          await renderEditor(ownDraft.recipeId);
+        } else {
+          state.activeDraftId = ownDraft.id;
+          await discardDraft();
+        }
+      }
     } catch (error) {
       nodes.empty.querySelector('.ingredientes-empty-text').textContent = 'No se pudo cargar producción desde Firebase.';
       setStateView('empty');
     }
   });
 
-  produccionModal.addEventListener('hidden.bs.modal', () => {
+  produccionModal.addEventListener('hidden.bs.modal', async () => {
+    if (state.activeRecipeId) {
+      await saveEditorDraft();
+      await releaseReservation('modal_closed');
+    }
     state.activeRecipeId = '';
+    state.activeDraftId = '';
     nodes.search.value = '';
     state.search = '';
     nodes.editor.innerHTML = '';
+    if (state.reservationTick) {
+      clearInterval(state.reservationTick);
+      state.reservationTick = null;
+    }
   });
 })();
