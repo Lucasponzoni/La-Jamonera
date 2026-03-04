@@ -4033,6 +4033,7 @@ html.login-protected.auth-ok body {
   padding: 6px 10px;
   font-size: 0.78rem;
   border-radius: 16px;
+  font-size: 16px;
 }
 
 .inventario-actions-row .inventario-threshold-btn:hover {
@@ -5137,7 +5138,6 @@ html.login-protected.auth-ok body {
 
 .produccion-hero-bg {
   width: 100%;
-  height: 100%;
   object-fit: cover;
 }
 
