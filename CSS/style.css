@@ -4367,6 +4367,15 @@ html.login-protected.auth-ok body {
   background: #edf3ff;
 }
 
+
+.inventario-table-compact tbody tr.is-even-row > td {
+  background: #f7faff !important;
+}
+
+.inventario-table-compact tbody tr.is-odd-row > td {
+  background: #eaf1ff !important;
+}
+
 .inventario-table-compact tbody td:nth-child(3) {
   color: #1f8a44;
 }
