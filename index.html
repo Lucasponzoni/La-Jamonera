@@ -129,6 +129,17 @@
               <i class="fa-solid fa-boxes-stacked icon-orange" aria-hidden="true"></i>
               <span>Inventario</span>
             </button>
+
+            <button
+              id="openProduccionModal"
+              type="button"
+              class="btn btn-light home-action-btn home-action-btn-success"
+              data-bs-toggle="modal"
+              data-bs-target="#produccionModal"
+            >
+              <i class="fa-solid fa-gears icon-green" aria-hidden="true"></i>
+              <span>Producir</span>
+            </button>
           </div>
         </div>
         <div class="home-content">
@@ -313,6 +324,65 @@
       </div>
       <!-- // FIN MODAL INVENTARIO -->
 
+
+
+      <!-- // MODAL PRODUCCIÓN -->
+      <div class="modal fade" id="produccionModal" tabindex="-1" aria-labelledby="produccionModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content ios-modal recetas-modal produccion-modal">
+            <div class="modal-header ios-modal-header">
+              <h5 class="modal-title ios-modal-title" id="produccionModalLabel">Producción</h5>
+              <button type="button" class="btn-close ios-modal-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body ios-modal-body">
+              <div id="produccionLoading" class="ingredientes-loading" aria-live="polite">
+                <img src="./IMG/Meta-ai-logo.webp" alt="Cargando producción" class="meta-spinner-login">
+              </div>
+
+              <div id="produccionData" class="d-none" aria-live="polite">
+                <div class="produccion-toolbar">
+                  <div class="input-group ios-input-group ingredientes-search-group">
+                    <span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+                    <input id="produccionSearchInput" type="search" class="form-control ios-input ingredientes-search-input" placeholder="Buscar receta para producir">
+                  </div>
+                  <div class="produccion-toolbar-actions">
+                    <button id="produccionConfigBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-sliders"></i><span>Configuración</span></button>
+                    <button id="produccionViewListBtn" type="button" class="btn ios-btn ios-btn-secondary is-active"><i class="fa-solid fa-play"></i><span>Producción</span></button>
+                    <button id="produccionViewHistoryBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-clock-rotate-left"></i><span>Historial</span></button>
+                  </div>
+                </div>
+
+                <section id="produccionListView" class="produccion-view">
+                  <div id="produccionList" class="recetas-list produccion-list"></div>
+                </section>
+
+                <section id="produccionDetailView" class="produccion-view d-none">
+                  <div class="produccion-detail-head">
+                    <button id="produccionBackBtn" type="button" class="btn ios-btn ios-btn-secondary recetas-back-btn"><i class="fa-solid fa-arrow-left"></i><span>Atrás</span></button>
+                    <div class="produccion-reservation-chip" id="produccionReservationChip">Reserva: --:--</div>
+                  </div>
+                  <div id="produccionDetailContent"></div>
+                </section>
+
+                <section id="produccionHistoryView" class="produccion-view d-none">
+                  <div class="produccion-history-filters">
+                    <input id="produccionFilterRange" class="form-control ios-input" placeholder="Desde / Hasta">
+                    <input id="produccionFilterId" class="form-control ios-input" placeholder="N° producción">
+                    <input id="produccionFilterProduct" class="form-control ios-input" placeholder="Producto">
+                    <select id="produccionFilterEstado" class="form-select ios-input">
+                      <option value="">Estado (todos)</option>
+                      <option value="confirmada">Confirmada</option>
+                      <option value="anulada">Anulada</option>
+                    </select>
+                    <button id="produccionApplyFiltersBtn" type="button" class="btn ios-btn ios-btn-primary"><i class="fa-solid fa-filter"></i><span>Filtrar</span></button>
+                  </div>
+                  <div id="produccionHistoryTable"></div>
+                </section>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="modal fade" id="imageViewerModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-xl">
           <div class="modal-content ios-modal image-viewer-modal">
@@ -396,6 +466,7 @@
   <script src="./JS/ingredientes.js"></script>
   <script src="./JS/recetas.js"></script>
   <script src="./JS/inventario.js"></script>
+  <script src="./JS/produccion.js"></script>
   <script src="./JS/app.js"></script>
 </body>
 </html>
