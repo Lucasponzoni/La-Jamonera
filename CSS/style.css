@@ -4041,6 +4041,11 @@ html.login-protected.auth-ok body {
   display: flex;
   justify-content: center;
   margin-bottom: 8px;
+  background-image: url("https://i.postimg.cc/SxTLsN2M/Ingredientes.png");
+  background-size: cover;
+  background-position: center;
+  padding: 6px 10px;
+  border-radius: 12px 12px 0 0;
 }
 
 .inventario-editor-photo .ingrediente-avatar {
@@ -4441,9 +4446,14 @@ html.login-protected.auth-ok body {
   min-height: 150px;
 }
 
-.swal2-popup.ios-alert .swal2-deny {
+.swal2-popup.ios-alert .swal2-deny:not(.ios-btn-deny-critical) {
   background: #e6ebfa !important;
   color: #2a4ea3 !important;
+}
+
+.swal2-popup.ios-alert .swal2-deny.ios-btn-deny-critical {
+  background: #ff4d4f !important;
+  color: #fff !important;
 }
 
 
@@ -4500,14 +4510,19 @@ html.login-protected.auth-ok body {
 
 .inventario-table-range {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: minmax(220px, 1fr) auto auto auto;
   gap: 8px;
   align-items: center;
 }
 
-.inventario-table-range #inventarioEntriesRange {
-  border-color: #9cb3e7;
-  background: #f7f9ff;
+.inventario-page-btn {
+  min-width: 44px;
+  padding-inline: 12px;
+}
+
+.inventario-entry-actions {
+  display: inline-flex;
+  gap: 6px;
 }
 
 .inventario-table-head.enhanced #inventarioEntriesSearch {
@@ -4564,6 +4579,38 @@ html.login-protected.auth-ok body {
   background: #d93a4f;
 }
 
+#inventarioEditor {
+  overflow-x: hidden;
+}
+
+#inventarioEditor .inventario-table-compact {
+  min-width: 980px;
+  table-layout: auto;
+}
+
+#inventarioEditor .inventario-table-compact th,
+#inventarioEditor .inventario-table-compact td {
+  white-space: nowrap;
+}
+
+.inventario-product-head-stats .inventario-stat-card:first-child {
+  border-color: #cfd9f1;
+  background: #f5f7fd;
+}
+
+.inventario-product-head-stats .inventario-stat-card:first-child small {
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  color: #4a5e8f;
+  font-weight: 700;
+}
+
+.inventario-product-head-stats .inventario-stat-card:first-child strong {
+  font-size: 1.35rem;
+  color: #7a5ce6;
+  font-weight: 800;
+}
+
 #inventarioOpenPeriodFilterBtn span {
   white-space: nowrap;
 }
@@ -4597,4 +4644,167 @@ html.login-protected.auth-ok body {
     max-width: 100%;
     justify-content: flex-start;
   }
+}
+
+
+.inventario-invoice-textarea {
+  min-height: 44px;
+  resize: vertical;
+}
+
+#inventarioEntriesRange {
+  border-color: #9cb3e7;
+  background: #f7f9ff;
+}
+
+.viewer-stage #viewerStageSpinner .meta-spinner-login {
+  width: 88px;
+  height: 88px;
+}
+
+.inventario-config-badge.is-secondary {
+  background: #eef1f8;
+  color: #6e7f9f;
+  border-color: #d9deeb;
+}
+
+
+#inventarioEntriesSearch::-webkit-search-cancel-button {
+  -webkit-appearance: searchfield-cancel-button;
+  cursor: pointer;
+}
+
+.inventario-delete-btn {
+  background: #ffeef0;
+  border-color: #f3ccd3;
+  color: #b3475a;
+}
+
+.inventario-delete-btn:hover {
+  background: #ffe3e7;
+  color: #b3475a;
+}
+
+.inventario-stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inventario-head-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inventario-day-kg {
+  bottom: -5px;
+  background: #6f5be6;
+  padding: 3px 6px;
+  font-size: 0.6rem;
+}
+
+
+.inventario-product-head-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+
+/* =========================================
+   INVENTARIO · HOTFIX UX FINAL
+========================================= */
+.inventario-modal .ios-modal-body,
+#inventarioEditor,
+#inventarioEditor .recipe-step-card,
+#inventarioEditor .inventario-product-head-v2 {
+  overflow-x: hidden !important;
+}
+
+#inventarioEditor .inventario-table-wrap {
+  overflow-x: hidden;
+}
+
+#inventarioEditor .inventario-table-compact-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+#inventarioEditor .inventario-table-compact {
+  min-width: 980px;
+  width: max-content;
+}
+
+#inventarioEditor .inventario-table-compact th,
+#inventarioEditor .inventario-table-compact td {
+  white-space: nowrap;
+}
+
+#inventarioEditor .inventario-table-compact tbody tr:nth-child(odd) {
+  background: #f4f7ff;
+}
+
+#inventarioEditor .inventario-table-compact tbody tr:nth-child(even) {
+  background: #e9eefb;
+}
+
+.inventario-product-head-main,
+.inventario-product-copy {
+  min-width: 0;
+}
+
+.inventario-product-head-stats .inventario-stat-card {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 60px;
+  padding: 8px 12px;
+  border: 1px solid #d6def3;
+  border-radius: 12px;
+  background: #eef3ff;
+}
+
+.inventario-product-head-stats .inventario-stat-card:first-child strong {
+  color: #7a5ce6;
+}
+
+.inventario-head-actions-row {
+  width: 100%;
+}
+
+.inventario-head-actions-row .inventario-head-action {
+  flex: 1;
+  min-width: 180px;
+}
+
+.inventario-delete-btn,
+.inventario-delete-btn:hover {
+  background: #ffeef0;
+  border-color: #f3ccd3;
+  color: #b3475a;
+}
+
+.inventario-stock-grid {
+  background: linear-gradient(180deg, #f8faff 0%, #f2f6ff 100%);
+  border: 1px solid #dbe4f7;
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.inventario-stock-grid .form-label {
+  font-weight: 700;
+  color: #314b82;
+}
+
+.inventario-stock-grid .ios-input,
+.inventario-stock-grid .image-file-input {
+  background: #f5f8ff;
+  border-color: #c9d6f1;
+}
+
+.viewer-stage #viewerStageSpinner .meta-spinner-login {
+  width: 96px;
+  height: 96px;
 }
