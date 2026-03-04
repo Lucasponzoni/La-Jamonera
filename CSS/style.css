@@ -4950,10 +4950,125 @@ html.login-protected.auth-ok body {
   gap: 10px;
 }
 
+.produccion-toolbar-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.produccion-toolbar-icon-btn {
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  padding: 0;
+}
+
+.produccion-history-btn {
+  width: fit-content;
+  max-width: none;
+  background: #ff8a2a;
+  color: #fff;
+}
+
+.produccion-history-btn:hover {
+  background: #ef7c1e;
+  color: #fff;
+}
+
 .produccion-umbral-global-btn,
 .produccion-umbral-btn {
   width: fit-content;
   max-width: none;
+}
+
+.produccion-umbral-btn {
+  background: #f4f7ff;
+  border: 1px solid #d6def3;
+  color: #2a3f70;
+  border-radius: 14px;
+}
+
+.produccion-umbral-btn:hover {
+  background: #eaf1ff;
+  color: #223760;
+}
+
+.produccion-period-board .inventario-period-filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto auto auto auto;
+  align-items: center;
+}
+
+.produccion-responsable-wrap {
+  display: grid;
+  line-height: 1.2;
+}
+
+.produccion-responsable-wrap strong {
+  color: #2d497e;
+}
+
+.produccion-responsable-wrap small {
+  color: #6a7a9d;
+  font-size: 0.74rem;
+}
+
+.produccion-trace-tree {
+  border: 1px solid #dbe4f8;
+  border-radius: 14px;
+  background: #f8fbff;
+  padding: 12px;
+  overflow: auto;
+  cursor: grab;
+}
+
+.produccion-trace-canvas {
+  transform-origin: top left;
+  min-width: 720px;
+}
+
+.produccion-trace-node {
+  border: 1px solid #d7e2f7;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 8px 10px;
+}
+
+.produccion-trace-node-head {
+  font-weight: 800;
+  color: #2b416f;
+  margin-bottom: 4px;
+}
+
+.produccion-trace-row {
+  display: grid;
+  grid-template-columns: 280px 26px 1fr;
+  gap: 10px;
+  align-items: stretch;
+  margin-bottom: 10px;
+}
+
+.produccion-trace-arrow {
+  align-self: center;
+  text-align: center;
+  color: #5c76aa;
+}
+
+.produccion-trace-lot-grid {
+  display: grid;
+  gap: 8px;
+}
+
+@media (max-width: 991.98px) {
+  .produccion-period-board .inventario-period-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .produccion-toolbar-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 
 .produccion-list {
