@@ -40,6 +40,7 @@
     globalExpandBtn: $('inventarioGlobalExpandBtn'),
     globalLoading: $('inventarioGlobalLoading'),
     globalPrintBtn: $('inventarioGlobalPrintBtn'),
+    globalExcelBtn: $('inventarioGlobalExcelBtn'),
     globalTableWrap: $('inventarioGlobalTableWrap'),
     imageViewerModal: $('imageViewerModal'),
     viewerImage: $('viewerImage'),
@@ -507,7 +508,7 @@
         <td>${row.qtyKg.toFixed(2)} kg</td>
         <td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td>
         <td>${escapeHtml(row.invoiceNumber)}</td>
-        <td>${row.invoiceImageUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-global-image="${row.invoiceImageUrl}"><i class="fa-regular fa-image"></i><span>Ver</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>No posee foto</button>'}</td>
+        <td>${row.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-global-images="${encodeURIComponent(JSON.stringify(row.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Ver (${row.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>No posee foto</button>'}</td>
       </tr>`).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos en ese rango.</td></tr>';
     nodes.globalTableWrap.innerHTML = `
       <div class="table-responsive inventario-global-table inventario-table-compact-wrap">
@@ -515,9 +516,6 @@
           <thead><tr><th>Fecha</th><th>Producto</th><th>Kilos</th><th>Cantidad</th><th>N° factura</th><th>Imagen</th></tr></thead>
           <tbody>${htmlRows}</tbody>
         </table>
-      </div>
-      <div class="inventario-global-actions">
-        <button type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn" id="inventarioGlobalTableExpandBtn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button>
       </div>
       <div class="inventario-pagination enhanced">
         <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-global-page="prev" ${state.globalTablePage <= 1 ? 'disabled' : ''} aria-label="Página anterior"><i class="fa-solid fa-chevron-left"></i></button>
@@ -688,6 +686,9 @@
     if (!images.length) return;
     ensureImageViewerModal();
     if (!imageViewerModal) return;
+    if (nodes.imageViewerModal) nodes.imageViewerModal.style.zIndex = '3200';
+    const latestBackdrop = document.querySelector('.modal-backdrop:last-of-type');
+    latestBackdrop?.classList.add('inventory-image-backdrop');
     nodes.imageViewerModal.querySelector('.ios-modal-title').textContent = title;
     state.viewerImages = images;
     state.viewerIndex = Math.min(Math.max(0, startIndex), images.length - 1);
@@ -988,10 +989,13 @@
           <input id="inventarioEntriesSearch" type="search" class="form-control ios-input" autocomplete="off" placeholder="Buscar en ingresos" value="${escapeHtml(state.tableSearch)}">
           <div class="inventario-table-range">
             <input id="inventarioEntriesRange" class="form-control ios-input" autocomplete="off" placeholder="Rango de fechas" value="${escapeHtml(state.tableDateRange)}">
-            <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn ${state.tableDateRange ? '' : 'd-none'}" id="inventarioClearFilterBtn"><i class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></button>
             <button type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn" id="inventarioExpandTableBtn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button>
+            <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn ${state.tableDateRange ? '' : 'd-none'}" id="inventarioClearFilterBtn"><i class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></button>
+          </div>
+          <div class="inventario-print-row">
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioPrintFilteredBtn"><i class="fa-solid fa-print"></i><span>Imprimir filtro</span></button>
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioPrintAllBtn"><i class="fa-solid fa-print"></i><span>Imprimir total</span></button>
+            <button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" id="inventarioExcelBtn"><i class="fa-solid fa-file-excel"></i><span>Excel</span></button>
           </div>
         </div>
         <div class="table-responsive inventario-table-compact-wrap">
@@ -1017,11 +1021,129 @@
       html: `<div class="inventario-expand-wrap">${tableHtml}</div>`,
       width: '92vw',
       confirmButtonText: 'Cerrar',
+      didOpen: (popup) => {
+        popup.querySelectorAll('.js-open-expanded-image').forEach((button) => {
+          button.addEventListener('click', async () => {
+            const raw = button.dataset.images;
+            if (!raw) return;
+            try {
+              const urls = JSON.parse(decodeURIComponent(raw));
+              if (!Array.isArray(urls) || !urls.length) return;
+              await openAttachmentViewer([{ invoiceImageUrls: urls }], 0, 'Imagen del ingreso');
+            } catch (error) {
+            }
+          });
+        });
+      },
       customClass: {
         popup: 'ios-alert inventario-expand-alert',
         confirmButton: 'ios-btn ios-btn-secondary'
       }
     });
+  };
+
+  const imageLinksText = (entry) => {
+    const urls = entryImageUrls(entry);
+    if (!urls.length) return '-';
+    return urls.map((_, index) => `LINK ${index + 1}`).join(', ');
+  };
+
+  const buildExpandedImageCell = (urls = []) => {
+    if (!urls.length) return 'Sin foto';
+    return `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn js-open-expanded-image" data-images="${encodeURIComponent(JSON.stringify(urls))}"><i class="fa-regular fa-image"></i><span>Ver (${urls.length})</span></button>`;
+  };
+
+  const showExcelPreparing = async () => openIosSwal({
+    title: '',
+    html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Exportando Excel" class="meta-spinner-login"><p class="mt-2 mb-0">Exportando Excel...</p></div>',
+    allowOutsideClick: false,
+    showConfirmButton: false
+  });
+
+  const makeWorkbook = async ({ fileName, sheetName, headers, rows }) => {
+    if (!window.ExcelJS) {
+      await openIosSwal({ title: 'Excel no disponible', html: '<p>No se pudo cargar la librería ExcelJS.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      return;
+    }
+
+    await showExcelPreparing();
+    try {
+      const wb = new window.ExcelJS.Workbook();
+      const ws = wb.addWorksheet(sheetName);
+      ws.columns = headers.map((header) => ({ header, key: header, width: 24 }));
+      ws.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: 1, column: headers.length }
+      };
+      ws.views = [{ state: 'frozen', ySplit: 1 }];
+
+      const headerRow = ws.getRow(1);
+      headerRow.height = 24;
+      headerRow.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F7AE8' } };
+        cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFCED8EE' } },
+          left: { style: 'thin', color: { argb: 'FFCED8EE' } },
+          bottom: { style: 'thin', color: { argb: 'FFCED8EE' } },
+          right: { style: 'thin', color: { argb: 'FFCED8EE' } }
+        };
+      });
+
+      rows.forEach((data, index) => {
+        const rowData = headers.reduce((acc, header) => {
+          acc[header] = data[header] ?? '';
+          return acc;
+        }, {});
+        const row = ws.addRow(rowData);
+        row.height = 21;
+        const tone = index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF';
+        row.eachCell((cell) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tone } };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFD8E2F5' } },
+            left: { style: 'thin', color: { argb: 'FFD8E2F5' } },
+            bottom: { style: 'thin', color: { argb: 'FFD8E2F5' } },
+            right: { style: 'thin', color: { argb: 'FFD8E2F5' } }
+          };
+          cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+        });
+
+        const imgCol = headers.indexOf('Imágenes') + 1;
+        if (imgCol > 0 && data.__firstImage) {
+          const imageCell = row.getCell(imgCol);
+          imageCell.note = data.__firstImage;
+        }
+      });
+
+      const imgCol = headers.indexOf('Imágenes') + 1;
+      if (imgCol > 0) {
+        for (let rowIndex = 2; rowIndex <= ws.rowCount; rowIndex += 1) {
+          const cell = ws.getCell(rowIndex, imgCol);
+          const firstUrl = cell.note;
+          if (firstUrl) {
+            cell.value = { text: String(cell.value || 'LINK 1'), hyperlink: firstUrl };
+            cell.font = { color: { argb: 'FF1F7AE8' }, underline: true };
+          }
+        }
+      }
+
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([new Uint8Array(buffer)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    } catch (error) {
+      await openIosSwal({ title: 'No se pudo exportar', html: '<p>Ocurrió un error generando el archivo Excel.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+    } finally {
+      Swal.close();
+    }
   };
 
   const renderEditor = (ingredientId, draft = null) => {
@@ -1113,30 +1235,30 @@
         <h6 class="step-title"><span class="recipe-step-number">2</span> Ingresar Stock</h6>
         <div class="step-content recipe-fields-flex inventario-stock-grid">
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryQty"><i class="fa-solid fa-weight-hanging"></i> Cantidad a ingresar</label>
+            <label class="form-label" for="inventoryQty"><i class="fa-solid fa-weight-hanging inventario-step-icon"></i> Cantidad a ingresar</label>
             <input id="inventoryQty" class="form-control ios-input" type="number" autocomplete="off" min="0" step="0.01" value="${state.editorDraft.qty}">
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryUnit"><i class="fa-solid fa-ruler"></i> Unidad</label>
+            <label class="form-label" for="inventoryUnit"><i class="fa-solid fa-ruler-combined inventario-step-icon"></i> Unidad</label>
             <select id="inventoryUnit" class="form-select ios-input" autocomplete="off">
               ${state.measures.map((m) => `<option value="${escapeHtml(m.name)}" ${measureKey(m.name) === measureKey(state.editorDraft.unit) ? 'selected' : ''}>${escapeHtml(getMeasureLabel(m.name))}</option>`).join('')}
               <option value="add_measure">+ Agregar medida</option>
             </select>
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryEntryDate"><i class="fa-regular fa-calendar-plus"></i> Fecha de ingreso</label>
+            <label class="form-label" for="inventoryEntryDate"><i class="fa-regular fa-calendar-plus inventario-step-icon"></i> Fecha de ingreso</label>
             <input id="inventoryEntryDate" class="form-control ios-input" autocomplete="off" value="${escapeHtml(state.editorDraft.entryDate)}" placeholder="Seleccionar fecha">
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryExpiryDate"><i class="fa-regular fa-calendar-check"></i> Fecha de caducidad</label>
+            <label class="form-label" for="inventoryExpiryDate"><i class="fa-regular fa-calendar-check inventario-step-icon"></i> Fecha de caducidad</label>
             <input id="inventoryExpiryDate" class="form-control ios-input" autocomplete="off" value="${escapeHtml(state.editorDraft.expiryDate)}" placeholder="Seleccionar fecha">
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryInvoiceNumber"><i class="fa-solid fa-file-invoice"></i> Número de factura/remito</label>
+            <label class="form-label" for="inventoryInvoiceNumber"><i class="fa-solid fa-file-invoice inventario-step-icon"></i> Número de factura/remito</label>
             <textarea id="inventoryInvoiceNumber" name="inventory_code_free" class="form-control ios-input inventario-invoice-textarea" rows="1" placeholder="Ej: A-000123" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text">${escapeHtml(state.editorDraft.invoiceNumber)}</textarea>
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryInvoiceImage"><i class="fa-regular fa-images"></i> Adjuntar foto(s) de factura/remito</label>
+            <label class="form-label" for="inventoryInvoiceImage"><i class="fa-regular fa-images inventario-step-icon"></i> Adjuntar foto(s) de factura/remito</label>
             <input id="inventoryInvoiceImage" class="form-control image-file-input" autocomplete="off" type="file" accept="image/*" multiple>
           </div>
         </div>
@@ -1367,7 +1489,7 @@
 
     nodes.editorForm.querySelector('#inventarioExpandTableBtn')?.addEventListener('click', async () => {
       const fullRows = getFilteredEntries(Array.isArray(record.entries) ? record.entries : []);
-      const htmlRows = fullRows.length ? fullRows.map((entry) => `<tr><td>${formatDateTime(entry.createdAt)}</td><td>${entry.expiryDate || '-'}</td><td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td>${entryImageUrls(entry).length ? `Ver (${entryImageUrls(entry).length})` : 'Sin foto'}</td></tr>`).join('') : '<tr><td colspan="5" class="text-center">Sin ingresos para mostrar.</td></tr>';
+      const htmlRows = fullRows.length ? fullRows.map((entry) => `<tr><td>${formatDateTime(entry.createdAt)}</td><td>${entry.expiryDate || '-'}</td><td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td>${buildExpandedImageCell(entryImageUrls(entry))}</td></tr>`).join('') : '<tr><td colspan="5" class="text-center">Sin ingresos para mostrar.</td></tr>';
       await openExpandedTable('Historial ampliado', `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura</th><th>Imagen</th></tr></thead><tbody>${htmlRows}</tbody></table></div>`);
     });
 
@@ -1376,6 +1498,28 @@
     });
     nodes.editorForm.querySelector('#inventarioPrintAllBtn')?.addEventListener('click', async () => {
       await openPrintEntries(ingredient, Array.isArray(record.entries) ? record.entries : []);
+    });
+
+    nodes.editorForm.querySelector('#inventarioExcelBtn')?.addEventListener('click', async () => {
+      const rows = getFilteredEntries(Array.isArray(record.entries) ? record.entries : []);
+      const payload = rows.map((entry) => {
+        const urls = entryImageUrls(entry);
+        const links = imageLinksText(entry);
+        return {
+          Fecha: formatDateTime(entry.createdAt),
+          'Fecha caducidad': entry.expiryDate || '-',
+          Cantidad: `${Number(entry.qty || 0).toFixed(2)} ${entry.unit || ''}`,
+          'N° factura': entry.invoiceNumber || '-',
+          Imágenes: links,
+          __firstImage: urls[0] || ''
+        };
+      });
+      await makeWorkbook({
+        fileName: `inventario_${normalizeLower(ingredient.name || 'producto')}_${Date.now()}.xlsx`,
+        sheetName: 'Historial',
+        headers: ['Fecha', 'Fecha caducidad', 'Cantidad', 'N° factura', 'Imágenes'],
+        rows: payload
+      });
     });
 
     nodes.editorForm.querySelectorAll('[data-print-entry]').forEach((btn) => {
@@ -1717,12 +1861,30 @@
 
   nodes.globalExpandBtn?.addEventListener('click', async () => {
     const rows = getGlobalFilteredEntries();
-    const htmlRows = rows.length ? rows.map((row) => `<tr><td>${escapeHtml(row.entryDate)}</td><td>${escapeHtml(row.ingredientName)}</td><td>${row.qtyKg.toFixed(2)} kg</td><td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td><td>${escapeHtml(row.invoiceNumber)}</td><td>${row.invoiceImageUrl ? 'Ver' : 'Sin foto'}</td></tr>`).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos en ese rango.</td></tr>';
+    const htmlRows = rows.length ? rows.map((row) => `<tr><td>${escapeHtml(row.entryDate)}</td><td>${escapeHtml(row.ingredientName)}</td><td>${row.qtyKg.toFixed(2)} kg</td><td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td><td>${escapeHtml(row.invoiceNumber)}</td><td>${buildExpandedImageCell(row.invoiceImageUrls)}</td></tr>`).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos en ese rango.</td></tr>';
     await openExpandedTable('Ingresos por período (ampliado)', `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha</th><th>Producto</th><th>Kilos</th><th>Cantidad</th><th>N° factura</th><th>Imagen</th></tr></thead><tbody>${htmlRows}</tbody></table></div>`);
   });
 
   nodes.globalPrintBtn?.addEventListener('click', async () => {
     await openPrintGlobalPeriod(getGlobalFilteredEntries());
+  });
+  nodes.globalExcelBtn?.addEventListener('click', async () => {
+    const rows = getGlobalFilteredEntries();
+    const payload = rows.map((row) => ({
+      Fecha: row.entryDate,
+      Producto: row.ingredientName,
+      Kilos: `${row.qtyKg.toFixed(2)} kg`,
+      Cantidad: `${row.qty.toFixed(2)} ${row.unit}`,
+      'N° factura': row.invoiceNumber,
+      Imágenes: row.invoiceImageUrls.length ? row.invoiceImageUrls.map((_, index) => `LINK ${index + 1}`).join(', ') : '-',
+      __firstImage: row.invoiceImageUrls[0] || ''
+    }));
+    await makeWorkbook({
+      fileName: `inventario_periodo_${Date.now()}.xlsx`,
+      sheetName: 'Periodo',
+      headers: ['Fecha', 'Producto', 'Kilos', 'Cantidad', 'N° factura', 'Imágenes'],
+      rows: payload
+    });
   });
   nodes.globalTableWrap?.addEventListener('click', async (event) => {
     const pageBtn = event.target.closest('[data-global-page]');
@@ -1731,16 +1893,11 @@
       renderGlobalPeriodTable();
       return;
     }
-    const expandBtn = event.target.closest('#inventarioGlobalTableExpandBtn');
-    if (expandBtn) {
-      const rows = getGlobalFilteredEntries();
-      const htmlRows = rows.length ? rows.map((row) => `<tr><td>${escapeHtml(row.entryDate)}</td><td>${escapeHtml(row.ingredientName)}</td><td>${row.qtyKg.toFixed(2)} kg</td><td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td><td>${escapeHtml(row.invoiceNumber)}</td><td>${row.invoiceImageUrl ? 'Ver' : 'Sin foto'}</td></tr>`).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos en ese rango.</td></tr>';
-      await openExpandedTable('Ingresos por período (ampliado)', `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha</th><th>Producto</th><th>Kilos</th><th>Cantidad</th><th>N° factura</th><th>Imagen</th></tr></thead><tbody>${htmlRows}</tbody></table></div>`);
-      return;
-    }
-    const btn = event.target.closest('[data-open-global-image]');
+    const btn = event.target.closest('[data-open-global-images]');
     if (!btn) return;
-    await openAttachmentViewer([{ invoiceImageUrls: [btn.dataset.openGlobalImage] }], 0, 'Imagen del ingreso');
+    const urls = JSON.parse(decodeURIComponent(btn.dataset.openGlobalImages || '[]'));
+    if (!Array.isArray(urls) || !urls.length) return;
+    await openAttachmentViewer([{ invoiceImageUrls: urls }], 0, 'Imagen del ingreso');
   });
 
   nodes.viewerPrevBtn?.addEventListener('click', () => {
@@ -1768,5 +1925,8 @@
 
   inventarioModal.addEventListener('hide.bs.modal', snapshotEditorDraft);
   inventarioModal.addEventListener('hidden.bs.modal', () => inventarioModal.removeAttribute('inert'));
+  nodes.imageViewerModal?.addEventListener('hidden.bs.modal', () => {
+    document.querySelectorAll('.modal-backdrop.inventory-image-backdrop').forEach((backdrop) => backdrop.classList.remove('inventory-image-backdrop'));
+  });
   inventarioModal.addEventListener('show.bs.modal', loadInventario);
 })();
