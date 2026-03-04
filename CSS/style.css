@@ -5242,6 +5242,10 @@ html.login-protected.auth-ok body {
   max-width: 540px;
 }
 
+.swal2-popup.ios-alert.produccion-umbral-alert {
+  border-radius: 22px;
+}
+
 .produccion-umbral-alert .swal2-html-container {
   margin-top: 0.4rem;
   text-align: left;
@@ -5261,6 +5265,7 @@ html.login-protected.auth-ok body {
 .produccion-umbral-alert .swal2-input.ios-input {
   margin: 0;
   width: 100%;
+  border-radius: 16px;
 }
 
 .produccion-head-icon {
@@ -5286,6 +5291,25 @@ html.login-protected.auth-ok body {
   margin: 8px 0 0;
   color: #5f6f94;
   font-size: 0.83rem;
+}
+
+.produccion-fefo-note {
+  margin: 8px 0 0;
+  border: 1px solid #cde0ff;
+  border-radius: 12px;
+  background: #f1f7ff;
+  color: #33558f;
+  padding: 10px 12px;
+  font-size: 0.83rem;
+}
+
+.produccion-fefo-note strong {
+  color: #1f4ea0;
+}
+
+.produccion-fefo-note span {
+  color: #26467d;
+  font-weight: 700;
 }
 
 .produccion-detail-grid {
@@ -5460,6 +5484,17 @@ html.login-protected.auth-ok body {
   color: #7d88a3;
 }
 
+.produccion-needs-value {
+  color: #158346;
+  font-weight: 800;
+  font-size: 1.03rem;
+}
+
+.produccion-available-value {
+  color: #7a859f !important;
+  font-weight: 700;
+}
+
 .produccion-lote-main p em {
   color: #b53c53;
   font-style: normal;
@@ -5512,6 +5547,52 @@ html.login-protected.auth-ok body {
   color: #28467f;
 }
 
+.produccion-lote-key,
+.produccion-provider-key {
+  color: #37588f;
+}
+
+.produccion-lote-value {
+  color: #204f9b;
+  font-weight: 700;
+}
+
+.produccion-expiry-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.produccion-expiry-badge.is-ok {
+  color: #138243;
+  background: #e9f8ef;
+  border-color: #bbe6c8;
+}
+
+.produccion-expiry-badge.is-warning {
+  color: #a86b10;
+  background: #fff4e2;
+  border-color: #f8d8ad;
+}
+
+.produccion-expiry-badge.is-danger {
+  color: #b63c52;
+  background: #fff0f3;
+  border-color: #f3c5ce;
+}
+
+.produccion-expiry-badge.is-unknown {
+  color: #637292;
+  background: #eef2fb;
+  border-color: #d5ddee;
+}
+
 .produccion-lote-adjuntos-row {
   display: inline-flex;
   align-items: center;
@@ -5554,6 +5635,51 @@ html.login-protected.auth-ok body {
   width: auto;
   max-width: none;
   min-height: 38px;
+}
+
+.produccion-drafts-wrap {
+  border: 1px solid #d8e2f7;
+  border-radius: 14px;
+  background: #f8fbff;
+  padding: 10px;
+  margin-bottom: 12px;
+}
+
+.produccion-drafts-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.produccion-draft-card {
+  border: 1px solid #d6e1f7;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.produccion-draft-card strong {
+  display: block;
+  color: #2d497e;
+}
+
+.produccion-draft-card small {
+  color: #6a7a9d;
+}
+
+.produccion-draft-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.produccion-draft-actions .ios-btn {
+  width: auto;
+  max-width: none;
+  min-height: 34px;
+  border-radius: 10px;
 }
 
 .produccion-final-actions {
@@ -5646,14 +5772,15 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-max-line strong {
-  color: #1f3f82;
+  color: #178c46;
   font-size: 1.15rem;
   font-weight: 800;
 }
 
 .produccion-max-line {
-  background-color: #eaf2ff;
+  background-color: #eaf9f0;
   padding: 8px 12px;
   border-radius: 12px;
   width: fit-content;
+  color: #178c46;
 }

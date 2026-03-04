@@ -324,8 +324,8 @@
 
     const minCoverage = Math.min(...requirements.map((item) => item.coverage));
     const maxKg = Math.max(0, minCoverage);
-    const averageCoverage = requirements.reduce((acc, item) => acc + item.coverage, 0) / Math.max(requirements.length, 1);
-    const progress = Math.max(0, Math.min(100, (averageCoverage / minKg) * 100));
+    const readyCount = requirements.filter((item) => item.missingForMin <= 0.0001).length;
+    const progress = Math.max(0, Math.min(100, (readyCount / Math.max(requirements.length, 1)) * 100));
     const canProduce = maxKg >= minKg;
     const missingForMin = requirements.filter((item) => item.missingForMin > 0.0001);
     const hasExpired = requirements.some((item) => item.hasExpired);
@@ -551,6 +551,10 @@
     return own || null;
   };
 
+  const getOwnDrafts = () => Object.values(safeObject(state.drafts))
+    .filter((item) => item.ownerSessionId === sessionId && item.status === 'active' && item.recipeId)
+    .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+
   const getForeignDraftConflict = (recipeId) => Object.values(safeObject(state.drafts)).find((item) => item.recipeId === recipeId && item.ownerSessionId !== sessionId);
 
   const openGlobalMinConfig = async () => {
@@ -639,7 +643,7 @@
         </div>`;
     };
 
-    nodes.list.innerHTML = list.map((recipe) => {
+    const cardsHtml = list.map((recipe) => {
       const analysis = state.analysis[recipe.id] || analyzeRecipe(recipe);
       const statusClass = analysis.status === 'success' ? 'tone-success' : analysis.status === 'warning' ? 'tone-warning' : 'tone-danger';
       const action = analysis.canProduce
@@ -699,6 +703,28 @@
         </article>`;
     }).join('');
 
+    const drafts = getOwnDrafts();
+    const draftsHtml = drafts.length
+      ? `<section class="produccion-drafts-wrap">
+          <h6 class="step-title"><span class="recipe-step-number">B</span> Borradores</h6>
+          <div class="produccion-drafts-grid">${drafts.map((draft) => {
+            const recipe = state.recetas[draft.recipeId] || {};
+            return `<article class="produccion-draft-card">
+              <div>
+                <strong>${capitalize(recipe.title || 'Receta')}</strong>
+                <small>Actualizado: ${formatDateTime(draft.updatedAt)}</small>
+              </div>
+              <div class="produccion-draft-actions">
+                <button type="button" class="btn ios-btn ios-btn-secondary" data-open-draft="${draft.id}"><i class="fa-solid fa-pen"></i><span>Continuar</span></button>
+                <button type="button" class="btn ios-btn ios-btn-warning" data-delete-draft="${draft.id}"><i class="fa-solid fa-trash"></i><span>Descartar</span></button>
+              </div>
+            </article>`;
+          }).join('')}</div>
+        </section>`
+      : '';
+
+    nodes.list.innerHTML = `${draftsHtml}${cardsHtml}`;
+
     document.querySelectorAll('.js-produccion-thumb').forEach((image) => {
       const wrap = image.closest('.receta-thumb-wrap');
       image.addEventListener('error', () => {
@@ -713,14 +739,28 @@
   const buildLotsBreakdownHtml = (plan) => {
     const mergeIcon = './IMG/Octicons-git-merge.svg';
     const allExpanded = plan.ingredientPlans.every((row) => state.lotCollapseState[row.ingredientId] !== true);
-    return plan.ingredientPlans.map((row) => `
+    const allCollapsed = plan.ingredientPlans.every((row) => state.lotCollapseState[row.ingredientId] === true);
+    const getExpiryBadge = (expiryDate) => {
+      const expiry = normalizeValue(expiryDate);
+      if (!expiry) return '<span class="produccion-expiry-badge is-unknown">Sin fecha</span>';
+      const days = Math.ceil((new Date(`${expiry}T00:00:00`).getTime() - new Date(`${plan.productionDate}T00:00:00`).getTime()) / 86400000);
+      if (days < 0) return `<span class="produccion-expiry-badge is-danger">Vencido ${Math.abs(days)}d</span>`;
+      if (days <= 7) return `<span class="produccion-expiry-badge is-danger">${days}d</span>`;
+      if (days <= 20) return `<span class="produccion-expiry-badge is-warning">${days}d</span>`;
+      return `<span class="produccion-expiry-badge is-ok">${days}d</span>`;
+    };
+
+    return `<div class="produccion-lote-global-actions">
+        <button type="button" class="btn ios-btn ios-btn-secondary" id="produccionCollapseAllBtn" ${allCollapsed ? 'disabled' : ''}>Colapsar todo</button>
+        <button type="button" class="btn ios-btn ios-btn-secondary" id="produccionExpandAllBtn" ${allExpanded ? 'disabled' : ''}>Descolapsar todo</button>
+      </div>` + plan.ingredientPlans.map((row) => `
       <article class="produccion-lote-group ${row.missingQty > 0 ? 'is-missing' : ''}" data-lot-group="${row.ingredientId}">
         <header class="produccion-lote-head">
           <div class="produccion-lote-main">
             <img src="${state.ingredientes[row.ingredientId]?.imageUrl || FIAMBRES_IMAGE}" alt="${row.ingredientName}" class="produccion-lote-ingredient-image">
             <div>
               <h6>${row.ingredientName}</h6>
-              <p><strong>Necesita:</strong> ${formatCompactQty(row.neededQty, row.ingredientUnit)} <span>· Disponible ${formatCompactQty(row.availableQty, row.ingredientUnit)}</span>${row.missingQty > 0 ? ` <em>· Faltan ${formatCompactQty(row.missingQty, row.ingredientUnit)}</em>` : ''}</p>
+              <p><span class="produccion-needs-value">Necesita ${formatCompactQty(row.neededQty, row.ingredientUnit)}</span> <span class="produccion-available-value">· Disponible ${formatCompactQty(row.availableQty, row.ingredientUnit)}</span>${row.missingQty > 0 ? ` <em>· Faltan ${formatCompactQty(row.missingQty, row.ingredientUnit)}</em>` : ''}</p>
             </div>
           </div>
           <div class="produccion-lote-head-actions">
@@ -734,11 +774,11 @@
         <div class="produccion-lote-rows ${state.lotCollapseState[row.ingredientId] ? 'is-collapsed' : ''}">
           ${row.lots.length ? row.lots.map((lot) => `
           <div class="produccion-lote-row tone-${lot.status}">
-            <div><strong>Lote:</strong> ${lot.lotNumber}</div>
+            <div><strong class="produccion-lote-key">Lote:</strong> <span class="produccion-lote-value">${lot.lotNumber}</span></div>
             <div><strong>Ingreso:</strong> ${lot.entryDate || formatDateTime(lot.createdAt)}</div>
-            <div><strong>Vence:</strong> ${lot.expiryDate || '-'}</div>
+            <div><strong>Vence:</strong> ${lot.expiryDate || '-'} ${getExpiryBadge(lot.expiryDate)}</div>
             <div><strong>Usar:</strong> ${formatCompactQty(lot.takeQty, lot.unit)}</div>
-            <div><strong>Proveedor:</strong> ${lot.provider || '-'}</div>
+            <div><strong class="produccion-provider-key">Proveedor:</strong> ${lot.provider || '-'}</div>
             <div><strong>Factura:</strong> ${lot.invoiceNumber || '-'}</div>
             <div class="produccion-lote-adjuntos-row"><strong>Adjuntos:</strong> ${lot.invoiceImageUrls.length
               ? `<button type="button" class="btn ios-btn ios-btn-secondary produccion-lote-adjuntos-btn" data-lot-images="${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Ver (${lot.invoiceImageUrls.length})</span></button>`
@@ -746,11 +786,7 @@
           </div>`).join('<hr class="produccion-lote-separator">') : '<p class="produccion-lote-empty">Sin lotes aptos para la fecha elegida.</p>'}
         </div>
       </article>
-    `).join('') + `
-      <div class="produccion-lote-global-actions">
-        <button type="button" class="btn ios-btn ios-btn-secondary" id="produccionCollapseAllBtn" ${allExpanded ? '' : 'disabled'}>Colapsar todo</button>
-        <button type="button" class="btn ios-btn ios-btn-secondary" id="produccionExpandAllBtn" ${allExpanded ? 'disabled' : ''}>Descolapsar todo</button>
-      </div>`;
+    `).join('');
   };
 
   const saveEditorDraft = async () => {
@@ -887,7 +923,7 @@
 
       <section class="recipe-step-card step-block">
         <h6 class="step-title"><span class="recipe-step-number">5</span> Desglose por lotes (FEFO)</h6>
-        <p class="produccion-qty-help">FEFO = First Expired, First Out (primero vence, primero se usa).</p>
+        <p class="produccion-fefo-note"><strong>FEFO:</strong> <span>First Expired, First Out</span> · primero vence, primero se usa.</p>
         <div id="produccionLotsBreakdown" class="produccion-lotes-wrap"></div>
       </section>
 
@@ -972,7 +1008,8 @@
       });
     }
 
-    qtyInput.addEventListener('input', async () => { await updateEditorPlan(); });
+    qtyInput.addEventListener('change', async () => { await updateEditorPlan(); });
+    qtyInput.addEventListener('blur', async () => { await updateEditorPlan(); });
     nodes.editor.querySelector('#produccionQtyMaxBtn').addEventListener('click', async () => {
       qtyInput.value = analysis.maxKg.toFixed(2);
       await updateEditorPlan();
@@ -1035,8 +1072,7 @@
         html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando producción" class="meta-spinner-login"></div>',
         allowOutsideClick: false,
         showConfirmButton: false,
-        customClass: { popup: 'ios-alert' },
-        didOpen: () => Swal.showLoading()
+        customClass: { popup: 'ios-alert' }
       });
 
       try {
@@ -1197,6 +1233,28 @@
   });
 
   nodes.list.addEventListener('click', async (event) => {
+    const openDraftBtn = event.target.closest('[data-open-draft]');
+    if (openDraftBtn) {
+      const draftId = openDraftBtn.dataset.openDraft;
+      const draft = state.drafts[draftId];
+      if (draft?.recipeId) {
+        state.activeRecipeId = draft.recipeId;
+        await renderEditor(draft.recipeId);
+      }
+      return;
+    }
+
+    const deleteDraftBtn = event.target.closest('[data-delete-draft]');
+    if (deleteDraftBtn) {
+      const draftId = deleteDraftBtn.dataset.deleteDraft;
+      const next = { ...state.drafts };
+      delete next[draftId];
+      await window.dbLaJamoneraRest.write(DRAFTS_PATH, next);
+      state.drafts = next;
+      renderList();
+      return;
+    }
+
     const produceBtn = event.target.closest('[data-open-produccion]');
     if (produceBtn) {
       state.activeRecipeId = produceBtn.dataset.openProduccion;
@@ -1205,8 +1263,7 @@
         html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando producción" class="meta-spinner-login"></div>',
         allowOutsideClick: false,
         showConfirmButton: false,
-        customClass: { popup: 'ios-alert' },
-        didOpen: () => Swal.showLoading()
+        customClass: { popup: 'ios-alert' }
       });
       try {
         await renderEditor(state.activeRecipeId);
@@ -1235,24 +1292,6 @@
     try {
       await refreshData();
       renderList();
-      const ownDraft = Object.values(state.drafts).find((item) => item.ownerSessionId === sessionId && item.status === 'active');
-      if (ownDraft?.recipeId) {
-        const prompt = await openIosSwal({
-          title: 'Borrador recuperado',
-          html: '<p>Encontramos un borrador activo. ¿Querés retomarlo?</p>',
-          icon: 'question',
-          showCancelButton: true,
-          confirmButtonText: 'Continuar borrador',
-          cancelButtonText: 'Descartar'
-        });
-        if (prompt.isConfirmed) {
-          state.activeRecipeId = ownDraft.recipeId;
-          await renderEditor(ownDraft.recipeId);
-        } else {
-          state.activeDraftId = ownDraft.id;
-          await discardDraft();
-        }
-      }
     } catch (error) {
       nodes.empty.querySelector('.ingredientes-empty-text').textContent = 'No se pudo cargar producción desde Firebase.';
       setStateView('empty');
