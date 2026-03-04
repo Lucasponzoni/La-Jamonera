@@ -4550,7 +4550,41 @@ html.login-protected.auth-ok body {
 }
 
 .inventario-print-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   align-items: center;
+}
+
+.inventario-expand-btn {
+  background: #ff8a2a;
+  border: 1px solid #ff8a2a;
+  color: #fff;
+}
+
+.inventario-expand-btn:hover {
+  background: #ef7c1e;
+  border-color: #ef7c1e;
+  color: #fff;
+}
+
+.inventario-step-icon {
+  margin-right: 6px;
+}
+
+.inventario-step-icon.tone-blue { color: #2f7de1; }
+.inventario-step-icon.tone-indigo { color: #485fd6; }
+.inventario-step-icon.tone-green { color: #28a745; }
+.inventario-step-icon.tone-orange { color: #ff8a2a; }
+.inventario-step-icon.tone-purple { color: #7b5be7; }
+.inventario-step-icon.tone-rose { color: #d2527f; }
+
+.inventario-row-tone:nth-child(odd) {
+  background: #f7faff;
+}
+
+.inventario-row-tone:nth-child(even) {
+  background: #eef3ff;
 }
 
 .inventario-print-photo-wrap {
@@ -4655,6 +4689,10 @@ html.login-protected.auth-ok body {
     max-width: 100%;
     justify-content: flex-start;
   }
+
+  .inventario-expand-btn {
+    display: none;
+  }
 }
 
 
@@ -4722,7 +4760,3 @@ html.login-protected.auth-ok body {
   align-items: flex-start;
   gap: 10px;
 }
-
-
-/* =========================================
-   INVENTARIO · HOTFIX UX FINAL
