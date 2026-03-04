@@ -47,6 +47,8 @@
 
   const imageViewerModalEl = document.getElementById('imageViewerModal');
   const viewerImage = document.getElementById('viewerImage');
+  const viewerStageSpinner = document.getElementById('viewerStageSpinner');
+  const viewerBackBtn = document.getElementById('viewerBackBtn');
   const viewerPrevBtn = document.getElementById('viewerPrevBtn');
   const viewerNextBtn = document.getElementById('viewerNextBtn');
   const viewerZoomInBtn = document.getElementById('viewerZoomInBtn');
@@ -2409,6 +2411,8 @@
     state.imageViewerIndex = index;
     state.viewerScale = 1;
     viewerImage.style.transform = 'scale(1)';
+    viewerImage.classList.remove('is-loaded');
+    viewerStageSpinner?.classList.remove('d-none');
     viewerImage.src = images[state.imageViewerIndex].previewUrl;
     imageViewerModal.show();
   };
@@ -2419,6 +2423,8 @@
     state.imageViewerIndex = (state.imageViewerIndex + delta + images.length) % images.length;
     state.viewerScale = 1;
     viewerImage.style.transform = 'scale(1)';
+    viewerImage.classList.remove('is-loaded');
+    viewerStageSpinner?.classList.remove('d-none');
     viewerImage.src = images[state.imageViewerIndex].previewUrl;
   };
 
@@ -2642,6 +2648,7 @@
 
   importanceRange.addEventListener('input', () => { updateImportanceLabel(); persistDraft(); });
 
+  viewerBackBtn?.addEventListener('click', () => imageViewerModal?.hide());
   viewerPrevBtn.addEventListener('click', () => updateViewerImage(-1));
   viewerNextBtn.addEventListener('click', () => updateViewerImage(1));
   viewerZoomInBtn.addEventListener('click', () => setViewerScale(state.viewerScale + 0.25));
@@ -2653,6 +2660,14 @@
     if (report) {
       await openReportViewer(report);
     }
+  });
+
+  viewerImage.addEventListener('load', () => {
+    viewerImage.classList.add('is-loaded');
+    viewerStageSpinner?.classList.add('d-none');
+  });
+  viewerImage.addEventListener('error', () => {
+    viewerStageSpinner?.classList.add('d-none');
   });
 
   viewerImage.addEventListener('wheel', (event) => {
