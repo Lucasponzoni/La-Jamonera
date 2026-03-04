@@ -1165,7 +1165,7 @@
             bottom: { style: 'thin', color: { argb: 'FFD8E2F5' } },
             right: { style: 'thin', color: { argb: 'FFD8E2F5' } }
           };
-          cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
         });
 
         const imgCol = headers.indexOf('Imágenes') + 1;
