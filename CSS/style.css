@@ -5481,3 +5481,16 @@ html.login-protected.auth-ok body {
   object-fit: contain;
   display: inline-block;
 }
+
+.produccion-max-line strong {
+  color: green;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.produccion-max-line {
+  background-color: #edffed;
+  padding: 5px 10px;
+  border-radius: 5px;
+  width: fit-content;
+}
