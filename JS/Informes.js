@@ -263,13 +263,44 @@
     reader.readAsDataURL(blob);
   });
 
+  const blobToSafePdfImageDataUrl = async (blob) => {
+    const mime = normalizeLower(blob?.type || '');
+    if (mime === 'image/png' || mime === 'image/jpeg' || mime === 'image/jpg') {
+      return blobToDataUrl(blob);
+    }
+
+    const objectUrl = URL.createObjectURL(blob);
+    try {
+      const image = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('image_decode_failed'));
+        img.src = objectUrl;
+      });
+
+      const width = Math.max(1, Number(image.naturalWidth || image.width || 1));
+      const height = Math.max(1, Number(image.naturalHeight || image.height || 1));
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('canvas_context_unavailable');
+      }
+      ctx.drawImage(image, 0, 0, width, height);
+      return canvas.toDataURL('image/png');
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  };
+
   const imageUrlToDataUrl = async (url) => {
     const response = await fetch(url, { mode: 'cors' });
     if (!response.ok) {
       throw new Error('image_fetch_failed');
     }
     const blob = await response.blob();
-    return blobToDataUrl(blob);
+    return blobToSafePdfImageDataUrl(blob);
   };
 
   const buildPdfEmbeddedImageBlocks = async (images) => {
