@@ -4035,6 +4035,12 @@ html.login-protected.auth-ok body {
   border-radius: 16px;
 }
 
+.inventario-actions-row .inventario-threshold-btn:hover {
+  background-color: rgb(210, 210, 210);
+  color: rgb(45, 45, 45);
+  cursor: pointer;
+}
+
 .inventario-threshold-btn i {
   font-size: 0.76rem;
 }
