@@ -4369,11 +4369,13 @@ html.login-protected.auth-ok body {
 
 
 .inventario-table-compact tbody tr.is-even-row > td {
-  background: #f7faff !important;
+  background: white !important;
+  border-bottom: 1px solid #e1e9f5 !important;
 }
 
 .inventario-table-compact tbody tr.is-odd-row > td {
-  background: #eaf1ff !important;
+  background: #f7faff !important;
+  border-bottom: 1px solid #e1e9f5 !important;
 }
 
 .inventario-table-compact tbody td:nth-child(3) {
