@@ -5006,6 +5006,16 @@ html.login-protected.auth-ok body {
   align-items: center;
 }
 
+#produccionGlobalRange {
+  min-width: 220px;
+  flex: 1 1 240px;
+}
+
+#produccionHistorySearch {
+  min-width: 220px;
+  flex: 1 1 240px;
+}
+
 .produccion-responsable-wrap {
   display: grid;
   line-height: 1.2;
