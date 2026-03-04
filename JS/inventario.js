@@ -686,6 +686,9 @@
     if (!images.length) return;
     ensureImageViewerModal();
     if (!imageViewerModal) return;
+    if (nodes.imageViewerModal) nodes.imageViewerModal.style.zIndex = '3200';
+    const latestBackdrop = document.querySelector('.modal-backdrop:last-of-type');
+    latestBackdrop?.classList.add('inventory-image-backdrop');
     nodes.imageViewerModal.querySelector('.ios-modal-title').textContent = title;
     state.viewerImages = images;
     state.viewerIndex = Math.min(Math.max(0, startIndex), images.length - 1);
@@ -1050,9 +1053,9 @@
     return `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn js-open-expanded-image" data-images="${encodeURIComponent(JSON.stringify(urls))}"><i class="fa-regular fa-image"></i><span>Ver (${urls.length})</span></button>`;
   };
 
-  const showExcelPreparing = async (message = 'Preparando excel...') => openIosSwal({
-    title: 'Exportando Excel',
-    html: `<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Preparando excel" class="meta-spinner-login"><p class="mt-2 mb-0">${message}</p></div>`,
+  const showExcelPreparing = async () => openIosSwal({
+    title: '',
+    html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Exportando Excel" class="meta-spinner-login"><p class="mt-2 mb-0">Exportando Excel...</p></div>',
     allowOutsideClick: false,
     showConfirmButton: false
   });
@@ -1063,7 +1066,7 @@
       return;
     }
 
-    await showExcelPreparing('Preparando excel...');
+    await showExcelPreparing();
     try {
       const wb = new window.ExcelJS.Workbook();
       const ws = wb.addWorksheet(sheetName);
@@ -1127,13 +1130,17 @@
       }
 
       const buffer = await wb.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const blob = new Blob([new Uint8Array(buffer)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
       anchor.download = fileName;
+      document.body.appendChild(anchor);
       anchor.click();
-      URL.revokeObjectURL(url);
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    } catch (error) {
+      await openIosSwal({ title: 'No se pudo exportar', html: '<p>Ocurrió un error generando el archivo Excel.</p>', icon: 'error', confirmButtonText: 'Entendido' });
     } finally {
       Swal.close();
     }
@@ -1228,30 +1235,30 @@
         <h6 class="step-title"><span class="recipe-step-number">2</span> Ingresar Stock</h6>
         <div class="step-content recipe-fields-flex inventario-stock-grid">
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryQty"><i class="fa-solid fa-weight-hanging inventario-step-icon tone-blue"></i> Cantidad a ingresar</label>
+            <label class="form-label" for="inventoryQty"><i class="fa-solid fa-weight-hanging inventario-step-icon"></i> Cantidad a ingresar</label>
             <input id="inventoryQty" class="form-control ios-input" type="number" autocomplete="off" min="0" step="0.01" value="${state.editorDraft.qty}">
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryUnit"><i class="fa-solid fa-ruler-combined inventario-step-icon tone-indigo"></i> Unidad</label>
+            <label class="form-label" for="inventoryUnit"><i class="fa-solid fa-ruler-combined inventario-step-icon"></i> Unidad</label>
             <select id="inventoryUnit" class="form-select ios-input" autocomplete="off">
               ${state.measures.map((m) => `<option value="${escapeHtml(m.name)}" ${measureKey(m.name) === measureKey(state.editorDraft.unit) ? 'selected' : ''}>${escapeHtml(getMeasureLabel(m.name))}</option>`).join('')}
               <option value="add_measure">+ Agregar medida</option>
             </select>
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryEntryDate"><i class="fa-regular fa-calendar-plus inventario-step-icon tone-green"></i> Fecha de ingreso</label>
+            <label class="form-label" for="inventoryEntryDate"><i class="fa-regular fa-calendar-plus inventario-step-icon"></i> Fecha de ingreso</label>
             <input id="inventoryEntryDate" class="form-control ios-input" autocomplete="off" value="${escapeHtml(state.editorDraft.entryDate)}" placeholder="Seleccionar fecha">
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryExpiryDate"><i class="fa-regular fa-calendar-check inventario-step-icon tone-orange"></i> Fecha de caducidad</label>
+            <label class="form-label" for="inventoryExpiryDate"><i class="fa-regular fa-calendar-check inventario-step-icon"></i> Fecha de caducidad</label>
             <input id="inventoryExpiryDate" class="form-control ios-input" autocomplete="off" value="${escapeHtml(state.editorDraft.expiryDate)}" placeholder="Seleccionar fecha">
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryInvoiceNumber"><i class="fa-solid fa-file-invoice inventario-step-icon tone-purple"></i> Número de factura/remito</label>
+            <label class="form-label" for="inventoryInvoiceNumber"><i class="fa-solid fa-file-invoice inventario-step-icon"></i> Número de factura/remito</label>
             <textarea id="inventoryInvoiceNumber" name="inventory_code_free" class="form-control ios-input inventario-invoice-textarea" rows="1" placeholder="Ej: A-000123" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text">${escapeHtml(state.editorDraft.invoiceNumber)}</textarea>
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryInvoiceImage"><i class="fa-regular fa-images inventario-step-icon tone-rose"></i> Adjuntar foto(s) de factura/remito</label>
+            <label class="form-label" for="inventoryInvoiceImage"><i class="fa-regular fa-images inventario-step-icon"></i> Adjuntar foto(s) de factura/remito</label>
             <input id="inventoryInvoiceImage" class="form-control image-file-input" autocomplete="off" type="file" accept="image/*" multiple>
           </div>
         </div>
@@ -1918,5 +1925,8 @@
 
   inventarioModal.addEventListener('hide.bs.modal', snapshotEditorDraft);
   inventarioModal.addEventListener('hidden.bs.modal', () => inventarioModal.removeAttribute('inert'));
+  nodes.imageViewerModal?.addEventListener('hidden.bs.modal', () => {
+    document.querySelectorAll('.modal-backdrop.inventory-image-backdrop').forEach((backdrop) => backdrop.classList.remove('inventory-image-backdrop'));
+  });
   inventarioModal.addEventListener('show.bs.modal', loadInventario);
 })();

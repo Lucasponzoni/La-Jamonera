@@ -4570,14 +4570,17 @@ html.login-protected.auth-ok body {
 
 .inventario-step-icon {
   margin-right: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #eef3ff;
+  color: #315aa6;
+  border: 1px solid #d6dff4;
+  font-size: 0.72rem;
 }
-
-.inventario-step-icon.tone-blue { color: #2f7de1; }
-.inventario-step-icon.tone-indigo { color: #485fd6; }
-.inventario-step-icon.tone-green { color: #28a745; }
-.inventario-step-icon.tone-orange { color: #ff8a2a; }
-.inventario-step-icon.tone-purple { color: #7b5be7; }
-.inventario-step-icon.tone-rose { color: #d2527f; }
 
 .inventario-row-tone:nth-child(odd) {
   background: #f7faff;
@@ -4585,6 +4588,14 @@ html.login-protected.auth-ok body {
 
 .inventario-row-tone:nth-child(even) {
   background: #eef3ff;
+}
+
+#imageViewerModal {
+  z-index: 3200;
+}
+
+.modal-backdrop.inventory-image-backdrop {
+  z-index: 3190;
 }
 
 .inventario-print-photo-wrap {
