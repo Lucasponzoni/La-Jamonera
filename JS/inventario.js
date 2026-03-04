@@ -685,6 +685,27 @@
     return LOT_TOKEN_OPTIONS.find((item) => item.key === token)?.label || token;
   };
 
+  const formatDateCompact = (isoDate) => {
+    const normalized = normalizeIsoDate(isoDate) || getArgentinaIsoDate();
+    return normalized.replaceAll('-', '');
+  };
+
+  const buildLotNumber = ({ lotConfig, invoiceNumber, entryDate }) => {
+    const config = safeObject(lotConfig);
+    const tokens = Array.isArray(config.tokens) ? config.tokens : [];
+    const custom = normalizeUpper(config.customAcronym);
+    const separator = config.includeSeparator ? (normalizeValue(config.separator) || '-') : '';
+    if (!tokens.length) return normalizeValue(invoiceNumber);
+    const resolved = tokens.map((token) => {
+      if (token === 'remito_factura') return normalizeValue(invoiceNumber) || 'SIN-FACT';
+      if (token === 'fecha_fabricacion') return formatDateCompact(entryDate);
+      if (token === 'fecha_hoy') return formatDateCompact(getArgentinaIsoDate());
+      if (token === 'siglas_personalizadas') return custom || 'LJ';
+      return normalizeUpper(token);
+    }).filter(Boolean);
+    return resolved.join(separator) || normalizeValue(invoiceNumber);
+  };
+
   const buildLotSummaryBadges = (lotConfig) => {
     const tokens = Array.isArray(lotConfig?.tokens) ? lotConfig.tokens : [];
     const customAcronym = normalizeValue(lotConfig?.customAcronym);
@@ -1803,6 +1824,18 @@
       }
 
       const qtyKg = Number(convertToKg(qty, unit).toFixed(4));
+      const lotNumber = buildLotNumber({
+        lotConfig: {
+          configured: state.editorDraft.tokens.length > 0,
+          tokens: [...state.editorDraft.tokens],
+          customAcronym: normalizeValue(state.editorDraft.customAcronym),
+          includeSeparator: Boolean(state.editorDraft.includeSeparator),
+          separator: normalizeValue(state.editorDraft.separator) || '-'
+        },
+        invoiceNumber,
+        entryDate
+      });
+
       const entry = {
         id: makeId('entry'),
         qty: Number(qty.toFixed(2)),
@@ -1811,7 +1844,9 @@
         entryDate,
         expiryDate,
         invoiceNumber,
+        lotNumber,
         provider,
+        lotStatus: 'disponible',
         invoiceImageUrl: invoiceImageUrls[0] || '',
         invoiceImageUrls,
         createdAt: Date.now()
