@@ -4327,7 +4327,7 @@ html.login-protected.auth-ok body {
 }
 
 .inventario-period-board {
-  margin-top: 14px;
+  margin-top: 0;
   border: 1px solid #dbe4f7;
   border-radius: 16px;
   padding: 12px;
@@ -4364,6 +4364,7 @@ html.login-protected.auth-ok body {
   text-align: center;
   font-weight: 800;
   color: #284a93;
+  white-space: nowrap;
 }
 
 .inventario-table-compact td {
@@ -4372,6 +4373,11 @@ html.login-protected.auth-ok body {
   text-align: center;
   font-weight: 700;
   color: #2f426d;
+  white-space: nowrap;
+}
+
+.inventario-provider-cell {
+  font-weight: 400 !important;
 }
 
 .inventario-table-compact tbody tr:nth-child(odd) {
@@ -4667,6 +4673,13 @@ html.login-protected.auth-ok body {
 
 .inventario-hidden-file-input {
   display: none;
+}
+
+.inventario-file-feedback {
+  display: block;
+  margin-top: 6px;
+  color: #5f6f94;
+  font-size: 0.8rem;
 }
 
 #imageViewerModal {
