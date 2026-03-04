@@ -36,6 +36,8 @@
     periodBackBtn: $('inventarioPeriodBackBtn'),
     globalRange: $('inventarioGlobalRange'),
     globalApplyBtn: $('inventarioGlobalApplyBtn'),
+    globalClearBtn: $('inventarioGlobalClearBtn'),
+    globalExpandBtn: $('inventarioGlobalExpandBtn'),
     globalLoading: $('inventarioGlobalLoading'),
     globalPrintBtn: $('inventarioGlobalPrintBtn'),
     globalTableWrap: $('inventarioGlobalTableWrap'),
@@ -499,7 +501,7 @@
     const start = (state.globalTablePage - 1) * PAGE_SIZE;
     const pageRows = rows.slice(start, start + PAGE_SIZE);
     const htmlRows = pageRows.length ? pageRows.map((row) => `
-      <tr>
+      <tr class="inventario-row-tone">
         <td>${escapeHtml(row.entryDate)}</td>
         <td>${escapeHtml(row.ingredientName)}</td>
         <td>${row.qtyKg.toFixed(2)} kg</td>
@@ -513,6 +515,9 @@
           <thead><tr><th>Fecha</th><th>Producto</th><th>Kilos</th><th>Cantidad</th><th>N° factura</th><th>Imagen</th></tr></thead>
           <tbody>${htmlRows}</tbody>
         </table>
+      </div>
+      <div class="inventario-global-actions">
+        <button type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn" id="inventarioGlobalTableExpandBtn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button>
       </div>
       <div class="inventario-pagination enhanced">
         <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-global-page="prev" ${state.globalTablePage <= 1 ? 'disabled' : ''} aria-label="Página anterior"><i class="fa-solid fa-chevron-left"></i></button>
@@ -756,7 +761,7 @@
       await preloadImages(entries.flatMap((entry) => entryImageUrls(entry)).concat([ingredient.imageUrl]));
     }
     const rows = entries.map((entry) => `
-      <tr>
+      <tr class="inventario-row-tone">
         <td>${formatDateTime(entry.createdAt)}</td>
         <td>${escapeHtml(entry.expiryDate || '-')}</td>
         <td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td>
@@ -963,7 +968,7 @@
     const pageRows = filtered.slice(start, start + PAGE_SIZE);
 
     const rowsHtml = pageRows.length ? pageRows.map((entry) => `
-      <tr>
+      <tr class="inventario-row-tone">
         <td>${formatDateTime(entry.createdAt)}</td>
         <td>${entry.expiryDate || '-'}</td>
         <td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td>
@@ -983,7 +988,8 @@
           <input id="inventarioEntriesSearch" type="search" class="form-control ios-input" autocomplete="off" placeholder="Buscar en ingresos" value="${escapeHtml(state.tableSearch)}">
           <div class="inventario-table-range">
             <input id="inventarioEntriesRange" class="form-control ios-input" autocomplete="off" placeholder="Rango de fechas" value="${escapeHtml(state.tableDateRange)}">
-            <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn ${state.tableDateRange ? '' : 'd-none'}" id="inventarioClearFilterBtn"><i class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></button>
+            <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn ${state.tableDateRange ? '' : 'd-none'}" id="inventarioClearFilterBtn"><i class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></button>
+            <button type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn" id="inventarioExpandTableBtn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button>
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioPrintFilteredBtn"><i class="fa-solid fa-print"></i><span>Imprimir filtro</span></button>
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioPrintAllBtn"><i class="fa-solid fa-print"></i><span>Imprimir total</span></button>
           </div>
@@ -1003,6 +1009,20 @@
   };
 
   const escapeHtml = (value) => String(value || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+
+
+  const openExpandedTable = async (title, tableHtml) => {
+    await openIosSwal({
+      title,
+      html: `<div class="inventario-expand-wrap">${tableHtml}</div>`,
+      width: '92vw',
+      confirmButtonText: 'Cerrar',
+      customClass: {
+        popup: 'ios-alert inventario-expand-alert',
+        confirmButton: 'ios-btn ios-btn-secondary'
+      }
+    });
+  };
 
   const renderEditor = (ingredientId, draft = null) => {
     const ingredient = state.ingredientes[ingredientId];
@@ -1056,11 +1076,11 @@
           </div>
         </div>
         <div class="inventario-product-head-stats">
+          <div class="inventario-total-banner">
+            <small>Stock total actual</small>
+            <strong>${(Number(record.stockKg) || 0).toFixed(2)} kg</strong>
+          </div>
           <div class="inventario-stat-row">
-            <div class="inventario-stat-card ${(Number(record.stockKg) || 0) <= 0 ? 'is-danger' : ''}>
-              <small>Stock total actual</small>
-              <strong>${(Number(record.stockKg) || 0).toFixed(2)} kg</strong>
-            </div>
             ${shouldShowExpiring ? `<div class="inventario-stat-card is-alert"><small>Próximos a caducar (${expiringDays} días)</small><strong>${expiringKg.toFixed(2)} kg</strong></div>` : ''}
           </div>
           <div class="inventario-head-actions-row">
@@ -1093,30 +1113,30 @@
         <h6 class="step-title"><span class="recipe-step-number">2</span> Ingresar Stock</h6>
         <div class="step-content recipe-fields-flex inventario-stock-grid">
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryQty">Cantidad a ingresar</label>
+            <label class="form-label" for="inventoryQty"><i class="fa-solid fa-weight-hanging"></i> Cantidad a ingresar</label>
             <input id="inventoryQty" class="form-control ios-input" type="number" autocomplete="off" min="0" step="0.01" value="${state.editorDraft.qty}">
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryUnit">Unidad</label>
+            <label class="form-label" for="inventoryUnit"><i class="fa-solid fa-ruler"></i> Unidad</label>
             <select id="inventoryUnit" class="form-select ios-input" autocomplete="off">
               ${state.measures.map((m) => `<option value="${escapeHtml(m.name)}" ${measureKey(m.name) === measureKey(state.editorDraft.unit) ? 'selected' : ''}>${escapeHtml(getMeasureLabel(m.name))}</option>`).join('')}
               <option value="add_measure">+ Agregar medida</option>
             </select>
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryEntryDate">Fecha de ingreso</label>
+            <label class="form-label" for="inventoryEntryDate"><i class="fa-regular fa-calendar-plus"></i> Fecha de ingreso</label>
             <input id="inventoryEntryDate" class="form-control ios-input" autocomplete="off" value="${escapeHtml(state.editorDraft.entryDate)}" placeholder="Seleccionar fecha">
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryExpiryDate">Fecha de caducidad</label>
+            <label class="form-label" for="inventoryExpiryDate"><i class="fa-regular fa-calendar-check"></i> Fecha de caducidad</label>
             <input id="inventoryExpiryDate" class="form-control ios-input" autocomplete="off" value="${escapeHtml(state.editorDraft.expiryDate)}" placeholder="Seleccionar fecha">
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryInvoiceNumber">Número de factura/remito</label>
+            <label class="form-label" for="inventoryInvoiceNumber"><i class="fa-solid fa-file-invoice"></i> Número de factura/remito</label>
             <textarea id="inventoryInvoiceNumber" name="inventory_code_free" class="form-control ios-input inventario-invoice-textarea" rows="1" placeholder="Ej: A-000123" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text">${escapeHtml(state.editorDraft.invoiceNumber)}</textarea>
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryInvoiceImage">Adjuntar foto(s) de factura/remito</label>
+            <label class="form-label" for="inventoryInvoiceImage"><i class="fa-regular fa-images"></i> Adjuntar foto(s) de factura/remito</label>
             <input id="inventoryInvoiceImage" class="form-control image-file-input" autocomplete="off" type="file" accept="image/*" multiple>
           </div>
         </div>
@@ -1343,6 +1363,12 @@
       state.tableDateRange = '';
       state.tablePage = 1;
       rerenderEditorKeepViewport(ingredientId, state.editorDraft, '#inventarioEntriesSearch');
+    });
+
+    nodes.editorForm.querySelector('#inventarioExpandTableBtn')?.addEventListener('click', async () => {
+      const fullRows = getFilteredEntries(Array.isArray(record.entries) ? record.entries : []);
+      const htmlRows = fullRows.length ? fullRows.map((entry) => `<tr><td>${formatDateTime(entry.createdAt)}</td><td>${entry.expiryDate || '-'}</td><td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td>${entryImageUrls(entry).length ? `Ver (${entryImageUrls(entry).length})` : 'Sin foto'}</td></tr>`).join('') : '<tr><td colspan="5" class="text-center">Sin ingresos para mostrar.</td></tr>';
+      await openExpandedTable('Historial ampliado', `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura</th><th>Imagen</th></tr></thead><tbody>${htmlRows}</tbody></table></div>`);
     });
 
     nodes.editorForm.querySelector('#inventarioPrintFilteredBtn')?.addEventListener('click', async () => {
@@ -1600,6 +1626,9 @@
     nodes.statusFilters?.classList.toggle('d-none', enabled);
     nodes.list?.classList.toggle('d-none', enabled);
     nodes.periodView?.classList.toggle('d-none', !enabled);
+    if (enabled) {
+      nodes.globalClearBtn?.classList.toggle('d-none', !state.dashboardDateRange);
+    }
   };
 
   const loadInventario = async () => {
@@ -1669,6 +1698,7 @@
   });
   nodes.globalApplyBtn?.addEventListener('click', async () => {
     state.dashboardDateRange = normalizeValue(nodes.globalRange?.value);
+    nodes.globalClearBtn?.classList.toggle('d-none', !state.dashboardDateRange);
     state.globalTablePage = 1;
     nodes.globalLoading?.classList.remove('d-none');
     nodes.globalTableWrap?.classList.add('d-none');
@@ -1677,6 +1707,20 @@
     nodes.globalLoading?.classList.add('d-none');
     nodes.globalTableWrap?.classList.remove('d-none');
   });
+  nodes.globalClearBtn?.addEventListener('click', () => {
+    state.dashboardDateRange = '';
+    if (nodes.globalRange) nodes.globalRange.value = '';
+    state.globalTablePage = 1;
+    nodes.globalClearBtn?.classList.add('d-none');
+    renderGlobalPeriodTable();
+  });
+
+  nodes.globalExpandBtn?.addEventListener('click', async () => {
+    const rows = getGlobalFilteredEntries();
+    const htmlRows = rows.length ? rows.map((row) => `<tr><td>${escapeHtml(row.entryDate)}</td><td>${escapeHtml(row.ingredientName)}</td><td>${row.qtyKg.toFixed(2)} kg</td><td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td><td>${escapeHtml(row.invoiceNumber)}</td><td>${row.invoiceImageUrl ? 'Ver' : 'Sin foto'}</td></tr>`).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos en ese rango.</td></tr>';
+    await openExpandedTable('Ingresos por período (ampliado)', `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha</th><th>Producto</th><th>Kilos</th><th>Cantidad</th><th>N° factura</th><th>Imagen</th></tr></thead><tbody>${htmlRows}</tbody></table></div>`);
+  });
+
   nodes.globalPrintBtn?.addEventListener('click', async () => {
     await openPrintGlobalPeriod(getGlobalFilteredEntries());
   });
@@ -1685,6 +1729,13 @@
     if (pageBtn) {
       state.globalTablePage += pageBtn.dataset.globalPage === 'next' ? 1 : -1;
       renderGlobalPeriodTable();
+      return;
+    }
+    const expandBtn = event.target.closest('#inventarioGlobalTableExpandBtn');
+    if (expandBtn) {
+      const rows = getGlobalFilteredEntries();
+      const htmlRows = rows.length ? rows.map((row) => `<tr><td>${escapeHtml(row.entryDate)}</td><td>${escapeHtml(row.ingredientName)}</td><td>${row.qtyKg.toFixed(2)} kg</td><td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td><td>${escapeHtml(row.invoiceNumber)}</td><td>${row.invoiceImageUrl ? 'Ver' : 'Sin foto'}</td></tr>`).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos en ese rango.</td></tr>';
+      await openExpandedTable('Ingresos por período (ampliado)', `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha</th><th>Producto</th><th>Kilos</th><th>Cantidad</th><th>N° factura</th><th>Imagen</th></tr></thead><tbody>${htmlRows}</tbody></table></div>`);
       return;
     }
     const btn = event.target.closest('[data-open-global-image]');
