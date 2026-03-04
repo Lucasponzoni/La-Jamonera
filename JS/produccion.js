@@ -13,7 +13,7 @@
     historyBackBtn: document.getElementById('produccionPeriodBackBtn'),
     historyRange: document.getElementById('produccionGlobalRange'),
     historyApplyBtn: document.getElementById('produccionGlobalApplyBtn'),
-    historySearch: document.getElementById('produccionHistorySearch'),
+    historyClearBtn: document.getElementById('produccionGlobalClearBtn'),
     historyExpandBtn: document.getElementById('produccionGlobalExpandBtn'),
     historyExcelBtn: document.getElementById('produccionGlobalExcelBtn'),
     historyPrintBtn: document.getElementById('produccionGlobalPrintBtn'),
@@ -46,11 +46,11 @@
     activeDraftId: '',
     activeReservationId: '',
     reservationTick: null,
+    draftsTick: null,
     editorPlan: null,
     lotCollapseState: {},
     historyMode: false,
     historyRange: '',
-    historySearch: '',
     historyPage: 1,
     historyTraceZoom: 1,
     config: {
@@ -329,6 +329,10 @@
 
   const setStateView = (view) => {
     state.view = view;
+    if (view !== 'list' && state.draftsTick) {
+      clearInterval(state.draftsTick);
+      state.draftsTick = null;
+    }
     nodes.loading.classList.toggle('d-none', view !== 'loading');
     nodes.empty.classList.toggle('d-none', view !== 'empty');
     nodes.data.classList.toggle('d-none', view !== 'list');
@@ -612,6 +616,10 @@
       clearInterval(state.reservationTick);
       state.reservationTick = null;
     }
+    if (state.draftsTick) {
+      clearInterval(state.draftsTick);
+      state.draftsTick = null;
+    }
   };
 
   const ensureReservationForPlan = async (plan) => {
@@ -678,6 +686,7 @@
     await window.dbLaJamoneraRest.write(DRAFTS_PATH, next);
     state.drafts = next;
     state.activeDraftId = '';
+    state.activeReservationId = '';
   };
 
   const getCurrentDraftForRecipe = (recipeId) => {
@@ -688,6 +697,19 @@
   const getOwnDrafts = () => Object.values(safeObject(state.drafts))
     .filter((item) => item.ownerSessionId === sessionId && item.status === 'active' && item.recipeId)
     .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+
+
+  const getDraftReservationCountdown = (draft) => {
+    const reservationId = normalizeValue(draft?.reservationId);
+    if (!reservationId) return null;
+    const reservation = safeObject(state.reservas[reservationId]);
+    if (reservation.status !== 'active') return null;
+    const remainingMs = Number(reservation.expiresAt || 0) - nowTs();
+    if (remainingMs <= 0) return null;
+    const mins = Math.floor(remainingMs / 60000);
+    const secs = Math.floor((remainingMs % 60000) / 1000);
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
 
   const getForeignDraftConflict = (recipeId) => Object.values(safeObject(state.drafts)).find((item) => item.recipeId === recipeId && item.ownerSessionId !== sessionId);
 
@@ -784,7 +806,6 @@
   };
 
   const getHistoryRows = () => {
-    const query = normalizeLower(state.historySearch);
     const [from, to] = normalizeValue(state.historyRange).split(' a ').map((item) => normalizeValue(item));
     const fromTs = from ? new Date(`${from}T00:00:00`).getTime() : 0;
     const toTs = to ? new Date(`${to}T23:59:59`).getTime() : 0;
@@ -793,10 +814,7 @@
         const createdAt = Number(item?.createdAt || 0);
         if (fromTs && createdAt < fromTs) return false;
         if (toTs && createdAt > toTs) return false;
-        if (!query) return true;
-        const manager = getManagerLabel(item);
-        const source = [item.id, item.recipeTitle, manager.name, manager.role, item.status].map(normalizeLower).join(' ');
-        return source.includes(query);
+        return true;
       })
       .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
   };
@@ -1031,7 +1049,7 @@
     nodes.historyTableWrap.innerHTML = `
       <div class="table-responsive inventario-global-table inventario-table-compact-wrap">
         <table class="table recipe-table inventario-table-compact mb-0">
-          <thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad fabricada</th><th>Responsable</th><th>Estado</th><th>Trazabilidad</th><th>Acciones</th></tr></thead>
+          <thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>Estado</th><th>Trazabilidad</th><th>Acciones</th></tr></thead>
           <tbody>${htmlRows}</tbody>
         </table>
       </div>
@@ -1051,6 +1069,8 @@
 
   const openHistory = async () => {
     state.historyPage = 1;
+    if (nodes.historyRange) nodes.historyRange.value = state.historyRange;
+    nodes.historyClearBtn?.classList.toggle('d-none', !state.historyRange);
     setHistoryMode(true);
     renderHistoryTable();
   };
@@ -1221,10 +1241,11 @@
               <div>
                 <strong>${capitalize(recipe.title || 'Receta')}</strong>
                 <small>Actualizado: ${formatDateTime(draft.updatedAt)}</small>
+                ${getDraftReservationCountdown(draft) ? `<small class="produccion-reserva-timer">Reserva activa: ${getDraftReservationCountdown(draft)}</small>` : '<small>Reserva sin bloqueo activo.</small>'}
               </div>
               <div class="produccion-draft-actions">
                 <button type="button" class="btn ios-btn ios-btn-secondary" data-open-draft="${draft.id}"><i class="fa-solid fa-pen"></i><span>Continuar</span></button>
-                <button type="button" class="btn ios-btn ios-btn-warning" data-delete-draft="${draft.id}"><i class="fa-solid fa-trash"></i><span>Descartar</span></button>
+                <button type="button" class="btn ios-btn ios-btn-danger" data-delete-draft="${draft.id}"><i class="fa-solid fa-trash"></i><span>Descartar</span></button>
               </div>
             </article>`;
           }).join('')}</div>
@@ -1240,6 +1261,13 @@
       }, { once: true });
     });
     prepareThumbLoaders('.js-produccion-thumb');
+
+    if (state.draftsTick) clearInterval(state.draftsTick);
+    state.draftsTick = setInterval(() => {
+      if (state.view === 'list' && !state.historyMode && !state.activeRecipeId) {
+        renderList();
+      }
+    }, 1000);
 
     setStateView('list');
   };
@@ -1463,7 +1491,6 @@
         ? `Escala aplicada: ${qty.toFixed(2)} kg. Reserva temporal activa por 10 min.`
         : `Hay conflictos de stock/lotes para ${productionDate}.`;
       await ensureReservationForPlan(state.editorPlan);
-      await saveEditorDraft();
     };
 
     nodes.editor.addEventListener('click', async (event) => {
@@ -1528,10 +1555,6 @@
       await updateEditorPlan();
     });
 
-    nodes.editor.querySelectorAll('[data-manager-check]').forEach((input) => {
-      input.addEventListener('change', async () => { await saveEditorDraft(); });
-    });
-
     nodes.editor.querySelector('#produccionSaveManagersPrefBtn')?.addEventListener('click', async () => {
       const selected = [...nodes.editor.querySelectorAll('[data-manager-check]:checked')].map((node) => node.value).filter(Boolean);
       state.config.preferredManagers = selected;
@@ -1542,8 +1565,6 @@
       await persistConfig();
       await openIosSwal({ title: 'Preferencia guardada', html: '<p>Este/estos encargados se preseleccionarán en próximas producciones.</p>', icon: 'success', confirmButtonText: 'Entendido' });
     });
-
-    nodes.editor.querySelector('#produccionObsInput').addEventListener('input', async () => { await saveEditorDraft(); });
 
     nodes.editor.querySelector('#produccionSaveDraftBtn').addEventListener('click', async () => {
       await saveEditorDraft();
@@ -1646,7 +1667,7 @@
     nodes.editor.querySelector('#produccionBackBtn').addEventListener('click', async () => {
       const result = await openIosSwal({
         title: '¿Deseás abandonar esta producción?',
-        html: '<p>Se guardará borrador y se liberará la reserva temporal.</p>',
+        html: '<p>Se guardará borrador para retomarlo luego.</p>',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Abandonar',
@@ -1654,9 +1675,13 @@
       });
       if (!result.isConfirmed) return;
       await saveEditorDraft();
-      await releaseReservation('abandoned');
       state.activeRecipeId = '';
-      setStateView('list');
+      state.activeReservationId = '';
+      if (state.reservationTick) {
+        clearInterval(state.reservationTick);
+        state.reservationTick = null;
+      }
+      renderList();
     });
 
     await updateEditorPlan();
@@ -1802,10 +1827,17 @@
     setHistoryMode(false);
   });
 
-  nodes.historySearch?.setAttribute('autocomplete', 'new-password');
+  nodes.historyApplyBtn?.addEventListener('click', () => {
+    state.historyRange = normalizeValue(nodes.historyRange?.value);
+    nodes.historyClearBtn?.classList.toggle('d-none', !state.historyRange);
+    state.historyPage = 1;
+    renderHistoryTable();
+  });
 
-  nodes.historySearch?.addEventListener('input', (event) => {
-    state.historySearch = event.target.value;
+  nodes.historyClearBtn?.addEventListener('click', () => {
+    state.historyRange = '';
+    if (nodes.historyRange) nodes.historyRange.value = '';
+    nodes.historyClearBtn?.classList.add('d-none');
     state.historyPage = 1;
     renderHistoryTable();
   });
@@ -1839,7 +1871,7 @@
       { header: 'ID producción', key: 'id', width: 24 },
       { header: 'Fecha y hora', key: 'fecha', width: 20 },
       { header: 'Producto', key: 'producto', width: 24 },
-      { header: 'Cantidad fabricada', key: 'cantidad', width: 16 },
+      { header: 'Fabricado (KG.)', key: 'cantidad', width: 16 },
       { header: 'Responsable', key: 'responsable', width: 24 },
       { header: 'Puesto', key: 'puesto', width: 18 },
       { header: 'Estado', key: 'estado', width: 14 }
@@ -1936,9 +1968,7 @@
           onClose: (_selectedDates, _dateStr, instance) => {
             const from = instance.selectedDates[0] ? getArgentinaIsoDate(instance.selectedDates[0]) : '';
             const to = instance.selectedDates[1] ? getArgentinaIsoDate(instance.selectedDates[1]) : '';
-            state.historyRange = from && to ? `${from} a ${to}` : from;
-            nodes.historyRange.value = state.historyRange;
-            state.historyPage = 1;
+            nodes.historyRange.value = from && to ? `${from} a ${to}` : from;
           }
         });
       }
@@ -1951,22 +1981,24 @@
   produccionModal.addEventListener('hidden.bs.modal', async () => {
     if (state.activeRecipeId) {
       await saveEditorDraft();
-      await releaseReservation('modal_closed');
     }
     state.activeRecipeId = '';
     state.activeDraftId = '';
+    state.activeReservationId = '';
     nodes.search.value = '';
     state.search = '';
     nodes.editor.innerHTML = '';
-    state.historySearch = '';
     state.historyRange = '';
     state.historyPage = 1;
-    if (nodes.historySearch) nodes.historySearch.value = '';
     if (nodes.historyRange) nodes.historyRange.value = '';
     setHistoryMode(false);
     if (state.reservationTick) {
       clearInterval(state.reservationTick);
       state.reservationTick = null;
+    }
+    if (state.draftsTick) {
+      clearInterval(state.draftsTick);
+      state.draftsTick = null;
     }
   });
 })();
