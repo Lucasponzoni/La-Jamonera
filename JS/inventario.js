@@ -779,6 +779,8 @@
     imageViewerModal.show();
   };
 
+  window.laJamoneraOpenImageViewer = openAttachmentViewer;
+
   const inDateRange = (value, from, to) => {
     const dateIso = normalizeIsoDate(value);
     if (!dateIso) return false;
