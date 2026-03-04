@@ -5295,6 +5295,7 @@ html.login-protected.auth-ok body {
 
 .produccion-fefo-note {
   margin: 8px 0 0;
+  margin-bottom: 10px;
   border: 1px solid #cde0ff;
   border-radius: 12px;
   background: #f1f7ff;
@@ -5474,6 +5475,10 @@ html.login-protected.auth-ok body {
   color: #2b416f;
 }
 
+.produccion-loading-alert .ios-alert-title {
+  font-size: 1.35rem;
+}
+
 .produccion-lote-main p {
   margin: 2px 0 0;
   color: #5a6f97;
@@ -5484,6 +5489,11 @@ html.login-protected.auth-ok body {
   color: #7d88a3;
 }
 
+.produccion-needs-label {
+  color: #5f7197;
+  font-weight: 600;
+}
+
 .produccion-needs-value {
   color: #158346;
   font-weight: 800;
@@ -5492,7 +5502,11 @@ html.login-protected.auth-ok body {
 
 .produccion-available-value {
   color: #7a859f !important;
-  font-weight: 700;
+  font-weight: 600;
+}
+
+.produccion-available-value strong {
+  font-weight: 800;
 }
 
 .produccion-lote-main p em {

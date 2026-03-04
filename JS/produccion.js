@@ -745,8 +745,8 @@
       if (!expiry) return '<span class="produccion-expiry-badge is-unknown">Sin fecha</span>';
       const days = Math.ceil((new Date(`${expiry}T00:00:00`).getTime() - new Date(`${plan.productionDate}T00:00:00`).getTime()) / 86400000);
       if (days < 0) return `<span class="produccion-expiry-badge is-danger">Vencido ${Math.abs(days)}d</span>`;
-      if (days <= 7) return `<span class="produccion-expiry-badge is-danger">${days}d</span>`;
-      if (days <= 20) return `<span class="produccion-expiry-badge is-warning">${days}d</span>`;
+      if (days <= 2) return `<span class="produccion-expiry-badge is-danger">${days}d</span>`;
+      if (days <= 4) return `<span class="produccion-expiry-badge is-warning">${days}d</span>`;
       return `<span class="produccion-expiry-badge is-ok">${days}d</span>`;
     };
 
@@ -760,7 +760,12 @@
             <img src="${state.ingredientes[row.ingredientId]?.imageUrl || FIAMBRES_IMAGE}" alt="${row.ingredientName}" class="produccion-lote-ingredient-image">
             <div>
               <h6>${row.ingredientName}</h6>
-              <p><span class="produccion-needs-value">Necesita ${formatCompactQty(row.neededQty, row.ingredientUnit)}</span> <span class="produccion-available-value">· Disponible ${formatCompactQty(row.availableQty, row.ingredientUnit)}</span>${row.missingQty > 0 ? ` <em>· Faltan ${formatCompactQty(row.missingQty, row.ingredientUnit)}</em>` : ''}</p>
+              <p>
+                <span class="produccion-needs-label">Necesita</span>
+                <strong class="produccion-needs-value">${formatCompactQty(row.neededQty, row.ingredientUnit)}</strong>
+                <span class="produccion-available-value">· Disponible <strong>${formatCompactQty(row.availableQty, row.ingredientUnit)}</strong></span>
+                ${row.missingQty > 0 ? ` <em>· Faltan ${formatCompactQty(row.missingQty, row.ingredientUnit)}</em>` : ''}
+              </p>
             </div>
           </div>
           <div class="produccion-lote-head-actions">
@@ -1072,7 +1077,11 @@
         html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando producción" class="meta-spinner-login"></div>',
         allowOutsideClick: false,
         showConfirmButton: false,
-        customClass: { popup: 'ios-alert' }
+        customClass: {
+          popup: 'ios-alert produccion-loading-alert',
+          title: 'ios-alert-title',
+          htmlContainer: 'ios-alert-text'
+        }
       });
 
       try {
@@ -1263,7 +1272,11 @@
         html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando producción" class="meta-spinner-login"></div>',
         allowOutsideClick: false,
         showConfirmButton: false,
-        customClass: { popup: 'ios-alert' }
+        customClass: {
+          popup: 'ios-alert produccion-loading-alert',
+          title: 'ios-alert-title',
+          htmlContainer: 'ios-alert-text'
+        }
       });
       try {
         await renderEditor(state.activeRecipeId);
