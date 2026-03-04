@@ -987,15 +987,17 @@
       <div class="inventario-table-wrap">
         <div class="inventario-table-head enhanced">
           <input id="inventarioEntriesSearch" type="search" class="form-control ios-input" autocomplete="off" placeholder="Buscar en ingresos" value="${escapeHtml(state.tableSearch)}">
-          <div class="inventario-table-range">
-            <input id="inventarioEntriesRange" class="form-control ios-input" autocomplete="off" placeholder="Rango de fechas" value="${escapeHtml(state.tableDateRange)}">
-            <button type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn" id="inventarioExpandTableBtn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button>
-            <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn ${state.tableDateRange ? '' : 'd-none'}" id="inventarioClearFilterBtn"><i class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></button>
-          </div>
-          <div class="inventario-print-row">
-            <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioPrintFilteredBtn"><i class="fa-solid fa-print"></i><span>Imprimir filtro</span></button>
-            <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioPrintAllBtn"><i class="fa-solid fa-print"></i><span>Imprimir total</span></button>
-            <button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" id="inventarioExcelBtn"><i class="fa-solid fa-file-excel"></i><span>Excel</span></button>
+          <div class="inventario-history-toolbar">
+            <div class="inventario-table-range">
+              <input id="inventarioEntriesRange" class="form-control ios-input" autocomplete="off" placeholder="Rango de fechas" value="${escapeHtml(state.tableDateRange)}">
+              <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn ${state.tableDateRange ? '' : 'd-none'}" id="inventarioClearFilterBtn"><i class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></button>
+            </div>
+            <div class="inventario-print-row">
+              <button type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn" id="inventarioExpandTableBtn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar</span></button>
+              <button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" id="inventarioExcelBtn"><i class="fa-solid fa-file-excel"></i><span>Excel</span></button>
+              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioPrintFilteredBtn"><i class="fa-solid fa-print"></i><span>Imprimir filtro</span></button>
+              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioPrintAllBtn"><i class="fa-solid fa-print"></i><span>Imprimir total</span></button>
+            </div>
           </div>
         </div>
         <div class="table-responsive inventario-table-compact-wrap">
@@ -1053,12 +1055,21 @@
     return `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn js-open-expanded-image" data-images="${encodeURIComponent(JSON.stringify(urls))}"><i class="fa-regular fa-image"></i><span>Ver (${urls.length})</span></button>`;
   };
 
-  const showExcelPreparing = async () => openIosSwal({
-    title: '',
-    html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Exportando Excel" class="meta-spinner-login"><p class="mt-2 mb-0">Exportando Excel...</p></div>',
-    allowOutsideClick: false,
-    showConfirmButton: false
-  });
+  const showExcelPreparing = () => {
+    Swal.fire({
+      title: 'Exportando Excel...',
+      html: '<img src="./IMG/Meta-ai-logo.webp" alt="Exportando Excel" class="meta-spinner-login">',
+      allowOutsideClick: false,
+      showConfirmButton: false,
+      customClass: {
+        popup: 'ios-alert ingredientes-alert ingredientes-saving-alert',
+        title: 'ios-alert-title',
+        htmlContainer: 'ios-alert-text ingredientes-saving-html'
+      },
+      buttonsStyling: false,
+      returnFocus: false
+    });
+  };
 
   const makeWorkbook = async ({ fileName, sheetName, headers, rows }) => {
     if (!window.ExcelJS) {
@@ -1066,7 +1077,7 @@
       return;
     }
 
-    await showExcelPreparing();
+    showExcelPreparing();
     try {
       const wb = new window.ExcelJS.Workbook();
       const ws = wb.addWorksheet(sheetName);
@@ -1142,7 +1153,7 @@
     } catch (error) {
       await openIosSwal({ title: 'No se pudo exportar', html: '<p>Ocurrió un error generando el archivo Excel.</p>', icon: 'error', confirmButtonText: 'Entendido' });
     } finally {
-      Swal.close();
+      if (Swal.isVisible()) Swal.close();
     }
   };
 
