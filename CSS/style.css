@@ -4234,6 +4234,7 @@ html.login-protected.auth-ok body {
 .inventario-check-grid {
   display: grid;
   gap: 8px;
+  margin-top: 10px;
 }
 
 .inventario-check-row {
@@ -4715,96 +4716,3 @@ html.login-protected.auth-ok body {
 
 /* =========================================
    INVENTARIO · HOTFIX UX FINAL
-========================================= */
-.inventario-modal .ios-modal-body,
-#inventarioEditor,
-#inventarioEditor .recipe-step-card,
-#inventarioEditor .inventario-product-head-v2 {
-  overflow-x: hidden !important;
-}
-
-#inventarioEditor .inventario-table-wrap {
-  overflow-x: hidden;
-}
-
-#inventarioEditor .inventario-table-compact-wrap {
-  width: 100%;
-  overflow-x: auto;
-}
-
-#inventarioEditor .inventario-table-compact {
-  min-width: 980px;
-  width: max-content;
-}
-
-#inventarioEditor .inventario-table-compact th,
-#inventarioEditor .inventario-table-compact td {
-  white-space: nowrap;
-}
-
-#inventarioEditor .inventario-table-compact tbody tr:nth-child(odd) {
-  background: #f4f7ff;
-}
-
-#inventarioEditor .inventario-table-compact tbody tr:nth-child(even) {
-  background: #e9eefb;
-}
-
-.inventario-product-head-main,
-.inventario-product-copy {
-  min-width: 0;
-}
-
-.inventario-product-head-stats .inventario-stat-card {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 2px;
-  min-height: 60px;
-  padding: 8px 12px;
-  border: 1px solid #d6def3;
-  border-radius: 12px;
-  background: #eef3ff;
-}
-
-.inventario-product-head-stats .inventario-stat-card:first-child strong {
-  color: #7a5ce6;
-}
-
-.inventario-head-actions-row {
-  width: 100%;
-}
-
-.inventario-head-actions-row .inventario-head-action {
-  flex: 1;
-  min-width: 180px;
-}
-
-.inventario-delete-btn,
-.inventario-delete-btn:hover {
-  background: #ffeef0;
-  border-color: #f3ccd3;
-  color: #b3475a;
-}
-
-.inventario-stock-grid {
-  background: linear-gradient(180deg, #f8faff 0%, #f2f6ff 100%);
-  border: 1px solid #dbe4f7;
-  border-radius: 14px;
-  padding: 12px;
-}
-
-.inventario-stock-grid .form-label {
-  font-weight: 700;
-  color: #314b82;
-}
-
-.inventario-stock-grid .ios-input,
-.inventario-stock-grid .image-file-input {
-  background: #f5f8ff;
-  border-color: #c9d6f1;
-}
-
-.viewer-stage #viewerStageSpinner .meta-spinner-login {
-  width: 96px;
-  height: 96px;
-}
