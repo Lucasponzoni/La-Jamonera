@@ -2796,11 +2796,6 @@ html.login-protected.auth-ok body {
   margin-bottom: 2px;
 }
 
-.recetas-editor {
-  display: grid;
-  gap: 14px;
-}
-
 .recetas-editor-header {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -3623,8 +3618,23 @@ html.login-protected.auth-ok body {
   gap: 10px;
 }
 
+.inventario-total-banner{
+  background-color: rgb(230 214 253);
+  padding: 5px 10px;
+  border-radius: 5px;
+}
+
+.inventario-total-banner small{
+  color: rgb(110 80 177);
+}
+
+.inventario-total-banner strong {
+  color: rgb(110 80 177);
+  font-size: 20px;
+  font-weight: 900;
+}
+
 @media (max-width: 768px) {
-  .recetas-editor,
   .recetas-editor-form,
   .recipe-step-card,
   .recipe-highlight-field,
@@ -4209,7 +4219,7 @@ html.login-protected.auth-ok body {
 .inventario-editor-photo .ingrediente-avatar {
   width: 96px;
   height: 96px;
-  border: 1px solid #d0dbf3;
+  border: 3px solid #34c759;
 }
 
 .inventario-editor-name {
