@@ -256,7 +256,8 @@
     return root.innerHTML;
   };
 
-  const buildPdfDefinition = (report) => {
+  const buildPdfDefinition = (report, options = {}) => {
+    const includeAttachments = options.includeAttachments !== false;
     const attachments = Array.isArray(report?.attachments) ? report.attachments : [];
     const images = attachments.filter((item) => item.type === 'image' && item.url);
     const docs = attachments.filter((item) => item.type !== 'image' && item.url);
@@ -278,13 +279,17 @@
         { text: 'Contenido', style: 'sectionTitle' },
         ...(Array.isArray(htmlContent) ? htmlContent : [htmlContent]),
         { text: 'Imágenes adjuntas', style: 'sectionTitle', margin: [0, 14, 0, 6] },
-        images.length
-          ? { ul: images.map((item) => ({ text: `${item.name || 'Imagen'} - ${item.url}`, link: item.url, color: '#1d4ed8' })) }
-          : { text: 'Sin imágenes adjuntas.', color: '#5a6482' },
+        !includeAttachments
+          ? { text: 'No incluidas en esta impresión.', color: '#5a6482' }
+          : (images.length
+            ? { ul: images.map((item) => ({ text: `${item.name || 'Imagen'} - ${item.url}`, link: item.url, color: '#1d4ed8' })) }
+            : { text: 'Sin imágenes adjuntas.', color: '#5a6482' }),
         { text: 'Otros adjuntos', style: 'sectionTitle', margin: [0, 14, 0, 6] },
-        docs.length
-          ? { ul: docs.map((item) => ({ text: `${item.name || 'Archivo'}${item.url ? ` - ${item.url}` : ''}`, link: item.url || undefined, color: item.url ? '#1d4ed8' : '#1f2a44' })) }
-          : { text: 'Sin archivos adjuntos.', color: '#5a6482' }
+        !includeAttachments
+          ? { text: 'No incluidos en esta impresión.', color: '#5a6482' }
+          : (docs.length
+            ? { ul: docs.map((item) => ({ text: `${item.name || 'Archivo'}${item.url ? ` - ${item.url}` : ''}`, link: item.url || undefined, color: item.url ? '#1d4ed8' : '#1f2a44' })) }
+            : { text: 'Sin archivos adjuntos.', color: '#5a6482' })
       ],
       styles: {
         title: { fontSize: 18, bold: true },
@@ -332,12 +337,12 @@
     };
   };
 
-  const buildReportPdfBlob = async (report) => {
+  const buildReportPdfBlob = async (report, options = {}) => {
     if (!window.pdfMake || !window.htmlToPdfmake) {
       throw new Error('pdf_lib_unavailable');
     }
 
-    const docDefinition = buildPdfDefinition(report);
+    const docDefinition = buildPdfDefinition(report, options);
     return await new Promise((resolve, reject) => {
       try {
         window.pdfMake.createPdf(docDefinition).getBlob((blob) => resolve(blob));
@@ -395,6 +400,27 @@
       return;
     }
 
+    const attachmentsChoice = await openIosSwal({
+      title: 'Imprimir período',
+      html: '<p>¿Querés incluir imágenes adjuntas?</p>',
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: 'Incluir',
+      denyButtonText: 'No incluir',
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        confirmButton: 'ios-btn ios-btn-success',
+        denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical',
+        cancelButton: 'ios-btn ios-btn-secondary'
+      }
+    });
+
+    if (!attachmentsChoice.isConfirmed && !attachmentsChoice.isDenied) {
+      return;
+    }
+
+    const includeAttachments = attachmentsChoice.isConfirmed;
+
     try {
       openProcessingAlert(choice.isConfirmed ? 'Leyendo informe desde Firebase y preparando PDF...' : 'Leyendo informe desde Firebase y generando PDF...');
       const latestReport = await fetchLatestReportData(report);
@@ -402,7 +428,7 @@
         throw new Error('empty_report_html');
       }
 
-      const blob = await buildReportPdfBlob(latestReport);
+      const blob = await buildReportPdfBlob(latestReport, { includeAttachments });
       const filename = `informe_${latestReport.id || Date.now()}.pdf`;
 
       if (choice.isConfirmed) {
