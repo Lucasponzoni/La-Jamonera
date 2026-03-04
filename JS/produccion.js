@@ -220,10 +220,11 @@
 
   const openGlobalMinConfig = async () => {
     const result = await Swal.fire({
-      title: 'Umbral de producción global',
-      html: `<p class="mb-2">Definí el mínimo en kg para validar disponibilidad.</p>
-        <input id="produccionGlobalMinInput" type="number" min="0.1" step="0.1" class="swal2-input" value="${Number(state.config.globalMinKg || 1).toFixed(2)}">`,
-      icon: 'question',
+      title: 'Umbral por producto',
+      html: `<div class="produccion-umbral-form">
+          <label for="produccionGlobalMinInput">Umbral de stock (kg)</label>
+          <input id="produccionGlobalMinInput" type="number" min="0.1" step="0.1" class="swal2-input ios-input" value="${Number(state.config.globalMinKg || 1).toFixed(2)}">
+        </div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
@@ -237,7 +238,7 @@
         return n;
       },
       customClass: {
-        popup: 'ios-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text',
+        popup: 'ios-alert produccion-umbral-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text',
         confirmButton: 'ios-btn ios-btn-primary', cancelButton: 'ios-btn ios-btn-secondary'
       },
       buttonsStyling: false
@@ -250,41 +251,38 @@
   };
 
   const openRecipeMinConfig = async (recipeId) => {
-    const current = readMinKgForRecipe(recipeId);
+    const currentRaw = state.config.recipeMinKg?.[recipeId];
     const result = await Swal.fire({
       title: 'Umbral por producto',
-      html: `<p class="mb-2">Mínimo para esta receta (kg).</p>
-        <input id="produccionRecipeMinInput" type="number" min="0.1" step="0.1" class="swal2-input" value="${Number(current).toFixed(2)}">`,
-      icon: 'question',
-      showDenyButton: true,
-      denyButtonText: 'Usar global',
+      html: `<div class="produccion-umbral-form">
+          <label for="produccionRecipeMinInput">Umbral de stock (kg)</label>
+          <input id="produccionRecipeMinInput" type="number" min="0.1" step="0.1" class="swal2-input ios-input" value="${normalizeValue(currentRaw)}" placeholder="Vacío = usar global">
+        </div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
       preConfirm: () => {
-        const value = document.getElementById('produccionRecipeMinInput')?.value;
+        const value = normalizeValue(document.getElementById('produccionRecipeMinInput')?.value);
+        if (!value) return null;
         const n = parseNumber(value);
         if (!Number.isFinite(n) || n <= 0) {
-          Swal.showValidationMessage('Ingresá un valor mayor a 0.');
+          Swal.showValidationMessage('Ingresá un valor mayor a 0 o dejá vacío para usar global.');
           return false;
         }
         return n;
       },
       customClass: {
-        popup: 'ios-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text',
-        confirmButton: 'ios-btn ios-btn-primary', cancelButton: 'ios-btn ios-btn-secondary', denyButton: 'ios-btn ios-btn-warning'
+        popup: 'ios-alert produccion-umbral-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text',
+        confirmButton: 'ios-btn ios-btn-primary', cancelButton: 'ios-btn ios-btn-secondary'
       },
       buttonsStyling: false
     });
-    if (result.isDenied) {
-      delete state.config.recipeMinKg[recipeId];
-      await persistConfig();
-      recomputeAnalysis();
-      renderList();
-      return;
-    }
     if (!result.isConfirmed) return;
-    state.config.recipeMinKg[recipeId] = Number(result.value.toFixed(2));
+    if (result.value == null) {
+      delete state.config.recipeMinKg[recipeId];
+    } else {
+      state.config.recipeMinKg[recipeId] = Number(result.value.toFixed(2));
+    }
     await persistConfig();
     recomputeAnalysis();
     renderList();
@@ -400,8 +398,7 @@
         <div class="produccion-hero-wrap">
           <img src="${FIAMBRES_IMAGE}" class="produccion-hero-bg" alt="Producción">
           <div class="produccion-hero-avatar">
-            <span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span>
-            <img id="produccionHeadImage" class="receta-thumb" src="${FIAMBRES_IMAGE}" alt="${capitalize(recipe.title || 'Producto')}" loading="lazy">
+            <img id="produccionHeadImage" class="produccion-head-image" src="${FIAMBRES_IMAGE}" alt="${capitalize(recipe.title || 'Producto')}" loading="lazy">
           </div>
         </div>
         <div class="inventario-product-copy">
@@ -427,20 +424,9 @@
       </section>`;
 
     const image = nodes.editor.querySelector('#produccionHeadImage');
-    const loading = nodes.editor.querySelector('.thumb-loading');
-    const showImage = () => {
-      image.classList.add('is-loaded');
-      loading?.classList.add('d-none');
-    };
-    const fallback = () => {
+    image.addEventListener('error', () => {
       image.src = FIAMBRES_IMAGE;
-      showImage();
-    };
-    if (image.complete && image.naturalWidth > 0) showImage();
-    else {
-      image.addEventListener('load', showImage, { once: true });
-      image.addEventListener('error', fallback, { once: true });
-    }
+    }, { once: true });
 
     const qtyInput = nodes.editor.querySelector('#produccionQtyInput');
     const qtyHelp = nodes.editor.querySelector('#produccionQtyHelp');

@@ -5132,7 +5132,7 @@ html.login-protected.auth-ok body {
   border-radius: 14px;
   overflow: hidden;
   position: relative;
-  margin-bottom: 10px;
+  margin-bottom: 0;
   border: 1px solid #d6ddf3;
 }
 
@@ -5157,9 +5157,36 @@ html.login-protected.auth-ok body {
   justify-content: center;
 }
 
-.produccion-hero-avatar .receta-thumb {
+.produccion-head-image {
   width: 100%;
   height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.produccion-umbral-alert {
+  max-width: 540px;
+}
+
+.produccion-umbral-alert .swal2-html-container {
+  margin-top: 0.4rem;
+  text-align: left;
+}
+
+.produccion-umbral-form {
+  display: grid;
+  gap: 8px;
+}
+
+.produccion-umbral-form label {
+  margin: 0;
+  color: #4f5f84;
+  font-weight: 500;
+}
+
+.produccion-umbral-alert .swal2-input.ios-input {
+  margin: 0;
+  width: 100%;
 }
 
 .produccion-head-icon {
