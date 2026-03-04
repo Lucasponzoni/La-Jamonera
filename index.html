@@ -373,9 +373,31 @@
                     <span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
                     <input id="produccionSearchInput" type="search" class="form-control ios-input ingredientes-search-input" placeholder="Buscar receta para producir">
                   </div>
-                  <button id="produccionGlobalMinBtn" type="button" class="btn ios-btn ios-btn-secondary produccion-umbral-global-btn"><i class="fa-solid fa-sliders"></i><span>Umbral</span></button>
+                  <div class="produccion-toolbar-actions">
+                    <button id="produccionGlobalMinBtn" type="button" class="btn ios-btn ios-btn-secondary produccion-toolbar-icon-btn" title="Configurar umbral">
+                      <i class="fa-solid fa-gear"></i>
+                    </button>
+                    <button id="produccionHistoryBtn" type="button" class="btn ios-btn ios-btn-secondary produccion-history-btn"><i class="fa-solid fa-clock-rotate-left"></i><span>Historial</span></button>
+                  </div>
                 </div>
                 <div id="produccionList" class="recetas-list produccion-list"></div>
+
+                <section id="produccionPeriodView" class="inventario-period-board produccion-period-board d-none" aria-live="polite">
+                  <div class="inventario-period-head">
+                    <button id="produccionPeriodBackBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button>
+                    <h6 class="step-title mb-0">Producciones guardadas</h6>
+                  </div>
+                  <div class="inventario-period-filters">
+                    <input id="produccionGlobalRange" class="form-control ios-input" placeholder="Seleccionar rango de fechas">
+                    <input id="produccionHistorySearch" type="search" class="form-control ios-input" placeholder="Buscar por producto, ID o responsable">
+                    <button id="produccionGlobalExpandBtn" type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button>
+                    <button id="produccionGlobalExcelBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="fa-solid fa-file-excel"></i><span>Excel</span></button>
+                    <span class="inventario-period-divider" aria-hidden="true"></span>
+                    <button id="produccionGlobalPrintBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-print"></i><span>Imprimir período</span></button>
+                  </div>
+                  <div id="produccionGlobalLoading" class="ingredientes-loading d-none"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"></div>
+                  <div id="produccionGlobalTableWrap"></div>
+                </section>
               </div>
 
               <div id="produccionEditor" class="produccion-editor d-none" aria-live="polite"></div>

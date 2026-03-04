@@ -8,7 +8,16 @@
     data: document.getElementById('produccionData'),
     list: document.getElementById('produccionList'),
     editor: document.getElementById('produccionEditor'),
-    search: document.getElementById('produccionSearchInput')
+    search: document.getElementById('produccionSearchInput'),
+    historyView: document.getElementById('produccionPeriodView'),
+    historyBackBtn: document.getElementById('produccionPeriodBackBtn'),
+    historyRange: document.getElementById('produccionGlobalRange'),
+    historySearch: document.getElementById('produccionHistorySearch'),
+    historyExpandBtn: document.getElementById('produccionGlobalExpandBtn'),
+    historyExcelBtn: document.getElementById('produccionGlobalExcelBtn'),
+    historyPrintBtn: document.getElementById('produccionGlobalPrintBtn'),
+    historyLoading: document.getElementById('produccionGlobalLoading'),
+    historyTableWrap: document.getElementById('produccionGlobalTableWrap')
   };
 
   const FIAMBRES_IMAGE = 'https://i.postimg.cc/fyvNDdrt/FIambres.png';
@@ -18,6 +27,7 @@
   const DRAFTS_PATH = '/produccion/drafts';
   const REGISTROS_PATH = '/produccion/registros';
   const SEQUENCE_PATH = '/produccion/sequence';
+  const AUDIT_PATH = '/produccion/auditoria';
   const RESERVE_TTL_MS = 10 * 60 * 1000;
 
   const state = {
@@ -27,6 +37,7 @@
     users: {},
     reservas: {},
     drafts: {},
+    registros: {},
     search: '',
     view: 'loading',
     analysis: {},
@@ -36,6 +47,11 @@
     reservationTick: null,
     editorPlan: null,
     lotCollapseState: {},
+    historyMode: false,
+    historyRange: '',
+    historySearch: '',
+    historyPage: 1,
+    historyTraceZoom: 1,
     config: {
       globalMinKg: 1,
       recipeMinKg: {},
@@ -115,6 +131,25 @@
     if (Number.isNaN(date.getTime())) return '';
     return date.toISOString().slice(0, 10);
   };
+
+  const getArgentinaIsoDate = (dateObj) => {
+    if (!(dateObj instanceof Date) || Number.isNaN(dateObj.getTime())) return '';
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(dateObj);
+    const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${map.year}-${map.month}-${map.day}`;
+  };
+
+  const getProductionDayMap = () => getRegistrosList().reduce((acc, item) => {
+    const iso = getArgentinaIsoDate(new Date(Number(item?.createdAt || 0)));
+    if (iso) acc[iso] = (acc[iso] || 0) + 1;
+    return acc;
+  }, {});
+
   const formatDate = (value) => {
     if (!value) return 'Nunca producida';
     const d = new Date(Number(value));
@@ -133,6 +168,104 @@
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+
+
+  const deepClone = (value) => JSON.parse(JSON.stringify(value || {}));
+  const getRegistrosList = () => Object.values(safeObject(state.registros));
+
+  const getGeneralPassword = async () => {
+    await window.laJamoneraReady;
+    const value = await window.dbLaJamoneraRest.read('/passGeneral/pass');
+    return normalizeValue(value);
+  };
+
+  const askSensitivePassword = async (title, html, withReason = false) => {
+    const result = await openIosSwal({
+      title,
+      html: `<div class="swal-stack-fields"><input id="produccionSecurePass" type="password" class="swal2-input ios-input" placeholder="Clave general">${withReason ? '<textarea id="produccionSecureReason" class="swal2-textarea ios-input" placeholder="Motivo"></textarea>' : ''}${html || ''}</div>`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Validar',
+      cancelButtonText: 'Cancelar',
+      preConfirm: async () => {
+        const entered = normalizeValue(document.getElementById('produccionSecurePass')?.value);
+        const remote = await getGeneralPassword();
+        if (!entered || !remote || entered !== remote) {
+          Swal.showValidationMessage('Clave incorrecta.');
+          return false;
+        }
+        const reason = normalizeValue(document.getElementById('produccionSecureReason')?.value);
+        if (withReason && !reason) {
+          Swal.showValidationMessage('Ingresá un motivo.');
+          return false;
+        }
+        return { reason };
+      }
+    });
+    return result;
+  };
+
+  const appendAudit = async ({ action, productionId = '', before = null, after = null, reason = '' }) => {
+    const existing = safeObject(await window.dbLaJamoneraRest.read(AUDIT_PATH));
+    const id = makeId('audit');
+    existing[id] = {
+      id,
+      action,
+      productionId,
+      user: getCurrentUserLabel(),
+      reason: normalizeValue(reason),
+      createdAt: nowTs(),
+      before,
+      after
+    };
+    await window.dbLaJamoneraRest.write(AUDIT_PATH, existing);
+  };
+
+  const updateEntryMovement = (entry, movement) => {
+    const next = { ...entry };
+    next.movementHistory = Array.isArray(next.movementHistory) ? next.movementHistory : [];
+    next.movementHistory.unshift(movement);
+    return next;
+  };
+
+  const applyPlanOnInventory = (inventorySource, plan, productionId, productionDate, mode = 'consume') => {
+    const inventoryNext = safeObject(inventorySource);
+    plan.ingredientPlans.forEach((item) => {
+      const record = safeObject(inventoryNext.items?.[item.ingredientId]);
+      const nextEntries = Array.isArray(record.entries) ? [...record.entries] : [];
+      item.lots.forEach((lot) => {
+        const index = nextEntries.findIndex((entry) => entry.id === lot.entryId);
+        if (index === -1) return;
+        const entry = { ...nextEntries[index] };
+        const entryQty = parsePositive(entry.qty, 0);
+        const amountInEntryUnit = fromBase(lot.takeBaseQty, entry.unit || lot.unit);
+        const sign = mode === 'consume' ? -1 : 1;
+        const nextQty = Math.max(0, Number((entryQty + (sign * amountInEntryUnit)).toFixed(4)));
+        entry.qty = Number(nextQty.toFixed(2));
+        entry.qtyKg = Number((toBase(nextQty, entry.unit) / 1000).toFixed(4));
+        entry.lotStatus = nextQty <= 0 ? 'consumido_en_produccion' : 'disponible';
+        const moveType = mode === 'consume' ? 'consumo_produccion' : 'reversion_produccion';
+        nextEntries[index] = updateEntryMovement(entry, {
+          type: moveType,
+          productionId,
+          qty: Number(amountInEntryUnit.toFixed(4)),
+          qtyUnit: entry.unit || lot.unit,
+          createdAt: nowTs(),
+          productionDate,
+          user: getCurrentUserLabel(),
+          reference: productionId,
+          observation: mode === 'consume' ? 'Consumo FEFO en producción' : 'Restitución por anulación/edición'
+        });
+      });
+      const stockKg = nextEntries.reduce((acc, entry) => acc + (Number(entry.qtyKg || 0) || 0), 0);
+      inventoryNext.items[item.ingredientId] = {
+        ...record,
+        entries: nextEntries,
+        stockKg: Number(stockKg.toFixed(4))
+      };
+    });
+    return inventoryNext;
+  };
 
   const initialsFromName = (value) => normalizeValue(value)
     .split(/\s+/)
@@ -560,9 +693,9 @@
   const openGlobalMinConfig = async () => {
     const result = await openIosSwal({
       title: 'Umbral por producto',
-      html: `<div class="produccion-umbral-form">
-          <label for="produccionGlobalMinInput">Umbral de stock (kg)</label>
-          <input id="produccionGlobalMinInput" type="number" min="0.1" step="0.1" class="swal2-input ios-input" value="${Number(state.config.globalMinKg || 1).toFixed(2)}">
+      html: `<div class="text-start">
+          <label class="form-label" for="produccionGlobalMinInput">Umbral global de stock bajo (kg)</label>
+          <input id="produccionGlobalMinInput" type="number" min="0" step="0.01" class="swal2-input ios-input" value="${Number(state.config.globalMinKg || 1).toFixed(2)}">
         </div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
@@ -589,9 +722,9 @@
     const currentRaw = state.config.recipeMinKg?.[recipeId];
     const result = await openIosSwal({
       title: 'Umbral por producto',
-      html: `<div class="produccion-umbral-form">
-          <label for="produccionRecipeMinInput">Umbral de stock (kg)</label>
-          <input id="produccionRecipeMinInput" type="number" min="0.1" step="0.1" class="swal2-input ios-input" value="${normalizeValue(currentRaw)}" placeholder="Vacío = usar global">
+      html: `<div class="text-start">
+          <label class="form-label" for="produccionRecipeMinInput">Umbral de stock (kg)</label>
+          <input id="produccionRecipeMinInput" type="number" min="0" step="0.01" class="swal2-input ios-input" value="${normalizeValue(currentRaw)}" placeholder="Vacío = usar global">
         </div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
@@ -617,6 +750,381 @@
     await persistConfig();
     recomputeAnalysis();
     renderList();
+  };
+
+
+  const getManagerLabel = (item) => {
+    const managers = Array.isArray(item?.managers) ? item.managers : [];
+    const first = managers[0] || item?.createdBy || 'Sin responsable';
+    const user = Object.values(safeObject(state.users)).find((u) => normalizeLower(u?.fullName || u?.email) === normalizeLower(first));
+    return {
+      name: user?.fullName || first,
+      role: user?.role || user?.position || user?.sector || 'Encargado'
+    };
+  };
+
+  const getHistoryRows = () => {
+    const query = normalizeLower(state.historySearch);
+    const [from, to] = normalizeValue(state.historyRange).split(' a ').map((item) => normalizeValue(item));
+    const fromTs = from ? new Date(`${from}T00:00:00`).getTime() : 0;
+    const toTs = to ? new Date(`${to}T23:59:59`).getTime() : 0;
+    return getRegistrosList()
+      .filter((item) => {
+        const createdAt = Number(item?.createdAt || 0);
+        if (fromTs && createdAt < fromTs) return false;
+        if (toTs && createdAt > toTs) return false;
+        if (!query) return true;
+        const manager = getManagerLabel(item);
+        const source = [item.id, item.recipeTitle, manager.name, manager.role, item.status].map(normalizeLower).join(' ');
+        return source.includes(query);
+      })
+      .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+  };
+
+  const markProductionExport = async (productionId, type) => {
+    const registros = deepClone(state.registros);
+    const reg = registros[productionId];
+    if (!reg) return;
+    reg.exports = safeObject(reg.exports);
+    reg.exports[type] = nowTs();
+    reg.auditTrail = Array.isArray(reg.auditTrail) ? reg.auditTrail : [];
+    reg.auditTrail.unshift({ action: `export_${type}`, user: getCurrentUserLabel(), at: nowTs() });
+    registros[productionId] = reg;
+    await window.dbLaJamoneraRest.write(REGISTROS_PATH, registros);
+    state.registros = registros;
+  };
+
+  const reportHtml = (registro, withAttachments = true) => {
+    const lotRows = (registro.lots || []).map((item) => `
+      <tr><td colspan="10" style="background:#eef3ff;font-weight:700">${escapeHtml(item.ingredientName || item.ingredientId)}</td></tr>
+      ${(item.lots || []).map((lot) => `<tr>
+        <td>${escapeHtml(lot.entryId || '-')}</td>
+        <td>${escapeHtml(lot.entryDate || '-')}</td>
+        <td>${escapeHtml(lot.expiryDate || '-')}</td>
+        <td>${Number(lot.takeQty || 0).toFixed(2)}</td>
+        <td>${escapeHtml(lot.unit || '')}</td>
+        <td>${escapeHtml(lot.provider || '-')}</td>
+        <td>${escapeHtml(lot.invoiceNumber || '-')}</td>
+        <td>${withAttachments ? (Array.isArray(lot.invoiceImageUrls) ? lot.invoiceImageUrls.length : 0) : '-'}</td>
+        <td>${escapeHtml(lot.status || '-')}</td>
+        <td>${escapeHtml(lot.productionDate || registro.productionDate || '-')}</td>
+      </tr>`).join('')}
+    `).join('');
+
+    return `
+      <div class="report-viewer-content-wrap" style="text-align:left">
+        <h3 style="margin:0 0 6px">Informe de producción ${escapeHtml(registro.id)}</h3>
+        <p><strong>Producto:</strong> ${escapeHtml(registro.recipeTitle || '-')} · <strong>Fecha:</strong> ${escapeHtml(registro.productionDate || '-')} · <strong>Estado:</strong> ${escapeHtml(registro.status || '-')}</p>
+        <p><strong>Cantidad:</strong> ${Number(registro.quantityKg || 0).toFixed(2)} kg · <strong>Encargados:</strong> ${escapeHtml((registro.managers || []).join(', ') || 'Sin asignar')}</p>
+        <p><strong>Observaciones:</strong> ${escapeHtml(registro.observations || '-')}</p>
+        <div style="overflow:auto"><table style="width:100%;border-collapse:collapse" border="1" cellpadding="6">
+          <thead><tr><th>Lote</th><th>Ingreso</th><th>Vence</th><th>Cantidad</th><th>Unidad</th><th>Proveedor</th><th>Factura</th><th>Adjuntos</th><th>Estado</th><th>Fecha/Hora</th></tr></thead>
+          <tbody>${lotRows || '<tr><td colspan="10">Sin lotes</td></tr>'}</tbody>
+        </table></div>
+      </div>`;
+  };
+
+  const printReport = async (registro) => {
+    const include = await openIosSwal({
+      title: 'Imprimir informe',
+      html: '<p>¿Incluir facturas, remitos e imágenes adjuntas?</p>',
+      showDenyButton: true,
+      showCancelButton: true,
+      confirmButtonText: 'Sí, incluir',
+      denyButtonText: 'No incluir',
+      cancelButtonText: 'Cancelar',
+      customClass: { denyButton: 'ios-btn ios-btn-danger' }
+    });
+    if (!include.isConfirmed && !include.isDenied) return;
+    const win = window.open('', '_blank', 'width=1200,height=900');
+    if (!win) return;
+    win.document.write(`<html><head><title>${registro.id}</title></head><body>${reportHtml(registro, include.isConfirmed)}</body></html>`);
+    win.document.close();
+    win.focus();
+    win.print();
+    await markProductionExport(registro.id, 'print');
+  };
+
+  const exportProductionExcel = async (registro) => {
+    if (!window.ExcelJS) return;
+    const wb = new window.ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Producción');
+    ws.columns = [
+      { header: 'Producción', key: 'id', width: 22 },
+      { header: 'Fecha y hora', key: 'fechaHora', width: 20 },
+      { header: 'Producto', key: 'producto', width: 24 },
+      { header: 'Cantidad kg', key: 'kg', width: 14 },
+      { header: 'Responsable', key: 'responsable', width: 24 },
+      { header: 'Puesto', key: 'puesto', width: 18 },
+      { header: 'Ingrediente', key: 'ingrediente', width: 24 },
+      { header: 'Lote', key: 'lote', width: 22 },
+      { header: 'Tomado', key: 'cantidad', width: 14 },
+      { header: 'Quedó', key: 'restante', width: 14 },
+      { header: 'Proveedor', key: 'proveedor', width: 20 }
+    ];
+    const manager = getManagerLabel(registro);
+    (registro.lots || []).forEach((item) => {
+      (item.lots || []).forEach((lot) => {
+        const totalBefore = Number(lot.availableQty || 0);
+        const used = Number(lot.takeQty || 0);
+        ws.addRow({
+          id: registro.id,
+          fechaHora: formatDateTime(registro.createdAt),
+          producto: registro.recipeTitle,
+          kg: Number(registro.quantityKg || 0),
+          responsable: manager.name,
+          puesto: manager.role,
+          ingrediente: item.ingredientName || item.ingredientId,
+          lote: lot.entryId,
+          cantidad: `${used.toFixed(2)} ${lot.unit || ''}`,
+          restante: `${Math.max(0, totalBefore - used).toFixed(2)} ${lot.unit || ''}`,
+          proveedor: lot.provider || '-'
+        });
+      });
+    });
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${registro.id}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    await markProductionExport(registro.id, 'excel');
+  };
+
+  const exportProductionPdf = async (registro) => {
+    if (!window.jspdf?.jsPDF) return;
+    const doc = new window.jspdf.jsPDF();
+    doc.setFontSize(12);
+    doc.text(`Producción ${registro.id}`, 10, 12);
+    doc.text(`Producto: ${registro.recipeTitle || '-'}`, 10, 20);
+    doc.text(`Fecha: ${formatDateTime(registro.createdAt)} / Estado: ${registro.status || '-'}`, 10, 28);
+    doc.text(`Cantidad: ${Number(registro.quantityKg || 0).toFixed(2)} kg`, 10, 36);
+    doc.text(`Encargados: ${(registro.managers || []).join(', ') || '-'}`, 10, 44);
+    doc.save(`${registro.id}.pdf`);
+    await markProductionExport(registro.id, 'pdf');
+  };
+
+  const renderTraceabilityTree = (registro) => {
+    const lines = (registro.lots || []).map((item) => {
+      const lotsHtml = (item.lots || []).map((lot) => {
+        const available = Number(lot.availableQty || 0);
+        const used = Number(lot.takeQty || 0);
+        const pct = available > 0 ? (used / available) * 100 : 0;
+        const remaining = Math.max(0, available - used);
+        return `<article class="produccion-trace-node">
+          <div class="produccion-trace-node-head">Lote ${escapeHtml(lot.entryId || '-')}</div>
+          <p class="m-0"><strong>Tomado:</strong> ${used.toFixed(2)} ${escapeHtml(lot.unit || '')} · <strong>Uso:</strong> ${pct.toFixed(1)}%</p>
+          <p class="m-0"><strong>Quedó:</strong> ${remaining.toFixed(2)} ${escapeHtml(lot.unit || '')}</p>
+          <p class="m-0"><strong>Proveedor:</strong> ${escapeHtml(lot.provider || '-')} · <strong>Factura:</strong> ${escapeHtml(lot.invoiceNumber || '-')}</p>
+          <p class="m-0"><strong>Ingreso/Vence:</strong> ${escapeHtml(lot.entryDate || '-')} / ${escapeHtml(lot.expiryDate || '-')}</p>
+          ${Array.isArray(lot.invoiceImageUrls) && lot.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn mt-2" data-prod-trace-images="${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Ver adjuntos (${lot.invoiceImageUrls.length})</span></button>` : ''}
+        </article>`;
+      }).join('');
+      return `<div class="produccion-trace-row">
+        <article class="produccion-trace-node">
+          <div class="produccion-trace-node-head">${escapeHtml(item.ingredientName || item.ingredientId)}</div>
+          <p class="m-0">Producción: <strong>${escapeHtml(registro.id)}</strong></p>
+          <p class="m-0">Fecha/Hora: <strong>${escapeHtml(formatDateTime(registro.createdAt))}</strong></p>
+          <p class="m-0">Cantidad total: <strong>${Number(item.requiredQty || 0).toFixed(2)} ${escapeHtml(item.unit || '')}</strong></p>
+        </article>
+        <div class="produccion-trace-arrow"><img src="./IMG/Octicons-git-merge.svg" alt="Merge" width="20" height="20"></div>
+        <div class="produccion-trace-lot-grid">${lotsHtml || '<p class="m-0">Sin lotes</p>'}</div>
+      </div>`;
+    }).join('');
+
+    return `<div class="produccion-trace-tree" id="produccionTraceTree">
+      <div class="produccion-trace-canvas" id="produccionTraceCanvas">
+        <article class="produccion-trace-node mb-3">
+          <div class="produccion-trace-node-head">Producción ${escapeHtml(registro.id)}</div>
+          <p class="m-0"><strong>Producto:</strong> ${escapeHtml(registro.recipeTitle || '-')} · <strong>Cantidad:</strong> ${Number(registro.quantityKg || 0).toFixed(2)} kg</p>
+          <p class="m-0"><strong>Responsables:</strong> ${escapeHtml((registro.managers || []).join(', ') || registro.createdBy || '-')}</p>
+        </article>
+        ${lines || '<p>Sin desglose disponible</p>'}
+      </div>
+    </div>
+    <div class="image-viewer-controls mt-2">
+      <button id="prodTraceZoomOutBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+      <button id="prodTraceZoomInBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+    </div>`;
+  };
+
+  const openTraceability = async (registro) => {
+    state.historyTraceZoom = 1;
+    await openIosSwal({
+      title: `Trazabilidad ${registro.id}`,
+      html: renderTraceabilityTree(registro),
+      width: '94vw',
+      confirmButtonText: 'Cerrar',
+      didOpen: (popup) => {
+        const canvas = popup.querySelector('#produccionTraceCanvas');
+        const apply = () => { if (canvas) canvas.style.transform = `scale(${state.historyTraceZoom})`; };
+        popup.querySelector('#prodTraceZoomOutBtn')?.addEventListener('click', () => { state.historyTraceZoom = Math.max(0.6, state.historyTraceZoom - 0.1); apply(); });
+        popup.querySelector('#prodTraceZoomInBtn')?.addEventListener('click', () => { state.historyTraceZoom = Math.min(2.2, state.historyTraceZoom + 0.1); apply(); });
+
+        const tree = popup.querySelector('#produccionTraceTree');
+        let dragging = false;
+        let startX = 0;
+        let scrollLeft = 0;
+        tree?.addEventListener('mousedown', (event) => {
+          dragging = true;
+          startX = event.pageX - tree.offsetLeft;
+          scrollLeft = tree.scrollLeft;
+        });
+        tree?.addEventListener('mouseleave', () => { dragging = false; });
+        tree?.addEventListener('mouseup', () => { dragging = false; });
+        tree?.addEventListener('mousemove', (event) => {
+          if (!dragging) return;
+          event.preventDefault();
+          const x = event.pageX - tree.offsetLeft;
+          const walk = (x - startX) * 1.2;
+          tree.scrollLeft = scrollLeft - walk;
+        });
+
+        popup.querySelectorAll('[data-prod-trace-images]').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const urls = JSON.parse(decodeURIComponent(btn.dataset.prodTraceImages || '[]'));
+            if (!Array.isArray(urls) || !urls.length) return;
+            if (typeof window.laJamoneraOpenImageViewer === 'function') {
+              await window.laJamoneraOpenImageViewer([{ invoiceImageUrls: urls }], 0, 'Adjuntos de lote');
+            }
+          });
+        });
+      }
+    });
+  };
+
+  const renderHistoryTable = () => {
+    if (!nodes.historyTableWrap) return;
+    const rows = getHistoryRows();
+    const PAGE = 8;
+    const pages = Math.max(1, Math.ceil(rows.length / PAGE));
+    state.historyPage = Math.min(Math.max(1, state.historyPage), pages);
+    const start = (state.historyPage - 1) * PAGE;
+    const pageRows = rows.slice(start, start + PAGE);
+    const htmlRows = pageRows.length ? pageRows.map((item, index) => {
+      const manager = getManagerLabel(item);
+      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
+        <td>${escapeHtml(item.id)}</td>
+        <td>${escapeHtml(formatDateTime(item.createdAt))}</td>
+        <td>${escapeHtml(item.recipeTitle || '-')}</td>
+        <td>${Number(item.quantityKg || 0).toFixed(2)} kg</td>
+        <td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td>
+        <td>${escapeHtml(item.status || '-')}</td>
+        <td>
+          <div class="report-comment-actions">
+            <button type="button" class="report-comment-reply-btn" data-prod-report="${item.id}">Informe</button>
+            <button type="button" class="report-comment-reply-btn" data-prod-trace="${item.id}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"> Trazabilidad</button>
+            <button type="button" class="report-comment-reply-btn" data-prod-print="${item.id}">Imprimir</button>
+            <button type="button" class="report-comment-reply-btn" data-prod-excel="${item.id}">Excel</button>
+            <button type="button" class="report-comment-reply-btn" data-prod-pdf="${item.id}">PDF</button>
+            <button type="button" class="report-comment-reply-btn" data-prod-edit="${item.id}">Editar</button>
+            <button type="button" class="report-comment-reply-btn is-danger" data-prod-cancel="${item.id}">Anular</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="7" class="text-center">Sin producciones en ese rango.</td></tr>';
+
+    nodes.historyTableWrap.innerHTML = `
+      <div class="table-responsive inventario-global-table inventario-table-compact-wrap">
+        <table class="table recipe-table inventario-table-compact mb-0">
+          <thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad fabricada</th><th>Responsable</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody>${htmlRows}</tbody>
+        </table>
+      </div>
+      <div class="inventario-pagination enhanced">
+        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-prod-page="prev" ${state.historyPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button>
+        <span>Página ${state.historyPage} de ${pages}</span>
+        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-prod-page="next" ${state.historyPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button>
+      </div>`;
+  };
+
+  const setHistoryMode = (enabled) => {
+    state.historyMode = enabled;
+    nodes.search?.closest('.produccion-toolbar')?.classList.toggle('d-none', enabled);
+    nodes.list?.classList.toggle('d-none', enabled);
+    nodes.historyView?.classList.toggle('d-none', !enabled);
+  };
+
+  const openHistory = async () => {
+    state.historyPage = 1;
+    setHistoryMode(true);
+    renderHistoryTable();
+  };
+
+  const cancelProduction = async (registro) => {
+    if (registro.status === 'anulada') {
+      await openIosSwal({ title: 'Ya anulada', html: '<p>La producción ya estaba anulada.</p>', icon: 'info', confirmButtonText: 'Entendido' });
+      return;
+    }
+    const auth = await askSensitivePassword('Anular producción', '<p>Se restituirá stock al inventario.</p>', true);
+    if (!auth.isConfirmed) return;
+    const latestInventory = safeObject(await window.dbLaJamoneraRest.read('/inventario'));
+    const restored = applyPlanOnInventory(latestInventory, { ingredientPlans: registro.lots || [] }, registro.id, registro.productionDate, 'restore');
+    const registros = deepClone(state.registros);
+    const previous = deepClone(registros[registro.id]);
+    registros[registro.id] = { ...registro, status: 'anulada', canceledAt: nowTs(), canceledBy: getCurrentUserLabel(), cancelReason: auth.value.reason };
+    await window.dbLaJamoneraRest.write('/inventario', restored);
+    await window.dbLaJamoneraRest.write(REGISTROS_PATH, registros);
+    await appendAudit({ action: 'produccion_anulada', productionId: registro.id, before: previous, after: registros[registro.id], reason: auth.value.reason });
+    state.inventario = restored;
+    state.registros = registros;
+    renderHistoryTable();
+    await openIosSwal({ title: 'Producción anulada', html: `<p>Se anuló ${registro.id} y se restituyó el stock.</p>`, icon: 'success', confirmButtonText: 'Entendido' });
+  };
+
+  const editProduction = async (registro) => {
+    if (registro.status === 'anulada') {
+      await openIosSwal({ title: 'No editable', html: '<p>Una producción anulada no puede editarse.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+      return;
+    }
+    const auth = await askSensitivePassword('Editar producción', '<p>Se recalculará el consumo FEFO.</p>', true);
+    if (!auth.isConfirmed) return;
+    const form = await openIosSwal({
+      title: `Editar ${registro.id}`,
+      html: `<div class="swal-stack-fields"><input id="editQty" type="number" min="0.1" step="0.01" class="swal2-input ios-input" value="${Number(registro.quantityKg || 0).toFixed(2)}"><input id="editDate" type="date" class="swal2-input ios-input" value="${registro.productionDate || toIsoDate()}"><textarea id="editObs" class="swal2-textarea ios-input">${escapeHtml(registro.observations || '')}</textarea></div>`,
+      showCancelButton: true,
+      confirmButtonText: 'Guardar cambios',
+      cancelButtonText: 'Cancelar',
+      preConfirm: () => ({ qty: parsePositive(document.getElementById('editQty')?.value, 0), date: normalizeValue(document.getElementById('editDate')?.value), obs: normalizeValue(document.getElementById('editObs')?.value) })
+    });
+    if (!form.isConfirmed) return;
+
+    const recipe = state.recetas[registro.recipeId];
+    if (!recipe) return;
+    const currentInventory = safeObject(await window.dbLaJamoneraRest.read('/inventario'));
+    const restored = applyPlanOnInventory(currentInventory, { ingredientPlans: registro.lots || [] }, registro.id, registro.productionDate, 'restore');
+    const backup = state.inventario;
+    state.inventario = restored;
+    const plan = buildPlanForRecipe(recipe, form.value.qty, form.value.date || toIsoDate());
+    state.inventario = backup;
+    if (!plan.isValid) {
+      await openIosSwal({ title: 'No se puede editar', html: `<p>${plan.conflicts.join('<br>')}</p>`, icon: 'warning', confirmButtonText: 'Entendido' });
+      return;
+    }
+    const consumed = applyPlanOnInventory(restored, plan, registro.id, form.value.date || toIsoDate(), 'consume');
+    const registros = deepClone(state.registros);
+    const prev = deepClone(registros[registro.id]);
+    registros[registro.id] = {
+      ...registro,
+      quantityKg: Number(form.value.qty.toFixed(2)),
+      productionDate: form.value.date || toIsoDate(),
+      observations: form.value.obs,
+      lots: plan.ingredientPlans,
+      editedAt: nowTs(),
+      editedBy: getCurrentUserLabel(),
+      editReason: auth.value.reason
+    };
+    await window.dbLaJamoneraRest.write('/inventario', consumed);
+    await window.dbLaJamoneraRest.write(REGISTROS_PATH, registros);
+    await appendAudit({ action: 'produccion_editada', productionId: registro.id, before: prev, after: registros[registro.id], reason: auth.value.reason });
+    state.inventario = consumed;
+    state.registros = registros;
+    renderHistoryTable();
+    await openIosSwal({ title: 'Producción editada', html: `<p>${registro.id} fue recalculada y guardada.</p>`, icon: 'success', confirmButtonText: 'Entendido' });
   };
 
   const renderList = () => {
@@ -697,7 +1205,7 @@
             ${analysis.errors.length ? `<p class="produccion-error">${analysis.errors[0]}</p>` : missingHtml}
             <div class="produccion-actions-row">
               ${action}
-              <button type="button" class="btn ios-btn ios-btn-secondary produccion-umbral-btn" data-set-recipe-min="${recipe.id}"><i class="fa-solid fa-sliders"></i><span>Umbral</span></button>
+              <button type="button" class="btn ios-btn ios-btn-secondary produccion-umbral-btn" data-set-recipe-min="${recipe.id}"><i class="fa-solid fa-gear"></i><span>Umbral</span></button>
             </div>
           </div>
         </article>`;
@@ -1095,38 +1603,7 @@
         const managers = [...nodes.editor.querySelectorAll('[data-manager-check]:checked')].map((node) => node.value).filter(Boolean);
         const observations = normalizeValue(nodes.editor.querySelector('#produccionObsInput')?.value);
 
-        const inventarioNext = safeObject(state.inventario);
-        revalidated.ingredientPlans.forEach((item) => {
-        const record = safeObject(inventarioNext.items?.[item.ingredientId]);
-        const nextEntries = Array.isArray(record.entries) ? [...record.entries] : [];
-        item.lots.forEach((lot) => {
-          const index = nextEntries.findIndex((entry) => entry.id === lot.entryId);
-          if (index === -1) return;
-          const entry = { ...nextEntries[index] };
-          const entryQty = parsePositive(entry.qty, 0);
-          const takeInEntryUnit = fromBase(lot.takeBaseQty, entry.unit || lot.unit);
-          const nextQty = Math.max(0, Number((entryQty - takeInEntryUnit).toFixed(4)));
-          entry.qty = Number(nextQty.toFixed(2));
-          entry.qtyKg = Number((toBase(nextQty, entry.unit) / 1000).toFixed(4));
-          entry.lotStatus = nextQty <= 0 ? 'consumido_en_produccion' : 'disponible';
-          entry.productionMovements = Array.isArray(entry.productionMovements) ? entry.productionMovements : [];
-          entry.productionMovements.unshift({
-            type: 'consumo_produccion',
-            productionId,
-            qtyTaken: Number(takeInEntryUnit.toFixed(4)),
-            qtyTakenUnit: entry.unit || lot.unit,
-            createdAt: nowTs(),
-            productionDate: date
-          });
-          nextEntries[index] = entry;
-        });
-        const stockKg = nextEntries.reduce((acc, entry) => acc + (Number(entry.qtyKg || 0) || 0), 0);
-        inventarioNext.items[item.ingredientId] = {
-          ...record,
-          entries: nextEntries,
-          stockKg: Number(stockKg.toFixed(4))
-        };
-      });
+        const inventarioNext = applyPlanOnInventory(state.inventario, revalidated, productionId, date, 'consume');
 
         const registro = {
         id: productionId,
@@ -1140,12 +1617,15 @@
         createdBy: getCurrentUserLabel(),
         createdAt: nowTs(),
         status: 'confirmada',
-        reservationId: state.activeReservationId
+        reservationId: state.activeReservationId,
+        exports: {},
+        auditTrail: [{ action: 'creada', at: nowTs(), user: getCurrentUserLabel() }]
       };
 
         await window.dbLaJamoneraRest.write('/inventario', inventarioNext);
         await window.dbLaJamoneraRest.write(SEQUENCE_PATH, nextSequence);
         await window.dbLaJamoneraRest.write(REGISTROS_PATH, { ...registros, [productionId]: registro });
+        await appendAudit({ action: 'produccion_confirmada', productionId, before: null, after: registro, reason: 'confirmacion final' });
 
         state.config.lastProductionByRecipe[recipe.id] = nowTs();
         await persistConfig();
@@ -1193,13 +1673,14 @@
   const refreshData = async () => {
     setStateView('loading');
     await window.laJamoneraReady;
-    const [recetas, ingredientes, inventario, config, reservas, drafts, users] = await Promise.all([
+    const [recetas, ingredientes, inventario, config, reservas, drafts, registros, users] = await Promise.all([
       window.dbLaJamoneraRest.read('/recetas'),
       window.dbLaJamoneraRest.read('/ingredientes/items'),
       window.dbLaJamoneraRest.read('/inventario'),
       window.dbLaJamoneraRest.read(CONFIG_PATH),
       window.dbLaJamoneraRest.read(RESERVAS_PATH),
       window.dbLaJamoneraRest.read(DRAFTS_PATH),
+      window.dbLaJamoneraRest.read(REGISTROS_PATH),
       window.dbLaJamoneraRest.read('/informes/users')
     ]);
 
@@ -1208,6 +1689,7 @@
     state.inventario = safeObject(inventario);
     state.reservas = safeObject(reservas);
     state.drafts = safeObject(drafts);
+    state.registros = safeObject(registros);
     state.users = safeObject(users);
     state.config = {
       globalMinKg: parsePositive(config?.globalMinKg, 1),
@@ -1256,6 +1738,13 @@
     const deleteDraftBtn = event.target.closest('[data-delete-draft]');
     if (deleteDraftBtn) {
       const draftId = deleteDraftBtn.dataset.deleteDraft;
+      const draft = state.drafts[draftId];
+      let reservasNext = { ...state.reservas };
+      if (draft?.reservationId && reservasNext[draft.reservationId]?.status === 'active') {
+        reservasNext[draft.reservationId] = { ...reservasNext[draft.reservationId], status: 'released', releasedAt: nowTs(), releasedReason: 'draft_deleted' };
+        await window.dbLaJamoneraRest.write(RESERVAS_PATH, reservasNext);
+        state.reservas = reservasNext;
+      }
       const next = { ...state.drafts };
       delete next[draftId];
       await window.dbLaJamoneraRest.write(DRAFTS_PATH, next);
@@ -1280,6 +1769,10 @@
       });
       try {
         await renderEditor(state.activeRecipeId);
+      } catch (error) {
+        await openIosSwal({ title: 'No se pudo abrir producción', html: '<p>Hubo un error al preparar el editor. Intentá nuevamente.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+        state.activeRecipeId = '';
+        setStateView('list');
       } finally {
         Swal.close();
       }
@@ -1298,13 +1791,175 @@
   produccionModal.addEventListener('click', async (event) => {
     if (event.target.closest('#produccionGlobalMinBtn')) {
       await openGlobalMinConfig();
+      return;
+    }
+    if (event.target.closest('#produccionHistoryBtn')) {
+      await openHistory();
+    }
+  });
+
+  nodes.historyBackBtn?.addEventListener('click', () => {
+    setHistoryMode(false);
+  });
+
+  nodes.historySearch?.addEventListener('input', (event) => {
+    state.historySearch = event.target.value;
+    state.historyPage = 1;
+    renderHistoryTable();
+  });
+
+  nodes.historyExpandBtn?.addEventListener('click', async () => {
+    const rows = getHistoryRows();
+    const htmlRows = rows.length ? rows.map((item, index) => {
+      const manager = getManagerLabel(item);
+      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(item.id)}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)} (${escapeHtml(manager.role)})</td><td>${escapeHtml(item.status || '-')}</td></tr>`;
+    }).join('') : '<tr><td colspan="6" class="text-center">Sin producciones.</td></tr>';
+    await openIosSwal({
+      title: 'Producciones (ampliado)',
+      html: `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>Estado</th></tr></thead><tbody>${htmlRows}</tbody></table></div>`,
+      width: '92vw',
+      confirmButtonText: 'Cerrar',
+      customClass: { confirmButton: 'ios-btn ios-btn-secondary' }
+    });
+  });
+
+  nodes.historyExcelBtn?.addEventListener('click', async () => {
+    if (!window.ExcelJS) return;
+    const rows = getHistoryRows();
+    const wb = new window.ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Producciones');
+    ws.columns = [
+      { header: 'ID producción', key: 'id', width: 24 },
+      { header: 'Fecha y hora', key: 'fecha', width: 20 },
+      { header: 'Producto', key: 'producto', width: 24 },
+      { header: 'Cantidad fabricada', key: 'cantidad', width: 16 },
+      { header: 'Responsable', key: 'responsable', width: 24 },
+      { header: 'Puesto', key: 'puesto', width: 18 },
+      { header: 'Estado', key: 'estado', width: 14 }
+    ];
+    rows.forEach((item) => {
+      const manager = getManagerLabel(item);
+      ws.addRow({
+        id: item.id,
+        fecha: formatDateTime(item.createdAt),
+        producto: item.recipeTitle || '-',
+        cantidad: `${Number(item.quantityKg || 0).toFixed(2)} kg`,
+        responsable: manager.name,
+        puesto: manager.role,
+        estado: item.status || '-'
+      });
+    });
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `producciones_periodo_${Date.now()}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  nodes.historyPrintBtn?.addEventListener('click', async () => {
+    const rows = getHistoryRows();
+    const win = window.open('', '_blank', 'width=1200,height=900');
+    if (!win) return;
+    const bodyRows = rows.map((item) => {
+      const manager = getManagerLabel(item);
+      return `<tr><td>${escapeHtml(item.id)}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)}<br><small>${escapeHtml(manager.role)}</small></td><td>${escapeHtml(item.status || '-')}</td></tr>`;
+    }).join('');
+    win.document.write(`<html><head><title>Producción por período</title></head><body><table border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse"><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>Estado</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table></body></html>`);
+    win.document.close();
+    win.focus();
+    win.print();
+  });
+
+  nodes.historyTableWrap?.addEventListener('click', async (event) => {
+    const pageBtn = event.target.closest('[data-prod-page]');
+    if (pageBtn) {
+      state.historyPage += pageBtn.dataset.prodPage === 'next' ? 1 : -1;
+      renderHistoryTable();
+      return;
+    }
+    const getRegistro = (key) => state.registros[key];
+    const reportBtn = event.target.closest('[data-prod-report]');
+    if (reportBtn) {
+      const reg = getRegistro(reportBtn.dataset.prodReport);
+      if (reg) await openIosSwal({ title: `Informe ${reg.id}`, html: reportHtml(reg), width: '92vw', confirmButtonText: 'Cerrar' });
+      return;
+    }
+    const traceBtn = event.target.closest('[data-prod-trace]');
+    if (traceBtn) {
+      const reg = getRegistro(traceBtn.dataset.prodTrace);
+      if (reg) await openTraceability(reg);
+      return;
+    }
+    const printBtn = event.target.closest('[data-prod-print]');
+    if (printBtn) {
+      const reg = getRegistro(printBtn.dataset.prodPrint);
+      if (reg) await printReport(reg);
+      return;
+    }
+    const excelBtn = event.target.closest('[data-prod-excel]');
+    if (excelBtn) {
+      const reg = getRegistro(excelBtn.dataset.prodExcel);
+      if (reg) await exportProductionExcel(reg);
+      return;
+    }
+    const pdfBtn = event.target.closest('[data-prod-pdf]');
+    if (pdfBtn) {
+      const reg = getRegistro(pdfBtn.dataset.prodPdf);
+      if (reg) await exportProductionPdf(reg);
+      return;
+    }
+    const editBtn = event.target.closest('[data-prod-edit]');
+    if (editBtn) {
+      const reg = getRegistro(editBtn.dataset.prodEdit);
+      if (reg) await editProduction(reg);
+      return;
+    }
+    const cancelBtn = event.target.closest('[data-prod-cancel]');
+    if (cancelBtn) {
+      const reg = getRegistro(cancelBtn.dataset.prodCancel);
+      if (reg) await cancelProduction(reg);
     }
   });
 
   produccionModal.addEventListener('show.bs.modal', async () => {
     try {
       await refreshData();
+      setHistoryMode(false);
       renderList();
+      if (window.flatpickr && nodes.historyRange) {
+        const locale = window.flatpickr.l10ns?.es || undefined;
+        const dayMap = getProductionDayMap();
+        window.flatpickr(nodes.historyRange, {
+          locale,
+          mode: 'range',
+          dateFormat: 'Y-m-d',
+          allowInput: true,
+          defaultDate: normalizeValue(state.historyRange).split(' a ').filter(Boolean),
+          onDayCreate: (_dObj, _dStr, _fp, dayElem) => {
+            const date = dayElem.dateObj ? getArgentinaIsoDate(dayElem.dateObj) : '';
+            const count = dayMap[date];
+            if (count) {
+              const bubble = document.createElement('span');
+              bubble.className = 'inventario-day-kg';
+              bubble.textContent = String(count);
+              dayElem.appendChild(bubble);
+            }
+          },
+          onClose: (_selectedDates, _dateStr, instance) => {
+            const from = instance.selectedDates[0] ? getArgentinaIsoDate(instance.selectedDates[0]) : '';
+            const to = instance.selectedDates[1] ? getArgentinaIsoDate(instance.selectedDates[1]) : '';
+            state.historyRange = from && to ? `${from} a ${to}` : from;
+            nodes.historyRange.value = state.historyRange;
+            state.historyPage = 1;
+            renderHistoryTable();
+          }
+        });
+      }
     } catch (error) {
       nodes.empty.querySelector('.ingredientes-empty-text').textContent = 'No se pudo cargar producción desde Firebase.';
       setStateView('empty');
@@ -1321,6 +1976,12 @@
     nodes.search.value = '';
     state.search = '';
     nodes.editor.innerHTML = '';
+    state.historySearch = '';
+    state.historyRange = '';
+    state.historyPage = 1;
+    if (nodes.historySearch) nodes.historySearch.value = '';
+    if (nodes.historyRange) nodes.historyRange.value = '';
+    setHistoryMode(false);
     if (state.reservationTick) {
       clearInterval(state.reservationTick);
       state.reservationTick = null;
