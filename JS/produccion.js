@@ -1146,15 +1146,24 @@
     await markProductionExport(registro.id, 'pdf');
   };
   const loadExternalScript = (src, id) => new Promise((resolve) => {
-    if (document.getElementById(id)) {
-      resolve(true);
+    const existing = document.getElementById(id);
+    if (existing) {
+      if (existing.dataset.loaded === 'true') {
+        resolve(true);
+        return;
+      }
+      existing.addEventListener('load', () => resolve(true), { once: true });
+      existing.addEventListener('error', () => resolve(false), { once: true });
       return;
     }
     const script = document.createElement('script');
     script.id = id;
     script.src = src;
     script.async = true;
-    script.onload = () => resolve(true);
+    script.onload = () => {
+      script.dataset.loaded = 'true';
+      resolve(true);
+    };
     script.onerror = () => resolve(false);
     document.head.appendChild(script);
   });
@@ -1166,17 +1175,36 @@
     link.href = href;
     document.head.appendChild(link);
   };
+  const loadScriptFromSources = async (sources, idPrefix) => {
+    for (let index = 0; index < sources.length; index += 1) {
+      const ok = await loadExternalScript(sources[index], `${idPrefix}_${index}`);
+      if (ok) return true;
+    }
+    return false;
+  };
+  const resolveReactFlowGlobal = () => window.ReactFlow || window.reactflow || window.Reactflow || null;
   const ensureTraceDiagramLib = async () => {
-    if (window.React && window.ReactDOM && window.ReactFlow) return true;
+    const existingFlow = resolveReactFlowGlobal();
+    if (window.React && window.ReactDOM && existingFlow) return true;
     if (window.__laJamoneraLoadingReactFlow) return window.__laJamoneraLoadingReactFlow;
     window.__laJamoneraLoadingReactFlow = (async () => {
-      loadExternalStylesheet('https://cdn.jsdelivr.net/npm/reactflow@11.11.4/dist/style.css', 'la-jamonera-reactflow-style');
-      const reactOk = await loadExternalScript('https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js', 'la-jamonera-react');
+      loadExternalStylesheet('https://unpkg.com/reactflow@11.11.4/dist/style.css', 'la-jamonera-reactflow-style-unpkg');
+      loadExternalStylesheet('https://cdn.jsdelivr.net/npm/reactflow@11.11.4/dist/style.css', 'la-jamonera-reactflow-style-jsdelivr');
+      const reactOk = await loadScriptFromSources([
+        'https://unpkg.com/react@18/umd/react.production.min.js',
+        'https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js'
+      ], 'la-jamonera-react');
       if (!reactOk) return false;
-      const reactDomOk = await loadExternalScript('https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js', 'la-jamonera-react-dom');
+      const reactDomOk = await loadScriptFromSources([
+        'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
+        'https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js'
+      ], 'la-jamonera-react-dom');
       if (!reactDomOk) return false;
-      const reactFlowOk = await loadExternalScript('https://cdn.jsdelivr.net/npm/reactflow@11.11.4/dist/umd/index.js', 'la-jamonera-reactflow');
-      return Boolean(reactFlowOk && window.ReactFlow);
+      const reactFlowOk = await loadScriptFromSources([
+        'https://unpkg.com/reactflow@11.11.4/dist/umd/index.js',
+        'https://cdn.jsdelivr.net/npm/reactflow@11.11.4/dist/umd/index.js'
+      ], 'la-jamonera-reactflow');
+      return Boolean(reactFlowOk && resolveReactFlowGlobal());
     })();
     return window.__laJamoneraLoadingReactFlow;
   };
@@ -1266,7 +1294,17 @@
 
     const React = window.React;
     const ReactDOM = window.ReactDOM;
-    const RF = window.ReactFlow;
+    const RF = resolveReactFlowGlobal();
+    const ReactFlowComponent = RF?.ReactFlow || RF?.default || RF;
+    if (!React || !ReactDOM || !ReactFlowComponent) {
+      host.innerHTML = '<p class="m-0">No se pudo inicializar React Flow.</p>';
+      return;
+    }
+
+    const BackgroundComponent = RF?.Background || null;
+    const ControlsComponent = RF?.Controls || null;
+    const MiniMapComponent = RF?.MiniMap || null;
+
     const ingredients = Array.isArray(registro.lots) ? registro.lots : [];
     const totalIngredientsKg = ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0);
     const mermaKg = Math.max(0, totalIngredientsKg - Number(registro.quantityKg || 0));
@@ -1321,35 +1359,50 @@
       });
     });
 
-    const root = ReactDOM.createRoot(host);
-    popup.__traceReactRoot = root;
-    const FlowApp = () => {
-      const onInit = (instance) => {
-        popup.__traceFlowApi = instance;
-        window.requestAnimationFrame(() => instance.fitView({ padding: 0.18 }));
+    const mountReactTree = () => {
+      const FlowApp = () => {
+        const onInit = (instance) => {
+          popup.__traceFlowApi = instance;
+          window.requestAnimationFrame(() => {
+            instance.fitView({ padding: 0.18, duration: 250 });
+          });
+        };
+        const children = [
+          React.createElement(ReactFlowComponent, {
+            key: 'flow',
+            nodes: flowNodes,
+            edges: flowEdges,
+            onInit,
+            fitView: true,
+            minZoom: 0.35,
+            maxZoom: 2.2,
+            nodesDraggable: false,
+            nodesConnectable: false,
+            elementsSelectable: false,
+            panOnDrag: true,
+            zoomOnScroll: true,
+            zoomOnPinch: true,
+            zoomOnDoubleClick: false,
+            proOptions: { hideAttribution: true }
+          }, [
+            BackgroundComponent ? React.createElement(BackgroundComponent, { key: 'bg', gap: 18, size: 1, color: '#dfe8fb' }) : null,
+            ControlsComponent ? React.createElement(ControlsComponent, { key: 'controls', showInteractive: false }) : null,
+            MiniMapComponent ? React.createElement(MiniMapComponent, { key: 'minimap', pannable: true, zoomable: true, nodeStrokeWidth: 2, maskColor: 'rgba(240,244,255,0.65)' }) : null
+          ].filter(Boolean))
+        ];
+        return React.createElement('div', { style: { width: '100%', height: '100%' } }, children);
       };
-      return React.createElement('div', { style: { width: '100%', height: '100%' } },
-        React.createElement(RF.ReactFlow, {
-          nodes: flowNodes,
-          edges: flowEdges,
-          onInit,
-          fitView: true,
-          minZoom: 0.35,
-          maxZoom: 2.2,
-          nodesDraggable: false,
-          elementsSelectable: false,
-          panOnDrag: true,
-          zoomOnScroll: true,
-          zoomOnPinch: true,
-          zoomOnDoubleClick: false,
-          proOptions: { hideAttribution: true }
-        },
-        React.createElement(RF.Background, { gap: 18, size: 1, color: '#dfe8fb' }),
-        React.createElement(RF.Controls, { showInteractive: false }),
-        React.createElement(RF.MiniMap, { pannable: true, zoomable: true, nodeStrokeWidth: 2, maskColor: 'rgba(240,244,255,0.65)' }))
-      );
+
+      if (typeof ReactDOM.createRoot === 'function') {
+        const root = ReactDOM.createRoot(host);
+        popup.__traceReactRoot = root;
+        root.render(React.createElement(FlowApp));
+        return;
+      }
+      ReactDOM.render(React.createElement(FlowApp), host);
     };
-    root.render(React.createElement(FlowApp));
+
+    mountReactTree();
   };
   const initTraceDiagramInteractions = (popup) => {
     const wrap = popup.querySelector('[data-trace-zoom-wrap]');
@@ -1436,6 +1489,11 @@
       },
       willClose: (popup) => {
         popup.__traceReactRoot?.unmount?.();
+        const host = popup.querySelector('[data-trace-reactflow]');
+        if (!popup.__traceReactRoot && host && window.ReactDOM?.unmountComponentAtNode) {
+          window.ReactDOM.unmountComponentAtNode(host);
+        }
+        popup.__traceFlowApi = null;
       }
     });
   };
