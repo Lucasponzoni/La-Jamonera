@@ -1142,6 +1142,10 @@ html.login-protected.auth-ok body {
   padding: 1.4rem;
 }
 
+.text-center {
+  text-align: center;
+}
+
 .swal2-title.ios-alert-title {
   color: #2a3556;
   font-size: 1.4rem;

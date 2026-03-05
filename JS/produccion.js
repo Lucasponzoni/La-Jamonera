@@ -716,7 +716,7 @@
   const openGlobalMinConfig = async () => {
     const result = await openIosSwal({
       title: 'Configuración global de inventario',
-      html: `<div class="text-start">
+      html: `<div class="text-center">
           <label class="form-label" for="produccionGlobalMinInput">Umbral global de stock bajo (kg)</label>
           <input id="produccionGlobalMinInput" type="number" min="0" step="0.01" class="swal2-input ios-input" value="${Number(state.config.globalMinKg || 1).toFixed(2)}">
         </div>`,
