@@ -800,6 +800,36 @@
         const body = popup.querySelector('#logoCompanyBody');
         const fileInput = popup.querySelector('#produccionCompanyLogoFile');
         const preview = popup.querySelector('#produccionCompanyLogoPreview');
+        const setLoading = () => {
+          if (!preview) return;
+          preview.innerHTML = '<span class="produccion-company-logo-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando logo" class="meta-spinner produccion-company-logo-spinner"></span>';
+        };
+        const setFallback = () => {
+          if (!preview) return;
+          preview.innerHTML = '<i class="fa-solid fa-image"></i>';
+        };
+        const setImage = (url) => {
+          const safeUrl = normalizeValue(url);
+          if (!safeUrl) {
+            setFallback();
+            return;
+          }
+          setLoading();
+          const image = new Image();
+          image.alt = 'Logo empresa';
+          image.src = safeUrl;
+          image.onload = () => {
+            if (!preview) return;
+            preview.innerHTML = '';
+            preview.appendChild(image);
+          };
+          image.onerror = () => {
+            setFallback();
+          };
+        };
+
+        setImage(state.config.companyLogoUrl);
+
         toggleBtn?.addEventListener('click', () => {
           const hidden = body?.classList.contains('d-none');
           body?.classList.toggle('d-none', !hidden);
@@ -807,9 +837,12 @@
         });
         fileInput?.addEventListener('change', () => {
           const file = fileInput.files?.[0];
-          if (!file || !preview) return;
+          if (!file) {
+            setImage(state.config.companyLogoUrl);
+            return;
+          }
           const tempUrl = URL.createObjectURL(file);
-          preview.innerHTML = `<img src="${tempUrl}" alt="Logo empresa">`;
+          setImage(tempUrl);
         });
       },
       preConfirm: async () => {
@@ -822,6 +855,10 @@
         const file = document.getElementById('produccionCompanyLogoFile')?.files?.[0];
         let companyLogoUrl = normalizeValue(state.config.companyLogoUrl);
         if (file) {
+          const preview = document.getElementById('produccionCompanyLogoPreview');
+          if (preview) {
+            preview.innerHTML = '<span class="produccion-company-logo-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Subiendo logo" class="meta-spinner produccion-company-logo-spinner"></span>';
+          }
           if (!ALLOWED_UPLOAD_TYPES.includes(file.type)) {
             Swal.showValidationMessage('Formato de logo no admitido.');
             return false;
@@ -1334,6 +1371,9 @@
       const analysis = state.analysis[recipe.id] || analyzeRecipe(recipe);
       const statusClass = analysis.status === 'success' ? 'tone-success' : analysis.status === 'warning' ? 'tone-warning' : 'tone-danger';
       const action = `<button type="button" class="btn ios-btn ios-btn-success produccion-main-btn ${analysis.canProduce ? '' : 'is-disabled'}" data-open-produccion="${recipe.id}" ${analysis.canProduce ? '' : 'disabled'}><i class="bi bi-plus-lg"></i><span>Producir</span></button>`;
+      const inventoryAction = analysis.canProduce
+        ? ''
+        : `<button type="button" class="btn ios-btn inventory-production-action-btn is-threshold" data-open-inventario="1"><i class="fa-solid fa-boxes-stacked"></i><span>Inventario</span></button>`;
       const viewAction = `<button type="button" class="btn ios-btn ios-btn-secondary produccion-visualizar-btn" data-open-produccion="${recipe.id}"><i class="fa-regular fa-eye"></i><span>Visualizar</span></button>`;
 
       const foreignDraft = getForeignDraftConflict(recipe.id);
@@ -1383,6 +1423,7 @@
             ${analysis.errors.length ? `<p class="produccion-error">${analysis.errors[0]}</p>` : missingHtml}
             <div class="produccion-actions-row inventory-production-actions">
               ${action.replace('produccion-main-btn', 'produccion-main-btn inventory-production-action-btn is-main')}
+              ${inventoryAction}
               ${viewAction.replace('produccion-visualizar-btn', 'produccion-visualizar-btn inventory-production-action-btn is-view')}
               <button type="button" class="btn ios-btn produccion-umbral-btn inventario-threshold-btn inventory-production-action-btn is-threshold" data-set-recipe-min="${recipe.id}"><i class="fa-solid fa-sliders"></i><span>Umbral</span></button>
             </div>
