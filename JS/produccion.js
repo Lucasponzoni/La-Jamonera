@@ -177,6 +177,12 @@
     if (Number.isNaN(d.getTime())) return '-';
     return d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
+  const formatIsoToDmyCompact = (iso) => {
+    const text = normalizeValue(iso);
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+    if (!match) return text.replaceAll('-', '');
+    return `${match[3]}${match[2]}${match[1]}`;
+  };
 
   const escapeHtml = (value) => String(value || '')
     .replaceAll('&', '&amp;')
@@ -1268,10 +1274,10 @@
             ${buildCoverageChecksHtml(analysis)}
             <div class="produccion-badges">${badges}</div>
             ${analysis.errors.length ? `<p class="produccion-error">${analysis.errors[0]}</p>` : missingHtml}
-            <div class="produccion-actions-row">
-              ${action}
-              ${viewAction}
-              <button type="button" class="btn ios-btn ios-btn-secondary produccion-umbral-btn inventario-threshold-btn" data-set-recipe-min="${recipe.id}"><i class="fa-solid fa-sliders"></i><span>Umbral</span></button>
+            <div class="produccion-actions-row inventory-production-actions">
+              ${action.replace('produccion-main-btn', 'produccion-main-btn inventory-production-action-btn is-main')}
+              ${viewAction.replace('produccion-visualizar-btn', 'produccion-visualizar-btn inventory-production-action-btn is-view')}
+              <button type="button" class="btn ios-btn produccion-umbral-btn inventario-threshold-btn inventory-production-action-btn is-threshold" data-set-recipe-min="${recipe.id}"><i class="fa-solid fa-sliders"></i><span>Umbral</span></button>
             </div>
           </div>
         </article>`;
@@ -1531,18 +1537,90 @@
     const qtyHelp = nodes.editor.querySelector('#produccionQtyHelp');
     const lotsWrap = nodes.editor.querySelector('#produccionLotsBreakdown');
     const confirmBtn = nodes.editor.querySelector('#produccionConfirmBtn');
+    const recipeHistoryState = { search: '', range: '' };
+
+    const getRecipeHistoryRows = () => {
+      const [from, to] = normalizeValue(recipeHistoryState.range).split(' a ').map((item) => normalizeValue(item));
+      const fromTs = from ? new Date(`${from}T00:00:00`).getTime() : 0;
+      const toTs = to ? new Date(`${to}T23:59:59`).getTime() : 0;
+      const query = normalizeLower(recipeHistoryState.search);
+
+      return getRegistrosList()
+        .filter((item) => normalizeValue(item.recipeId) === normalizeValue(recipe.id))
+        .filter((item) => {
+          const createdAt = Number(item?.createdAt || 0);
+          if (fromTs && createdAt < fromTs) return false;
+          if (toTs && createdAt > toTs) return false;
+          if (!query) return true;
+          const blob = [item.id, item.recipeTitle, item.status, formatDateTime(item.createdAt), item.productionDate]
+            .map(normalizeLower)
+            .join(' ');
+          return blob.includes(query);
+        })
+        .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+    };
+
+    const printRecipeHistoryRows = (rows) => {
+      const win = window.open('', '_blank', 'width=1200,height=900');
+      if (!win) return;
+      const bodyRows = rows.map((item) => {
+        const manager = getManagerLabel(item);
+        return `<tr><td>${escapeHtml(item.id || '-')}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.productionDate || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)}<br><small>${escapeHtml(manager.role)}</small></td><td>${escapeHtml(item.status || '-')}</td></tr>`;
+      }).join('');
+      win.document.write(`<html><head><title>Historial producción ${escapeHtml(capitalize(recipe.title || ''))}</title></head><body><table border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse"><thead><tr><th>ID</th><th>Fecha y hora</th><th>Fecha producción</th><th>Cantidad</th><th>Responsable</th><th>Estado</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table></body></html>`);
+      win.document.close();
+      win.focus();
+      win.print();
+    };
 
     const renderRecipeHistory = () => {
-      const rows = getRegistrosList()
-        .filter((item) => normalizeValue(item.recipeId) === normalizeValue(recipe.id))
-        .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+      const rows = getRecipeHistoryRows();
       const node = nodes.editor.querySelector('#produccionRecipeHistory');
       if (!node) return;
       if (!rows.length) {
         node.innerHTML = '<p class="produccion-lote-empty">Todavía no hay producciones confirmadas para esta receta.</p>';
         return;
       }
-      node.innerHTML = `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Código</th><th>Fecha y hora</th><th>Fecha producción</th><th>Kilos</th><th>Estado</th></tr></thead><tbody>${rows.map((item, index) => `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(item.id || '-')}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.productionDate || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(item.status || '-')}</td></tr>`).join('')}</tbody></table></div>`;
+      node.innerHTML = `
+        <div class="inventario-table-head enhanced">
+          <input id="produccionRecipeHistorySearch" type="search" class="form-control ios-input" autocomplete="off" placeholder="Buscar por producción" value="${escapeHtml(recipeHistoryState.search)}">
+          <div class="inventario-history-toolbar">
+            <div class="inventario-table-range">
+              <input id="produccionRecipeHistoryRange" class="form-control ios-input" autocomplete="off" placeholder="Rango de fechas" value="${escapeHtml(recipeHistoryState.range)}">
+              <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn ${recipeHistoryState.range ? '' : 'd-none'}" id="produccionRecipeHistoryClearBtn"><i class="fa-solid fa-xmark"></i><span>Limpiar rango</span></button>
+            </div>
+            <div class="inventario-print-row toolbar-scroll-x">
+              <button type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn" id="produccionRecipeHistoryExpandBtn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar</span></button>
+              <button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" id="produccionRecipeHistoryExcelBtn"><i class="fa-solid fa-file-excel"></i><span>Excel</span></button>
+              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeHistoryPrintFilteredBtn"><i class="fa-solid fa-print"></i><span>Imprimir filtro</span></button>
+              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeHistoryPrintAllBtn"><i class="fa-solid fa-print"></i><span>Imprimir total</span></button>
+            </div>
+          </div>
+        </div>
+        <div class="table-responsive inventario-table-compact-wrap">
+          <table class="table recipe-table inventario-table-compact mb-0">
+            <thead><tr><th>Código</th><th>Fecha y hora</th><th>Fecha producción</th><th>Kilos</th><th>Estado</th></tr></thead>
+            <tbody>${rows.map((item, index) => `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(item.id || '-')}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.productionDate || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(item.status || '-')}</td></tr>`).join('')}</tbody>
+          </table>
+        </div>`;
+
+      const rangeNode = nodes.editor.querySelector('#produccionRecipeHistoryRange');
+      if (window.flatpickr && rangeNode) {
+        const locale = window.flatpickr.l10ns?.es || undefined;
+        window.flatpickr(rangeNode, {
+          locale,
+          mode: 'range',
+          dateFormat: 'Y-m-d',
+          allowInput: true,
+          defaultDate: normalizeValue(recipeHistoryState.range).split(' a ').filter(Boolean),
+          onClose: (_dates, _str, instance) => {
+            const from = instance.selectedDates[0] ? toIsoDate(instance.selectedDates[0].getTime()) : '';
+            const to = instance.selectedDates[1] ? toIsoDate(instance.selectedDates[1].getTime()) : '';
+            recipeHistoryState.range = from && to ? `${from} a ${to}` : from;
+            renderRecipeHistory();
+          }
+        });
+      }
     };
 
     const updateEditorPlan = async () => {
@@ -1589,6 +1667,70 @@
         return;
       }
 
+      if (event.target.closest('#produccionRecipeHistoryClearBtn')) {
+        recipeHistoryState.range = '';
+        renderRecipeHistory();
+        return;
+      }
+
+      if (event.target.closest('#produccionRecipeHistoryExpandBtn')) {
+        const rows = getRecipeHistoryRows();
+        const htmlRows = rows.length
+          ? rows.map((item, index) => `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(item.id || '-')}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.productionDate || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(item.status || '-')}</td></tr>`).join('')
+          : '<tr><td colspan="5" class="text-center">Sin producciones.</td></tr>';
+        await openIosSwal({
+          title: 'Historial de producción (ampliado)',
+          html: `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Código</th><th>Fecha y hora</th><th>Fecha producción</th><th>Kilos</th><th>Estado</th></tr></thead><tbody>${htmlRows}</tbody></table></div>`,
+          width: '92vw',
+          confirmButtonText: 'Cerrar',
+          customClass: { confirmButton: 'ios-btn ios-btn-secondary' }
+        });
+        return;
+      }
+
+      if (event.target.closest('#produccionRecipeHistoryExcelBtn')) {
+        if (!window.ExcelJS) return;
+        const rows = getRecipeHistoryRows();
+        const wb = new window.ExcelJS.Workbook();
+        const ws = wb.addWorksheet('Producción receta');
+        ws.columns = [
+          { header: 'ID', key: 'id', width: 24 },
+          { header: 'Fecha y hora', key: 'fecha', width: 20 },
+          { header: 'Fecha producción', key: 'produccion', width: 16 },
+          { header: 'Kilos', key: 'kilos', width: 14 },
+          { header: 'Estado', key: 'estado', width: 16 }
+        ];
+        rows.forEach((item) => ws.addRow({
+          id: item.id || '-',
+          fecha: formatDateTime(item.createdAt),
+          produccion: item.productionDate || '-',
+          kilos: `${Number(item.quantityKg || 0).toFixed(2)} kg`,
+          estado: item.status || '-'
+        }));
+        const buf = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `produccion_receta_${normalizeLower(recipe.title || 'receta').replace(/\s+/g, '_')}_${Date.now()}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      if (event.target.closest('#produccionRecipeHistoryPrintFilteredBtn')) {
+        printRecipeHistoryRows(getRecipeHistoryRows());
+        return;
+      }
+
+      if (event.target.closest('#produccionRecipeHistoryPrintAllBtn')) {
+        const allRows = getRegistrosList().filter((item) => normalizeValue(item.recipeId) === normalizeValue(recipe.id));
+        printRecipeHistoryRows(allRows);
+        return;
+      }
+
       const attachmentBtn = event.target.closest('[data-lot-images]');
       if (attachmentBtn) {
         const raw = decodeURIComponent(attachmentBtn.dataset.lotImages || '');
@@ -1604,6 +1746,13 @@
           await openIosSwal({ title: 'Visor no disponible', html: '<p>No se pudo abrir el visor de imágenes.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
         }
       }
+    });
+
+    nodes.editor.addEventListener('input', (event) => {
+      const searchNode = event.target.closest('#produccionRecipeHistorySearch');
+      if (!searchNode) return;
+      recipeHistoryState.search = normalizeValue(searchNode.value);
+      renderRecipeHistory();
     });
 
     if (window.flatpickr) {
@@ -1689,7 +1838,7 @@
         const registros = safeObject(await window.dbLaJamoneraRest.read(REGISTROS_PATH));
         const sequence = Number(await window.dbLaJamoneraRest.read(SEQUENCE_PATH)) || 0;
         const nextSequence = sequence + 1;
-        const dateToken = date.replaceAll('-', '');
+        const dateToken = formatIsoToDmyCompact(date);
         const prefix = normalizeValue(state.config.idConfig?.prefix) || 'PROD-LJ';
         const productionId = `${prefix}-${dateToken}-${String(nextSequence).padStart(4, '0')}`;
 
@@ -2045,7 +2194,7 @@
             if (count) {
               const bubble = document.createElement('span');
               bubble.className = 'inventario-day-kg';
-              bubble.textContent = String(count);
+              bubble.textContent = `${count} prod.`;
               dayElem.appendChild(bubble);
             }
           },
