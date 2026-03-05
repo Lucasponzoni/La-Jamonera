@@ -6674,3 +6674,132 @@ html.login-protected.auth-ok body {
     min-width: 860px;
   }
 }
+
+.produccion-trace-flow-board {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.produccion-trace-flow-col {
+  display: grid;
+  gap: 8px;
+}
+
+.produccion-trace-flow-col.is-side {
+  align-content: start;
+}
+
+.produccion-trace-flow-card,
+.produccion-trace-flow-side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-width: 1px;
+}
+
+.produccion-trace-flow-card > div,
+.produccion-trace-flow-side > div {
+  display: grid;
+  gap: 2px;
+}
+
+.produccion-trace-flow-card small,
+.produccion-trace-flow-side small {
+  font-size: .72rem;
+  color: #6b7fa8;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  font-weight: 800;
+}
+
+.produccion-trace-flow-card span,
+.produccion-trace-flow-side span {
+  font-weight: 900;
+  color: #214379;
+}
+
+.produccion-trace-flow-connector {
+  position: relative;
+  height: 26px;
+  display: grid;
+  place-items: center;
+}
+
+.produccion-trace-flow-connector::before {
+  content: '';
+  position: absolute;
+  background: #7f95c2;
+}
+
+.produccion-trace-flow-connector.is-down::before {
+  width: 2px;
+  height: 22px;
+}
+
+.produccion-trace-flow-connector.is-right::before {
+  width: 88%;
+  height: 2px;
+}
+
+.produccion-trace-flow-connector span {
+  z-index: 1;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #f0f4ff;
+  color: #375c99;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d2dcf2;
+}
+
+.produccion-trace-product-thumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid #d6e0f6;
+  background: #f0f4ff;
+}
+
+.produccion-trace-product-thumb.is-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #3f5d95;
+}
+
+.produccion-trace-ingredients {
+  gap: 14px;
+  padding-right: 4px;
+}
+
+.produccion-trace-ingredient-card {
+  background: #fbfdff;
+  padding: 14px;
+}
+
+.produccion-trace-lot-card {
+  background: #fff;
+  border-color: #d6e1f8;
+}
+
+@media (max-width: 991.98px) {
+  .produccion-trace-flow-board {
+    grid-template-columns: 1fr;
+  }
+
+  .produccion-trace-flow-connector.is-right::before {
+    width: 2px;
+    height: 20px;
+  }
+
+  .produccion-trace-flow-col.is-side {
+    border-top: 1px dashed #d5dff5;
+    padding-top: 10px;
+  }
+}

@@ -1252,7 +1252,7 @@
       const amount = Number(qty || 0);
       const normalizedUnit = normalizeLower(unit || 'kg');
       if (normalizedUnit.includes('gram')) return amount / 1000;
-      if (normalizedUnit in { 'g': 1, 'gr': 1, 'gramo': 1, 'gramos': 1 }) return amount / 1000;
+      if (normalizedUnit in { g: 1, gr: 1, gramo: 1, gramos: 1 }) return amount / 1000;
       return amount;
     };
 
@@ -1267,6 +1267,7 @@
       return sum + safeToKg(qty, item.unit || item.ingredientUnit || 'kg');
     }, 0);
     const mermakg = Math.max(0, totalIngredientsKg - Number(registro.quantityKg || 0));
+    const productImage = normalizeValue(registro?.traceability?.product?.imageUrl) || normalizeValue(state.recetas?.[registro.recipeId]?.imageUrl);
 
     const ingredients = (registro.lots || []).map((item, idx) => {
       const ingredientImage = normalizeValue(state.ingredientes[item.ingredientId]?.imageUrl);
@@ -1317,16 +1318,22 @@
       </div>
       <div class="produccion-trace-diagram-wrap" data-trace-zoom-wrap>
         <div class="produccion-trace-diagram" data-trace-zoom-canvas>
-          <div class="produccion-trace-flow-grid">
-            <article class="produccion-trace-flow-card is-product"><i class="bi bi-award fa-solid fa-medal"></i><span>${escapeHtml(registro.recipeTitle || '-')}</span></article>
-            <div class="produccion-trace-flow-arrow">↓</div>
-            <article class="produccion-trace-flow-card is-production"><i class="bi bi-gear-wide-connected fa-solid fa-gears"></i><span>Producción ${Number(registro.quantityKg || 0).toFixed(2)} kg</span></article>
-            <div class="produccion-trace-flow-side is-lot"><i class="bi bi-upc-scan fa-solid fa-barcode"></i><span>Lote: ${escapeHtml(registro.id)}</span><small>VTO: ${escapeHtml(formatProductExpiryLabel(registro))}</small></div>
-            <div class="produccion-trace-flow-arrow">↓</div>
-            <article class="produccion-trace-flow-card is-ingredients"><i class="bi bi-boxes fa-solid fa-boxes-stacked"></i><span>Ingredientes ${totalIngredientsKg.toFixed(3)} kg</span></article>
-            <div class="produccion-trace-flow-side is-manager"><i class="bi bi-person-badge fa-solid fa-user-tie"></i><span>${escapeHtml((Array.isArray(registro.managers) && registro.managers[0]) ? getManagerDisplay(registro.managers[0]).name : 'Sin encargado')}</span><small>Encargado</small></div>
-            <div class="produccion-trace-flow-arrow">↓</div>
-            <article class="produccion-trace-flow-card is-waste"><i class="bi bi-exclamation-triangle fa-solid fa-triangle-exclamation"></i><span>Merma ${mermakg.toFixed(3)} kg</span></article>
+          <div class="produccion-trace-flow-board">
+            <div class="produccion-trace-flow-col is-main">
+              <article class="produccion-trace-flow-card is-product">${productImage ? `<img class="produccion-trace-product-thumb" src="${escapeHtml(productImage)}" alt="${escapeHtml(registro.recipeTitle || 'Producto')}">` : '<span class="produccion-trace-product-thumb is-fallback"><i class="fa-solid fa-drumstick-bite"></i></span>'}<div><small>Producto</small><span>${escapeHtml(registro.recipeTitle || '-')}</span></div></article>
+              <div class="produccion-trace-flow-connector is-down"><span>↓</span></div>
+              <article class="produccion-trace-flow-card is-production"><i class="bi bi-gear-wide-connected fa-solid fa-gears"></i><div><small>Producción</small><span>${Number(registro.quantityKg || 0).toFixed(2)} kg</span></div></article>
+              <div class="produccion-trace-flow-connector is-down"><span>↓</span></div>
+              <article class="produccion-trace-flow-card is-ingredients"><i class="bi bi-boxes fa-solid fa-boxes-stacked"></i><div><small>Ingredientes totales</small><span>${totalIngredientsKg.toFixed(3)} kg</span></div></article>
+            </div>
+            <div class="produccion-trace-flow-col is-side">
+              <div class="produccion-trace-flow-connector is-right"><span>→</span></div>
+              <article class="produccion-trace-flow-side is-lot"><i class="bi bi-upc-scan fa-solid fa-barcode"></i><div><small>Lote producido</small><span>${escapeHtml(registro.id)}</span><small>VTO ${escapeHtml(formatProductExpiryLabel(registro))}</small></div></article>
+              <div class="produccion-trace-flow-connector is-right"><span>→</span></div>
+              <article class="produccion-trace-flow-side is-manager"><i class="bi bi-person-badge fa-solid fa-user-check"></i><div><small>Encargado</small><span>${escapeHtml((Array.isArray(registro.managers) && registro.managers[0]) ? getManagerDisplay(registro.managers[0]).name : 'Sin encargado')}</span></div></article>
+              <div class="produccion-trace-flow-connector is-right"><span>→</span></div>
+              <article class="produccion-trace-flow-side is-waste"><i class="bi bi-exclamation-triangle fa-solid fa-triangle-exclamation"></i><div><small>Merma estimada</small><span>${mermakg.toFixed(3)} kg</span></div></article>
+            </div>
           </div>
           <article class="produccion-trace-summary">
             <h6><i class="bi bi-diagram-3 fa-solid fa-diagram-project"></i> Trazabilidad ${escapeHtml(registro.id)}</h6>
