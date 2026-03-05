@@ -4344,6 +4344,10 @@ html.login-protected.auth-ok body {
   align-items: center;
 }
 
+.inventario-period-filters #inventarioGlobalClearBtn, .inventario-period-filters #produccionGlobalClearBtn {
+  border-radius: 16px !important;
+}
+
 #inventarioGlobalRange,
 #produccionGlobalRange {
   grid-column: 1 / -1;
