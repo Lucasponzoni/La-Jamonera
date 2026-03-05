@@ -5182,6 +5182,11 @@ html.login-protected.auth-ok body {
   font-size: 0.74rem;
 }
 
+.produccion-vto-cell {
+  color: #8a4b12 !important;
+  font-weight: 800 !important;
+}
+
 .produccion-trace-v2 {
   display: grid;
   gap: 12px;
@@ -5705,6 +5710,32 @@ html.login-protected.auth-ok body {
   margin: 8px 0 0;
   color: #5f6f94;
   font-size: 0.83rem;
+}
+
+.produccion-confirm-summary {
+  display: grid;
+  gap: 6px;
+}
+
+.produccion-confirm-summary p {
+  margin: 0;
+  color: #3a4f7f;
+}
+
+.produccion-confirm-summary strong {
+  color: #273f70;
+}
+
+.produccion-confirm-vto {
+  color: #8a4b12;
+  font-weight: 700;
+}
+
+.produccion-confirm-total {
+  color: #1f7ae8;
+  font-weight: 800;
+  font-size: 1.4rem;
+  line-height: 1.1;
 }
 
 .produccion-fefo-note {
