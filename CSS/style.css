@@ -4001,15 +4001,25 @@ html.login-protected.auth-ok body {
 
 .inventario-stock-line {
   margin: 6px 0 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: block;
   color: #4c5e86;
 }
 
 .inventario-stock-line strong {
   color: #1f4ea5;
   font-size: 18px;
+}
+
+.inventario-stock-unit {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #1f4ea5;
+  margin-left: 4px;
+}
+
+.inventario-stock-line > span {
+  display: block;
+  margin-top: 2px;
 }
 
 .inventario-actions-row {
@@ -4288,6 +4298,10 @@ html.login-protected.auth-ok body {
   font-size: 18px;
 }
 
+.inventario-stock-line.is-zero .inventario-stock-unit {
+  color: #cc3f52;
+}
+
 .inventario-threshold-btn {
   width: fit-content;
   max-width: none;
@@ -4471,6 +4485,10 @@ html.login-protected.auth-ok body {
 #produccionGlobalRange {
   flex: 1 1 100%;
   min-width: 0;
+}
+
+#inventarioGlobalRange {
+  border-radius: 5px !important;
 }
 
 .inventario-period-divider {
@@ -5324,6 +5342,23 @@ html.login-protected.auth-ok body {
 
 .produccion-list {
   max-height: 60vh;
+}
+
+.produccion-list.has-scroll-hint::after {
+  content: '↓ Deslizá para ver más producciones';
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: block;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #7048e9;
+  background: linear-gradient(to bottom, rgba(242, 245, 252, 0), rgb(236 231 255));
+  padding: 10px 0 4px;
+  margin-top: -28px;
+  pointer-events: none;
 }
 
 .produccion-card {
@@ -6204,6 +6239,35 @@ html.login-protected.auth-ok body {
   gap: 8px;
 }
 
+.inventario-trace-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid #d6deef;
+  background: #eef2fd;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.inventario-trace-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.inventario-trace-avatar .thumb-loading .meta-spinner-login {
+  width: 16px;
+  height: 16px;
+}
+
+.inventario-trace-label {
+  font-weight: 700;
+  color: #465a88;
+}
+
 .inventario-trace-icon {
   width: 18px;
   height: 18px;
@@ -6214,6 +6278,10 @@ html.login-protected.auth-ok body {
 .inventario-trace-kilos {
   color: #d31233 !important;
   font-weight: 800;
+}
+
+.inventario-available-line.is-zero {
+  color: #cc3f52;
 }
 
 .produccion-visualizar-btn {
