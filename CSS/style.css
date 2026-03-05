@@ -6083,3 +6083,49 @@ html.login-protected.auth-ok body {
   width: fit-content;
   color: #178c46;
 }
+
+/* =========================================
+   INVENTARIO / PRODUCCIÓN TRACE UI
+========================================= */
+.inventario-available-line {
+  color: #6c7a98;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.inventario-trace-row td {
+  background: #f8ecee !important;
+  border-bottom: 1px solid #eed7dc !important;
+  color: #4b5f8d;
+  font-size: 0.82rem;
+}
+
+.inventario-trace-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inventario-trace-icon {
+  width: 18px;
+  height: 18px;
+  color: #5b7ec8;
+  flex-shrink: 0;
+}
+
+.inventario-trace-kilos {
+  color: #d31233 !important;
+  font-weight: 800;
+}
+
+.produccion-visualizar-btn {
+  background: #edf3ff;
+  color: #2a4ea3;
+}
+
+.produccion-recipe-history {
+  border: 1px solid #d8e2f7;
+  border-radius: 14px;
+  padding: 10px;
+  background: #fbfdff;
+}
