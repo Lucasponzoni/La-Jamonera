@@ -1020,7 +1020,6 @@ html.login-protected.auth-ok body {
 ========================================= */
 .ios-input,
 .ios-input-group {
-  min-height: 50px;
   border-radius: 14px;
   border: 1px solid #d2d8e8;
   background: #f2f4fa;
@@ -4569,6 +4568,7 @@ html.login-protected.auth-ok body {
 }
 
 .inventario-collapse-head-styled {
+  margin-bottom: 10px;
   width: 100%;
   border: 1px solid #d6def3;
   border-radius: 14px;
@@ -4684,13 +4684,6 @@ html.login-protected.auth-ok body {
   width: fit-content;
   max-width: none;
   flex: 0 0 auto;
-}
-
-.inventario-table-range {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto;
-  gap: 8px;
-  align-items: center;
 }
 
 .inventario-history-toolbar {
