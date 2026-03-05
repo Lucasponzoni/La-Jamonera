@@ -1842,11 +1842,6 @@
     renderHistoryTable();
   });
 
-  nodes.historyApplyBtn?.addEventListener('click', () => {
-    state.historyPage = 1;
-    renderHistoryTable();
-  });
-
   nodes.historyExpandBtn?.addEventListener('click', async () => {
     const rows = getHistoryRows();
     const htmlRows = rows.length ? rows.map((item, index) => {

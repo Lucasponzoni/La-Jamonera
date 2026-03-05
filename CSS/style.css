@@ -4337,10 +4337,40 @@ html.login-protected.auth-ok body {
 }
 
 .inventario-period-filters {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto auto auto auto auto;
   gap: 8px;
-  flex-wrap: wrap;
   margin-bottom: 10px;
+  align-items: center;
+}
+
+#inventarioGlobalRange,
+#produccionGlobalRange {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.inventario-period-filters:has(#inventarioGlobalClearBtn:not(.d-none)) #inventarioGlobalRange,
+.inventario-period-filters:has(#produccionGlobalClearBtn:not(.d-none)) #produccionGlobalRange {
+  grid-column: 1 / 6;
+}
+
+#inventarioGlobalClearBtn,
+#produccionGlobalClearBtn {
+  grid-column: 6;
+  justify-self: end;
+}
+
+#inventarioGlobalApplyBtn,
+#produccionGlobalApplyBtn,
+#inventarioGlobalExpandBtn,
+#produccionGlobalExpandBtn,
+#inventarioGlobalExcelBtn,
+#produccionGlobalExcelBtn,
+.inventario-period-divider,
+#inventarioGlobalPrintBtn,
+#produccionGlobalPrintBtn {
+  grid-row: 2;
 }
 
 #inventarioGlobalRange,
@@ -4853,6 +4883,33 @@ html.login-protected.auth-ok body {
     display: none;
   }
 
+  .inventario-period-filters {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  #inventarioGlobalRange,
+  #produccionGlobalRange {
+    grid-column: 1 / -1;
+  }
+
+  #inventarioGlobalClearBtn,
+  #produccionGlobalClearBtn {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  #inventarioGlobalApplyBtn,
+  #produccionGlobalApplyBtn,
+  #inventarioGlobalExpandBtn,
+  #produccionGlobalExpandBtn,
+  #inventarioGlobalExcelBtn,
+  #produccionGlobalExcelBtn,
+  #inventarioGlobalPrintBtn,
+  #produccionGlobalPrintBtn,
+  .inventario-period-divider {
+    grid-row: auto;
+  }
+
   .inventario-period-divider {
     display: none;
   }
@@ -4998,22 +5055,6 @@ html.login-protected.auth-ok body {
 .produccion-umbral-btn:hover {
   background: #eaf1ff;
   color: #223760;
-}
-
-.produccion-period-board .inventario-period-filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-#produccionGlobalRange {
-  min-width: 220px;
-  flex: 1 1 240px;
-}
-
-#produccionHistorySearch {
-  min-width: 220px;
-  flex: 1 1 240px;
 }
 
 .produccion-responsable-wrap {
@@ -5182,11 +5223,6 @@ html.login-protected.auth-ok body {
 }
 
 @media (max-width: 991.98px) {
-  .produccion-period-board .inventario-period-filters {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
   .produccion-toolbar-actions {
     width: 100%;
     justify-content: flex-end;
