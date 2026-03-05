@@ -51,7 +51,6 @@
     historyMode: false,
     historyRange: '',
     historyPage: 1,
-    historyTraceZoom: 1,
     historyTraceCollapse: {},
     config: {
       globalMinKg: 1,
@@ -185,6 +184,30 @@
     if (Number.isNaN(utc.getTime())) return '';
     utc.setUTCDate(utc.getUTCDate() + Number(days || 0));
     return utc.toISOString().slice(0, 10);
+  };
+  const moveIsoFromSunday = (isoDate) => {
+    const text = normalizeValue(isoDate);
+    if (!text) return '';
+    const cursor = new Date(`${text}T00:00:00Z`);
+    if (Number.isNaN(cursor.getTime())) return '';
+    while (cursor.getUTCDay() === 0) {
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+    return cursor.toISOString().slice(0, 10);
+  };
+  const resolvePackagingFromRegistro = (registro) => {
+    const persisted = normalizeValue(registro?.packagingDate);
+    const persistedAging = Number(registro?.agingDaysAtProduction);
+    if (persisted && Number.isFinite(persistedAging) && persistedAging > 0) {
+      return { agingDays: persistedAging, packagingDate: persisted };
+    }
+    const recipe = state.recetas?.[registro?.recipeId] || {};
+    const agingDays = Number(registro?.agingDaysAtProduction ?? recipe?.agingDays);
+    if (!Number.isFinite(agingDays) || agingDays <= 0) return { agingDays: 0, packagingDate: '' };
+    const baseDate = toIsoDate(registro?.createdAt || nowTs());
+    if (!baseDate) return { agingDays, packagingDate: '' };
+    const computed = addDaysToIso(baseDate, agingDays);
+    return { agingDays, packagingDate: moveIsoFromSunday(computed) };
   };
   const resolveProductExpiryIso = (registro) => {
     const persisted = normalizeValue(registro?.productExpiryDate);
@@ -1145,28 +1168,114 @@
     doc.save(`${registro.id}.pdf`);
     await markProductionExport(registro.id, 'pdf');
   };
+  const loadExternalScript = (src, id) => new Promise((resolve) => {
+    const existing = document.getElementById(id);
+    if (existing) {
+      if (existing.dataset.loaded === 'true') {
+        resolve(true);
+        return;
+      }
+      existing.addEventListener('load', () => resolve(true), { once: true });
+      existing.addEventListener('error', () => resolve(false), { once: true });
+      return;
+    }
+    const script = document.createElement('script');
+    script.id = id;
+    script.src = src;
+    script.async = true;
+    script.onload = () => {
+      script.dataset.loaded = 'true';
+      resolve(true);
+    };
+    script.onerror = () => resolve(false);
+    document.head.appendChild(script);
+  });
+  const loadScriptFromSources = async (sources, idPrefix) => {
+    for (let index = 0; index < sources.length; index += 1) {
+      const ok = await loadExternalScript(sources[index], `${idPrefix}_${index}`);
+      if (ok) return true;
+    }
+    return false;
+  };
   const ensureTraceDiagramLib = async () => {
-    if (window.cytoscape) return true;
-    if (window.__laJamoneraLoadingCytoscape) return window.__laJamoneraLoadingCytoscape;
-    window.__laJamoneraLoadingCytoscape = new Promise((resolve) => {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/cytoscape@3.29.2/dist/cytoscape.min.js';
-      script.async = true;
-      script.onload = () => resolve(Boolean(window.cytoscape));
-      script.onerror = () => resolve(false);
-      document.head.appendChild(script);
+    if (window.mermaid) return true;
+    if (window.__laJamoneraLoadingMermaid) return window.__laJamoneraLoadingMermaid;
+    window.__laJamoneraLoadingMermaid = (async () => {
+      const loaded = await loadScriptFromSources([
+        'https://unpkg.com/mermaid@10/dist/mermaid.min.js',
+        'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js'
+      ], 'la-jamonera-mermaid');
+      if (!loaded || !window.mermaid) return false;
+      window.mermaid.initialize({
+        startOnLoad: false,
+        theme: 'base',
+        securityLevel: 'loose',
+        themeVariables: {
+          primaryColor: '#eef3ff',
+          primaryTextColor: '#26457d',
+          primaryBorderColor: '#cfdaf4',
+          lineColor: '#7f95c2',
+          tertiaryColor: '#ffffff',
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
+        }
+      });
+      return true;
+    })();
+    return window.__laJamoneraLoadingMermaid;
+  };
+  const buildTraceMermaidDefinition = (registro) => {
+    const esc = (value) => String(value || '-')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+    const ingredients = Array.isArray(registro?.lots) ? registro.lots : [];
+    const totalIngredientsKg = ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0);
+    const mermaKg = Math.max(0, totalIngredientsKg - Number(registro?.quantityKg || 0));
+    const manager = (Array.isArray(registro?.managers) && registro.managers[0]) ? getManagerDisplay(registro.managers[0]).name : 'Sin encargado';
+    const productionDate = normalizeValue(registro?.productionDate) || toIsoDate(registro?.createdAt || nowTs());
+    const packaging = resolvePackagingFromRegistro(registro);
+    const lines = [
+      'flowchart TD',
+      `P["<b>${esc((registro?.recipeTitle || 'Producto').toUpperCase())}</b>"]:::toneProduct`,
+      `L["<b>LOTE:</b> ${esc(registro?.id || '-')}<br/><b>VTO:</b> ${esc(formatProductExpiryLabel(registro))}"]:::toneLot`,
+      `R["<b>PRODUCCIÓN</b> ${Number(registro?.quantityKg || 0).toFixed(2)} KG<br/><b>Fecha:</b> ${esc(formatIsoEs(productionDate))}"]:::toneProduction`,
+      `M["<b>ENCARGADO:</b> ${esc(manager)}"]:::toneManager`,
+      `I["<b>INGREDIENTES TOTALES</b> ${totalIngredientsKg.toFixed(3)} KG"]:::toneIngredients`,
+      `W["<b>MERMA</b> ${mermaKg.toFixed(3)} KG"]:::toneWaste`,
+      'P --> R',
+      'P --> L',
+      'R --> I',
+      'R --> M',
+      'I --> W'
+    ];
+    if (packaging.agingDays > 0 && packaging.packagingDate) {
+      lines.push(`E["<b>ENVASADO</b><br/><b>+${packaging.agingDays} días</b><br/>${esc(formatIsoEs(packaging.packagingDate))}"]:::toneManager`);
+      lines.push('R -.-> E');
+    }
+    ingredients.forEach((item, index) => {
+      const lot = Array.isArray(item?.lots) && item.lots[0] ? item.lots[0] : {};
+      const nodeId = `ING${index + 1}`;
+      const nodeLabel = [
+        `<b>${index + 1}. ${(item?.ingredientName || 'Ingrediente').toUpperCase()}</b>`,
+        `<b>Cantidad usada:</b> ${formatCompactQty(item?.requiredQty ?? item?.neededQty, item?.unit || item?.ingredientUnit || '')}`,
+        `<b>Lote:</b> ${lot?.lotNumber || lot?.entryId || '-'}`,
+        `<b>Vencimiento al elaborar:</b> ${formatIsoEs(lot?.expiryDate) || '-'}`,
+        `<b>Proveedor:</b> ${lot?.provider || '-'}`
+      ].map(esc).join('<br/>');
+      lines.push(`${nodeId}["${nodeLabel}"]:::toneIngredient`);
+      lines.push(`${index === 0 ? 'I' : `ING${index}`} --> ${nodeId}`);
     });
-    return window.__laJamoneraLoadingCytoscape;
+    lines.push('classDef toneProduct fill:#dfeaff,stroke:#bdd0f5,color:#28467f,stroke-width:1px;');
+    lines.push('classDef toneLot fill:#ffeed9,stroke:#efd1aa,color:#6f4a1f,stroke-width:1px;');
+    lines.push('classDef toneProduction fill:#fff3c6,stroke:#e8d79d,color:#6c531a,stroke-width:1px;');
+    lines.push('classDef toneManager fill:#e8e1ff,stroke:#cbc0f4,color:#4f3d86,stroke-width:1px;');
+    lines.push('classDef toneIngredients fill:#d8f4e4,stroke:#b2e0c5,color:#1f6a46,stroke-width:1px;');
+    lines.push('classDef toneWaste fill:#ffdede,stroke:#f0bdbd,color:#8b2f3f,stroke-width:1px;');
+    lines.push('classDef toneIngredient fill:#f3f5f9,stroke:#d4dbe9,color:#2d426f,stroke-width:1px;');
+    return lines.join('\n');
   };
   const renderTraceabilityTree = (registro) => {
-    const safeToKg = (qty, unit) => {
-      const amount = Number(qty || 0);
-      const normalizedUnit = normalizeLower(unit || 'kg');
-      if (normalizedUnit.includes('gram')) return amount / 1000;
-      if (normalizedUnit in { g: 1, gr: 1, gramo: 1, gramos: 1 }) return amount / 1000;
-      return amount;
-    };
-    const productImage = normalizeValue(registro?.traceability?.product?.imageUrl) || normalizeValue(state.recetas?.[registro.recipeId]?.imageUrl);
     const ingredients = (registro.lots || []).map((item, idx) => {
       const ingredientImage = normalizeValue(state.ingredientes[item.ingredientId]?.imageUrl);
       const aggregatedImages = (item.lots || []).flatMap((lot) => Array.isArray(lot.invoiceImageUrls) ? lot.invoiceImageUrls : []);
@@ -1177,7 +1286,7 @@
         return `<article class="produccion-trace-lot-card">
           <div class="produccion-trace-lot-head">
             <strong><i class="bi bi-upc-scan fa-solid fa-barcode"></i> Lote ${escapeHtml(lot.lotNumber || lot.entryId || '-')}</strong>
-            <span class="produccion-expiry-badge is-${escapeHtml(lot.status || 'unknown')}">${escapeHtml((lot.expiryDate || 'Sin vencimiento').replaceAll('-', '/'))}</span>
+            <span class="produccion-trace-used-badge">Vencimiento al elaborar: ${escapeHtml(formatIsoEs(lot.expiryDate || ''))}</span>
           </div>
           <div class="produccion-trace-grid">
             <p><strong>Usado</strong><span>${formatCompactQty(takenQty, lot.unit || item.unit || '')}</span></p>
@@ -1197,7 +1306,7 @@
             <span class="produccion-trace-ingredient-avatar">${ingredientImage ? `<img src="${ingredientImage}" alt="${escapeHtml(item.ingredientName || 'Ingrediente')}">` : '<i class="bi bi-basket2-fill fa-solid fa-carrot"></i>'}</span>
             <div>
               <h6><i class="bi bi-box-seam fa-solid fa-box-open"></i> ${escapeHtml(item.ingredientName || item.ingredientId || 'Ingrediente')}</h6>
-              <small>Necesario: ${formatCompactQty(item.requiredQty ?? item.neededQty, item.unit || item.ingredientUnit || '')}</small>
+              <small>Cantidad usada: ${formatCompactQty(item.requiredQty ?? item.neededQty, item.unit || item.ingredientUnit || '')}</small>
             </div>
           </div>
           ${aggregatedImages.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(aggregatedImages))}"><i class="bi bi-images fa-regular fa-images"></i><span>Ver adjunto (${aggregatedImages.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}
@@ -1206,14 +1315,14 @@
       </article>`;
     }).join('');
     return `<section class="produccion-trace-v2 produccion-trace-apple-viewer">
-      <div class="produccion-trace-toolbar-zoom">
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-trace-zoom-out aria-label="Alejar"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
-        <span class="produccion-trace-zoom-value" data-trace-zoom-value>100%</span>
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-trace-zoom-in aria-label="Acercar"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-trace-zoom-reset aria-label="Restablecer zoom"><i class="fa-solid fa-arrows-rotate"></i></button>
-      </div>
-      <div class="produccion-trace-diagram-wrap" data-trace-zoom-wrap>
-        <div class="produccion-trace-diagram" data-trace-zoom-canvas>
+      <div class="produccion-trace-diagram-wrap">
+        <div class="produccion-trace-diagram">
+          <div class="produccion-trace-toolbar-zoom">
+            <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-trace-zoom-out aria-label="Alejar"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+            <span class="produccion-trace-zoom-value" data-trace-zoom-value>100%</span>
+            <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-trace-zoom-in aria-label="Acercar"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+            <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-trace-zoom-reset aria-label="Restablecer zoom"><i class="fa-solid fa-arrows-rotate"></i></button>
+          </div>
           <article class="produccion-trace-summary">
             <h6><i class="bi bi-diagram-3 fa-solid fa-diagram-project"></i> Trazabilidad ${escapeHtml(registro.id)}</h6>
             <div class="produccion-trace-grid">
@@ -1225,128 +1334,68 @@
             <div class="produccion-trace-managers">${(Array.isArray(registro.managers) ? registro.managers : []).map((token) => { const manager = getManagerDisplay(token); return `<span class="produccion-trace-chip"><i class="bi bi-person-badge fa-solid fa-user-tie"></i><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span>`; }).join('') || '<span class="produccion-trace-chip"><i class="bi bi-person-x fa-solid fa-user-xmark"></i><strong>Sin responsable</strong><small>Encargado</small></span>'}</div>
           </article>
           <div class="produccion-trace-mermaid-wrap">
-            <div class="produccion-trace-product-preview">${productImage ? `<img src="${escapeHtml(productImage)}" alt="${escapeHtml(registro.recipeTitle || 'Producto')}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</div>
-            <div class="produccion-trace-cytoscape" data-trace-cytoscape></div>
+            <div class="produccion-trace-mermaid" data-trace-mermaid></div>
           </div>
           <div class="produccion-trace-ingredients">${ingredients || '<p class="m-0">Sin desglose de lotes para esta producción.</p>'}</div>
         </div>
       </div>
     </section>`;
   };
-  const initTraceCytoscapeDiagram = async (popup, registro) => {
-    const host = popup.querySelector('[data-trace-cytoscape]');
+  const initTraceMermaidDiagram = async (popup, registro) => {
+    const host = popup.querySelector('[data-trace-mermaid]');
     if (!host) return;
     const hasLib = await ensureTraceDiagramLib();
     if (!hasLib) {
-      host.innerHTML = '<p class="m-0">No se pudo cargar la librería de diagrama.</p>';
+      host.innerHTML = '<p class="m-0">No se pudo cargar Mermaid.</p>';
       return;
     }
-
-    const ingredients = Array.isArray(registro.lots) ? registro.lots : [];
-    const nodes = [
-      { data: { id: 'product', label: `${registro.recipeTitle || '-'}
-Producto` }, position: { x: 220, y: 60 }, classes: 'product' },
-      { data: { id: 'production', label: `Producción ${Number(registro.quantityKg || 0).toFixed(2)} kg` }, position: { x: 220, y: 150 }, classes: 'production' },
-      { data: { id: 'ingredientsTotal', label: `Ingredientes ${(ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0)).toFixed(3)} kg` }, position: { x: 220, y: 240 }, classes: 'ingredients' },
-      { data: { id: 'lot', label: `Lote ${registro.id}
-VTO ${formatProductExpiryLabel(registro)}` }, position: { x: 520, y: 60 }, classes: 'lot' },
-      { data: { id: 'manager', label: `Encargado ${(Array.isArray(registro.managers) && registro.managers[0]) ? getManagerDisplay(registro.managers[0]).name : 'Sin encargado'}` }, position: { x: 520, y: 150 }, classes: 'manager' },
-      { data: { id: 'waste', label: `Merma ${Math.max(0, ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0) - Number(registro.quantityKg || 0)).toFixed(3)} kg` }, position: { x: 520, y: 240 }, classes: 'waste' }
-    ];
-
-    const edges = [
-      { data: { source: 'product', target: 'production' } },
-      { data: { source: 'product', target: 'lot' } },
-      { data: { source: 'production', target: 'ingredientsTotal' } },
-      { data: { source: 'production', target: 'manager' } },
-      { data: { source: 'ingredientsTotal', target: 'waste' } }
-    ];
-
-    let y = 370;
-    ingredients.forEach((item, index) => {
-      const nodeId = `ing_${index}`;
-      const col = index % 2;
-      const row = Math.floor(index / 2);
-      const x = col ? 520 : 220;
-      const yy = y + (row * 170);
-      const lot = Array.isArray(item.lots) && item.lots[0] ? item.lots[0] : {};
-      const label = `${index + 1}. ${item.ingredientName || 'Ingrediente'}
-Necesita: ${formatCompactQty(item.requiredQty ?? item.neededQty, item.unit || item.ingredientUnit || '')}
-Lote: ${lot.lotNumber || lot.entryId || '-'}
-Vence: ${formatIsoEs(lot.expiryDate) || '-'}
-Proveedor: ${lot.provider || '-'}`;
-      nodes.push({ data: { id: nodeId, label }, position: { x, y: yy }, classes: 'ingredient' });
-      if (index === 0) {
-        edges.push({ data: { source: 'ingredientsTotal', target: nodeId } });
-      } else {
-        edges.push({ data: { source: `ing_${index - 1}`, target: nodeId } });
-      }
-    });
-
-    const cy = window.cytoscape({
-      container: host,
-      elements: { nodes, edges },
-      style: [
-        { selector: 'node', style: { 'shape': 'round-rectangle', 'width': 280, 'height': 72, 'background-color': '#eef3ff', 'border-width': 1, 'border-color': '#cbd8f3', 'label': 'data(label)', 'font-size': 14, 'text-wrap': 'wrap', 'text-max-width': 250, 'text-valign': 'center', 'text-halign': 'center', 'color': '#244277', 'font-weight': 700 } },
-        { selector: 'node.ingredient', style: { 'width': 340, 'height': 150, 'background-color': '#f3f5f9', 'text-halign': 'left', 'text-valign': 'top', 'padding': '14px', 'font-size': 13 } },
-        { selector: 'node.product', style: { 'background-color': '#dfeaff' } },
-        { selector: 'node.production', style: { 'background-color': '#fff3c6' } },
-        { selector: 'node.ingredients', style: { 'background-color': '#d8f4e4' } },
-        { selector: 'node.lot', style: { 'background-color': '#ffeed9' } },
-        { selector: 'node.manager', style: { 'background-color': '#e8e1ff' } },
-        { selector: 'node.waste', style: { 'background-color': '#ffdede' } },
-        { selector: 'edge', style: { 'width': 2, 'line-color': '#7f95c2', 'target-arrow-shape': 'triangle', 'target-arrow-color': '#7f95c2', 'curve-style': 'bezier' } }
-      ],
-      userZoomingEnabled: true,
-      userPanningEnabled: true,
-      wheelSensitivity: 0.2,
-      minZoom: 0.4,
-      maxZoom: 2.6
-    });
-
-    popup.__traceCy = cy;
-    cy.fit(undefined, 26);
+    const source = buildTraceMermaidDefinition(registro);
+    host.innerHTML = `<pre class="mermaid">${source}</pre>`;
+    try {
+      await window.mermaid.run({ nodes: [host.querySelector('.mermaid')] });
+      host.dataset.traceScale = '1';
+      host.style.transformOrigin = 'top left';
+      host.style.transform = 'scale(1)';
+    } catch (error) {
+      host.innerHTML = '<p class="m-0">No se pudo renderizar el diagrama.</p>';
+    }
   };
-  const initTraceDiagramInteractions = (popup) => {
-    const wrap = popup.querySelector('[data-trace-zoom-wrap]');
-    const zoomLabel = popup.querySelector('[data-trace-zoom-value]');
-    if (!wrap || !zoomLabel) return;
-    const cy = popup.__traceCy || null;
-    let zoom = cy ? cy.zoom() : 1;
-    const setZoom = (value) => {
-      zoom = Math.min(2.6, Math.max(0.4, value));
-      if (cy) cy.zoom({ level: zoom, renderedPosition: { x: wrap.clientWidth / 2, y: wrap.clientHeight / 2 } });
-      else {
-        const canvas = popup.querySelector('[data-trace-zoom-canvas]');
-        if (canvas) canvas.style.transform = `scale(${zoom})`;
-      }
-      zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
+  const initTraceMermaidZoomControls = (popup) => {
+    const host = popup.querySelector('[data-trace-mermaid]');
+    const label = popup.querySelector('[data-trace-zoom-value]');
+    if (!host || !label) return;
+    let zoom = Number(host.dataset.traceScale || 1);
+    const setZoom = (next) => {
+      zoom = Math.min(2.2, Math.max(0.65, next));
+      host.dataset.traceScale = String(zoom);
+      host.style.transform = `scale(${zoom})`;
+      label.textContent = `${Math.round(zoom * 100)}%`;
     };
     popup.querySelector('[data-trace-zoom-in]')?.addEventListener('click', () => setZoom(zoom + 0.12));
     popup.querySelector('[data-trace-zoom-out]')?.addEventListener('click', () => setZoom(zoom - 0.12));
     popup.querySelector('[data-trace-zoom-reset]')?.addEventListener('click', () => setZoom(1));
-    wrap.addEventListener('wheel', (event) => {
-      if (!event.ctrlKey) return;
-      event.preventDefault();
-      setZoom(zoom + (event.deltaY < 0 ? 0.1 : -0.1));
-    }, { passive: false });
-    let pinchStart = 0;
-    const dist = (touches) => {
-      const [a, b] = touches;
-      return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-    };
-    wrap.addEventListener('touchstart', (event) => {
-      if (event.touches.length === 2) pinchStart = dist(event.touches);
-    }, { passive: true });
-    wrap.addEventListener('touchmove', (event) => {
-      if (event.touches.length !== 2 || !pinchStart) return;
-      const current = dist(event.touches);
-      const ratio = current / pinchStart;
-      setZoom(zoom * ratio);
-      pinchStart = current;
-      event.preventDefault();
-    }, { passive: false });
     setZoom(1);
+  };
+  const ensureTraceabilityDerivedData = async (registro) => {
+    if (!registro?.id) return registro;
+    const packaging = resolvePackagingFromRegistro(registro);
+    const needsPersist = packaging.agingDays > 0 && packaging.packagingDate
+      && (normalizeValue(registro.packagingDate) !== packaging.packagingDate
+        || Number(registro.agingDaysAtProduction || 0) !== Number(packaging.agingDays || 0));
+    if (!needsPersist) return registro;
+    const updated = {
+      ...registro,
+      packagingDate: packaging.packagingDate,
+      agingDaysAtProduction: Number(packaging.agingDays || 0)
+    };
+    state.registros[registro.id] = updated;
+    try {
+      const remote = safeObject(await window.dbLaJamoneraRest.read(REGISTROS_PATH));
+      remote[registro.id] = updated;
+      await window.dbLaJamoneraRest.write(REGISTROS_PATH, remote);
+    } catch (error) {
+    }
+    return updated;
   };
   const openTraceability = async (registro) => {
     Swal.fire({
@@ -1362,17 +1411,18 @@ Proveedor: ${lot.provider || '-'}`;
     });
     await new Promise((resolve) => setTimeout(resolve, 220));
     Swal.close();
+    const traceRegistro = await ensureTraceabilityDerivedData(registro);
     await openIosSwal({
-      title: `Trazabilidad ${registro.id}`,
-      html: renderTraceabilityTree(registro),
+      title: `Trazabilidad ${traceRegistro.id}`,
+      html: renderTraceabilityTree(traceRegistro),
       width: '94vw',
       confirmButtonText: 'Cerrar',
       customClass: {
         popup: 'produccion-trace-alert'
       },
       didOpen: async (popup) => {
-        await initTraceCytoscapeDiagram(popup, registro);
-        initTraceDiagramInteractions(popup);
+        await initTraceMermaidDiagram(popup, traceRegistro);
+        initTraceMermaidZoomControls(popup);
         popup.querySelectorAll('[data-prod-trace-images]').forEach((btn) => {
           btn.addEventListener('click', async () => {
             const urls = JSON.parse(decodeURIComponent(btn.dataset.prodTraceImages || '[]'));
@@ -1502,6 +1552,10 @@ Proveedor: ${lot.provider || '-'}`;
       return;
     }
     const consumed = applyPlanOnInventory(restored, plan, registro.id, form.value.date || toIsoDate(), 'consume');
+    const agingDaysAtProduction = Number(recipe.agingDays || 0);
+    const packagingDate = agingDaysAtProduction > 0
+      ? moveIsoFromSunday(addDaysToIso(toIsoDate(nowTs()), agingDaysAtProduction))
+      : '';
     const registros = deepClone(state.registros);
     const prev = deepClone(registros[registro.id]);
     registros[registro.id] = {
@@ -1510,6 +1564,8 @@ Proveedor: ${lot.provider || '-'}`;
       productionDate: form.value.date || toIsoDate(),
       observations: form.value.obs,
       lots: plan.ingredientPlans,
+      agingDaysAtProduction,
+      packagingDate,
       editedAt: nowTs(),
       editedBy: getCurrentUserLabel(),
       editReason: auth.value.reason
@@ -2301,6 +2357,10 @@ Proveedor: ${lot.provider || '-'}`;
         const productionId = `${prefix}-${dateToken}-${String(nextSequence).padStart(4, '0')}`;
         const observations = normalizeValue(nodes.editor.querySelector('#produccionObsInput')?.value);
         const inventarioNext = applyPlanOnInventory(state.inventario, revalidated, productionId, date, 'consume');
+        const agingDaysAtProduction = Number(recipe.agingDays || 0);
+        const packagingDate = agingDaysAtProduction > 0
+          ? moveIsoFromSunday(addDaysToIso(toIsoDate(nowTs()), agingDaysAtProduction))
+          : '';
         const registro = {
         id: productionId,
         recipeId: recipe.id,
@@ -2308,6 +2368,8 @@ Proveedor: ${lot.provider || '-'}`;
         productionDate: date,
         productExpiryDate: productExpiry,
         shelfLifeDaysAtProduction: Number(recipe.shelfLifeDays || 0),
+        agingDaysAtProduction,
+        packagingDate,
         quantityKg: qty,
         managers,
         observations,
