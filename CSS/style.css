@@ -4497,7 +4497,7 @@ html.login-protected.auth-ok body {
   min-width: 0;
 }
 
-#inventarioGlobalRange {
+#inventarioGlobalRange, #produccionGlobalRange {
   border-radius: 5px !important;
 }
 
