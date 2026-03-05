@@ -4080,6 +4080,18 @@ html.login-protected.auth-ok body {
   color: #434f6a;
 }
 
+.inventory-production-action-btn.is-inventory {
+  background: #ff8a2a;
+  border: 1px solid #ff8a2a;
+  color: #fff;
+}
+
+.inventory-production-action-btn.is-inventory:hover {
+  background: #ef7c1e;
+  border-color: #ef7c1e;
+  color: #fff;
+}
+
 .inventario-actions-row .ios-btn {
   width: fit-content;
   max-width: none;
@@ -4090,6 +4102,13 @@ html.login-protected.auth-ok body {
   padding: 6px 10px;
   font-size: 0.78rem;
   border-radius: 5px;
+}
+
+.inventory-production-action-btn.inventario-threshold-btn {
+  min-height: 38px;
+  padding: 8px 14px;
+  font-size: 0.88rem;
+  border-radius: 14px;
 }
 
 .inventario-actions-row .inventario-threshold-btn:not(.inventory-production-action-btn) {
@@ -6250,7 +6269,6 @@ html.login-protected.auth-ok body {
   color: #3f424a;
 }
 
-.inventory-production-action-btn.produccion-umbral-btn,
 .produccion-actions-row .inventory-production-action-btn.is-threshold {
   min-height: 38px;
   border-radius: 14px;
@@ -6262,12 +6280,10 @@ html.login-protected.auth-ok body {
   border: 1px solid #d6d8de;
 }
 
-.inventory-production-action-btn.produccion-umbral-btn i,
 .produccion-actions-row .inventory-production-action-btn.is-threshold i {
   color: inherit;
 }
 
-.inventory-production-action-btn.produccion-umbral-btn:hover,
 .produccion-actions-row .inventory-production-action-btn.is-threshold:hover {
   background: #dee4f0;
   color: #434f6a;
