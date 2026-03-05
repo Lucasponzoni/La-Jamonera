@@ -6444,6 +6444,13 @@ html.login-protected.auth-ok body {
   background: #f9fbff;
 }
 
+.swal2-popup.produccion-trace-alert .swal2-html-container {
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  text-align: left;
+}
+
 .produccion-trace-apple-viewer {
   border: 1px solid #dfe6f8;
   border-radius: 16px;
@@ -6513,15 +6520,15 @@ html.login-protected.auth-ok body {
   border: 1px solid #dbe4f8;
   border-radius: 14px;
   background: #f8fbff;
-  padding: 12px;
+  padding: 8px;
 }
 
 .produccion-trace-ingredient-card header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .produccion-trace-ingredient-head-main {
@@ -6557,12 +6564,21 @@ html.login-protected.auth-ok body {
 
 .produccion-trace-ingredient-card {
   background: #fbfdff;
-  padding: 14px;
+  padding: 8px;
 }
 
 .produccion-trace-lot-card {
   background: #fff;
   border-color: #d6e1f8;
+  padding: 8px;
+}
+
+.produccion-trace-ingredient-card .inventario-threshold-btn {
+  flex-shrink: 0;
+}
+
+.produccion-trace-ingredient-card .inventario-threshold-btn span {
+  white-space: nowrap;
 }
 
 .produccion-trace-used-badge {
@@ -6615,6 +6631,16 @@ html.login-protected.auth-ok body {
 
   .produccion-trace-grid {
     grid-template-columns: 1fr;
+  }
+
+  .produccion-trace-ingredient-card header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .produccion-trace-ingredient-card .inventario-threshold-btn {
+    width: 100%;
+    justify-content: center;
   }
 
   .produccion-trace-mermaid .mermaid {
