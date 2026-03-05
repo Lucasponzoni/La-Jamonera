@@ -1271,7 +1271,7 @@
             <div class="produccion-actions-row">
               ${action}
               ${viewAction}
-              <button type="button" class="btn ios-btn ios-btn-secondary produccion-umbral-btn" data-set-recipe-min="${recipe.id}"><i class="fa-solid fa-gear"></i><span>Umbral</span></button>
+              <button type="button" class="btn ios-btn ios-btn-secondary produccion-umbral-btn inventario-threshold-btn" data-set-recipe-min="${recipe.id}"><i class="fa-solid fa-sliders"></i><span>Umbral</span></button>
             </div>
           </div>
         </article>`;

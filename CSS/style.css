@@ -4726,6 +4726,7 @@ html.login-protected.auth-ok body {
   margin-top: 6px;
   color: #5f6f94;
   font-size: 0.8rem;
+  text-align: center;
 }
 
 #imageViewerModal {
@@ -5521,6 +5522,7 @@ html.login-protected.auth-ok body {
 
 .produccion-umbral-alert {
   max-width: 540px;
+  border-radius: 20px;
 }
 
 .swal2-popup.ios-alert.produccion-umbral-alert {
@@ -6121,6 +6123,7 @@ html.login-protected.auth-ok body {
 .produccion-visualizar-btn {
   background: #edf3ff;
   color: #2a4ea3;
+  width: fit-content;
 }
 
 .produccion-recipe-history {
@@ -6132,3 +6135,57 @@ html.login-protected.auth-ok body {
 
 /* =========================================
    AJUSTES UX INVENTARIO/PRODUCCIÓN (REVISION)
+========================================= */
+.inventario-trace-toolbar {
+  justify-content: flex-end;
+}
+
+.inventario-trace-toolbar .inventario-period-divider {
+  margin-right: 2px;
+}
+
+.produccion-actions-row .produccion-visualizar-btn,
+.produccion-visualizar-btn {
+  width: fit-content;
+  max-width: none;
+  min-height: 40px;
+}
+
+.produccion-umbral-btn {
+  width: fit-content;
+  max-width: none;
+  min-height: 40px;
+  border-radius: 16px;
+  border: 1px solid #dcdcdc;
+  background: #ececef;
+  color: #4d4f57;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 8px 14px;
+}
+
+.produccion-umbral-btn i {
+  color: #666a73;
+}
+
+.produccion-umbral-btn:hover {
+  background: #e2e3e8;
+  color: #3f424a;
+}
+
+.swal2-popup.ios-alert.produccion-umbral-alert {
+  max-width: 520px;
+}
+
+.produccion-umbral-alert .swal2-html-container {
+  text-align: center;
+}
+
+.produccion-umbral-alert .swal2-actions {
+  justify-content: center;
+}
+
+.produccion-umbral-alert .swal2-input.ios-input {
+  margin-inline: auto;
+  text-align: center;
+}
