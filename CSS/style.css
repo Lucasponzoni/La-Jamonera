@@ -4042,14 +4042,15 @@ html.login-protected.auth-ok body {
 
 .inventory-production-action-btn {
   min-height: 38px;
-  border-radius: 12px;
+  border-radius: 14px;
   font-size: 0.88rem;
   font-weight: 700;
-  padding: 7px 12px;
+  padding: 8px 14px;
 }
 
 .inventory-production-action-btn.is-main {
   background: #34c759;
+  border: 1px solid #34c759;
   color: #fff;
 }
 
@@ -4060,6 +4061,7 @@ html.login-protected.auth-ok body {
 
 .inventory-production-action-btn.is-view {
   background: #1f7ae8;
+  border: 1px solid #1f7ae8;
   color: #fff;
 }
 
@@ -4069,9 +4071,9 @@ html.login-protected.auth-ok body {
 }
 
 .inventory-production-action-btn.is-threshold {
-  background: #eceff6;
-  color: #586480;
-  border: 1px solid #d7ddeb;
+  background: #eceef3;
+  color: #555c68;
+  border: 1px solid #d6d8de;
 }
 
 .inventory-production-action-btn.is-threshold:hover {
@@ -5391,7 +5393,19 @@ html.login-protected.auth-ok body {
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: #1f7ae8;
+  background: linear-gradient(90deg, #ff9f0a 0%, #ff7a00 100%);
+}
+
+.produccion-progress-bar span.is-success {
+  background: linear-gradient(90deg, #30d158 0%, #34c759 100%);
+}
+
+.produccion-progress-bar span.is-warning {
+  background: linear-gradient(90deg, #ffb340 0%, #ff8a00 100%);
+}
+
+.produccion-progress-bar span.is-danger {
+  background: linear-gradient(90deg, #ff5e57 0%, #ff3b30 100%);
 }
 
 .produccion-stats-line {
@@ -6258,4 +6272,61 @@ html.login-protected.auth-ok body {
 .produccion-umbral-alert .swal2-input.ios-input {
   margin-inline: auto;
   text-align: center;
+}
+
+.produccion-company-logo-preview-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+.produccion-company-logo-preview {
+  width: 120px;
+  height: 120px;
+  border-radius: 999px;
+  border: 1px solid #d6def3;
+  background: #eef3ff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #6280bf;
+  font-size: 1.8rem;
+}
+
+.produccion-company-logo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.produccion-trace-alert {
+  background: #f9fbff;
+}
+
+.produccion-trace-apple-viewer {
+  border: 1px solid #dfe6f8;
+  border-radius: 16px;
+  padding: 12px;
+  background-image: radial-gradient(circle at 1px 1px, rgba(112, 130, 170, 0.22) 1px, transparent 0);
+  background-size: 18px 18px;
+  background-color: #f7f9ff;
+}
+
+.produccion-trace-ingredient-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid #d2dcf2;
+  background: #eef3ff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #4c69a5;
+}
+
+.produccion-trace-ingredient-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
