@@ -120,6 +120,21 @@
     return Number(baseQty || 0) / (meta.factor || 1);
   };
 
+  const getEntryAvailableQty = (entry) => {
+    const available = parseNumber(entry?.availableQty);
+    if (Number.isFinite(available) && available >= 0) return available;
+    const qty = parseNumber(entry?.qty);
+    return Number.isFinite(qty) && qty > 0 ? qty : 0;
+  };
+
+  const getEntryAvailableKg = (entry) => {
+    const availableKg = Number(entry?.availableKg);
+    if (Number.isFinite(availableKg) && availableKg >= 0) return availableKg;
+    const availableQty = getEntryAvailableQty(entry);
+    const base = toBase(availableQty, entry?.unit);
+    return Number.isFinite(base) ? Number((base / 1000).toFixed(4)) : 0;
+  };
+
   const formatQty = (value, unit = '', digits = 2) => `${Number(value || 0).toFixed(digits)} ${unit}`.trim();
   const formatCompactQty = (value, unit = '') => {
     const amount = Number(value || 0);
@@ -238,18 +253,40 @@
         const index = nextEntries.findIndex((entry) => entry.id === lot.entryId);
         if (index === -1) return;
         const entry = { ...nextEntries[index] };
-        const entryQty = parsePositive(entry.qty, 0);
+        const currentAvailableQty = getEntryAvailableQty(entry);
         const amountInEntryUnit = fromBase(lot.takeBaseQty, entry.unit || lot.unit);
+        const safeAmount = Number.isFinite(amountInEntryUnit) ? amountInEntryUnit : 0;
         const sign = mode === 'consume' ? -1 : 1;
-        const nextQty = Math.max(0, Number((entryQty + (sign * amountInEntryUnit)).toFixed(4)));
-        entry.qty = Number(nextQty.toFixed(2));
-        entry.qtyKg = Number((toBase(nextQty, entry.unit) / 1000).toFixed(4));
-        entry.lotStatus = nextQty <= 0 ? 'consumido_en_produccion' : 'disponible';
+        const nextAvailableQty = Math.max(0, Number((currentAvailableQty + (sign * safeAmount)).toFixed(4)));
+        const nextAvailableKg = Number((toBase(nextAvailableQty, entry.unit || lot.unit) / 1000).toFixed(4));
+
+        entry.availableQty = Number(nextAvailableQty.toFixed(2));
+        entry.availableKg = nextAvailableKg;
+        entry.lotStatus = nextAvailableQty <= 0 ? 'consumido_en_produccion' : 'disponible';
+
+        entry.productionUsage = Array.isArray(entry.productionUsage) ? [...entry.productionUsage] : [];
+        if (mode === 'restore') {
+          entry.productionUsage = entry.productionUsage.filter((usage) => normalizeValue(usage?.productionId) !== normalizeValue(productionId));
+        } else {
+          entry.productionUsage.unshift({
+            id: makeId('usage'),
+            productionId,
+            producedAt: nowTs(),
+            productionDate,
+            expiryDateAtProduction: normalizeValue(entry.expiryDate),
+            kilosUsed: Number((Number(lot.takeBaseQty || 0) / 1000).toFixed(4)),
+            lotNumber: normalizeValue(entry.lotNumber) || normalizeValue(entry.invoiceNumber) || entry.id,
+            ingredientLot: normalizeValue(entry.lotNumber) || normalizeValue(entry.invoiceNumber) || entry.id,
+            ingredientEntryId: entry.id,
+            ingredientId: item.ingredientId
+          });
+        }
+
         const moveType = mode === 'consume' ? 'consumo_produccion' : 'reversion_produccion';
         nextEntries[index] = updateEntryMovement(entry, {
           type: moveType,
           productionId,
-          qty: Number(amountInEntryUnit.toFixed(4)),
+          qty: Number(safeAmount.toFixed(4)),
           qtyUnit: entry.unit || lot.unit,
           createdAt: nowTs(),
           productionDate,
@@ -258,7 +295,7 @@
           observation: mode === 'consume' ? 'Consumo FEFO en producción' : 'Restitución por anulación/edición'
         });
       });
-      const stockKg = nextEntries.reduce((acc, entry) => acc + (Number(entry.qtyKg || 0) || 0), 0);
+      const stockKg = nextEntries.reduce((acc, entry) => acc + getEntryAvailableKg(entry), 0);
       inventoryNext.items[item.ingredientId] = {
         ...record,
         entries: nextEntries,
@@ -383,7 +420,7 @@
     }
 
     const aggregate = entries.reduce((acc, entry) => {
-      const qty = parseNumber(entry.qty);
+      const qty = getEntryAvailableQty(entry);
       if (!Number.isFinite(qty) || qty <= 0) return acc;
       const entryMeta = getUnitMeta(entry.unit);
       const entryBase = qty * entryMeta.factor;
@@ -507,7 +544,7 @@
         const reqMeta = getUnitMeta(requirement.unit);
         if (entryMeta.category !== reqMeta.category) return;
 
-        const entryQty = parsePositive(entry.qty, 0);
+        const entryQty = getEntryAvailableQty(entry);
         const reservedByOther = reservedByOthersForEntry(requirement.ingredientId, entry.id, entryUnit);
         const available = Math.max(0, entryQty - reservedByOther);
         const expiryIso = normalizeValue(entry.expiryDate);
@@ -537,6 +574,7 @@
           unit: requirement.unit,
           takeQty: Number(take.toFixed(4)),
           takeBaseQty: Number(toBase(take, requirement.unit).toFixed(6)),
+          availableQty: Number(available.toFixed(4)),
           entryAvailableQty: Number(available.toFixed(4)),
           status: isSoon ? 'soon' : 'ok'
         });
@@ -1177,6 +1215,7 @@
       const action = analysis.canProduce
         ? `<button type="button" class="btn ios-btn ios-btn-success produccion-main-btn" data-open-produccion="${recipe.id}"><i class="bi bi-plus-lg"></i><span>Producir</span></button>`
         : `<button type="button" class="btn ios-btn produccion-to-inventario-btn" data-open-inventario="1"><i class="fa-solid fa-boxes-stacked"></i><span>Inventario</span></button>`;
+      const viewAction = `<button type="button" class="btn ios-btn ios-btn-secondary produccion-visualizar-btn" data-open-produccion="${recipe.id}"><i class="fa-regular fa-eye"></i><span>Visualizar</span></button>`;
 
       const foreignDraft = getForeignDraftConflict(recipe.id);
       const badges = [
@@ -1225,6 +1264,7 @@
             ${analysis.errors.length ? `<p class="produccion-error">${analysis.errors[0]}</p>` : missingHtml}
             <div class="produccion-actions-row">
               ${action}
+              ${viewAction}
               <button type="button" class="btn ios-btn ios-btn-secondary produccion-umbral-btn" data-set-recipe-min="${recipe.id}"><i class="fa-solid fa-gear"></i><span>Umbral</span></button>
             </div>
           </div>
@@ -1469,6 +1509,11 @@
       </section>
 
       <section class="recipe-step-card step-block">
+        <h6 class="step-title"><span class="recipe-step-number">6</span> Historial de producción</h6>
+        <div id="produccionRecipeHistory" class="produccion-recipe-history"></div>
+      </section>
+
+      <section class="recipe-step-card step-block">
         <div class="produccion-final-actions">
           <button id="produccionSaveDraftBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-floppy-disk"></i><span>Guardar borrador</span></button>
           <button id="produccionConfirmBtn" type="button" class="btn ios-btn ios-btn-success"><i class="fa-solid fa-check"></i><span>Confirmar producción</span></button>
@@ -1479,6 +1524,20 @@
     const dateInput = nodes.editor.querySelector('#produccionDateInput');
     const qtyHelp = nodes.editor.querySelector('#produccionQtyHelp');
     const lotsWrap = nodes.editor.querySelector('#produccionLotsBreakdown');
+    const confirmBtn = nodes.editor.querySelector('#produccionConfirmBtn');
+
+    const renderRecipeHistory = () => {
+      const rows = getRegistrosList()
+        .filter((item) => normalizeValue(item.recipeId) === normalizeValue(recipe.id))
+        .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+      const node = nodes.editor.querySelector('#produccionRecipeHistory');
+      if (!node) return;
+      if (!rows.length) {
+        node.innerHTML = '<p class="produccion-lote-empty">Todavía no hay producciones confirmadas para esta receta.</p>';
+        return;
+      }
+      node.innerHTML = `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Código</th><th>Fecha y hora</th><th>Fecha producción</th><th>Kilos</th><th>Estado</th></tr></thead><tbody>${rows.map((item, index) => `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(item.id || '-')}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.productionDate || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(item.status || '-')}</td></tr>`).join('')}</tbody></table></div>`;
+    };
 
     const updateEditorPlan = async () => {
       let qty = parsePositive(qtyInput.value, 0.1);
@@ -1487,9 +1546,12 @@
       const productionDate = normalizeValue(dateInput.value) || toIsoDate();
       state.editorPlan = buildPlanForRecipe(recipe, qty, productionDate);
       lotsWrap.innerHTML = buildLotsBreakdownHtml(state.editorPlan);
-      qtyHelp.textContent = state.editorPlan.isValid
+      renderRecipeHistory();
+      const canConfirm = state.editorPlan.isValid && qty > 0;
+      if (confirmBtn) confirmBtn.disabled = !canConfirm;
+      qtyHelp.textContent = canConfirm
         ? `Escala aplicada: ${qty.toFixed(2)} kg. Reserva temporal activa por 10 min.`
-        : `Hay conflictos de stock/lotes para ${productionDate}.`;
+        : (qty <= 0 ? 'Modo visualización: ajustá kilos para confirmar producción.' : `Hay conflictos de stock/lotes para ${productionDate}.`);
       await ensureReservationForPlan(state.editorPlan);
     };
 
@@ -1499,6 +1561,7 @@
         const ingredientId = toggleBtn.dataset.lotToggle;
         state.lotCollapseState[ingredientId] = !state.lotCollapseState[ingredientId];
         lotsWrap.innerHTML = buildLotsBreakdownHtml(state.editorPlan);
+      renderRecipeHistory();
         return;
       }
 
@@ -1507,6 +1570,7 @@
           state.lotCollapseState[item.ingredientId] = true;
         });
         lotsWrap.innerHTML = buildLotsBreakdownHtml(state.editorPlan);
+      renderRecipeHistory();
         return;
       }
 
@@ -1515,6 +1579,7 @@
           state.lotCollapseState[item.ingredientId] = false;
         });
         lotsWrap.innerHTML = buildLotsBreakdownHtml(state.editorPlan);
+      renderRecipeHistory();
         return;
       }
 
@@ -1588,6 +1653,7 @@
         });
         state.editorPlan = revalidated;
         lotsWrap.innerHTML = buildLotsBreakdownHtml(state.editorPlan);
+      renderRecipeHistory();
         return;
       }
 
@@ -1685,6 +1751,7 @@
     });
 
     await updateEditorPlan();
+    renderRecipeHistory();
     setStateView('editor');
   };
 
@@ -1936,6 +2003,22 @@
     }
   });
 
+
+  window.laJamoneraProduccionAPI = {
+    openTraceabilityById: async (productionId) => {
+      const id = normalizeValue(productionId);
+      if (!id) return;
+      if (!state.registros[id]) {
+        await refreshData();
+      }
+      const reg = state.registros[id];
+      if (!reg) {
+        await openIosSwal({ title: 'Sin datos', html: '<p>No se encontró la producción solicitada.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+        return;
+      }
+      await openTraceability(reg);
+    }
+  };
   produccionModal.addEventListener('show.bs.modal', async () => {
     try {
       await refreshData();
