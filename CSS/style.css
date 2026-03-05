@@ -6809,6 +6809,7 @@ html.login-protected.auth-ok body {
   }
 }
 
+
 .produccion-trace-mermaid-wrap {
   border: 1px solid #d9e3f8;
   border-radius: 16px;
@@ -6845,4 +6846,13 @@ html.login-protected.auth-ok body {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+
+.produccion-trace-cytoscape {
+  width: 100%;
+  min-height: 760px;
+  border: 1px solid #dce5f8;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f9fbff 0%, #ffffff 100%);
 }

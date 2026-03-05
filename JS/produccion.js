@@ -1145,18 +1145,18 @@
     doc.save(`${registro.id}.pdf`);
     await markProductionExport(registro.id, 'pdf');
   };
-  const ensureMermaidLib = async () => {
-    if (window.mermaid) return true;
-    if (window.__laJamoneraLoadingMermaid) return window.__laJamoneraLoadingMermaid;
-    window.__laJamoneraLoadingMermaid = new Promise((resolve) => {
+  const ensureTraceDiagramLib = async () => {
+    if (window.cytoscape) return true;
+    if (window.__laJamoneraLoadingCytoscape) return window.__laJamoneraLoadingCytoscape;
+    window.__laJamoneraLoadingCytoscape = new Promise((resolve) => {
       const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
+      script.src = 'https://cdn.jsdelivr.net/npm/cytoscape@3.29.2/dist/cytoscape.min.js';
       script.async = true;
-      script.onload = () => resolve(Boolean(window.mermaid));
+      script.onload = () => resolve(Boolean(window.cytoscape));
       script.onerror = () => resolve(false);
       document.head.appendChild(script);
     });
-    return window.__laJamoneraLoadingMermaid;
+    return window.__laJamoneraLoadingCytoscape;
   };
   const renderTraceabilityTree = (registro) => {
     const safeToKg = (qty, unit) => {
@@ -1166,35 +1166,6 @@
       if (normalizedUnit in { g: 1, gr: 1, gramo: 1, gramos: 1 }) return amount / 1000;
       return amount;
     };
-    const mermaidSafe = (value) => String(value || '-').replace(/[\[\]{}()"']/g, '').replace(/\n+/g, ' ').trim();
-    const managerName = (Array.isArray(registro.managers) && registro.managers[0]) ? getManagerDisplay(registro.managers[0]).name : 'Sin encargado';
-    const totalIngredientsKg = (registro.lots || []).reduce((sum, item) => {
-      const qty = item?.requiredQty ?? item?.neededQty ?? 0;
-      return sum + safeToKg(qty, item.unit || item.ingredientUnit || 'kg');
-    }, 0);
-    const mermakg = Math.max(0, totalIngredientsKg - Number(registro.quantityKg || 0));
-    const productImage = normalizeValue(registro?.traceability?.product?.imageUrl) || normalizeValue(state.recetas?.[registro.recipeId]?.imageUrl);
-    const graph = [
-      'flowchart TD',
-      `A[${mermaidSafe(registro.recipeTitle)}] --> B[Producción ${Number(registro.quantityKg || 0).toFixed(2)} kg]`,
-      `B --> C[Ingredientes ${totalIngredientsKg.toFixed(3)} kg]`,
-      `A --> D[Lote ${mermaidSafe(registro.id)}
-VTO ${mermaidSafe(formatProductExpiryLabel(registro))}]`,
-      `B --> E[Encargado ${mermaidSafe(managerName)}]`,
-      `C --> F[Merma ${mermakg.toFixed(3)} kg]`,
-      'classDef product fill:#dfeaff,stroke:#7f95c2,color:#1d3f77',
-      'classDef production fill:#fff3c6,stroke:#d8ba61,color:#6a4f00',
-      'classDef ingredients fill:#d8f4e4,stroke:#71c39c,color:#0c5a35',
-      'classDef lot fill:#ffeed9,stroke:#e2b875,color:#704a0b',
-      'classDef manager fill:#e8e1ff,stroke:#a899e6,color:#3f3381',
-      'classDef waste fill:#ffdede,stroke:#df9ea1,color:#7f1d22',
-      'class A product',
-      'class B production',
-      'class C ingredients',
-      'class D lot',
-      'class E manager',
-      'class F waste'
-    ].join('\n');
     const ingredients = (registro.lots || []).map((item, idx) => {
       const ingredientImage = normalizeValue(state.ingredientes[item.ingredientId]?.imageUrl);
       const aggregatedImages = (item.lots || []).flatMap((lot) => Array.isArray(lot.invoiceImageUrls) ? lot.invoiceImageUrls : []);
@@ -1254,41 +1225,100 @@ VTO ${mermaidSafe(formatProductExpiryLabel(registro))}]`,
           </article>
           <div class="produccion-trace-mermaid-wrap">
             <div class="produccion-trace-product-preview">${productImage ? `<img src="${escapeHtml(productImage)}" alt="${escapeHtml(registro.recipeTitle || 'Producto')}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</div>
-            <div class="produccion-trace-mermaid" data-trace-mermaid="${encodeURIComponent(graph)}"></div>
+            <div class="produccion-trace-cytoscape" data-trace-cytoscape></div>
           </div>
           <div class="produccion-trace-ingredients">${ingredients || '<p class="m-0">Sin desglose de lotes para esta producción.</p>'}</div>
         </div>
       </div>
     </section>`;
   };
-  const initTraceMermaidDiagram = async (popup) => {
-    const host = popup.querySelector('[data-trace-mermaid]');
+  const initTraceCytoscapeDiagram = async (popup, registro) => {
+    const host = popup.querySelector('[data-trace-cytoscape]');
     if (!host) return;
-    const graph = decodeURIComponent(host.dataset.traceMermaid || '');
-    if (!graph) return;
-    const hasMermaid = await ensureMermaidLib();
-    if (!hasMermaid) {
+    const hasLib = await ensureTraceDiagramLib();
+    if (!hasLib) {
       host.innerHTML = '<p class="m-0">No se pudo cargar la librería de diagrama.</p>';
       return;
     }
-    window.mermaid.initialize({ startOnLoad: false, securityLevel: 'loose', theme: 'base' });
-    const id = `trace-mermaid-${Date.now()}`;
-    try {
-      const { svg } = await window.mermaid.render(id, graph);
-      host.innerHTML = svg;
-    } catch (_error) {
-      host.innerHTML = '<p class="m-0">No se pudo renderizar el diagrama.</p>';
-    }
+
+    const ingredients = Array.isArray(registro.lots) ? registro.lots : [];
+    const nodes = [
+      { data: { id: 'product', label: `${registro.recipeTitle || '-'}
+Producto` }, position: { x: 220, y: 60 }, classes: 'product' },
+      { data: { id: 'production', label: `Producción ${Number(registro.quantityKg || 0).toFixed(2)} kg` }, position: { x: 220, y: 150 }, classes: 'production' },
+      { data: { id: 'ingredientsTotal', label: `Ingredientes ${(ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0)).toFixed(3)} kg` }, position: { x: 220, y: 240 }, classes: 'ingredients' },
+      { data: { id: 'lot', label: `Lote ${registro.id}
+VTO ${formatProductExpiryLabel(registro)}` }, position: { x: 520, y: 60 }, classes: 'lot' },
+      { data: { id: 'manager', label: `Encargado ${(Array.isArray(registro.managers) && registro.managers[0]) ? getManagerDisplay(registro.managers[0]).name : 'Sin encargado'}` }, position: { x: 520, y: 150 }, classes: 'manager' },
+      { data: { id: 'waste', label: `Merma ${Math.max(0, ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0) - Number(registro.quantityKg || 0)).toFixed(3)} kg` }, position: { x: 520, y: 240 }, classes: 'waste' }
+    ];
+
+    const edges = [
+      { data: { source: 'product', target: 'production' } },
+      { data: { source: 'product', target: 'lot' } },
+      { data: { source: 'production', target: 'ingredientsTotal' } },
+      { data: { source: 'production', target: 'manager' } },
+      { data: { source: 'ingredientsTotal', target: 'waste' } }
+    ];
+
+    let y = 370;
+    ingredients.forEach((item, index) => {
+      const nodeId = `ing_${index}`;
+      const col = index % 2;
+      const row = Math.floor(index / 2);
+      const x = col ? 520 : 220;
+      const yy = y + (row * 170);
+      const lot = Array.isArray(item.lots) && item.lots[0] ? item.lots[0] : {};
+      const label = `${index + 1}. ${item.ingredientName || 'Ingrediente'}
+Necesita: ${formatCompactQty(item.requiredQty ?? item.neededQty, item.unit || item.ingredientUnit || '')}
+Lote: ${lot.lotNumber || lot.entryId || '-'}
+Vence: ${formatIsoEs(lot.expiryDate) || '-'}
+Proveedor: ${lot.provider || '-'}`;
+      nodes.push({ data: { id: nodeId, label }, position: { x, y: yy }, classes: 'ingredient' });
+      if (index === 0) {
+        edges.push({ data: { source: 'ingredientsTotal', target: nodeId } });
+      } else {
+        edges.push({ data: { source: `ing_${index - 1}`, target: nodeId } });
+      }
+    });
+
+    const cy = window.cytoscape({
+      container: host,
+      elements: { nodes, edges },
+      style: [
+        { selector: 'node', style: { 'shape': 'round-rectangle', 'width': 280, 'height': 72, 'background-color': '#eef3ff', 'border-width': 1, 'border-color': '#cbd8f3', 'label': 'data(label)', 'font-size': 14, 'text-wrap': 'wrap', 'text-max-width': 250, 'text-valign': 'center', 'text-halign': 'center', 'color': '#244277', 'font-weight': 700 } },
+        { selector: 'node.ingredient', style: { 'width': 340, 'height': 150, 'background-color': '#f3f5f9', 'text-halign': 'left', 'text-valign': 'top', 'padding': '14px', 'font-size': 13 } },
+        { selector: 'node.product', style: { 'background-color': '#dfeaff' } },
+        { selector: 'node.production', style: { 'background-color': '#fff3c6' } },
+        { selector: 'node.ingredients', style: { 'background-color': '#d8f4e4' } },
+        { selector: 'node.lot', style: { 'background-color': '#ffeed9' } },
+        { selector: 'node.manager', style: { 'background-color': '#e8e1ff' } },
+        { selector: 'node.waste', style: { 'background-color': '#ffdede' } },
+        { selector: 'edge', style: { 'width': 2, 'line-color': '#7f95c2', 'target-arrow-shape': 'triangle', 'target-arrow-color': '#7f95c2', 'curve-style': 'bezier' } }
+      ],
+      userZoomingEnabled: true,
+      userPanningEnabled: true,
+      wheelSensitivity: 0.2,
+      minZoom: 0.4,
+      maxZoom: 2.6
+    });
+
+    popup.__traceCy = cy;
+    cy.fit(undefined, 26);
   };
   const initTraceDiagramInteractions = (popup) => {
     const wrap = popup.querySelector('[data-trace-zoom-wrap]');
-    const canvas = popup.querySelector('[data-trace-zoom-canvas]');
     const zoomLabel = popup.querySelector('[data-trace-zoom-value]');
-    if (!wrap || !canvas || !zoomLabel) return;
-    let zoom = 1;
+    if (!wrap || !zoomLabel) return;
+    const cy = popup.__traceCy || null;
+    let zoom = cy ? cy.zoom() : 1;
     const setZoom = (value) => {
-      zoom = Math.min(2.4, Math.max(0.65, value));
-      canvas.style.transform = `scale(${zoom})`;
+      zoom = Math.min(2.6, Math.max(0.4, value));
+      if (cy) cy.zoom({ level: zoom, renderedPosition: { x: wrap.clientWidth / 2, y: wrap.clientHeight / 2 } });
+      else {
+        const canvas = popup.querySelector('[data-trace-zoom-canvas]');
+        if (canvas) canvas.style.transform = `scale(${zoom})`;
+      }
       zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
     };
     popup.querySelector('[data-trace-zoom-in]')?.addEventListener('click', () => setZoom(zoom + 0.12));
@@ -1340,7 +1370,7 @@ VTO ${mermaidSafe(formatProductExpiryLabel(registro))}]`,
         popup: 'produccion-trace-alert'
       },
       didOpen: async (popup) => {
-        await initTraceMermaidDiagram(popup);
+        await initTraceCytoscapeDiagram(popup, registro);
         initTraceDiagramInteractions(popup);
         popup.querySelectorAll('[data-prod-trace-images]').forEach((btn) => {
           btn.addEventListener('click', async () => {
