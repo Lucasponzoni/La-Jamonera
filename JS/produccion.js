@@ -1356,6 +1356,14 @@
             }
           });
         });
+      },
+      willClose: (popup) => {
+        popup.__traceReactRoot?.unmount?.();
+        const host = popup.querySelector('[data-trace-reactflow]');
+        if (!popup.__traceReactRoot && host && window.ReactDOM?.unmountComponentAtNode) {
+          window.ReactDOM.unmountComponentAtNode(host);
+        }
+        popup.__traceFlowApi = null;
       }
     });
   };
