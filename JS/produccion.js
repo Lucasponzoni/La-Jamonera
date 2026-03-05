@@ -1345,8 +1345,6 @@
     state.historyPage = Math.min(Math.max(1, state.historyPage), pages);
     const start = (state.historyPage - 1) * PAGE;
     const pageRows = rows.slice(start, start + PAGE);
-    const canCollapse = pageRows.some((item) => getTraceRowsFromRegistro(item).length && state.historyTraceCollapse[item.id] !== true);
-    const canExpand = pageRows.some((item) => getTraceRowsFromRegistro(item).length && state.historyTraceCollapse[item.id] === true);
     const htmlRows = pageRows.length ? pageRows.map((item, index) => {
       const manager = getManagerLabel(item);
       const traceRows = getTraceRowsFromRegistro(item);
@@ -1372,19 +1370,14 @@
         <td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${item.id}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td>
         <td>
           <div class="inventario-entry-actions">
-            ${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-prod-collapse="${item.id}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-prod-print="${item.id}" title="Imprimir"><i class="fa-solid fa-print"></i></button>
             <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn inventario-icon-only-btn" data-prod-cancel="${item.id}" title="Anular"><i class="fa-solid fa-trash"></i></button>
           </div>
         </td>
-      </tr>${traceHtml}`;
+      </tr>`;
     }).join('') : '<tr><td colspan="8" class="text-center">Sin producciones en ese rango.</td></tr>';
 
     nodes.historyTableWrap.innerHTML = `
-      <div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x">
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionHistoryCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button>
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionHistoryExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button>
-      </div>
       <div class="table-responsive inventario-global-table inventario-table-compact-wrap">
         <table class="table recipe-table inventario-table-compact mb-0">
           <thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Acciones</th></tr></thead>
@@ -1926,8 +1919,6 @@
         return;
       }
 
-      const canCollapse = rows.some((item) => getTraceRowsFromRegistro(item).length && state.historyTraceCollapse[item.id] !== true);
-      const canExpand = rows.some((item) => getTraceRowsFromRegistro(item).length && state.historyTraceCollapse[item.id] === true);
       const htmlRows = rows.map((item, index) => {
         const manager = getManagerLabel(item);
         const traceRows = getTraceRowsFromRegistro(item);
