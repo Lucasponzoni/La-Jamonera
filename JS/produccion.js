@@ -394,6 +394,13 @@
     nodes.editor.classList.toggle('d-none', view !== 'editor');
   };
 
+  const updateProduccionListScrollHint = () => {
+    if (!nodes.list) return;
+    const hasOverflow = nodes.list.scrollHeight > nodes.list.clientHeight + 4;
+    const isAtEnd = nodes.list.scrollTop + nodes.list.clientHeight >= nodes.list.scrollHeight - 4;
+    nodes.list.classList.toggle('has-scroll-hint', hasOverflow && !isAtEnd);
+  };
+
   const getRecipes = () => Object.values(safeObject(state.recetas));
   const getThumbPlaceholder = () => `<span class="image-placeholder-circle-2">${BASE_ICON}</span>`;
 
@@ -972,6 +979,9 @@
       id: `${registro.id}_${ingredientPlan.ingredientId || 'ing'}_${lot.entryId || index}`,
       index: index + 1,
       createdAt: Number(lot?.producedAt || registro?.createdAt || 0),
+      ingredientId: ingredientPlan?.ingredientId || '',
+      ingredientName: normalizeValue(ingredientPlan?.ingredientName) || 'Ingrediente',
+      ingredientImageUrl: normalizeValue(state.ingredientes?.[ingredientPlan?.ingredientId]?.imageUrl),
       expiryDate: normalizeValue(lot?.expiryDate) || '-',
       amount: `${Number(lot?.takeQty || 0).toFixed(2)} ${lot?.unit || ingredientPlan?.unit || ''}`.trim(),
       lotNumber: normalizeValue(lot?.lotNumber || lot?.entryId || lot?.invoiceNumber) || '-',
@@ -1212,13 +1222,14 @@
       const isCollapsed = state.historyTraceCollapse[item.id] === true;
       const traceHtml = (!isCollapsed && traceRows.length)
         ? traceRows.map((trace) => `<tr class="inventario-trace-row">
-          <td>${trace.index}</td>
+          <td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${escapeHtml(trace.ingredientName)}</span></div></td>
+          <td>↳ ${trace.index}</td>
           <td>${escapeHtml(formatDateTime(trace.createdAt))}</td>
           <td>${escapeHtml(trace.expiryDate)}</td>
           <td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td>
           <td>${escapeHtml(trace.lotNumber)}</td>
           <td>${trace.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin imagen</button>'}</td>
-          <td colspan="2">Ingrediente utilizado</td>
+          <td></td>
         </tr>`).join('') : '';
       return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
         <td>${escapeHtml(item.id)}</td>
@@ -1254,6 +1265,7 @@
         <span>Página ${state.historyPage} de ${pages}</span>
         <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-prod-page="next" ${state.historyPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button>
       </div>`;
+    prepareThumbLoaders('.js-produccion-thumb');
   };
 
   const setHistoryMode = (enabled) => {
@@ -1351,6 +1363,7 @@
 
     if (!list.length) {
       nodes.list.innerHTML = '<div class="ingrediente-empty-list">No hay recetas para ese filtro.</div>';
+      updateProduccionListScrollHint();
       setStateView(getRecipes().length ? 'list' : 'empty');
       return;
     }
@@ -1461,6 +1474,7 @@
       }, { once: true });
     });
     prepareThumbLoaders('.js-produccion-thumb');
+    updateProduccionListScrollHint();
 
     if (state.draftsTick) clearInterval(state.draftsTick);
     state.draftsTick = setInterval(() => {
@@ -1708,12 +1722,37 @@
         .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
     };
 
-    const printRecipeHistoryRows = (rows) => {
+    const printRecipeHistoryRows = async (rows) => {
+      const ask = await openIosSwal({
+        title: 'Imprimir período',
+        html: '<p>¿Querés incluir imágenes adjuntas?</p>',
+        showCancelButton: true,
+        showDenyButton: true,
+        confirmButtonText: 'Incluir',
+        denyButtonText: 'No incluir',
+        cancelButtonText: 'Cancelar'
+      });
+      if (!ask.isConfirmed && !ask.isDenied) return;
+
+      const askTrace = await openIosSwal({
+        title: 'Incluir trazabilidad',
+        html: '<p>¿Querés incluir los datos colapsados de trazabilidad?</p>',
+        showCancelButton: true,
+        showDenyButton: true,
+        confirmButtonText: 'Incluir',
+        denyButtonText: 'No incluir',
+        cancelButtonText: 'Cancelar'
+      });
+      if (!askTrace.isConfirmed && !askTrace.isDenied) return;
+      const includeTrace = askTrace.isConfirmed;
       const win = window.open('', '_blank', 'width=1200,height=900');
       if (!win) return;
-      const bodyRows = rows.map((item) => {
+      const bodyRows = rows.flatMap((item) => {
         const manager = getManagerLabel(item);
-        return `<tr><td>${escapeHtml(item.id || '-')}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.productionDate || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)}<br><small>${escapeHtml(manager.role)}</small></td><td>${escapeHtml(item.status || '-')}</td></tr>`;
+        const main = `<tr><td>${escapeHtml(item.id || '-')}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.productionDate || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)}<br><small>${escapeHtml(manager.role)}</small></td><td>${escapeHtml(item.status || '-')}</td></tr>`;
+        if (!includeTrace) return [main];
+        const traces = getTraceRowsFromRegistro(item).map((trace) => `<tr style="background:#ffecef;"><td>↳ ${trace.index}</td><td>${escapeHtml(formatDateTime(trace.createdAt))}</td><td>${escapeHtml(trace.ingredientName)}</td><td>-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td>Trazabilidad</td></tr>`);
+        return [main, ...traces];
       }).join('');
       win.document.write(`<html><head><title>Historial producción ${escapeHtml(capitalize(recipe.title || ''))}</title></head><body><table border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse"><thead><tr><th>ID</th><th>Fecha y hora</th><th>Fecha producción</th><th>Cantidad</th><th>Responsable</th><th>Estado</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table></body></html>`);
       win.document.close();
@@ -1825,7 +1864,11 @@
       if (event.target.closest('#produccionRecipeHistoryExpandBtn')) {
         const rows = getRecipeHistoryRows();
         const htmlRows = rows.length
-          ? rows.map((item, index) => `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(item.id || '-')}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.productionDate || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(item.status || '-')}</td></tr>`).join('')
+          ? rows.map((item, index) => {
+            const main = `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(item.id || '-')}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.productionDate || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(item.status || '-')}</td></tr>`;
+            const traces = getTraceRowsFromRegistro(item).map((trace) => `<tr class="inventario-trace-row"><td>↳ ${trace.index}</td><td>${escapeHtml(formatDateTime(trace.createdAt))}</td><td>${escapeHtml(trace.ingredientName)}</td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td></tr>`).join('');
+            return `${main}${traces}`;
+          }).join('')
           : '<tr><td colspan="5" class="text-center">Sin producciones.</td></tr>';
         await openIosSwal({
           title: 'Historial de producción (ampliado)',
@@ -1849,13 +1892,28 @@
           { header: 'Kilos', key: 'kilos', width: 14 },
           { header: 'Estado', key: 'estado', width: 16 }
         ];
-        rows.forEach((item) => ws.addRow({
-          id: item.id || '-',
-          fecha: formatDateTime(item.createdAt),
-          produccion: item.productionDate || '-',
-          kilos: `${Number(item.quantityKg || 0).toFixed(2)} kg`,
-          estado: item.status || '-'
-        }));
+        rows.forEach((item) => {
+          ws.addRow({
+            id: item.id || '-',
+            fecha: formatDateTime(item.createdAt),
+            produccion: item.productionDate || '-',
+            kilos: `${Number(item.quantityKg || 0).toFixed(2)} kg`,
+            estado: item.status || '-'
+          });
+          getTraceRowsFromRegistro(item).forEach((trace) => {
+            const row = ws.addRow({
+              id: `↳ ${trace.index}`,
+              fecha: formatDateTime(trace.createdAt),
+              produccion: trace.ingredientName,
+              kilos: `-${trace.amount}`,
+              estado: trace.lotNumber
+            });
+            row.eachCell((cell) => {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFECEF' } };
+              cell.font = { color: { argb: 'FFB42338' }, bold: true };
+            });
+          });
+        });
         const buf = await wb.xlsx.writeBuffer();
         const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         const url = URL.createObjectURL(blob);
@@ -1870,13 +1928,13 @@
       }
 
       if (event.target.closest('#produccionRecipeHistoryPrintFilteredBtn')) {
-        printRecipeHistoryRows(getRecipeHistoryRows());
+        await printRecipeHistoryRows(getRecipeHistoryRows());
         return;
       }
 
       if (event.target.closest('#produccionRecipeHistoryPrintAllBtn')) {
         const allRows = getRegistrosList().filter((item) => normalizeValue(item.recipeId) === normalizeValue(recipe.id));
-        printRecipeHistoryRows(allRows);
+        await printRecipeHistoryRows(allRows);
         return;
       }
 
@@ -2145,6 +2203,8 @@
     renderList();
   });
 
+  nodes.list.addEventListener('scroll', updateProduccionListScrollHint);
+
   nodes.list.addEventListener('click', async (event) => {
     const openDraftBtn = event.target.closest('[data-open-draft]');
     if (openDraftBtn) {
@@ -2241,17 +2301,49 @@
 
   nodes.historyExpandBtn?.addEventListener('click', async () => {
     const rows = getHistoryRows();
-    const htmlRows = rows.length ? rows.map((item, index) => {
+    const collapseMap = { ...state.historyTraceCollapse };
+    const renderRows = () => rows.length ? rows.map((item, index) => {
       const manager = getManagerLabel(item);
+      const traceRows = getTraceRowsFromRegistro(item);
+      const isCollapsed = collapseMap[item.id] === true;
       const mainRow = `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(item.id)}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)} (${escapeHtml(manager.role)})</td><td>${escapeHtml(item.status || '-')}</td></tr>`;
-      const traceRows = getTraceRowsFromRegistro(item).map((trace) => `<tr class="inventario-trace-row"><td>↳ ${trace.index}</td><td>${escapeHtml(formatDateTime(trace.createdAt))}</td><td>${escapeHtml(trace.expiryDate)}</td><td>-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td>Trazabilidad</td></tr>`).join('');
-      return `${mainRow}${traceRows}`;
+      const traceHtml = (!isCollapsed && traceRows.length)
+        ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${escapeHtml(trace.ingredientName)}</span></div></td><td>↳ ${trace.index}</td><td>${escapeHtml(formatDateTime(trace.createdAt))}</td><td>${escapeHtml(trace.expiryDate)}</td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td></tr>`).join('') : '';
+      return `${mainRow}${traceHtml}`;
     }).join('') : '<tr><td colspan="6" class="text-center">Sin producciones.</td></tr>';
+
+    const renderExpandedContent = (popup) => {
+      const canCollapse = rows.some((item) => getTraceRowsFromRegistro(item).length && collapseMap[item.id] !== true);
+      const canExpand = rows.some((item) => getTraceRowsFromRegistro(item).length && collapseMap[item.id] === true);
+      const host = popup.querySelector('#produccionExpandedHistoryHost');
+      if (!host) return;
+      host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionExpandedCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionExpandedExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>Estado</th></tr></thead><tbody>${renderRows()}</tbody></table></div>`;
+      prepareThumbLoaders('.js-produccion-thumb');
+    };
+
     await openIosSwal({
-      title: 'Producciones (ampliado)',
-      html: `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>Estado</th></tr></thead><tbody>${htmlRows}</tbody></table></div>`,
+      title: 'Producciones guardadas • La Jamonera',
+      html: '<div id="produccionExpandedHistoryHost" class="inventario-expand-wrap"></div>',
       width: '92vw',
       confirmButtonText: 'Cerrar',
+      didOpen: (popup) => {
+        renderExpandedContent(popup);
+        popup.addEventListener('click', (event) => {
+          if (event.target.closest('#produccionExpandedCollapseAllRowsBtn')) {
+            rows.forEach((item) => {
+              if (getTraceRowsFromRegistro(item).length) collapseMap[item.id] = true;
+            });
+            renderExpandedContent(popup);
+            return;
+          }
+          if (event.target.closest('#produccionExpandedExpandAllRowsBtn')) {
+            rows.forEach((item) => {
+              if (getTraceRowsFromRegistro(item).length) collapseMap[item.id] = false;
+            });
+            renderExpandedContent(popup);
+          }
+        });
+      },
       customClass: { confirmButton: 'ios-btn ios-btn-secondary' }
     });
   });
@@ -2306,6 +2398,27 @@
         };
         cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
       });
+      getTraceRowsFromRegistro(item).forEach((trace) => {
+        const traceRow = ws.addRow({
+          id: `↳ ${trace.index}`,
+          fecha: formatDateTime(trace.createdAt),
+          producto: trace.ingredientName,
+          cantidad: `-${trace.amount}`,
+          responsable: trace.lotNumber,
+          puesto: 'Trazabilidad',
+          estado: '-'
+        });
+        traceRow.eachCell((cell) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFECEF' } };
+          cell.font = { color: { argb: 'FFB42338' }, bold: true };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFF3C9D2' } },
+            left: { style: 'thin', color: { argb: 'FFF3C9D2' } },
+            bottom: { style: 'thin', color: { argb: 'FFF3C9D2' } },
+            right: { style: 'thin', color: { argb: 'FFF3C9D2' } }
+          };
+        });
+      });
     });
     const buf = await wb.xlsx.writeBuffer();
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -2320,14 +2433,43 @@
   });
 
   nodes.historyPrintBtn?.addEventListener('click', async () => {
+    const ask = await openIosSwal({
+      title: 'Imprimir período',
+      html: '<p>¿Querés incluir imágenes adjuntas?</p>',
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: 'Incluir',
+      denyButtonText: 'No incluir',
+      cancelButtonText: 'Cancelar'
+    });
+    if (!ask.isConfirmed && !ask.isDenied) return;
+    const includeImages = ask.isConfirmed;
+
+    const askTrace = await openIosSwal({
+      title: 'Incluir trazabilidad',
+      html: '<p>¿Querés incluir los datos colapsados de trazabilidad?</p>',
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: 'Incluir',
+      denyButtonText: 'No incluir',
+      cancelButtonText: 'Cancelar'
+    });
+    if (!askTrace.isConfirmed && !askTrace.isDenied) return;
+    const includeTrace = askTrace.isConfirmed;
+
     const rows = getHistoryRows();
     const win = window.open('', '_blank', 'width=1200,height=900');
     if (!win) return;
-    const bodyRows = rows.map((item) => {
+    const bodyRows = rows.flatMap((item) => {
       const manager = getManagerLabel(item);
-      return `<tr><td>${escapeHtml(item.id)}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)}<br><small>${escapeHtml(manager.role)}</small></td><td>${escapeHtml(item.status || '-')}</td></tr>`;
+      const main = `<tr><td>${escapeHtml(item.id)}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)}<br><small>${escapeHtml(manager.role)}</small></td><td>${escapeHtml(item.status || '-')}</td></tr>`;
+      if (!includeTrace) return [main];
+      const traces = getTraceRowsFromRegistro(item).map((trace) => `<tr style="background:#ffecef;"><td>↳ ${trace.index}</td><td>${escapeHtml(formatDateTime(trace.createdAt))}</td><td>${escapeHtml(trace.ingredientName)}</td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td>Trazabilidad</td></tr>`);
+      return [main, ...traces];
     }).join('');
-    win.document.write(`<html><head><title>Producción por período</title></head><body><table border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse"><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>Estado</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table></body></html>`);
+    const images = includeImages ? rows.flatMap((item) => getTraceRowsFromRegistro(item).flatMap((trace) => trace.invoiceImageUrls || [])) : [];
+    const imagesHtml = includeImages ? `<h2>Imágenes adjuntas</h2>${images.map((url, idx) => `<figure style="margin:0 0 12px;"><img src="${url}" style="max-width:100%;max-height:280px;object-fit:contain;"><figcaption>Adjunto ${idx + 1}</figcaption></figure>`).join('')}` : '';
+    win.document.write(`<html><head><title>Producción por período</title></head><body><table border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse"><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>Estado</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
     win.document.close();
     win.focus();
     win.print();

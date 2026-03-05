@@ -494,7 +494,7 @@
             </div>
             <p class="ingrediente-meta">${capitalize(item.familyName)} · ${getMeasureLabel(item.measure || 'kilos')}</p>
             ${item.description ? `<p class="ingrediente-description">${sentenceCase(item.description)}</p>` : ''}
-            <p class="inventario-stock-line ${stockClass}"><strong>${(Number(record.stockKg) || 0).toFixed(2)} kg</strong><span>Umbral bajo: ${record.lowThresholdKg != null ? record.lowThresholdKg.toFixed(2) : Number(state.inventario.config.globalLowThresholdKg || DEFAULT_LOW_THRESHOLD).toFixed(2)} kg ${record.lowThresholdKg != null ? '(personalizado)' : '(global)'}</span></p>
+            <p class="inventario-stock-line ${stockClass}"><strong>${(Number(record.stockKg) || 0).toFixed(2)}</strong><small class="inventario-stock-unit">Kg.</small><span>Umbral bajo: ${record.lowThresholdKg != null ? record.lowThresholdKg.toFixed(2) : Number(state.inventario.config.globalLowThresholdKg || DEFAULT_LOW_THRESHOLD).toFixed(2)} kg ${record.lowThresholdKg != null ? '(personalizado)' : '(global)'}</span></p>
             <div class="inventario-actions-row inventory-production-actions">
               <button type="button" class="btn ios-btn ios-btn-success inventory-production-action-btn is-main" data-inventario-open-editor="${item.id}"><i class="fa-solid fa-plus"></i><span>Ingresar Stock</span></button>
               <button type="button" class="btn ios-btn inventory-production-action-btn is-view inventario-view-btn" data-inventario-open-editor="${item.id}"><i class="fa-regular fa-eye"></i><span>Visualizar</span></button>
@@ -599,10 +599,11 @@
         <td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button></td>
       </tr>`).join('') : '';
 
+      const availableClass = Number(row.availableKg || 0) <= 0 ? 'is-zero' : '';
       return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
         <td>${escapeHtml(row.entryDateTime)}</td>
         <td>${escapeHtml(row.ingredientName)}</td>
-        <td><strong>${row.qtyKg.toFixed(2)} kg</strong><br><span class="inventario-available-line">disp. ${Number(row.availableKg || 0).toFixed(3)} kg</span></td>
+        <td><strong>${row.qtyKg.toFixed(2)} kg</strong><br><span class="inventario-available-line ${availableClass}">disp. ${Number(row.availableKg || 0).toFixed(3)} kg</span></td>
         <td>${escapeHtml(row.expiryDate || '-')}</td>
         <td>${escapeHtml(row.invoiceNumber)}</td>
         <td class="inventario-provider-cell">${escapeHtml(row.provider)}</td>
@@ -1249,11 +1250,12 @@
           <td></td>
         </tr>`).join('') : '';
 
+      const availableClass = getAvailableKg(entry) <= 0 ? 'is-zero' : '';
       return `
       <tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
         <td>${formatDateTime(entry.createdAt)}</td>
         <td>${entry.expiryDate || '-'}</td>
-        <td><strong>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</strong><br><span class="inventario-available-line">disponible ${getAvailableKg(entry).toFixed(3)} kilos</span></td>
+        <td><strong>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</strong><br><span class="inventario-available-line ${availableClass}">disp. ${getAvailableKg(entry).toFixed(3)} kg</span></td>
         <td>${escapeHtml(entry.invoiceNumber || '-')}</td>
         <td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td>
         <td>${entryImageUrls(entry).length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-invoice-image="${entry.id}"><i class="fa-regular fa-image"></i><span>Ver (${entryImageUrls(entry).length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin foto</button>'}</td>
@@ -2280,8 +2282,74 @@
 
   nodes.globalExpandBtn?.addEventListener('click', async () => {
     const rows = getGlobalFilteredEntries();
-    const htmlRows = rows.length ? rows.map((row, index) => `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(row.entryDateTime)}</td><td>${escapeHtml(row.ingredientName)}</td><td>${row.qtyKg.toFixed(2)} kg</td><td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td>${buildExpandedImageCell(row.invoiceImageUrls)}</td></tr>`).join('') : '<tr><td colspan="7" class="text-center">Sin ingresos en ese rango.</td></tr>';
-    await openExpandedTable('Ingresos por período (ampliado)', `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha y hora</th><th>Producto</th><th>Kilos</th><th>Cantidad</th><th>N° factura</th><th>Proveedor</th><th>Imagen</th></tr></thead><tbody>${htmlRows}</tbody></table></div>`);
+    const collapseMap = { ...state.globalEntryCollapse };
+
+    const renderExpandedRows = () => rows.length ? rows.map((row, index) => {
+      const traceRows = getEntryTraceRows(row);
+      const isCollapsed = collapseMap[row.entryId] === true;
+      const traceHtml = (!isCollapsed && traceRows.length)
+        ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(trace.createdAt))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${formatUsageAmount(trace.kilosUsed)}</td><td>${escapeHtml(trace.expiryDateAtProduction || '-')}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml(trace.productionId)}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button></td></tr>`).join('') : '';
+      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(row.entryDateTime)}</td><td>${escapeHtml(row.ingredientName)}</td><td>${row.qtyKg.toFixed(2)} kg</td><td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><div class="inventario-entry-actions">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expand-toggle-collapse="${row.entryId}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(row.invoiceImageUrls)}</div></td></tr>${traceHtml}`;
+    }).join('') : '<tr><td colspan="7" class="text-center">Sin ingresos en ese rango.</td></tr>';
+
+    const renderExpandedContent = (popup) => {
+      const canCollapse = rows.some((row) => getEntryTraceRows(row).length && collapseMap[row.entryId] !== true);
+      const canExpand = rows.some((row) => getEntryTraceRows(row).length && collapseMap[row.entryId] === true);
+      const host = popup.querySelector('#inventarioExpandedGlobalHost');
+      if (!host) return;
+      host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioExpandedCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar todo</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioExpandedExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar todo</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha y hora</th><th>Producto</th><th>Kilos</th><th>Cantidad</th><th>N° factura</th><th>Proveedor</th><th>Imagen / Acción</th></tr></thead><tbody>${renderExpandedRows()}</tbody></table></div>`;
+    };
+
+    await openIosSwal({
+      title: 'Ingresos por periodo • La Jamonera',
+      html: '<div id="inventarioExpandedGlobalHost" class="inventario-expand-wrap"></div>',
+      width: '92vw',
+      confirmButtonText: 'Cerrar',
+      didOpen: (popup) => {
+        renderExpandedContent(popup);
+        popup.addEventListener('click', async (event) => {
+          const toggleBtn = event.target.closest('[data-expand-toggle-collapse]');
+          if (toggleBtn) {
+            collapseMap[toggleBtn.dataset.expandToggleCollapse] = !collapseMap[toggleBtn.dataset.expandToggleCollapse];
+            renderExpandedContent(popup);
+            return;
+          }
+          if (event.target.closest('#inventarioExpandedCollapseAllRowsBtn')) {
+            rows.forEach((row) => {
+              if (getEntryTraceRows(row).length) collapseMap[row.entryId] = true;
+            });
+            renderExpandedContent(popup);
+            return;
+          }
+          if (event.target.closest('#inventarioExpandedExpandAllRowsBtn')) {
+            rows.forEach((row) => {
+              if (getEntryTraceRows(row).length) collapseMap[row.entryId] = false;
+            });
+            renderExpandedContent(popup);
+            return;
+          }
+          const traceBtn = event.target.closest('[data-open-production-trace]');
+          if (traceBtn) {
+            const productionId = normalizeValue(traceBtn.dataset.openProductionTrace);
+            if (productionId) await window.laJamoneraProduccionAPI?.openTraceabilityById?.(productionId);
+            return;
+          }
+          const imageBtn = event.target.closest('.js-open-expanded-image');
+          if (!imageBtn) return;
+          try {
+            const urls = JSON.parse(decodeURIComponent(imageBtn.dataset.images || '[]'));
+            if (Array.isArray(urls) && urls.length) {
+              await openAttachmentViewer([{ invoiceImageUrls: urls }], 0, 'Imagen del ingreso');
+            }
+          } catch (error) {
+          }
+        });
+      },
+      customClass: {
+        popup: 'ios-alert inventario-expand-alert',
+        confirmButton: 'ios-btn ios-btn-secondary'
+      }
+    });
   });
 
   nodes.globalPrintBtn?.addEventListener('click', async () => {
