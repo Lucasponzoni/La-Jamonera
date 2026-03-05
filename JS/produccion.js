@@ -30,6 +30,8 @@
   const SEQUENCE_PATH = '/produccion/sequence';
   const AUDIT_PATH = '/produccion/auditoria';
   const RESERVE_TTL_MS = 10 * 60 * 1000;
+  const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
 
   const state = {
     recetas: {},
@@ -53,6 +55,7 @@
     historyRange: '',
     historyPage: 1,
     historyTraceZoom: 1,
+    historyTraceCollapse: {},
     config: {
       globalMinKg: 1,
       recipeMinKg: {},
@@ -60,7 +63,8 @@
       preferredManagers: [],
       preferredManagersByRecipe: {},
       usersPreferences: {},
-      idConfig: { prefix: 'PROD-LJ' }
+      idConfig: { prefix: 'PROD-LJ' },
+      companyLogoUrl: ''
     }
   };
 
@@ -368,6 +372,14 @@
   const persistConfig = async () => {
     await window.laJamoneraReady;
     await window.dbLaJamoneraRest.write(CONFIG_PATH, state.config);
+  };
+
+  const uploadImageToStorage = async (file, folder) => {
+    const safeName = String(file?.name || 'logo').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '');
+    const refPath = `${folder}/${Date.now()}_${safeName}`;
+    const ref = window.storageLaJamonera.ref().child(refPath);
+    await ref.put(file);
+    return ref.getDownloadURL();
   };
 
   const setStateView = (view) => {
@@ -759,10 +771,23 @@
 
   const openGlobalMinConfig = async () => {
     const result = await openIosSwal({
-      title: 'Configuración global de inventario',
-      html: `<div class="text-center">
+      title: 'Configuración de Producción',
+      html: `<div class="text-center produccion-umbral-form">
           <label class="form-label" for="produccionGlobalMinInput">Umbral global de stock bajo (kg)</label>
           <input id="produccionGlobalMinInput" type="number" min="0" step="0.01" class="swal2-input ios-input" value="${Number(state.config.globalMinKg || 1).toFixed(2)}">
+          <section class="recipe-step-card step-block inventario-lot-section mt-2">
+            <button type="button" class="inventario-collapse-head inventario-collapse-head-styled" id="logoCompanyToggleBtn" aria-expanded="false">
+              <span><span class="recipe-step-number">2</span> Logo Empresa</span>
+              <span class="inventario-collapse-summary">Subir / reemplazar</span>
+            </button>
+            <div id="logoCompanyBody" class="step-content d-none">
+              <div class="produccion-company-logo-preview-wrap">
+                <span class="produccion-company-logo-preview" id="produccionCompanyLogoPreview">${normalizeValue(state.config.companyLogoUrl) ? `<img src="${state.config.companyLogoUrl}" alt="Logo empresa">` : '<i class="fa-solid fa-image"></i>'}</span>
+              </div>
+              <input id="produccionCompanyLogoFile" class="form-control ios-input image-file-input" type="file" accept="image/*">
+              <small class="text-muted">JPG, PNG, WEBP o GIF. Máx. 5MB.</small>
+            </div>
+          </section>
         </div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
@@ -770,18 +795,91 @@
       customClass: {
         popup: 'produccion-umbral-alert'
       },
-      preConfirm: () => {
+      didOpen: (popup) => {
+        const toggleBtn = popup.querySelector('#logoCompanyToggleBtn');
+        const body = popup.querySelector('#logoCompanyBody');
+        const fileInput = popup.querySelector('#produccionCompanyLogoFile');
+        const preview = popup.querySelector('#produccionCompanyLogoPreview');
+        const setLoading = () => {
+          if (!preview) return;
+          preview.innerHTML = '<span class="produccion-company-logo-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando logo" class="meta-spinner produccion-company-logo-spinner"></span>';
+        };
+        const setFallback = () => {
+          if (!preview) return;
+          preview.innerHTML = '<i class="fa-solid fa-image"></i>';
+        };
+        const setImage = (url) => {
+          const safeUrl = normalizeValue(url);
+          if (!safeUrl) {
+            setFallback();
+            return;
+          }
+          setLoading();
+          const image = new Image();
+          image.alt = 'Logo empresa';
+          image.src = safeUrl;
+          image.onload = () => {
+            if (!preview) return;
+            preview.innerHTML = '';
+            preview.appendChild(image);
+          };
+          image.onerror = () => {
+            setFallback();
+          };
+        };
+
+        setImage(state.config.companyLogoUrl);
+
+        toggleBtn?.addEventListener('click', () => {
+          const hidden = body?.classList.contains('d-none');
+          body?.classList.toggle('d-none', !hidden);
+          toggleBtn.setAttribute('aria-expanded', String(hidden));
+        });
+        fileInput?.addEventListener('change', () => {
+          const file = fileInput.files?.[0];
+          if (!file) {
+            setImage(state.config.companyLogoUrl);
+            return;
+          }
+          const tempUrl = URL.createObjectURL(file);
+          setImage(tempUrl);
+        });
+      },
+      preConfirm: async () => {
         const value = document.getElementById('produccionGlobalMinInput')?.value;
         const n = parseNumber(value);
         if (!Number.isFinite(n) || n <= 0) {
           Swal.showValidationMessage('Ingresá un valor mayor a 0.');
           return false;
         }
-        return n;
+        const file = document.getElementById('produccionCompanyLogoFile')?.files?.[0];
+        let companyLogoUrl = normalizeValue(state.config.companyLogoUrl);
+        if (file) {
+          const preview = document.getElementById('produccionCompanyLogoPreview');
+          if (preview) {
+            preview.innerHTML = '<span class="produccion-company-logo-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Subiendo logo" class="meta-spinner produccion-company-logo-spinner"></span>';
+          }
+          if (!ALLOWED_UPLOAD_TYPES.includes(file.type)) {
+            Swal.showValidationMessage('Formato de logo no admitido.');
+            return false;
+          }
+          if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+            Swal.showValidationMessage('El logo supera 5MB.');
+            return false;
+          }
+          try {
+            companyLogoUrl = await uploadImageToStorage(file, 'produccion/logo_empresa');
+          } catch (error) {
+            Swal.showValidationMessage('No se pudo subir el logo a Firebase Storage.');
+            return false;
+          }
+        }
+        return { minKg: n, companyLogoUrl };
       }
     });
     if (!result.isConfirmed) return;
-    state.config.globalMinKg = Number(result.value.toFixed(2));
+    state.config.globalMinKg = Number(result.value.minKg.toFixed(2));
+    state.config.companyLogoUrl = normalizeValue(result.value.companyLogoUrl);
     await persistConfig();
     recomputeAnalysis();
     renderList();
@@ -868,6 +966,17 @@
       })
       .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
   };
+
+  const getTraceRowsFromRegistro = (registro) => (Array.isArray(registro?.lots) ? registro.lots : [])
+    .flatMap((ingredientPlan) => (Array.isArray(ingredientPlan?.lots) ? ingredientPlan.lots : []).map((lot, index) => ({
+      id: `${registro.id}_${ingredientPlan.ingredientId || 'ing'}_${lot.entryId || index}`,
+      index: index + 1,
+      createdAt: Number(lot?.producedAt || registro?.createdAt || 0),
+      expiryDate: normalizeValue(lot?.expiryDate) || '-',
+      amount: `${Number(lot?.takeQty || 0).toFixed(2)} ${lot?.unit || ingredientPlan?.unit || ''}`.trim(),
+      lotNumber: normalizeValue(lot?.lotNumber || lot?.entryId || lot?.invoiceNumber) || '-',
+      invoiceImageUrls: Array.isArray(lot?.invoiceImageUrls) ? lot.invoiceImageUrls : []
+    })));
 
   const markProductionExport = async (productionId, type) => {
     const registros = deepClone(state.registros);
@@ -1004,6 +1113,7 @@
       }).join('');
 
     const ingredients = (registro.lots || []).map((item) => {
+      const ingredientImage = normalizeValue(state.ingredientes[item.ingredientId]?.imageUrl);
       const lotCards = (item.lots || []).map((lot) => {
         const takenQty = Number(lot.takeQty || 0);
         const availableQty = Number(lot.availableQty || 0);
@@ -1021,12 +1131,13 @@
             <p><strong>Factura</strong><span>${escapeHtml(lot.invoiceNumber || '-')}</span></p>
             <p><strong>Ingreso</strong><span>${escapeHtml(lot.entryDate || '-')}</span></p>
           </div>
-          ${Array.isArray(lot.invoiceImageUrls) && lot.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Adjuntos (${lot.invoiceImageUrls.length})</span></button>` : ''}
+          ${Array.isArray(lot.invoiceImageUrls) && lot.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Ver remito/factura (${lot.invoiceImageUrls.length})</span></button>` : ''}
         </article>`;
       }).join('');
 
       return `<article class="produccion-trace-ingredient">
         <header>
+          <span class="produccion-trace-ingredient-avatar">${ingredientImage ? `<img src="${ingredientImage}" alt="${escapeHtml(item.ingredientName || 'Ingrediente')}">` : '<i class="fa-solid fa-carrot"></i>'}</span>
           <h6>${escapeHtml(item.ingredientName || item.ingredientId || 'Ingrediente')}</h6>
           <small>Necesario: ${formatCompactQty(item.requiredQty, item.unit || '')}</small>
         </header>
@@ -1034,7 +1145,7 @@
       </article>`;
     }).join('');
 
-    return `<section class="produccion-trace-v2">
+    return `<section class="produccion-trace-v2 produccion-trace-apple-viewer">
       <article class="produccion-trace-summary">
         <h6>Producción ${escapeHtml(registro.id)}</h6>
         <div class="produccion-trace-grid">
@@ -1050,11 +1161,27 @@
   };
 
   const openTraceability = async (registro) => {
+    Swal.fire({
+      title: 'Cargando trazabilidad...',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando trazabilidad" class="meta-spinner-login"></div>',
+      allowOutsideClick: false,
+      showConfirmButton: false,
+      customClass: {
+        popup: 'ios-alert produccion-loading-alert',
+        title: 'ios-alert-title',
+        htmlContainer: 'ios-alert-text'
+      }
+    });
+    await new Promise((resolve) => setTimeout(resolve, 220));
+    Swal.close();
     await openIosSwal({
       title: `Trazabilidad ${registro.id}`,
       html: renderTraceabilityTree(registro),
       width: '94vw',
       confirmButtonText: 'Cerrar',
+      customClass: {
+        popup: 'produccion-trace-alert'
+      },
       didOpen: (popup) => {
         popup.querySelectorAll('[data-prod-trace-images]').forEach((btn) => {
           btn.addEventListener('click', async () => {
@@ -1077,8 +1204,22 @@
     state.historyPage = Math.min(Math.max(1, state.historyPage), pages);
     const start = (state.historyPage - 1) * PAGE;
     const pageRows = rows.slice(start, start + PAGE);
+    const canCollapse = pageRows.some((item) => getTraceRowsFromRegistro(item).length && state.historyTraceCollapse[item.id] !== true);
+    const canExpand = pageRows.some((item) => getTraceRowsFromRegistro(item).length && state.historyTraceCollapse[item.id] === true);
     const htmlRows = pageRows.length ? pageRows.map((item, index) => {
       const manager = getManagerLabel(item);
+      const traceRows = getTraceRowsFromRegistro(item);
+      const isCollapsed = state.historyTraceCollapse[item.id] === true;
+      const traceHtml = (!isCollapsed && traceRows.length)
+        ? traceRows.map((trace) => `<tr class="inventario-trace-row">
+          <td>${trace.index}</td>
+          <td>${escapeHtml(formatDateTime(trace.createdAt))}</td>
+          <td>${escapeHtml(trace.expiryDate)}</td>
+          <td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td>
+          <td>${escapeHtml(trace.lotNumber)}</td>
+          <td>${trace.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin imagen</button>'}</td>
+          <td colspan="2">Ingrediente utilizado</td>
+        </tr>`).join('') : '';
       return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
         <td>${escapeHtml(item.id)}</td>
         <td>${escapeHtml(formatDateTime(item.createdAt))}</td>
@@ -1089,14 +1230,19 @@
         <td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${item.id}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td>
         <td>
           <div class="inventario-entry-actions">
+            ${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-prod-collapse="${item.id}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-prod-print="${item.id}" title="Imprimir"><i class="fa-solid fa-print"></i></button>
             <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn inventario-icon-only-btn" data-prod-cancel="${item.id}" title="Anular"><i class="fa-solid fa-trash"></i></button>
           </div>
         </td>
-      </tr>`;
+      </tr>${traceHtml}`;
     }).join('') : '<tr><td colspan="8" class="text-center">Sin producciones en ese rango.</td></tr>';
 
     nodes.historyTableWrap.innerHTML = `
+      <div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x">
+        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionHistoryCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button>
+        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionHistoryExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button>
+      </div>
       <div class="table-responsive inventario-global-table inventario-table-compact-wrap">
         <table class="table recipe-table inventario-table-compact mb-0">
           <thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>Estado</th><th>Trazabilidad</th><th>Acciones</th></tr></thead>
@@ -1224,9 +1370,10 @@
     const cardsHtml = list.map((recipe) => {
       const analysis = state.analysis[recipe.id] || analyzeRecipe(recipe);
       const statusClass = analysis.status === 'success' ? 'tone-success' : analysis.status === 'warning' ? 'tone-warning' : 'tone-danger';
-      const action = analysis.canProduce
-        ? `<button type="button" class="btn ios-btn ios-btn-success produccion-main-btn" data-open-produccion="${recipe.id}"><i class="bi bi-plus-lg"></i><span>Producir</span></button>`
-        : `<button type="button" class="btn ios-btn produccion-to-inventario-btn" data-open-inventario="1"><i class="fa-solid fa-boxes-stacked"></i><span>Inventario</span></button>`;
+      const action = `<button type="button" class="btn ios-btn ios-btn-success produccion-main-btn ${analysis.canProduce ? '' : 'is-disabled'}" data-open-produccion="${recipe.id}" ${analysis.canProduce ? '' : 'disabled'}><i class="bi bi-plus-lg"></i><span>Producir</span></button>`;
+      const inventoryAction = analysis.canProduce
+        ? ''
+        : `<button type="button" class="btn ios-btn inventory-production-action-btn is-inventory" data-open-inventario="1"><i class="fa-solid fa-boxes-stacked"></i><span>Inventario</span></button>`;
       const viewAction = `<button type="button" class="btn ios-btn ios-btn-secondary produccion-visualizar-btn" data-open-produccion="${recipe.id}"><i class="fa-regular fa-eye"></i><span>Visualizar</span></button>`;
 
       const foreignDraft = getForeignDraftConflict(recipe.id);
@@ -1268,7 +1415,7 @@
             </div>
             <p class="produccion-last-line"><i class="fa-regular fa-clock"></i> Última producción: <strong>${formatDate(lastProductionAt)}</strong></p>
             <div class="produccion-progress-wrap">
-              <div class="produccion-progress-bar"><span style="width:${analysis.progress.toFixed(1)}%"></span></div>
+              <div class="produccion-progress-bar"><span class="${analysis.status === 'danger' ? 'is-danger' : analysis.progress >= 100 ? 'is-success' : 'is-warning'}" style="width:${analysis.progress.toFixed(1)}%"></span></div>
               <small>Cobertura del mínimo: ${analysis.progress.toFixed(0)}%</small>
             </div>
             ${buildCoverageChecksHtml(analysis)}
@@ -1276,8 +1423,9 @@
             ${analysis.errors.length ? `<p class="produccion-error">${analysis.errors[0]}</p>` : missingHtml}
             <div class="produccion-actions-row inventory-production-actions">
               ${action.replace('produccion-main-btn', 'produccion-main-btn inventory-production-action-btn is-main')}
+              ${inventoryAction}
               ${viewAction.replace('produccion-visualizar-btn', 'produccion-visualizar-btn inventory-production-action-btn is-view')}
-              <button type="button" class="btn ios-btn produccion-umbral-btn inventario-threshold-btn inventory-production-action-btn is-threshold" data-set-recipe-min="${recipe.id}"><i class="fa-solid fa-sliders"></i><span>Umbral</span></button>
+              <button type="button" class="btn ios-btn inventory-production-action-btn is-threshold" data-set-recipe-min="${recipe.id}"><i class="fa-solid fa-sliders"></i><span>Umbral</span></button>
             </div>
           </div>
         </article>`;
@@ -1857,6 +2005,31 @@
         managers,
         observations,
         lots: revalidated.ingredientPlans,
+        traceability: {
+          generatedAt: nowTs(),
+          product: {
+            id: recipe.id,
+            title: recipe.title,
+            imageUrl: normalizeValue(recipe.imageUrl)
+          },
+          ingredients: revalidated.ingredientPlans.map((ingredientPlan) => ({
+            ingredientId: ingredientPlan.ingredientId,
+            ingredientName: ingredientPlan.ingredientName,
+            ingredientImageUrl: normalizeValue(state.ingredientes[ingredientPlan.ingredientId]?.imageUrl),
+            requiredQty: ingredientPlan.requiredQty,
+            unit: ingredientPlan.unit,
+            lots: (ingredientPlan.lots || []).map((lot) => ({
+              entryId: lot.entryId,
+              lotNumber: lot.lotNumber,
+              takeQty: lot.takeQty,
+              unit: lot.unit,
+              expiryDate: lot.expiryDate,
+              provider: lot.provider,
+              invoiceNumber: lot.invoiceNumber,
+              invoiceImageUrls: Array.isArray(lot.invoiceImageUrls) ? lot.invoiceImageUrls : []
+            }))
+          }))
+        },
         createdBy: getCurrentUserLabel(),
         createdAt: nowTs(),
         status: 'confirmada',
@@ -1946,7 +2119,8 @@
       preferredManagers: Array.isArray(config?.preferredManagers) ? config.preferredManagers : [],
       preferredManagersByRecipe: safeObject(config?.preferredManagersByRecipe),
       usersPreferences: safeObject(config?.usersPreferences),
-      idConfig: { prefix: normalizeValue(config?.idConfig?.prefix) || 'PROD-LJ' }
+      idConfig: { prefix: normalizeValue(config?.idConfig?.prefix) || 'PROD-LJ' },
+      companyLogoUrl: normalizeValue(config?.companyLogoUrl)
     };
 
     await cleanupExpiredReservations();
@@ -2069,7 +2243,9 @@
     const rows = getHistoryRows();
     const htmlRows = rows.length ? rows.map((item, index) => {
       const manager = getManagerLabel(item);
-      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(item.id)}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)} (${escapeHtml(manager.role)})</td><td>${escapeHtml(item.status || '-')}</td></tr>`;
+      const mainRow = `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(item.id)}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)} (${escapeHtml(manager.role)})</td><td>${escapeHtml(item.status || '-')}</td></tr>`;
+      const traceRows = getTraceRowsFromRegistro(item).map((trace) => `<tr class="inventario-trace-row"><td>↳ ${trace.index}</td><td>${escapeHtml(formatDateTime(trace.createdAt))}</td><td>${escapeHtml(trace.expiryDate)}</td><td>-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td>Trazabilidad</td></tr>`).join('');
+      return `${mainRow}${traceRows}`;
     }).join('') : '<tr><td colspan="6" class="text-center">Sin producciones.</td></tr>';
     await openIosSwal({
       title: 'Producciones (ampliado)',
@@ -2094,9 +2270,23 @@
       { header: 'Puesto', key: 'puesto', width: 18 },
       { header: 'Estado', key: 'estado', width: 14 }
     ];
-    rows.forEach((item) => {
+    const headerRow = ws.getRow(1);
+    headerRow.height = 24;
+    headerRow.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F7AE8' } };
+      cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFCED8EE' } },
+        left: { style: 'thin', color: { argb: 'FFCED8EE' } },
+        bottom: { style: 'thin', color: { argb: 'FFCED8EE' } },
+        right: { style: 'thin', color: { argb: 'FFCED8EE' } }
+      };
+    });
+
+    rows.forEach((item, index) => {
       const manager = getManagerLabel(item);
-      ws.addRow({
+      const row = ws.addRow({
         id: item.id,
         fecha: formatDateTime(item.createdAt),
         producto: item.recipeTitle || '-',
@@ -2104,6 +2294,17 @@
         responsable: manager.name,
         puesto: manager.role,
         estado: item.status || '-'
+      });
+      const tone = index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF';
+      row.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tone } };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFD8E2F5' } },
+          left: { style: 'thin', color: { argb: 'FFD8E2F5' } },
+          bottom: { style: 'thin', color: { argb: 'FFD8E2F5' } },
+          right: { style: 'thin', color: { argb: 'FFD8E2F5' } }
+        };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
       });
     });
     const buf = await wb.xlsx.writeBuffer();
@@ -2133,6 +2334,20 @@
   });
 
   nodes.historyTableWrap?.addEventListener('click', async (event) => {
+    if (event.target.closest('#produccionHistoryCollapseAllRowsBtn')) {
+      getHistoryRows().forEach((item) => {
+        if (getTraceRowsFromRegistro(item).length) state.historyTraceCollapse[item.id] = true;
+      });
+      renderHistoryTable();
+      return;
+    }
+    if (event.target.closest('#produccionHistoryExpandAllRowsBtn')) {
+      getHistoryRows().forEach((item) => {
+        if (getTraceRowsFromRegistro(item).length) state.historyTraceCollapse[item.id] = false;
+      });
+      renderHistoryTable();
+      return;
+    }
     const pageBtn = event.target.closest('[data-prod-page]');
     if (pageBtn) {
       state.historyPage += pageBtn.dataset.prodPage === 'next' ? 1 : -1;
@@ -2144,6 +2359,21 @@
     if (traceBtn) {
       const reg = getRegistro(traceBtn.dataset.prodTrace);
       if (reg) await openTraceability(reg);
+      return;
+    }
+    const traceImageBtn = event.target.closest('[data-prod-trace-images]');
+    if (traceImageBtn) {
+      const urls = JSON.parse(decodeURIComponent(traceImageBtn.dataset.prodTraceImages || '[]'));
+      if (Array.isArray(urls) && urls.length && typeof window.laJamoneraOpenImageViewer === 'function') {
+        await window.laJamoneraOpenImageViewer([{ invoiceImageUrls: urls }], 0, 'Adjuntos de lote');
+      }
+      return;
+    }
+    const collapseBtn = event.target.closest('[data-prod-collapse]');
+    if (collapseBtn) {
+      const prodId = collapseBtn.dataset.prodCollapse;
+      state.historyTraceCollapse[prodId] = !state.historyTraceCollapse[prodId];
+      renderHistoryTable();
       return;
     }
     const printBtn = event.target.closest('[data-prod-print]');
