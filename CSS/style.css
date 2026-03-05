@@ -2801,6 +2801,7 @@ html.login-protected.auth-ok body {
 }
 
 .recetas-editor-header {
+  margin-bottom: 10px;
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: center;
