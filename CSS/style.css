@@ -6273,7 +6273,10 @@ html.login-protected.auth-ok body {
 }
 
 .inventario-available-line.is-zero {
-  color: #cc3f52;
+    color: #cc3f52;
+    background-color: #fdefef;
+    padding: 2px 4px;
+    border-radius: 10px;
 }
 
 .produccion-visualizar-btn {
