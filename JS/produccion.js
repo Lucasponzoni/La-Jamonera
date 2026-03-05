@@ -51,7 +51,6 @@
     historyMode: false,
     historyRange: '',
     historyPage: 1,
-    historyTraceZoom: 1,
     historyTraceCollapse: {},
     config: {
       globalMinKg: 1,
@@ -1145,27 +1144,108 @@
     doc.save(`${registro.id}.pdf`);
     await markProductionExport(registro.id, 'pdf');
   };
+  const loadExternalScript = (src, id) => new Promise((resolve) => {
+    const existing = document.getElementById(id);
+    if (existing) {
+      if (existing.dataset.loaded === 'true') {
+        resolve(true);
+        return;
+      }
+      existing.addEventListener('load', () => resolve(true), { once: true });
+      existing.addEventListener('error', () => resolve(false), { once: true });
+      return;
+    }
+    const script = document.createElement('script');
+    script.id = id;
+    script.src = src;
+    script.async = true;
+    script.onload = () => {
+      script.dataset.loaded = 'true';
+      resolve(true);
+    };
+    script.onerror = () => resolve(false);
+    document.head.appendChild(script);
+  });
+  const loadScriptFromSources = async (sources, idPrefix) => {
+    for (let index = 0; index < sources.length; index += 1) {
+      const ok = await loadExternalScript(sources[index], `${idPrefix}_${index}`);
+      if (ok) return true;
+    }
+    return false;
+  };
   const ensureTraceDiagramLib = async () => {
-    if (window.cytoscape) return true;
-    if (window.__laJamoneraLoadingCytoscape) return window.__laJamoneraLoadingCytoscape;
-    window.__laJamoneraLoadingCytoscape = new Promise((resolve) => {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/cytoscape@3.29.2/dist/cytoscape.min.js';
-      script.async = true;
-      script.onload = () => resolve(Boolean(window.cytoscape));
-      script.onerror = () => resolve(false);
-      document.head.appendChild(script);
+    if (window.mermaid) return true;
+    if (window.__laJamoneraLoadingMermaid) return window.__laJamoneraLoadingMermaid;
+    window.__laJamoneraLoadingMermaid = (async () => {
+      const loaded = await loadScriptFromSources([
+        'https://unpkg.com/mermaid@10/dist/mermaid.min.js',
+        'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js'
+      ], 'la-jamonera-mermaid');
+      if (!loaded || !window.mermaid) return false;
+      window.mermaid.initialize({
+        startOnLoad: false,
+        theme: 'base',
+        securityLevel: 'loose',
+        themeVariables: {
+          primaryColor: '#eef3ff',
+          primaryTextColor: '#26457d',
+          primaryBorderColor: '#cfdaf4',
+          lineColor: '#7f95c2',
+          tertiaryColor: '#ffffff',
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
+        }
+      });
+      return true;
+    })();
+    return window.__laJamoneraLoadingMermaid;
+  };
+  const buildTraceMermaidDefinition = (registro) => {
+    const esc = (value) => String(value || '-')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+    const ingredients = Array.isArray(registro?.lots) ? registro.lots : [];
+    const totalIngredientsKg = ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0);
+    const mermaKg = Math.max(0, totalIngredientsKg - Number(registro?.quantityKg || 0));
+    const manager = (Array.isArray(registro?.managers) && registro.managers[0]) ? getManagerDisplay(registro.managers[0]).name : 'Sin encargado';
+    const lines = [
+      'flowchart TD',
+      `P["${esc((registro?.recipeTitle || 'Producto').toUpperCase())}"]:::toneProduct`,
+      `L["LOTE: ${esc(registro?.id || '-')}<br/>VTO: ${esc(formatProductExpiryLabel(registro))}"]:::toneLot`,
+      `R["PRODUCCIÓN ${Number(registro?.quantityKg || 0).toFixed(2)} KG"]:::toneProduction`,
+      `M["ENCARGADO: ${esc(manager)}"]:::toneManager`,
+      `I["INGREDIENTES TOTALES ${totalIngredientsKg.toFixed(3)} KG"]:::toneIngredients`,
+      `W["MERMA ${mermaKg.toFixed(3)} KG"]:::toneWaste`,
+      'P --> R',
+      'P --> L',
+      'R --> I',
+      'R --> M',
+      'I --> W'
+    ];
+    ingredients.forEach((item, index) => {
+      const lot = Array.isArray(item?.lots) && item.lots[0] ? item.lots[0] : {};
+      const nodeId = `ING${index + 1}`;
+      const nodeLabel = [
+        `${index + 1}. ${(item?.ingredientName || 'Ingrediente').toUpperCase()}`,
+        `Necesita: ${formatCompactQty(item?.requiredQty ?? item?.neededQty, item?.unit || item?.ingredientUnit || '')}`,
+        `Lote: ${lot?.lotNumber || lot?.entryId || '-'}`,
+        `Vence: ${formatIsoEs(lot?.expiryDate) || '-'}`,
+        `Proveedor: ${lot?.provider || '-'}`
+      ].map(esc).join('<br/>');
+      lines.push(`${nodeId}["${nodeLabel}"]:::toneIngredient`);
+      lines.push(`${index === 0 ? 'I' : `ING${index}`} --> ${nodeId}`);
     });
-    return window.__laJamoneraLoadingCytoscape;
+    lines.push('classDef toneProduct fill:#dfeaff,stroke:#bdd0f5,color:#28467f,stroke-width:1px;');
+    lines.push('classDef toneLot fill:#ffeed9,stroke:#efd1aa,color:#6f4a1f,stroke-width:1px;');
+    lines.push('classDef toneProduction fill:#fff3c6,stroke:#e8d79d,color:#6c531a,stroke-width:1px;');
+    lines.push('classDef toneManager fill:#e8e1ff,stroke:#cbc0f4,color:#4f3d86,stroke-width:1px;');
+    lines.push('classDef toneIngredients fill:#d8f4e4,stroke:#b2e0c5,color:#1f6a46,stroke-width:1px;');
+    lines.push('classDef toneWaste fill:#ffdede,stroke:#f0bdbd,color:#8b2f3f,stroke-width:1px;');
+    lines.push('classDef toneIngredient fill:#f3f5f9,stroke:#d4dbe9,color:#2d426f,stroke-width:1px;');
+    return lines.join('\n');
   };
   const renderTraceabilityTree = (registro) => {
-    const safeToKg = (qty, unit) => {
-      const amount = Number(qty || 0);
-      const normalizedUnit = normalizeLower(unit || 'kg');
-      if (normalizedUnit.includes('gram')) return amount / 1000;
-      if (normalizedUnit in { g: 1, gr: 1, gramo: 1, gramos: 1 }) return amount / 1000;
-      return amount;
-    };
     const productImage = normalizeValue(registro?.traceability?.product?.imageUrl) || normalizeValue(state.recetas?.[registro.recipeId]?.imageUrl);
     const ingredients = (registro.lots || []).map((item, idx) => {
       const ingredientImage = normalizeValue(state.ingredientes[item.ingredientId]?.imageUrl);
@@ -1206,14 +1286,8 @@
       </article>`;
     }).join('');
     return `<section class="produccion-trace-v2 produccion-trace-apple-viewer">
-      <div class="produccion-trace-toolbar-zoom">
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-trace-zoom-out aria-label="Alejar"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
-        <span class="produccion-trace-zoom-value" data-trace-zoom-value>100%</span>
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-trace-zoom-in aria-label="Acercar"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-trace-zoom-reset aria-label="Restablecer zoom"><i class="fa-solid fa-arrows-rotate"></i></button>
-      </div>
-      <div class="produccion-trace-diagram-wrap" data-trace-zoom-wrap>
-        <div class="produccion-trace-diagram" data-trace-zoom-canvas>
+      <div class="produccion-trace-diagram-wrap">
+        <div class="produccion-trace-diagram">
           <article class="produccion-trace-summary">
             <h6><i class="bi bi-diagram-3 fa-solid fa-diagram-project"></i> Trazabilidad ${escapeHtml(registro.id)}</h6>
             <div class="produccion-trace-grid">
@@ -1226,127 +1300,28 @@
           </article>
           <div class="produccion-trace-mermaid-wrap">
             <div class="produccion-trace-product-preview">${productImage ? `<img src="${escapeHtml(productImage)}" alt="${escapeHtml(registro.recipeTitle || 'Producto')}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</div>
-            <div class="produccion-trace-cytoscape" data-trace-cytoscape></div>
+            <div class="produccion-trace-mermaid" data-trace-mermaid></div>
           </div>
           <div class="produccion-trace-ingredients">${ingredients || '<p class="m-0">Sin desglose de lotes para esta producción.</p>'}</div>
         </div>
       </div>
     </section>`;
   };
-  const initTraceCytoscapeDiagram = async (popup, registro) => {
-    const host = popup.querySelector('[data-trace-cytoscape]');
+  const initTraceMermaidDiagram = async (popup, registro) => {
+    const host = popup.querySelector('[data-trace-mermaid]');
     if (!host) return;
     const hasLib = await ensureTraceDiagramLib();
     if (!hasLib) {
-      host.innerHTML = '<p class="m-0">No se pudo cargar la librería de diagrama.</p>';
+      host.innerHTML = '<p class="m-0">No se pudo cargar Mermaid.</p>';
       return;
     }
-
-    const ingredients = Array.isArray(registro.lots) ? registro.lots : [];
-    const nodes = [
-      { data: { id: 'product', label: `${registro.recipeTitle || '-'}
-Producto` }, position: { x: 220, y: 60 }, classes: 'product' },
-      { data: { id: 'production', label: `Producción ${Number(registro.quantityKg || 0).toFixed(2)} kg` }, position: { x: 220, y: 150 }, classes: 'production' },
-      { data: { id: 'ingredientsTotal', label: `Ingredientes ${(ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0)).toFixed(3)} kg` }, position: { x: 220, y: 240 }, classes: 'ingredients' },
-      { data: { id: 'lot', label: `Lote ${registro.id}
-VTO ${formatProductExpiryLabel(registro)}` }, position: { x: 520, y: 60 }, classes: 'lot' },
-      { data: { id: 'manager', label: `Encargado ${(Array.isArray(registro.managers) && registro.managers[0]) ? getManagerDisplay(registro.managers[0]).name : 'Sin encargado'}` }, position: { x: 520, y: 150 }, classes: 'manager' },
-      { data: { id: 'waste', label: `Merma ${Math.max(0, ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0) - Number(registro.quantityKg || 0)).toFixed(3)} kg` }, position: { x: 520, y: 240 }, classes: 'waste' }
-    ];
-
-    const edges = [
-      { data: { source: 'product', target: 'production' } },
-      { data: { source: 'product', target: 'lot' } },
-      { data: { source: 'production', target: 'ingredientsTotal' } },
-      { data: { source: 'production', target: 'manager' } },
-      { data: { source: 'ingredientsTotal', target: 'waste' } }
-    ];
-
-    let y = 370;
-    ingredients.forEach((item, index) => {
-      const nodeId = `ing_${index}`;
-      const col = index % 2;
-      const row = Math.floor(index / 2);
-      const x = col ? 520 : 220;
-      const yy = y + (row * 170);
-      const lot = Array.isArray(item.lots) && item.lots[0] ? item.lots[0] : {};
-      const label = `${index + 1}. ${item.ingredientName || 'Ingrediente'}
-Necesita: ${formatCompactQty(item.requiredQty ?? item.neededQty, item.unit || item.ingredientUnit || '')}
-Lote: ${lot.lotNumber || lot.entryId || '-'}
-Vence: ${formatIsoEs(lot.expiryDate) || '-'}
-Proveedor: ${lot.provider || '-'}`;
-      nodes.push({ data: { id: nodeId, label }, position: { x, y: yy }, classes: 'ingredient' });
-      if (index === 0) {
-        edges.push({ data: { source: 'ingredientsTotal', target: nodeId } });
-      } else {
-        edges.push({ data: { source: `ing_${index - 1}`, target: nodeId } });
-      }
-    });
-
-    const cy = window.cytoscape({
-      container: host,
-      elements: { nodes, edges },
-      style: [
-        { selector: 'node', style: { 'shape': 'round-rectangle', 'width': 280, 'height': 72, 'background-color': '#eef3ff', 'border-width': 1, 'border-color': '#cbd8f3', 'label': 'data(label)', 'font-size': 14, 'text-wrap': 'wrap', 'text-max-width': 250, 'text-valign': 'center', 'text-halign': 'center', 'color': '#244277', 'font-weight': 700 } },
-        { selector: 'node.ingredient', style: { 'width': 340, 'height': 150, 'background-color': '#f3f5f9', 'text-halign': 'left', 'text-valign': 'top', 'padding': '14px', 'font-size': 13 } },
-        { selector: 'node.product', style: { 'background-color': '#dfeaff' } },
-        { selector: 'node.production', style: { 'background-color': '#fff3c6' } },
-        { selector: 'node.ingredients', style: { 'background-color': '#d8f4e4' } },
-        { selector: 'node.lot', style: { 'background-color': '#ffeed9' } },
-        { selector: 'node.manager', style: { 'background-color': '#e8e1ff' } },
-        { selector: 'node.waste', style: { 'background-color': '#ffdede' } },
-        { selector: 'edge', style: { 'width': 2, 'line-color': '#7f95c2', 'target-arrow-shape': 'triangle', 'target-arrow-color': '#7f95c2', 'curve-style': 'bezier' } }
-      ],
-      userZoomingEnabled: true,
-      userPanningEnabled: true,
-      wheelSensitivity: 0.2,
-      minZoom: 0.4,
-      maxZoom: 2.6
-    });
-
-    popup.__traceCy = cy;
-    cy.fit(undefined, 26);
-  };
-  const initTraceDiagramInteractions = (popup) => {
-    const wrap = popup.querySelector('[data-trace-zoom-wrap]');
-    const zoomLabel = popup.querySelector('[data-trace-zoom-value]');
-    if (!wrap || !zoomLabel) return;
-    const cy = popup.__traceCy || null;
-    let zoom = cy ? cy.zoom() : 1;
-    const setZoom = (value) => {
-      zoom = Math.min(2.6, Math.max(0.4, value));
-      if (cy) cy.zoom({ level: zoom, renderedPosition: { x: wrap.clientWidth / 2, y: wrap.clientHeight / 2 } });
-      else {
-        const canvas = popup.querySelector('[data-trace-zoom-canvas]');
-        if (canvas) canvas.style.transform = `scale(${zoom})`;
-      }
-      zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
-    };
-    popup.querySelector('[data-trace-zoom-in]')?.addEventListener('click', () => setZoom(zoom + 0.12));
-    popup.querySelector('[data-trace-zoom-out]')?.addEventListener('click', () => setZoom(zoom - 0.12));
-    popup.querySelector('[data-trace-zoom-reset]')?.addEventListener('click', () => setZoom(1));
-    wrap.addEventListener('wheel', (event) => {
-      if (!event.ctrlKey) return;
-      event.preventDefault();
-      setZoom(zoom + (event.deltaY < 0 ? 0.1 : -0.1));
-    }, { passive: false });
-    let pinchStart = 0;
-    const dist = (touches) => {
-      const [a, b] = touches;
-      return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-    };
-    wrap.addEventListener('touchstart', (event) => {
-      if (event.touches.length === 2) pinchStart = dist(event.touches);
-    }, { passive: true });
-    wrap.addEventListener('touchmove', (event) => {
-      if (event.touches.length !== 2 || !pinchStart) return;
-      const current = dist(event.touches);
-      const ratio = current / pinchStart;
-      setZoom(zoom * ratio);
-      pinchStart = current;
-      event.preventDefault();
-    }, { passive: false });
-    setZoom(1);
+    const source = buildTraceMermaidDefinition(registro);
+    host.innerHTML = `<pre class="mermaid">${source}</pre>`;
+    try {
+      await window.mermaid.run({ nodes: [host.querySelector('.mermaid')] });
+    } catch (error) {
+      host.innerHTML = '<p class="m-0">No se pudo renderizar el diagrama.</p>';
+    }
   };
   const openTraceability = async (registro) => {
     Swal.fire({
@@ -1371,8 +1346,7 @@ Proveedor: ${lot.provider || '-'}`;
         popup: 'produccion-trace-alert'
       },
       didOpen: async (popup) => {
-        await initTraceCytoscapeDiagram(popup, registro);
-        initTraceDiagramInteractions(popup);
+        await initTraceMermaidDiagram(popup, registro);
         popup.querySelectorAll('[data-prod-trace-images]').forEach((btn) => {
           btn.addEventListener('click', async () => {
             const urls = JSON.parse(decodeURIComponent(btn.dataset.prodTraceImages || '[]'));
