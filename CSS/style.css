@@ -4373,6 +4373,12 @@ html.login-protected.auth-ok body {
   grid-row: 2;
 }
 
+#inventarioGlobalRange,
+#produccionGlobalRange {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
 .inventario-period-divider {
   width: 1px;
   height: 30px;
