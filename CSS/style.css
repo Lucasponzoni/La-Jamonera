@@ -111,7 +111,6 @@ html.login-protected.auth-ok body {
   gap: 6px;
 }
 
-
 .topbar-divider-item {
   display: inline-flex;
   align-items: center;
@@ -466,7 +465,6 @@ html.login-protected.auth-ok body {
   display: flex;
 }
 
-
 /* =========================================
    MODAL
 ========================================= */
@@ -516,7 +514,6 @@ html.login-protected.auth-ok body {
   margin: 0;
   color: #5a6482;
 }
-
 
 .ingredientes-modal .ios-modal-body {
   min-height: 65vh;
@@ -608,7 +605,6 @@ html.login-protected.auth-ok body {
   object-fit: cover;
 }
 
-
 .thumb-loading {
   position: absolute;
   inset: 0;
@@ -660,7 +656,6 @@ html.login-protected.auth-ok body {
   padding-right: 6px;
   padding-bottom: 8px;
 }
-
 
 .ingredientes-list.has-scroll-hint::after {
   content: '↓ Deslizá para ver más ingredientes';
@@ -860,7 +855,6 @@ html.login-protected.auth-ok body {
   font-size: 0.83rem;
 }
 
-
 /* SweetAlert layout fix */
 
 .ingredientes-saving-alert .swal2-html-container,
@@ -955,7 +949,6 @@ html.login-protected.auth-ok body {
   font-size: 1rem;
 }
 
-
 .image-file-input {
   min-height: 0;
   height: auto;
@@ -1016,8 +1009,6 @@ html.login-protected.auth-ok body {
   color: #6f46eb;
   border: 1px solid #d8ccff;
 }
-
-
 
 /* =========================================
    COMPONENTES IOS (INPUTS/BOTONES/ALERT)
@@ -1103,7 +1094,6 @@ html.login-protected.auth-ok body {
 .ios-btn-primary[disabled] {
   opacity: 0.75;
 }
-
 
 .ios-btn-success {
   background: #34c759;
@@ -1216,7 +1206,6 @@ html.login-protected.auth-ok body {
     transform: rotate(360deg);
   }
 }
-
 
 .report-notify-wrap {
   border: 1px solid #d7e1f7;
@@ -1441,7 +1430,6 @@ html.login-protected.auth-ok body {
     border-radius: 999px;
   }
 
-
   .ingredientes-toolbar {
     flex-direction: column;
     align-items: stretch;
@@ -1458,7 +1446,6 @@ html.login-protected.auth-ok body {
   .ingrediente-actions {
     margin-left: auto;
   }
-
 
   .family-inline-create {
     grid-template-columns: 1fr;
@@ -2145,9 +2132,6 @@ html.login-protected.auth-ok body {
   }
 }
 
-
-
-
 .editor-plain-text {
   color: #000000;
   background: transparent;
@@ -2294,7 +2278,6 @@ html.login-protected.auth-ok body {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
-
 
 /* =========================================
    INFORMES BOARD REFINES
@@ -2533,7 +2516,6 @@ html.login-protected.auth-ok body {
   color: #415174;
 }
 
-
 .report-inline-comment-form {
   margin: 10px 0 12px;
   display: grid;
@@ -2559,7 +2541,6 @@ html.login-protected.auth-ok body {
   width: 18px;
   height: 18px;
 }
-
 
 .report-viewer-meta-actions {
   width: 100%;
@@ -2709,7 +2690,6 @@ html.login-protected.auth-ok body {
 .icon-orangered {
   color: orangered;
 }
-
 
 /* =========================================
    MODAL RECETAS
@@ -3081,7 +3061,6 @@ html.login-protected.auth-ok body {
   height: 26px;
   object-fit: contain;
 }
-
 
 .recipe-nutrition-ai-disclaimer {
   margin: 0;
@@ -3626,7 +3605,6 @@ html.login-protected.auth-ok body {
   gap: 10px;
 }
 
-
 .swal2-popup.produccion-secure-alert :is(.swal2-input, .swal2-file, .swal2-textarea, .swal2-select) {
   margin: 0;
   width: 100%;
@@ -3800,7 +3778,6 @@ html.login-protected.auth-ok body {
   gap: 12px;
 }
 
-
 .recipe-print-loading {
   display: grid;
   gap: 10px;
@@ -3879,7 +3856,6 @@ html.login-protected.auth-ok body {
 .receta-front-inline {
   margin-top: 6px;
 }
-
 
 .recipe-print-alert .swal2-actions {
   gap: 12px;
@@ -4552,7 +4528,6 @@ html.login-protected.auth-ok body {
   background: #edf3ff;
 }
 
-
 .inventario-table-compact tbody tr.is-even-row > td {
   background: white !important;
   border-bottom: 1px solid #e1e9f5 !important;
@@ -4605,7 +4580,6 @@ html.login-protected.auth-ok body {
     padding-inline: 10px;
   }
 }
-
 
 .inventario-head-action {
   flex: 1;
@@ -4685,7 +4659,6 @@ html.login-protected.auth-ok body {
   color: #fff !important;
 }
 
-
 .inventario-card.status-never .inventario-status-badge {
   background: #eceff7;
   border-color: #d5dcec;
@@ -4755,7 +4728,6 @@ html.login-protected.auth-ok body {
 .inventario-entry-actions .inventario-delete-btn{
   border-radius: 5px !important;
 }
-
 
 .inventario-table-head.enhanced #inventarioEntriesSearch {
   border-color: #d2d8e8;
@@ -5042,7 +5014,6 @@ html.login-protected.auth-ok body {
   }
 }
 
-
 .inventario-invoice-textarea {
   min-height: 44px;
   resize: vertical;
@@ -5063,7 +5034,6 @@ html.login-protected.auth-ok body {
   color: #6e7f9f;
   border-color: #d9deeb;
 }
-
 
 #inventarioEntriesSearch::-webkit-search-cancel-button {
   -webkit-appearance: searchfield-cancel-button;
@@ -5103,7 +5073,6 @@ html.login-protected.auth-ok body {
   padding: 2px 4px;
   font-size: 0.6rem;
 }
-
 
 .inventario-product-head-stats {
   display: flex;
@@ -5304,52 +5273,6 @@ html.login-protected.auth-ok body {
 .produccion-trace-chip small {
   color: #6f80a6;
   font-size: 0.72rem;
-}
-
-.produccion-trace-tree {
-  border: 1px solid #dbe4f8;
-  border-radius: 14px;
-  background: #f8fbff;
-  padding: 12px;
-  overflow: auto;
-  cursor: grab;
-}
-
-.produccion-trace-canvas {
-  transform-origin: top left;
-  min-width: 720px;
-}
-
-.produccion-trace-node {
-  border: 1px solid #d7e2f7;
-  border-radius: 12px;
-  background: #ffffff;
-  padding: 8px 10px;
-}
-
-.produccion-trace-node-head {
-  font-weight: 800;
-  color: #2b416f;
-  margin-bottom: 4px;
-}
-
-.produccion-trace-row {
-  display: grid;
-  grid-template-columns: 280px 26px 1fr;
-  gap: 10px;
-  align-items: stretch;
-  margin-bottom: 10px;
-}
-
-.produccion-trace-arrow {
-  align-self: center;
-  text-align: center;
-  color: #5c76aa;
-}
-
-.produccion-trace-lot-grid {
-  display: grid;
-  gap: 8px;
 }
 
 @media (max-width: 991.98px) {
@@ -5751,7 +5674,6 @@ html.login-protected.auth-ok body {
   font-size: 1.4rem;
   line-height: 1.1;
 }
-
 
 .produccion-confirm-card {
   background: #f6f9ff;
@@ -6549,27 +6471,9 @@ html.login-protected.auth-ok body {
   object-fit: cover;
 }
 
-
 /* =========================================
    TRAZABILIDAD · DIAGRAMA IOS
 ========================================= */
-.produccion-trace-toolbar-zoom {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.produccion-trace-zoom-value {
-  min-width: 58px;
-  text-align: center;
-  font-weight: 800;
-  color: #2f4f8b;
-  background: #eef3ff;
-  border: 1px solid #d7e2f8;
-  border-radius: 10px;
-  padding: 4px 8px;
-}
 
 .produccion-trace-diagram-wrap {
   max-height: 68vh;
@@ -6584,52 +6488,6 @@ html.login-protected.auth-ok body {
   min-width: 980px;
   padding: 14px;
   transform-origin: top left;
-}
-
-.produccion-trace-flow-grid {
-  display: grid;
-  grid-template-columns: minmax(240px, 1fr) 120px minmax(240px, 1fr);
-  gap: 10px 12px;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.produccion-trace-flow-card,
-.produccion-trace-flow-side {
-  border: 1px solid #d7e2f7;
-  border-radius: 14px;
-  padding: 10px 12px;
-  display: grid;
-  gap: 4px;
-  color: #29467f;
-  font-weight: 800;
-  background: #fff;
-}
-
-.produccion-trace-flow-card i,
-.produccion-trace-flow-side i {
-  font-size: 0.95rem;
-  opacity: 0.9;
-}
-
-.produccion-trace-flow-side small {
-  color: #6377a1;
-  font-size: 0.76rem;
-  font-weight: 700;
-}
-
-.produccion-trace-flow-card.is-product { background: #dfeaff; }
-.produccion-trace-flow-card.is-production { background: #fff5c6; }
-.produccion-trace-flow-card.is-ingredients { background: #d6f5e4; }
-.produccion-trace-flow-card.is-waste { background: #ffe0e0; }
-.produccion-trace-flow-side.is-lot { background: #fff3df; }
-.produccion-trace-flow-side.is-manager { background: #e7e3ff; }
-
-.produccion-trace-flow-arrow {
-  text-align: center;
-  font-size: 1.15rem;
-  color: #4f6ea9;
-  font-weight: 900;
 }
 
 .produccion-trace-ingredient-card {
@@ -6673,111 +6531,6 @@ html.login-protected.auth-ok body {
   gap: 6px;
 }
 
-@media (max-width: 991.98px) {
-  .produccion-trace-diagram {
-    min-width: 860px;
-  }
-}
-
-
-.produccion-trace-flow-board {
-  display: grid;
-  grid-template-columns: 1.1fr 1fr;
-  gap: 18px;
-  margin-bottom: 16px;
-}
-
-.produccion-trace-flow-col {
-  display: grid;
-  gap: 8px;
-}
-
-.produccion-trace-flow-col.is-side {
-  align-content: start;
-}
-
-.produccion-trace-flow-card,
-.produccion-trace-flow-side {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border-width: 1px;
-}
-
-.produccion-trace-flow-card > div,
-.produccion-trace-flow-side > div {
-  display: grid;
-  gap: 2px;
-}
-
-.produccion-trace-flow-card small,
-.produccion-trace-flow-side small {
-  font-size: .72rem;
-  color: #6b7fa8;
-  text-transform: uppercase;
-  letter-spacing: .03em;
-  font-weight: 800;
-}
-
-.produccion-trace-flow-card span,
-.produccion-trace-flow-side span {
-  font-weight: 900;
-  color: #214379;
-}
-
-.produccion-trace-flow-connector {
-  position: relative;
-  height: 26px;
-  display: grid;
-  place-items: center;
-}
-
-.produccion-trace-flow-connector::before {
-  content: '';
-  position: absolute;
-  background: #7f95c2;
-}
-
-.produccion-trace-flow-connector.is-down::before {
-  width: 2px;
-  height: 22px;
-}
-
-.produccion-trace-flow-connector.is-right::before {
-  width: 88%;
-  height: 2px;
-}
-
-.produccion-trace-flow-connector span {
-  z-index: 1;
-  width: 20px;
-  height: 20px;
-  border-radius: 999px;
-  background: #f0f4ff;
-  color: #375c99;
-  font-weight: 900;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #d2dcf2;
-}
-
-.produccion-trace-product-thumb {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  object-fit: cover;
-  border: 1px solid #d6e0f6;
-  background: #f0f4ff;
-}
-
-.produccion-trace-product-thumb.is-fallback {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #3f5d95;
-}
-
 .produccion-trace-ingredients {
   gap: 14px;
   padding-right: 4px;
@@ -6792,23 +6545,6 @@ html.login-protected.auth-ok body {
   background: #fff;
   border-color: #d6e1f8;
 }
-
-@media (max-width: 991.98px) {
-  .produccion-trace-flow-board {
-    grid-template-columns: 1fr;
-  }
-
-  .produccion-trace-flow-connector.is-right::before {
-    width: 2px;
-    height: 20px;
-  }
-
-  .produccion-trace-flow-col.is-side {
-    border-top: 1px dashed #d5dff5;
-    padding-top: 10px;
-  }
-}
-
 
 .produccion-trace-mermaid-wrap {
   border: 1px solid #d9e3f8;
@@ -6848,69 +6584,3 @@ html.login-protected.auth-ok body {
   object-fit: cover;
 }
 
-
-.produccion-trace-reactflow {
-  width: 100%;
-  min-height: 760px;
-  border: 1px solid #dce5f8;
-  border-radius: 14px;
-  background: linear-gradient(180deg, #f9fbff 0%, #ffffff 100%);
-}
-
-.produccion-trace-flow-node {
-  min-width: 280px;
-  max-width: 320px;
-  border: 1px solid #cfdbf7;
-  border-radius: 14px;
-  background: #f6f9ff;
-  color: #2b467c;
-  padding: 10px 12px;
-  display: grid;
-  gap: 2px;
-  text-align: left;
-}
-
-.produccion-trace-flow-node strong {
-  font-size: 0.9rem;
-}
-
-.produccion-trace-flow-node span {
-  font-size: 0.78rem;
-  color: #5d7098;
-  line-height: 1.3;
-}
-
-.produccion-trace-flow-node.tone-product {
-  background: #dfeaff;
-  border-color: #bdd0f5;
-}
-
-.produccion-trace-flow-node.tone-production {
-  background: #fff3c6;
-  border-color: #e8d79d;
-}
-
-.produccion-trace-flow-node.tone-ingredients {
-  background: #d8f4e4;
-  border-color: #b2e0c5;
-}
-
-.produccion-trace-flow-node.tone-lot {
-  background: #ffeed9;
-  border-color: #efd1aa;
-}
-
-.produccion-trace-flow-node.tone-manager {
-  background: #e8e1ff;
-  border-color: #cbc0f4;
-}
-
-.produccion-trace-flow-node.tone-waste {
-  background: #ffdede;
-  border-color: #f0bdbd;
-}
-
-.produccion-trace-flow-node.tone-ingredient {
-  background: #f3f5f9;
-  border-color: #d4dbe9;
-}

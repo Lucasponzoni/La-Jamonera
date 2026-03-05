@@ -51,7 +51,6 @@
     historyMode: false,
     historyRange: '',
     historyPage: 1,
-    historyTraceZoom: 1,
     historyTraceCollapse: {},
     config: {
       globalMinKg: 1,
@@ -1167,14 +1166,6 @@
     script.onerror = () => resolve(false);
     document.head.appendChild(script);
   });
-  const loadExternalStylesheet = (href, id) => {
-    if (document.getElementById(id)) return;
-    const link = document.createElement('link');
-    link.id = id;
-    link.rel = 'stylesheet';
-    link.href = href;
-    document.head.appendChild(link);
-  };
   const loadScriptFromSources = async (sources, idPrefix) => {
     for (let index = 0; index < sources.length; index += 1) {
       const ok = await loadExternalScript(sources[index], `${idPrefix}_${index}`);
@@ -1182,40 +1173,79 @@
     }
     return false;
   };
-  const resolveReactFlowGlobal = () => window.ReactFlow || window.reactflow || window.Reactflow || null;
   const ensureTraceDiagramLib = async () => {
-    const existingFlow = resolveReactFlowGlobal();
-    if (window.React && window.ReactDOM && existingFlow) return true;
-    if (window.__laJamoneraLoadingReactFlow) return window.__laJamoneraLoadingReactFlow;
-    window.__laJamoneraLoadingReactFlow = (async () => {
-      loadExternalStylesheet('https://unpkg.com/reactflow@11.11.4/dist/style.css', 'la-jamonera-reactflow-style-unpkg');
-      loadExternalStylesheet('https://cdn.jsdelivr.net/npm/reactflow@11.11.4/dist/style.css', 'la-jamonera-reactflow-style-jsdelivr');
-      const reactOk = await loadScriptFromSources([
-        'https://unpkg.com/react@18/umd/react.production.min.js',
-        'https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js'
-      ], 'la-jamonera-react');
-      if (!reactOk) return false;
-      const reactDomOk = await loadScriptFromSources([
-        'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
-        'https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js'
-      ], 'la-jamonera-react-dom');
-      if (!reactDomOk) return false;
-      const reactFlowOk = await loadScriptFromSources([
-        'https://unpkg.com/reactflow@11.11.4/dist/umd/index.js',
-        'https://cdn.jsdelivr.net/npm/reactflow@11.11.4/dist/umd/index.js'
-      ], 'la-jamonera-reactflow');
-      return Boolean(reactFlowOk && resolveReactFlowGlobal());
+    if (window.mermaid) return true;
+    if (window.__laJamoneraLoadingMermaid) return window.__laJamoneraLoadingMermaid;
+    window.__laJamoneraLoadingMermaid = (async () => {
+      const loaded = await loadScriptFromSources([
+        'https://unpkg.com/mermaid@10/dist/mermaid.min.js',
+        'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js'
+      ], 'la-jamonera-mermaid');
+      if (!loaded || !window.mermaid) return false;
+      window.mermaid.initialize({
+        startOnLoad: false,
+        theme: 'base',
+        securityLevel: 'loose',
+        themeVariables: {
+          primaryColor: '#eef3ff',
+          primaryTextColor: '#26457d',
+          primaryBorderColor: '#cfdaf4',
+          lineColor: '#7f95c2',
+          tertiaryColor: '#ffffff',
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
+        }
+      });
+      return true;
     })();
-    return window.__laJamoneraLoadingReactFlow;
+    return window.__laJamoneraLoadingMermaid;
+  };
+  const buildTraceMermaidDefinition = (registro) => {
+    const esc = (value) => String(value || '-')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+    const ingredients = Array.isArray(registro?.lots) ? registro.lots : [];
+    const totalIngredientsKg = ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0);
+    const mermaKg = Math.max(0, totalIngredientsKg - Number(registro?.quantityKg || 0));
+    const manager = (Array.isArray(registro?.managers) && registro.managers[0]) ? getManagerDisplay(registro.managers[0]).name : 'Sin encargado';
+    const lines = [
+      'flowchart TD',
+      `P["${esc((registro?.recipeTitle || 'Producto').toUpperCase())}"]:::toneProduct`,
+      `L["LOTE: ${esc(registro?.id || '-')}<br/>VTO: ${esc(formatProductExpiryLabel(registro))}"]:::toneLot`,
+      `R["PRODUCCIÓN ${Number(registro?.quantityKg || 0).toFixed(2)} KG"]:::toneProduction`,
+      `M["ENCARGADO: ${esc(manager)}"]:::toneManager`,
+      `I["INGREDIENTES TOTALES ${totalIngredientsKg.toFixed(3)} KG"]:::toneIngredients`,
+      `W["MERMA ${mermaKg.toFixed(3)} KG"]:::toneWaste`,
+      'P --> R',
+      'P --> L',
+      'R --> I',
+      'R --> M',
+      'I --> W'
+    ];
+    ingredients.forEach((item, index) => {
+      const lot = Array.isArray(item?.lots) && item.lots[0] ? item.lots[0] : {};
+      const nodeId = `ING${index + 1}`;
+      const nodeLabel = [
+        `${index + 1}. ${(item?.ingredientName || 'Ingrediente').toUpperCase()}`,
+        `Necesita: ${formatCompactQty(item?.requiredQty ?? item?.neededQty, item?.unit || item?.ingredientUnit || '')}`,
+        `Lote: ${lot?.lotNumber || lot?.entryId || '-'}`,
+        `Vence: ${formatIsoEs(lot?.expiryDate) || '-'}`,
+        `Proveedor: ${lot?.provider || '-'}`
+      ].map(esc).join('<br/>');
+      lines.push(`${nodeId}["${nodeLabel}"]:::toneIngredient`);
+      lines.push(`${index === 0 ? 'I' : `ING${index}`} --> ${nodeId}`);
+    });
+    lines.push('classDef toneProduct fill:#dfeaff,stroke:#bdd0f5,color:#28467f,stroke-width:1px;');
+    lines.push('classDef toneLot fill:#ffeed9,stroke:#efd1aa,color:#6f4a1f,stroke-width:1px;');
+    lines.push('classDef toneProduction fill:#fff3c6,stroke:#e8d79d,color:#6c531a,stroke-width:1px;');
+    lines.push('classDef toneManager fill:#e8e1ff,stroke:#cbc0f4,color:#4f3d86,stroke-width:1px;');
+    lines.push('classDef toneIngredients fill:#d8f4e4,stroke:#b2e0c5,color:#1f6a46,stroke-width:1px;');
+    lines.push('classDef toneWaste fill:#ffdede,stroke:#f0bdbd,color:#8b2f3f,stroke-width:1px;');
+    lines.push('classDef toneIngredient fill:#f3f5f9,stroke:#d4dbe9,color:#2d426f,stroke-width:1px;');
+    return lines.join('\n');
   };
   const renderTraceabilityTree = (registro) => {
-    const safeToKg = (qty, unit) => {
-      const amount = Number(qty || 0);
-      const normalizedUnit = normalizeLower(unit || 'kg');
-      if (normalizedUnit.includes('gram')) return amount / 1000;
-      if (normalizedUnit in { g: 1, gr: 1, gramo: 1, gramos: 1 }) return amount / 1000;
-      return amount;
-    };
     const productImage = normalizeValue(registro?.traceability?.product?.imageUrl) || normalizeValue(state.recetas?.[registro.recipeId]?.imageUrl);
     const ingredients = (registro.lots || []).map((item, idx) => {
       const ingredientImage = normalizeValue(state.ingredientes[item.ingredientId]?.imageUrl);
@@ -1256,14 +1286,8 @@
       </article>`;
     }).join('');
     return `<section class="produccion-trace-v2 produccion-trace-apple-viewer">
-      <div class="produccion-trace-toolbar-zoom">
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-trace-zoom-out aria-label="Alejar"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
-        <span class="produccion-trace-zoom-value" data-trace-zoom-value>100%</span>
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-trace-zoom-in aria-label="Acercar"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-trace-zoom-reset aria-label="Restablecer zoom"><i class="fa-solid fa-arrows-rotate"></i></button>
-      </div>
-      <div class="produccion-trace-diagram-wrap" data-trace-zoom-wrap>
-        <div class="produccion-trace-diagram" data-trace-zoom-canvas>
+      <div class="produccion-trace-diagram-wrap">
+        <div class="produccion-trace-diagram">
           <article class="produccion-trace-summary">
             <h6><i class="bi bi-diagram-3 fa-solid fa-diagram-project"></i> Trazabilidad ${escapeHtml(registro.id)}</h6>
             <div class="produccion-trace-grid">
@@ -1276,181 +1300,28 @@
           </article>
           <div class="produccion-trace-mermaid-wrap">
             <div class="produccion-trace-product-preview">${productImage ? `<img src="${escapeHtml(productImage)}" alt="${escapeHtml(registro.recipeTitle || 'Producto')}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</div>
-            <div class="produccion-trace-reactflow" data-trace-reactflow></div>
+            <div class="produccion-trace-mermaid" data-trace-mermaid></div>
           </div>
           <div class="produccion-trace-ingredients">${ingredients || '<p class="m-0">Sin desglose de lotes para esta producción.</p>'}</div>
         </div>
       </div>
     </section>`;
   };
-  const initTraceReactFlowDiagram = async (popup, registro) => {
-    const host = popup.querySelector('[data-trace-reactflow]');
+  const initTraceMermaidDiagram = async (popup, registro) => {
+    const host = popup.querySelector('[data-trace-mermaid]');
     if (!host) return;
     const hasLib = await ensureTraceDiagramLib();
     if (!hasLib) {
-      host.innerHTML = '<p class="m-0">No se pudo cargar la librería de diagrama.</p>';
+      host.innerHTML = '<p class="m-0">No se pudo cargar Mermaid.</p>';
       return;
     }
-
-    const React = window.React;
-    const ReactDOM = window.ReactDOM;
-    const RF = resolveReactFlowGlobal();
-    const ReactFlowComponent = RF?.ReactFlow || RF?.default || RF;
-    if (!React || !ReactDOM || !ReactFlowComponent) {
-      host.innerHTML = '<p class="m-0">No se pudo inicializar React Flow.</p>';
-      return;
+    const source = buildTraceMermaidDefinition(registro);
+    host.innerHTML = `<pre class="mermaid">${source}</pre>`;
+    try {
+      await window.mermaid.run({ nodes: [host.querySelector('.mermaid')] });
+    } catch (error) {
+      host.innerHTML = '<p class="m-0">No se pudo renderizar el diagrama.</p>';
     }
-
-    const BackgroundComponent = RF?.Background || null;
-    const ControlsComponent = RF?.Controls || null;
-    const MiniMapComponent = RF?.MiniMap || null;
-
-    const ingredients = Array.isArray(registro.lots) ? registro.lots : [];
-    const totalIngredientsKg = ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0);
-    const mermaKg = Math.max(0, totalIngredientsKg - Number(registro.quantityKg || 0));
-    const managerMain = (Array.isArray(registro.managers) && registro.managers[0]) ? getManagerDisplay(registro.managers[0]).name : 'Sin encargado';
-    const nodeBox = (title, lines, tone = '') => React.createElement('div', { className: `produccion-trace-flow-node ${tone}`.trim() }, [
-      React.createElement('strong', { key: 'title' }, title),
-      ...lines.map((line, index) => React.createElement('span', { key: `line_${index}` }, line))
-    ]);
-    const flowNodes = [
-      { id: 'product', position: { x: 80, y: 20 }, data: { label: nodeBox(`${registro.recipeTitle || '-'} (producto)`, [`ID: ${registro.id || '-'}`], 'tone-product') }, draggable: false },
-      { id: 'lot', position: { x: 520, y: 20 }, data: { label: nodeBox('Lote y vencimiento', [`${registro.id || '-'}`, `VTO: ${formatProductExpiryLabel(registro)}`], 'tone-lot') }, draggable: false },
-      { id: 'production', position: { x: 80, y: 125 }, data: { label: nodeBox('Producción', [`Cantidad final: ${Number(registro.quantityKg || 0).toFixed(2)} kg`], 'tone-production') }, draggable: false },
-      { id: 'manager', position: { x: 520, y: 125 }, data: { label: nodeBox('Encargado', [managerMain], 'tone-manager') }, draggable: false },
-      { id: 'ingredientsTotal', position: { x: 80, y: 230 }, data: { label: nodeBox('Ingredientes totales', [`${totalIngredientsKg.toFixed(3)} kg`], 'tone-ingredients') }, draggable: false },
-      { id: 'waste', position: { x: 520, y: 230 }, data: { label: nodeBox('Merma estimada', [`${mermaKg.toFixed(3)} kg`], 'tone-waste') }, draggable: false }
-    ];
-    const flowEdges = [
-      { id: 'e_product_production', source: 'product', target: 'production', type: 'smoothstep', animated: true },
-      { id: 'e_product_lot', source: 'product', target: 'lot', type: 'smoothstep' },
-      { id: 'e_production_ingtotal', source: 'production', target: 'ingredientsTotal', type: 'smoothstep', animated: true },
-      { id: 'e_production_manager', source: 'production', target: 'manager', type: 'smoothstep' },
-      { id: 'e_ingtotal_waste', source: 'ingredientsTotal', target: 'waste', type: 'smoothstep' }
-    ];
-
-    ingredients.forEach((item, index) => {
-      const lot = Array.isArray(item.lots) && item.lots[0] ? item.lots[0] : {};
-      const row = Math.floor(index / 2);
-      const col = index % 2;
-      const nodeId = `ingredient_${index}`;
-      flowNodes.push({
-        id: nodeId,
-        position: { x: col ? 520 : 80, y: 355 + (row * 180) },
-        data: {
-          label: nodeBox(
-            `${index + 1}. ${item.ingredientName || 'Ingrediente'}`,
-            [
-              `Necesita: ${formatCompactQty(item.requiredQty ?? item.neededQty, item.unit || item.ingredientUnit || '')}`,
-              `Lote: ${lot.lotNumber || lot.entryId || '-'}`,
-              `Vence: ${formatIsoEs(lot.expiryDate) || '-'}`,
-              `Proveedor: ${lot.provider || '-'}`
-            ],
-            'tone-ingredient'
-          )
-        },
-        draggable: false
-      });
-      flowEdges.push({
-        id: `e_ing_${index}`,
-        source: index === 0 ? 'ingredientsTotal' : `ingredient_${index - 1}`,
-        target: nodeId,
-        type: 'smoothstep'
-      });
-    });
-
-    const mountReactTree = () => {
-      const FlowApp = () => {
-        const onInit = (instance) => {
-          popup.__traceFlowApi = instance;
-          window.requestAnimationFrame(() => {
-            instance.fitView({ padding: 0.18, duration: 250 });
-          });
-        };
-        const children = [
-          React.createElement(ReactFlowComponent, {
-            key: 'flow',
-            nodes: flowNodes,
-            edges: flowEdges,
-            onInit,
-            fitView: true,
-            minZoom: 0.35,
-            maxZoom: 2.2,
-            nodesDraggable: false,
-            nodesConnectable: false,
-            elementsSelectable: false,
-            panOnDrag: true,
-            zoomOnScroll: true,
-            zoomOnPinch: true,
-            zoomOnDoubleClick: false,
-            proOptions: { hideAttribution: true }
-          }, [
-            BackgroundComponent ? React.createElement(BackgroundComponent, { key: 'bg', gap: 18, size: 1, color: '#dfe8fb' }) : null,
-            ControlsComponent ? React.createElement(ControlsComponent, { key: 'controls', showInteractive: false }) : null,
-            MiniMapComponent ? React.createElement(MiniMapComponent, { key: 'minimap', pannable: true, zoomable: true, nodeStrokeWidth: 2, maskColor: 'rgba(240,244,255,0.65)' }) : null
-          ].filter(Boolean))
-        ];
-        return React.createElement('div', { style: { width: '100%', height: '100%' } }, children);
-      };
-
-      if (typeof ReactDOM.createRoot === 'function') {
-        const root = ReactDOM.createRoot(host);
-        popup.__traceReactRoot = root;
-        root.render(React.createElement(FlowApp));
-        return;
-      }
-      ReactDOM.render(React.createElement(FlowApp), host);
-    };
-
-    mountReactTree();
-  };
-  const initTraceDiagramInteractions = (popup) => {
-    const wrap = popup.querySelector('[data-trace-zoom-wrap]');
-    const zoomLabel = popup.querySelector('[data-trace-zoom-value]');
-    if (!wrap || !zoomLabel) return;
-    const flowApi = popup.__traceFlowApi || null;
-    let zoom = flowApi?.getZoom ? flowApi.getZoom() : 1;
-    const setZoom = (value) => {
-      zoom = Math.min(2.6, Math.max(0.4, value));
-      if (flowApi?.setViewport && flowApi?.getViewport) {
-        const viewport = flowApi.getViewport();
-        flowApi.setViewport({ x: viewport.x, y: viewport.y, zoom }, { duration: 160 });
-      }
-      zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
-    };
-    popup.querySelector('[data-trace-zoom-in]')?.addEventListener('click', () => setZoom((flowApi?.getZoom ? flowApi.getZoom() : zoom) + 0.12));
-    popup.querySelector('[data-trace-zoom-out]')?.addEventListener('click', () => setZoom((flowApi?.getZoom ? flowApi.getZoom() : zoom) - 0.12));
-    popup.querySelector('[data-trace-zoom-reset]')?.addEventListener('click', () => {
-      if (flowApi?.fitView) {
-        flowApi.fitView({ padding: 0.18, duration: 180 });
-        zoom = flowApi.getZoom ? flowApi.getZoom() : 1;
-        zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
-        return;
-      }
-      setZoom(1);
-    });
-    wrap.addEventListener('wheel', (event) => {
-      if (!event.ctrlKey) return;
-      event.preventDefault();
-      setZoom(zoom + (event.deltaY < 0 ? 0.1 : -0.1));
-    }, { passive: false });
-    let pinchStart = 0;
-    const dist = (touches) => {
-      const [a, b] = touches;
-      return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-    };
-    wrap.addEventListener('touchstart', (event) => {
-      if (event.touches.length === 2) pinchStart = dist(event.touches);
-    }, { passive: true });
-    wrap.addEventListener('touchmove', (event) => {
-      if (event.touches.length !== 2 || !pinchStart) return;
-      const current = dist(event.touches);
-      const ratio = current / pinchStart;
-      setZoom(zoom * ratio);
-      pinchStart = current;
-      event.preventDefault();
-    }, { passive: false });
-    zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
   };
   const openTraceability = async (registro) => {
     Swal.fire({
@@ -1475,8 +1346,7 @@
         popup: 'produccion-trace-alert'
       },
       didOpen: async (popup) => {
-        await initTraceReactFlowDiagram(popup, registro);
-        initTraceDiagramInteractions(popup);
+        await initTraceMermaidDiagram(popup, registro);
         popup.querySelectorAll('[data-prod-trace-images]').forEach((btn) => {
           btn.addEventListener('click', async () => {
             const urls = JSON.parse(decodeURIComponent(btn.dataset.prodTraceImages || '[]'));
