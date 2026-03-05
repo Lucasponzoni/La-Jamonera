@@ -6481,14 +6481,32 @@ html.login-protected.auth-ok body {
   overflow: auto;
   border: 1px solid #dbe4f8;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.45);
+  background: transparent;
   touch-action: pan-x pan-y;
 }
 
 .produccion-trace-diagram {
-  min-width: 980px;
+  min-width: 100%;
   padding: 14px;
   transform-origin: top left;
+}
+
+.produccion-trace-toolbar-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.produccion-trace-zoom-value {
+  min-width: 58px;
+  text-align: center;
+  font-weight: 800;
+  color: #2f4f8b;
+  background: #eef3ff;
+  border: 1px solid #d7e2f8;
+  border-radius: 10px;
+  padding: 4px 8px;
 }
 
 .produccion-trace-ingredient-card {
@@ -6547,10 +6565,20 @@ html.login-protected.auth-ok body {
   border-color: #d6e1f8;
 }
 
+.produccion-trace-used-badge {
+  border: 1px solid #d7e2f8;
+  border-radius: 999px;
+  background: #edf3ff;
+  color: #355995;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 8px;
+}
+
 .produccion-trace-mermaid-wrap {
-  border: 1px solid #d9e3f8;
+  border: 1px solid #cfdbf4;
   border-radius: 16px;
-  background: #ffffff;
+  background: transparent;
   padding: 12px;
   margin-bottom: 14px;
 }
@@ -6560,28 +6588,36 @@ html.login-protected.auth-ok body {
   overflow: auto;
 }
 
+.produccion-trace-mermaid .mermaid {
+  min-width: 640px;
+  width: max-content;
+}
+
 .produccion-trace-mermaid svg {
   max-width: 100%;
   height: auto;
 }
 
-.produccion-trace-product-preview {
-  width: 54px;
-  height: 54px;
-  border-radius: 14px;
-  border: 1px solid #d6e0f6;
-  background: #eff4ff;
-  color: #355995;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  margin-bottom: 10px;
-}
+@media (max-width: 768px) {
+  .produccion-trace-diagram {
+    padding: 10px;
+  }
 
-.produccion-trace-product-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
+  .produccion-trace-toolbar-zoom {
+    width: 100%;
+    justify-content: space-between;
+  }
 
+  .produccion-trace-lot-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .produccion-trace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .produccion-trace-mermaid .mermaid {
+    min-width: 520px;
+  }
+}
