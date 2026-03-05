@@ -1248,21 +1248,36 @@
   };
 
   const renderTraceabilityTree = (registro) => {
+    const safeToKg = (qty, unit) => {
+      const amount = Number(qty || 0);
+      const normalizedUnit = normalizeLower(unit || 'kg');
+      if (normalizedUnit.includes('gram')) return amount / 1000;
+      if (normalizedUnit in { 'g': 1, 'gr': 1, 'gramo': 1, 'gramos': 1 }) return amount / 1000;
+      return amount;
+    };
+
     const managerBadges = (Array.isArray(registro.managers) ? registro.managers : [])
       .map((token) => {
         const manager = getManagerDisplay(token);
-        return `<span class="produccion-trace-chip"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span>`;
+        return `<span class="produccion-trace-chip"><i class="bi bi-person-badge fa-solid fa-user-tie"></i><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span>`;
       }).join('');
 
-    const ingredients = (registro.lots || []).map((item) => {
+    const totalIngredientsKg = (registro.lots || []).reduce((sum, item) => {
+      const qty = item?.requiredQty ?? item?.neededQty ?? 0;
+      return sum + safeToKg(qty, item.unit || item.ingredientUnit || 'kg');
+    }, 0);
+    const mermakg = Math.max(0, totalIngredientsKg - Number(registro.quantityKg || 0));
+
+    const ingredients = (registro.lots || []).map((item, idx) => {
       const ingredientImage = normalizeValue(state.ingredientes[item.ingredientId]?.imageUrl);
+      const aggregatedImages = (item.lots || []).flatMap((lot) => Array.isArray(lot.invoiceImageUrls) ? lot.invoiceImageUrls : []);
       const lotCards = (item.lots || []).map((lot) => {
         const takenQty = Number(lot.takeQty || 0);
         const availableQty = Number(lot.availableQty || 0);
         const remainingQty = Math.max(0, availableQty - takenQty);
         return `<article class="produccion-trace-lot-card">
           <div class="produccion-trace-lot-head">
-            <strong>Lote ${escapeHtml(lot.lotNumber || lot.entryId || '-')}</strong>
+            <strong><i class="bi bi-upc-scan fa-solid fa-barcode"></i> Lote ${escapeHtml(lot.lotNumber || lot.entryId || '-')}</strong>
             <span class="produccion-expiry-badge is-${escapeHtml(lot.status || 'unknown')}">${escapeHtml((lot.expiryDate || 'Sin vencimiento').replaceAll('-', '/'))}</span>
           </div>
           <div class="produccion-trace-grid">
@@ -1273,33 +1288,105 @@
             <p><strong>Factura</strong><span>${escapeHtml(lot.invoiceNumber || '-')}</span></p>
             <p><strong>Ingreso</strong><span>${escapeHtml(lot.entryDate || '-')}</span></p>
           </div>
-          ${Array.isArray(lot.invoiceImageUrls) && lot.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Ver remito/factura (${lot.invoiceImageUrls.length})</span></button>` : ''}
+          ${Array.isArray(lot.invoiceImageUrls) && lot.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}"><i class="bi bi-paperclip fa-solid fa-paperclip"></i><span>Ver adjunto (${lot.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}
         </article>`;
       }).join('');
 
-      return `<article class="produccion-trace-ingredient">
+      return `<article class="produccion-trace-ingredient-card">
         <header>
-          <span class="produccion-trace-ingredient-avatar">${ingredientImage ? `<img src="${ingredientImage}" alt="${escapeHtml(item.ingredientName || 'Ingrediente')}">` : '<i class="fa-solid fa-carrot"></i>'}</span>
-          <h6>${escapeHtml(item.ingredientName || item.ingredientId || 'Ingrediente')}</h6>
-          <small>Necesario: ${formatCompactQty(item.requiredQty ?? item.neededQty, item.unit || item.ingredientUnit || '')}</small>
+          <div class="produccion-trace-ingredient-head-main">
+            <span class="produccion-trace-ingredient-index">${idx + 1}</span>
+            <span class="produccion-trace-ingredient-avatar">${ingredientImage ? `<img src="${ingredientImage}" alt="${escapeHtml(item.ingredientName || 'Ingrediente')}">` : '<i class="bi bi-basket2-fill fa-solid fa-carrot"></i>'}</span>
+            <div>
+              <h6><i class="bi bi-box-seam fa-solid fa-box-open"></i> ${escapeHtml(item.ingredientName || item.ingredientId || 'Ingrediente')}</h6>
+              <small>Necesario: ${formatCompactQty(item.requiredQty ?? item.neededQty, item.unit || item.ingredientUnit || '')}</small>
+            </div>
+          </div>
+          ${aggregatedImages.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(aggregatedImages))}"><i class="bi bi-images fa-regular fa-images"></i><span>Ver adjunto (${aggregatedImages.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}
         </header>
         <div class="produccion-trace-lots">${lotCards || '<p class="m-0">Sin lotes asociados.</p>'}</div>
       </article>`;
     }).join('');
 
     return `<section class="produccion-trace-v2 produccion-trace-apple-viewer">
-      <article class="produccion-trace-summary">
-        <h6>Producción ${escapeHtml(registro.id)}</h6>
-        <div class="produccion-trace-grid">
-          <p><strong>Producto</strong><span>${escapeHtml(registro.recipeTitle || '-')}</span></p>
-          <p><strong>Cantidad</strong><span>${Number(registro.quantityKg || 0).toFixed(2)} kg</span></p>
-          <p><strong>Fecha</strong><span>${escapeHtml(formatDateTime(registro.createdAt))}</span></p>
-          <p><strong>Estado</strong><span>${escapeHtml(registro.status || '-')}</span></p>
+      <div class="produccion-trace-toolbar-zoom">
+        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-trace-zoom-out aria-label="Alejar"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+        <span class="produccion-trace-zoom-value" data-trace-zoom-value>100%</span>
+        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-trace-zoom-in aria-label="Acercar"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-trace-zoom-reset aria-label="Restablecer zoom"><i class="fa-solid fa-arrows-rotate"></i></button>
+      </div>
+      <div class="produccion-trace-diagram-wrap" data-trace-zoom-wrap>
+        <div class="produccion-trace-diagram" data-trace-zoom-canvas>
+          <div class="produccion-trace-flow-grid">
+            <article class="produccion-trace-flow-card is-product"><i class="bi bi-award fa-solid fa-medal"></i><span>${escapeHtml(registro.recipeTitle || '-')}</span></article>
+            <div class="produccion-trace-flow-arrow">↓</div>
+            <article class="produccion-trace-flow-card is-production"><i class="bi bi-gear-wide-connected fa-solid fa-gears"></i><span>Producción ${Number(registro.quantityKg || 0).toFixed(2)} kg</span></article>
+            <div class="produccion-trace-flow-side is-lot"><i class="bi bi-upc-scan fa-solid fa-barcode"></i><span>Lote: ${escapeHtml(registro.id)}</span><small>VTO: ${escapeHtml(formatProductExpiryLabel(registro))}</small></div>
+            <div class="produccion-trace-flow-arrow">↓</div>
+            <article class="produccion-trace-flow-card is-ingredients"><i class="bi bi-boxes fa-solid fa-boxes-stacked"></i><span>Ingredientes ${totalIngredientsKg.toFixed(3)} kg</span></article>
+            <div class="produccion-trace-flow-side is-manager"><i class="bi bi-person-badge fa-solid fa-user-tie"></i><span>${escapeHtml((Array.isArray(registro.managers) && registro.managers[0]) ? getManagerDisplay(registro.managers[0]).name : 'Sin encargado')}</span><small>Encargado</small></div>
+            <div class="produccion-trace-flow-arrow">↓</div>
+            <article class="produccion-trace-flow-card is-waste"><i class="bi bi-exclamation-triangle fa-solid fa-triangle-exclamation"></i><span>Merma ${mermakg.toFixed(3)} kg</span></article>
+          </div>
+          <article class="produccion-trace-summary">
+            <h6><i class="bi bi-diagram-3 fa-solid fa-diagram-project"></i> Trazabilidad ${escapeHtml(registro.id)}</h6>
+            <div class="produccion-trace-grid">
+              <p><strong>Producto</strong><span>${escapeHtml(registro.recipeTitle || '-')}</span></p>
+              <p><strong>Cantidad final</strong><span>${Number(registro.quantityKg || 0).toFixed(2)} kg</span></p>
+              <p><strong>Fecha</strong><span>${escapeHtml(formatDateTime(registro.createdAt))}</span></p>
+              <p><strong>Estado</strong><span>${escapeHtml(registro.status || '-')}</span></p>
+            </div>
+            <div class="produccion-trace-managers">${managerBadges || '<span class="produccion-trace-chip"><i class="bi bi-person-x fa-solid fa-user-xmark"></i><strong>Sin responsable</strong><small>Encargado</small></span>'}</div>
+          </article>
+          <div class="produccion-trace-ingredients">${ingredients || '<p class="m-0">Sin desglose de lotes para esta producción.</p>'}</div>
         </div>
-        <div class="produccion-trace-managers">${managerBadges || '<span class="produccion-trace-chip"><strong>Sin responsable</strong><small>Encargado</small></span>'}</div>
-      </article>
-      <div class="produccion-trace-ingredients">${ingredients || '<p class="m-0">Sin desglose de lotes para esta producción.</p>'}</div>
+      </div>
     </section>`;
+  };
+
+  const initTraceDiagramInteractions = (popup) => {
+    const wrap = popup.querySelector('[data-trace-zoom-wrap]');
+    const canvas = popup.querySelector('[data-trace-zoom-canvas]');
+    const zoomLabel = popup.querySelector('[data-trace-zoom-value]');
+    if (!wrap || !canvas || !zoomLabel) return;
+
+    let zoom = 1;
+    const setZoom = (value) => {
+      zoom = Math.min(2.4, Math.max(0.65, value));
+      canvas.style.transform = `scale(${zoom})`;
+      zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
+    };
+
+    popup.querySelector('[data-trace-zoom-in]')?.addEventListener('click', () => setZoom(zoom + 0.12));
+    popup.querySelector('[data-trace-zoom-out]')?.addEventListener('click', () => setZoom(zoom - 0.12));
+    popup.querySelector('[data-trace-zoom-reset]')?.addEventListener('click', () => setZoom(1));
+
+    wrap.addEventListener('wheel', (event) => {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      setZoom(zoom + (event.deltaY < 0 ? 0.1 : -0.1));
+    }, { passive: false });
+
+    let pinchStart = 0;
+    const dist = (touches) => {
+      const [a, b] = touches;
+      return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    };
+
+    wrap.addEventListener('touchstart', (event) => {
+      if (event.touches.length === 2) pinchStart = dist(event.touches);
+    }, { passive: true });
+
+    wrap.addEventListener('touchmove', (event) => {
+      if (event.touches.length !== 2 || !pinchStart) return;
+      const current = dist(event.touches);
+      const ratio = current / pinchStart;
+      setZoom(zoom * ratio);
+      pinchStart = current;
+      event.preventDefault();
+    }, { passive: false });
+
+    setZoom(1);
   };
 
   const openTraceability = async (registro) => {
@@ -1325,6 +1412,7 @@
         popup: 'produccion-trace-alert'
       },
       didOpen: (popup) => {
+        initTraceDiagramInteractions(popup);
         popup.querySelectorAll('[data-prod-trace-images]').forEach((btn) => {
           btn.addEventListener('click', async () => {
             const urls = JSON.parse(decodeURIComponent(btn.dataset.prodTraceImages || '[]'));
@@ -2309,7 +2397,7 @@
 
       const confirm = await openIosSwal({
         title: 'Confirmar producción final',
-        html: `<div class="text-start produccion-confirm-summary produccion-confirm-card"><div class="produccion-confirm-head"><span class="produccion-confirm-icon"><i class="bi bi-check2-circle"></i></span><div><p class="produccion-confirm-kicker">Validación final</p><p class="produccion-confirm-note">Se descontará stock real del inventario al confirmar.</p></div></div><p><strong><i class="bi bi-box-seam"></i> Producto:</strong> <span>${escapeHtml(recipe.title || '-')}</span></p><p><strong><i class="bi bi-calendar-event"></i> Fecha:</strong> <span class="produccion-trace-date">${escapeHtml(formatIsoEs(date))}</span></p><p><strong><i class="bi bi-hourglass-split"></i> VTO producto:</strong> <span class="produccion-confirm-vto">${escapeHtml(formatIsoEs(productExpiry || ''))} (VTO)</span></p><p><strong><i class="bi bi-speedometer2"></i> Total a producir:</strong> <span class="produccion-confirm-total">${qty.toFixed(2)} kg</span></p><p><strong><i class="bi bi-people"></i> Encargado/s:</strong><br>${managerSummary}</p><p><strong><i class="bi bi-list-check"></i> Resumen de insumos:</strong></p><ul>${summaryRows}</ul></div>`,
+        html: `<div class="text-start produccion-confirm-summary produccion-confirm-card"><div class="produccion-confirm-head"><span class="produccion-confirm-icon"><i class="bi bi-check2-circle"></i></span><div><p class="produccion-confirm-kicker">Validación final</p><p class="produccion-confirm-note">Se descontará stock real del inventario al confirmar.</p></div></div><p><strong><i class="bi bi-box-seam fa-solid fa-box-open"></i> Producto:</strong> <span>${escapeHtml(recipe.title || '-')}</span></p><p><strong><i class="bi bi-calendar-event"></i> Fecha:</strong> <span class="produccion-trace-date">${escapeHtml(formatIsoEs(date))}</span></p><p><strong><i class="bi bi-hourglass-split"></i> VTO producto:</strong> <span class="produccion-confirm-vto">${escapeHtml(formatIsoEs(productExpiry || ''))} (VTO)</span></p><p><strong><i class="bi bi-speedometer2"></i> Total a producir:</strong> <span class="produccion-confirm-total">${qty.toFixed(2)} kg</span></p><p><strong><i class="bi bi-people"></i> Encargado/s:</strong><br>${managerSummary}</p><p><strong><i class="bi bi-list-check"></i> Resumen de insumos:</strong></p><ul>${summaryRows}</ul></div>`,
         showCancelButton: true,
         confirmButtonText: 'Confirmar',
         cancelButtonText: 'Cancelar',
