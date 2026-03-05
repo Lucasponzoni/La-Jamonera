@@ -4019,6 +4019,65 @@ html.login-protected.auth-ok body {
   flex-wrap: wrap;
 }
 
+.toolbar-scroll-x {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.toolbar-scroll-x > * {
+  flex: 0 0 auto;
+}
+
+.inventory-production-actions {
+  gap: 8px;
+}
+
+.inventory-production-action-btn {
+  min-height: 38px;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 7px 12px;
+}
+
+.inventory-production-action-btn.is-main {
+  background: #34c759;
+  color: #fff;
+}
+
+.inventory-production-action-btn.is-main:hover {
+  background: #28b14a;
+  color: #fff;
+}
+
+.inventory-production-action-btn.is-view {
+  background: #1f7ae8;
+  color: #fff;
+}
+
+.inventory-production-action-btn.is-view:hover {
+  background: #166ad0;
+  color: #fff;
+}
+
+.inventory-production-action-btn.is-threshold {
+  background: #eceff6;
+  color: #586480;
+  border: 1px solid #d7ddeb;
+}
+
+.inventory-production-action-btn.is-threshold:hover {
+  background: #dee4f0;
+  color: #434f6a;
+}
+
 .inventario-actions-row .ios-btn {
   width: fit-content;
   max-width: none;
@@ -4031,7 +4090,7 @@ html.login-protected.auth-ok body {
   border-radius: 5px;
 }
 
-.inventario-actions-row .inventario-threshold-btn {
+.inventario-actions-row .inventario-threshold-btn:not(.inventory-production-action-btn) {
   min-height: 34px;
   background-color: rgb(230, 230, 230);
   color: rgb(87, 87, 87);
@@ -4041,7 +4100,7 @@ html.login-protected.auth-ok body {
   font-size: 16px;
 }
 
-.inventario-actions-row .inventario-threshold-btn:hover {
+.inventario-actions-row .inventario-threshold-btn:not(.inventory-production-action-btn):hover {
   background-color: rgb(210, 210, 210);
   color: rgb(45, 45, 45);
   cursor: pointer;
@@ -4343,10 +4402,14 @@ html.login-protected.auth-ok body {
 
 .inventario-period-filters {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) auto auto auto auto auto;
+  grid-template-columns: minmax(240px, 1fr);
   gap: 8px;
   margin-bottom: 10px;
   align-items: center;
+}
+
+.inventario-period-actions-scroll {
+  width: 100%;
 }
 
 .inventario-period-filters #inventarioGlobalClearBtn, .inventario-period-filters #produccionGlobalClearBtn {
@@ -4876,6 +4939,10 @@ html.login-protected.auth-ok body {
 
   .inventario-print-row {
     justify-content: flex-start;
+  }
+
+  .toolbar-scroll-x {
+    width: 100%;
   }
 
   .inventario-collapse-head-styled {
