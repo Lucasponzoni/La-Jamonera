@@ -1162,7 +1162,7 @@
     const win = window.open('', '_blank', 'width=1300,height=900');
     if (!win) return;
     const range = parseRangeValue(state.dashboardDateRange);
-    const title = range.from && range.to ? `Ingresos del ${range.from.split('-').reverse().join('/')} al ${range.to.split('-').reverse().join('/')}` : 'Ingresos por período';
+    const title = range.from && range.to ? `Ingresos del ${range.from.split('-').reverse().join('/')} al ${range.to.split('-').reverse().join('/')}` : 'Ingresos por período • La Jamonera';
     win.document.write(`<html><head><title>${title}</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}</style></head><body><h1>${title}</h1>${content || '<p>Sin datos.</p>'}${imagesHtml}</body></html>`);
     win.document.close();
     win.focus();
