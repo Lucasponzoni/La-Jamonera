@@ -420,6 +420,10 @@ html.login-protected.auth-ok body {
   align-items: center;
 }
 
+#loginCard input {
+  min-height: 56px !important;
+}
+
 .support-link {
   display: flex;
   gap: 8px;
@@ -4497,7 +4501,7 @@ html.login-protected.auth-ok body {
   min-width: 0;
 }
 
-#inventarioGlobalRange {
+#inventarioGlobalRange, #produccionGlobalRange {
   border-radius: 5px !important;
 }
 
@@ -6804,7 +6808,6 @@ html.login-protected.auth-ok body {
     padding-top: 10px;
   }
 }
-
 
 .produccion-trace-mermaid-wrap {
   border: 1px solid #d9e3f8;
