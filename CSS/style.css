@@ -3622,6 +3622,16 @@ html.login-protected.auth-ok body {
   gap: 10px;
 }
 
+
+.swal2-popup.produccion-secure-alert :is(.swal2-input, .swal2-file, .swal2-textarea, .swal2-select) {
+  margin: 0;
+  width: 100%;
+}
+
+.swal2-popup.produccion-secure-alert .swal-stack-fields {
+  gap: 8px;
+}
+
 .inventario-total-banner{
   background-color: rgb(244 238 254);
   padding: 5px 10px;
@@ -5736,6 +5746,66 @@ html.login-protected.auth-ok body {
   font-weight: 800;
   font-size: 1.4rem;
   line-height: 1.1;
+}
+
+
+.produccion-confirm-card {
+  background: #f6f9ff;
+  border: 1px solid #dce6fb;
+  border-radius: 14px;
+  padding: 10px;
+}
+
+.produccion-confirm-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.produccion-confirm-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #1f7ae8;
+  background: #e8f1ff;
+  border: 1px solid #cfe0ff;
+  font-size: 1.05rem;
+}
+
+.produccion-confirm-kicker {
+  margin: 0;
+  font-weight: 800;
+  color: #26467d;
+  font-size: 0.85rem;
+}
+
+.produccion-confirm-note {
+  margin: 0;
+  color: #5f6f94;
+  font-size: 0.78rem;
+}
+
+.produccion-trace-date {
+  color: #1f6fd6;
+  font-weight: 700;
+}
+
+.produccion-trace-expiry {
+  color: #b14f10;
+  font-weight: 700;
+}
+
+.produccion-trace-badge {
+  color: #8e2f40;
+  font-weight: 700;
+}
+
+.swal2-popup.produccion-confirm-alert .swal2-icon.swal2-question {
+  display: none !important;
 }
 
 .produccion-fefo-note {

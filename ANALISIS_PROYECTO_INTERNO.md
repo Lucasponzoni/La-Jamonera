@@ -132,3 +132,68 @@
 - Ejecutar pasada de deduplicación en estilos de modales (ingredientes/recetas/informes/inventario).
 - Revisar consistencia responsive entre módulos de alta densidad (listas + editor).
 
+## 8) Profundización técnica Firebase (mapa real de uso)
+
+### 8.1 Módulos conectados a RTDB por wrapper REST
+- `JS/login.js`: lectura de raíz `/`, y nodos `user` + `auth` para validar acceso.
+- `JS/ingredientes.js`: lectura/escritura de `ingredientes_data` (familias, items, metadata).
+- `JS/recetas.js`: CRUD completo en `recetas_data` y sincronización de catálogos de ingredientes.
+- `JS/inventario.js`: gestión de stock, movimientos, alertas de umbral, trazabilidad y reservas.
+- `JS/produccion.js`: configuración de producción, registros por lote, reservas y auditoría.
+- `JS/Informes.js`: árbol `/informes`, índice `/informes_index`, preferencias por usuario y comentarios.
+
+### 8.2 Patrón transversal recomendado (ya casi implementado)
+1. Esperar `window.laJamoneraReady`.
+2. Leer estado actual (`read`) para render inicial.
+3. Transformar in-memory (normalización de objetos/listas).
+4. Persistir con `write`/`update`.
+5. Volver a renderizar con estado ya confirmado.
+
+### 8.3 Riesgos detectados para estabilidad
+- Escrituras concurrentes en nodos grandes (ej. índices de informes) pueden pisarse al no existir transacciones en cliente.
+- La app depende de que el Worker mantenga contrato estable (`/bootstrap`, `/rtdb/*`).
+- No hay cola offline: si falla red, se pierde la operación salvo reintento manual.
+
+## 9) Profundización CSS: estructura de títulos y coherencia visual
+
+### 9.1 Convención exacta de encabezados de bloque
+Se sostiene un patrón consistente, legible y fácil de escanear:
+
+```css
+/* =========================================
+   NOMBRE DEL BLOQUE
+========================================= */
+```
+
+Esto ordena el archivo por dominios de UI, facilita mantenimiento y minimiza colisiones.
+
+### 9.2 Orden práctico recomendado para mantener el estilo actual
+1. **CONFIGURACION GENERAL** (reset, tipografía, base body/html).
+2. **LAYOUT BASE** (shell, contenedores globales).
+3. **NAVEGACIÓN / TOPBAR / FOOTER**.
+4. **COMPONENTES REUTILIZABLES IOS** (botones, inputs, modales, alerts).
+5. **FEATURES POR MÓDULO** (home, ingredientes, recetas, inventario, informes).
+6. **ANIMACIONES Y ESTADOS DE CARGA**.
+7. **RESPONSIVE** al final.
+
+### 9.3 Principios de estilo (alineados a preferencia iOS)
+- Sin sombras paralelas duras (`box-shadow` agresivo).
+- Profundidad lograda por capas de fondo + bordes sutiles.
+- Radios amplios y consistentes.
+- Iconografía clara con color semántico (verde éxito, azul acción, naranja advertencia).
+- Transiciones cortas y suaves para hover/focus/active.
+
+### 9.4 Reutilización de clases para mantener limpieza
+- Base obligatoria por composición:
+  - `.ios-btn` + variante (`.ios-btn-primary`, `.ios-btn-secondary`, etc.).
+  - `.ios-input` y `.ios-input-group` para cualquier formulario o SweetAlert.
+  - `.ios-modal*` para estructura visual homogénea en todas las ventanas.
+- Evitar crear clases monolíticas por pantalla; priorizar utilidades por rol visual.
+- Si una pieza se repite 3+ veces, convertirla en clase reutilizable antes de seguir escalando estilos.
+
+## 10) Checklist de consistencia para futuras iteraciones UI
+- ¿El nuevo bloque CSS tiene encabezado con el formato estándar?
+- ¿Se reutilizaron clases `ios-*` existentes antes de agregar nuevas?
+- ¿La jerarquía visual se logró sin sombras paralelas?
+- ¿Los estados hover/focus son visibles pero sutiles?
+- ¿El responsive quedó ubicado en la sección final sin mezclar reglas base?
