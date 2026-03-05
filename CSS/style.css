@@ -420,6 +420,10 @@ html.login-protected.auth-ok body {
   align-items: center;
 }
 
+#loginCard input {
+  min-height: 56px !important;
+}
+
 .support-link {
   display: flex;
   gap: 8px;
