@@ -1378,6 +1378,10 @@
     }).join('') : '<tr><td colspan="8" class="text-center">Sin producciones en ese rango.</td></tr>';
 
     nodes.historyTableWrap.innerHTML = `
+      <div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x">
+        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionHistoryCollapseAllRowsBtn"><i class="fa-solid fa-compress"></i><span>Colapsar</span></button>
+        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionHistoryExpandAllRowsBtn"><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button>
+      </div>
       <div class="table-responsive inventario-global-table inventario-table-compact-wrap">
         <table class="table recipe-table inventario-table-compact mb-0">
           <thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Acciones</th></tr></thead>
@@ -1937,8 +1941,8 @@
               <input id="produccionRecipeHistoryRange" class="form-control ios-input" autocomplete="off" placeholder="Rango de fechas" value="${escapeHtml(recipeHistoryState.range)}">
             </div>
             <div class="inventario-print-row toolbar-scroll-x">
-              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeHistoryCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button>
-              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeHistoryExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button>
+              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeHistoryCollapseAllRowsBtn"><i class="fa-solid fa-compress"></i><span>Colapsar</span></button>
+              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeHistoryExpandAllRowsBtn"><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button>
             </div>
             <div class="inventario-print-row toolbar-scroll-x">
               <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn ${recipeHistoryState.range ? '' : 'd-none'}" id="produccionRecipeHistoryClearBtn"><i class="fa-solid fa-xmark"></i><span>Limpiar rango</span></button>
