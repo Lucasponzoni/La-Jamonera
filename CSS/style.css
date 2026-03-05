@@ -4001,9 +4001,7 @@ html.login-protected.auth-ok body {
 
 .inventario-stock-line {
   margin: 6px 0 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: block;
   color: #4c5e86;
 }
 
@@ -4015,7 +4013,13 @@ html.login-protected.auth-ok body {
 .inventario-stock-unit {
   font-size: 0.78rem;
   font-weight: 700;
-  color: #63739a;
+  color: #1f4ea5;
+  margin-left: 4px;
+}
+
+.inventario-stock-line > span {
+  display: block;
+  margin-top: 2px;
 }
 
 .inventario-actions-row {
@@ -4294,6 +4298,10 @@ html.login-protected.auth-ok body {
   font-size: 18px;
 }
 
+.inventario-stock-line.is-zero .inventario-stock-unit {
+  color: #cc3f52;
+}
+
 .inventario-threshold-btn {
   width: fit-content;
   max-width: none;
@@ -4479,7 +4487,7 @@ html.login-protected.auth-ok body {
   min-width: 0;
 }
 
-#inventarioGlobalRange , #produccionGlobalRange{
+#inventarioGlobalRange {
   border-radius: 5px !important;
 }
 
@@ -6273,10 +6281,7 @@ html.login-protected.auth-ok body {
 }
 
 .inventario-available-line.is-zero {
-    color: #cc3f52;
-    background-color: #fdefef;
-    padding: 2px 4px;
-    border-radius: 10px;
+  color: #cc3f52;
 }
 
 .produccion-visualizar-btn {
