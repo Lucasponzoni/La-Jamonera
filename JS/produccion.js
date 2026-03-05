@@ -260,7 +260,7 @@
         const nextAvailableQty = Math.max(0, Number((currentAvailableQty + (sign * safeAmount)).toFixed(4)));
         const nextAvailableKg = Number((toBase(nextAvailableQty, entry.unit || lot.unit) / 1000).toFixed(4));
 
-        entry.availableQty = Number(nextAvailableQty.toFixed(2));
+        entry.availableQty = Number(nextAvailableQty.toFixed(4));
         entry.availableKg = nextAvailableKg;
         entry.lotStatus = nextAvailableQty <= 0 ? 'consumido_en_produccion' : 'disponible';
 
@@ -761,6 +761,9 @@
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
+      customClass: {
+        popup: 'produccion-umbral-alert'
+      },
       preConfirm: () => {
         const value = document.getElementById('produccionGlobalMinInput')?.value;
         const n = parseNumber(value);
@@ -782,13 +785,16 @@
     const currentRaw = state.config.recipeMinKg?.[recipeId];
     const result = await openIosSwal({
       title: 'Umbral por producto',
-      html: `<div class="text-start">
+      html: `<div class="text-center produccion-umbral-form">
           <label class="form-label" for="produccionRecipeMinInput">Umbral de stock (kg)</label>
           <input id="produccionRecipeMinInput" type="number" min="0" step="0.01" class="swal2-input ios-input" value="${normalizeValue(currentRaw)}" placeholder="Vacío = usar global">
         </div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
+      customClass: {
+        popup: 'produccion-umbral-alert'
+      },
       preConfirm: () => {
         const value = normalizeValue(document.getElementById('produccionRecipeMinInput')?.value);
         if (!value) return null;
