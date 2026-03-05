@@ -6544,3 +6544,311 @@ html.login-protected.auth-ok body {
   height: 100%;
   object-fit: cover;
 }
+
+
+/* =========================================
+   TRAZABILIDAD · DIAGRAMA IOS
+========================================= */
+.produccion-trace-toolbar-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.produccion-trace-zoom-value {
+  min-width: 58px;
+  text-align: center;
+  font-weight: 800;
+  color: #2f4f8b;
+  background: #eef3ff;
+  border: 1px solid #d7e2f8;
+  border-radius: 10px;
+  padding: 4px 8px;
+}
+
+.produccion-trace-diagram-wrap {
+  max-height: 68vh;
+  overflow: auto;
+  border: 1px solid #dbe4f8;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.45);
+  touch-action: pan-x pan-y;
+}
+
+.produccion-trace-diagram {
+  min-width: 980px;
+  padding: 14px;
+  transform-origin: top left;
+}
+
+.produccion-trace-flow-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) 120px minmax(240px, 1fr);
+  gap: 10px 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.produccion-trace-flow-card,
+.produccion-trace-flow-side {
+  border: 1px solid #d7e2f7;
+  border-radius: 14px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+  color: #29467f;
+  font-weight: 800;
+  background: #fff;
+}
+
+.produccion-trace-flow-card i,
+.produccion-trace-flow-side i {
+  font-size: 0.95rem;
+  opacity: 0.9;
+}
+
+.produccion-trace-flow-side small {
+  color: #6377a1;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.produccion-trace-flow-card.is-product { background: #dfeaff; }
+.produccion-trace-flow-card.is-production { background: #fff5c6; }
+.produccion-trace-flow-card.is-ingredients { background: #d6f5e4; }
+.produccion-trace-flow-card.is-waste { background: #ffe0e0; }
+.produccion-trace-flow-side.is-lot { background: #fff3df; }
+.produccion-trace-flow-side.is-manager { background: #e7e3ff; }
+
+.produccion-trace-flow-arrow {
+  text-align: center;
+  font-size: 1.15rem;
+  color: #4f6ea9;
+  font-weight: 900;
+}
+
+.produccion-trace-ingredient-card {
+  border: 1px solid #dbe4f8;
+  border-radius: 14px;
+  background: #f8fbff;
+  padding: 12px;
+}
+
+.produccion-trace-ingredient-card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.produccion-trace-ingredient-head-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.produccion-trace-ingredient-index {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #dfeaff;
+  color: #284782;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.75rem;
+}
+
+.produccion-trace-ingredient-head-main h6 {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 991.98px) {
+  .produccion-trace-diagram {
+    min-width: 860px;
+  }
+}
+
+
+.produccion-trace-flow-board {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.produccion-trace-flow-col {
+  display: grid;
+  gap: 8px;
+}
+
+.produccion-trace-flow-col.is-side {
+  align-content: start;
+}
+
+.produccion-trace-flow-card,
+.produccion-trace-flow-side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-width: 1px;
+}
+
+.produccion-trace-flow-card > div,
+.produccion-trace-flow-side > div {
+  display: grid;
+  gap: 2px;
+}
+
+.produccion-trace-flow-card small,
+.produccion-trace-flow-side small {
+  font-size: .72rem;
+  color: #6b7fa8;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  font-weight: 800;
+}
+
+.produccion-trace-flow-card span,
+.produccion-trace-flow-side span {
+  font-weight: 900;
+  color: #214379;
+}
+
+.produccion-trace-flow-connector {
+  position: relative;
+  height: 26px;
+  display: grid;
+  place-items: center;
+}
+
+.produccion-trace-flow-connector::before {
+  content: '';
+  position: absolute;
+  background: #7f95c2;
+}
+
+.produccion-trace-flow-connector.is-down::before {
+  width: 2px;
+  height: 22px;
+}
+
+.produccion-trace-flow-connector.is-right::before {
+  width: 88%;
+  height: 2px;
+}
+
+.produccion-trace-flow-connector span {
+  z-index: 1;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #f0f4ff;
+  color: #375c99;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d2dcf2;
+}
+
+.produccion-trace-product-thumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid #d6e0f6;
+  background: #f0f4ff;
+}
+
+.produccion-trace-product-thumb.is-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #3f5d95;
+}
+
+.produccion-trace-ingredients {
+  gap: 14px;
+  padding-right: 4px;
+}
+
+.produccion-trace-ingredient-card {
+  background: #fbfdff;
+  padding: 14px;
+}
+
+.produccion-trace-lot-card {
+  background: #fff;
+  border-color: #d6e1f8;
+}
+
+@media (max-width: 991.98px) {
+  .produccion-trace-flow-board {
+    grid-template-columns: 1fr;
+  }
+
+  .produccion-trace-flow-connector.is-right::before {
+    width: 2px;
+    height: 20px;
+  }
+
+  .produccion-trace-flow-col.is-side {
+    border-top: 1px dashed #d5dff5;
+    padding-top: 10px;
+  }
+}
+
+
+.produccion-trace-mermaid-wrap {
+  border: 1px solid #d9e3f8;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+
+.produccion-trace-mermaid {
+  min-height: 260px;
+  overflow: auto;
+}
+
+.produccion-trace-mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.produccion-trace-product-preview {
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  border: 1px solid #d6e0f6;
+  background: #eff4ff;
+  color: #355995;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.produccion-trace-product-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+
+.produccion-trace-cytoscape {
+  width: 100%;
+  min-height: 760px;
+  border: 1px solid #dce5f8;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f9fbff 0%, #ffffff 100%);
+}

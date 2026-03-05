@@ -1,7 +1,6 @@
 (function produccionModule() {
   const produccionModal = document.getElementById('produccionModal');
   if (!produccionModal) return;
-
   const nodes = {
     loading: document.getElementById('produccionLoading'),
     empty: document.getElementById('produccionEmpty'),
@@ -20,7 +19,6 @@
     historyLoading: document.getElementById('produccionGlobalLoading'),
     historyTableWrap: document.getElementById('produccionGlobalTableWrap')
   };
-
   const FIAMBRES_IMAGE = 'https://i.postimg.cc/fyvNDdrt/FIambres.png';
   const BASE_ICON = '<i class="fa-solid fa-drumstick-bite"></i>';
   const CONFIG_PATH = '/produccion/config';
@@ -32,7 +30,6 @@
   const RESERVE_TTL_MS = 10 * 60 * 1000;
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
-
   const state = {
     recetas: {},
     ingredientes: {},
@@ -67,7 +64,6 @@
       companyLogoUrl: ''
     }
   };
-
   const safeObject = (value) => (value && typeof value === 'object' ? value : {});
   const normalizeValue = (value) => String(value || '').trim();
   const normalizeLower = (value) => normalizeValue(value).toLowerCase();
@@ -82,7 +78,6 @@
   };
   const makeId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const nowTs = () => Date.now();
-
   const sessionId = (() => {
     const key = 'laJamoneraProduccionSessionId';
     const current = normalizeValue(localStorage.getItem(key));
@@ -91,9 +86,7 @@
     localStorage.setItem(key, next);
     return next;
   })();
-
   const getCurrentUserLabel = () => 'La Jamonera';
-
   const getUnitMeta = (unitRaw) => {
     const unit = normalizeLower(unitRaw);
     const massMap = {
@@ -111,26 +104,22 @@
     if (['paquete', 'paquetes', 'pack', 'packs'].includes(unit)) return { category: 'paquete', factor: 1, label: 'paquete' };
     return { category: 'otro', factor: 1, label: unit || 'otro' };
   };
-
   const toBase = (qty, unit) => {
     const meta = getUnitMeta(unit);
     const amount = parseNumber(qty);
     if (!Number.isFinite(amount)) return Number.NaN;
     return amount * meta.factor;
   };
-
   const fromBase = (baseQty, unit) => {
     const meta = getUnitMeta(unit);
     return Number(baseQty || 0) / (meta.factor || 1);
   };
-
   const getEntryAvailableQty = (entry) => {
     const available = parseNumber(entry?.availableQty);
     if (Number.isFinite(available) && available >= 0) return available;
     const qty = parseNumber(entry?.qty);
     return Number.isFinite(qty) && qty > 0 ? qty : 0;
   };
-
   const getEntryAvailableKg = (entry) => {
     const availableKg = Number(entry?.availableKg);
     if (Number.isFinite(availableKg) && availableKg >= 0) return availableKg;
@@ -138,7 +127,6 @@
     const base = toBase(availableQty, entry?.unit);
     return Number.isFinite(base) ? Number((base / 1000).toFixed(4)) : 0;
   };
-
   const formatQty = (value, unit = '', digits = 2) => `${Number(value || 0).toFixed(digits)} ${unit}`.trim();
   const formatCompactQty = (value, unit = '') => {
     const amount = Number(value || 0);
@@ -151,7 +139,6 @@
     if (Number.isNaN(date.getTime())) return '';
     return date.toISOString().slice(0, 10);
   };
-
   const getArgentinaIsoDate = (dateObj) => {
     if (!(dateObj instanceof Date) || Number.isNaN(dateObj.getTime())) return '';
     const parts = new Intl.DateTimeFormat('en-CA', {
@@ -163,13 +150,11 @@
     const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
     return `${map.year}-${map.month}-${map.day}`;
   };
-
   const getProductionDayMap = () => getRegistrosList().reduce((acc, item) => {
     const iso = getArgentinaIsoDate(new Date(Number(item?.createdAt || 0)));
     if (iso) acc[iso] = (acc[iso] || 0) + 1;
     return acc;
   }, {});
-
   const formatDate = (value) => {
     if (!value) return 'Nunca producida';
     const d = new Date(Number(value));
@@ -187,14 +172,12 @@
     if (!match) return text.replaceAll('-', '');
     return `${match[3]}${match[2]}${match[1]}`;
   };
-
   const formatIsoEs = (iso) => {
     const text = normalizeValue(iso);
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
     if (!match) return text || 'Sin VTO';
     return `${match[3]}-${match[2]}-${match[1]}`;
   };
-
   const addDaysToIso = (isoDate, days) => {
     const text = normalizeValue(isoDate);
     if (!text) return '';
@@ -203,7 +186,6 @@
     utc.setUTCDate(utc.getUTCDate() + Number(days || 0));
     return utc.toISOString().slice(0, 10);
   };
-
   const resolveProductExpiryIso = (registro) => {
     const persisted = normalizeValue(registro?.productExpiryDate);
     if (persisted) return persisted;
@@ -213,30 +195,24 @@
     if (!Number.isFinite(shelfLifeDays) || shelfLifeDays <= 0 || !productionDate) return '';
     return addDaysToIso(productionDate, shelfLifeDays);
   };
-
   const formatProductExpiryLabel = (registro) => {
     const expiryIso = resolveProductExpiryIso(registro);
     if (!expiryIso) return 'Sin VTO';
     return formatIsoEs(expiryIso);
   };
-
   const escapeHtml = (value) => String(value || '')
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
-
-
   const deepClone = (value) => JSON.parse(JSON.stringify(value || {}));
   const getRegistrosList = () => Object.values(safeObject(state.registros));
-
   const getGeneralPassword = async () => {
     await window.laJamoneraReady;
     const value = await window.dbLaJamoneraRest.read('/passGeneral/pass');
     return normalizeValue(value);
   };
-
   const askSensitivePassword = async (title, html, withReason = false) => {
     const result = await openIosSwal({
       title,
@@ -263,7 +239,6 @@
     });
     return result;
   };
-
   const appendAudit = async ({ action, productionId = '', before = null, after = null, reason = '' }) => {
     const existing = safeObject(await window.dbLaJamoneraRest.read(AUDIT_PATH));
     const id = makeId('audit');
@@ -279,14 +254,12 @@
     };
     await window.dbLaJamoneraRest.write(AUDIT_PATH, existing);
   };
-
   const updateEntryMovement = (entry, movement) => {
     const next = { ...entry };
     next.movementHistory = Array.isArray(next.movementHistory) ? next.movementHistory : [];
     next.movementHistory.unshift(movement);
     return next;
   };
-
   const applyPlanOnInventory = (inventorySource, plan, productionId, productionDate, mode = 'consume') => {
     const inventoryNext = safeObject(inventorySource);
     plan.ingredientPlans.forEach((item) => {
@@ -302,11 +275,9 @@
         const sign = mode === 'consume' ? -1 : 1;
         const nextAvailableQty = Math.max(0, Number((currentAvailableQty + (sign * safeAmount)).toFixed(4)));
         const nextAvailableKg = Number((toBase(nextAvailableQty, entry.unit || lot.unit) / 1000).toFixed(4));
-
         entry.availableQty = Number(nextAvailableQty.toFixed(4));
         entry.availableKg = nextAvailableKg;
         entry.lotStatus = nextAvailableQty <= 0 ? 'consumido_en_produccion' : 'disponible';
-
         entry.productionUsage = Array.isArray(entry.productionUsage) ? [...entry.productionUsage] : [];
         if (mode === 'restore') {
           entry.productionUsage = entry.productionUsage.filter((usage) => normalizeValue(usage?.productionId) !== normalizeValue(productionId));
@@ -324,7 +295,6 @@
             ingredientId: item.ingredientId
           });
         }
-
         const moveType = mode === 'consume' ? 'consumo_produccion' : 'reversion_produccion';
         nextEntries[index] = updateEntryMovement(entry, {
           type: moveType,
@@ -347,14 +317,12 @@
     });
     return inventoryNext;
   };
-
   const initialsFromName = (value) => normalizeValue(value)
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
     .map((item) => item.charAt(0).toUpperCase())
     .join('');
-
   const renderUserAvatar = (user) => {
     if (normalizeValue(user?.photoUrl)) {
       return `<span class="user-avatar-thumb"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-user-photo" src="${user.photoUrl}" alt="${normalizeValue(user.fullName || user.email || 'Usuario')}"></span>`;
@@ -362,7 +330,6 @@
     const initials = initialsFromName(user?.fullName || user?.email || '');
     return `<span class="user-avatar-thumb user-avatar-initials">${initials || '<i class="bi bi-person-fill"></i>'}</span>`;
   };
-
   const prepareThumbLoaders = (selector) => {
     const list = Array.from(document.querySelectorAll(selector));
     list.forEach((img) => {
@@ -380,11 +347,9 @@
       }
     });
   };
-
   const waitPrintAssets = async (printWindow) => {
     const images = [...(printWindow?.document?.images || [])];
     if (!images.length) return;
-
     await Promise.all(images.map((img) => new Promise((resolve) => {
       if (img.complete) {
         resolve();
@@ -395,11 +360,9 @@
       img.addEventListener('error', done, { once: true });
     })));
   };
-
   const preloadPrintImages = async (urls = []) => {
     const unique = [...new Set((Array.isArray(urls) ? urls : []).filter(Boolean))];
     if (!unique.length) return;
-
     Swal.fire({
       title: 'Preparando impresión...',
       html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Preparando impresión" class="meta-spinner-login"></div>',
@@ -411,7 +374,6 @@
         htmlContainer: 'ios-alert-text'
       }
     });
-
     try {
       await Promise.all(unique.map((url) => new Promise((resolve) => {
         const img = new Image();
@@ -423,7 +385,6 @@
       if (Swal.isVisible()) Swal.close();
     }
   };
-
   const openIosSwal = (options) => Swal.fire({
     ...options,
     returnFocus: false,
@@ -438,7 +399,6 @@
     },
     buttonsStyling: false
   });
-
   const exportStyledExcel = async ({ fileName, sheetName, headers, rows }) => {
     if (!window.ExcelJS) return;
     const wb = new window.ExcelJS.Workbook();
@@ -446,7 +406,6 @@
     ws.columns = headers.map((header) => ({ header, key: header, width: 24 }));
     ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: headers.length } };
     ws.views = [{ state: 'frozen', ySplit: 1 }];
-
     const headerRow = ws.getRow(1);
     headerRow.height = 24;
     headerRow.eachCell((cell) => {
@@ -460,7 +419,6 @@
         right: { style: 'thin', color: { argb: 'FFCED8EE' } }
       };
     });
-
     rows.forEach((data, index) => {
       const rowData = headers.reduce((acc, header) => {
         acc[header] = data[header] ?? '';
@@ -482,7 +440,6 @@
         }
       });
     });
-
     const buf = await wb.xlsx.writeBuffer();
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
@@ -494,18 +451,15 @@
     a.remove();
     URL.revokeObjectURL(url);
   };
-
   const readMinKgForRecipe = (recipeId) => {
     const local = parseNumber(state.config.recipeMinKg?.[recipeId]);
     if (Number.isFinite(local) && local > 0) return local;
     return parsePositive(state.config.globalMinKg, 1);
   };
-
   const persistConfig = async () => {
     await window.laJamoneraReady;
     await window.dbLaJamoneraRest.write(CONFIG_PATH, state.config);
   };
-
   const uploadImageToStorage = async (file, folder) => {
     const safeName = String(file?.name || 'logo').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '');
     const refPath = `${folder}/${Date.now()}_${safeName}`;
@@ -513,7 +467,6 @@
     await ref.put(file);
     return ref.getDownloadURL();
   };
-
   const setStateView = (view) => {
     state.view = view;
     if (view !== 'list' && state.draftsTick) {
@@ -525,20 +478,16 @@
     nodes.data.classList.toggle('d-none', view !== 'list');
     nodes.editor.classList.toggle('d-none', view !== 'editor');
   };
-
   const updateProduccionListScrollHint = () => {
     if (!nodes.list) return;
     const hasOverflow = nodes.list.scrollHeight > nodes.list.clientHeight + 4;
     const isAtEnd = nodes.list.scrollTop + nodes.list.clientHeight >= nodes.list.scrollHeight - 4;
     nodes.list.classList.toggle('has-scroll-hint', hasOverflow && !isAtEnd);
   };
-
   const getRecipes = () => Object.values(safeObject(state.recetas));
   const getThumbPlaceholder = () => `<span class="image-placeholder-circle-2">${BASE_ICON}</span>`;
-
   const activeReservations = () => Object.values(safeObject(state.reservas))
     .filter((item) => Number(item?.expiresAt || 0) > nowTs() && item.status !== 'released');
-
   const reservedByOthersForEntry = (ingredientId, entryId, unit) => {
     const baseUnit = normalizeLower(unit);
     const baseMeta = getUnitMeta(baseUnit);
@@ -556,12 +505,10 @@
       return acc;
     }, 0);
   };
-
   const getInventoryAvailability = (ingredientId, targetUnit, productionDateIso = toIsoDate()) => {
     const record = safeObject(state.inventario.items?.[ingredientId]);
     const entries = Array.isArray(record.entries) ? record.entries : [];
     const targetMeta = getUnitMeta(targetUnit);
-
     if (!entries.length && targetMeta.category === 'peso') {
       const stockKg = Number(record.stockKg || 0);
       const base = Number.isFinite(stockKg) ? stockKg * 1000 : 0;
@@ -575,7 +522,6 @@
         nextToExpire: null
       };
     }
-
     const aggregate = entries.reduce((acc, entry) => {
       const qty = getEntryAvailableQty(entry);
       if (!Number.isFinite(qty) || qty <= 0) return acc;
@@ -596,7 +542,6 @@
       if (!acc.nextToExpire && expiryIso) acc.nextToExpire = expiryIso;
       return acc;
     }, { totalBase: 0, usableBase: 0, incompatible: [], hasExpired: false, nextToExpire: null });
-
     return {
       available: fromBase(aggregate.usableBase, targetUnit),
       total: fromBase(aggregate.totalBase, targetUnit),
@@ -605,13 +550,11 @@
       nextToExpire: aggregate.nextToExpire
     };
   };
-
   const analyzeRecipe = (recipe, productionDateIso = toIsoDate()) => {
     const rows = (Array.isArray(recipe.rows) ? recipe.rows : []).filter((row) => row.type === 'ingredient');
     const yieldQty = parseNumber(recipe.yieldQuantity);
     const yieldMeta = getUnitMeta(recipe.yieldUnit);
     const minKg = readMinKgForRecipe(recipe.id);
-
     if (!Number.isFinite(yieldQty) || yieldQty <= 0 || yieldMeta.category !== 'peso') {
       return {
         status: 'danger', statusText: 'Configuración inválida', maxKg: 0, progress: 0, canProduce: false,
@@ -619,11 +562,9 @@
         requirements: [], missingForMin: [], hasExpired: false, minKg
       };
     }
-
     const yieldKg = toBase(yieldQty, recipe.yieldUnit) / 1000;
     const requirements = [];
     const errors = [];
-
     rows.forEach((row) => {
       const reqQty = parseNumber(row.quantity);
       const unit = normalizeLower(row.unit);
@@ -645,7 +586,6 @@
         hasExpired: availability.hasExpired
       });
     });
-
     if (!requirements.length) {
       return {
         status: 'danger', statusText: 'Sin insumos', maxKg: 0, progress: 0, canProduce: false,
@@ -653,7 +593,6 @@
         requirements: [], missingForMin: [], hasExpired: false, minKg
       };
     }
-
     const minCoverage = Math.min(...requirements.map((item) => item.coverage));
     const maxKg = Math.max(0, minCoverage);
     const readyCount = requirements.filter((item) => item.missingForMin <= 0.0001).length;
@@ -661,7 +600,6 @@
     const canProduce = maxKg >= minKg;
     const missingForMin = requirements.filter((item) => item.missingForMin > 0.0001);
     const hasExpired = requirements.some((item) => item.hasExpired);
-
     let status = 'danger';
     let statusText = 'Faltan insumos';
     if (canProduce) {
@@ -671,36 +609,30 @@
       status = 'warning';
       statusText = 'Stock parcial';
     }
-
     return { status, statusText, maxKg, progress, canProduce, errors, requirements, missingForMin, hasExpired, minKg };
   };
-
   const sortEntriesFEFO = (entries = []) => [...entries].sort((a, b) => {
     const expiryA = normalizeValue(a.expiryDate) || '9999-12-31';
     const expiryB = normalizeValue(b.expiryDate) || '9999-12-31';
     if (expiryA !== expiryB) return expiryA.localeCompare(expiryB);
     return Number(a.createdAt || 0) - Number(b.createdAt || 0);
   });
-
   const buildPlanForRecipe = (recipe, qtyKg, productionDateIso = toIsoDate()) => {
     const analysis = analyzeRecipe(recipe, productionDateIso);
     const ingredientPlans = [];
     const conflicts = [];
     const warnings = [];
-
     analysis.requirements.forEach((requirement) => {
       const rowNeed = requirement.neededPerKg * qtyKg;
       let remaining = rowNeed;
       const record = safeObject(state.inventario.items?.[requirement.ingredientId]);
       const entries = sortEntriesFEFO(Array.isArray(record.entries) ? record.entries : []);
       const lots = [];
-
       entries.forEach((entry) => {
         const entryUnit = normalizeLower(entry.unit || requirement.unit);
         const entryMeta = getUnitMeta(entryUnit);
         const reqMeta = getUnitMeta(requirement.unit);
         if (entryMeta.category !== reqMeta.category) return;
-
         const entryQty = getEntryAvailableQty(entry);
         const reservedByOther = reservedByOthersForEntry(requirement.ingredientId, entry.id, entryUnit);
         const available = Math.max(0, entryQty - reservedByOther);
@@ -709,11 +641,9 @@
         const isSoon = expiryIso && expiryIso >= productionDateIso && expiryIso <= toIsoDate(new Date(productionDateIso).getTime() + 2 * 86400000);
         if (isSoon) warnings.push(`${requirement.name}: lote próximo a vencer (${expiryIso}).`);
         if (status === 'expired') return;
-
         const availableInReqUnit = fromBase(toBase(available, entryUnit), requirement.unit);
         const take = Math.min(remaining, availableInReqUnit);
         if (take <= 0) return;
-
         remaining = Number((remaining - take).toFixed(6));
         const lotNumber = normalizeValue(entry.lotNumber) || normalizeValue(entry.invoiceNumber) || entry.id;
         lots.push({
@@ -736,12 +666,10 @@
           status: isSoon ? 'soon' : 'ok'
         });
       });
-
       const missing = Math.max(0, Number(remaining.toFixed(4)));
       if (missing > 0.0001) {
         conflicts.push(`${requirement.name}: faltan ${formatQty(missing, requirement.unit)} para la fecha ${productionDateIso}.`);
       }
-
       ingredientPlans.push({
         ingredientId: requirement.ingredientId,
         ingredientName: requirement.name,
@@ -752,7 +680,6 @@
         lots
       });
     });
-
     const flatLocks = ingredientPlans.flatMap((item) => item.lots.map((lot) => ({
       ingredientId: lot.ingredientId,
       entryId: lot.entryId,
@@ -761,7 +688,6 @@
       unit: lot.unit,
       lotNumber: lot.lotNumber
     })));
-
     return {
       recipeId: recipe.id,
       qtyKg: Number(qtyKg.toFixed(2)),
@@ -773,7 +699,6 @@
       isValid: conflicts.length === 0
     };
   };
-
   const cleanupExpiredReservations = async () => {
     const now = nowTs();
     const reservas = safeObject(await window.dbLaJamoneraRest.read(RESERVAS_PATH));
@@ -789,7 +714,6 @@
     if (changed) await window.dbLaJamoneraRest.write(RESERVAS_PATH, updates);
     state.reservas = changed ? updates : reservas;
   };
-
   const releaseReservation = async (reason = 'manual') => {
     if (!state.activeReservationId) return;
     const reservation = safeObject(state.reservas[state.activeReservationId]);
@@ -816,7 +740,6 @@
       state.draftsTick = null;
     }
   };
-
   const ensureReservationForPlan = async (plan) => {
     if (!plan?.locks?.length) return;
     if (state.activeReservationId) await releaseReservation('refresh');
@@ -836,7 +759,6 @@
     await window.dbLaJamoneraRest.write(RESERVAS_PATH, next);
     state.reservas = next;
     state.activeReservationId = reservationId;
-
     if (state.reservationTick) clearInterval(state.reservationTick);
     state.reservationTick = setInterval(async () => {
       const remaining = Number(reservation.expiresAt || 0) - nowTs();
@@ -858,7 +780,6 @@
       }
     }, 5000);
   };
-
   const persistDraft = async (payload) => {
     const draftId = `${sessionId}_${payload.recipeId}`;
     const draft = {
@@ -873,7 +794,6 @@
     state.drafts = next;
     state.activeDraftId = draftId;
   };
-
   const discardDraft = async () => {
     if (!state.activeDraftId) return;
     const next = { ...state.drafts };
@@ -883,17 +803,13 @@
     state.activeDraftId = '';
     state.activeReservationId = '';
   };
-
   const getCurrentDraftForRecipe = (recipeId) => {
     const own = Object.values(safeObject(state.drafts)).find((item) => item.recipeId === recipeId && item.ownerSessionId === sessionId);
     return own || null;
   };
-
   const getOwnDrafts = () => Object.values(safeObject(state.drafts))
     .filter((item) => item.ownerSessionId === sessionId && item.status === 'active' && item.recipeId)
     .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
-
-
   const getDraftReservationCountdown = (draft) => {
     const reservationId = normalizeValue(draft?.reservationId);
     if (!reservationId) return null;
@@ -905,9 +821,7 @@
     const secs = Math.floor((remainingMs % 60000) / 1000);
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
-
   const getForeignDraftConflict = (recipeId) => Object.values(safeObject(state.drafts)).find((item) => item.recipeId === recipeId && item.ownerSessionId !== sessionId);
-
   const openGlobalMinConfig = async () => {
     const result = await openIosSwal({
       title: 'Configuración de Producción',
@@ -966,9 +880,7 @@
             setFallback();
           };
         };
-
         setImage(state.config.companyLogoUrl);
-
         toggleBtn?.addEventListener('click', () => {
           const hidden = body?.classList.contains('d-none');
           body?.classList.toggle('d-none', !hidden);
@@ -1023,7 +935,6 @@
     recomputeAnalysis();
     renderList();
   };
-
   const openRecipeMinConfig = async (recipeId) => {
     const currentRaw = state.config.recipeMinKg?.[recipeId];
     const result = await openIosSwal({
@@ -1059,8 +970,6 @@
     recomputeAnalysis();
     renderList();
   };
-
-
   const getUserByManagerToken = (token) => {
     const key = normalizeValue(token);
     if (!key) return null;
@@ -1075,7 +984,6 @@
       return options.includes(normalizeLower(key));
     }) || null;
   };
-
   const getManagerDisplay = (token) => {
     const user = getUserByManagerToken(token);
     const raw = normalizeValue(token);
@@ -1085,13 +993,11 @@
       role: normalizeValue(user?.position || user?.role || user?.sector) || 'Encargado'
     };
   };
-
   const getManagerLabel = (item) => {
     const managers = Array.isArray(item?.managers) ? item.managers : [];
     const first = managers[0] || item?.createdBy || '';
     return getManagerDisplay(first);
   };
-
   const getHistoryRows = () => {
     const [from, to] = normalizeValue(state.historyRange).split(' a ').map((item) => normalizeValue(item));
     const fromTs = from ? new Date(`${from}T00:00:00`).getTime() : 0;
@@ -1105,7 +1011,6 @@
       })
       .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
   };
-
   const getTraceRowsFromRegistro = (registro) => (Array.isArray(registro?.lots) ? registro.lots : [])
     .flatMap((ingredientPlan) => (Array.isArray(ingredientPlan?.lots) ? ingredientPlan.lots : []).map((lot, index) => ({
       id: `${registro.id}_${ingredientPlan.ingredientId || 'ing'}_${lot.entryId || index}`,
@@ -1119,7 +1024,6 @@
       lotNumber: normalizeValue(lot?.lotNumber || lot?.entryId || lot?.invoiceNumber) || '-',
       invoiceImageUrls: Array.isArray(lot?.invoiceImageUrls) ? lot.invoiceImageUrls : []
     })));
-
   const markProductionExport = async (productionId, type) => {
     const registros = deepClone(state.registros);
     const reg = registros[productionId];
@@ -1132,7 +1036,6 @@
     await window.dbLaJamoneraRest.write(REGISTROS_PATH, registros);
     state.registros = registros;
   };
-
   const reportHtml = (registro, withAttachments = true) => {
     const lotRows = (registro.lots || []).map((item) => `
       <tr><td colspan="10" style="background:#eef3ff;font-weight:700">${escapeHtml(item.ingredientName || item.ingredientId)}</td></tr>
@@ -1149,7 +1052,6 @@
         <td>${escapeHtml(lot.productionDate || registro.productionDate || '-')}</td>
       </tr>`).join('')}
     `).join('');
-
     return `
       <div class="report-viewer-content-wrap" style="text-align:left">
         <h3 style="margin:0 0 6px">Informe de producción ${escapeHtml(registro.id)}</h3>
@@ -1162,7 +1064,6 @@
         </table></div>
       </div>`;
   };
-
   const printReport = async (registro) => {
     const include = await openIosSwal({
       title: 'Imprimir informe',
@@ -1183,7 +1084,6 @@
     win.print();
     await markProductionExport(registro.id, 'print');
   };
-
   const exportProductionExcel = async (registro) => {
     if (!window.ExcelJS) return;
     const wb = new window.ExcelJS.Workbook();
@@ -1233,7 +1133,6 @@
     URL.revokeObjectURL(url);
     await markProductionExport(registro.id, 'excel');
   };
-
   const exportProductionPdf = async (registro) => {
     if (!window.jspdf?.jsPDF) return;
     const doc = new window.jspdf.jsPDF();
@@ -1246,23 +1145,37 @@
     doc.save(`${registro.id}.pdf`);
     await markProductionExport(registro.id, 'pdf');
   };
-
+  const ensureTraceDiagramLib = async () => {
+    if (window.cytoscape) return true;
+    if (window.__laJamoneraLoadingCytoscape) return window.__laJamoneraLoadingCytoscape;
+    window.__laJamoneraLoadingCytoscape = new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/cytoscape@3.29.2/dist/cytoscape.min.js';
+      script.async = true;
+      script.onload = () => resolve(Boolean(window.cytoscape));
+      script.onerror = () => resolve(false);
+      document.head.appendChild(script);
+    });
+    return window.__laJamoneraLoadingCytoscape;
+  };
   const renderTraceabilityTree = (registro) => {
-    const managerBadges = (Array.isArray(registro.managers) ? registro.managers : [])
-      .map((token) => {
-        const manager = getManagerDisplay(token);
-        return `<span class="produccion-trace-chip"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span>`;
-      }).join('');
-
-    const ingredients = (registro.lots || []).map((item) => {
+    const safeToKg = (qty, unit) => {
+      const amount = Number(qty || 0);
+      const normalizedUnit = normalizeLower(unit || 'kg');
+      if (normalizedUnit.includes('gram')) return amount / 1000;
+      if (normalizedUnit in { g: 1, gr: 1, gramo: 1, gramos: 1 }) return amount / 1000;
+      return amount;
+    };
+    const ingredients = (registro.lots || []).map((item, idx) => {
       const ingredientImage = normalizeValue(state.ingredientes[item.ingredientId]?.imageUrl);
+      const aggregatedImages = (item.lots || []).flatMap((lot) => Array.isArray(lot.invoiceImageUrls) ? lot.invoiceImageUrls : []);
       const lotCards = (item.lots || []).map((lot) => {
         const takenQty = Number(lot.takeQty || 0);
         const availableQty = Number(lot.availableQty || 0);
         const remainingQty = Math.max(0, availableQty - takenQty);
         return `<article class="produccion-trace-lot-card">
           <div class="produccion-trace-lot-head">
-            <strong>Lote ${escapeHtml(lot.lotNumber || lot.entryId || '-')}</strong>
+            <strong><i class="bi bi-upc-scan fa-solid fa-barcode"></i> Lote ${escapeHtml(lot.lotNumber || lot.entryId || '-')}</strong>
             <span class="produccion-expiry-badge is-${escapeHtml(lot.status || 'unknown')}">${escapeHtml((lot.expiryDate || 'Sin vencimiento').replaceAll('-', '/'))}</span>
           </div>
           <div class="produccion-trace-grid">
@@ -1273,35 +1186,167 @@
             <p><strong>Factura</strong><span>${escapeHtml(lot.invoiceNumber || '-')}</span></p>
             <p><strong>Ingreso</strong><span>${escapeHtml(lot.entryDate || '-')}</span></p>
           </div>
-          ${Array.isArray(lot.invoiceImageUrls) && lot.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Ver remito/factura (${lot.invoiceImageUrls.length})</span></button>` : ''}
+          ${Array.isArray(lot.invoiceImageUrls) && lot.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}"><i class="bi bi-paperclip fa-solid fa-paperclip"></i><span>Ver adjunto (${lot.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}
         </article>`;
       }).join('');
-
-      return `<article class="produccion-trace-ingredient">
+      return `<article class="produccion-trace-ingredient-card">
         <header>
-          <span class="produccion-trace-ingredient-avatar">${ingredientImage ? `<img src="${ingredientImage}" alt="${escapeHtml(item.ingredientName || 'Ingrediente')}">` : '<i class="fa-solid fa-carrot"></i>'}</span>
-          <h6>${escapeHtml(item.ingredientName || item.ingredientId || 'Ingrediente')}</h6>
-          <small>Necesario: ${formatCompactQty(item.requiredQty ?? item.neededQty, item.unit || item.ingredientUnit || '')}</small>
+          <div class="produccion-trace-ingredient-head-main">
+            <span class="produccion-trace-ingredient-index">${idx + 1}</span>
+            <span class="produccion-trace-ingredient-avatar">${ingredientImage ? `<img src="${ingredientImage}" alt="${escapeHtml(item.ingredientName || 'Ingrediente')}">` : '<i class="bi bi-basket2-fill fa-solid fa-carrot"></i>'}</span>
+            <div>
+              <h6><i class="bi bi-box-seam fa-solid fa-box-open"></i> ${escapeHtml(item.ingredientName || item.ingredientId || 'Ingrediente')}</h6>
+              <small>Necesario: ${formatCompactQty(item.requiredQty ?? item.neededQty, item.unit || item.ingredientUnit || '')}</small>
+            </div>
+          </div>
+          ${aggregatedImages.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(aggregatedImages))}"><i class="bi bi-images fa-regular fa-images"></i><span>Ver adjunto (${aggregatedImages.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}
         </header>
         <div class="produccion-trace-lots">${lotCards || '<p class="m-0">Sin lotes asociados.</p>'}</div>
       </article>`;
     }).join('');
-
     return `<section class="produccion-trace-v2 produccion-trace-apple-viewer">
-      <article class="produccion-trace-summary">
-        <h6>Producción ${escapeHtml(registro.id)}</h6>
-        <div class="produccion-trace-grid">
-          <p><strong>Producto</strong><span>${escapeHtml(registro.recipeTitle || '-')}</span></p>
-          <p><strong>Cantidad</strong><span>${Number(registro.quantityKg || 0).toFixed(2)} kg</span></p>
-          <p><strong>Fecha</strong><span>${escapeHtml(formatDateTime(registro.createdAt))}</span></p>
-          <p><strong>Estado</strong><span>${escapeHtml(registro.status || '-')}</span></p>
+      <div class="produccion-trace-toolbar-zoom">
+        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-trace-zoom-out aria-label="Alejar"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+        <span class="produccion-trace-zoom-value" data-trace-zoom-value>100%</span>
+        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-trace-zoom-in aria-label="Acercar"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-trace-zoom-reset aria-label="Restablecer zoom"><i class="fa-solid fa-arrows-rotate"></i></button>
+      </div>
+      <div class="produccion-trace-diagram-wrap" data-trace-zoom-wrap>
+        <div class="produccion-trace-diagram" data-trace-zoom-canvas>
+          <article class="produccion-trace-summary">
+            <h6><i class="bi bi-diagram-3 fa-solid fa-diagram-project"></i> Trazabilidad ${escapeHtml(registro.id)}</h6>
+            <div class="produccion-trace-grid">
+              <p><strong>Producto</strong><span>${escapeHtml(registro.recipeTitle || '-')}</span></p>
+              <p><strong>Cantidad final</strong><span>${Number(registro.quantityKg || 0).toFixed(2)} kg</span></p>
+              <p><strong>Fecha</strong><span>${escapeHtml(formatDateTime(registro.createdAt))}</span></p>
+              <p><strong>Estado</strong><span>${escapeHtml(registro.status || '-')}</span></p>
+            </div>
+            <div class="produccion-trace-managers">${(Array.isArray(registro.managers) ? registro.managers : []).map((token) => { const manager = getManagerDisplay(token); return `<span class="produccion-trace-chip"><i class="bi bi-person-badge fa-solid fa-user-tie"></i><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span>`; }).join('') || '<span class="produccion-trace-chip"><i class="bi bi-person-x fa-solid fa-user-xmark"></i><strong>Sin responsable</strong><small>Encargado</small></span>'}</div>
+          </article>
+          <div class="produccion-trace-mermaid-wrap">
+            <div class="produccion-trace-product-preview">${productImage ? `<img src="${escapeHtml(productImage)}" alt="${escapeHtml(registro.recipeTitle || 'Producto')}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</div>
+            <div class="produccion-trace-cytoscape" data-trace-cytoscape></div>
+          </div>
+          <div class="produccion-trace-ingredients">${ingredients || '<p class="m-0">Sin desglose de lotes para esta producción.</p>'}</div>
         </div>
-        <div class="produccion-trace-managers">${managerBadges || '<span class="produccion-trace-chip"><strong>Sin responsable</strong><small>Encargado</small></span>'}</div>
-      </article>
-      <div class="produccion-trace-ingredients">${ingredients || '<p class="m-0">Sin desglose de lotes para esta producción.</p>'}</div>
+      </div>
     </section>`;
   };
+  const initTraceCytoscapeDiagram = async (popup, registro) => {
+    const host = popup.querySelector('[data-trace-cytoscape]');
+    if (!host) return;
+    const hasLib = await ensureTraceDiagramLib();
+    if (!hasLib) {
+      host.innerHTML = '<p class="m-0">No se pudo cargar la librería de diagrama.</p>';
+      return;
+    }
 
+    const ingredients = Array.isArray(registro.lots) ? registro.lots : [];
+    const nodes = [
+      { data: { id: 'product', label: `${registro.recipeTitle || '-'}
+Producto` }, position: { x: 220, y: 60 }, classes: 'product' },
+      { data: { id: 'production', label: `Producción ${Number(registro.quantityKg || 0).toFixed(2)} kg` }, position: { x: 220, y: 150 }, classes: 'production' },
+      { data: { id: 'ingredientsTotal', label: `Ingredientes ${(ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0)).toFixed(3)} kg` }, position: { x: 220, y: 240 }, classes: 'ingredients' },
+      { data: { id: 'lot', label: `Lote ${registro.id}
+VTO ${formatProductExpiryLabel(registro)}` }, position: { x: 520, y: 60 }, classes: 'lot' },
+      { data: { id: 'manager', label: `Encargado ${(Array.isArray(registro.managers) && registro.managers[0]) ? getManagerDisplay(registro.managers[0]).name : 'Sin encargado'}` }, position: { x: 520, y: 150 }, classes: 'manager' },
+      { data: { id: 'waste', label: `Merma ${Math.max(0, ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0) - Number(registro.quantityKg || 0)).toFixed(3)} kg` }, position: { x: 520, y: 240 }, classes: 'waste' }
+    ];
+
+    const edges = [
+      { data: { source: 'product', target: 'production' } },
+      { data: { source: 'product', target: 'lot' } },
+      { data: { source: 'production', target: 'ingredientsTotal' } },
+      { data: { source: 'production', target: 'manager' } },
+      { data: { source: 'ingredientsTotal', target: 'waste' } }
+    ];
+
+    let y = 370;
+    ingredients.forEach((item, index) => {
+      const nodeId = `ing_${index}`;
+      const col = index % 2;
+      const row = Math.floor(index / 2);
+      const x = col ? 520 : 220;
+      const yy = y + (row * 170);
+      const lot = Array.isArray(item.lots) && item.lots[0] ? item.lots[0] : {};
+      const label = `${index + 1}. ${item.ingredientName || 'Ingrediente'}
+Necesita: ${formatCompactQty(item.requiredQty ?? item.neededQty, item.unit || item.ingredientUnit || '')}
+Lote: ${lot.lotNumber || lot.entryId || '-'}
+Vence: ${formatIsoEs(lot.expiryDate) || '-'}
+Proveedor: ${lot.provider || '-'}`;
+      nodes.push({ data: { id: nodeId, label }, position: { x, y: yy }, classes: 'ingredient' });
+      if (index === 0) {
+        edges.push({ data: { source: 'ingredientsTotal', target: nodeId } });
+      } else {
+        edges.push({ data: { source: `ing_${index - 1}`, target: nodeId } });
+      }
+    });
+
+    const cy = window.cytoscape({
+      container: host,
+      elements: { nodes, edges },
+      style: [
+        { selector: 'node', style: { 'shape': 'round-rectangle', 'width': 280, 'height': 72, 'background-color': '#eef3ff', 'border-width': 1, 'border-color': '#cbd8f3', 'label': 'data(label)', 'font-size': 14, 'text-wrap': 'wrap', 'text-max-width': 250, 'text-valign': 'center', 'text-halign': 'center', 'color': '#244277', 'font-weight': 700 } },
+        { selector: 'node.ingredient', style: { 'width': 340, 'height': 150, 'background-color': '#f3f5f9', 'text-halign': 'left', 'text-valign': 'top', 'padding': '14px', 'font-size': 13 } },
+        { selector: 'node.product', style: { 'background-color': '#dfeaff' } },
+        { selector: 'node.production', style: { 'background-color': '#fff3c6' } },
+        { selector: 'node.ingredients', style: { 'background-color': '#d8f4e4' } },
+        { selector: 'node.lot', style: { 'background-color': '#ffeed9' } },
+        { selector: 'node.manager', style: { 'background-color': '#e8e1ff' } },
+        { selector: 'node.waste', style: { 'background-color': '#ffdede' } },
+        { selector: 'edge', style: { 'width': 2, 'line-color': '#7f95c2', 'target-arrow-shape': 'triangle', 'target-arrow-color': '#7f95c2', 'curve-style': 'bezier' } }
+      ],
+      userZoomingEnabled: true,
+      userPanningEnabled: true,
+      wheelSensitivity: 0.2,
+      minZoom: 0.4,
+      maxZoom: 2.6
+    });
+
+    popup.__traceCy = cy;
+    cy.fit(undefined, 26);
+  };
+  const initTraceDiagramInteractions = (popup) => {
+    const wrap = popup.querySelector('[data-trace-zoom-wrap]');
+    const zoomLabel = popup.querySelector('[data-trace-zoom-value]');
+    if (!wrap || !zoomLabel) return;
+    const cy = popup.__traceCy || null;
+    let zoom = cy ? cy.zoom() : 1;
+    const setZoom = (value) => {
+      zoom = Math.min(2.6, Math.max(0.4, value));
+      if (cy) cy.zoom({ level: zoom, renderedPosition: { x: wrap.clientWidth / 2, y: wrap.clientHeight / 2 } });
+      else {
+        const canvas = popup.querySelector('[data-trace-zoom-canvas]');
+        if (canvas) canvas.style.transform = `scale(${zoom})`;
+      }
+      zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
+    };
+    popup.querySelector('[data-trace-zoom-in]')?.addEventListener('click', () => setZoom(zoom + 0.12));
+    popup.querySelector('[data-trace-zoom-out]')?.addEventListener('click', () => setZoom(zoom - 0.12));
+    popup.querySelector('[data-trace-zoom-reset]')?.addEventListener('click', () => setZoom(1));
+    wrap.addEventListener('wheel', (event) => {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      setZoom(zoom + (event.deltaY < 0 ? 0.1 : -0.1));
+    }, { passive: false });
+    let pinchStart = 0;
+    const dist = (touches) => {
+      const [a, b] = touches;
+      return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    };
+    wrap.addEventListener('touchstart', (event) => {
+      if (event.touches.length === 2) pinchStart = dist(event.touches);
+    }, { passive: true });
+    wrap.addEventListener('touchmove', (event) => {
+      if (event.touches.length !== 2 || !pinchStart) return;
+      const current = dist(event.touches);
+      const ratio = current / pinchStart;
+      setZoom(zoom * ratio);
+      pinchStart = current;
+      event.preventDefault();
+    }, { passive: false });
+    setZoom(1);
+  };
   const openTraceability = async (registro) => {
     Swal.fire({
       title: 'Cargando trazabilidad...',
@@ -1324,7 +1369,9 @@
       customClass: {
         popup: 'produccion-trace-alert'
       },
-      didOpen: (popup) => {
+      didOpen: async (popup) => {
+        await initTraceCytoscapeDiagram(popup, registro);
+        initTraceDiagramInteractions(popup);
         popup.querySelectorAll('[data-prod-trace-images]').forEach((btn) => {
           btn.addEventListener('click', async () => {
             const urls = JSON.parse(decodeURIComponent(btn.dataset.prodTraceImages || '[]'));
@@ -1337,7 +1384,6 @@
       }
     });
   };
-
   const renderHistoryTable = () => {
     if (!nodes.historyTableWrap) return;
     const rows = getHistoryRows();
@@ -1346,6 +1392,9 @@
     state.historyPage = Math.min(Math.max(1, state.historyPage), pages);
     const start = (state.historyPage - 1) * PAGE;
     const pageRows = rows.slice(start, start + PAGE);
+    const traceableRows = rows.filter((item) => getTraceRowsFromRegistro(item).length);
+    const canCollapseRows = traceableRows.some((item) => state.historyTraceCollapse[item.id] !== true);
+    const canExpandRows = traceableRows.some((item) => state.historyTraceCollapse[item.id] === true);
     const htmlRows = pageRows.length ? pageRows.map((item, index) => {
       const manager = getManagerLabel(item);
       const traceRows = getTraceRowsFromRegistro(item);
@@ -1355,14 +1404,14 @@
           <td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${escapeHtml(trace.ingredientName)}</span></div></td>
           <td></td>
           <td><span class="produccion-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td>
-          <td><span class="produccion-trace-expiry">${escapeHtml(formatIsoEs(trace.expiryDate))} (VTO)</span></td>
           <td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td>
           <td>${escapeHtml(trace.lotNumber)}</td>
-          <td>${trace.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin imagen</button>'}</td>
-          <td></td>
+          <td><span class="produccion-trace-expiry">${escapeHtml(formatIsoEs(trace.expiryDate))} (VTO)</span></td>
+          <td><span class="produccion-trace-badge">Trazabilidad</span></td>
+          <td>${trace.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td>
         </tr>`).join('') : '';
       return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
-        <td>${escapeHtml(item.id)}</td>
+        <td><div class="d-flex align-items-center gap-2">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-collapse="${escapeHtml(item.id)}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isCollapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(item.id)}</span></div></td>
         <td>${escapeHtml(formatDateTime(item.createdAt))}</td>
         <td>${escapeHtml(item.recipeTitle || '-')}</td>
         <td>${Number(item.quantityKg || 0).toFixed(2)} kg</td>
@@ -1372,11 +1421,10 @@
         <td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td>
       </tr>${traceHtml}`;
     }).join('') : '<tr><td colspan="8" class="text-center">Sin producciones en ese rango.</td></tr>';
-
     nodes.historyTableWrap.innerHTML = `
       <div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x">
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionHistoryCollapseAllRowsBtn"><i class="fa-solid fa-compress"></i><span>Colapsar</span></button>
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionHistoryExpandAllRowsBtn"><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button>
+        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button>
+        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button>
       </div>
       <div class="table-responsive inventario-global-table inventario-table-compact-wrap">
         <table class="table recipe-table inventario-table-compact mb-0">
@@ -1391,14 +1439,12 @@
       </div>`;
     prepareThumbLoaders('.js-produccion-thumb');
   };
-
   const setHistoryMode = (enabled) => {
     state.historyMode = enabled;
     nodes.search?.closest('.produccion-toolbar')?.classList.toggle('d-none', enabled);
     nodes.list?.classList.toggle('d-none', enabled);
     nodes.historyView?.classList.toggle('d-none', !enabled);
   };
-
   const openHistory = async () => {
     state.historyPage = 1;
     if (nodes.historyRange) nodes.historyRange.value = state.historyRange;
@@ -1406,7 +1452,6 @@
     setHistoryMode(true);
     renderHistoryTable();
   };
-
   const cancelProduction = async (registro) => {
     if (registro.status === 'anulada') {
       await openIosSwal({ title: 'Ya anulada', html: '<p>La producción ya estaba anulada.</p>', icon: 'info', confirmButtonText: 'Entendido' });
@@ -1427,7 +1472,6 @@
     renderHistoryTable();
     await openIosSwal({ title: 'Producción anulada', html: `<p>Se anuló ${registro.id} y se restituyó el stock.</p>`, icon: 'success', confirmButtonText: 'Entendido' });
   };
-
   const editProduction = async (registro) => {
     if (registro.status === 'anulada') {
       await openIosSwal({ title: 'No editable', html: '<p>Una producción anulada no puede editarse.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
@@ -1444,7 +1488,6 @@
       preConfirm: () => ({ qty: parsePositive(document.getElementById('editQty')?.value, 0), date: normalizeValue(document.getElementById('editDate')?.value), obs: normalizeValue(document.getElementById('editObs')?.value) })
     });
     if (!form.isConfirmed) return;
-
     const recipe = state.recetas[registro.recipeId];
     if (!recipe) return;
     const currentInventory = safeObject(await window.dbLaJamoneraRest.read('/inventario'));
@@ -1478,20 +1521,17 @@
     renderHistoryTable();
     await openIosSwal({ title: 'Producción editada', html: `<p>${registro.id} fue recalculada y guardada.</p>`, icon: 'success', confirmButtonText: 'Entendido' });
   };
-
   const renderList = () => {
     const query = normalizeLower(state.search);
     const list = getRecipes()
       .filter((item) => !query || normalizeLower(item.title).includes(query) || normalizeLower(item.description).includes(query))
       .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
-
     if (!list.length) {
       nodes.list.innerHTML = '<div class="ingrediente-empty-list">No hay recetas para ese filtro.</div>';
       updateProduccionListScrollHint();
       setStateView(getRecipes().length ? 'list' : 'empty');
       return;
     }
-
     const buildCoverageChecksHtml = (analysis) => {
       const available = analysis.requirements.filter((item) => item.missingForMin <= 0.0001).length;
       return `
@@ -1503,7 +1543,6 @@
           </span>`).join('')}
         </div>`;
     };
-
     const cardsHtml = list.map((recipe) => {
       const analysis = state.analysis[recipe.id] || analyzeRecipe(recipe);
       const statusClass = analysis.status === 'success' ? 'tone-success' : analysis.status === 'warning' ? 'tone-warning' : 'tone-danger';
@@ -1512,7 +1551,6 @@
         ? ''
         : `<button type="button" class="btn ios-btn inventory-production-action-btn is-inventory" data-open-inventario="1"><i class="fa-solid fa-boxes-stacked"></i><span>Inventario</span></button>`;
       const viewAction = `<button type="button" class="btn ios-btn ios-btn-secondary produccion-visualizar-btn" data-open-produccion="${recipe.id}"><i class="fa-regular fa-eye"></i><span>Visualizar</span></button>`;
-
       const foreignDraft = getForeignDraftConflict(recipe.id);
       const badges = [
         analysis.missingForMin.length ? '<span class="produccion-badge">Faltan insumos</span>' : '',
@@ -1520,13 +1558,10 @@
         analysis.hasExpired ? '<span class="produccion-badge is-danger">Vencido</span>' : '',
         foreignDraft ? '<span class="produccion-badge is-warning">Borrador en uso</span>' : ''
       ].filter(Boolean).join('');
-
       const missingHtml = analysis.missingForMin.length
         ? `<div class="produccion-missing-list">${analysis.missingForMin.map((item) => `<p><strong>${item.name}:</strong> disponible ${formatQty(item.available, item.unit)} / faltan ${formatQty(item.missingForMin, item.unit)}</p>`).join('')}</div>`
         : '<p class="produccion-ok-line">Cobertura suficiente para iniciar producción.</p>';
-
       const lastProductionAt = state.config.lastProductionByRecipe?.[recipe.id] || recipe.lastProductionAt || recipe.production?.lastAt || 0;
-
       return `
         <article class="ingrediente-card receta-card produccion-card ${statusClass}">
           <div class="ingrediente-avatar receta-thumb-wrap">
@@ -1567,7 +1602,6 @@
           </div>
         </article>`;
     }).join('');
-
     const drafts = getOwnDrafts();
     const draftsHtml = drafts.length
       ? `<section class="produccion-drafts-wrap">
@@ -1588,9 +1622,7 @@
           }).join('')}</div>
         </section>`
       : '';
-
     nodes.list.innerHTML = `${draftsHtml}${cardsHtml}`;
-
     document.querySelectorAll('.js-produccion-thumb').forEach((image) => {
       const wrap = image.closest('.receta-thumb-wrap');
       image.addEventListener('error', () => {
@@ -1599,17 +1631,14 @@
     });
     prepareThumbLoaders('.js-produccion-thumb');
     updateProduccionListScrollHint();
-
     if (state.draftsTick) clearInterval(state.draftsTick);
     state.draftsTick = setInterval(() => {
       if (state.view === 'list' && !state.historyMode && !state.activeRecipeId) {
         renderList();
       }
     }, 1000);
-
     setStateView('list');
   };
-
   const buildLotsBreakdownHtml = (plan) => {
     const mergeIcon = './IMG/Octicons-git-merge.svg';
     const gitIcon = './IMG/Octicons-git-branch.svg';
@@ -1624,7 +1653,6 @@
       if (days <= 4) return `<span class="produccion-expiry-badge is-warning">${days}d</span>`;
       return `<span class="produccion-expiry-badge is-ok">${days}d</span>`;
     };
-
     return `<div class="produccion-lote-global-actions">
         <button type="button" class="btn ios-btn ios-btn-secondary" id="produccionCollapseAllBtn" ${allCollapsed ? 'disabled' : ''}>Colapsar todo</button>
         <button type="button" class="btn ios-btn ios-btn-secondary" id="produccionExpandAllBtn" ${allExpanded ? 'disabled' : ''}>Descolapsar todo</button>
@@ -1668,7 +1696,6 @@
       </article>
     `).join('');
   };
-
   const saveEditorDraft = async () => {
     const recipe = state.recetas[state.activeRecipeId];
     if (!recipe || !state.editorPlan) return;
@@ -1676,7 +1703,6 @@
     const productionDate = normalizeValue(nodes.editor.querySelector('#produccionDateInput')?.value) || toIsoDate();
     const observations = normalizeValue(nodes.editor.querySelector('#produccionObsInput')?.value);
     const managers = [...nodes.editor.querySelectorAll('[data-manager-check]:checked')].map((node) => node.value).filter(Boolean);
-
     await persistDraft({
       recipeId: recipe.id,
       quantityKg: qty,
@@ -1690,7 +1716,6 @@
       status: 'active'
     });
   };
-
   const buildManagersHtml = (selected = []) => {
     const users = Object.values(safeObject(state.users))
       .sort((a, b) => String(a.fullName || a.email || '').localeCompare(String(b.fullName || b.email || '')));
@@ -1706,12 +1731,10 @@
       </label>`;
     }).join('');
   };
-
   const renderEditor = async (recipeId) => {
     const recipe = state.recetas[recipeId];
     const analysis = state.analysis[recipeId];
     if (!recipe || !analysis) return;
-
     const foreignDraft = getForeignDraftConflict(recipe.id);
     if (foreignDraft) {
       const action = await openIosSwal({
@@ -1733,7 +1756,6 @@
         state.drafts = next;
       }
     }
-
     const ownDraft = getCurrentDraftForRecipe(recipe.id);
     const preferredManagers = Array.isArray(state.config.preferredManagersByRecipe?.[recipe.id])
       ? state.config.preferredManagersByRecipe[recipe.id]
@@ -1742,12 +1764,10 @@
     const initialDate = ownDraft?.productionDate || toIsoDate();
     const initialObs = ownDraft?.observations || '';
     const initialManagers = Array.isArray(ownDraft?.managers) ? ownDraft.managers : preferredManagers;
-
     state.lotCollapseState = {};
     state.editorPlan = buildPlanForRecipe(recipe, initialQty, initialDate);
     await ensureReservationForPlan(state.editorPlan);
     state.activeDraftId = ownDraft?.id || state.activeDraftId;
-
     nodes.editor.innerHTML = `
       <div class="recetas-editor-header produccion-editor-header">
         <button id="produccionBackBtn" type="button" class="btn ios-btn ios-btn-secondary recetas-back-btn"><i class="fa-solid fa-arrow-left"></i><span>Atrás</span></button>
@@ -1756,7 +1776,6 @@
           <h6 class="recetas-editor-title mb-0">Detalle de producción</h6>
         </div>
       </div>
-
       <section class="inventario-product-head-v2 produccion-head-box">
         <div class="produccion-hero-wrap">
           <img src="${FIAMBRES_IMAGE}" class="produccion-hero-bg" alt="Producción">
@@ -1772,7 +1791,6 @@
           <p id="produccionReservaTimer" class="produccion-reserva-timer"></p>
         </div>
       </section>
-
       <section class="recipe-step-card step-block">
         <h6 class="step-title"><span class="recipe-step-number">1</span> ¿Qué cantidad deseás producir?</h6>
         <div class="produccion-qty-grid">
@@ -1781,13 +1799,11 @@
         </div>
         <p id="produccionQtyHelp" class="produccion-qty-help"></p>
       </section>
-
       <section class="recipe-step-card step-block">
         <h6 class="step-title"><span class="recipe-step-number">2</span> Fecha de producción</h6>
         <input id="produccionDateInput" type="text" class="form-control ios-input" value="${initialDate}">
         <p class="produccion-qty-help">Si cambiás la fecha, recalculamos vencimientos y lotes (FEFO).</p>
       </section>
-
       <section class="recipe-step-card step-block">
         <h6 class="step-title"><span class="recipe-step-number">3</span> Encargados</h6>
         <div class="produccion-managers-actions">
@@ -1795,43 +1811,36 @@
         </div>
         <div class="produccion-managers-grid">${buildManagersHtml(initialManagers)}</div>
       </section>
-
       <section class="recipe-step-card step-block">
         <h6 class="step-title"><span class="recipe-step-number">4</span> Observaciones</h6>
         <textarea id="produccionObsInput" class="form-control ios-input" rows="3" placeholder="Notas de producción, incidentes, reemplazos...">${initialObs}</textarea>
       </section>
-
       <section class="recipe-step-card step-block">
         <h6 class="step-title"><span class="recipe-step-number">5</span> Desglose por lotes (FEFO)</h6>
         <p class="produccion-fefo-note"><strong>FEFO:</strong> <span>First Expired, First Out</span> · primero vence, primero se usa.</p>
         <div id="produccionLotsBreakdown" class="produccion-lotes-wrap"></div>
       </section>
-
       <section class="recipe-step-card step-block">
         <h6 class="step-title"><span class="recipe-step-number">6</span> Historial de producción</h6>
         <div id="produccionRecipeHistory" class="produccion-recipe-history"></div>
       </section>
-
       <section class="recipe-step-card step-block">
         <div class="produccion-final-actions">
           <button id="produccionSaveDraftBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-floppy-disk"></i><span>Guardar borrador</span></button>
           <button id="produccionConfirmBtn" type="button" class="btn ios-btn ios-btn-success"><i class="fa-solid fa-check"></i><span>Confirmar producción</span></button>
         </div>
       </section>`;
-
     const qtyInput = nodes.editor.querySelector('#produccionQtyInput');
     const dateInput = nodes.editor.querySelector('#produccionDateInput');
     const qtyHelp = nodes.editor.querySelector('#produccionQtyHelp');
     const lotsWrap = nodes.editor.querySelector('#produccionLotsBreakdown');
     const confirmBtn = nodes.editor.querySelector('#produccionConfirmBtn');
     const recipeHistoryState = { search: '', range: '' };
-
     const getRecipeHistoryRows = () => {
       const [from, to] = normalizeValue(recipeHistoryState.range).split(' a ').map((item) => normalizeValue(item));
       const fromTs = from ? new Date(`${from}T00:00:00`).getTime() : 0;
       const toTs = to ? new Date(`${to}T23:59:59`).getTime() : 0;
       const query = normalizeLower(recipeHistoryState.search);
-
       return getRegistrosList()
         .filter((item) => normalizeValue(item.recipeId) === normalizeValue(recipe.id))
         .filter((item) => {
@@ -1846,7 +1855,6 @@
         })
         .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
     };
-
     const printRecipeHistoryRows = async (rows) => {
       const ask = await openIosSwal({
         title: 'Imprimir período',
@@ -1863,7 +1871,6 @@
         }
       });
       if (!ask.isConfirmed && !ask.isDenied) return;
-
       const askTrace = await openIosSwal({
         title: 'Incluir trazabilidad',
         html: '<p>¿Querés incluir los datos colapsados de trazabilidad?</p>',
@@ -1889,7 +1896,6 @@
       if (ask.isConfirmed) {
         await preloadPrintImages([...ingredientImages, ...attachedImages]);
       }
-
       const win = window.open('', '_blank', 'width=1300,height=900');
       if (!win) return;
       const bodyRows = rows.flatMap((item) => {
@@ -1910,7 +1916,6 @@
       await waitPrintAssets(win);
       win.print();
     };
-
     const renderRecipeHistory = () => {
       const rows = getRecipeHistoryRows();
       const node = nodes.editor.querySelector('#produccionRecipeHistory');
@@ -1919,17 +1924,17 @@
         node.innerHTML = '<p class="produccion-lote-empty">Todavía no hay producciones confirmadas para esta receta.</p>';
         return;
       }
-
+      const traceableRows = rows.filter((item) => getTraceRowsFromRegistro(item).length);
+      const canCollapseRows = traceableRows.some((item) => state.historyTraceCollapse[item.id] !== true);
+      const canExpandRows = traceableRows.some((item) => state.historyTraceCollapse[item.id] === true);
       const htmlRows = rows.map((item, index) => {
         const manager = getManagerLabel(item);
         const traceRows = getTraceRowsFromRegistro(item);
         const isCollapsed = state.historyTraceCollapse[item.id] === true;
         const traceHtml = (!isCollapsed && traceRows.length)
           ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${escapeHtml(trace.ingredientName)}</span></div></td><td></td><td><span class="produccion-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="produccion-trace-expiry">${escapeHtml(formatIsoEs(trace.expiryDate))} (VTO)</span></td><td><span class="produccion-trace-badge">Trazabilidad</span></td><td>${trace.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images="${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td></tr>`).join('') : '';
-
-        return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(item.id || '-')}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td></tr>${traceHtml}`;
+        return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isCollapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(item.id || '-')}</span></div></td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td></tr>${traceHtml}`;
       }).join('');
-
       node.innerHTML = `
         <div class="inventario-table-head enhanced">
           <input id="produccionRecipeHistorySearch" type="search" class="form-control ios-input" autocomplete="off" placeholder="Buscar por producción" value="${escapeHtml(recipeHistoryState.search)}">
@@ -1946,8 +1951,8 @@
               <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeHistoryPrintAllBtn"><i class="fa-solid fa-print"></i><span>Imprimir total</span></button>
             </div>
             <div class="inventario-print-row toolbar-scroll-x">
-              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeHistoryCollapseAllRowsBtn"><i class="fa-solid fa-compress"></i><span>Colapsar</span></button>
-              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeHistoryExpandAllRowsBtn"><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button>
+              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button>
+              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button>
             </div>
           </div>
         </div>
@@ -1957,9 +1962,7 @@
             <tbody>${htmlRows}</tbody>
           </table>
         </div>`;
-
       prepareThumbLoaders('.js-produccion-thumb');
-
       const rangeNode = nodes.editor.querySelector('#produccionRecipeHistoryRange');
       if (window.flatpickr && rangeNode) {
         const locale = window.flatpickr.l10ns?.es || undefined;
@@ -1978,7 +1981,6 @@
         });
       }
     };
-
     const updateEditorPlan = async () => {
       let qty = parsePositive(qtyInput.value, 0.1);
       if (qty > analysis.maxKg) qty = analysis.maxKg;
@@ -1994,7 +1996,6 @@
         : (qty <= 0 ? 'Modo visualización: ajustá kilos para confirmar producción.' : `Hay conflictos de stock/lotes para ${productionDate}.`);
       await ensureReservationForPlan(state.editorPlan);
     };
-
     nodes.editor.addEventListener('click', async (event) => {
       const toggleBtn = event.target.closest('[data-lot-toggle]');
       if (toggleBtn && state.editorPlan) {
@@ -2004,7 +2005,6 @@
       renderRecipeHistory();
         return;
       }
-
       if (event.target.closest('#produccionCollapseAllBtn') && state.editorPlan) {
         state.editorPlan.ingredientPlans.forEach((item) => {
           state.lotCollapseState[item.ingredientId] = true;
@@ -2013,7 +2013,6 @@
       renderRecipeHistory();
         return;
       }
-
       if (event.target.closest('#produccionExpandAllBtn') && state.editorPlan) {
         state.editorPlan.ingredientPlans.forEach((item) => {
           state.lotCollapseState[item.ingredientId] = false;
@@ -2022,13 +2021,11 @@
       renderRecipeHistory();
         return;
       }
-
       if (event.target.closest('#produccionRecipeHistoryClearBtn')) {
         recipeHistoryState.range = '';
         renderRecipeHistory();
         return;
       }
-
       if (event.target.closest('#produccionRecipeHistoryCollapseAllRowsBtn')) {
         getRecipeHistoryRows().forEach((item) => {
           if (getTraceRowsFromRegistro(item).length) state.historyTraceCollapse[item.id] = true;
@@ -2036,7 +2033,6 @@
         renderRecipeHistory();
         return;
       }
-
       if (event.target.closest('#produccionRecipeHistoryExpandAllRowsBtn')) {
         getRecipeHistoryRows().forEach((item) => {
           if (getTraceRowsFromRegistro(item).length) state.historyTraceCollapse[item.id] = false;
@@ -2044,14 +2040,12 @@
         renderRecipeHistory();
         return;
       }
-
       const recipeTraceBtn = event.target.closest('[data-recipe-prod-trace]');
       if (recipeTraceBtn) {
         const reg = state.registros[recipeTraceBtn.dataset.recipeProdTrace];
         if (reg) await openTraceability(reg);
         return;
       }
-
       const recipeTraceImageBtn = event.target.closest('[data-recipe-prod-trace-images]');
       if (recipeTraceImageBtn) {
         const urls = JSON.parse(decodeURIComponent(recipeTraceImageBtn.dataset.recipeProdTraceImages || '[]'));
@@ -2060,7 +2054,6 @@
         }
         return;
       }
-
       const recipeCollapseBtn = event.target.closest('[data-recipe-prod-collapse]');
       if (recipeCollapseBtn) {
         const prodId = recipeCollapseBtn.dataset.recipeProdCollapse;
@@ -2068,40 +2061,83 @@
         renderRecipeHistory();
         return;
       }
-
       const recipePrintBtn = event.target.closest('[data-recipe-prod-print]');
       if (recipePrintBtn) {
         const reg = state.registros[recipePrintBtn.dataset.recipeProdPrint];
         if (reg) await printReport(reg);
         return;
       }
-
       if (event.target.closest('#produccionRecipeHistoryExpandBtn')) {
         const rows = getRecipeHistoryRows();
-        const htmlRows = rows.length
+        const collapseMap = { ...state.historyTraceCollapse };
+        const renderRows = () => rows.length
           ? rows.map((item, index) => {
             const manager = getManagerLabel(item);
-            return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(item.id || '-')}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)}</td><td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td></tr>`;
+            const traceRows = getTraceRowsFromRegistro(item);
+            const isCollapsed = collapseMap[item.id] === true;
+            const traceHtml = (!isCollapsed && traceRows.length)
+              ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${escapeHtml(trace.ingredientName)}</span></div></td><td></td><td><span class="produccion-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="produccion-trace-expiry">${escapeHtml(formatIsoEs(trace.expiryDate))} (VTO)</span></td><td><span class="produccion-trace-badge">Trazabilidad</span></td><td>${trace.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images="${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td></tr>`).join('')
+              : '';
+            return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isCollapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(item.id || '-')}</span></div></td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td></tr>${traceHtml}`;
           }).join('')
-          : '<tr><td colspan="7" class="text-center">Sin producciones.</td></tr>';
+          : '<tr><td colspan="8" class="text-center">Sin producciones.</td></tr>';
+        const renderExpandedContent = (popup) => {
+          const host = popup.querySelector('#produccionRecipeExpandedHistoryHost');
+          if (!host) return;
+          const traceableRows = rows.filter((item) => getTraceRowsFromRegistro(item).length);
+          const canCollapseRows = traceableRows.some((item) => collapseMap[item.id] !== true);
+          const canExpandRows = traceableRows.some((item) => collapseMap[item.id] === true);
+          host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeExpandedHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeExpandedHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Adjuntos</th></tr></thead><tbody>${renderRows()}</tbody></table></div>`;
+          prepareThumbLoaders('.js-produccion-thumb');
+        };
         await openIosSwal({
           title: 'Historial de producción (ampliado)',
-          html: `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Código</th><th>Fecha y hora</th><th>Producto</th><th>Kilos</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th></tr></thead><tbody>${htmlRows}</tbody></table></div>`,
+          html: '<div id="produccionRecipeExpandedHistoryHost" class="inventario-expand-wrap"></div>',
           width: '92vw',
           confirmButtonText: 'Cerrar',
           customClass: { confirmButton: 'ios-btn ios-btn-secondary' },
           didOpen: (popup) => {
+            renderExpandedContent(popup);
             popup.addEventListener('click', async (clickEvent) => {
+              if (clickEvent.target.closest('#produccionRecipeExpandedHistoryCollapseAllRowsBtn')) {
+                rows.forEach((item) => {
+                  if (getTraceRowsFromRegistro(item).length) collapseMap[item.id] = true;
+                });
+                renderExpandedContent(popup);
+                return;
+              }
+              if (clickEvent.target.closest('#produccionRecipeExpandedHistoryExpandAllRowsBtn')) {
+                rows.forEach((item) => {
+                  if (getTraceRowsFromRegistro(item).length) collapseMap[item.id] = false;
+                });
+                renderExpandedContent(popup);
+                return;
+              }
+              const collapseBtn = clickEvent.target.closest('[data-recipe-prod-collapse]');
+              if (collapseBtn) {
+                const prodId = collapseBtn.dataset.recipeProdCollapse;
+                collapseMap[prodId] = !collapseMap[prodId];
+                renderExpandedContent(popup);
+                return;
+              }
               const traceBtn = clickEvent.target.closest('[data-recipe-prod-trace]');
-              if (!traceBtn) return;
-              const reg = state.registros[traceBtn.dataset.recipeProdTrace];
-              if (reg) await openTraceability(reg);
+              if (traceBtn) {
+                const reg = state.registros[traceBtn.dataset.recipeProdTrace];
+                if (reg) await openTraceability(reg);
+                return;
+              }
+              const traceImageBtn = clickEvent.target.closest('[data-recipe-prod-trace-images]');
+              if (traceImageBtn && typeof window.laJamoneraOpenImageViewer === 'function') {
+                const urls = JSON.parse(decodeURIComponent(traceImageBtn.dataset.recipeProdTraceImages || '[]'));
+                if (Array.isArray(urls) && urls.length) {
+                  await window.laJamoneraOpenImageViewer([{ invoiceImageUrls: urls }], 0, 'Adjuntos de lote');
+                }
+              }
             });
           }
         });
         return;
       }
-
       if (event.target.closest('#produccionRecipeHistoryExcelBtn')) {
         const rows = getRecipeHistoryRows();
         const payload = rows.flatMap((item) => {
@@ -2137,18 +2173,15 @@
         });
         return;
       }
-
       if (event.target.closest('#produccionRecipeHistoryPrintFilteredBtn')) {
         await printRecipeHistoryRows(getRecipeHistoryRows());
         return;
       }
-
       if (event.target.closest('#produccionRecipeHistoryPrintAllBtn')) {
         const allRows = getRegistrosList().filter((item) => normalizeValue(item.recipeId) === normalizeValue(recipe.id));
         await printRecipeHistoryRows(allRows);
         return;
       }
-
       const attachmentBtn = event.target.closest('[data-lot-images]');
       if (attachmentBtn) {
         const raw = decodeURIComponent(attachmentBtn.dataset.lotImages || '');
@@ -2165,14 +2198,12 @@
         }
       }
     });
-
     nodes.editor.addEventListener('input', (event) => {
       const searchNode = event.target.closest('#produccionRecipeHistorySearch');
       if (!searchNode) return;
       recipeHistoryState.search = normalizeValue(searchNode.value);
       renderRecipeHistory();
     });
-
     if (window.flatpickr) {
       const locale = window.flatpickr.l10ns?.es || undefined;
       window.flatpickr(dateInput, {
@@ -2185,14 +2216,12 @@
         }
       });
     }
-
     qtyInput.addEventListener('change', async () => { await updateEditorPlan(); });
     qtyInput.addEventListener('blur', async () => { await updateEditorPlan(); });
     nodes.editor.querySelector('#produccionQtyMaxBtn').addEventListener('click', async () => {
       qtyInput.value = analysis.maxKg.toFixed(2);
       await updateEditorPlan();
     });
-
     nodes.editor.querySelector('#produccionSaveManagersPrefBtn')?.addEventListener('click', async () => {
       const selected = [...nodes.editor.querySelectorAll('[data-manager-check]:checked')].map((node) => node.value).filter(Boolean);
       state.config.preferredManagers = selected;
@@ -2203,14 +2232,11 @@
       await persistConfig();
       await openIosSwal({ title: 'Preferencia guardada', html: '<p>Este/estos encargados se preseleccionarán en próximas producciones.</p>', icon: 'success', confirmButtonText: 'Entendido' });
     });
-
     nodes.editor.querySelector('#produccionSaveDraftBtn').addEventListener('click', async () => {
       await saveEditorDraft();
       await openIosSwal({ title: 'Borrador guardado', html: '<p>Podés retomarlo cuando quieras.</p>', icon: 'success', confirmButtonText: 'Entendido' });
     });
-
     prepareThumbLoaders('.js-produccion-head-photo, .js-produccion-user-photo');
-
     const confirmProduction = async () => {
       const refreshBefore = await window.dbLaJamoneraRest.read('/inventario');
       state.inventario = safeObject(refreshBefore);
@@ -2229,7 +2255,6 @@
       renderRecipeHistory();
         return;
       }
-
       const managers = [...nodes.editor.querySelectorAll('[data-manager-check]:checked')].map((node) => node.value).filter(Boolean);
       if (!managers.length) {
         await openIosSwal({
@@ -2240,24 +2265,21 @@
         });
         return;
       }
-
       const managerSummary = managers.map((token) => {
         const manager = getManagerDisplay(token);
         return `${escapeHtml(manager.name)} (${escapeHtml(manager.role)})`;
       }).join('<br>');
       const productExpiry = addDaysToIso(date, Number(recipe.shelfLifeDays || 0));
       const summaryRows = revalidated.ingredientPlans.map((plan) => `<li><strong>${escapeHtml(plan.ingredientName)}</strong>: ${Number(plan.neededQty || 0).toFixed(2)} ${escapeHtml(plan.ingredientUnit || '')}</li>`).join('');
-
       const confirm = await openIosSwal({
         title: 'Confirmar producción final',
-        html: `<div class="text-start produccion-confirm-summary produccion-confirm-card"><div class="produccion-confirm-head"><span class="produccion-confirm-icon"><i class="bi bi-check2-circle"></i></span><div><p class="produccion-confirm-kicker">Validación final</p><p class="produccion-confirm-note">Se descontará stock real del inventario al confirmar.</p></div></div><p><strong><i class="bi bi-box-seam"></i> Producto:</strong> <span>${escapeHtml(recipe.title || '-')}</span></p><p><strong><i class="bi bi-calendar-event"></i> Fecha:</strong> <span class="produccion-trace-date">${escapeHtml(formatIsoEs(date))}</span></p><p><strong><i class="bi bi-hourglass-split"></i> VTO producto:</strong> <span class="produccion-confirm-vto">${escapeHtml(formatIsoEs(productExpiry || ''))} (VTO)</span></p><p><strong><i class="bi bi-speedometer2"></i> Total a producir:</strong> <span class="produccion-confirm-total">${qty.toFixed(2)} kg</span></p><p><strong><i class="bi bi-people"></i> Encargado/s:</strong><br>${managerSummary}</p><p><strong><i class="bi bi-list-check"></i> Resumen de insumos:</strong></p><ul>${summaryRows}</ul></div>`,
+        html: `<div class="text-start produccion-confirm-summary produccion-confirm-card"><div class="produccion-confirm-head"><span class="produccion-confirm-icon"><i class="bi bi-check2-circle"></i></span><div><p class="produccion-confirm-kicker">Validación final</p><p class="produccion-confirm-note">Se descontará stock real del inventario al confirmar.</p></div></div><p><strong><i class="bi bi-box-seam fa-solid fa-box-open"></i> Producto:</strong> <span>${escapeHtml(recipe.title || '-')}</span></p><p><strong><i class="bi bi-calendar-event"></i> Fecha:</strong> <span class="produccion-trace-date">${escapeHtml(formatIsoEs(date))}</span></p><p><strong><i class="bi bi-hourglass-split"></i> VTO producto:</strong> <span class="produccion-confirm-vto">${escapeHtml(formatIsoEs(productExpiry || ''))} (VTO)</span></p><p><strong><i class="bi bi-speedometer2"></i> Total a producir:</strong> <span class="produccion-confirm-total">${qty.toFixed(2)} kg</span></p><p><strong><i class="bi bi-people"></i> Encargado/s:</strong><br>${managerSummary}</p><p><strong><i class="bi bi-list-check"></i> Resumen de insumos:</strong></p><ul>${summaryRows}</ul></div>`,
         showCancelButton: true,
         confirmButtonText: 'Confirmar',
         cancelButtonText: 'Cancelar',
         customClass: { popup: 'produccion-confirm-alert', confirmButton: 'ios-btn ios-btn-success', cancelButton: 'ios-btn ios-btn-secondary' }
       });
       if (!confirm.isConfirmed) return;
-
       Swal.fire({
         title: 'Cargando producción...',
         html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando producción" class="meta-spinner-login"></div>',
@@ -2269,7 +2291,6 @@
           htmlContainer: 'ios-alert-text'
         }
       });
-
       try {
         const registros = safeObject(await window.dbLaJamoneraRest.read(REGISTROS_PATH));
         const sequence = Number(await window.dbLaJamoneraRest.read(SEQUENCE_PATH)) || 0;
@@ -2277,11 +2298,8 @@
         const dateToken = formatIsoToDmyCompact(date);
         const prefix = normalizeValue(state.config.idConfig?.prefix) || 'PROD-LJ';
         const productionId = `${prefix}-${dateToken}-${String(nextSequence).padStart(4, '0')}`;
-
         const observations = normalizeValue(nodes.editor.querySelector('#produccionObsInput')?.value);
-
         const inventarioNext = applyPlanOnInventory(state.inventario, revalidated, productionId, date, 'consume');
-
         const registro = {
         id: productionId,
         recipeId: recipe.id,
@@ -2325,12 +2343,10 @@
         exports: {},
         auditTrail: [{ action: 'creada', at: nowTs(), user: getCurrentUserLabel() }]
       };
-
         await window.dbLaJamoneraRest.write('/inventario', inventarioNext);
         await window.dbLaJamoneraRest.write(SEQUENCE_PATH, nextSequence);
         await window.dbLaJamoneraRest.write(REGISTROS_PATH, { ...registros, [productionId]: registro });
         await appendAudit({ action: 'produccion_confirmada', productionId, before: null, after: registro, reason: 'confirmacion final' });
-
         state.config.lastProductionByRecipe[recipe.id] = nowTs();
         await persistConfig();
         await releaseReservation('confirmed');
@@ -2344,9 +2360,7 @@
         await openIosSwal({ title: 'No se pudo confirmar', html: '<p>Ocurrió un error al guardar la producción.</p>', icon: 'error', confirmButtonText: 'Entendido' });
       }
     };
-
     nodes.editor.querySelector('#produccionConfirmBtn').addEventListener('click', confirmProduction);
-
     nodes.editor.querySelector('#produccionBackBtn').addEventListener('click', async () => {
       const result = await openIosSwal({
         title: '¿Deseás abandonar esta producción?',
@@ -2366,19 +2380,16 @@
       }
       renderList();
     });
-
     await updateEditorPlan();
     renderRecipeHistory();
     setStateView('editor');
   };
-
   const recomputeAnalysis = () => {
     state.analysis = Object.values(state.recetas).reduce((acc, recipe) => {
       acc[recipe.id] = analyzeRecipe(recipe);
       return acc;
     }, {});
   };
-
   const refreshData = async () => {
     setStateView('loading');
     await window.laJamoneraReady;
@@ -2392,7 +2403,6 @@
       window.dbLaJamoneraRest.read(REGISTROS_PATH),
       window.dbLaJamoneraRest.read('/informes/users')
     ]);
-
     state.recetas = safeObject(recetas);
     state.ingredientes = safeObject(ingredientes);
     state.inventario = safeObject(inventario);
@@ -2410,11 +2420,9 @@
       idConfig: { prefix: normalizeValue(config?.idConfig?.prefix) || 'PROD-LJ' },
       companyLogoUrl: normalizeValue(config?.companyLogoUrl)
     };
-
     await cleanupExpiredReservations();
     recomputeAnalysis();
   };
-
   const openInventarioFromProduccion = () => {
     const productionInstance = window.bootstrap?.Modal?.getOrCreateInstance(produccionModal);
     const inventarioModal = document.getElementById('inventarioModal');
@@ -2427,14 +2435,11 @@
     produccionModal.addEventListener('hidden.bs.modal', openOnHidden, { once: true });
     productionInstance.hide();
   };
-
   nodes.search.addEventListener('input', (event) => {
     state.search = event.target.value;
     renderList();
   });
-
   nodes.list.addEventListener('scroll', updateProduccionListScrollHint);
-
   nodes.list.addEventListener('click', async (event) => {
     const openDraftBtn = event.target.closest('[data-open-draft]');
     if (openDraftBtn) {
@@ -2446,7 +2451,6 @@
       }
       return;
     }
-
     const deleteDraftBtn = event.target.closest('[data-delete-draft]');
     if (deleteDraftBtn) {
       const draftId = deleteDraftBtn.dataset.deleteDraft;
@@ -2464,7 +2468,6 @@
       renderList();
       return;
     }
-
     const produceBtn = event.target.closest('[data-open-produccion]');
     if (produceBtn) {
       state.activeRecipeId = produceBtn.dataset.openProduccion;
@@ -2499,7 +2502,6 @@
       await openRecipeMinConfig(minBtn.dataset.setRecipeMin);
     }
   });
-
   produccionModal.addEventListener('click', async (event) => {
     if (event.target.closest('#produccionGlobalMinBtn')) {
       await openGlobalMinConfig();
@@ -2509,18 +2511,15 @@
       await openHistory();
     }
   });
-
   nodes.historyBackBtn?.addEventListener('click', () => {
     setHistoryMode(false);
   });
-
   nodes.historyApplyBtn?.addEventListener('click', () => {
     state.historyRange = normalizeValue(nodes.historyRange?.value);
     nodes.historyClearBtn?.classList.toggle('d-none', !state.historyRange);
     state.historyPage = 1;
     renderHistoryTable();
   });
-
   nodes.historyClearBtn?.addEventListener('click', () => {
     state.historyRange = '';
     if (nodes.historyRange) nodes.historyRange.value = '';
@@ -2528,14 +2527,14 @@
     state.historyPage = 1;
     renderHistoryTable();
   });
-
   nodes.historyExpandBtn?.addEventListener('click', async () => {
     const rows = getHistoryRows();
     const collapseMap = { ...state.historyTraceCollapse };
     const renderRows = () => rows.length ? rows.map((item, index) => {
       const manager = getManagerLabel(item);
       const traceRows = getTraceRowsFromRegistro(item);
-      const traceHtml = traceRows.map((trace) => `<tr class="inventario-trace-row">
+      const isCollapsed = collapseMap[item.id] === true;
+      const traceHtml = (!isCollapsed && traceRows.length) ? traceRows.map((trace) => `<tr class="inventario-trace-row">
         <td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${escapeHtml(trace.ingredientName)}</span></div></td>
         <td></td>
         <td><span class="produccion-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td>
@@ -2544,17 +2543,18 @@
         <td><span class="produccion-trace-expiry">${escapeHtml(formatIsoEs(trace.expiryDate))} (VTO)</span></td>
         <td><span class="produccion-trace-badge">Trazabilidad</span></td>
         <td>${trace.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}'><i class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td>
-      </tr>`).join('');
-      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(item.id)}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)} (${escapeHtml(manager.role)})</td><td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td></tr>${traceHtml}`;
+      </tr>`).join('') : '';
+      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-expanded-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isCollapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(item.id)}</span></div></td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)} (${escapeHtml(manager.role)})</td><td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td></tr>${traceHtml}`;
     }).join('') : '<tr><td colspan="8" class="text-center">Sin producciones.</td></tr>';
-
     const renderExpandedContent = (popup) => {
       const host = popup.querySelector('#produccionExpandedHistoryHost');
       if (!host) return;
-      host.innerHTML = `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Adjuntos</th></tr></thead><tbody>${renderRows()}</tbody></table></div>`;
+      const traceableRows = rows.filter((item) => getTraceRowsFromRegistro(item).length);
+      const canCollapseRows = traceableRows.some((item) => collapseMap[item.id] !== true);
+      const canExpandRows = traceableRows.some((item) => collapseMap[item.id] === true);
+      host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionExpandedHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionExpandedHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Adjuntos</th></tr></thead><tbody>${renderRows()}</tbody></table></div>`;
       prepareThumbLoaders('.js-produccion-thumb');
     };
-
     await openIosSwal({
       title: 'Producciones guardadas • La Jamonera',
       html: '<div id="produccionExpandedHistoryHost" class="inventario-expand-wrap"></div>',
@@ -2563,6 +2563,27 @@
       didOpen: (popup) => {
         renderExpandedContent(popup);
         popup.addEventListener('click', async (event) => {
+          if (event.target.closest('#produccionExpandedHistoryCollapseAllRowsBtn')) {
+            rows.forEach((item) => {
+              if (getTraceRowsFromRegistro(item).length) collapseMap[item.id] = true;
+            });
+            renderExpandedContent(popup);
+            return;
+          }
+          if (event.target.closest('#produccionExpandedHistoryExpandAllRowsBtn')) {
+            rows.forEach((item) => {
+              if (getTraceRowsFromRegistro(item).length) collapseMap[item.id] = false;
+            });
+            renderExpandedContent(popup);
+            return;
+          }
+          const collapseBtn = event.target.closest('[data-prod-expanded-collapse]');
+          if (collapseBtn) {
+            const prodId = collapseBtn.dataset.prodExpandedCollapse;
+            collapseMap[prodId] = !collapseMap[prodId];
+            renderExpandedContent(popup);
+            return;
+          }
           const traceBtn = event.target.closest('[data-recipe-prod-trace]');
           if (traceBtn) {
             const reg = state.registros[traceBtn.dataset.recipeProdTrace];
@@ -2581,7 +2602,6 @@
       customClass: { confirmButton: 'ios-btn ios-btn-secondary' }
     });
   });
-
   nodes.historyExcelBtn?.addEventListener('click', async () => {
     const rows = getHistoryRows();
     const payload = rows.flatMap((item) => {
@@ -2609,7 +2629,6 @@
       }));
       return [main, ...traces];
     });
-
     await exportStyledExcel({
       fileName: `producciones_periodo_${Date.now()}.xlsx`,
       sheetName: 'Producciones',
@@ -2617,7 +2636,6 @@
       rows: payload
     });
   });
-
   nodes.historyPrintBtn?.addEventListener('click', async () => {
     const ask = await openIosSwal({
       title: 'Imprimir período',
@@ -2635,7 +2653,6 @@
     });
     if (!ask.isConfirmed && !ask.isDenied) return;
     const includeImages = ask.isConfirmed;
-
     const askTrace = await openIosSwal({
       title: 'Incluir trazabilidad',
       html: '<p>¿Querés incluir los datos colapsados de trazabilidad?</p>',
@@ -2652,7 +2669,6 @@
     });
     if (!askTrace.isConfirmed && !askTrace.isDenied) return;
     const includeTrace = askTrace.isConfirmed;
-
     const rows = getHistoryRows();
     const ingredientImages = includeImages
       ? rows.flatMap((item) => getTraceRowsFromRegistro(item).map((trace) => trace.ingredientImageUrl).filter(Boolean))
@@ -2660,11 +2676,9 @@
     const attachedImages = includeImages
       ? rows.flatMap((item) => getTraceRowsFromRegistro(item).flatMap((trace) => trace.invoiceImageUrls || []))
       : [];
-
     if (includeImages) {
       await preloadPrintImages([...ingredientImages, ...attachedImages]);
     }
-
     const win = window.open('', '_blank', 'width=1300,height=900');
     if (!win) return;
     const bodyRows = rows.flatMap((item) => {
@@ -2676,18 +2690,15 @@
       const traces = getTraceRowsFromRegistro(item).map((trace) => `<tr class="is-trace-row"><td>↳ ${trace.index}</td><td><span class="print-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td><span style="display:inline-flex;align-items:center;gap:8px;">${trace.ingredientImageUrl ? `<img src="${escapeHtml(trace.ingredientImageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(trace.ingredientName)}</span></span></td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="print-trace-vto">${escapeHtml(formatIsoEs(trace.expiryDate))} (VTO)</span></td></tr>`);
       return [main, ...traces];
     }).join('');
-
     const imagesHtml = includeImages
       ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas del período</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${rows.flatMap((item) => getTraceRowsFromRegistro(item).map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">${trace.ingredientImageUrl ? `<img src="${trace.ingredientImageUrl}" style="width:36px;height:36px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<figcaption style="font-size:12px;color:#4b5f8e;">${escapeHtml(trace.ingredientName)}</figcaption></div>${(trace.invoiceImageUrls || []).map((url, idx) => `<img src="${url}" style="width:100%;max-height:240px;object-fit:contain;border-radius:10px;margin-top:${idx ? '8px' : '0'};">`).join('')}</figure>`)).join('')}</div></section>`
       : '';
-
     win.document.write(`<html><head><title>Producción por período</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.is-trace-row td{background:#ffecef}.print-trace-date{color:#1f6fd6;font-weight:700}.print-trace-vto{color:#b04a09;font-weight:700}</style></head><body><h1>Producción por período • La Jamonera</h1><table><thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
     win.document.close();
     win.focus();
     await waitPrintAssets(win);
     win.print();
   });
-
   nodes.historyTableWrap?.addEventListener('click', async (event) => {
     if (event.target.closest('#produccionHistoryCollapseAllRowsBtn')) {
       getHistoryRows().forEach((item) => {
@@ -2743,8 +2754,6 @@
       if (reg) await cancelProduction(reg);
     }
   });
-
-
   window.laJamoneraProduccionAPI = {
     openTraceabilityById: async (productionId) => {
       const id = normalizeValue(productionId);
@@ -2796,7 +2805,6 @@
       setStateView('empty');
     }
   });
-
   produccionModal.addEventListener('hidden.bs.modal', async () => {
     if (state.activeRecipeId) {
       await saveEditorDraft();
