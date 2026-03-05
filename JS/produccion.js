@@ -1145,18 +1145,40 @@
     doc.save(`${registro.id}.pdf`);
     await markProductionExport(registro.id, 'pdf');
   };
+  const loadExternalScript = (src, id) => new Promise((resolve) => {
+    if (document.getElementById(id)) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.id = id;
+    script.src = src;
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.head.appendChild(script);
+  });
+  const loadExternalStylesheet = (href, id) => {
+    if (document.getElementById(id)) return;
+    const link = document.createElement('link');
+    link.id = id;
+    link.rel = 'stylesheet';
+    link.href = href;
+    document.head.appendChild(link);
+  };
   const ensureTraceDiagramLib = async () => {
-    if (window.cytoscape) return true;
-    if (window.__laJamoneraLoadingCytoscape) return window.__laJamoneraLoadingCytoscape;
-    window.__laJamoneraLoadingCytoscape = new Promise((resolve) => {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/cytoscape@3.29.2/dist/cytoscape.min.js';
-      script.async = true;
-      script.onload = () => resolve(Boolean(window.cytoscape));
-      script.onerror = () => resolve(false);
-      document.head.appendChild(script);
-    });
-    return window.__laJamoneraLoadingCytoscape;
+    if (window.React && window.ReactDOM && window.ReactFlow) return true;
+    if (window.__laJamoneraLoadingReactFlow) return window.__laJamoneraLoadingReactFlow;
+    window.__laJamoneraLoadingReactFlow = (async () => {
+      loadExternalStylesheet('https://cdn.jsdelivr.net/npm/reactflow@11.11.4/dist/style.css', 'la-jamonera-reactflow-style');
+      const reactOk = await loadExternalScript('https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js', 'la-jamonera-react');
+      if (!reactOk) return false;
+      const reactDomOk = await loadExternalScript('https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js', 'la-jamonera-react-dom');
+      if (!reactDomOk) return false;
+      const reactFlowOk = await loadExternalScript('https://cdn.jsdelivr.net/npm/reactflow@11.11.4/dist/umd/index.js', 'la-jamonera-reactflow');
+      return Boolean(reactFlowOk && window.ReactFlow);
+    })();
+    return window.__laJamoneraLoadingReactFlow;
   };
   const renderTraceabilityTree = (registro) => {
     const safeToKg = (qty, unit) => {
@@ -1226,15 +1248,15 @@
           </article>
           <div class="produccion-trace-mermaid-wrap">
             <div class="produccion-trace-product-preview">${productImage ? `<img src="${escapeHtml(productImage)}" alt="${escapeHtml(registro.recipeTitle || 'Producto')}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</div>
-            <div class="produccion-trace-cytoscape" data-trace-cytoscape></div>
+            <div class="produccion-trace-reactflow" data-trace-reactflow></div>
           </div>
           <div class="produccion-trace-ingredients">${ingredients || '<p class="m-0">Sin desglose de lotes para esta producción.</p>'}</div>
         </div>
       </div>
     </section>`;
   };
-  const initTraceCytoscapeDiagram = async (popup, registro) => {
-    const host = popup.querySelector('[data-trace-cytoscape]');
+  const initTraceReactFlowDiagram = async (popup, registro) => {
+    const host = popup.querySelector('[data-trace-reactflow]');
     if (!host) return;
     const hasLib = await ensureTraceDiagramLib();
     if (!hasLib) {
@@ -1242,89 +1264,118 @@
       return;
     }
 
+    const React = window.React;
+    const ReactDOM = window.ReactDOM;
+    const RF = window.ReactFlow;
     const ingredients = Array.isArray(registro.lots) ? registro.lots : [];
-    const nodes = [
-      { data: { id: 'product', label: `${registro.recipeTitle || '-'}
-Producto` }, position: { x: 220, y: 60 }, classes: 'product' },
-      { data: { id: 'production', label: `Producción ${Number(registro.quantityKg || 0).toFixed(2)} kg` }, position: { x: 220, y: 150 }, classes: 'production' },
-      { data: { id: 'ingredientsTotal', label: `Ingredientes ${(ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0)).toFixed(3)} kg` }, position: { x: 220, y: 240 }, classes: 'ingredients' },
-      { data: { id: 'lot', label: `Lote ${registro.id}
-VTO ${formatProductExpiryLabel(registro)}` }, position: { x: 520, y: 60 }, classes: 'lot' },
-      { data: { id: 'manager', label: `Encargado ${(Array.isArray(registro.managers) && registro.managers[0]) ? getManagerDisplay(registro.managers[0]).name : 'Sin encargado'}` }, position: { x: 520, y: 150 }, classes: 'manager' },
-      { data: { id: 'waste', label: `Merma ${Math.max(0, ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0) - Number(registro.quantityKg || 0)).toFixed(3)} kg` }, position: { x: 520, y: 240 }, classes: 'waste' }
+    const totalIngredientsKg = ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0);
+    const mermaKg = Math.max(0, totalIngredientsKg - Number(registro.quantityKg || 0));
+    const managerMain = (Array.isArray(registro.managers) && registro.managers[0]) ? getManagerDisplay(registro.managers[0]).name : 'Sin encargado';
+    const nodeBox = (title, lines, tone = '') => React.createElement('div', { className: `produccion-trace-flow-node ${tone}`.trim() }, [
+      React.createElement('strong', { key: 'title' }, title),
+      ...lines.map((line, index) => React.createElement('span', { key: `line_${index}` }, line))
+    ]);
+    const flowNodes = [
+      { id: 'product', position: { x: 80, y: 20 }, data: { label: nodeBox(`${registro.recipeTitle || '-'} (producto)`, [`ID: ${registro.id || '-'}`], 'tone-product') }, draggable: false },
+      { id: 'lot', position: { x: 520, y: 20 }, data: { label: nodeBox('Lote y vencimiento', [`${registro.id || '-'}`, `VTO: ${formatProductExpiryLabel(registro)}`], 'tone-lot') }, draggable: false },
+      { id: 'production', position: { x: 80, y: 125 }, data: { label: nodeBox('Producción', [`Cantidad final: ${Number(registro.quantityKg || 0).toFixed(2)} kg`], 'tone-production') }, draggable: false },
+      { id: 'manager', position: { x: 520, y: 125 }, data: { label: nodeBox('Encargado', [managerMain], 'tone-manager') }, draggable: false },
+      { id: 'ingredientsTotal', position: { x: 80, y: 230 }, data: { label: nodeBox('Ingredientes totales', [`${totalIngredientsKg.toFixed(3)} kg`], 'tone-ingredients') }, draggable: false },
+      { id: 'waste', position: { x: 520, y: 230 }, data: { label: nodeBox('Merma estimada', [`${mermaKg.toFixed(3)} kg`], 'tone-waste') }, draggable: false }
+    ];
+    const flowEdges = [
+      { id: 'e_product_production', source: 'product', target: 'production', type: 'smoothstep', animated: true },
+      { id: 'e_product_lot', source: 'product', target: 'lot', type: 'smoothstep' },
+      { id: 'e_production_ingtotal', source: 'production', target: 'ingredientsTotal', type: 'smoothstep', animated: true },
+      { id: 'e_production_manager', source: 'production', target: 'manager', type: 'smoothstep' },
+      { id: 'e_ingtotal_waste', source: 'ingredientsTotal', target: 'waste', type: 'smoothstep' }
     ];
 
-    const edges = [
-      { data: { source: 'product', target: 'production' } },
-      { data: { source: 'product', target: 'lot' } },
-      { data: { source: 'production', target: 'ingredientsTotal' } },
-      { data: { source: 'production', target: 'manager' } },
-      { data: { source: 'ingredientsTotal', target: 'waste' } }
-    ];
-
-    let y = 370;
     ingredients.forEach((item, index) => {
-      const nodeId = `ing_${index}`;
-      const col = index % 2;
-      const row = Math.floor(index / 2);
-      const x = col ? 520 : 220;
-      const yy = y + (row * 170);
       const lot = Array.isArray(item.lots) && item.lots[0] ? item.lots[0] : {};
-      const label = `${index + 1}. ${item.ingredientName || 'Ingrediente'}
-Necesita: ${formatCompactQty(item.requiredQty ?? item.neededQty, item.unit || item.ingredientUnit || '')}
-Lote: ${lot.lotNumber || lot.entryId || '-'}
-Vence: ${formatIsoEs(lot.expiryDate) || '-'}
-Proveedor: ${lot.provider || '-'}`;
-      nodes.push({ data: { id: nodeId, label }, position: { x, y: yy }, classes: 'ingredient' });
-      if (index === 0) {
-        edges.push({ data: { source: 'ingredientsTotal', target: nodeId } });
-      } else {
-        edges.push({ data: { source: `ing_${index - 1}`, target: nodeId } });
-      }
+      const row = Math.floor(index / 2);
+      const col = index % 2;
+      const nodeId = `ingredient_${index}`;
+      flowNodes.push({
+        id: nodeId,
+        position: { x: col ? 520 : 80, y: 355 + (row * 180) },
+        data: {
+          label: nodeBox(
+            `${index + 1}. ${item.ingredientName || 'Ingrediente'}`,
+            [
+              `Necesita: ${formatCompactQty(item.requiredQty ?? item.neededQty, item.unit || item.ingredientUnit || '')}`,
+              `Lote: ${lot.lotNumber || lot.entryId || '-'}`,
+              `Vence: ${formatIsoEs(lot.expiryDate) || '-'}`,
+              `Proveedor: ${lot.provider || '-'}`
+            ],
+            'tone-ingredient'
+          )
+        },
+        draggable: false
+      });
+      flowEdges.push({
+        id: `e_ing_${index}`,
+        source: index === 0 ? 'ingredientsTotal' : `ingredient_${index - 1}`,
+        target: nodeId,
+        type: 'smoothstep'
+      });
     });
 
-    const cy = window.cytoscape({
-      container: host,
-      elements: { nodes, edges },
-      style: [
-        { selector: 'node', style: { 'shape': 'round-rectangle', 'width': 280, 'height': 72, 'background-color': '#eef3ff', 'border-width': 1, 'border-color': '#cbd8f3', 'label': 'data(label)', 'font-size': 14, 'text-wrap': 'wrap', 'text-max-width': 250, 'text-valign': 'center', 'text-halign': 'center', 'color': '#244277', 'font-weight': 700 } },
-        { selector: 'node.ingredient', style: { 'width': 340, 'height': 150, 'background-color': '#f3f5f9', 'text-halign': 'left', 'text-valign': 'top', 'padding': '14px', 'font-size': 13 } },
-        { selector: 'node.product', style: { 'background-color': '#dfeaff' } },
-        { selector: 'node.production', style: { 'background-color': '#fff3c6' } },
-        { selector: 'node.ingredients', style: { 'background-color': '#d8f4e4' } },
-        { selector: 'node.lot', style: { 'background-color': '#ffeed9' } },
-        { selector: 'node.manager', style: { 'background-color': '#e8e1ff' } },
-        { selector: 'node.waste', style: { 'background-color': '#ffdede' } },
-        { selector: 'edge', style: { 'width': 2, 'line-color': '#7f95c2', 'target-arrow-shape': 'triangle', 'target-arrow-color': '#7f95c2', 'curve-style': 'bezier' } }
-      ],
-      userZoomingEnabled: true,
-      userPanningEnabled: true,
-      wheelSensitivity: 0.2,
-      minZoom: 0.4,
-      maxZoom: 2.6
-    });
-
-    popup.__traceCy = cy;
-    cy.fit(undefined, 26);
+    const root = ReactDOM.createRoot(host);
+    popup.__traceReactRoot = root;
+    const FlowApp = () => {
+      const onInit = (instance) => {
+        popup.__traceFlowApi = instance;
+        window.requestAnimationFrame(() => instance.fitView({ padding: 0.18 }));
+      };
+      return React.createElement('div', { style: { width: '100%', height: '100%' } },
+        React.createElement(RF.ReactFlow, {
+          nodes: flowNodes,
+          edges: flowEdges,
+          onInit,
+          fitView: true,
+          minZoom: 0.35,
+          maxZoom: 2.2,
+          nodesDraggable: false,
+          elementsSelectable: false,
+          panOnDrag: true,
+          zoomOnScroll: true,
+          zoomOnPinch: true,
+          zoomOnDoubleClick: false,
+          proOptions: { hideAttribution: true }
+        },
+        React.createElement(RF.Background, { gap: 18, size: 1, color: '#dfe8fb' }),
+        React.createElement(RF.Controls, { showInteractive: false }),
+        React.createElement(RF.MiniMap, { pannable: true, zoomable: true, nodeStrokeWidth: 2, maskColor: 'rgba(240,244,255,0.65)' }))
+      );
+    };
+    root.render(React.createElement(FlowApp));
   };
   const initTraceDiagramInteractions = (popup) => {
     const wrap = popup.querySelector('[data-trace-zoom-wrap]');
     const zoomLabel = popup.querySelector('[data-trace-zoom-value]');
     if (!wrap || !zoomLabel) return;
-    const cy = popup.__traceCy || null;
-    let zoom = cy ? cy.zoom() : 1;
+    const flowApi = popup.__traceFlowApi || null;
+    let zoom = flowApi?.getZoom ? flowApi.getZoom() : 1;
     const setZoom = (value) => {
       zoom = Math.min(2.6, Math.max(0.4, value));
-      if (cy) cy.zoom({ level: zoom, renderedPosition: { x: wrap.clientWidth / 2, y: wrap.clientHeight / 2 } });
-      else {
-        const canvas = popup.querySelector('[data-trace-zoom-canvas]');
-        if (canvas) canvas.style.transform = `scale(${zoom})`;
+      if (flowApi?.setViewport && flowApi?.getViewport) {
+        const viewport = flowApi.getViewport();
+        flowApi.setViewport({ x: viewport.x, y: viewport.y, zoom }, { duration: 160 });
       }
       zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
     };
-    popup.querySelector('[data-trace-zoom-in]')?.addEventListener('click', () => setZoom(zoom + 0.12));
-    popup.querySelector('[data-trace-zoom-out]')?.addEventListener('click', () => setZoom(zoom - 0.12));
-    popup.querySelector('[data-trace-zoom-reset]')?.addEventListener('click', () => setZoom(1));
+    popup.querySelector('[data-trace-zoom-in]')?.addEventListener('click', () => setZoom((flowApi?.getZoom ? flowApi.getZoom() : zoom) + 0.12));
+    popup.querySelector('[data-trace-zoom-out]')?.addEventListener('click', () => setZoom((flowApi?.getZoom ? flowApi.getZoom() : zoom) - 0.12));
+    popup.querySelector('[data-trace-zoom-reset]')?.addEventListener('click', () => {
+      if (flowApi?.fitView) {
+        flowApi.fitView({ padding: 0.18, duration: 180 });
+        zoom = flowApi.getZoom ? flowApi.getZoom() : 1;
+        zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
+        return;
+      }
+      setZoom(1);
+    });
     wrap.addEventListener('wheel', (event) => {
       if (!event.ctrlKey) return;
       event.preventDefault();
@@ -1346,7 +1397,7 @@ Proveedor: ${lot.provider || '-'}`;
       pinchStart = current;
       event.preventDefault();
     }, { passive: false });
-    setZoom(1);
+    zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
   };
   const openTraceability = async (registro) => {
     Swal.fire({
@@ -1371,7 +1422,7 @@ Proveedor: ${lot.provider || '-'}`;
         popup: 'produccion-trace-alert'
       },
       didOpen: async (popup) => {
-        await initTraceCytoscapeDiagram(popup, registro);
+        await initTraceReactFlowDiagram(popup, registro);
         initTraceDiagramInteractions(popup);
         popup.querySelectorAll('[data-prod-trace-images]').forEach((btn) => {
           btn.addEventListener('click', async () => {
@@ -1382,6 +1433,9 @@ Proveedor: ${lot.provider || '-'}`;
             }
           });
         });
+      },
+      willClose: (popup) => {
+        popup.__traceReactRoot?.unmount?.();
       }
     });
   };
