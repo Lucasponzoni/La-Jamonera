@@ -6576,7 +6576,7 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-trace-mermaid-wrap {
-  border: 1px solid #cfdbf4;
+  border: 2px dashed #cfdbf4;
   border-radius: 16px;
   background: transparent;
   padding: 12px;
