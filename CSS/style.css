@@ -6083,3 +6083,105 @@ html.login-protected.auth-ok body {
   width: fit-content;
   color: #178c46;
 }
+
+/* =========================================
+   INVENTARIO / PRODUCCIÓN TRACE UI
+========================================= */
+.inventario-available-line {
+  color: #6c7a98;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.inventario-trace-row td {
+  background: #f8ecee !important;
+  border-bottom: 1px solid #eed7dc !important;
+  color: #4b5f8d;
+  font-size: 0.82rem;
+}
+
+.inventario-trace-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inventario-trace-icon {
+  width: 18px;
+  height: 18px;
+  color: #5b7ec8;
+  flex-shrink: 0;
+}
+
+.inventario-trace-kilos {
+  color: #d31233 !important;
+  font-weight: 800;
+}
+
+.produccion-visualizar-btn {
+  background: #edf3ff;
+  color: #2a4ea3;
+}
+
+.produccion-recipe-history {
+  border: 1px solid #d8e2f7;
+  border-radius: 14px;
+  padding: 10px;
+  background: #fbfdff;
+}
+
+/* =========================================
+   AJUSTES UX INVENTARIO/PRODUCCIÓN (REVISION)
+========================================= */
+.inventario-trace-toolbar {
+  justify-content: flex-end;
+}
+
+.inventario-trace-toolbar .inventario-period-divider {
+  margin-right: 2px;
+}
+
+.produccion-actions-row .produccion-visualizar-btn,
+.produccion-visualizar-btn {
+  width: fit-content;
+  max-width: none;
+  min-height: 40px;
+}
+
+.produccion-umbral-btn {
+  width: fit-content;
+  max-width: none;
+  min-height: 40px;
+  border-radius: 16px;
+  border: 1px solid #d8dce7;
+  background: #ececef;
+  color: #4d4f57;
+  font-weight: 700;
+  padding: 8px 14px;
+}
+
+.produccion-umbral-btn i {
+  color: #666a73;
+}
+
+.produccion-umbral-btn:hover {
+  background: #e2e3e8;
+  color: #3f424a;
+}
+
+.swal2-popup.ios-alert.produccion-umbral-alert {
+  max-width: 520px;
+}
+
+.produccion-umbral-alert .swal2-html-container {
+  text-align: center;
+}
+
+.produccion-umbral-alert .swal2-actions {
+  justify-content: center;
+}
+
+.produccion-umbral-alert .swal2-input.ios-input {
+  margin-inline: auto;
+  text-align: center;
+}
