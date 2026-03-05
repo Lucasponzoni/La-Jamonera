@@ -1370,12 +1370,11 @@
         <td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${item.id}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td>
         <td>
           <div class="inventario-entry-actions">
-            ${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-prod-collapse="${item.id}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-prod-print="${item.id}" title="Imprimir"><i class="fa-solid fa-print"></i></button>
             <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn inventario-icon-only-btn" data-prod-cancel="${item.id}" title="Anular"><i class="fa-solid fa-trash"></i></button>
           </div>
         </td>
-      </tr>${traceHtml}`;
+      </tr>`;
     }).join('') : '<tr><td colspan="8" class="text-center">Sin producciones en ese rango.</td></tr>';
 
     nodes.historyTableWrap.innerHTML = `
