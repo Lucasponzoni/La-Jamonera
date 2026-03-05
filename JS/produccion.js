@@ -1375,7 +1375,7 @@
             <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn inventario-icon-only-btn" data-prod-cancel="${item.id}" title="Anular"><i class="fa-solid fa-trash"></i></button>
           </div>
         </td>
-      </tr>`;
+      </tr>${traceHtml}`;
     }).join('') : '<tr><td colspan="8" class="text-center">Sin producciones en ese rango.</td></tr>';
 
     nodes.historyTableWrap.innerHTML = `
@@ -2256,8 +2256,8 @@
         title: 'Confirmar producción final',
         html: `<div class="text-start produccion-confirm-summary produccion-confirm-card"><div class="produccion-confirm-head"><span class="produccion-confirm-icon"><i class="bi bi-check2-circle"></i></span><div><p class="produccion-confirm-kicker">Validación final</p><p class="produccion-confirm-note">Se descontará stock real del inventario al confirmar.</p></div></div><p><strong><i class="bi bi-box-seam"></i> Producto:</strong> <span>${escapeHtml(recipe.title || '-')}</span></p><p><strong><i class="bi bi-calendar-event"></i> Fecha:</strong> <span class="produccion-trace-date">${escapeHtml(formatIsoEs(date))}</span></p><p><strong><i class="bi bi-hourglass-split"></i> VTO producto:</strong> <span class="produccion-confirm-vto">${escapeHtml(formatIsoEs(productExpiry || ''))} (VTO)</span></p><p><strong><i class="bi bi-speedometer2"></i> Total a producir:</strong> <span class="produccion-confirm-total">${qty.toFixed(2)} kg</span></p><p><strong><i class="bi bi-people"></i> Encargado/s:</strong><br>${managerSummary}</p><p><strong><i class="bi bi-list-check"></i> Resumen de insumos:</strong></p><ul>${summaryRows}</ul></div>`,
         showCancelButton: true,
-        confirmButtonText: '<i class="bi bi-check2-circle"></i><span>Confirmar</span>',
-        cancelButtonText: '<i class="bi bi-x-circle"></i><span>Cancelar</span>',
+        confirmButtonText: 'Confirmar',
+        cancelButtonText: 'Cancelar',
         customClass: { popup: 'produccion-confirm-alert', confirmButton: 'ios-btn ios-btn-success', cancelButton: 'ios-btn ios-btn-secondary' }
       });
       if (!confirm.isConfirmed) return;
