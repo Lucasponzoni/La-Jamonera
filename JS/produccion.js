@@ -1063,6 +1063,7 @@
               <small class="text-muted">Si cargás un nuevo archivo podés guardar la versión anterior en el historial.</small>
               <div class="produccion-config-actions">
                 <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionOpenRneViewerBtn" ${normalizeValue(currentRne.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i><span>Visualizar adjunto actual</span></button>
+                <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn" id="produccionDeleteRneBtn" ${(normalizeValue(currentRne.number) || normalizeValue(currentRne.attachmentUrl) || (Array.isArray(currentRne.history) && currentRne.history.length)) ? '' : 'disabled'}><i class="fa-solid fa-trash"></i><span>Borrar RNE</span></button>
               </div>
               <div class="produccion-rne-history-wrap">
                 <h6><strong>Historial de RNE</strong></h6>
@@ -1095,6 +1096,7 @@
         const preview = popup.querySelector('#produccionCompanyLogoPreview');
         const logoViewerBtn = popup.querySelector('#produccionOpenLogoViewerBtn');
         const rneViewerBtn = popup.querySelector('#produccionOpenRneViewerBtn');
+        const deleteRneBtn = popup.querySelector('#produccionDeleteRneBtn');
         const rneInput = popup.querySelector('#produccionRneNumberInput');
 
         const setLoading = () => {
@@ -1143,6 +1145,18 @@
           const currentUrl = normalizeValue(state.config.rne?.attachmentUrl);
           if (!currentUrl) return;
           await window.laJamoneraOpenImageViewer?.([{ invoiceImageUrls: [currentUrl] }], 0, 'Adjunto RNE');
+        });
+
+        deleteRneBtn?.addEventListener('click', async () => {
+          const auth = await askSensitivePassword(
+            'Borrar RNE de Producción',
+            '<p><strong>Confirmación:</strong> se eliminará el RNE actual junto a su historial.</p><p><small>Luego podrás cargar una nueva versión cuando quieras.</small></p>'
+          );
+          if (!auth.isConfirmed) return;
+          state.config.rne = { number: '', expiryDate: '', attachmentUrl: '', attachmentType: '', validFrom: '', updatedAt: 0, history: [] };
+          await persistConfig();
+          Swal.close();
+          await openGlobalMinConfig();
         });
         popup.querySelectorAll('[data-open-rne-history]').forEach((button) => {
           button.addEventListener('click', async () => {
