@@ -272,6 +272,15 @@
       confirmButtonText: 'Validar',
       cancelButtonText: 'Cancelar',
       customClass: { popup: 'produccion-secure-alert', confirmButton: 'ios-btn ios-btn-primary', cancelButton: 'ios-btn ios-btn-secondary' },
+      didOpen: () => {
+        const passNode = document.getElementById('produccionSecurePass');
+        if (passNode) {
+          passNode.value = '';
+          passNode.setAttribute('readonly', 'readonly');
+          setTimeout(() => passNode.removeAttribute('readonly'), 60);
+          passNode.focus({ preventScroll: true });
+        }
+      },
       preConfirm: async () => {
         const entered = normalizeValue(document.getElementById('produccionSecurePass')?.value);
         const remote = await getGeneralPassword();
