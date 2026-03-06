@@ -4,6 +4,7 @@
   const RECIPE_PLACEHOLDER_ICON = '<i class="fa-solid fa-bowl-food"></i>';
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
+  const ALLOWED_RNPA_UPLOAD_TYPES = [...ALLOWED_UPLOAD_TYPES, 'application/pdf'];
 
   const recetasModal = document.getElementById('recetasModal');
   if (!recetasModal) return;
@@ -25,6 +26,7 @@
     ingredientes: {},
     familias: {},
     measures: [],
+    recipeCities: ['Rosario'],
     search: '',
     view: 'list',
     activeRecipeId: '',
@@ -83,6 +85,9 @@
     { value: 'pote', singular: 'pote', plural: 'potes' },
     { value: 'paquete', singular: 'paquete', plural: 'paquetes' }
   ];
+
+  const RNPA_COUNTRY = 'Argentina';
+  const ARGENTINA_PROVINCES = ['Buenos Aires','CABA','Catamarca','Chaco','Chubut','Córdoba','Corrientes','Entre Ríos','Formosa','Jujuy','La Pampa','La Rioja','Mendoza','Misiones','Neuquén','Río Negro','Salta','San Juan','San Luis','Santa Cruz','Santa Fe','Santiago del Estero','Tierra del Fuego','Tucumán'];
 
   const FRONT_LABELS_ALLOWED = [
     'EXCESO EN AZÚCARES',
@@ -215,6 +220,13 @@
     return '';
   };
 
+  const validateRnpaFile = (file) => {
+    if (!file) return '';
+    if (!ALLOWED_RNPA_UPLOAD_TYPES.includes(file.type)) return 'RNPA: formato inválido. Permitido PDF o imagen.';
+    if (file.size > MAX_UPLOAD_SIZE_BYTES) return 'RNPA: el archivo supera 5MB.';
+    return '';
+  };
+
   const uploadImageToStorage = async (file, basePath) => {
     await window.laJamoneraReady;
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
@@ -261,11 +273,41 @@
   const fetchRecetas = async () => {
     await window.laJamoneraReady;
     state.recetas = safeObject(await window.dbLaJamoneraRest.read('/recetas'));
+    const cfg = safeObject(await window.dbLaJamoneraRest.read('/recetas_config'));
+    const cities = Array.isArray(cfg.cities) ? cfg.cities.map((item) => normalizeValue(item)).filter(Boolean) : [];
+    state.recipeCities = Array.from(new Set(['Rosario', ...cities])).sort((a, b) => a.localeCompare(b, 'es'));
+  };
+
+  const persistRecetasConfig = async () => {
+    await window.laJamoneraReady;
+    await window.dbLaJamoneraRest.write('/recetas_config', { cities: state.recipeCities });
   };
 
   const persistRecetas = async () => {
     await window.laJamoneraReady;
     await window.dbLaJamoneraRest.write('/recetas', state.recetas);
+  };
+
+
+  const getRnpaStatus = (recipe) => {
+    const rnpa = safeObject(recipe?.rnpa);
+    const attachmentUrl = normalizeValue(rnpa.attachmentUrl);
+    if (!attachmentUrl) return { label: 'RNPA pendiente', className: 'is-pending', days: null, icon: 'fa-triangle-exclamation' };
+    const expiryDate = normalizeValue(rnpa.expiryDate);
+    const expiryTs = expiryDate ? new Date(`${expiryDate}T00:00:00`).getTime() : Number.NaN;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days = Number.isFinite(expiryTs) ? Math.ceil((expiryTs - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
+    const nearDanger = days != null && days <= 90;
+    const nearWarning = days != null && days <= 180;
+    const className = nearDanger ? 'is-danger' : nearWarning ? 'is-warning' : 'is-ok';
+    return { label: 'RNPA adjunto', className, days, icon: 'fa-file-shield' };
+  };
+
+  const getRnpaCityOptions = (selected = '') => {
+    const chosen = normalizeValue(selected);
+    const merged = Array.from(new Set(['Rosario', ...(Array.isArray(state.recipeCities) ? state.recipeCities : [])])).sort((a, b) => a.localeCompare(b, 'es'));
+    return `${merged.map((city) => `<option value="${escapeHtml(city)}" ${normalizeLower(city) === normalizeLower(chosen) ? 'selected' : ''}>${escapeHtml(city)}</option>`).join('')}<option value="__new_city__">+ Agregar ciudad</option>`;
   };
 
   const renderRecetas = () => {
@@ -310,6 +352,7 @@
               </button>
             </div>
             <p class="ingrediente-meta receta-card-meta">Rinde: ${item.yieldQuantity || '0'} ${label || ''}</p>
+            ${(() => { const rnpaStatus = getRnpaStatus(item); const daysText = rnpaStatus.days == null ? '' : `<span class="receta-rnpa-days"><i class="fa-regular fa-hourglass-half"></i>${rnpaStatus.days} días</span>`; return `<div class="receta-rnpa-inline"><span class="receta-rnpa-badge ${rnpaStatus.className}"><i class="fa-solid ${rnpaStatus.icon}"></i>${rnpaStatus.label}</span>${daysText}</div>`; })()} 
             <p class="ingrediente-meta receta-card-ingredients">Ingredientes: ${recipeIngredients.length ? recipeIngredients.join(' · ') : 'Sin ingredientes vinculados.'}</p>
             ${item.description ? `<p class="ingrediente-description">${capitalize(item.description)}</p>` : '<p class="ingrediente-description"><em>Sin descripción</em></p>'}
             ${frontLabels.length ? `<div class="receta-front-inline">${buildFrontLabelsHtml(frontLabels, { compact: true })}</div>` : ''}
@@ -319,6 +362,7 @@
             </p>
           </div>
           <div class="ingrediente-actions recipe-row-actions">
+            <button type="button" class="btn family-manage-btn" data-receta-rnpa-view="${item.id}" title="Ver RNPA" ${normalizeValue(item?.rnpa?.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i></button>
             <button type="button" class="btn family-manage-btn" data-receta-edit="${item.id}" title="Editar"><i class="fa-solid fa-pen"></i></button>
             <button type="button" class="btn family-manage-btn" data-receta-delete="${item.id}" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
           </div>
@@ -1682,6 +1726,10 @@
           }
           return;
         }
+        if (['recipeRnpaDenomination','recipeRnpaBrand','recipeRnpaBusinessName','recipeRnpaExpiryDate'].includes(input.id)) {
+          markEditorDirty();
+          return;
+        }
         if (input.id === 'recipeNutritionHouseholdAmount') {
           renderHouseholdMeasureOptions();
           markEditorDirty();
@@ -1764,6 +1812,38 @@
             renderRows();
           }
         }
+
+        if (select.id === 'recipeRnpaCity' && select.value === '__new_city__') {
+          const res = await openIosSwal({
+            title: 'Agregar localidad',
+            showCancelButton: true,
+            confirmButtonText: 'Guardar',
+            cancelButtonText: 'Cancelar',
+            html: '<input id="recipeNewCityInput" class="swal2-input ios-input" placeholder="Ej: Venado Tuerto">',
+            preConfirm: () => {
+              const city = normalizeValue(document.getElementById('recipeNewCityInput')?.value);
+              if (!city) {
+                Swal.showValidationMessage('Ingresá una localidad.');
+                return false;
+              }
+              return city;
+            }
+          });
+          if (res.isConfirmed && res.value) {
+            state.recipeCities = Array.from(new Set([...(state.recipeCities || []), res.value])).sort((a, b) => a.localeCompare(b, 'es'));
+            await persistRecetasConfig();
+            select.innerHTML = `<option value="">Localidad</option>${getRnpaCityOptions(res.value)}`;
+            select.value = res.value;
+            markEditorDirty();
+          } else {
+            select.value = state.editor?.rnpa?.city || '';
+          }
+          return;
+        }
+        if (['recipeRnpaProvince', 'recipeRnpaCity', 'recipeRnpaCountry'].includes(select.id)) {
+          markEditorDirty();
+          return;
+        }
         if (select.id === 'recipeOrderModeEditor') {
           state.editor.orderMode = normalizeLower(select.value);
           markEditorDirty();
@@ -1823,6 +1903,10 @@
           state.editor.nutrition.declarationAmount = normalizeValue(input.value);
           markEditorDirty();
           markNutritionAiAsStaleIfNeeded();
+          return;
+        }
+        if (['recipeRnpaDenomination','recipeRnpaBrand','recipeRnpaBusinessName','recipeRnpaExpiryDate'].includes(input.id)) {
+          markEditorDirty();
           return;
         }
         if (input.id === 'recipeNutritionHouseholdAmount') {
@@ -2016,6 +2100,19 @@
             <label class="form-label" for="recipeDescription">Descripción (opcional)</label>
             <textarea id="recipeDescription" class="form-control ios-input recipe-description-lg" placeholder="Detalle amplio de la receta">${initial?.description || ''}</textarea>
           </div>
+          <div class="recipe-field recipe-field-full recipe-rnpa-block"><p class="recipe-subsection-title">RNPA (opcional)</p>
+            <div class="recipe-rnpa-grid">
+              <input id="recipeRnpaDenomination" class="form-control ios-input" placeholder="Denominación" value="${escapeHtml(state.editor.rnpa?.denomination || '')}">
+              <input id="recipeRnpaBrand" class="form-control ios-input" placeholder="Marca" value="${escapeHtml(state.editor.rnpa?.brand || '')}">
+              <input id="recipeRnpaBusinessName" class="form-control ios-input" placeholder="Razón social" value="${escapeHtml(state.editor.rnpa?.businessName || '')}">
+              <select id="recipeRnpaProvince" class="form-select ios-input"><option value="">Provincia</option>${ARGENTINA_PROVINCES.map((province) => `<option value="${escapeHtml(province)}" ${normalizeLower(state.editor.rnpa?.province) === normalizeLower(province) ? 'selected' : ''}>${escapeHtml(province)}</option>`).join('')}</select>
+              <select id="recipeRnpaCity" class="form-select ios-input"><option value="">Localidad</option>${getRnpaCityOptions(state.editor.rnpa?.city)}</select>
+              <select id="recipeRnpaCountry" class="form-select ios-input"><option value="Argentina" selected>Argentina</option></select>
+              <input id="recipeRnpaExpiryDate" class="form-control ios-input" placeholder="Vencimiento RNPA" value="${escapeHtml(state.editor.rnpa?.expiryDate || '')}">
+              <input id="recipeRnpaAttachment" class="form-control ios-input image-file-input" type="file" accept="image/*,application/pdf">
+              <div class="recipe-rnpa-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="recipeRnpaViewAttachmentBtn" ${normalizeValue(state.editor.rnpa?.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i><span>Ver adjunto</span></button></div>
+            </div>
+          </div>
           <div class="recipe-field recipe-field-full"><p class="recipe-subsection-title">Rendimiento / producción</p></div>
           <div class="recipe-field recipe-field-half recipe-highlight-field">
             <label class="form-label" for="recipeYieldQty"><i class="fa-solid fa-weight-hanging"></i> Cantidad final obtenida *</label>
@@ -2126,6 +2223,22 @@
     renderNutritionSubcategories(state.editor.nutrition.subcategory);
     renderHouseholdMeasureOptions();
     renderNutritionAiPreview();
+    const rnpaExpiryInput = recipeEditorForm.querySelector('#recipeRnpaExpiryDate');
+    if (window.flatpickr && rnpaExpiryInput) {
+      const locale = window.flatpickr.l10ns?.es || undefined;
+      window.flatpickr(rnpaExpiryInput, {
+        locale,
+        dateFormat: 'Y-m-d',
+        allowInput: true,
+        disableMobile: true,
+        defaultDate: normalizeValue(state.editor?.rnpa?.expiryDate) || undefined
+      });
+    }
+    recipeEditorForm.querySelector('#recipeRnpaViewAttachmentBtn')?.addEventListener('click', async () => {
+      const currentUrl = normalizeValue(state.editor?.rnpa?.attachmentUrl);
+      if (!currentUrl) return;
+      await window.laJamoneraOpenImageViewer?.([{ invoiceImageUrls: [currentUrl] }], 0, 'Adjunto RNPA');
+    });
     bindEditorEvents();
     setView('editor');
   };
@@ -2172,6 +2285,39 @@
 
     const sortedRows = sortRowsByOrderMode(rows, orderMode);
 
+    const rnpa = {
+      denomination: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaDenomination')?.value),
+      brand: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaBrand')?.value),
+      businessName: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaBusinessName')?.value),
+      city: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaCity')?.value),
+      province: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaProvince')?.value),
+      country: RNPA_COUNTRY,
+      expiryDate: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaExpiryDate')?.value),
+      attachmentUrl: normalizeValue(state.editor?.rnpa?.attachmentUrl),
+      attachmentType: normalizeValue(state.editor?.rnpa?.attachmentType),
+      attachmentName: normalizeValue(state.editor?.rnpa?.attachmentName)
+    };
+
+    const rnpaFile = recipeEditorForm.querySelector('#recipeRnpaAttachment')?.files?.[0];
+    const rnpaFileValidation = validateRnpaFile(rnpaFile);
+    if (rnpaFileValidation) throw new Error(rnpaFileValidation);
+    if (rnpaFile) {
+      rnpa.attachmentUrl = await uploadImageToStorage(rnpaFile, 'recetas/rnpa');
+      rnpa.attachmentType = normalizeValue(rnpaFile.type);
+      rnpa.attachmentName = normalizeValue(rnpaFile.name);
+    }
+    const rnpaValues = [rnpa.denomination, rnpa.brand, rnpa.businessName, rnpa.city, rnpa.province, rnpa.expiryDate, rnpa.attachmentUrl];
+    const hasSomeRnpa = rnpaValues.some(Boolean);
+    const hasAllRnpa = rnpaValues.every(Boolean);
+    if (hasSomeRnpa && !hasAllRnpa) throw new Error('RNPA incompleto: completá todos los campos o dejalo totalmente pendiente.');
+    if (hasAllRnpa) {
+      const cityExists = (state.recipeCities || []).some((item) => normalizeLower(item) === normalizeLower(rnpa.city));
+      if (!cityExists) {
+        state.recipeCities = Array.from(new Set([...(state.recipeCities || []), rnpa.city])).sort((a, b) => a.localeCompare(b, 'es'));
+        await persistRecetasConfig();
+      }
+    }
+
     const nutrition = {
       productType: normalizeLower(recipeEditorForm.querySelector('#recipeNutritionProductType')?.value),
       category: normalizeLower(recipeEditorForm.querySelector('#recipeNutritionCategory')?.value),
@@ -2200,7 +2346,7 @@
       }
     }
 
-    return { title, description, yieldQuantity, yieldUnit, shelfLifeDays, agingDays, orderMode, rows: sortedRows, nutrition, imageUrl };
+    return { title, description, yieldQuantity, yieldUnit, shelfLifeDays, agingDays, orderMode, rows: sortedRows, nutrition, rnpa: hasAllRnpa ? rnpa : { denomination: '', brand: '', businessName: '', city: '', province: '', country: RNPA_COUNTRY, expiryDate: '', attachmentUrl: '', attachmentType: '', attachmentName: '' }, imageUrl };
   };
 
   const removeRecipe = async (recipeId) => {
@@ -2329,6 +2475,13 @@
       return;
     }
 
+    const rnpaViewBtn = event.target.closest('[data-receta-rnpa-view]');
+    if (rnpaViewBtn) {
+      const recipe = state.recetas[rnpaViewBtn.dataset.recetaRnpaView];
+      const attachment = normalizeValue(recipe?.rnpa?.attachmentUrl);
+      if (attachment) await window.laJamoneraOpenImageViewer?.([{ invoiceImageUrls: [attachment] }], 0, 'Adjunto RNPA');
+      return;
+    }
     const editBtn = event.target.closest('[data-receta-edit]');
     if (editBtn) return renderEditor(state.recetas[editBtn.dataset.recetaEdit]);
     const deleteBtn = event.target.closest('[data-receta-delete]');
