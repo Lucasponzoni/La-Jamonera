@@ -535,15 +535,6 @@
       showCancelButton: true,
       confirmButtonText: 'Confirmar',
       cancelButtonText: 'Cancelar',
-      didOpen: () => {
-        const passNode = document.getElementById('inventarioSecurePass');
-        if (passNode) {
-          passNode.value = '';
-          passNode.setAttribute('readonly', 'readonly');
-          setTimeout(() => passNode.removeAttribute('readonly'), 60);
-          passNode.focus({ preventScroll: true });
-        }
-      },
       preConfirm: async () => {
         const entered = normalizeValue(document.getElementById('inventarioSecurePass')?.value);
         const remote = await getGeneralPassword();
@@ -663,14 +654,13 @@
 
     nodes.providersRneAlert.classList.remove('d-none');
     nodes.providersRneAlert.innerHTML = `
-      <p class="inventario-rne-alert-title"><i class="bi bi-file-earmark-check"></i> Resumen informativo de RNE de proveedores</p>
-      <p class="inventario-rne-alert-copy">Este bloque es solo informativo para detectar rápido qué proveedores requieren atención de RNE.</p>
-      <ul class="inventario-rne-alert-list">
-        <li><span>Total de proveedores</span><strong>${counts.all}</strong></li>
-        <li><span>Sin RNE cargado</span><strong>${counts.none}</strong></li>
-        <li><span>Vencen en menos de 6 meses</span><strong>${counts.warning}</strong></li>
-        <li><span>Vencen en menos de 60 días o vencidos</span><strong>${counts.danger}</strong></li>
-      </ul>`;
+      <div class="inventario-rne-alert-inline" aria-label="Resumen RNE proveedores">
+        <span class="inventario-rne-inline-title"><i class="fa-solid fa-file-shield"></i> RNE Proveedores</span>
+        <span class="inventario-rne-inline-item">Total <strong>${counts.all}</strong></span>
+        <span class="inventario-rne-inline-item is-info">Sin RNE <strong>${counts.none}</strong></span>
+        <span class="inventario-rne-inline-item is-warning">&lt; 6 meses <strong>${counts.warning}</strong></span>
+        <span class="inventario-rne-inline-item is-danger">Críticos <strong>${counts.danger}</strong></span>
+      </div>`;
   };
 
   const renderFamilies = () => {
@@ -2774,8 +2764,11 @@
       title: 'RNE de proveedores',
       html: `<div class="inventario-provider-manager">
         <div class="inventario-provider-manager-head">
-          <p class="inventario-provider-manager-copy">Administrá el RNE de cada proveedor (número, vencimiento, adjunto e historial).</p>
-          <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-provider-create-btn" id="inventarioProviderCreateBtn"><i class="fa-solid fa-plus"></i><span>Nuevo proveedor</span></button>
+          <div class="inventario-provider-manager-copy-wrap">
+            <p class="inventario-provider-manager-kicker">Proveedores</p>
+            <p class="inventario-provider-manager-copy">Gestión de RNE, vencimientos y adjuntos.</p>
+          </div>
+          <button type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn inventario-provider-create-fab" id="inventarioProviderCreateBtn" aria-label="Nuevo proveedor"><i class="fa-solid fa-plus"></i></button>
         </div>
         <div id="inventarioProviderRneFilters" class="inventario-status-filters"></div>
         <div id="inventarioProviderRneList" class="inventario-provider-rne-list"></div>
@@ -2817,12 +2810,14 @@
             const status = getProviderRneStatus(provider);
             const rne = safeObject(provider.rne);
             const history = Array.isArray(rne.history) ? rne.history : [];
-            return `<article class="inventario-provider-card">
+            return `<article class="inventario-provider-card ios-card-soft">
               <div class="inventario-provider-avatar">${escapeHtml(providerInitials(provider.name))}</div>
               <div class="inventario-provider-main">
                 <div class="inventario-provider-head"><strong>${escapeHtml(provider.name)}</strong><span class="inventario-status-chip tone-${status.tone}">${status.label}</span></div>
-                <p class="inventario-provider-meta"><span>RNE</span><strong>${escapeHtml(rne.number || 'Sin cargar')}</strong></p>
-                <p class="inventario-provider-meta"><span>Caducidad</span><strong>${escapeHtml(rne.expiryDate ? formatIsoDateEs(rne.expiryDate) : 'Sin fecha')}</strong></p>
+                <div class="inventario-provider-meta-grid">
+                  <p class="inventario-provider-meta"><span>RNE</span><strong>${escapeHtml(rne.number || 'Sin cargar')}</strong></p>
+                  <p class="inventario-provider-meta"><span>Caducidad</span><strong>${escapeHtml(rne.expiryDate ? formatIsoDateEs(rne.expiryDate) : 'Sin fecha')}</strong></p>
+                </div>
                 <p class="inventario-provider-meta inventario-provider-meta-helper"><small>${escapeHtml(status.helper)}</small></p>
                 <div class="inventario-provider-actions inventario-provider-actions-top">
                   <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-edit="${provider.id}"><i class="fa-solid fa-pen"></i><span>Editar</span></button>
