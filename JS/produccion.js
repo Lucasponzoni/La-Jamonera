@@ -511,6 +511,44 @@
   const getThumbPlaceholder = () => `<span class="image-placeholder-circle-2">${BASE_ICON}</span>`;
   const activeReservations = () => Object.values(safeObject(state.reservas))
     .filter((item) => Number(item?.expiresAt || 0) > nowTs() && item.status !== 'released');
+  const getDraftExpiryTs = (draft) => Number(draft?.updatedAt || 0) + RESERVE_TTL_MS;
+  const getDraftRemainingMs = (draft) => getDraftExpiryTs(draft) - nowTs();
+  const formatCountdown = (remainingMs) => {
+    const safeMs = Math.max(0, Number(remainingMs || 0));
+    const mins = Math.floor(safeMs / 60000);
+    const secs = Math.floor((safeMs % 60000) / 1000);
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
+  const getRecipeDraftLockInfo = (recipeId) => {
+    const relevantDrafts = Object.values(safeObject(state.drafts)).filter((draft) => (
+      normalizeValue(draft?.recipeId) === normalizeValue(recipeId)
+      && normalizeValue(draft?.status || 'active') === 'active'
+      && getDraftRemainingMs(draft) > 0
+    ));
+    if (!relevantDrafts.length) return null;
+    const draftWithTime = relevantDrafts.reduce((best, draft) => {
+      if (!best) return draft;
+      return getDraftExpiryTs(draft) > getDraftExpiryTs(best) ? draft : best;
+    }, null);
+    const reservationMap = safeObject(state.reservas);
+    const blockedKg = relevantDrafts.reduce((acc, draft) => {
+      const reservationId = normalizeValue(draft?.reservationId);
+      const reservation = reservationMap[reservationId];
+      if (!reservation || reservation.status !== 'active' || Number(reservation.expiresAt || 0) <= nowTs()) return acc;
+      const locks = Array.isArray(reservation.locks) ? reservation.locks : [];
+      const reservedKg = locks.reduce((sum, lock) => {
+        const reservedBase = Number(lock?.reservedBaseQty);
+        if (Number.isFinite(reservedBase) && reservedBase > 0) return sum + (reservedBase / 1000);
+        const fallbackBase = toBase(lock?.reservedQty, lock?.unit);
+        return sum + ((Number.isFinite(fallbackBase) && fallbackBase > 0) ? (fallbackBase / 1000) : 0);
+      }, 0);
+      return acc + reservedKg;
+    }, 0);
+    return {
+      blockedKg: Number(blockedKg.toFixed(2)),
+      remainingMs: getDraftRemainingMs(draftWithTime)
+    };
+  };
   const reservedByOthersForEntry = (ingredientId, entryId, unit) => {
     const baseUnit = normalizeLower(unit);
     const baseMeta = getUnitMeta(baseUnit);
@@ -737,6 +775,37 @@
     if (changed) await window.dbLaJamoneraRest.write(RESERVAS_PATH, updates);
     state.reservas = changed ? updates : reservas;
   };
+  const cleanupExpiredDrafts = async () => {
+    const drafts = safeObject(await window.dbLaJamoneraRest.read(DRAFTS_PATH));
+    const reservas = safeObject(await window.dbLaJamoneraRest.read(RESERVAS_PATH));
+    const now = nowTs();
+    const nextDrafts = { ...drafts };
+    const nextReservas = { ...reservas };
+    let draftsChanged = false;
+    let reservasChanged = false;
+    Object.entries(drafts).forEach(([id, draft]) => {
+      const draftStatus = normalizeValue(draft?.status || 'active');
+      if (draftStatus !== 'active') return;
+      if (getDraftRemainingMs(draft) > 0) return;
+      delete nextDrafts[id];
+      draftsChanged = true;
+      const reservationId = normalizeValue(draft?.reservationId);
+      const reservation = nextReservas[reservationId];
+      if (reservation?.status === 'active') {
+        nextReservas[reservationId] = {
+          ...reservation,
+          status: 'released',
+          releasedAt: now,
+          releasedReason: 'draft_expired'
+        };
+        reservasChanged = true;
+      }
+    });
+    if (draftsChanged) await window.dbLaJamoneraRest.write(DRAFTS_PATH, nextDrafts);
+    if (reservasChanged) await window.dbLaJamoneraRest.write(RESERVAS_PATH, nextReservas);
+    state.drafts = draftsChanged ? nextDrafts : drafts;
+    state.reservas = reservasChanged ? nextReservas : reservas;
+  };
   const releaseReservation = async (reason = 'manual') => {
     if (!state.activeReservationId) return;
     const reservation = safeObject(state.reservas[state.activeReservationId]);
@@ -831,7 +900,7 @@
     return own || null;
   };
   const getOwnDrafts = () => Object.values(safeObject(state.drafts))
-    .filter((item) => item.ownerSessionId === sessionId && item.status === 'active' && item.recipeId)
+    .filter((item) => item.ownerSessionId === sessionId && item.status === 'active' && item.recipeId && getDraftRemainingMs(item) > 0)
     .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
   const getDraftReservationCountdown = (draft) => {
     const reservationId = normalizeValue(draft?.reservationId);
@@ -840,9 +909,12 @@
     if (reservation.status !== 'active') return null;
     const remainingMs = Number(reservation.expiresAt || 0) - nowTs();
     if (remainingMs <= 0) return null;
-    const mins = Math.floor(remainingMs / 60000);
-    const secs = Math.floor((remainingMs % 60000) / 1000);
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    return formatCountdown(remainingMs);
+  };
+  const getDraftExpirationCountdown = (draft) => {
+    const remainingMs = getDraftRemainingMs(draft);
+    if (remainingMs <= 0) return null;
+    return formatCountdown(remainingMs);
   };
   const getForeignDraftConflict = (recipeId) => Object.values(safeObject(state.drafts)).find((item) => item.recipeId === recipeId && item.ownerSessionId !== sessionId);
   const openGlobalMinConfig = async () => {
@@ -1559,6 +1631,10 @@
   const renderHistoryTable = () => {
     if (!nodes.historyTableWrap) return;
     const rows = getHistoryRows();
+    rows.forEach((item) => {
+      if (state.historyTraceCollapse[item.id] !== undefined) return;
+      if (getTraceRowsFromRegistro(item).length) state.historyTraceCollapse[item.id] = true;
+    });
     const PAGE = 8;
     const pages = Math.max(1, Math.ceil(rows.length / PAGE));
     state.historyPage = Math.min(Math.max(1, state.historyPage), pages);
@@ -1723,6 +1799,7 @@
     };
     const cardsHtml = list.map((recipe) => {
       const analysis = state.analysis[recipe.id] || analyzeRecipe(recipe);
+      const draftLock = getRecipeDraftLockInfo(recipe.id);
       const statusClass = analysis.status === 'success' ? 'tone-success' : analysis.status === 'warning' ? 'tone-warning' : 'tone-danger';
       const action = `<button type="button" class="btn ios-btn ios-btn-success produccion-main-btn ${analysis.canProduce ? '' : 'is-disabled'}" data-open-produccion="${recipe.id}" ${analysis.canProduce ? '' : 'disabled'}><i class="bi bi-plus-lg"></i><span>Producir</span></button>`;
       const inventoryAction = analysis.canProduce
@@ -1763,6 +1840,7 @@
                 <strong>${analysis.minKg.toFixed(2)} kg</strong>
               </div>
             </div>
+            ${draftLock?.blockedKg > 0 ? `<p class="produccion-last-line"><i class="fa-solid fa-lock"></i> Bloqueado por borrador: <strong>${draftLock.blockedKg.toFixed(2)} kg</strong> · disponible en <strong>${formatCountdown(draftLock.remainingMs)}</strong></p>` : ''}
             <p class="produccion-last-line"><i class="fa-regular fa-clock"></i> Última producción: <strong>${formatDate(lastProductionAt)}</strong></p>
             <div class="produccion-progress-wrap">
               <div class="produccion-progress-bar"><span class="${analysis.status === 'danger' ? 'is-danger' : analysis.progress >= 100 ? 'is-success' : 'is-warning'}" style="width:${analysis.progress.toFixed(1)}%"></span></div>
@@ -1790,7 +1868,8 @@
               <div>
                 <strong>${capitalize(recipe.title || 'Receta')}</strong>
                 <small>Actualizado: ${formatDateTime(draft.updatedAt)}</small>
-                ${getDraftReservationCountdown(draft) ? `<small class="produccion-reserva-timer">Reserva activa: ${getDraftReservationCountdown(draft)}</small>` : '<small>Reserva sin bloqueo activo.</small>'}
+                ${getDraftReservationCountdown(draft) ? `<small class="produccion-reserva-timer" data-draft-reservation-timer="${draft.id}">Reserva activa: ${getDraftReservationCountdown(draft)}</small>` : '<small data-draft-reservation-timer="">Reserva sin bloqueo activo.</small>'}
+                ${getDraftExpirationCountdown(draft) ? `<small class="produccion-reserva-timer" data-draft-expiry-timer="${draft.id}">Borrador vence en: ${getDraftExpirationCountdown(draft)}</small>` : '<small data-draft-expiry-timer="">Borrador vencido.</small>'}
               </div>
               <div class="produccion-draft-actions">
                 <button type="button" class="btn ios-btn ios-btn-secondary" data-open-draft="${draft.id}"><i class="fa-solid fa-pen"></i><span>Continuar</span></button>
@@ -1810,8 +1889,22 @@
     prepareThumbLoaders('.js-produccion-thumb');
     updateProduccionListScrollHint();
     if (state.draftsTick) clearInterval(state.draftsTick);
-    state.draftsTick = setInterval(() => {
-      if (state.view === 'list' && !state.historyMode && !state.activeRecipeId) {
+    state.draftsTick = setInterval(async () => {
+      if (state.view !== 'list' || state.historyMode || state.activeRecipeId) return;
+      const ownDrafts = Object.values(safeObject(state.drafts)).filter((item) => item.ownerSessionId === sessionId && item.status === 'active' && item.recipeId);
+      let hasExpiredDraft = false;
+      ownDrafts.forEach((draft) => {
+        const reservationNode = nodes.list.querySelector(`[data-draft-reservation-timer="${draft.id}"]`);
+        const reservationCountdown = getDraftReservationCountdown(draft);
+        if (reservationNode) reservationNode.textContent = reservationCountdown ? `Reserva activa: ${reservationCountdown}` : 'Reserva sin bloqueo activo.';
+        const expiryNode = nodes.list.querySelector(`[data-draft-expiry-timer="${draft.id}"]`);
+        const draftCountdown = getDraftExpirationCountdown(draft);
+        if (expiryNode) expiryNode.textContent = draftCountdown ? `Borrador vence en: ${draftCountdown}` : 'Borrador vencido.';
+        if (!draftCountdown) hasExpiredDraft = true;
+      });
+      if (hasExpiredDraft) {
+        await cleanupExpiredDrafts();
+        recomputeAnalysis();
         renderList();
       }
     }, 1000);
@@ -2605,6 +2698,7 @@
       companyLogoUrl: normalizeValue(config?.companyLogoUrl)
     };
     await cleanupExpiredReservations();
+    await cleanupExpiredDrafts();
     recomputeAnalysis();
   };
   const openInventarioFromProduccion = () => {
@@ -2639,6 +2733,15 @@
     if (deleteDraftBtn) {
       const draftId = deleteDraftBtn.dataset.deleteDraft;
       const draft = state.drafts[draftId];
+      const confirmDelete = await openIosSwal({
+        title: 'Descartar borrador',
+        html: '<p>Se liberará el stock reservado y el borrador se eliminará.</p><small>Esta acción no se puede deshacer.</small>',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, descartar',
+        cancelButtonText: 'Cancelar'
+      });
+      if (!confirmDelete.isConfirmed) return;
       let reservasNext = { ...state.reservas };
       if (draft?.reservationId && reservasNext[draft.reservationId]?.status === 'active') {
         reservasNext[draft.reservationId] = { ...reservasNext[draft.reservationId], status: 'released', releasedAt: nowTs(), releasedReason: 'draft_deleted' };
@@ -2714,6 +2817,10 @@
   nodes.historyExpandBtn?.addEventListener('click', async () => {
     const rows = getHistoryRows();
     const collapseMap = { ...state.historyTraceCollapse };
+    rows.forEach((item) => {
+      if (collapseMap[item.id] !== undefined) return;
+      if (getTraceRowsFromRegistro(item).length) collapseMap[item.id] = true;
+    });
     const renderRows = () => rows.length ? rows.map((item, index) => {
       const manager = getManagerLabel(item);
       const traceRows = getTraceRowsFromRegistro(item);
@@ -2956,6 +3063,7 @@
   produccionModal.addEventListener('show.bs.modal', async () => {
     try {
       await refreshData();
+      state.historyTraceCollapse = {};
       setHistoryMode(false);
       renderList();
       if (window.flatpickr && nodes.historyRange) {
