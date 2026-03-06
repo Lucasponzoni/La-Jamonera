@@ -4121,7 +4121,7 @@ html.login-protected.auth-ok body {
   min-height: 34px;
   padding: 6px 10px;
   font-size: 0.78rem;
-  border-radius: 12px;
+  border-radius: 5px;
 }
 
 .inventory-production-action-btn.inventario-threshold-btn {
