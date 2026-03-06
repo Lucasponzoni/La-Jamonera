@@ -6990,6 +6990,32 @@ html.login-protected.auth-ok body {
   justify-content: space-between;
 }
 
+.inventario-provider-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.inventario-provider-state {
+  margin: 6px 0 0;
+  color: #5e6f94;
+  font-size: 0.85rem;
+}
+
+.inventario-provider-line {
+  margin: 6px 0 0;
+  color: #3f527f;
+  font-size: 0.86rem;
+}
+
+.inventario-provider-editor-top {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 10px;
+}
+
 .inventario-provider-meta {
   margin: 3px 0 0;
   color: #56688f;
