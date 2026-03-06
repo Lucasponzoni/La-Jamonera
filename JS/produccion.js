@@ -266,7 +266,7 @@
   const askSensitivePassword = async (title, html, withReason = false) => {
     const result = await openIosSwal({
       title,
-      html: `<div class="swal-stack-fields"><input id="produccionSecurePass" type="password" class="swal2-input ios-input" placeholder="Clave general">${withReason ? '<textarea id="produccionSecureReason" class="swal2-textarea ios-input" placeholder="Motivo"></textarea>' : ''}${html || ''}</div>`,
+      html: `<div class="swal-stack-fields"><input id="produccionSecurePass" type="password" class="swal2-input ios-input" placeholder="Clave general" autocomplete="new-password" name="produccion-secure-pass" autocapitalize="off" autocorrect="off" spellcheck="false">${withReason ? '<textarea id="produccionSecureReason" class="swal2-textarea ios-input" placeholder="Motivo"></textarea>' : ''}${html || ''}</div>`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Validar',
@@ -1021,7 +1021,7 @@
   const openGlobalMinConfig = async () => {
     const currentRne = safeObject(state.config.rne);
     const rneHistoryHtml = (Array.isArray(currentRne.history) && currentRne.history.length)
-      ? `<div class="produccion-rne-history">${currentRne.history.map((item, index) => `<article class="produccion-rne-history-item"><div><strong>Versión ${index + 1}</strong><p><strong>N° RNE:</strong> ${escapeHtml(item.number || '-')}</p><p><strong>Vigencia:</strong> ${escapeHtml(formatIsoEs(item.validFrom || ''))} → ${item.replacedAt || item.savedAt ? escapeHtml(formatDateTime(item.replacedAt || item.savedAt)) : '-'}</p><p><strong>Vencimiento declarado:</strong> ${escapeHtml(formatIsoEs(item.expiryDate || ''))}</p></div>${item.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-rne-history="${index}"><i class="bi bi-eye"></i><span>Ver</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjunto</button>'}</article>`).join('')}</div>`
+      ? `<div class="produccion-rne-history">${currentRne.history.map((item, index) => `<article class="produccion-rne-history-item" data-rne-history-item="${index}"><div><strong>Versión ${index + 1}</strong><p><strong>N° RNE:</strong> ${escapeHtml(item.number || '-')}</p><p><strong>Vigencia:</strong> ${escapeHtml(formatIsoEs(item.validFrom || ''))} → ${item.replacedAt || item.savedAt ? escapeHtml(formatDateTime(item.replacedAt || item.savedAt)) : '-'}</p><p><strong>Vencimiento declarado:</strong> ${escapeHtml(formatIsoEs(item.expiryDate || ''))}</p></div><div class="produccion-rne-history-actions">${item.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-rne-history="${index}"><i class="bi bi-eye"></i><span>Ver</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjunto</button>'}<button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn" data-delete-rne-history="${index}"><i class="fa-solid fa-trash"></i><span>Borrar</span></button></div></article>`).join('')}</div>`
       : '<p class="produccion-rne-history-empty">Aún no hay historial de RNE.</p>';
     const result = await openIosSwal({
       title: 'Configuración de Producción',
@@ -1063,6 +1063,7 @@
               <small class="text-muted">Si cargás un nuevo archivo podés guardar la versión anterior en el historial.</small>
               <div class="produccion-config-actions">
                 <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionOpenRneViewerBtn" ${normalizeValue(currentRne.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i><span>Visualizar adjunto actual</span></button>
+                <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn" id="produccionDeleteRneBtn" ${(normalizeValue(currentRne.number) || normalizeValue(currentRne.attachmentUrl) || (Array.isArray(currentRne.history) && currentRne.history.length)) ? '' : 'disabled'}><i class="fa-solid fa-trash"></i><span>Borrar RNE</span></button>
               </div>
               <div class="produccion-rne-history-wrap">
                 <h6><strong>Historial de RNE</strong></h6>
@@ -1095,6 +1096,7 @@
         const preview = popup.querySelector('#produccionCompanyLogoPreview');
         const logoViewerBtn = popup.querySelector('#produccionOpenLogoViewerBtn');
         const rneViewerBtn = popup.querySelector('#produccionOpenRneViewerBtn');
+        const deleteRneBtn = popup.querySelector('#produccionDeleteRneBtn');
         const rneInput = popup.querySelector('#produccionRneNumberInput');
 
         const setLoading = () => {
@@ -1144,6 +1146,18 @@
           if (!currentUrl) return;
           await window.laJamoneraOpenImageViewer?.([{ invoiceImageUrls: [currentUrl] }], 0, 'Adjunto RNE');
         });
+
+        deleteRneBtn?.addEventListener('click', async () => {
+          const auth = await askSensitivePassword(
+            'Borrar RNE de Producción',
+            '<p><strong>Confirmación:</strong> se eliminará solo el RNE actual.</p><p><small>El historial se conservará para trazabilidad.</small></p>'
+          );
+          if (!auth.isConfirmed) return;
+          state.config.rne = { ...safeObject(state.config.rne), number: '', expiryDate: '', attachmentUrl: '', attachmentType: '', validFrom: '', updatedAt: 0 };
+          await persistConfig();
+          Swal.close();
+          await openGlobalMinConfig();
+        });
         popup.querySelectorAll('[data-open-rne-history]').forEach((button) => {
           button.addEventListener('click', async () => {
             const index = Number(button.dataset.openRneHistory || -1);
@@ -1151,6 +1165,23 @@
             const attachment = normalizeValue(item?.attachmentUrl);
             if (!attachment) return;
             await window.laJamoneraOpenImageViewer?.([{ invoiceImageUrls: [attachment] }], 0, `Historial RNE #${index + 1}`);
+          });
+        });
+
+        popup.querySelectorAll('[data-delete-rne-history]').forEach((button) => {
+          button.addEventListener('click', async () => {
+            const index = Number(button.dataset.deleteRneHistory || -1);
+            const history = Array.isArray(state.config.rne?.history) ? [...state.config.rne.history] : [];
+            if (index < 0 || index >= history.length) return;
+            const auth = await askSensitivePassword(
+              'Borrar versión de historial RNE',
+              '<p><strong>Confirmación:</strong> se eliminará solo esta versión del historial.</p><p><small>El RNE actual no se modifica.</small></p>'
+            );
+            if (!auth.isConfirmed) return;
+            history.splice(index, 1);
+            state.config.rne = { ...safeObject(state.config.rne), history };
+            await persistConfig();
+            button.closest('[data-rne-history-item]')?.remove();
           });
         });
         rneInput?.addEventListener('input', () => {
