@@ -47,6 +47,7 @@
     reservationTick: null,
     draftsTick: null,
     editorPlan: null,
+    pendingExpiryActions: {},
     lotCollapseState: {},
     historyMode: false,
     historyRange: '',
@@ -115,13 +116,29 @@
   };
   const getEntryAvailableQty = (entry) => {
     const available = parseNumber(entry?.availableQty);
-    if (Number.isFinite(available) && available >= 0) return available;
+    const entryId = normalizeValue(entry?.id);
+    const pendingQtyKg = Number(state.pendingExpiryActions?.[entryId]?.qtyKg || 0);
+    const sourceAvailableKg = Number(entry?.availableKg);
+    if (Number.isFinite(available) && available >= 0) {
+      if (Number.isFinite(sourceAvailableKg) && sourceAvailableKg > 0 && pendingQtyKg > 0) {
+        const ratio = Math.max(0, Math.min(1, pendingQtyKg / sourceAvailableKg));
+        return Math.max(0, available - (available * ratio));
+      }
+      return available;
+    }
     const qty = parseNumber(entry?.qty);
-    return Number.isFinite(qty) && qty > 0 ? qty : 0;
+    if (!(Number.isFinite(qty) && qty > 0)) return 0;
+    if (Number.isFinite(sourceAvailableKg) && sourceAvailableKg > 0 && pendingQtyKg > 0) {
+      const ratio = Math.max(0, Math.min(1, pendingQtyKg / sourceAvailableKg));
+      return Math.max(0, qty - (qty * ratio));
+    }
+    return qty;
   };
   const getEntryAvailableKg = (entry) => {
     const availableKg = Number(entry?.availableKg);
-    if (Number.isFinite(availableKg) && availableKg >= 0) return availableKg;
+    const entryId = normalizeValue(entry?.id);
+    const pendingQtyKg = Number(state.pendingExpiryActions?.[entryId]?.qtyKg || 0);
+    if (Number.isFinite(availableKg) && availableKg >= 0) return Math.max(0, availableKg - pendingQtyKg);
     const availableQty = getEntryAvailableQty(entry);
     const base = toBase(availableQty, entry?.unit);
     return Number.isFinite(base) ? Number((base / 1000).toFixed(4)) : 0;
@@ -176,6 +193,12 @@
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
     if (!match) return text || 'Sin VTO';
     return `${match[3]}-${match[2]}-${match[1]}`;
+  };
+  const formatValidProductionRange = (entryDate, expiryDate) => {
+    const from = formatIsoEs(normalizeValue(entryDate));
+    const to = formatIsoEs(normalizeValue(expiryDate));
+    if (!normalizeValue(entryDate) || !normalizeValue(expiryDate)) return '';
+    return `(producible entre ${from} y ${to})`;
   };
   const addDaysToIso = (isoDate, days) => {
     const text = normalizeValue(isoDate);
@@ -812,6 +835,34 @@
     });
     if (changed) await window.dbLaJamoneraRest.write(RESERVAS_PATH, updates);
     state.reservas = changed ? updates : reservas;
+  };
+  const applyPendingExpiryActionsOnInventory = (inventory) => {
+    const pending = safeObject(state.pendingExpiryActions);
+    if (!Object.keys(pending).length) return inventory;
+    const next = deepClone(safeObject(inventory));
+    Object.values(safeObject(next.items)).forEach((record) => {
+      const entries = Array.isArray(record.entries) ? record.entries : [];
+      entries.forEach((entry) => {
+        const action = pending[normalizeValue(entry.id)];
+        if (!action) return;
+        const availableKg = Number(entry.availableKg);
+        const availableQty = Number(entry.availableQty);
+        const qtyKg = Math.max(0, Math.min(Number(action.qtyKg || 0), Number.isFinite(availableKg) ? availableKg : 0));
+        if (qtyKg <= 0) return;
+        const ratio = Number.isFinite(availableKg) && availableKg > 0 ? (qtyKg / availableKg) : 1;
+        const qtyDiscount = Number.isFinite(availableQty) ? (availableQty * ratio) : 0;
+        entry.availableKg = Number(Math.max(0, (Number.isFinite(availableKg) ? availableKg : 0) - qtyKg).toFixed(4));
+        entry.availableQty = Number(Math.max(0, (Number.isFinite(availableQty) ? availableQty : 0) - qtyDiscount).toFixed(4));
+        entry.expiryResolutions = Array.isArray(entry.expiryResolutions) ? entry.expiryResolutions : [];
+        entry.expiryResolutions.unshift({ id: makeId('expiry_resolution'), createdAt: nowTs(), type: action.type, qtyKg: Number(qtyKg.toFixed(4)) });
+        if (entry.availableKg <= 0.0001) {
+          entry.expiryResolutionStatus = action.type;
+          entry.status = action.type;
+        }
+      });
+      record.stockKg = Number(entries.reduce((acc, item) => acc + Number(item?.availableKg || 0), 0).toFixed(4));
+    });
+    return next;
   };
   const cleanupExpiredDrafts = async () => {
     const drafts = safeObject(await window.dbLaJamoneraRest.read(DRAFTS_PATH));
@@ -1996,13 +2047,13 @@
             <div><strong>Ingreso:</strong> ${lot.entryDate || formatDateTime(lot.createdAt)}</div>
             <div><strong>Vence:</strong> ${lot.expiryDate || '-'} ${getExpiryBadge(lot.expiryDate)}</div>
             <div><strong>Usar:</strong> ${formatCompactQty(lot.takeQty, lot.unit)}</div>
-            ${lot.status === 'expired' ? `<div class="produccion-lote-expired-help"><strong>Lote expirado:</strong> no se usará con fecha ${plan.productionDate}. Cambiá la fecha o resolvelo manualmente.</div>` : ''}
+            ${lot.status === 'expired' ? `<div class="produccion-lote-expired-help"><strong>Lote expirado:</strong> no se usará con fecha ${plan.productionDate}. Cambiá la fecha o resolvelo manualmente ${formatValidProductionRange(lot.entryDate, lot.expiryDate)}.</div>` : ''}
             <div><strong class="produccion-provider-key">Proveedor:</strong> ${lot.provider || '-'}</div>
             <div><strong>Factura:</strong> ${lot.invoiceNumber || '-'}</div>
             <div class="produccion-lote-adjuntos-row"><strong>Adjuntos:</strong> ${lot.invoiceImageUrls.length
               ? `<button type="button" class="btn ios-btn ios-btn-secondary produccion-lote-adjuntos-btn" data-lot-images="${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Ver (${lot.invoiceImageUrls.length})</span></button>`
               : '<span>Sin adjuntos</span>'}</div>
-            ${lot.status === 'expired' ? `<div class="produccion-lote-expired-actions"><button type="button" class="btn ios-btn ios-btn-secondary" data-resolve-expired-lot="${escapeHtml(lot.ingredientId)}" data-resolve-expired-entry="${escapeHtml(lot.entryId)}" data-resolve-expired-qty="${Number(lot.availableQty || 0).toFixed(4)}"><i class="fa-solid fa-store"></i><span>Vendido en sucursal / mostrador</span></button><button type="button" class="btn ios-btn ios-btn-danger" data-resolve-expired-lot="${escapeHtml(lot.ingredientId)}" data-resolve-expired-entry="${escapeHtml(lot.entryId)}" data-resolve-expired-qty="${Number(lot.availableQty || 0).toFixed(4)}" data-resolve-expired-mode="decommissioned"><i class="fa-solid fa-trash"></i><span>Decomisado</span></button></div>` : ''}
+            ${lot.status === 'expired' ? `<div class="produccion-lote-expired-actions"><button type="button" class="btn ios-btn ios-btn-secondary" data-resolve-expired-lot="${escapeHtml(lot.ingredientId)}" data-resolve-expired-entry="${escapeHtml(lot.entryId)}" data-resolve-expired-qty="${Number(lot.availableQty || 0).toFixed(4)}" data-resolve-expired-mode="sold_counter"><i class="fa-solid fa-shop"></i><span>Vendido en mostrador</span></button><button type="button" class="btn ios-btn ios-btn-danger" data-resolve-expired-lot="${escapeHtml(lot.ingredientId)}" data-resolve-expired-entry="${escapeHtml(lot.entryId)}" data-resolve-expired-qty="${Number(lot.availableQty || 0).toFixed(4)}" data-resolve-expired-mode="decommissioned"><i class="fa-solid fa-trash"></i><span>Decomisado</span></button></div>` : ''}
           </div>`).join('<hr class="produccion-lote-separator">') : '<p class="produccion-lote-empty">Sin lotes aptos para la fecha elegida.</p>'}
         </div>
       </article>
@@ -2023,6 +2074,7 @@
       observations,
       locks: state.editorPlan.locks,
       lotPlan: state.editorPlan,
+      pendingExpiryActions: safeObject(state.pendingExpiryActions),
       reservationId: state.activeReservationId,
       step: 'editor',
       status: 'active'
@@ -2076,6 +2128,7 @@
     const initialDate = ownDraft?.productionDate || toIsoDate();
     const initialObs = ownDraft?.observations || '';
     const initialManagers = Array.isArray(ownDraft?.managers) ? ownDraft.managers : preferredManagers;
+    state.pendingExpiryActions = safeObject(ownDraft?.pendingExpiryActions);
     state.lotCollapseState = {};
     state.editorPlan = buildPlanForRecipe(recipe, initialQty, initialDate);
     await ensureReservationForPlan(state.editorPlan);
@@ -2301,14 +2354,15 @@
       state.editorPlan = buildPlanForRecipe(recipe, qty, productionDate);
       lotsWrap.innerHTML = buildLotsBreakdownHtml(state.editorPlan);
       renderRecipeHistory();
-      const canConfirm = state.editorPlan.isValid && qty > 0;
+      const expiredLotsCount = state.editorPlan.ingredientPlans.reduce((acc, row) => acc + row.lots.filter((lot) => lot.status === 'expired').length, 0);
+      const canConfirm = state.editorPlan.isValid && qty > 0 && expiredLotsCount === 0;
       if (confirmBtn) confirmBtn.disabled = !canConfirm;
       const expiredLotsCount = state.editorPlan.ingredientPlans.reduce((acc, row) => acc + row.lots.filter((lot) => lot.status === 'expired').length, 0);
       qtyHelp.textContent = canConfirm
         ? `Escala aplicada: ${qty.toFixed(2)} kg. Reserva temporal activa por 10 min.`
         : (qty <= 0 ? 'Modo visualización: ajustá kilos para confirmar producción.' : `Hay conflictos de stock/lotes para ${productionDate}.`);
       if (expiredLotsCount > 0) {
-        qtyHelp.textContent += ` Detectamos ${expiredLotsCount} lote(s) vencido(s): podés cambiar fecha o resolverlos manualmente.`;
+        qtyHelp.textContent += ` Detectamos ${expiredLotsCount} lote(s) vencido(s): resolvé su estado o cambiá fecha para continuar.`;
       }
       await ensureReservationForPlan(state.editorPlan);
     };
@@ -2318,24 +2372,12 @@
         const ingredientId = normalizeValue(resolveExpiredBtn.dataset.resolveExpiredLot);
         const entryId = normalizeValue(resolveExpiredBtn.dataset.resolveExpiredEntry);
         const maxQtyKg = parseNumber(resolveExpiredBtn.dataset.resolveExpiredQty) || 0;
-        let resolutionType = normalizeValue(resolveExpiredBtn.dataset.resolveExpiredMode);
+        const resolutionType = normalizeValue(resolveExpiredBtn.dataset.resolveExpiredMode);
         if (!ingredientId || !entryId || maxQtyKg <= 0) return;
-        if (!resolutionType) {
-          const askType = await openIosSwal({
-            title: 'Resolver lote vencido',
-            html: '<p>Seleccioná el destino del lote vencido.</p>',
-            showCancelButton: true,
-            showDenyButton: true,
-            confirmButtonText: 'Vendido en sucursal',
-            denyButtonText: 'Vendido en mostrador',
-            cancelButtonText: 'Cancelar'
-          });
-          if (!askType.isConfirmed && !askType.isDenied) return;
-          resolutionType = askType.isConfirmed ? 'sold_branch' : 'sold_counter';
-        }
+        if (!resolutionType) return;
         const askQty = await openIosSwal({
           title: 'Cantidad a resolver',
-          html: `<div class="text-start"><p>Máximo disponible: <strong>${maxQtyKg.toFixed(3)} kg</strong></p><input id="produccionResolveExpiredQty" type="number" class="swal2-input ios-input" min="0.001" max="${maxQtyKg.toFixed(3)}" step="0.001" value="${maxQtyKg.toFixed(3)}"></div>`,
+          html: `<div class="text-center produccion-resolve-qty-wrap"><p>Máximo disponible: <strong>${maxQtyKg.toFixed(3)} kg</strong></p><input id="produccionResolveExpiredQty" type="number" class="swal2-input ios-input" min="0.001" max="${maxQtyKg.toFixed(3)}" step="0.001" value="${maxQtyKg.toFixed(3)}"></div>`,
           showCancelButton: true,
           confirmButtonText: 'Aplicar',
           cancelButtonText: 'Cancelar',
@@ -2349,20 +2391,13 @@
           }
         });
         if (!askQty.isConfirmed) return;
-        const result = await window.laJamoneraInventarioAPI?.resolveExpiredEntryStock?.({
+        state.pendingExpiryActions[entryId] = {
           ingredientId,
-          entryId,
-          resolutionType,
-          qtyKg: askQty.value
-        });
-        if (!result?.ok) {
-          await openIosSwal({ title: 'No se pudo resolver', html: `<p>${escapeHtml(result?.message || 'No pudimos actualizar el lote vencido.')}</p>`, icon: 'error', confirmButtonText: 'Entendido' });
-          return;
-        }
-        await refreshData();
-        recomputeAnalysis();
+          type: resolutionType,
+          qtyKg: Number(askQty.value)
+        };
         await updateEditorPlan();
-        await openIosSwal({ title: 'Lote resuelto', html: `<p>Se resolvieron <strong>${Number(result.resolvedKg || 0).toFixed(3)} kg</strong> del lote vencido.</p>`, icon: 'success', confirmButtonText: 'Continuar' });
+        await openIosSwal({ title: 'Acción preparada', html: '<p>La resolución se aplicará al confirmar la producción.</p>', icon: 'success', confirmButtonText: 'Continuar' });
         return;
       }
       const toggleBtn = event.target.closest('[data-lot-toggle]');
@@ -2667,7 +2702,8 @@
         const prefix = normalizeValue(state.config.idConfig?.prefix) || 'PROD-LJ';
         const productionId = `${prefix}-${dateToken}-${String(nextSequence).padStart(4, '0')}`;
         const observations = normalizeValue(nodes.editor.querySelector('#produccionObsInput')?.value);
-        const inventarioNext = applyPlanOnInventory(state.inventario, revalidated, productionId, date, 'consume');
+        const inventoryWithResolutions = applyPendingExpiryActionsOnInventory(state.inventario);
+        const inventarioNext = applyPlanOnInventory(inventoryWithResolutions, revalidated, productionId, date, 'consume');
         const agingDaysAtProduction = Number(recipe.agingDays || 0);
         const packagingDate = agingDaysAtProduction > 0
           ? moveIsoFromSunday(addDaysToIso(toIsoDate(nowTs()), agingDaysAtProduction))
@@ -2725,6 +2761,7 @@
         await persistConfig();
         await releaseReservation('confirmed');
         await discardDraft();
+        state.pendingExpiryActions = {};
         await refreshData();
         renderList();
         Swal.close();
@@ -3201,6 +3238,7 @@
     state.activeRecipeId = '';
     state.activeDraftId = '';
     state.activeReservationId = '';
+    state.pendingExpiryActions = {};
     nodes.search.value = '';
     state.search = '';
     nodes.editor.innerHTML = '';

@@ -1926,7 +1926,12 @@
 
     nodes.editorForm.querySelector('#inventarioExpandTableBtn')?.addEventListener('click', async () => {
       const fullRows = getFilteredEntries(Array.isArray(record.entries) ? record.entries : []);
-      const htmlRows = fullRows.length ? fullRows.map((entry, index) => `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${formatDateTime(entry.createdAt)}</td><td>${entry.expiryDate || '-'}</td><td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td>${buildExpandedImageCell(entryImageUrls(entry))}</td></tr>`).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos para mostrar.</td></tr>';
+      const htmlRows = fullRows.length ? fullRows.map((entry, index) => {
+        const expiryMeta = getEntryExpiryMeta(entry);
+        const isExpiredAvailable = expiryMeta.isExpired;
+        const resolutionLabel = getEntryResolutionLabel(entry);
+        return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${formatDateTime(entry.createdAt)}</td><td>${entry.expiryDate || '-'} ${isExpiredAvailable ? '<span class="inventario-expired-badge">EXPIRADO</span>' : ''} ${resolutionLabel ? `<span class="inventario-resolution-badge">${escapeHtml(resolutionLabel)}</span>` : ''}</td><td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td>${buildExpandedImageCell(entryImageUrls(entry))}</td></tr>`;
+      }).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos para mostrar.</td></tr>';
       await openExpandedTable('Historial ampliado', `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura</th><th>Proveedor</th><th>Imagen</th></tr></thead><tbody>${htmlRows}</tbody></table></div>`);
     });
 

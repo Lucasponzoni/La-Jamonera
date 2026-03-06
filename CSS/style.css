@@ -4016,6 +4016,12 @@ html.login-protected.auth-ok body {
   color: #b42338;
 }
 
+.inventario-stock-line-expired .inventario-stock-unit,
+.inventario-stock-line-expired > span {
+  color: #b42338;
+  font-weight: 700;
+}
+
 .inventario-stock-line-expired em {
   color: #b42338;
   font-style: normal;
@@ -6314,6 +6320,15 @@ html.login-protected.auth-ok body {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.produccion-resolve-qty-wrap {
+  text-align: center;
+}
+
+.produccion-resolve-qty-wrap .swal2-input {
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .inventario-trace-main {
