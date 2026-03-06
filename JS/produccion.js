@@ -18,7 +18,8 @@
     historyPrintBtn: document.getElementById('produccionGlobalPrintBtn'),
     historyLoading: document.getElementById('produccionGlobalLoading'),
     historyTableWrap: document.getElementById('produccionGlobalTableWrap'),
-    rneAlert: document.getElementById('produccionRneAlert')
+    rneAlert: document.getElementById('produccionRneAlert'),
+    modalTitle: document.getElementById('produccionModalLabel')
   };
   const FIAMBRES_IMAGE = 'https://i.postimg.cc/fyvNDdrt/FIambres.png';
   const BASE_ICON = '<i class="fa-solid fa-drumstick-bite"></i>';
@@ -474,7 +475,7 @@
         return acc;
       }, {});
       const row = ws.addRow(rowData);
-      const tone = data.__tone === 'trace' ? 'FFFFECEF' : data.__tone === 'resolution_blue' ? 'FFDDEBFF' : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
+      const tone = data.__tone === 'trace' ? 'FFFFECEF' : data.__tone === 'resolution_yellow' ? 'FFFFF6D9' : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
       row.eachCell((cell) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tone } };
         cell.border = {
@@ -500,7 +501,7 @@
     a.remove();
     URL.revokeObjectURL(url);
   };
-  const isBlueResolutionType = (type) => ['decommissioned', 'sold_counter'].includes(normalizeValue(type));
+  const isHighlightedResolutionType = (type) => ['decommissioned', 'sold_counter'].includes(normalizeValue(type));
   const readMinKgForRecipe = (recipeId) => {
     const local = parseNumber(state.config.recipeMinKg?.[recipeId]);
     if (Number.isFinite(local) && local > 0) return local;
@@ -2020,34 +2021,47 @@
   };
 
   const getRneExpiryMeta = () => {
+    const hasAttachment = Boolean(normalizeValue(state.config?.rne?.attachmentUrl));
     const expiryIso = normalizeValue(state.config?.rne?.expiryDate);
-    if (!expiryIso) return { visible: false, days: null, tone: 'none', text: '' };
+    if (!expiryIso) return { visible: false, days: null, tone: 'none', text: '', hasAttachment };
     const expiryTs = new Date(`${expiryIso}T00:00:00`).getTime();
-    if (!Number.isFinite(expiryTs)) return { visible: false, days: null, tone: 'none', text: '' };
+    if (!Number.isFinite(expiryTs)) return { visible: false, days: null, tone: 'none', text: '', hasAttachment };
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const days = Math.ceil((expiryTs - today.getTime()) / (1000 * 60 * 60 * 24));
-    if (days > 180) return { visible: false, days, tone: 'none', text: '' };
-    const tone = days <= 90 ? 'danger' : 'warning';
+    const tone = days < 0 ? 'danger' : days < 60 ? 'danger' : days < 180 ? 'warning' : 'ok';
     const text = days < 0
       ? `El RNE venció hace ${Math.abs(days)} días (${formatIsoEs(expiryIso)}).`
       : `El RNE vence en ${days} días (${formatIsoEs(expiryIso)}).`;
-    return { visible: true, days, tone, text };
+    return { visible: true, days, tone, text, hasAttachment };
   };
 
   const renderRneExpiryAlert = () => {
     if (!nodes.rneAlert) return;
     const meta = getRneExpiryMeta();
-    nodes.rneAlert.className = `produccion-rne-expiry-alert ${meta.visible ? '' : 'd-none'} ${meta.tone === 'danger' ? 'is-danger' : 'is-warning'}`.trim();
+    nodes.rneAlert.className = `produccion-rne-expiry-alert ${meta.visible ? '' : 'd-none'} ${meta.tone === 'danger' ? 'is-danger' : meta.tone === 'ok' ? 'is-ok' : 'is-warning'}`.trim();
     if (!meta.visible) {
       nodes.rneAlert.innerHTML = '';
       return;
     }
-    nodes.rneAlert.innerHTML = `<i class="bi ${meta.tone === 'danger' ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill'}"></i><span>${escapeHtml(meta.text)}</span>`;
+    nodes.rneAlert.innerHTML = `<i class="bi ${meta.tone === 'danger' ? 'bi-exclamation-octagon-fill' : meta.tone === 'ok' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'}"></i><span>${escapeHtml(meta.text)}</span>`;
+  };
+
+  const renderModalRneBadge = () => {
+    if (!nodes.modalTitle) return;
+    const meta = getRneExpiryMeta();
+    const attachmentBadge = `<span class="produccion-modal-rne-badge ${meta.hasAttachment ? 'is-ok' : 'is-warning'}"><i class="bi bi-paperclip"></i>${meta.hasAttachment ? 'RNE adjunto' : 'Sin adjunto'}</span>`;
+    if (!meta.visible) {
+      nodes.modalTitle.innerHTML = `Producción <span class="produccion-modal-rne-badges">${attachmentBadge}</span>`;
+      return;
+    }
+    const expiryLabel = meta.days < 0 ? `RNE vencido` : `RNE ${meta.days} días`;
+    nodes.modalTitle.innerHTML = `Producción <span class="produccion-modal-rne-badges"><span class="produccion-modal-rne-badge ${meta.tone === 'danger' ? 'is-danger' : meta.tone === 'warning' ? 'is-warning' : 'is-ok'}"><i class="bi bi-clock-history"></i>${escapeHtml(expiryLabel)}</span>${attachmentBadge}</span>`;
   };
 
   const renderList = () => {
     renderRneExpiryAlert();
+    renderModalRneBadge();
     const query = normalizeLower(state.search);
     const list = getRecipes()
       .filter((item) => !query || normalizeLower(item.title).includes(query) || normalizeLower(item.description).includes(query))
@@ -2451,14 +2465,19 @@
         const productImage = normalizeValue(item?.traceability?.product?.imageUrl) || normalizeValue(state.recetas?.[item.recipeId]?.imageUrl);
         const productCell = `<span style="display:inline-flex;align-items:center;gap:8px;">${productImage ? `<img src="${escapeHtml(productImage)}" style="width:28px;height:28px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<strong>${escapeHtml(item.recipeTitle || '-')}</strong></span>`;
         const main = `<tr><td>${escapeHtml(item.id || '-')}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${productCell}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)}<br><small>${escapeHtml(manager.role)}</small></td><td>${escapeHtml(formatProductExpiryLabel(item))} (VTO)</td></tr>`;
-        if (!includeTrace) return [main];
+        const resolutions = (Array.isArray(item?.lots) ? item.lots : [])
+          .flatMap((plan) => (Array.isArray(plan?.lots) ? plan.lots : [])
+            .flatMap((lot) => (Array.isArray(lot?.expiryResolutions) ? lot.expiryResolutions : [])
+              .filter((res) => isHighlightedResolutionType(res.type))
+              .map((res) => `<tr class="is-resolution-row"><td>↳ RES</td><td>${escapeHtml(formatDateTime(res.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>-${Number(res.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(res.type === 'decommissioned' ? 'Decomisado' : 'Vendido en mostrador')}</td><td>${escapeHtml(formatProductExpiryLabel(item))} (VTO)</td></tr>`)));
+        if (!includeTrace) return [main, ...resolutions];
         const traces = getTraceRowsFromRegistro(item).map((trace) => `<tr class="is-trace-row"><td>↳ ${trace.index}</td><td><span class="print-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td><span style="display:inline-flex;align-items:center;gap:8px;">${trace.ingredientImageUrl ? `<img src="${escapeHtml(trace.ingredientImageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(trace.ingredientName)}</span></span></td><td>-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="print-trace-vto">${escapeHtml(formatIsoEs(trace.expiryDate))} (VTO)</span></td></tr>`);
-        return [main, ...traces];
+        return [main, ...resolutions, ...traces];
       }).join('');
       const imagesHtml = ask.isConfirmed
         ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));">${rows.flatMap((item) => getTraceRowsFromRegistro(item).map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">${trace.ingredientImageUrl ? `<img src="${trace.ingredientImageUrl}" style="width:36px;height:36px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<figcaption style="font-size:12px;color:#4b5f8e;">${escapeHtml(trace.ingredientName)}</figcaption></div>${(trace.invoiceImageUrls || []).map((url) => `<img src="${url}" style="width:100%;max-height:220px;object-fit:contain;border-radius:10px;margin-top:8px;">`).join('')}</figure>`)).join('')}</div></section>`
         : '';
-      win.document.write(`<html><head><title>Historial producción ${escapeHtml(capitalize(recipe.title || ''))}</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.is-trace-row td{background:#ffecef}.print-trace-date{color:#1f6fd6;font-weight:700}.print-trace-vto{color:#b04a09;font-weight:700}</style></head><body><h1>Historial producción ${escapeHtml(capitalize(recipe.title || ''))}</h1><table><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>VTO producto</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
+      win.document.write(`<html><head><title>Historial producción ${escapeHtml(capitalize(recipe.title || ''))}</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.is-trace-row td{background:#ffecef}.is-resolution-row td{background:#fff6d9}.print-trace-date{color:#1f6fd6;font-weight:700}.print-trace-vto{color:#b04a09;font-weight:700}</style></head><body><h1>Historial producción ${escapeHtml(capitalize(recipe.title || ''))}</h1><table><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>VTO producto</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
       win.document.close();
       win.focus();
       await waitPrintAssets(win);
@@ -2745,7 +2764,7 @@
                 'VTO producto': formatProductExpiryLabel(item),
                 Trazabilidad: 'Resolución vencido',
                 Acciones: '-',
-                __tone: 'resolution'
+                __tone: isHighlightedResolutionType(res.type) ? 'resolution_yellow' : 'normal'
               }))));
           const traces = getTraceRowsFromRegistro(item).map((trace) => ({
             'ID producción': `↳ ${trace.index}`,
@@ -3266,7 +3285,7 @@
             'VTO producto': formatProductExpiryLabel(item),
             Trazabilidad: 'Resolución vencido',
             Acciones: '-',
-            __tone: isBlueResolutionType(res.type) ? 'resolution_blue' : 'normal'
+            __tone: isHighlightedResolutionType(res.type) ? 'resolution_yellow' : 'normal'
           }))));
       const traces = getTraceRowsFromRegistro(item).map((trace) => ({
         'ID producción': `↳ ${trace.index}`,
@@ -3338,14 +3357,19 @@
       const productImage = normalizeValue(item?.traceability?.product?.imageUrl) || normalizeValue(state.recetas?.[item.recipeId]?.imageUrl);
       const productCell = `<span style="display:inline-flex;align-items:center;gap:8px;">${productImage ? `<img src="${escapeHtml(productImage)}" style="width:28px;height:28px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<strong>${escapeHtml(item.recipeTitle || '-')}</strong></span>`;
       const main = `<tr><td>${escapeHtml(item.id)}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${productCell}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)}<br><small>${escapeHtml(manager.role)}</small></td><td>${escapeHtml(formatProductExpiryLabel(item))} (VTO)</td></tr>`;
-      if (!includeTrace) return [main];
+      const resolutions = (Array.isArray(item?.lots) ? item.lots : [])
+        .flatMap((plan) => (Array.isArray(plan?.lots) ? plan.lots : [])
+          .flatMap((lot) => (Array.isArray(lot?.expiryResolutions) ? lot.expiryResolutions : [])
+            .filter((res) => isHighlightedResolutionType(res.type))
+            .map((res) => `<tr class="is-resolution-row"><td>↳ RES</td><td>${escapeHtml(formatDateTime(res.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>-${Number(res.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(res.type === 'decommissioned' ? 'Decomisado' : 'Vendido en mostrador')}</td><td>${escapeHtml(formatProductExpiryLabel(item))} (VTO)</td></tr>`)));
+      if (!includeTrace) return [main, ...resolutions];
       const traces = getTraceRowsFromRegistro(item).map((trace) => `<tr class="is-trace-row"><td>↳ ${trace.index}</td><td><span class="print-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td><span style="display:inline-flex;align-items:center;gap:8px;">${trace.ingredientImageUrl ? `<img src="${escapeHtml(trace.ingredientImageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(trace.ingredientName)}</span></span></td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="print-trace-vto">${escapeHtml(formatIsoEs(trace.expiryDate))} (VTO)</span></td></tr>`);
-      return [main, ...traces];
+      return [main, ...resolutions, ...traces];
     }).join('');
     const imagesHtml = includeImages
       ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas del período</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${rows.flatMap((item) => getTraceRowsFromRegistro(item).map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">${trace.ingredientImageUrl ? `<img src="${trace.ingredientImageUrl}" style="width:36px;height:36px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<figcaption style="font-size:12px;color:#4b5f8e;">${escapeHtml(trace.ingredientName)}</figcaption></div>${(trace.invoiceImageUrls || []).map((url, idx) => `<img src="${url}" style="width:100%;max-height:240px;object-fit:contain;border-radius:10px;margin-top:${idx ? '8px' : '0'};">`).join('')}</figure>`)).join('')}</div></section>`
       : '';
-    win.document.write(`<html><head><title>Producción por período</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.is-trace-row td{background:#ffecef}.print-trace-date{color:#1f6fd6;font-weight:700}.print-trace-vto{color:#b04a09;font-weight:700}</style></head><body><h1>Producción por período • La Jamonera</h1><table><thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
+    win.document.write(`<html><head><title>Producción por período</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.is-trace-row td{background:#ffecef}.is-resolution-row td{background:#fff6d9}.print-trace-date{color:#1f6fd6;font-weight:700}.print-trace-vto{color:#b04a09;font-weight:700}</style></head><body><h1>Producción por período • La Jamonera</h1><table><thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
     win.document.close();
     win.focus();
     await waitPrintAssets(win);
@@ -3427,6 +3451,7 @@
       state.historyTraceCollapse = {};
       setHistoryMode(false);
       renderList();
+      renderModalRneBadge();
       if (window.flatpickr && nodes.historyRange) {
         const locale = window.flatpickr.l10ns?.es || undefined;
         const dayMap = getProductionDayMap();
