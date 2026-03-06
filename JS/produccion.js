@@ -742,7 +742,7 @@
         const isSoon = expiryIso && expiryIso >= productionDateIso && expiryIso <= toIsoDate(new Date(productionDateIso).getTime() + 2 * 86400000);
         if (isSoon) warnings.push(`${requirement.name}: lote próximo a vencer (${expiryIso}).`);
         const lotNumber = normalizeValue(entry.lotNumber) || normalizeValue(entry.invoiceNumber) || entry.id;
-        if (status === 'expired') {
+        if (status === 'expired' && available > 0.0001) {
           lots.push({
             ingredientId: requirement.ingredientId,
             ingredientName: requirement.name,
@@ -759,6 +759,7 @@
             takeQty: 0,
             takeBaseQty: 0,
             availableQty: Number(available.toFixed(4)),
+            availableKg: getEntryAvailableKg(entry),
             entryAvailableQty: Number(available.toFixed(4)),
             status: 'expired'
           });
@@ -784,13 +785,19 @@
           takeQty: Number(take.toFixed(4)),
           takeBaseQty: Number(toBase(take, requirement.unit).toFixed(6)),
           availableQty: Number(available.toFixed(4)),
+          availableKg: getEntryAvailableKg(entry),
           entryAvailableQty: Number(available.toFixed(4)),
           status: isSoon ? 'soon' : 'ok'
         });
       });
       const missing = Math.max(0, Number(remaining.toFixed(4)));
       if (missing > 0.0001) {
-        conflicts.push(`${requirement.name}: faltan ${formatQty(missing, requirement.unit)} para la fecha ${productionDateIso}.`);
+        const hasExpiredWithStock = lots.some((lot) => lot.status === 'expired' && Number(lot.availableQty || 0) > 0.0001);
+        if (hasExpiredWithStock) {
+          conflicts.push(`${requirement.name}: faltan ${formatQty(missing, requirement.unit)} para la fecha ${productionDateIso}. Resolvé vencidos, cambiá el rango de fecha o ingresá un nuevo lote.`);
+        } else {
+          conflicts.push(`${requirement.name}: faltan ${formatQty(missing, requirement.unit)} para la fecha ${productionDateIso}. Ingresá un nuevo lote o cambiá fecha.`);
+        }
       }
       ingredientPlans.push({
         ingredientId: requirement.ingredientId,
@@ -2053,7 +2060,7 @@
             <div class="produccion-lote-adjuntos-row"><strong>Adjuntos:</strong> ${lot.invoiceImageUrls.length
               ? `<button type="button" class="btn ios-btn ios-btn-secondary produccion-lote-adjuntos-btn" data-lot-images="${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Ver (${lot.invoiceImageUrls.length})</span></button>`
               : '<span>Sin adjuntos</span>'}</div>
-            ${lot.status === 'expired' ? `<div class="produccion-lote-expired-actions"><button type="button" class="btn ios-btn ios-btn-secondary" data-resolve-expired-lot="${escapeHtml(lot.ingredientId)}" data-resolve-expired-entry="${escapeHtml(lot.entryId)}" data-resolve-expired-qty="${Number(lot.availableQty || 0).toFixed(4)}" data-resolve-expired-mode="sold_counter"><i class="fa-solid fa-shop"></i><span>Vendido en mostrador</span></button><button type="button" class="btn ios-btn ios-btn-danger" data-resolve-expired-lot="${escapeHtml(lot.ingredientId)}" data-resolve-expired-entry="${escapeHtml(lot.entryId)}" data-resolve-expired-qty="${Number(lot.availableQty || 0).toFixed(4)}" data-resolve-expired-mode="decommissioned"><i class="fa-solid fa-trash"></i><span>Decomisado</span></button></div>` : ''}
+            ${lot.status === 'expired' ? `<div class="produccion-lote-expired-actions"><button type="button" class="btn ios-btn ios-btn-secondary" data-resolve-expired-lot="${escapeHtml(lot.ingredientId)}" data-resolve-expired-entry="${escapeHtml(lot.entryId)}" data-resolve-expired-qtykg="${Number(lot.availableKg || 0).toFixed(4)}" data-resolve-expired-mode="sold_counter"><i class="fa-solid fa-shop"></i><span>Vendido en mostrador</span></button><button type="button" class="btn ios-btn ios-btn-danger" data-resolve-expired-lot="${escapeHtml(lot.ingredientId)}" data-resolve-expired-entry="${escapeHtml(lot.entryId)}" data-resolve-expired-qtykg="${Number(lot.availableKg || 0).toFixed(4)}" data-resolve-expired-mode="decommissioned"><i class="fa-solid fa-trash"></i><span>Decomisado</span></button></div>` : ''}
           </div>`).join('<hr class="produccion-lote-separator">') : '<p class="produccion-lote-empty">Sin lotes aptos para la fecha elegida.</p>'}
         </div>
       </article>
@@ -2370,30 +2377,23 @@
       if (resolveExpiredBtn) {
         const ingredientId = normalizeValue(resolveExpiredBtn.dataset.resolveExpiredLot);
         const entryId = normalizeValue(resolveExpiredBtn.dataset.resolveExpiredEntry);
-        const maxQtyKg = parseNumber(resolveExpiredBtn.dataset.resolveExpiredQty) || 0;
+        const maxQtyKg = parseNumber(resolveExpiredBtn.dataset.resolveExpiredQtykg) || 0;
         const resolutionType = normalizeValue(resolveExpiredBtn.dataset.resolveExpiredMode);
         if (!ingredientId || !entryId || maxQtyKg <= 0) return;
         if (!resolutionType) return;
-        const askQty = await openIosSwal({
-          title: 'Cantidad a resolver',
-          html: `<div class="text-center produccion-resolve-qty-wrap"><p>Máximo disponible: <strong>${maxQtyKg.toFixed(3)} kg</strong></p><input id="produccionResolveExpiredQty" type="number" class="swal2-input ios-input" min="0.001" max="${maxQtyKg.toFixed(3)}" step="0.001" value="${maxQtyKg.toFixed(3)}"></div>`,
+        const label = resolutionType === 'decommissioned' ? 'decomisar' : 'vender en mostrador';
+        const askConfirm = await openIosSwal({
+          title: 'Confirmar acción',
+          html: `<div class="text-center produccion-resolve-qty-wrap"><p>Se aplicará <strong>${label}</strong> sobre el lote completo.</p><p>Cantidad afectada: <strong>${maxQtyKg.toFixed(3)} kg</strong>.</p></div>`,
           showCancelButton: true,
-          confirmButtonText: 'Aplicar',
+          confirmButtonText: 'Confirmar',
           cancelButtonText: 'Cancelar',
-          preConfirm: () => {
-            const value = parseNumber(document.getElementById('produccionResolveExpiredQty')?.value);
-            if (!Number.isFinite(value) || value <= 0 || value > maxQtyKg) {
-              Swal.showValidationMessage('Ingresá una cantidad válida dentro del rango disponible.');
-              return false;
-            }
-            return Number(value.toFixed(3));
-          }
         });
-        if (!askQty.isConfirmed) return;
+        if (!askConfirm.isConfirmed) return;
         state.pendingExpiryActions[entryId] = {
           ingredientId,
           type: resolutionType,
-          qtyKg: Number(askQty.value)
+          qtyKg: Number(maxQtyKg.toFixed(3))
         };
         await updateEditorPlan();
         await openIosSwal({ title: 'Acción preparada', html: '<p>La resolución se aplicará al confirmar la producción.</p>', icon: 'success', confirmButtonText: 'Continuar' });
@@ -2645,6 +2645,19 @@
       const qty = parsePositive(qtyInput.value, 0.1);
       const date = normalizeValue(dateInput.value) || toIsoDate();
       const revalidated = buildPlanForRecipe(recipe, qty, date);
+      const revalidatedExpiredLots = revalidated.ingredientPlans.reduce((acc, row) => acc + row.lots.filter((lot) => lot.status === 'expired').length, 0);
+      if (revalidatedExpiredLots > 0) {
+        await openIosSwal({
+          title: 'Hay carne vencida pendiente',
+          html: '<p>No podés confirmar hasta resolver el estado de los lotes vencidos o cambiar la fecha de producción a un rango válido.</p>',
+          icon: 'warning',
+          confirmButtonText: 'Entendido'
+        });
+        state.editorPlan = revalidated;
+        lotsWrap.innerHTML = buildLotsBreakdownHtml(state.editorPlan);
+        renderRecipeHistory();
+        return;
+      }
       if (!revalidated.isValid) {
         await openIosSwal({
           title: 'Stock cambió durante la edición',
