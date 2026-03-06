@@ -6589,7 +6589,7 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-rne-history {
-  max-height: 220px;
+  max-height: 150px;
   overflow-y: auto;
   padding-right: 4px;
 }
