@@ -594,7 +594,8 @@
       const isCollapsed = state.globalEntryCollapse[row.entryId] === true;
       const expiryMeta = getEntryExpiryMeta(row);
       const isExpiredAvailable = expiryMeta.isExpired;
-      const resolutionLabel = getEntryResolutionLabel(row);
+      const resolutionMeta = getEntryResolutionMeta(row);
+      const resolutionLabel = resolutionMeta.badge;
       const traceHtml = (!isCollapsed && traces.length)
         ? traces.map((trace) => `
       <tr class="inventario-trace-row">
@@ -821,13 +822,29 @@
   };
   const getRecordExpiredAvailableKg = (record, targetIso = getArgentinaIsoDate()) => (Array.isArray(record?.entries) ? record.entries : [])
     .reduce((acc, entry) => acc + getEntryExpiryMeta(entry, targetIso).expiredKg, 0);
-  const getEntryResolutionLabel = (entry) => {
-    const status = normalizeValue(entry?.expiryResolutionStatus || entry?.status);
-    if (status === 'sold_local') return 'Vendida en local';
-    if (status === 'sold_branch') return 'Vendido en sucursal';
-    if (status === 'sold_counter') return 'Vendido en mostrador';
-    if (status === 'decommissioned') return 'Decomisado';
-    return '';
+  const getEntryResolutionMeta = (entry) => {
+    const resolutions = Array.isArray(entry?.expiryResolutions) ? entry.expiryResolutions : [];
+    const latest = resolutions[0] || null;
+    const status = normalizeValue(entry?.expiryResolutionStatus || entry?.status || latest?.type);
+    const totalKg = Number(entry?.qtyKg || 0);
+    const availableKg = getAvailableKg(entry);
+    const isFull = availableKg <= 0.0001;
+    const resolvedKg = Number(latest?.qtyKg || 0);
+    const baseLabel = status === 'sold_local'
+      ? 'Vendida en local'
+      : status === 'sold_branch'
+        ? 'Vendido en sucursal'
+        : status === 'sold_counter'
+          ? 'Vendido en mostrador'
+          : status === 'decommissioned'
+            ? 'Decomisado'
+            : '';
+    if (!baseLabel) return { badge: '', status };
+    if (isFull) return { badge: `${baseLabel} (lote completo)`, status };
+    if (resolvedKg > 0.0001 && totalKg > 0.0001) {
+      return { badge: `${baseLabel} ${resolvedKg.toFixed(1)}Kg de ${totalKg.toFixed(0)}Kg`, status };
+    }
+    return { badge: baseLabel, status };
   };
 
   const getEntryTraceRows = (entry) => getEntryUsages(entry).map((usage) => ({
@@ -1269,7 +1286,8 @@
       const isCollapsed = collapseMap[entry.id] === true;
       const expiryMeta = getEntryExpiryMeta(entry);
       const isExpiredAvailable = expiryMeta.isExpired;
-      const resolutionLabel = getEntryResolutionLabel(entry);
+      const resolutionMeta = getEntryResolutionMeta(entry);
+      const resolutionLabel = resolutionMeta.badge;
       const traceHtml = (!isCollapsed && traceRows.length)
         ? traceRows.map((trace) => `
         <tr class="inventario-trace-row">
@@ -1932,11 +1950,13 @@
         const isCollapsed = collapseMap[entry.id] === true;
         const expiryMeta = getEntryExpiryMeta(entry);
         const isExpiredAvailable = expiryMeta.isExpired;
-        const resolutionLabel = getEntryResolutionLabel(entry);
+        const resolutionMeta = getEntryResolutionMeta(entry);
+        const resolutionLabel = resolutionMeta.badge;
         const traceHtml = (!isCollapsed && traceRows.length)
           ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(trace.createdAt)}</div></td><td>${escapeHtml(trace.expiryDateAtProduction || '-')}</td><td class="inventario-trace-kilos">-${formatUsageAmount(trace.kilosUsed)}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml(trace.productionId)}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button></td><td></td></tr>`).join('')
           : '';
-        return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${formatDateTime(entry.createdAt)}</td><td>${entry.expiryDate || '-'} ${isExpiredAvailable ? '<span class="inventario-expired-badge">EXPIRADO</span>' : ''} ${resolutionLabel ? `<span class="inventario-resolution-badge">${escapeHtml(resolutionLabel)}</span>` : ''}</td><td>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><div class="inventario-entry-actions">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expanded-entry-collapse="${entry.id}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(entryImageUrls(entry))}</div></td></tr>${traceHtml}`;
+        const availableClass = getAvailableKg(entry) <= 0 ? 'is-zero' : '';
+        return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${formatDateTime(entry.createdAt)}</td><td>${entry.expiryDate || '-'} ${isExpiredAvailable ? '<span class="inventario-expired-badge">EXPIRADO</span>' : ''} ${resolutionLabel ? `<span class="inventario-resolution-badge">${escapeHtml(resolutionLabel)}</span>` : ''}</td><td><strong>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</strong><br><span class="inventario-available-line ${availableClass}">disp. ${getAvailableKg(entry).toFixed(3)} kg</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><div class="inventario-entry-actions">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expanded-entry-collapse="${entry.id}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(entryImageUrls(entry))}</div></td></tr>${traceHtml}`;
       }).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos para mostrar.</td></tr>';
       await openIosSwal({
         title: 'Historial ampliado',
@@ -2425,7 +2445,8 @@
       const isCollapsed = collapseMap[row.entryId] === true;
       const expiryMeta = getEntryExpiryMeta(row);
       const isExpiredAvailable = expiryMeta.isExpired;
-      const resolutionLabel = getEntryResolutionLabel(row);
+      const resolutionMeta = getEntryResolutionMeta(row);
+      const resolutionLabel = resolutionMeta.badge;
       const traceHtml = (!isCollapsed && traceRows.length)
         ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(trace.createdAt))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${formatUsageAmount(trace.kilosUsed)}</td><td>${escapeHtml(trace.expiryDateAtProduction || '-')}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml(trace.productionId)}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button></td></tr>`).join('') : '';
       return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(row.entryDateTime)}</td><td>${escapeHtml(row.ingredientName)}</td><td>${row.qtyKg.toFixed(2)} kg</td><td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)} ${isExpiredAvailable ? '<span class="inventario-expired-badge">EXPIRADO</span>' : ''} ${resolutionLabel ? `<span class="inventario-resolution-badge">${escapeHtml(resolutionLabel)}</span>` : ''}</td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><div class="inventario-entry-actions">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expand-toggle-collapse="${row.entryId}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(row.invoiceImageUrls)}</div></td></tr>${traceHtml}`;

@@ -5375,6 +5375,16 @@ html.login-protected.auth-ok body {
   color: #60739f;
 }
 
+.produccion-last-line.produccion-last-line-expired {
+  color: #b42338;
+  font-weight: 700;
+}
+
+.produccion-last-line.produccion-last-line-expired i,
+.produccion-last-line.produccion-last-line-expired strong {
+  color: #b42338;
+}
+
 .produccion-progress-wrap {
   margin-top: 8px;
   display: grid;

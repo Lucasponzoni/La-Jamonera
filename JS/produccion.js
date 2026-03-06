@@ -1906,7 +1906,7 @@
       const badges = [
         analysis.missingForMin.length ? '<span class="produccion-badge">Faltan insumos</span>' : '',
         analysis.status === 'warning' ? '<span class="produccion-badge is-warning">Stock parcial</span>' : '',
-        analysis.hasExpired ? '<span class="produccion-badge is-danger">Vencido</span>' : '',
+        analysis.hasExpired ? '<span class="produccion-badge is-danger">Posee lotes expirados</span>' : '',
         foreignDraft ? '<span class="produccion-badge is-warning">Borrador en uso</span>' : ''
       ].filter(Boolean).join('');
       const missingHtml = analysis.missingForMin.length
@@ -1936,7 +1936,7 @@
                 <strong>${analysis.minKg.toFixed(2)} kg</strong>
               </div>
             </div>
-            ${Number(analysis.expiredKg || 0) > 0.0001 ? `<p class="produccion-last-line"><i class="fa-solid fa-triangle-exclamation"></i> Kilos expirados: <strong>${Number(analysis.expiredKg || 0).toFixed(2)} kg</strong></p>` : ''}
+            ${Number(analysis.expiredKg || 0) > 0.0001 ? `<p class="produccion-last-line produccion-last-line-expired"><i class="fa-solid fa-triangle-exclamation"></i> <strong>Kilos expirados:</strong> <strong>${Number(analysis.expiredKg || 0).toFixed(2)} kg</strong></p>` : ''}
             ${draftLock?.blockedKg > 0 ? `<p class="produccion-last-line"><i class="fa-solid fa-lock"></i> Bloqueado por borrador: <strong>${draftLock.blockedKg.toFixed(2)} kg</strong> · disponible en <strong>${formatCountdown(draftLock.remainingMs)}</strong></p>` : ''}
             <p class="produccion-last-line"><i class="fa-regular fa-clock"></i> Última producción: <strong>${formatDate(lastProductionAt)}</strong></p>
             <div class="produccion-progress-wrap">
