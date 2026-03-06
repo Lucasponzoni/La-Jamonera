@@ -747,6 +747,7 @@ html.login-protected.auth-ok body {
 
 .ingrediente-actions {
   display: flex;
+  flex-direction: column;
   gap: 6px;
 }
 
