@@ -2794,8 +2794,8 @@
           const options = [
             { key: 'all', label: 'Todos', tone: 'neutral', count: counts.all },
             { key: 'none', label: 'Sin RNE', tone: 'info', count: counts.none },
-            { key: 'warning', label: 'Vence en menos de 6 meses', tone: 'warning', count: counts.warning },
-            { key: 'danger', label: 'Vence en menos de 60 días', tone: 'danger', count: counts.danger }
+            { key: 'warning', label: '< de 6 meses', tone: 'warning', count: counts.warning },
+            { key: 'danger', label: '< de 60 días', tone: 'danger', count: counts.danger }
           ];
           filtersNode.innerHTML = options.map((option) => `<button type="button" class="inventario-status-btn tone-${option.tone} ${state.providerRneFilter === option.key ? 'is-active' : ''}" data-provider-rne-filter="${option.key}"><span>${option.label}</span><strong>${option.count}</strong></button>`).join('');
         };
