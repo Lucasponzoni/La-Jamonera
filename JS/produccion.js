@@ -2292,6 +2292,10 @@
       const rows = getRecipeHistoryRows();
       const node = nodes.editor.querySelector('#produccionRecipeHistory');
       if (!node) return;
+      rows.forEach((item) => {
+        if (state.historyTraceCollapse[item.id] !== undefined) return;
+        if (getTraceRowsFromRegistro(item).length) state.historyTraceCollapse[item.id] = true;
+      });
       if (!rows.length) {
         node.innerHTML = '<p class="produccion-lote-empty">Todavía no hay producciones confirmadas para esta receta.</p>';
         return;

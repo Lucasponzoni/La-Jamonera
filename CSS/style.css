@@ -6287,6 +6287,13 @@ html.login-protected.auth-ok body {
   font-size: 0.82rem;
 }
 
+.inventario-resolution-row td {
+  background: #eaf1ff !important;
+  border-bottom: 1px solid #d5e3ff !important;
+  color: #2f4f86;
+  font-size: 0.82rem;
+}
+
 .inventario-row-tone.is-expired-row td {
   background: #ffe06c7a !important;
 }
