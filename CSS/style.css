@@ -2817,6 +2817,7 @@ html.login-protected.auth-ok body {
   border: 1px solid #dbe4f8;
   background: #fbfcff;
   border-radius: 14px;
+  text-align: start !important;
   padding: 12px;
 }
 
@@ -7152,7 +7153,6 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-config-actions {
-  justify-content: flex-start;
   flex-wrap: wrap;
   gap: 8px;
 }
