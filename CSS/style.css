@@ -6463,6 +6463,9 @@ html.login-protected.auth-ok body {
 .produccion-trace-ingredient-avatar {
   width: 42px;
   height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  flex: 0 0 42px;
   border-radius: 999px;
   overflow: hidden;
   border: 1px solid #d2dcf2;
@@ -6521,12 +6524,8 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-trace-zoom-value {
-  display: flex;
-  justify-content: center;
-  align-items: center;
   min-width: 58px;
   text-align: center;
-  min-height: 36px;
   font-weight: 800;
   color: #2f4f8b;
   background: #eef3ff;
@@ -6559,6 +6558,9 @@ html.login-protected.auth-ok body {
 .produccion-trace-ingredient-index {
   width: 24px;
   height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  flex: 0 0 24px;
   border-radius: 999px;
   background: #dfeaff;
   color: #284782;
@@ -6620,7 +6622,14 @@ html.login-protected.auth-ok body {
 
 .produccion-trace-mermaid {
   min-height: 260px;
-  overflow: auto;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+
+.produccion-trace-mermaid.is-dragging {
+  cursor: grabbing;
 }
 
 .produccion-trace-mermaid .mermaid {
@@ -6629,8 +6638,9 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-trace-mermaid svg {
-  max-width: 100%;
+  max-width: none;
   height: auto;
+  display: block;
 }
 
 @media (max-width: 768px) {
@@ -6648,11 +6658,7 @@ html.login-protected.auth-ok body {
   }
 
   .produccion-trace-zoom-value {
-    display: flex;
-    justify-content: center;
-    align-items: center;
     min-width: 52px;
-    min-height: 36px;
     padding: 4px 6px;
     font-size: 0.86rem;
   }

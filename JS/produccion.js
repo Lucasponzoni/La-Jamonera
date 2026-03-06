@@ -1362,19 +1362,153 @@
   };
   const initTraceMermaidZoomControls = (popup) => {
     const host = popup.querySelector('[data-trace-mermaid]');
+    const viewport = popup.querySelector('.produccion-trace-mermaid');
     const label = popup.querySelector('[data-trace-zoom-value]');
-    if (!host || !label) return;
+    if (!host || !viewport || !label) return;
     let zoom = Number(host.dataset.traceScale || 1);
-    const setZoom = (next) => {
-      zoom = Math.min(2.2, Math.max(0.65, next));
+    let panX = Number(host.dataset.tracePanX || 0);
+    let panY = Number(host.dataset.tracePanY || 0);
+    const minZoom = 0.65;
+    const maxZoom = 2.5;
+    const pointers = new Map();
+    let pointerDrag = null;
+    let pinchStart = null;
+
+    const applyTransform = () => {
       host.dataset.traceScale = String(zoom);
-      host.style.transform = `scale(${zoom})`;
+      host.dataset.tracePanX = String(panX);
+      host.dataset.tracePanY = String(panY);
+      host.style.transformOrigin = '0 0';
+      host.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
       label.textContent = `${Math.round(zoom * 100)}%`;
     };
-    popup.querySelector('[data-trace-zoom-in]')?.addEventListener('click', () => setZoom(zoom + 0.12));
-    popup.querySelector('[data-trace-zoom-out]')?.addEventListener('click', () => setZoom(zoom - 0.12));
-    popup.querySelector('[data-trace-zoom-reset]')?.addEventListener('click', () => setZoom(1));
-    setZoom(1);
+
+    const setZoom = (next, originX = viewport.clientWidth / 2, originY = viewport.clientHeight / 2) => {
+      const clamped = Math.min(maxZoom, Math.max(minZoom, next));
+      if (Math.abs(clamped - zoom) < 0.0001) return;
+      const worldX = (originX - panX) / zoom;
+      const worldY = (originY - panY) / zoom;
+      zoom = clamped;
+      panX = originX - worldX * zoom;
+      panY = originY - worldY * zoom;
+      applyTransform();
+    };
+
+    const setPan = (nextX, nextY) => {
+      panX = nextX;
+      panY = nextY;
+      applyTransform();
+    };
+
+    viewport.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      const rect = viewport.getBoundingClientRect();
+      const originX = event.clientX - rect.left;
+      const originY = event.clientY - rect.top;
+      const factor = event.deltaY < 0 ? 1.1 : 0.9;
+      setZoom(zoom * factor, originX, originY);
+    }, { passive: false });
+
+    viewport.addEventListener('pointerdown', (event) => {
+      viewport.setPointerCapture(event.pointerId);
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pointers.size === 1) {
+        pointerDrag = { startX: event.clientX, startY: event.clientY, originX: panX, originY: panY };
+        viewport.classList.add('is-dragging');
+      } else if (pointers.size === 2) {
+        const [a, b] = Array.from(pointers.values());
+        pinchStart = {
+          distance: Math.hypot(a.x - b.x, a.y - b.y),
+          zoom,
+          panX,
+          panY,
+          centerX: (a.x + b.x) / 2,
+          centerY: (a.y + b.y) / 2
+        };
+      }
+    });
+
+    viewport.addEventListener('pointermove', (event) => {
+      if (!pointers.has(event.pointerId)) return;
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pointers.size >= 2) {
+        const [a, b] = Array.from(pointers.values());
+        const distance = Math.hypot(a.x - b.x, a.y - b.y);
+        if (!pinchStart || pinchStart.distance <= 0) return;
+        const rect = viewport.getBoundingClientRect();
+        const centerX = ((a.x + b.x) / 2) - rect.left;
+        const centerY = ((a.y + b.y) / 2) - rect.top;
+        const ratio = distance / pinchStart.distance;
+        const nextZoom = Math.min(maxZoom, Math.max(minZoom, pinchStart.zoom * ratio));
+        const worldX = (centerX - pinchStart.panX) / pinchStart.zoom;
+        const worldY = (centerY - pinchStart.panY) / pinchStart.zoom;
+        zoom = nextZoom;
+        panX = centerX - worldX * zoom;
+        panY = centerY - worldY * zoom;
+        applyTransform();
+        return;
+      }
+      if (!pointerDrag) return;
+      const dx = event.clientX - pointerDrag.startX;
+      const dy = event.clientY - pointerDrag.startY;
+      setPan(pointerDrag.originX + dx, pointerDrag.originY + dy);
+    });
+
+    const endPointer = (event) => {
+      pointers.delete(event.pointerId);
+      if (pointers.size < 2) pinchStart = null;
+      if (pointers.size === 0) {
+        pointerDrag = null;
+        viewport.classList.remove('is-dragging');
+      } else if (pointers.size === 1) {
+        const [single] = Array.from(pointers.values());
+        pointerDrag = { startX: single.x, startY: single.y, originX: panX, originY: panY };
+      }
+    };
+
+    viewport.addEventListener('pointerup', endPointer);
+    viewport.addEventListener('pointercancel', endPointer);
+    viewport.addEventListener('pointerleave', (event) => {
+      if (!event.buttons) endPointer(event);
+    });
+
+    const setZoomCentered = (next) => {
+      const rect = viewport.getBoundingClientRect();
+      setZoom(next, rect.width / 2, rect.height / 2);
+    };
+    popup.querySelector('[data-trace-zoom-in]')?.addEventListener('click', () => setZoomCentered(zoom + 0.12));
+    popup.querySelector('[data-trace-zoom-out]')?.addEventListener('click', () => setZoomCentered(zoom - 0.12));
+    popup.querySelector('[data-trace-zoom-reset]')?.addEventListener('click', () => {
+      zoom = 1;
+      panX = 0;
+      panY = 0;
+      applyTransform();
+    });
+    zoom = 1;
+    panX = 0;
+    panY = 0;
+    applyTransform();
+  };
+  const ensureTraceabilityDerivedData = async (registro) => {
+    if (!registro?.id) return registro;
+    const packaging = resolvePackagingFromRegistro(registro);
+    const needsPersist = packaging.agingDays > 0 && packaging.packagingDate
+      && (normalizeValue(registro.packagingDate) !== packaging.packagingDate
+        || Number(registro.agingDaysAtProduction || 0) !== Number(packaging.agingDays || 0));
+    if (!needsPersist) return registro;
+    const updated = {
+      ...registro,
+      packagingDate: packaging.packagingDate,
+      agingDaysAtProduction: Number(packaging.agingDays || 0)
+    };
+    state.registros[registro.id] = updated;
+    try {
+      const remote = safeObject(await window.dbLaJamoneraRest.read(REGISTROS_PATH));
+      remote[registro.id] = updated;
+      await window.dbLaJamoneraRest.write(REGISTROS_PATH, remote);
+    } catch (error) {
+    }
+    return updated;
   };
   const ensureTraceabilityDerivedData = async (registro) => {
     if (!registro?.id) return registro;
