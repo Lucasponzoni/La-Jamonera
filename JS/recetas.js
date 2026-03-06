@@ -1180,6 +1180,18 @@
       title,
       description,
       ingredients,
+      rnpa: {
+        denomination: normalizeValue(initial?.rnpa?.denomination),
+        brand: normalizeValue(initial?.rnpa?.brand),
+        businessName: normalizeValue(initial?.rnpa?.businessName),
+        city: normalizeValue(initial?.rnpa?.city || 'Rosario'),
+        province: normalizeValue(initial?.rnpa?.province || 'Santa Fe'),
+        country: RNPA_COUNTRY,
+        expiryDate: normalizeValue(initial?.rnpa?.expiryDate),
+        attachmentUrl: normalizeValue(initial?.rnpa?.attachmentUrl),
+        attachmentType: normalizeValue(initial?.rnpa?.attachmentType),
+        attachmentName: normalizeValue(initial?.rnpa?.attachmentName)
+      },
       nutrition: {
         productType,
         category,
