@@ -484,6 +484,8 @@
       const record = getRecord(item.id);
       const status = stockStatusFor(record);
       const stockClass = Number(record.stockKg) <= 0 ? 'is-zero' : '';
+      const expiredKg = getRecordExpiredAvailableKg(record);
+      const availableRealKg = Math.max(0, (Number(record.stockKg) || 0) - expiredKg);
       return `
         <article class="ingrediente-card inventario-card ${status.className}" data-inventario-card="${item.id}">
           ${ingredientAvatar(item)}
@@ -495,6 +497,7 @@
             <p class="ingrediente-meta">${capitalize(item.familyName)} · ${getMeasureLabel(item.measure || 'kilos')}</p>
             ${item.description ? `<p class="ingrediente-description">${sentenceCase(item.description)}</p>` : ''}
             <p class="inventario-stock-line ${stockClass}"><strong>${(Number(record.stockKg) || 0).toFixed(2)}</strong><small class="inventario-stock-unit">Kg.</small><span>Umbral bajo: ${record.lowThresholdKg != null ? record.lowThresholdKg.toFixed(2) : Number(state.inventario.config.globalLowThresholdKg || DEFAULT_LOW_THRESHOLD).toFixed(2)} kg ${record.lowThresholdKg != null ? '(personalizado)' : '(global)'}</span></p>
+            ${expiredKg > 0.0001 ? `<p class="inventario-stock-line inventario-stock-line-expired"><strong>${availableRealKg.toFixed(2)}</strong><small class="inventario-stock-unit">Kg.</small><span>Disponible real <em>(${expiredKg.toFixed(2)} kg expirados)</em></span></p>` : ''}
             <div class="inventario-actions-row inventory-production-actions">
               <button type="button" class="btn ios-btn ios-btn-success inventory-production-action-btn is-main" data-inventario-open-editor="${item.id}"><i class="fa-solid fa-plus"></i><span>Ingresar Stock</span></button>
               <button type="button" class="btn ios-btn inventory-production-action-btn is-view inventario-view-btn" data-inventario-open-editor="${item.id}"><i class="fa-regular fa-eye"></i><span>Visualizar</span></button>
@@ -552,7 +555,9 @@
           invoiceNumber: entry.invoiceNumber || '-',
           provider: providerLabel(entry.provider),
           invoiceImageUrls: entryImageUrls(entry),
-          invoiceImageUrl: entryImageUrls(entry)[0] || ''
+          invoiceImageUrl: entryImageUrls(entry)[0] || '',
+          expiryResolutionStatus: normalizeValue(entry.expiryResolutionStatus),
+          status: normalizeValue(entry.status)
         });
       });
     });
@@ -587,6 +592,9 @@
     const htmlRows = pageRows.length ? pageRows.map((row, index) => {
       const traces = getEntryTraceRows(row);
       const isCollapsed = state.globalEntryCollapse[row.entryId] === true;
+      const expiryMeta = getEntryExpiryMeta(row);
+      const isExpiredAvailable = expiryMeta.isExpired;
+      const resolutionLabel = getEntryResolutionLabel(row);
       const traceHtml = (!isCollapsed && traces.length)
         ? traces.map((trace) => `
       <tr class="inventario-trace-row">
@@ -600,11 +608,11 @@
       </tr>`).join('') : '';
 
       const availableClass = Number(row.availableKg || 0) <= 0 ? 'is-zero' : '';
-      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
+      return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
         <td>${escapeHtml(row.entryDateTime)}</td>
         <td>${escapeHtml(row.ingredientName)}</td>
         <td><strong>${row.qtyKg.toFixed(2)} kg</strong><br><span class="inventario-available-line ${availableClass}">disp. ${Number(row.availableKg || 0).toFixed(3)} kg</span></td>
-        <td>${escapeHtml(row.expiryDate || '-')}</td>
+        <td>${escapeHtml(row.expiryDate || '-')} ${isExpiredAvailable ? '<span class="inventario-expired-badge">EXPIRADO</span>' : ''} ${resolutionLabel ? `<span class="inventario-resolution-badge">${escapeHtml(resolutionLabel)}</span>` : ''}</td>
         <td>${escapeHtml(row.invoiceNumber)}</td>
         <td class="inventario-provider-cell">${escapeHtml(row.provider)}</td>
         <td><div class="inventario-entry-actions">${traces.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-toggle-global-collapse="${row.entryId}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${row.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-global-images="${encodeURIComponent(JSON.stringify(row.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Ver (${row.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>No posee foto</button>'}</div></td>
@@ -800,6 +808,27 @@
   };
 
   const getEntryUsages = (entry) => Array.isArray(entry?.productionUsage) ? entry.productionUsage : [];
+  const getEntryExpiryMeta = (entry, targetIso = getArgentinaIsoDate()) => {
+    const expiryIso = normalizeIsoDate(entry?.expiryDate);
+    if (!expiryIso) return { isExpired: false, availableKg: getAvailableKg(entry), expiredKg: 0 };
+    const availableKg = getAvailableKg(entry);
+    const isExpired = expiryIso < targetIso && availableKg > 0.0001;
+    return {
+      isExpired,
+      availableKg,
+      expiredKg: isExpired ? Number(availableKg.toFixed(3)) : 0
+    };
+  };
+  const getRecordExpiredAvailableKg = (record, targetIso = getArgentinaIsoDate()) => (Array.isArray(record?.entries) ? record.entries : [])
+    .reduce((acc, entry) => acc + getEntryExpiryMeta(entry, targetIso).expiredKg, 0);
+  const getEntryResolutionLabel = (entry) => {
+    const status = normalizeValue(entry?.expiryResolutionStatus || entry?.status);
+    if (status === 'sold_local') return 'Vendida en local';
+    if (status === 'sold_branch') return 'Vendido en sucursal';
+    if (status === 'sold_counter') return 'Vendido en mostrador';
+    if (status === 'decommissioned') return 'Decomisado';
+    return '';
+  };
 
   const getEntryTraceRows = (entry) => getEntryUsages(entry).map((usage) => ({
     id: usage.id || makeId('usage_row'),
@@ -1238,6 +1267,9 @@
     const rowsHtml = pageRows.length ? pageRows.map((entry, index) => {
       const traceRows = getEntryTraceRows(entry);
       const isCollapsed = collapseMap[entry.id] === true;
+      const expiryMeta = getEntryExpiryMeta(entry);
+      const isExpiredAvailable = expiryMeta.isExpired;
+      const resolutionLabel = getEntryResolutionLabel(entry);
       const traceHtml = (!isCollapsed && traceRows.length)
         ? traceRows.map((trace) => `
         <tr class="inventario-trace-row">
@@ -1252,9 +1284,9 @@
 
       const availableClass = getAvailableKg(entry) <= 0 ? 'is-zero' : '';
       return `
-      <tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
+      <tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
         <td>${formatDateTime(entry.createdAt)}</td>
-        <td>${entry.expiryDate || '-'}</td>
+        <td>${entry.expiryDate || '-'} ${isExpiredAvailable ? '<span class="inventario-expired-badge">EXPIRADO</span>' : ''} ${resolutionLabel ? `<span class="inventario-resolution-badge">${escapeHtml(resolutionLabel)}</span>` : ''}</td>
         <td><strong>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</strong><br><span class="inventario-available-line ${availableClass}">disp. ${getAvailableKg(entry).toFixed(3)} kg</span></td>
         <td>${escapeHtml(entry.invoiceNumber || '-')}</td>
         <td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td>
@@ -1968,6 +2000,42 @@
     return qty;
   };
 
+  const resolveExpiredEntryStock = async ({ ingredientId, entryId, resolutionType, qtyKg }) => {
+    const record = getRecord(ingredientId);
+    const entries = Array.isArray(record.entries) ? [...record.entries] : [];
+    const index = entries.findIndex((item) => item.id === entryId);
+    if (index < 0) return { ok: false, message: 'Lote no encontrado.' };
+    const entry = { ...entries[index] };
+    const expiryMeta = getEntryExpiryMeta(entry);
+    if (!expiryMeta.isExpired) return { ok: false, message: 'El lote no está expirado o no tiene stock disponible.' };
+    const availableKg = getAvailableKg(entry);
+    const availableQty = getAvailableQty(entry);
+    if (!Number.isFinite(availableKg) || availableKg <= 0) return { ok: false, message: 'No hay kilos disponibles para resolver.' };
+    const safeQtyKg = Math.min(Math.max(0.001, Number(qtyKg || 0)), availableKg);
+    const ratio = safeQtyKg / availableKg;
+    const qtyToDiscount = Number((availableQty * ratio).toFixed(4));
+    entry.availableKg = Number((availableKg - safeQtyKg).toFixed(4));
+    entry.availableQty = Number(Math.max(0, availableQty - qtyToDiscount).toFixed(4));
+    entry.expiryResolutions = Array.isArray(entry.expiryResolutions) ? entry.expiryResolutions : [];
+    entry.expiryResolutions.unshift({
+      id: makeId('expiry_resolution'),
+      createdAt: Date.now(),
+      type: normalizeValue(resolutionType),
+      qtyKg: Number(safeQtyKg.toFixed(4))
+    });
+    if (entry.availableKg <= 0.0001) {
+      entry.expiryResolutionStatus = normalizeValue(resolutionType);
+      entry.status = normalizeValue(resolutionType);
+    }
+    entries[index] = entry;
+    record.entries = entries;
+    record.stockKg = Number(entries.reduce((acc, row) => acc + getAvailableKg(row), 0).toFixed(4));
+    state.inventario.items[ingredientId] = record;
+    rebuildInventarioIndexes();
+    await persistInventario();
+    return { ok: true, resolvedKg: safeQtyKg, remainingKg: entry.availableKg };
+  };
+
   const backToList = async () => {
     if (state.editorDirty) {
       const answer = await openIosSwal({
@@ -2287,9 +2355,12 @@
     const renderExpandedRows = () => rows.length ? rows.map((row, index) => {
       const traceRows = getEntryTraceRows(row);
       const isCollapsed = collapseMap[row.entryId] === true;
+      const expiryMeta = getEntryExpiryMeta(row);
+      const isExpiredAvailable = expiryMeta.isExpired;
+      const resolutionLabel = getEntryResolutionLabel(row);
       const traceHtml = (!isCollapsed && traceRows.length)
         ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(trace.createdAt))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${formatUsageAmount(trace.kilosUsed)}</td><td>${escapeHtml(trace.expiryDateAtProduction || '-')}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml(trace.productionId)}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button></td></tr>`).join('') : '';
-      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(row.entryDateTime)}</td><td>${escapeHtml(row.ingredientName)}</td><td>${row.qtyKg.toFixed(2)} kg</td><td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><div class="inventario-entry-actions">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expand-toggle-collapse="${row.entryId}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(row.invoiceImageUrls)}</div></td></tr>${traceHtml}`;
+      return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(row.entryDateTime)}</td><td>${escapeHtml(row.ingredientName)}</td><td>${row.qtyKg.toFixed(2)} kg</td><td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)} ${isExpiredAvailable ? '<span class="inventario-expired-badge">EXPIRADO</span>' : ''} ${resolutionLabel ? `<span class="inventario-resolution-badge">${escapeHtml(resolutionLabel)}</span>` : ''}</td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><div class="inventario-entry-actions">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expand-toggle-collapse="${row.entryId}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(row.invoiceImageUrls)}</div></td></tr>${traceHtml}`;
     }).join('') : '<tr><td colspan="7" class="text-center">Sin ingresos en ese rango.</td></tr>';
 
     const renderExpandedContent = (popup) => {
@@ -2458,6 +2529,15 @@
   nodes.viewerImage?.addEventListener('error', () => {
     nodes.viewerStageSpinner?.classList.add('d-none');
   });
+
+  window.laJamoneraInventarioAPI = {
+    ...(window.laJamoneraInventarioAPI || {}),
+    resolveExpiredEntryStock,
+    refreshInventarioData: async () => {
+      await loadData();
+      renderList();
+    }
+  };
 
   inventarioModal.addEventListener('hide.bs.modal', snapshotEditorDraft);
   inventarioModal.addEventListener('hidden.bs.modal', () => inventarioModal.removeAttribute('inert'));
