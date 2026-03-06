@@ -6524,6 +6524,9 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-trace-zoom-value {
+  display: flex;
+  justify-content: center;
+  align-items: center;
   min-width: 58px;
   text-align: center;
   font-weight: 800;
@@ -6532,6 +6535,7 @@ html.login-protected.auth-ok body {
   border: 1px solid #d7e2f8;
   border-radius: 10px;
   padding: 4px 8px;
+  min-height: 36px;
 }
 
 .produccion-trace-ingredient-card {
@@ -6618,6 +6622,7 @@ html.login-protected.auth-ok body {
   background: transparent;
   padding: 12px;
   margin-bottom: 14px;
+  overflow: hidden;
 }
 
 .produccion-trace-mermaid {
@@ -6658,9 +6663,13 @@ html.login-protected.auth-ok body {
   }
 
   .produccion-trace-zoom-value {
+    display: flex;
+    justify-content: center;
+    align-items: center;
     min-width: 52px;
     padding: 4px 6px;
     font-size: 0.86rem;
+    min-height: 36px;
   }
 
   .produccion-trace-lot-head {
