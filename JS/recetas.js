@@ -329,13 +329,14 @@
   const updateRnpaFilterButtons = (recipes = []) => {
     const counts = recipes.reduce((acc, recipe) => {
       const bucket = getRecipeRnpaFilterBucket(recipe);
+      acc.all += 1;
       if (bucket === 'none') acc.none += 1;
       if (bucket === 'warning') acc.warning += 1;
       if (bucket === 'danger') acc.danger += 1;
       return acc;
-    }, { none: 0, warning: 0, danger: 0 });
+    }, { all: 0, none: 0, warning: 0, danger: 0 });
 
-    ['none', 'warning', 'danger'].forEach((key) => {
+    ['all', 'none', 'warning', 'danger'].forEach((key) => {
       const button = recetasData?.querySelector(`[data-rnpa-filter="${key}"]`);
       const badge = recetasData?.querySelector(`[data-rnpa-filter-count="${key}"]`);
       if (!button || !badge) return;
@@ -343,7 +344,6 @@
       button.classList.toggle('is-active', state.rnpaFilter === key);
       button.disabled = count === 0;
       badge.textContent = String(count);
-      badge.classList.toggle('d-none', count === 0);
     });
   };
 
@@ -2679,7 +2679,7 @@
     const rnpaFilterBtn = event.target.closest('[data-rnpa-filter]');
     if (rnpaFilterBtn) {
       const selected = normalizeValue(rnpaFilterBtn.dataset.rnpaFilter);
-      state.rnpaFilter = state.rnpaFilter === selected ? 'all' : selected;
+      state.rnpaFilter = selected || 'all';
       renderRecetas();
       return;
     }

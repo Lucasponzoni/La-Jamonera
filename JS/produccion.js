@@ -2051,13 +2051,18 @@
   const renderModalRneBadge = () => {
     if (!nodes.modalTitle) return;
     const meta = getRneExpiryMeta();
-    const attachmentBadge = `<span class="produccion-modal-rne-badge ${meta.hasAttachment ? 'is-ok' : 'is-warning'}"><i class="bi bi-paperclip"></i>${meta.hasAttachment ? 'RNE adjunto' : 'Sin adjunto'}</span>`;
-    if (!meta.visible) {
+    const attachmentLabel = meta.hasAttachment ? 'RNE adjunto' : 'Sin adjunto';
+    let expiryBadge = '';
+    if (meta.days != null) {
+      const expiryLabel = meta.days < 0 ? `Vencido hace ${Math.abs(meta.days)} días` : `Vence en ${meta.days} días`;
+      expiryBadge = `<span class="produccion-modal-rne-badge ${meta.tone === 'danger' ? 'is-danger' : meta.tone === 'warning' ? 'is-warning' : 'is-ok'}"><i class="bi bi-clock-history"></i>${escapeHtml(expiryLabel)}</span>`;
+    }
+    const attachmentBadge = `<span class="produccion-modal-rne-badge ${meta.hasAttachment ? 'is-ok' : 'is-warning'}"><i class="bi bi-paperclip"></i>${attachmentLabel}</span>`;
+    if (!expiryBadge) {
       nodes.modalTitle.innerHTML = `Producción <span class="produccion-modal-rne-badges">${attachmentBadge}</span>`;
       return;
     }
-    const expiryLabel = meta.days < 0 ? `RNE vencido` : `RNE ${meta.days} días`;
-    nodes.modalTitle.innerHTML = `Producción <span class="produccion-modal-rne-badges"><span class="produccion-modal-rne-badge ${meta.tone === 'danger' ? 'is-danger' : meta.tone === 'warning' ? 'is-warning' : 'is-ok'}"><i class="bi bi-clock-history"></i>${escapeHtml(expiryLabel)}</span>${attachmentBadge}</span>`;
+    nodes.modalTitle.innerHTML = `Producción <span class="produccion-modal-rne-badges">${attachmentBadge}${expiryBadge}</span>`;
   };
 
   const renderList = () => {
