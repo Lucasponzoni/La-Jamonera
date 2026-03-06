@@ -850,6 +850,8 @@
     }
     return { badge: baseLabel, status };
   };
+  const isBlueResolutionStatus = (status) => ['decommissioned', 'sold_counter'].includes(normalizeValue(status));
+
   const getEntryResolutionRowData = (entry) => {
     const meta = getEntryResolutionMeta(entry);
     if (!meta.badge) return null;
@@ -861,6 +863,7 @@
     const resolvedKg = resolvedKgRaw > 0 ? resolvedKgRaw : Math.max(0, totalKg - availableKg);
     return {
       badge: meta.badge,
+      status: meta.status,
       at: Number(latest?.createdAt || entry?.createdAt || 0),
       resolvedKg: Number(resolvedKg.toFixed(2)),
       availableKg: Number(availableKg.toFixed(3))
@@ -907,6 +910,7 @@
       const resolutionRow = getEntryResolutionRowData(entry);
       rows.push({
         __isTrace: false,
+        __tone: 'normal',
         fechaHora: formatDateTime(entry.createdAt),
         fechaCaducidad: entry.expiryDate || '-',
         cantidad: `${Number(entry.qty || 0).toFixed(2)} ${entry.unit || ''} · disp. ${getAvailableKg(entry).toFixed(3)} kg`,
@@ -917,6 +921,7 @@
       if (resolutionRow) {
         rows.push({
           __isTrace: true,
+          __tone: isBlueResolutionStatus(resolutionRow.status) ? 'resolution' : 'normal',
           fechaHora: formatDateTime(resolutionRow.at),
           fechaCaducidad: resolutionRow.badge,
           cantidad: `-${resolutionRow.resolvedKg.toFixed(2)} kilos · disp. ${resolutionRow.availableKg.toFixed(3)} kg`,
@@ -953,7 +958,7 @@
           'N° factura': entry.invoiceNumber || '-',
           Proveedor: providerLabel(entry.provider),
           Imágenes: 'Resolución',
-          __tone: 'resolution'
+          __tone: isBlueResolutionStatus(resolutionRow.status) ? 'resolution_yellow' : 'normal'
         });
       }
       if (includeTrace) {
@@ -1108,7 +1113,7 @@
 
     const printableRows = buildPrintableRowsForEntries(entries, includeTrace);
     const rows = printableRows.map((row, index) => `
-      <tr class="inventario-row-tone ${row.__isTrace ? 'is-trace-row' : (index % 2 === 0 ? 'is-even-row' : 'is-odd-row')}">
+      <tr class="inventario-row-tone ${row.__tone === 'resolution' ? 'is-resolution-row-print' : row.__isTrace ? 'is-trace-row' : (index % 2 === 0 ? 'is-even-row' : 'is-odd-row')}">
         <td>${escapeHtml(row.__isTrace ? `↳ ${row.fechaHora}` : row.fechaHora)}</td>
         <td>${escapeHtml(row.fechaCaducidad)}</td>
         <td>${escapeHtml(row.cantidad)}</td>
@@ -1134,6 +1139,7 @@
             th,td{border:1px solid #d7def2;padding:8px;text-align:left;font-size:13px;vertical-align:top}
             th{background:#eef3ff}
             .is-trace-row td{background:#ffecef}
+            .is-resolution-row-print td{background:#fff6d9}
           </style>
         </head>
         <body>
@@ -1253,7 +1259,7 @@
       const tableRows = productRows.flatMap((row) => {
         const mainRow = `<tr><td>${escapeHtml(row.entryDateTime)}</td><td>${row.qtyKg.toFixed(2)} kg<br><small>disp. ${Number(row.availableKg || 0).toFixed(3)} kg</small></td><td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td>${includeImages ? (row.invoiceImageUrls?.length ? `Ver adjunto (${row.invoiceImageUrls.length})` : 'Sin imagen') : (row.invoiceImageUrls?.length ? `Posee ${row.invoiceImageUrls.length} imagen/es` : 'Sin imagen')}</td></tr>`;
         const resolution = getEntryResolutionRowData(row);
-        const resolutionRow = resolution ? `<tr style="background:#eaf1ff;"><td>${escapeHtml(`↳ ${formatDateTime(resolution.at)}`)}</td><td>${escapeHtml(`-${resolution.resolvedKg.toFixed(2)} kilos`)}</td><td>${escapeHtml(resolution.badge)}</td><td>${escapeHtml(row.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(row.provider || '-')}</td><td>Resolución</td></tr>` : '';
+        const resolutionRow = resolution ? `<tr style="background:#fff6d9;"><td>${escapeHtml(`↳ ${formatDateTime(resolution.at)}`)}</td><td>${escapeHtml(`-${resolution.resolvedKg.toFixed(2)} kilos`)}</td><td>${escapeHtml(resolution.badge)}</td><td>${escapeHtml(row.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(row.provider || '-')}</td><td>Resolución</td></tr>` : '';
         if (!includeTrace) return [mainRow, resolutionRow].filter(Boolean);
         const traceRows = buildTraceRowsForEntry(row).map((trace) => `<tr style="background:#ffecef;"><td>${escapeHtml(`↳ ${trace.fechaHora}`)}</td><td>${escapeHtml(trace.cantidad)}</td><td>${escapeHtml(trace.factura)}</td><td>${escapeHtml(trace.proveedor)}</td><td class="inventario-provider-cell">Trazabilidad</td><td></td></tr>`);
         return [mainRow, resolutionRow, ...traceRows].filter(Boolean);
@@ -1515,7 +1521,11 @@
         }, {});
         const row = ws.addRow(rowData);
         row.height = 21;
-        const tone = data.__tone === 'trace' ? 'FFEAF2FF' : data.__tone === 'resolution' ? 'FFDDEBFF' : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
+        const tone = data.__tone === 'trace'
+          ? 'FFFFECEF'
+          : data.__tone === 'resolution_yellow'
+            ? 'FFFFF6D9'
+            : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
         row.eachCell((cell) => {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tone } };
           cell.border = {
@@ -2584,6 +2594,7 @@
   nodes.globalExcelBtn?.addEventListener('click', async () => {
     const rows = getGlobalFilteredEntries();
     const payload = rows.flatMap((row) => {
+      const resolutionRow = getEntryResolutionRowData(row);
       const main = {
         'Fecha y hora': row.entryDateTime,
         Producto: row.ingredientName,
@@ -2595,6 +2606,16 @@
         __firstImage: row.invoiceImageUrls[0] || '',
         __tone: 'normal'
       };
+      const resolution = resolutionRow ? {
+        'Fecha y hora': `↳ ${formatDateTime(resolutionRow.at)}`,
+        Producto: row.ingredientName,
+        Kilos: `-${resolutionRow.resolvedKg.toFixed(2)} kg`,
+        Cantidad: resolutionRow.badge,
+        'N° factura': row.invoiceNumber,
+        Proveedor: providerLabel(row.provider),
+        Imágenes: 'Resolución',
+        __tone: isBlueResolutionStatus(resolutionRow.status) ? 'resolution_yellow' : 'normal'
+      } : null;
       const traces = buildTraceRowsForEntry(row).map((trace) => ({
         'Fecha y hora': `↳ ${trace.fechaHora}`,
         Producto: row.ingredientName,
@@ -2605,7 +2626,7 @@
         Imágenes: 'Trazabilidad',
         __tone: 'trace'
       }));
-      return [main, ...traces];
+      return [main, resolution, ...traces].filter(Boolean);
     });
     await makeWorkbook({
       fileName: `inventario_periodo_${Date.now()}.xlsx`,
