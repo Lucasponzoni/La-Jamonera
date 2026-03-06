@@ -13,6 +13,7 @@
   const LOT_SEPARATORS = ['.', '-', '_', ',', ';', '|'];
   const PAGE_SIZE = 10;
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  const ALLOWED_RNE_UPLOAD_TYPES = [...ALLOWED_UPLOAD_TYPES, 'application/pdf'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
 
   const $ = (id) => document.getElementById(id);
@@ -27,6 +28,8 @@
     createIngredientBtn: $('inventarioCreateIngredientBtn'),
     toolbarCreateBtn: $('inventarioToolbarCreateIngredientBtn'),
     configBtn: $('inventarioConfigBtn'),
+    providersRneBtn: $('inventarioProvidersRneBtn'),
+    providersRneAlert: $('inventarioProvidersRneAlert'),
     editorWrap: $('inventarioEditor'),
     editorForm: $('inventarioEditorForm'),
     editorTitle: $('inventarioEditorTitle'),
@@ -76,7 +79,8 @@
     viewerIndex: 0,
     viewerScale: 1,
     entryCollapseByIngredient: {},
-    globalEntryCollapse: {}
+    globalEntryCollapse: {},
+    providerRneFilter: 'all'
   };
 
   const safeObject = (value) => (value && typeof value === 'object' ? value : {});
@@ -135,17 +139,147 @@
     return `${match[1]}-${match[2]}-${match[3]}`;
   };
 
+  const formatIsoDateEs = (isoDate) => {
+    const match = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(normalizeValue(isoDate));
+    if (!match) return '-';
+    return `${match[3]}/${match[2]}/${match[1]}`;
+  };
+
   const parseNumber = (value) => {
     const parsed = Number(normalizeValue(value).replace(',', '.'));
     return Number.isFinite(parsed) ? parsed : NaN;
   };
 
-  const providerLabel = (value) => normalizeValue(value) || 'No indica';
-  const sortedProviders = () => [...(Array.isArray(state.inventario?.config?.providers) ? state.inventario.config.providers : [])]
-    .map((item) => normalizeUpper(item))
-    .filter(Boolean)
-    .filter((item, index, arr) => arr.indexOf(item) === index)
-    .sort((a, b) => a.localeCompare(b, 'es'));
+  const getDefaultProviderRne = () => ({
+    number: '',
+    expiryDate: '',
+    attachmentUrl: '',
+    attachmentType: '',
+    updatedAt: 0,
+    history: []
+  });
+
+  const getDefaultProvider = () => ({
+    id: makeId('provider'),
+    name: '',
+    createdAt: Date.now(),
+    rne: getDefaultProviderRne()
+  });
+
+  const normalizeProvider = (item) => {
+    if (typeof item === 'string') {
+      const name = normalizeUpper(item);
+      if (!name) return null;
+      return {
+        ...getDefaultProvider(),
+        name
+      };
+    }
+
+    const source = safeObject(item);
+    const name = normalizeUpper(source.name || source.label || source.provider);
+    if (!name) return null;
+
+    return {
+      ...getDefaultProvider(),
+      ...source,
+      id: normalizeValue(source.id) || makeId('provider'),
+      name,
+      rne: {
+        ...getDefaultProviderRne(),
+        ...safeObject(source.rne),
+        history: Array.isArray(source?.rne?.history) ? source.rne.history : []
+      }
+    };
+  };
+
+  const getProviders = () => (Array.isArray(state.inventario?.config?.providers) ? state.inventario.config.providers : [])
+    .map((item) => normalizeProvider(item))
+    .filter(Boolean);
+
+  const sortedProviders = () => getProviders().sort((a, b) => a.name.localeCompare(b.name, 'es'));
+
+  const findProviderById = (providerId) => {
+    const id = normalizeValue(providerId);
+    if (!id) return null;
+    return getProviders().find((item) => item.id === id) || null;
+  };
+
+  const findProviderByName = (providerName) => {
+    const name = normalizeUpper(providerName);
+    if (!name) return null;
+    return getProviders().find((item) => normalizeUpper(item.name) === name) || null;
+  };
+
+  const resolveProvider = (value) => {
+    const raw = normalizeValue(value);
+    if (!raw) return null;
+    return findProviderById(raw) || findProviderByName(raw);
+  };
+
+  const providerLabel = (value) => {
+    const provider = resolveProvider(value);
+    if (provider?.name) return provider.name;
+    return normalizeValue(value) || 'No indica';
+  };
+
+  const providerInitials = (name) => {
+    const tokens = normalizeValue(name).split(/\s+/).filter(Boolean);
+    if (!tokens.length) return 'PR';
+    if (tokens.length === 1) return tokens[0].slice(0, 2).toUpperCase();
+    return `${tokens[0][0] || ''}${tokens[1][0] || ''}`.toUpperCase();
+  };
+
+  const getRneRemainingDays = (expiryIso) => {
+    const expiry = new Date(`${normalizeValue(expiryIso)}T00:00:00`);
+    if (Number.isNaN(expiry.getTime())) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Math.round((expiry.getTime() - today.getTime()) / 86400000);
+  };
+
+  const getProviderRneStatus = (provider) => {
+    const rne = safeObject(provider?.rne);
+    const hasRne = Boolean(normalizeValue(rne.number) || normalizeValue(rne.attachmentUrl));
+    if (!hasRne) {
+      return { key: 'none', label: 'Sin RNE', tone: 'info', helper: 'Podés cargarlo más tarde.' };
+    }
+    const remainingDays = getRneRemainingDays(rne.expiryDate);
+    if (remainingDays == null) {
+      return { key: 'all', label: 'RNE cargado', tone: 'success', helper: 'Sin fecha de caducidad declarada.' };
+    }
+    if (remainingDays < 0) {
+      return { key: 'danger', label: 'RNE vencido', tone: 'danger', helper: `Venció hace ${Math.abs(remainingDays)} día(s).` };
+    }
+    if (remainingDays < 60) {
+      return { key: 'danger', label: 'Vence en menos de 60 días', tone: 'danger', helper: `Vence en ${remainingDays} día(s).` };
+    }
+    if (remainingDays < 180) {
+      return { key: 'warning', label: 'Vence en menos de 6 meses', tone: 'warning', helper: `Vence en ${remainingDays} día(s).` };
+    }
+    return { key: 'all', label: 'RNE al día', tone: 'success', helper: `Vence en ${remainingDays} día(s).` };
+  };
+
+
+  const createProviderWithName = (name) => ({
+    ...getDefaultProvider(),
+    name: normalizeUpper(name)
+  });
+
+  const saveProviderInConfig = (provider) => {
+    const next = sortedProviders().filter((item) => item.id !== provider.id && normalizeUpper(item.name) !== normalizeUpper(provider.name));
+    next.push(provider);
+    state.inventario.config.providers = next;
+    normalizeProvidersConfig();
+  };
+
+  const buildProviderRneHistoryEntry = (source) => ({
+    number: normalizeValue(source?.number),
+    expiryDate: normalizeValue(source?.expiryDate),
+    attachmentUrl: normalizeValue(source?.attachmentUrl),
+    attachmentType: normalizeValue(source?.attachmentType),
+    savedAt: Date.now()
+  });
 
   const measureKey = (value) => normalizeLower(value);
   const getMeasureLabel = (name) => {
@@ -300,7 +434,22 @@
     state.inventario.indexes.byDate = byDate;
   };
 
+
+  const normalizeProvidersConfig = () => {
+    const seen = new Set();
+    const providers = getProviders()
+      .filter((provider) => {
+        const key = normalizeUpper(provider.name);
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+    state.inventario.config.providers = providers;
+  };
+
   const persistInventario = async () => {
+    normalizeProvidersConfig();
     await window.laJamoneraReady;
     await window.dbLaJamoneraRest.write('/inventario', state.inventario);
   };
@@ -325,11 +474,12 @@
         globalLowThresholdKg: Number(inv?.config?.globalLowThresholdKg) >= 0 ? Number(inv.config.globalLowThresholdKg) : DEFAULT_LOW_THRESHOLD,
         expiringSoonDays: Number(inv?.config?.expiringSoonDays) >= 0 ? Number(inv.config.expiringSoonDays) : DEFAULT_EXPIRING_SOON_DAYS,
         providers: Array.isArray(inv?.config?.providers)
-          ? inv.config.providers.map((item) => normalizeUpper(item)).filter(Boolean)
+          ? inv.config.providers.map((item) => normalizeProvider(item)).filter(Boolean)
           : []
       },
       items: safeObject(inv?.items)
     };
+    normalizeProvidersConfig();
     rebuildInventarioIndexes();
   };
 
@@ -375,6 +525,36 @@
     await window.laJamoneraReady;
     const value = await window.dbLaJamoneraRest.read('/passGeneral/pass');
     return normalizeValue(value);
+  };
+
+  const requestGeneralPasswordConfirmation = async ({ title, text, subtext }) => {
+    const result = await openIosSwal({
+      title,
+      html: `<div class="swal-stack-fields"><p>${text}</p><p><small>${subtext}</small></p><input id="inventarioSecurePass" type="password" class="swal2-input ios-input" placeholder="Contraseña general" autocomplete="new-password" name="inventario-secure-pass" autocapitalize="off" autocorrect="off" spellcheck="false"></div>`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Confirmar',
+      cancelButtonText: 'Cancelar',
+      didOpen: () => {
+        const passNode = document.getElementById('inventarioSecurePass');
+        if (passNode) {
+          passNode.value = '';
+          passNode.setAttribute('readonly', 'readonly');
+          setTimeout(() => passNode.removeAttribute('readonly'), 60);
+          passNode.focus({ preventScroll: true });
+        }
+      },
+      preConfirm: async () => {
+        const entered = normalizeValue(document.getElementById('inventarioSecurePass')?.value);
+        const remote = await getGeneralPassword();
+        if (!entered || !remote || entered !== remote) {
+          Swal.showValidationMessage('Contraseña general incorrecta.');
+          return false;
+        }
+        return true;
+      }
+    });
+    return result.isConfirmed;
   };
 
   const waitPrintAssets = async (printWindow) => {
@@ -453,6 +633,46 @@
       </button>`).join('');
   };
 
+
+  const getProviderRneCounts = () => {
+    const providers = sortedProviders();
+    return providers.reduce((acc, provider) => {
+      const status = getProviderRneStatus(provider);
+      acc.all += 1;
+      if (status.key === 'none') acc.none += 1;
+      if (status.key === 'warning') acc.warning += 1;
+      if (status.key === 'danger') acc.danger += 1;
+      return acc;
+    }, { all: 0, none: 0, warning: 0, danger: 0 });
+  };
+
+  const renderProviderRneAlert = () => {
+    const counts = getProviderRneCounts();
+    const hasIssues = counts.none > 0 || counts.warning > 0 || counts.danger > 0;
+
+    if (nodes.providersRneBtn) {
+      nodes.providersRneBtn.innerHTML = `<i class="fa-solid fa-file-shield"></i><span>RNE</span>${hasIssues ? `<strong class="inventario-rne-alert-badge">${counts.none + counts.warning + counts.danger}</strong>` : ''}`;
+    }
+
+    if (!nodes.providersRneAlert) return;
+    if (!counts.all) {
+      nodes.providersRneAlert.classList.add('d-none');
+      nodes.providersRneAlert.innerHTML = '';
+      return;
+    }
+
+    nodes.providersRneAlert.classList.remove('d-none');
+    nodes.providersRneAlert.innerHTML = `
+      <p class="inventario-rne-alert-title"><i class="bi bi-file-earmark-check"></i> Resumen informativo de RNE de proveedores</p>
+      <p class="inventario-rne-alert-copy">Este bloque es solo informativo para detectar rápido qué proveedores requieren atención de RNE.</p>
+      <ul class="inventario-rne-alert-list">
+        <li><span>Total de proveedores</span><strong>${counts.all}</strong></li>
+        <li><span>Sin RNE cargado</span><strong>${counts.none}</strong></li>
+        <li><span>Vencen en menos de 6 meses</span><strong>${counts.warning}</strong></li>
+        <li><span>Vencen en menos de 60 días o vencidos</span><strong>${counts.danger}</strong></li>
+      </ul>`;
+  };
+
   const renderFamilies = () => {
     const families = Object.values(state.familias).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     const allBtn = `
@@ -474,6 +694,7 @@
 
   const renderList = () => {
     renderStatusFilters();
+    renderProviderRneAlert();
     const items = filteredIngredients();
     if (!items.length) {
       nodes.list.innerHTML = '<div class="ingrediente-empty-list">No encontramos ingredientes para inventario.</div>';
@@ -1690,8 +1911,8 @@
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryProvider"><i class="fa-solid fa-truck-field inventario-step-icon"></i> Proveedor</label>
             <select id="inventoryProvider" class="form-select ios-input" autocomplete="off">
-              <option value="">Seleccionar proveedor (opcional)</option>
-              ${providers.map((provider) => `<option value="${escapeHtml(provider)}" ${normalizeUpper(state.editorDraft.provider) === provider ? 'selected' : ''}>${escapeHtml(provider)}</option>`).join('')}
+              <option value="">Seleccionar proveedor (opcional, podés cargar el RNE más tarde)</option>
+              ${providers.map((provider) => `<option value="${escapeHtml(provider.id)}" ${normalizeValue(state.editorDraft.provider) === provider.id ? 'selected' : ''}>${escapeHtml(provider.name)}</option>`).join('')}
               <option value="add_provider">+ Agregar proveedor</option>
             </select>
           </div>
@@ -1887,24 +2108,89 @@
 
       const result = await openIosSwal({
         title: 'Agregar proveedor',
-        html: '<input id="newProviderName" class="swal2-input ios-input" placeholder="Nombre del proveedor">',
+        html: `<div class="swal-stack-fields">
+          <input id="newProviderName" class="swal2-input ios-input" placeholder="Nombre del proveedor">
+          <p class="text-start"><small><strong>Opcional:</strong> podés cargar el RNE ahora o hacerlo más tarde.</small></p>
+          <input id="newProviderRneNumber" class="swal2-input ios-input" placeholder="RNE (opcional)">
+          <input id="newProviderRneExpiry" class="swal2-input ios-input" placeholder="Vencimiento RNE (opcional)">
+          <input id="newProviderRneFile" class="swal2-input ios-input image-file-input" type="file" accept="image/*,application/pdf">
+        </div>`,
         showCancelButton: true,
         confirmButtonText: 'Guardar',
         cancelButtonText: 'Cancelar',
-        preConfirm: () => {
-          const provider = normalizeUpper(document.getElementById('newProviderName')?.value);
-          if (!provider) {
+        willOpen: () => {
+          const expiryInput = document.getElementById('newProviderRneExpiry');
+          const numberInput = document.getElementById('newProviderRneNumber');
+          numberInput?.addEventListener('input', () => {
+            numberInput.value = numberInput.value.replace(/[^0-9-]/g, '');
+          });
+          if (window.flatpickr && expiryInput) {
+            window.flatpickr(expiryInput, {
+              locale: window.flatpickr.l10ns?.es || undefined,
+              dateFormat: 'Y-m-d',
+              altInput: true,
+              altFormat: 'd/m/Y',
+              allowInput: true,
+              disableMobile: true
+            });
+          }
+        },
+        preConfirm: async () => {
+          const name = normalizeUpper(document.getElementById('newProviderName')?.value);
+          const rneNumber = normalizeValue(document.getElementById('newProviderRneNumber')?.value);
+          const rneExpiry = normalizeIsoDate(document.getElementById('newProviderRneExpiry')?.value);
+          const rneFile = document.getElementById('newProviderRneFile')?.files?.[0] || null;
+
+          if (!name) {
             Swal.showValidationMessage('Completá el nombre del proveedor.');
             return false;
           }
-          return provider;
+          if (rneNumber && !/^[0-9-]+$/.test(rneNumber)) {
+            Swal.showValidationMessage('El número de RNE solo admite dígitos y guion (-).');
+            return false;
+          }
+          if (rneFile && !ALLOWED_RNE_UPLOAD_TYPES.includes(rneFile.type)) {
+            Swal.showValidationMessage('Adjunto RNE inválido. Permitido: PDF o imagen.');
+            return false;
+          }
+          if (rneFile && rneFile.size > MAX_UPLOAD_SIZE_BYTES) {
+            Swal.showValidationMessage('El adjunto RNE supera 5MB.');
+            return false;
+          }
+
+          let attachmentUrl = '';
+          if (rneFile) {
+            attachmentUrl = await uploadImageToStorage(rneFile, 'inventario/proveedores/rne');
+          }
+
+          return {
+            name,
+            rne: {
+              ...getDefaultProviderRne(),
+              number: rneNumber,
+              expiryDate: rneExpiry,
+              attachmentUrl,
+              attachmentType: rneFile?.type || '',
+              updatedAt: Date.now()
+            }
+          };
         }
       });
 
       if (result.isConfirmed) {
-        const merged = new Set([...(state.inventario.config.providers || []), result.value]);
-        state.inventario.config.providers = [...merged].map((item) => normalizeUpper(item)).filter(Boolean).sort((a, b) => a.localeCompare(b, 'es'));
-        state.editorDraft.provider = result.value;
+        const existing = findProviderByName(result.value.name);
+        const provider = existing
+          ? {
+            ...existing,
+            rne: {
+              ...getDefaultProviderRne(),
+              ...safeObject(existing.rne),
+              ...safeObject(result.value.rne)
+            }
+          }
+          : { ...createProviderWithName(result.value.name), rne: safeObject(result.value.rne) };
+        saveProviderInConfig(provider);
+        state.editorDraft.provider = provider.id;
         await persistInventario();
       }
 
@@ -2227,7 +2513,8 @@
     const entryDate = normalizeValue(nodes.editorForm.querySelector('#inventoryEntryDate')?.value);
     const expiryDate = normalizeValue(nodes.editorForm.querySelector('#inventoryExpiryDate')?.value);
     const invoiceNumber = normalizeValue(nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value);
-    const provider = normalizeUpper(nodes.editorForm.querySelector('#inventoryProvider')?.value);
+    const providerValue = normalizeValue(nodes.editorForm.querySelector('#inventoryProvider')?.value);
+    const provider = providerLabel(providerValue);
     const files = [...(nodes.editorForm.querySelector('#inventoryInvoiceImage')?.files || [])];
     const record = getRecord(ingredientId);
 
@@ -2370,9 +2657,302 @@
       inventarioModal.removeAttribute('inert');
     }
     await loadData();
+    renderProviderRneAlert();
     setStateView(Object.keys(state.ingredientes).length ? 'list' : 'empty');
     renderFamilies();
     renderList();
+  };
+
+
+  const openProviderRneEditor = async (providerId = '') => {
+    const existing = findProviderById(providerId);
+    const provider = existing || createProviderWithName('');
+    const currentRne = safeObject(provider.rne);
+
+    const result = await openIosSwal({
+      title: existing ? `Proveedor: ${escapeHtml(provider.name)}` : 'Nuevo proveedor',
+      html: `<div class="swal-stack-fields text-start">
+        <label class="form-label" for="providerNameInput"><strong>Nombre</strong></label>
+        <input id="providerNameInput" class="swal2-input ios-input" value="${escapeHtml(provider.name)}" placeholder="Nombre del proveedor">
+        <label class="form-label" for="providerRneNumberInput"><strong>RNE</strong></label>
+        <input id="providerRneNumberInput" class="swal2-input ios-input" value="${escapeHtml(currentRne.number || '')}" placeholder="Número de registro (admite guiones)">
+        <label class="form-label" for="providerRneExpiryInput"><strong>Fecha de caducidad</strong></label>
+        <input id="providerRneExpiryInput" class="swal2-input ios-input" value="${escapeHtml(currentRne.expiryDate || '')}" placeholder="Seleccionar fecha">
+        <label class="form-label" for="providerRneFileInput"><strong>Adjunto PDF o imagen</strong></label>
+        <input id="providerRneFileInput" class="form-control ios-input image-file-input" type="file" accept="image/*,application/pdf">
+        ${normalizeValue(currentRne.attachmentUrl) ? '<small>Si subís un nuevo archivo, el actual pasa al historial.</small>' : '<small>Podés cargar el archivo más tarde.</small>'}
+      </div>`,
+      showCancelButton: true,
+      confirmButtonText: 'Guardar',
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        popup: 'inventario-provider-form-alert',
+        htmlContainer: 'inventario-provider-form-html'
+      },
+      willOpen: () => {
+        const numberInput = document.getElementById('providerRneNumberInput');
+        numberInput?.addEventListener('input', () => {
+          numberInput.value = numberInput.value.replace(/[^0-9-]/g, '');
+        });
+        if (window.flatpickr) {
+          const expiryInput = document.getElementById('providerRneExpiryInput');
+          if (expiryInput) {
+            window.flatpickr(expiryInput, {
+              locale: window.flatpickr.l10ns?.es || undefined,
+              dateFormat: 'Y-m-d',
+              altInput: true,
+              altFormat: 'd/m/Y',
+              allowInput: true,
+              disableMobile: true,
+              defaultDate: normalizeValue(currentRne.expiryDate) || undefined
+            });
+          }
+        }
+      },
+      preConfirm: async () => {
+        const name = normalizeUpper(document.getElementById('providerNameInput')?.value);
+        const number = normalizeValue(document.getElementById('providerRneNumberInput')?.value);
+        const expiryDate = normalizeIsoDate(document.getElementById('providerRneExpiryInput')?.value);
+        const file = document.getElementById('providerRneFileInput')?.files?.[0] || null;
+
+        if (!name) {
+          Swal.showValidationMessage('Completá el nombre del proveedor.');
+          return false;
+        }
+        if (number && !/^[0-9-]+$/.test(number)) {
+          Swal.showValidationMessage('El RNE solo admite números y guiones.');
+          return false;
+        }
+        if (file && !ALLOWED_RNE_UPLOAD_TYPES.includes(file.type)) {
+          Swal.showValidationMessage('Adjunto RNE inválido. Permitido: PDF o imagen.');
+          return false;
+        }
+        if (file && file.size > MAX_UPLOAD_SIZE_BYTES) {
+          Swal.showValidationMessage('El adjunto RNE supera 5MB.');
+          return false;
+        }
+
+        let attachmentUrl = normalizeValue(currentRne.attachmentUrl);
+        let attachmentType = normalizeValue(currentRne.attachmentType);
+        const history = Array.isArray(currentRne.history) ? [...currentRne.history] : [];
+
+        if (file) {
+          if (normalizeValue(currentRne.attachmentUrl) || normalizeValue(currentRne.number)) {
+            history.unshift(buildProviderRneHistoryEntry(currentRne));
+          }
+          attachmentUrl = await uploadImageToStorage(file, 'inventario/proveedores/rne');
+          attachmentType = file.type;
+        }
+
+        return {
+          id: provider.id,
+          name,
+          createdAt: Number(provider.createdAt || Date.now()),
+          rne: {
+            ...getDefaultProviderRne(),
+            ...currentRne,
+            number,
+            expiryDate,
+            attachmentUrl,
+            attachmentType,
+            history,
+            updatedAt: Date.now()
+          }
+        };
+      }
+    });
+
+    if (!result.isConfirmed) return false;
+    saveProviderInConfig(result.value);
+    await persistInventario();
+    renderProviderRneAlert();
+    return true;
+  };
+
+  const openProvidersRneManager = async () => {
+    const result = await openIosSwal({
+      title: 'RNE de proveedores',
+      html: `<div class="inventario-provider-manager">
+        <div class="inventario-provider-manager-head">
+          <p class="inventario-provider-manager-copy">Administrá el RNE de cada proveedor (número, vencimiento, adjunto e historial).</p>
+          <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-provider-create-btn" id="inventarioProviderCreateBtn"><i class="fa-solid fa-plus"></i><span>Nuevo proveedor</span></button>
+        </div>
+        <div id="inventarioProviderRneFilters" class="inventario-status-filters"></div>
+        <div id="inventarioProviderRneList" class="inventario-provider-rne-list"></div>
+      </div>`,
+      confirmButtonText: 'Cerrar',
+      showCancelButton: false,
+      customClass: {
+        popup: 'inventario-provider-rne-alert',
+        htmlContainer: 'inventario-provider-rne-html'
+      },
+      didOpen: () => {
+        const popup = Swal.getPopup();
+        const filtersNode = popup.querySelector('#inventarioProviderRneFilters');
+        const listNode = popup.querySelector('#inventarioProviderRneList');
+
+        const renderFilters = () => {
+          const counts = getProviderRneCounts();
+          const options = [
+            { key: 'all', label: 'Todos', tone: 'neutral', count: counts.all },
+            { key: 'none', label: 'Sin RNE', tone: 'info', count: counts.none },
+            { key: 'warning', label: 'Vence en menos de 6 meses', tone: 'warning', count: counts.warning },
+            { key: 'danger', label: 'Vence en menos de 60 días', tone: 'danger', count: counts.danger }
+          ];
+          filtersNode.innerHTML = options.map((option) => `<button type="button" class="inventario-status-btn tone-${option.tone} ${state.providerRneFilter === option.key ? 'is-active' : ''}" data-provider-rne-filter="${option.key}"><span>${option.label}</span><strong>${option.count}</strong></button>`).join('');
+        };
+
+        const renderProviders = () => {
+          const providers = sortedProviders().filter((provider) => {
+            if (state.providerRneFilter === 'all') return true;
+            return getProviderRneStatus(provider).key === state.providerRneFilter;
+          });
+
+          if (!providers.length) {
+            listNode.innerHTML = '<div class="ingrediente-empty-list">No hay proveedores para este filtro.</div>';
+            return;
+          }
+
+          listNode.innerHTML = providers.map((provider) => {
+            const status = getProviderRneStatus(provider);
+            const rne = safeObject(provider.rne);
+            const history = Array.isArray(rne.history) ? rne.history : [];
+            return `<article class="inventario-provider-card">
+              <div class="inventario-provider-avatar">${escapeHtml(providerInitials(provider.name))}</div>
+              <div class="inventario-provider-main">
+                <div class="inventario-provider-head"><strong>${escapeHtml(provider.name)}</strong><span class="inventario-status-chip tone-${status.tone}">${status.label}</span></div>
+                <p class="inventario-provider-meta"><span>RNE</span><strong>${escapeHtml(rne.number || 'Sin cargar')}</strong></p>
+                <p class="inventario-provider-meta"><span>Caducidad</span><strong>${escapeHtml(rne.expiryDate ? formatIsoDateEs(rne.expiryDate) : 'Sin fecha')}</strong></p>
+                <p class="inventario-provider-meta inventario-provider-meta-helper"><small>${escapeHtml(status.helper)}</small></p>
+                <div class="inventario-provider-actions inventario-provider-actions-top">
+                  <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-edit="${provider.id}"><i class="fa-solid fa-pen"></i><span>Editar</span></button>
+                  <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-view="${provider.id}" ${normalizeValue(rne.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i><span>Ver adjunto</span></button>
+                </div>
+                <div class="inventario-provider-actions inventario-provider-actions-bottom">
+                  <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-history="${provider.id}" ${history.length ? '' : 'disabled'}><i class="bi bi-clock-history"></i><span>Historial (${history.length})</span></button>
+                  <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn" data-provider-rne-delete="${provider.id}" ${(normalizeValue(rne.number) || normalizeValue(rne.attachmentUrl)) ? '' : 'disabled'}><i class="fa-solid fa-trash"></i><span>Borrar RNE actual</span></button>
+                </div>
+              </div>
+            </article>`;
+          }).join('');
+        };
+
+        const rerender = () => {
+          renderFilters();
+          renderProviders();
+          renderProviderRneAlert();
+        };
+
+        popup.querySelector('#inventarioProviderCreateBtn')?.addEventListener('click', async () => {
+          const changed = await openProviderRneEditor('');
+          if (changed) rerender();
+        });
+
+        filtersNode.addEventListener('click', (event) => {
+          const button = event.target.closest('[data-provider-rne-filter]');
+          if (!button) return;
+          state.providerRneFilter = button.dataset.providerRneFilter || 'all';
+          rerender();
+        });
+
+        listNode.addEventListener('click', async (event) => {
+          const editBtn = event.target.closest('[data-provider-rne-edit]');
+          if (editBtn) {
+            const changed = await openProviderRneEditor(editBtn.dataset.providerRneEdit || '');
+            if (changed) rerender();
+            return;
+          }
+
+          const viewBtn = event.target.closest('[data-provider-rne-view]');
+          if (viewBtn) {
+            const provider = findProviderById(viewBtn.dataset.providerRneView || '');
+            const attachment = normalizeValue(provider?.rne?.attachmentUrl);
+            if (!attachment) return;
+            await openAttachmentViewer([{ invoiceImageUrls: [attachment] }], 0, `RNE · ${provider.name}`);
+            return;
+          }
+
+          const historyBtn = event.target.closest('[data-provider-rne-history]');
+          if (historyBtn) {
+            const provider = findProviderById(historyBtn.dataset.providerRneHistory || '');
+            const history = Array.isArray(provider?.rne?.history) ? provider.rne.history : [];
+            if (!history.length) return;
+            await openIosSwal({
+              title: `Historial RNE · ${provider.name}`,
+              html: `<div class="produccion-rne-history">${history.map((item, index) => `<article class="produccion-rne-history-item" data-provider-history-item="${provider.id}|${index}"><div><strong>Versión ${index + 1}</strong><p><strong>N° RNE:</strong> ${escapeHtml(item.number || '-')}</p><p><strong>Vencimiento:</strong> ${escapeHtml(item.expiryDate ? formatIsoDateEs(item.expiryDate) : '-')}</p></div><div class="produccion-rne-history-actions">${item.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-history-view="${provider.id}|${index}"><i class="bi bi-eye"></i><span>Ver</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjunto</button>'}<button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn" data-provider-rne-history-delete="${provider.id}|${index}"><i class="fa-solid fa-trash"></i><span>Borrar</span></button></div></article>`).join('')}</div>`,
+              customClass: { popup: 'inventario-provider-history-alert', htmlContainer: 'inventario-provider-rne-html' },
+              didOpen: (modal) => {
+                modal.querySelectorAll('[data-provider-rne-history-view]').forEach((button) => {
+                  button.addEventListener('click', async () => {
+                    const [provId, index] = String(button.dataset.providerRneHistoryView || '').split('|');
+                    const selected = findProviderById(provId);
+                    const item = Array.isArray(selected?.rne?.history) ? selected.rne.history[Number(index)] : null;
+                    const attachment = normalizeValue(item?.attachmentUrl);
+                    if (!attachment) return;
+                    await openAttachmentViewer([{ invoiceImageUrls: [attachment] }], 0, `Historial RNE #${Number(index) + 1}`);
+                  });
+                });
+
+                modal.querySelectorAll('[data-provider-rne-history-delete]').forEach((button) => {
+                  button.addEventListener('click', async () => {
+                    const [provId, indexRaw] = String(button.dataset.providerRneHistoryDelete || '').split('|');
+                    const index = Number(indexRaw);
+                    const selected = findProviderById(provId);
+                    if (!selected) return;
+                    const ok = await requestGeneralPasswordConfirmation({
+                      title: 'Borrar versión del historial',
+                      text: `<strong>${escapeHtml(selected.name)}</strong>: se eliminará solo esta versión de historial.`,
+                      subtext: 'El RNE actual no será modificado.'
+                    });
+                    if (!ok) return;
+                    const nextHistory = Array.isArray(selected.rne?.history) ? [...selected.rne.history] : [];
+                    if (index < 0 || index >= nextHistory.length) return;
+                    nextHistory.splice(index, 1);
+                    selected.rne = { ...getDefaultProviderRne(), ...safeObject(selected.rne), history: nextHistory };
+                    saveProviderInConfig(selected);
+                    await persistInventario();
+                    button.closest('[data-provider-history-item]')?.remove();
+                    rerender();
+                  });
+                });
+              },
+              confirmButtonText: 'Cerrar'
+            });
+            return;
+          }
+
+          const deleteBtn = event.target.closest('[data-provider-rne-delete]');
+          if (deleteBtn) {
+            const provider = findProviderById(deleteBtn.dataset.providerRneDelete || '');
+            if (!provider) return;
+            const ok = await requestGeneralPasswordConfirmation({
+              title: 'Borrar RNE actual del proveedor',
+              text: `<strong>${escapeHtml(provider.name)}</strong>: se eliminará solo el RNE actual.`,
+              subtext: 'El historial se conserva para trazabilidad y podés restaurar/cargar un nuevo RNE.'
+            });
+            if (!ok) return;
+            provider.rne = {
+              ...getDefaultProviderRne(),
+              ...safeObject(provider.rne),
+              number: '',
+              expiryDate: '',
+              attachmentUrl: '',
+              attachmentType: '',
+              updatedAt: Date.now()
+            };
+            saveProviderInConfig(provider);
+            await persistInventario();
+            rerender();
+          }
+        });
+
+        rerender();
+      }
+    });
+
+    if (result.isConfirmed) {
+      renderProviderRneAlert();
+    }
   };
 
   const onListClick = async (event) => {
@@ -2425,6 +3005,7 @@
     try {
       await loadData();
       if (!Object.keys(state.ingredientes).length) {
+        renderProviderRneAlert();
         setStateView('empty');
         return;
       }
@@ -2478,6 +3059,7 @@
   nodes.statusFilters?.addEventListener('click', onListClick);
   nodes.list?.addEventListener('scroll', updateListScrollHint);
   nodes.configBtn?.addEventListener('click', openGlobalConfig);
+  nodes.providersRneBtn?.addEventListener('click', openProvidersRneManager);
   nodes.createIngredientBtn?.addEventListener('click', openCreateIngredient);
   nodes.toolbarCreateBtn?.addEventListener('click', openCreateIngredient);
   nodes.backBtn?.addEventListener('click', backToList);
