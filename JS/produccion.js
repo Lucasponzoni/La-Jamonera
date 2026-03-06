@@ -17,7 +17,8 @@
     historyExcelBtn: document.getElementById('produccionGlobalExcelBtn'),
     historyPrintBtn: document.getElementById('produccionGlobalPrintBtn'),
     historyLoading: document.getElementById('produccionGlobalLoading'),
-    historyTableWrap: document.getElementById('produccionGlobalTableWrap')
+    historyTableWrap: document.getElementById('produccionGlobalTableWrap'),
+    rneAlert: document.getElementById('produccionRneAlert')
   };
   const FIAMBRES_IMAGE = 'https://i.postimg.cc/fyvNDdrt/FIambres.png';
   const BASE_ICON = '<i class="fa-solid fa-drumstick-bite"></i>';
@@ -473,7 +474,7 @@
         return acc;
       }, {});
       const row = ws.addRow(rowData);
-      const tone = data.__tone === 'trace' ? 'FFFFECEF' : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
+      const tone = data.__tone === 'trace' ? 'FFFFECEF' : data.__tone === 'resolution' ? 'FFDDEBFF' : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
       row.eachCell((cell) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tone } };
         cell.border = {
@@ -1018,7 +1019,7 @@
   const openGlobalMinConfig = async () => {
     const currentRne = safeObject(state.config.rne);
     const rneHistoryHtml = (Array.isArray(currentRne.history) && currentRne.history.length)
-      ? `<div class="produccion-rne-history">${currentRne.history.map((item, index) => `<article class="produccion-rne-history-item"><div><strong>Versión ${index + 1}</strong><p><strong>N° RNE:</strong> ${escapeHtml(item.number || '-')}</p><p><strong>Vigencia:</strong> ${escapeHtml(item.validFrom || '-')} → ${item.replacedAt || item.savedAt ? escapeHtml(formatDateTime(item.replacedAt || item.savedAt)) : '-'}</p><p><strong>Vencimiento declarado:</strong> ${escapeHtml(item.expiryDate || '-')}</p></div>${item.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-rne-history="${index}"><i class="fa-regular fa-eye"></i><span>Ver archivo</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjunto</button>'}</article>`).join('')}</div>`
+      ? `<div class="produccion-rne-history">${currentRne.history.map((item, index) => `<article class="produccion-rne-history-item"><div><strong>Versión ${index + 1}</strong><p><strong>N° RNE:</strong> ${escapeHtml(item.number || '-')}</p><p><strong>Vigencia:</strong> ${escapeHtml(formatIsoEs(item.validFrom || ''))} → ${item.replacedAt || item.savedAt ? escapeHtml(formatDateTime(item.replacedAt || item.savedAt)) : '-'}</p><p><strong>Vencimiento declarado:</strong> ${escapeHtml(formatIsoEs(item.expiryDate || ''))}</p></div>${item.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-rne-history="${index}"><i class="bi bi-eye"></i><span>Ver</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjunto</button>'}</article>`).join('')}</div>`
       : '<p class="produccion-rne-history-empty">Aún no hay historial de RNE.</p>';
     const result = await openIosSwal({
       title: 'Configuración de Producción',
@@ -1027,7 +1028,7 @@
           <input id="produccionGlobalMinInput" type="number" min="0" step="0.01" class="swal2-input ios-input" value="${Number(state.config.globalMinKg || 1).toFixed(2)}">
           <section class="recipe-step-card step-block inventario-lot-section mt-2 produccion-config-section">
             <button type="button" class="inventario-collapse-head inventario-collapse-head-styled produccion-config-toggle" id="logoCompanyToggleBtn" aria-expanded="false">
-              <span><span class="recipe-step-number">2</span> <strong>Logo Empresa</strong></span>
+              <span><span class="recipe-step-number">2</span> <i class="bi bi-building"></i> <strong>Logo Empresa</strong></span>
               <span class="inventario-collapse-summary"><strong>Subir, reemplazar y visualizar</strong></span>
             </button>
             <div id="logoCompanyBody" class="step-content d-none">
@@ -1043,7 +1044,7 @@
           </section>
           <section class="recipe-step-card step-block inventario-lot-section mt-2 produccion-config-section">
             <button type="button" class="inventario-collapse-head inventario-collapse-head-styled produccion-config-toggle" id="rneToggleBtn" aria-expanded="false">
-              <span><span class="recipe-step-number">3</span> <strong>RNE – Registro Nacional de Establecimiento</strong></span>
+              <span><span class="recipe-step-number">3</span> <i class="bi bi-shield-check"></i> <strong>RNE – Registro Nacional de Establecimiento</strong></span>
               <span class="inventario-collapse-summary"><strong>Número, vencimiento, adjunto e historial</strong></span>
             </button>
             <div id="rneBody" class="step-content d-none">
@@ -1160,6 +1161,8 @@
             window.flatpickr(expiryInput, {
               locale,
               dateFormat: 'Y-m-d',
+              altInput: true,
+              altFormat: 'd/m/Y',
               allowInput: true,
               disableMobile: true,
               defaultDate: normalizeValue(currentRne.expiryDate) || undefined
@@ -1928,6 +1931,7 @@
   const setHistoryMode = (enabled) => {
     state.historyMode = enabled;
     nodes.search?.closest('.produccion-toolbar')?.classList.toggle('d-none', enabled);
+    nodes.rneAlert?.classList.toggle('d-none', enabled || !getRneExpiryMeta().visible);
     nodes.list?.classList.toggle('d-none', enabled);
     nodes.historyView?.classList.toggle('d-none', !enabled);
   };
@@ -2013,7 +2017,36 @@
     renderHistoryTable();
     await openIosSwal({ title: 'Producción editada', html: `<p>${registro.id} fue recalculada y guardada.</p>`, icon: 'success', confirmButtonText: 'Entendido' });
   };
+
+  const getRneExpiryMeta = () => {
+    const expiryIso = normalizeValue(state.config?.rne?.expiryDate);
+    if (!expiryIso) return { visible: false, days: null, tone: 'none', text: '' };
+    const expiryTs = new Date(`${expiryIso}T00:00:00`).getTime();
+    if (!Number.isFinite(expiryTs)) return { visible: false, days: null, tone: 'none', text: '' };
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days = Math.ceil((expiryTs - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (days > 180) return { visible: false, days, tone: 'none', text: '' };
+    const tone = days <= 90 ? 'danger' : 'warning';
+    const text = days < 0
+      ? `El RNE venció hace ${Math.abs(days)} días (${formatIsoEs(expiryIso)}).`
+      : `El RNE vence en ${days} días (${formatIsoEs(expiryIso)}).`;
+    return { visible: true, days, tone, text };
+  };
+
+  const renderRneExpiryAlert = () => {
+    if (!nodes.rneAlert) return;
+    const meta = getRneExpiryMeta();
+    nodes.rneAlert.className = `produccion-rne-expiry-alert ${meta.visible ? '' : 'd-none'} ${meta.tone === 'danger' ? 'is-danger' : 'is-warning'}`.trim();
+    if (!meta.visible) {
+      nodes.rneAlert.innerHTML = '';
+      return;
+    }
+    nodes.rneAlert.innerHTML = `<i class="bi ${meta.tone === 'danger' ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill'}"></i><span>${escapeHtml(meta.text)}</span>`;
+  };
+
   const renderList = () => {
+    renderRneExpiryAlert();
     const query = normalizeLower(state.search);
     const list = getRecipes()
       .filter((item) => !query || normalizeLower(item.title).includes(query) || normalizeLower(item.description).includes(query))
@@ -2700,6 +2733,19 @@
             Trazabilidad: '-',
             Acciones: '-'
           };
+          const resolutions = (Array.isArray(item?.lots) ? item.lots : [])
+            .flatMap((plan) => (Array.isArray(plan?.lots) ? plan.lots : [])
+              .flatMap((lot) => (Array.isArray(lot?.expiryResolutions) ? lot.expiryResolutions : []).map((res) => ({
+                'ID producción': '↳ RES',
+                'Fecha y hora': formatDateTime(res.createdAt),
+                Producto: item.recipeTitle || '-',
+                'Fabricado (KG.)': `-${Number(res.qtyKg || 0).toFixed(2)} kg`,
+                Responsable: res.type === 'decommissioned' ? 'Decomisado' : 'Vendido mostrador',
+                'VTO producto': formatProductExpiryLabel(item),
+                Trazabilidad: 'Resolución vencido',
+                Acciones: '-',
+                __tone: 'resolution'
+              }))));
           const traces = getTraceRowsFromRegistro(item).map((trace) => ({
             'ID producción': `↳ ${trace.index}`,
             'Fecha y hora': formatDateTime(trace.createdAt),
@@ -2711,7 +2757,7 @@
             Acciones: '-',
             __tone: 'trace'
           }));
-          return [main, ...traces];
+          return [main, ...resolutions, ...traces];
         });
         await exportStyledExcel({
           fileName: `produccion_receta_${normalizeLower(recipe.title || 'receta').replace(/\s+/g, '_')}_${Date.now()}.xlsx`,
@@ -3208,6 +3254,19 @@
         Trazabilidad: '-',
         Acciones: '-'
       };
+      const resolutions = (Array.isArray(item?.lots) ? item.lots : [])
+        .flatMap((plan) => (Array.isArray(plan?.lots) ? plan.lots : [])
+          .flatMap((lot) => (Array.isArray(lot?.expiryResolutions) ? lot.expiryResolutions : []).map((res) => ({
+            'ID producción': '↳ RES',
+            'Fecha y hora': formatDateTime(res.createdAt),
+            Producto: item.recipeTitle || '-',
+            'Fabricado (KG.)': `-${Number(res.qtyKg || 0).toFixed(2)} kg`,
+            Responsable: res.type === 'decommissioned' ? 'Decomisado' : 'Vendido mostrador',
+            'VTO producto': formatProductExpiryLabel(item),
+            Trazabilidad: 'Resolución vencido',
+            Acciones: '-',
+            __tone: 'resolution'
+          }))));
       const traces = getTraceRowsFromRegistro(item).map((trace) => ({
         'ID producción': `↳ ${trace.index}`,
         'Fecha y hora': formatDateTime(trace.createdAt),
@@ -3219,7 +3278,7 @@
         Acciones: '-',
         __tone: 'trace'
       }));
-      return [main, ...traces];
+      return [main, ...resolutions, ...traces];
     });
     await exportStyledExcel({
       fileName: `producciones_periodo_${Date.now()}.xlsx`,
