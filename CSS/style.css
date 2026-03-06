@@ -2965,6 +2965,8 @@ html.login-protected.auth-ok body {
   content: attr(data-placeholder);
   color: #9c6a74;
 }
+.recipe-monography-manual-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.recipe-monography-manual-name{font-size:.75rem;color:#5e6a8b;background:#f2f5ff;border:1px solid #d6def5;padding:4px 8px;border-radius:999px;}
 
 .recipe-table tbody tr.is-dragging {
   opacity: 0.55;
@@ -6882,6 +6884,17 @@ html.login-protected.auth-ok body {
 .receta-rnpa-badge.is-warning{background:#fff4e7;border-color:#f3d4ad;color:#9a621d;}
 .receta-rnpa-badge.is-ok{background:#e9f8ef;border-color:#b6e4c4;color:#1f8a48;}
 .receta-rnpa-days{font-size:.75rem;color:#5f6a89;display:inline-flex;align-items:center;gap:4px;}
+.receta-rnpa-days.is-warning{color:#9a621d;font-weight:700;}
+.receta-rnpa-days.is-danger{color:#a6324a;font-weight:700;}
+.receta-rnpa-days.is-ok{color:#1f8a48;font-weight:700;}
+.recetas-rnpa-filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 12px;}
+.recetas-rnpa-filter{position:relative;border-radius:14px;padding:8px 14px;font-weight:700;border:1px solid #d6dff5;background:#eef3ff;color:#34518f;}
+.recetas-rnpa-filter.is-blue{background:#1f7ae8;color:#fff;border-color:#1f7ae8;}
+.recetas-rnpa-filter.is-orange{background:#fff4e7;color:#9a621d;border-color:#f3d4ad;}
+.recetas-rnpa-filter.is-red{background:#ffecef;color:#a6324a;border-color:#f2b4c0;}
+.recetas-rnpa-filter.is-active{box-shadow:0 0 0 2px rgba(31,122,232,.2) inset;}
+.recetas-rnpa-filter:disabled{opacity:.45;cursor:not-allowed;}
+.recetas-rnpa-filter-count{position:absolute;top:-12px;right:-12px;min-width:34px;height:34px;border-radius:999px;background:#f21f2f;color:#fff;font-weight:800;font-size:1.15rem;line-height:34px;text-align:center;border:4px solid #fff;}
 .recipe-rnpa-block{border:1px solid #dbe3f6;border-radius:14px;padding:10px;background:#f8faff;}
 .recipe-rnpa-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
 .recipe-rnpa-actions{grid-column:1 / -1;display:flex;justify-content:flex-start;}
@@ -6893,4 +6906,10 @@ html.login-protected.auth-ok body {
 .inventario-collapse-head-styled.is-open{background:#e9f1ff;border-color:#b7caf2;}
 .produccion-rne-expiry-alert{display:flex;align-items:center;gap:8px;border-radius:12px;padding:10px 12px;margin-bottom:10px;border:1px solid #f1d3ab;background:#fff4e5;color:#9a5e16;font-weight:600;}
 .produccion-rne-expiry-alert.is-danger{border-color:#f2b4c0;background:#ffecef;color:#a6324a;}
+.produccion-rne-expiry-alert.is-ok{border-color:#b6e4c4;background:#e9f8ef;color:#1f8a48;}
 .produccion-rne-expiry-alert i{font-size:1rem;}
+.produccion-modal-rne-badges{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:8px;}
+.produccion-modal-rne-badge{display:inline-flex;align-items:center;gap:6px;border:1px solid #d7def2;background:#eef3ff;color:#30508f;border-radius:999px;padding:3px 10px;font-size:.72rem;font-weight:700;}
+.produccion-modal-rne-badge.is-warning{background:#fff4e7;border-color:#f3d4ad;color:#9a621d;}
+.produccion-modal-rne-badge.is-danger{background:#ffecef;border-color:#f2b4c0;color:#a6324a;}
+.produccion-modal-rne-badge.is-ok{background:#e9f8ef;border-color:#b6e4c4;color:#1f8a48;}

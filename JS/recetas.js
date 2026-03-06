@@ -27,7 +27,10 @@
     familias: {},
     measures: [],
     recipeCities: ['Rosario'],
+    recipeBrands: [],
+    recipeBusinessNames: [],
     search: '',
+    rnpaFilter: 'all',
     view: 'list',
     activeRecipeId: '',
     editor: null,
@@ -227,6 +230,13 @@
     return '';
   };
 
+  const validateMonographyManualFile = (file) => {
+    if (!file) return '';
+    if (!ALLOWED_RNPA_UPLOAD_TYPES.includes(file.type)) return 'Manual: formato inválido. Permitido PDF o imagen.';
+    if (file.size > MAX_UPLOAD_SIZE_BYTES) return 'Manual: el archivo supera 5MB.';
+    return '';
+  };
+
   const uploadImageToStorage = async (file, basePath) => {
     await window.laJamoneraReady;
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
@@ -275,12 +285,20 @@
     state.recetas = safeObject(await window.dbLaJamoneraRest.read('/recetas'));
     const cfg = safeObject(await window.dbLaJamoneraRest.read('/recetas_config'));
     const cities = Array.isArray(cfg.cities) ? cfg.cities.map((item) => normalizeValue(item)).filter(Boolean) : [];
+    const brands = Array.isArray(cfg.brands) ? cfg.brands.map((item) => normalizeValue(item)).filter(Boolean) : [];
+    const businessNames = Array.isArray(cfg.businessNames) ? cfg.businessNames.map((item) => normalizeValue(item)).filter(Boolean) : [];
     state.recipeCities = Array.from(new Set(['Rosario', ...cities])).sort((a, b) => a.localeCompare(b, 'es'));
+    state.recipeBrands = Array.from(new Set(brands)).sort((a, b) => a.localeCompare(b, 'es'));
+    state.recipeBusinessNames = Array.from(new Set(businessNames)).sort((a, b) => a.localeCompare(b, 'es'));
   };
 
   const persistRecetasConfig = async () => {
     await window.laJamoneraReady;
-    await window.dbLaJamoneraRest.write('/recetas_config', { cities: state.recipeCities });
+    await window.dbLaJamoneraRest.write('/recetas_config', {
+      cities: state.recipeCities,
+      brands: state.recipeBrands,
+      businessNames: state.recipeBusinessNames
+    });
   };
 
   const persistRecetas = async () => {
@@ -292,16 +310,47 @@
   const getRnpaStatus = (recipe) => {
     const rnpa = safeObject(recipe?.rnpa);
     const attachmentUrl = normalizeValue(rnpa.attachmentUrl);
-    if (!attachmentUrl) return { label: 'RNPA pendiente', className: 'is-pending', days: null, icon: 'fa-triangle-exclamation' };
+    if (!attachmentUrl) return { label: 'RNPA pendiente', className: 'is-pending', days: null, icon: 'fa-triangle-exclamation', filterBucket: 'none' };
     const expiryDate = normalizeValue(rnpa.expiryDate);
     const expiryTs = expiryDate ? new Date(`${expiryDate}T00:00:00`).getTime() : Number.NaN;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const days = Number.isFinite(expiryTs) ? Math.ceil((expiryTs - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
-    const nearDanger = days != null && days <= 90;
-    const nearWarning = days != null && days <= 180;
-    const className = nearDanger ? 'is-danger' : nearWarning ? 'is-warning' : 'is-ok';
-    return { label: 'RNPA adjunto', className, days, icon: 'fa-file-shield' };
+    const daysTone = days == null ? 'is-neutral' : days < 60 ? 'is-danger' : days < 180 ? 'is-warning' : 'is-ok';
+    const filterBucket = days == null ? 'none' : days < 60 ? 'danger' : days < 180 ? 'warning' : 'ok';
+    return { label: 'RNPA adjunto', className: 'is-ok', days, daysTone, icon: 'fa-file-shield', filterBucket };
+  };
+
+  const getRecipeRnpaFilterBucket = (recipe) => {
+    const status = getRnpaStatus(recipe);
+    return status.filterBucket || 'none';
+  };
+
+  const updateRnpaFilterButtons = (recipes = []) => {
+    const counts = recipes.reduce((acc, recipe) => {
+      const bucket = getRecipeRnpaFilterBucket(recipe);
+      if (bucket === 'none') acc.none += 1;
+      if (bucket === 'warning') acc.warning += 1;
+      if (bucket === 'danger') acc.danger += 1;
+      return acc;
+    }, { none: 0, warning: 0, danger: 0 });
+
+    ['none', 'warning', 'danger'].forEach((key) => {
+      const button = recetasData?.querySelector(`[data-rnpa-filter="${key}"]`);
+      const badge = recetasData?.querySelector(`[data-rnpa-filter-count="${key}"]`);
+      if (!button || !badge) return;
+      const count = counts[key] || 0;
+      button.classList.toggle('is-active', state.rnpaFilter === key);
+      button.disabled = count === 0;
+      badge.textContent = String(count);
+      badge.classList.toggle('d-none', count === 0);
+    });
+  };
+
+  const getRnpaSelectOptions = (list, selected = '', fieldLabel = 'opción') => {
+    const chosen = normalizeValue(selected);
+    const merged = Array.from(new Set([...(Array.isArray(list) ? list.map((item) => normalizeValue(item)).filter(Boolean) : []), chosen].filter(Boolean))).sort((a, b) => a.localeCompare(b, 'es'));
+    return `<option value="">${fieldLabel}</option>${merged.map((item) => `<option value="${escapeHtml(item)}" ${normalizeLower(item) === normalizeLower(chosen) ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}<option value="__new_value__">+ Agregar</option>`;
   };
 
   const getRnpaCityOptions = (selected = '') => {
@@ -312,9 +361,17 @@
 
   const renderRecetas = () => {
     const query = normalizeLower(state.search);
-    const source = getRecetasArray()
+    const baseSource = getRecetasArray()
       .filter((item) => !query || normalizeLower(item.title).includes(query) || normalizeLower(item.description).includes(query))
       .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+    updateRnpaFilterButtons(baseSource);
+
+    const source = baseSource.filter((item) => {
+      if (state.rnpaFilter === 'none') return getRecipeRnpaFilterBucket(item) === 'none';
+      if (state.rnpaFilter === 'warning') return getRecipeRnpaFilterBucket(item) === 'warning';
+      if (state.rnpaFilter === 'danger') return getRecipeRnpaFilterBucket(item) === 'danger';
+      return true;
+    });
 
     if (!source.length) {
       recetasList.innerHTML = '<div class="ingrediente-empty-list">No encontramos recetas con ese filtro.</div>';
@@ -352,7 +409,7 @@
               </button>
             </div>
             <p class="ingrediente-meta receta-card-meta">Rinde: ${item.yieldQuantity || '0'} ${label || ''}</p>
-            ${(() => { const rnpaStatus = getRnpaStatus(item); const daysText = rnpaStatus.days == null ? '' : `<span class="receta-rnpa-days"><i class="fa-regular fa-hourglass-half"></i>${rnpaStatus.days} días</span>`; return `<div class="receta-rnpa-inline"><span class="receta-rnpa-badge ${rnpaStatus.className}"><i class="fa-solid ${rnpaStatus.icon}"></i>${rnpaStatus.label}</span>${daysText}</div>`; })()} 
+            ${(() => { const rnpaStatus = getRnpaStatus(item); const daysText = rnpaStatus.days == null ? '' : `<span class="receta-rnpa-days ${rnpaStatus.daysTone || 'is-neutral'}"><i class="bi bi-clock-history"></i>${rnpaStatus.days} días</span>`; return `<div class="receta-rnpa-inline"><span class="receta-rnpa-badge ${rnpaStatus.className}"><i class="fa-solid ${rnpaStatus.icon}"></i>${rnpaStatus.label}</span>${daysText}</div>`; })()} 
             <p class="ingrediente-meta receta-card-ingredients">Ingredientes: ${recipeIngredients.length ? recipeIngredients.join(' · ') : 'Sin ingredientes vinculados.'}</p>
             ${item.description ? `<p class="ingrediente-description">${capitalize(item.description)}</p>` : '<p class="ingrediente-description"><em>Sin descripción</em></p>'}
             ${frontLabels.length ? `<div class="receta-front-inline">${buildFrontLabelsHtml(frontLabels, { compact: true })}</div>` : ''}
@@ -363,6 +420,7 @@
           </div>
           <div class="ingrediente-actions recipe-row-actions">
             <button type="button" class="btn family-manage-btn" data-receta-rnpa-view="${item.id}" title="Ver RNPA" ${normalizeValue(item?.rnpa?.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i></button>
+            <button type="button" class="btn family-manage-btn" data-receta-manual-view="${item.id}" title="Ver manual" ${Array.isArray(item?.rows) && item.rows.some((row) => row.type === MONOGRAPHY_ROW_TYPE && normalizeValue(row.manualUrl)) ? '' : 'disabled'}><i class="fa-solid fa-book-open"></i></button>
             <button type="button" class="btn family-manage-btn" data-receta-edit="${item.id}" title="Editar"><i class="fa-solid fa-pen"></i></button>
             <button type="button" class="btn family-manage-btn" data-receta-delete="${item.id}" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
           </div>
@@ -1167,6 +1225,7 @@
     const subcategory = normalizeLower(recipeEditorForm.querySelector('#recipeNutritionSubcategory')?.value || state.editor?.nutrition?.subcategory || '');
     const householdMeasure = normalizeLower(recipeEditorForm.querySelector('#recipeNutritionHouseholdMeasure')?.value || state.editor?.nutrition?.householdMeasure || '');
     const householdAmount = normalizeValue(recipeEditorForm.querySelector('#recipeNutritionHouseholdAmount')?.value || state.editor?.nutrition?.householdAmount || '');
+    const rnpaSource = safeObject(state.editor?.rnpa);
 
     const ingredients = (state.editor?.rows || [])
       .filter((row) => row.type === 'ingredient' && normalizeValue(row.ingredientName))
@@ -1181,16 +1240,16 @@
       description,
       ingredients,
       rnpa: {
-        denomination: normalizeValue(initial?.rnpa?.denomination),
-        brand: normalizeValue(initial?.rnpa?.brand),
-        businessName: normalizeValue(initial?.rnpa?.businessName),
-        city: normalizeValue(initial?.rnpa?.city || 'Rosario'),
-        province: normalizeValue(initial?.rnpa?.province || 'Santa Fe'),
+        denomination: normalizeValue(rnpaSource.denomination),
+        brand: normalizeValue(rnpaSource.brand),
+        businessName: normalizeValue(rnpaSource.businessName),
+        city: normalizeValue(rnpaSource.city || 'Rosario'),
+        province: normalizeValue(rnpaSource.province || 'Santa Fe'),
         country: RNPA_COUNTRY,
-        expiryDate: normalizeValue(initial?.rnpa?.expiryDate),
-        attachmentUrl: normalizeValue(initial?.rnpa?.attachmentUrl),
-        attachmentType: normalizeValue(initial?.rnpa?.attachmentType),
-        attachmentName: normalizeValue(initial?.rnpa?.attachmentName)
+        expiryDate: normalizeValue(rnpaSource.expiryDate),
+        attachmentUrl: normalizeValue(rnpaSource.attachmentUrl),
+        attachmentType: normalizeValue(rnpaSource.attachmentType),
+        attachmentName: normalizeValue(rnpaSource.attachmentName)
       },
       nutrition: {
         productType,
@@ -1205,7 +1264,18 @@
     };
   };
 
-  const getNutritionGenerationHash = () => JSON.stringify(getNutritionGenerationSnapshot());
+  const buildNutritionComparableSnapshot = () => {
+    const snapshot = getNutritionGenerationSnapshot();
+    return {
+      title: snapshot.title,
+      description: snapshot.description,
+      ingredients: snapshot.ingredients,
+      nutrition: snapshot.nutrition
+    };
+  };
+
+  const getNutritionGenerationHash = () => JSON.stringify(buildNutritionComparableSnapshot());
+  const getNutritionGenerationLegacyHash = () => JSON.stringify(getNutritionGenerationSnapshot());
 
   const hasNutritionFieldsForAI = () => {
     const snapshot = getNutritionGenerationSnapshot();
@@ -1252,7 +1322,10 @@
   const isNutritionAiStale = () => {
     const ai = state.editor?.nutrition?.ai;
     if (!ai?.tableHtml) return false;
-    return Boolean(ai.inputHash && ai.inputHash !== getNutritionGenerationHash());
+    if (!ai.inputHash) return false;
+    const currentHash = getNutritionGenerationHash();
+    const legacyHash = getNutritionGenerationLegacyHash();
+    return ![currentHash, legacyHash].includes(ai.inputHash);
   };
 
   const syncSaveButtonWithNutritionState = () => {
@@ -1574,6 +1647,12 @@
                 <button type="button" class="editor-btn" data-mono-cmd="justifyCenter" data-mono-row="${row.id}"><i class="fa-solid fa-align-center"></i></button>
               </div>
               <div class="recipe-monography-editor informe-editor" data-monography-input="${row.id}" contenteditable="true" data-placeholder="Proceso de fabricación / monografía">${row.html || ''}</div>
+              <div class="recipe-monography-manual-row">
+                <input type="file" class="d-none" data-monography-manual-file="${row.id}" accept="image/*,application/pdf">
+                <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-monography-manual-upload="${row.id}"><i class="fa-solid fa-paperclip"></i><span>Adjuntar manual</span></button>
+                <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-monography-manual-view="${row.id}" ${normalizeValue(row.manualUrl) ? '' : 'disabled'}><i class="fa-solid fa-book-open"></i><span>Ver manual</span></button>
+                ${normalizeValue(row.manualName) ? `<span class="recipe-monography-manual-name">${escapeHtml(row.manualName)}</span>` : ''}
+              </div>
             </td>
             <td><button type="button" class="btn family-manage-btn" data-remove-row="${row.id}"><i class="fa-solid fa-trash"></i></button></td>
           </tr>`;
@@ -1690,6 +1769,21 @@
           return;
         }
 
+        const manualUploadBtn = event.target.closest('[data-monography-manual-upload]');
+        if (manualUploadBtn) {
+          const input = recipeEditorForm.querySelector(`[data-monography-manual-file="${manualUploadBtn.dataset.monographyManualUpload}"]`);
+          input?.click();
+          return;
+        }
+
+        const manualViewBtn = event.target.closest('[data-monography-manual-view]');
+        if (manualViewBtn) {
+          const row = state.editor.rows.find((item) => item.id === manualViewBtn.dataset.monographyManualView);
+          const manualUrl = normalizeValue(row?.manualUrl);
+          if (manualUrl) window.open(manualUrl, '_blank', 'noopener,noreferrer');
+          return;
+        }
+
         const removeBtn = event.target.closest('[data-remove-row]');
         if (removeBtn) {
           state.editor.rows = state.editor.rows.filter((row) => row.id !== removeBtn.dataset.removeRow);
@@ -1739,6 +1833,11 @@
           return;
         }
         if (['recipeRnpaDenomination','recipeRnpaBrand','recipeRnpaBusinessName','recipeRnpaExpiryDate'].includes(input.id)) {
+          state.editor.rnpa = state.editor.rnpa || {};
+          if (input.id === 'recipeRnpaDenomination') state.editor.rnpa.denomination = normalizeValue(input.value);
+          if (input.id === 'recipeRnpaBrand') state.editor.rnpa.brand = normalizeValue(input.value);
+          if (input.id === 'recipeRnpaBusinessName') state.editor.rnpa.businessName = normalizeValue(input.value);
+          if (input.id === 'recipeRnpaExpiryDate') state.editor.rnpa.expiryDate = normalizeValue(input.value);
           markEditorDirty();
           return;
         }
@@ -1846,13 +1945,56 @@
             await persistRecetasConfig();
             select.innerHTML = `<option value="">Localidad</option>${getRnpaCityOptions(res.value)}`;
             select.value = res.value;
+            state.editor.rnpa = state.editor.rnpa || {};
+            state.editor.rnpa.city = res.value;
             markEditorDirty();
           } else {
             select.value = state.editor?.rnpa?.city || '';
           }
           return;
         }
-        if (['recipeRnpaProvince', 'recipeRnpaCity', 'recipeRnpaCountry'].includes(select.id)) {
+        if ((select.id === 'recipeRnpaBrand' || select.id === 'recipeRnpaBusinessName') && select.value === '__new_value__') {
+          const isBrand = select.id === 'recipeRnpaBrand';
+          const res = await openIosSwal({
+            title: isBrand ? 'Agregar marca' : 'Agregar razón social',
+            showCancelButton: true,
+            confirmButtonText: 'Guardar',
+            cancelButtonText: 'Cancelar',
+            html: `<input id="recipeRnpaNewValueInput" class="swal2-input ios-input" placeholder="${isBrand ? 'Ej: La Jamonera' : 'Ej: La Jamonera SRL'}">`,
+            preConfirm: () => {
+              const value = normalizeValue(document.getElementById('recipeRnpaNewValueInput')?.value);
+              if (!value) {
+                Swal.showValidationMessage('Ingresá un valor.');
+                return false;
+              }
+              return value;
+            }
+          });
+          if (res.isConfirmed && res.value) {
+            if (isBrand) {
+              state.recipeBrands = Array.from(new Set([...(state.recipeBrands || []), res.value])).sort((a, b) => a.localeCompare(b, 'es'));
+              select.innerHTML = getRnpaSelectOptions(state.recipeBrands, res.value, 'Marca');
+              state.editor.rnpa.brand = res.value;
+            } else {
+              state.recipeBusinessNames = Array.from(new Set([...(state.recipeBusinessNames || []), res.value])).sort((a, b) => a.localeCompare(b, 'es'));
+              select.innerHTML = getRnpaSelectOptions(state.recipeBusinessNames, res.value, 'Razón social');
+              state.editor.rnpa.businessName = res.value;
+            }
+            select.value = res.value;
+            await persistRecetasConfig();
+            markEditorDirty();
+          } else {
+            select.value = isBrand ? (state.editor?.rnpa?.brand || '') : (state.editor?.rnpa?.businessName || '');
+          }
+          return;
+        }
+        if (['recipeRnpaProvince', 'recipeRnpaCity', 'recipeRnpaCountry', 'recipeRnpaBrand', 'recipeRnpaBusinessName'].includes(select.id)) {
+          state.editor.rnpa = state.editor.rnpa || {};
+          if (select.id === 'recipeRnpaProvince') state.editor.rnpa.province = normalizeValue(select.value);
+          if (select.id === 'recipeRnpaCity') state.editor.rnpa.city = normalizeValue(select.value);
+          if (select.id === 'recipeRnpaCountry') state.editor.rnpa.country = normalizeValue(select.value);
+          if (select.id === 'recipeRnpaBrand') state.editor.rnpa.brand = normalizeValue(select.value);
+          if (select.id === 'recipeRnpaBusinessName') state.editor.rnpa.businessName = normalizeValue(select.value);
           markEditorDirty();
           return;
         }
@@ -1938,6 +2080,30 @@
           markEditorDirty();
           markNutritionAiAsStaleIfNeeded();
           return;
+        }
+      });
+
+      recipeEditorForm.addEventListener('change', async (event) => {
+        const input = event.target;
+        if (!input.matches('[data-monography-manual-file]')) return;
+        const row = state.editor?.rows.find((item) => item.id === input.dataset.monographyManualFile);
+        const file = input.files?.[0];
+        if (!row || !file) return;
+        const fileError = validateMonographyManualFile(file);
+        if (fileError) {
+          await openIosSwal({ title: 'Archivo inválido', html: `<p>${escapeHtml(fileError)}</p>`, icon: 'warning', confirmButtonText: 'Entendido' });
+          input.value = '';
+          return;
+        }
+        try {
+          const manualUrl = await uploadImageToStorage(file, 'recetas/manuales');
+          row.manualUrl = normalizeValue(manualUrl);
+          row.manualType = normalizeValue(file.type);
+          row.manualName = normalizeValue(file.name);
+          markEditorDirty();
+          renderRows();
+        } catch (error) {
+          await openIosSwal({ title: 'No se pudo adjuntar', html: '<p>Error subiendo el manual a Firebase.</p>', icon: 'error', confirmButtonText: 'Entendido' });
         }
       });
 
@@ -2071,6 +2237,18 @@
         : [{ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: getMeasureOptions()[0]?.value || '' }],
       orderMode: initial?.orderMode || 'desc',
       agingDays: normalizeValue(initial?.agingDays),
+      rnpa: {
+        denomination: normalizeValue(initial?.rnpa?.denomination),
+        brand: normalizeValue(initial?.rnpa?.brand),
+        businessName: normalizeValue(initial?.rnpa?.businessName),
+        city: normalizeValue(initial?.rnpa?.city || 'Rosario'),
+        province: normalizeValue(initial?.rnpa?.province || 'Santa Fe'),
+        country: RNPA_COUNTRY,
+        expiryDate: normalizeValue(initial?.rnpa?.expiryDate),
+        attachmentUrl: normalizeValue(initial?.rnpa?.attachmentUrl),
+        attachmentType: normalizeValue(initial?.rnpa?.attachmentType),
+        attachmentName: normalizeValue(initial?.rnpa?.attachmentName)
+      },
       nutrition: {
         productType: normalizeLower(initial?.nutrition?.productType || ''),
         category: normalizeLower(initial?.nutrition?.category || ''),
@@ -2094,6 +2272,18 @@
       householdAmount: normalizeValue(state.editor.nutrition?.householdAmount || '1'),
       ai: safeObject(state.editor.nutrition?.ai)
     };
+    state.editor.rnpa = {
+      denomination: normalizeValue(state.editor.rnpa?.denomination),
+      brand: normalizeValue(state.editor.rnpa?.brand),
+      businessName: normalizeValue(state.editor.rnpa?.businessName),
+      city: normalizeValue(state.editor.rnpa?.city || 'Rosario'),
+      province: normalizeValue(state.editor.rnpa?.province || 'Santa Fe'),
+      country: RNPA_COUNTRY,
+      expiryDate: normalizeValue(state.editor.rnpa?.expiryDate),
+      attachmentUrl: normalizeValue(state.editor.rnpa?.attachmentUrl),
+      attachmentType: normalizeValue(state.editor.rnpa?.attachmentType),
+      attachmentName: normalizeValue(state.editor.rnpa?.attachmentName)
+    };
     state.editor.agingDays = normalizeValue(state.editor.agingDays);
     ensureMonographyAtEnd();
     state.editorDirty = false;
@@ -2115,8 +2305,8 @@
           <div class="recipe-field recipe-field-full recipe-rnpa-block"><p class="recipe-subsection-title">RNPA (opcional)</p>
             <div class="recipe-rnpa-grid">
               <input id="recipeRnpaDenomination" class="form-control ios-input" placeholder="Denominación" value="${escapeHtml(state.editor.rnpa?.denomination || '')}">
-              <input id="recipeRnpaBrand" class="form-control ios-input" placeholder="Marca" value="${escapeHtml(state.editor.rnpa?.brand || '')}">
-              <input id="recipeRnpaBusinessName" class="form-control ios-input" placeholder="Razón social" value="${escapeHtml(state.editor.rnpa?.businessName || '')}">
+              <select id="recipeRnpaBrand" class="form-select ios-input">${getRnpaSelectOptions(state.recipeBrands, state.editor.rnpa?.brand, 'Marca')}</select>
+              <select id="recipeRnpaBusinessName" class="form-select ios-input">${getRnpaSelectOptions(state.recipeBusinessNames, state.editor.rnpa?.businessName, 'Razón social')}</select>
               <select id="recipeRnpaProvince" class="form-select ios-input"><option value="">Provincia</option>${ARGENTINA_PROVINCES.map((province) => `<option value="${escapeHtml(province)}" ${normalizeLower(state.editor.rnpa?.province) === normalizeLower(province) ? 'selected' : ''}>${escapeHtml(province)}</option>`).join('')}</select>
               <select id="recipeRnpaCity" class="form-select ios-input"><option value="">Localidad</option>${getRnpaCityOptions(state.editor.rnpa?.city)}</select>
               <select id="recipeRnpaCountry" class="form-select ios-input"><option value="Argentina" selected>Argentina</option></select>
@@ -2241,6 +2431,8 @@
       window.flatpickr(rnpaExpiryInput, {
         locale,
         dateFormat: 'Y-m-d',
+        altInput: true,
+        altFormat: 'd/m/Y',
         allowInput: true,
         disableMobile: true,
         defaultDate: normalizeValue(state.editor?.rnpa?.expiryDate) || undefined
@@ -2278,7 +2470,14 @@
           return { id: row.id, type: 'comment', comment: normalizeValue(row.comment) };
         }
         if (row.type === MONOGRAPHY_ROW_TYPE) {
-          return { id: row.id, type: MONOGRAPHY_ROW_TYPE, html: normalizeValue(row.html) };
+          return {
+            id: row.id,
+            type: MONOGRAPHY_ROW_TYPE,
+            html: normalizeValue(row.html),
+            manualUrl: normalizeValue(row.manualUrl),
+            manualType: normalizeValue(row.manualType),
+            manualName: normalizeValue(row.manualName)
+          };
         }
         return {
           id: row.id,
@@ -2299,8 +2498,8 @@
 
     const rnpa = {
       denomination: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaDenomination')?.value),
-      brand: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaBrand')?.value),
-      businessName: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaBusinessName')?.value),
+      brand: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaBrand')?.value) === '__new_value__' ? '' : normalizeValue(recipeEditorForm.querySelector('#recipeRnpaBrand')?.value),
+      businessName: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaBusinessName')?.value) === '__new_value__' ? '' : normalizeValue(recipeEditorForm.querySelector('#recipeRnpaBusinessName')?.value),
       city: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaCity')?.value),
       province: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaProvince')?.value),
       country: RNPA_COUNTRY,
@@ -2326,8 +2525,14 @@
       const cityExists = (state.recipeCities || []).some((item) => normalizeLower(item) === normalizeLower(rnpa.city));
       if (!cityExists) {
         state.recipeCities = Array.from(new Set([...(state.recipeCities || []), rnpa.city])).sort((a, b) => a.localeCompare(b, 'es'));
-        await persistRecetasConfig();
       }
+      if (rnpa.brand && !(state.recipeBrands || []).some((item) => normalizeLower(item) === normalizeLower(rnpa.brand))) {
+        state.recipeBrands = Array.from(new Set([...(state.recipeBrands || []), rnpa.brand])).sort((a, b) => a.localeCompare(b, 'es'));
+      }
+      if (rnpa.businessName && !(state.recipeBusinessNames || []).some((item) => normalizeLower(item) === normalizeLower(rnpa.businessName))) {
+        state.recipeBusinessNames = Array.from(new Set([...(state.recipeBusinessNames || []), rnpa.businessName])).sort((a, b) => a.localeCompare(b, 'es'));
+      }
+      await persistRecetasConfig();
     }
 
     const nutrition = {
@@ -2377,6 +2582,7 @@
 
   const loadRecetas = async () => {
     showState('loading');
+    state.rnpaFilter = 'all';
     recetasEditor?.classList.add('d-none');
     recetasData?.classList.add('d-none');
     recetasEmpty?.classList.add('d-none');
@@ -2470,6 +2676,13 @@
   emptyCreateRecipeBtn?.addEventListener('click', () => renderEditor());
 
   recetasData?.addEventListener('click', async (event) => {
+    const rnpaFilterBtn = event.target.closest('[data-rnpa-filter]');
+    if (rnpaFilterBtn) {
+      const selected = normalizeValue(rnpaFilterBtn.dataset.rnpaFilter);
+      state.rnpaFilter = state.rnpaFilter === selected ? 'all' : selected;
+      renderRecetas();
+      return;
+    }
     const printBtn = event.target.closest('[data-receta-print]');
     if (printBtn) {
       const recipe = state.recetas[printBtn.dataset.recetaId];
@@ -2492,6 +2705,13 @@
       const recipe = state.recetas[rnpaViewBtn.dataset.recetaRnpaView];
       const attachment = normalizeValue(recipe?.rnpa?.attachmentUrl);
       if (attachment) await window.laJamoneraOpenImageViewer?.([{ invoiceImageUrls: [attachment] }], 0, 'Adjunto RNPA');
+      return;
+    }
+    const manualViewBtn = event.target.closest('[data-receta-manual-view]');
+    if (manualViewBtn) {
+      const recipe = state.recetas[manualViewBtn.dataset.recetaManualView];
+      const manualUrl = normalizeValue((Array.isArray(recipe?.rows) ? recipe.rows : []).find((row) => row.type === MONOGRAPHY_ROW_TYPE && normalizeValue(row.manualUrl))?.manualUrl);
+      if (manualUrl) window.open(manualUrl, '_blank', 'noopener,noreferrer');
       return;
     }
     const editBtn = event.target.closest('[data-receta-edit]');
