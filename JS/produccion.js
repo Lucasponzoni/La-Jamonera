@@ -1018,7 +1018,7 @@
   const openGlobalMinConfig = async () => {
     const currentRne = safeObject(state.config.rne);
     const rneHistoryHtml = (Array.isArray(currentRne.history) && currentRne.history.length)
-      ? `<div class="produccion-rne-history">${currentRne.history.map((item, index) => `<article class="produccion-rne-history-item"><div><strong>Versión ${index + 1}</strong><p><strong>N° RNE:</strong> ${escapeHtml(item.number || '-')}</p><p><strong>Vigencia:</strong> ${escapeHtml(item.validFrom || '-')} → ${escapeHtml(item.expiryDate || '-')}</p></div>${item.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-rne-history="${index}"><i class="fa-regular fa-eye"></i><span>Ver archivo</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjunto</button>'}</article>`).join('')}</div>`
+      ? `<div class="produccion-rne-history">${currentRne.history.map((item, index) => `<article class="produccion-rne-history-item"><div><strong>Versión ${index + 1}</strong><p><strong>N° RNE:</strong> ${escapeHtml(item.number || '-')}</p><p><strong>Vigencia:</strong> ${escapeHtml(item.validFrom || '-')} → ${item.replacedAt || item.savedAt ? escapeHtml(formatDateTime(item.replacedAt || item.savedAt)) : '-'}</p><p><strong>Vencimiento declarado:</strong> ${escapeHtml(item.expiryDate || '-')}</p></div>${item.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-rne-history="${index}"><i class="fa-regular fa-eye"></i><span>Ver archivo</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjunto</button>'}</article>`).join('')}</div>`
       : '<p class="produccion-rne-history-empty">Aún no hay historial de RNE.</p>';
     const result = await openIosSwal({
       title: 'Configuración de Producción',
@@ -1055,7 +1055,7 @@
               <label class="form-label mt-2" for="produccionRneFile"><strong>Archivo adjunto</strong> (PDF o imagen)</label>
               <div class="produccion-rne-file-row">
                 <input id="produccionRneFile" class="form-control ios-input image-file-input" type="file" accept="image/*,application/pdf">
-                <span id="produccionRneFileLoading" class="produccion-rne-upload-loading d-none"><img src="./IMG/Meta-ai-logo.webp" alt="Subiendo RNE" class="meta-spinner produccion-company-logo-spinner"></span>
+                <span id="produccionRneFileLoading" class="produccion-rne-upload-loading d-none"><img src="./IMG/Meta-ai-logo.webp" alt="Subiendo RNE" class="meta-spinner-login produccion-rne-spinner"></span>
               </div>
               <small class="text-muted">Si cargás un nuevo archivo podés guardar la versión anterior en el historial.</small>
               <div class="produccion-config-actions">
@@ -1221,27 +1221,15 @@
             return false;
           }
           if (normalizeValue(previousRne.attachmentUrl)) {
-            const saveHistoryResult = await openIosSwal({
-              title: 'Reemplazar archivo de RNE',
-              html: '<p><strong>¿Querés guardar el RNE anterior en el historial?</strong></p>',
-              showCancelButton: true,
-              showDenyButton: true,
-              confirmButtonText: 'Sí, guardar historial',
-              denyButtonText: 'No guardar',
-              cancelButtonText: 'Cancelar',
-              focusConfirm: false
+            nextHistory.unshift({
+              number: normalizeValue(previousRne.number),
+              validFrom: normalizeValue(previousRne.validFrom || toIsoDate(previousRne.updatedAt || nowTs())),
+              expiryDate: normalizeValue(previousRne.expiryDate),
+              attachmentUrl: normalizeValue(previousRne.attachmentUrl),
+              attachmentType: normalizeValue(previousRne.attachmentType),
+              savedAt: nowTs(),
+              replacedAt: nowTs()
             });
-            if (saveHistoryResult.isDismissed) return false;
-            if (saveHistoryResult.isConfirmed) {
-              nextHistory.unshift({
-                number: normalizeValue(previousRne.number),
-                validFrom: normalizeValue(previousRne.validFrom || toIsoDate(previousRne.updatedAt || nowTs())),
-                expiryDate: normalizeValue(previousRne.expiryDate),
-                attachmentUrl: normalizeValue(previousRne.attachmentUrl),
-                attachmentType: normalizeValue(previousRne.attachmentType),
-                savedAt: nowTs()
-              });
-            }
           }
           try {
             rneLoading?.classList.remove('d-none');
@@ -1263,7 +1251,7 @@
             attachmentUrl: nextRneAttachmentUrl,
             attachmentType: nextRneAttachmentType,
             updatedAt: nowTs(),
-            validFrom: normalizeValue(previousRne.validFrom) || toIsoDate(nowTs()),
+            validFrom: rneFile ? toIsoDate(nowTs()) : (normalizeValue(previousRne.validFrom) || toIsoDate(nowTs())),
             history: nextHistory
           }
         };
@@ -1885,7 +1873,7 @@
       if (state.historyTraceCollapse[item.id] !== undefined) return;
       if (getTraceRowsFromRegistro(item).length) state.historyTraceCollapse[item.id] = true;
     });
-    const PAGE = 8;
+    const PAGE = 10;
     const pages = Math.max(1, Math.ceil(rows.length / PAGE));
     state.historyPage = Math.min(Math.max(1, state.historyPage), pages);
     const start = (state.historyPage - 1) * PAGE;
