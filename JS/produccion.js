@@ -29,6 +29,7 @@
   const AUDIT_PATH = '/produccion/auditoria';
   const RESERVE_TTL_MS = 10 * 60 * 1000;
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  const ALLOWED_RNE_UPLOAD_TYPES = [...ALLOWED_UPLOAD_TYPES, 'application/pdf'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
   const state = {
     recetas: {},
@@ -61,7 +62,8 @@
       preferredManagersByRecipe: {},
       usersPreferences: {},
       idConfig: { prefix: 'PROD-LJ' },
-      companyLogoUrl: ''
+      companyLogoUrl: '',
+      rne: { number: '', expiryDate: '', attachmentUrl: '', attachmentType: '', validFrom: '', updatedAt: 0, history: [] }
     }
   };
   const safeObject = (value) => (value && typeof value === 'object' ? value : {});
@@ -1014,22 +1016,55 @@
   };
   const getForeignDraftConflict = (recipeId) => Object.values(safeObject(state.drafts)).find((item) => item.recipeId === recipeId && item.ownerSessionId !== sessionId);
   const openGlobalMinConfig = async () => {
+    const currentRne = safeObject(state.config.rne);
+    const rneHistoryHtml = (Array.isArray(currentRne.history) && currentRne.history.length)
+      ? `<div class="produccion-rne-history">${currentRne.history.map((item, index) => `<article class="produccion-rne-history-item"><div><strong>Versión ${index + 1}</strong><p><strong>N° RNE:</strong> ${escapeHtml(item.number || '-')}</p><p><strong>Vigencia:</strong> ${escapeHtml(item.validFrom || '-')} → ${escapeHtml(item.expiryDate || '-')}</p></div>${item.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-rne-history="${index}"><i class="fa-regular fa-eye"></i><span>Ver archivo</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjunto</button>'}</article>`).join('')}</div>`
+      : '<p class="produccion-rne-history-empty">Aún no hay historial de RNE.</p>';
     const result = await openIosSwal({
       title: 'Configuración de Producción',
-      html: `<div class="text-center produccion-umbral-form">
-          <label class="form-label" for="produccionGlobalMinInput">Umbral global de stock bajo (kg)</label>
+      html: `<div class="text-center produccion-umbral-form produccion-config-form">
+          <label class="form-label" for="produccionGlobalMinInput"><strong>Umbral global de stock bajo (kg)</strong></label>
           <input id="produccionGlobalMinInput" type="number" min="0" step="0.01" class="swal2-input ios-input" value="${Number(state.config.globalMinKg || 1).toFixed(2)}">
-          <section class="recipe-step-card step-block inventario-lot-section mt-2">
-            <button type="button" class="inventario-collapse-head inventario-collapse-head-styled" id="logoCompanyToggleBtn" aria-expanded="false">
-              <span><span class="recipe-step-number">2</span> Logo Empresa</span>
-              <span class="inventario-collapse-summary">Subir / reemplazar</span>
+          <section class="recipe-step-card step-block inventario-lot-section mt-2 produccion-config-section">
+            <button type="button" class="inventario-collapse-head inventario-collapse-head-styled produccion-config-toggle" id="logoCompanyToggleBtn" aria-expanded="false">
+              <span><span class="recipe-step-number">2</span> <strong>Logo Empresa</strong></span>
+              <span class="inventario-collapse-summary"><strong>Subir, reemplazar y visualizar</strong></span>
             </button>
             <div id="logoCompanyBody" class="step-content d-none">
               <div class="produccion-company-logo-preview-wrap">
                 <span class="produccion-company-logo-preview" id="produccionCompanyLogoPreview">${normalizeValue(state.config.companyLogoUrl) ? `<img src="${state.config.companyLogoUrl}" alt="Logo empresa">` : '<i class="fa-solid fa-image"></i>'}</span>
               </div>
+              <div class="produccion-config-actions">
+                <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionOpenLogoViewerBtn" ${normalizeValue(state.config.companyLogoUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i><span>Visualizar logo</span></button>
+              </div>
               <input id="produccionCompanyLogoFile" class="form-control ios-input image-file-input" type="file" accept="image/*">
-              <small class="text-muted">JPG, PNG, WEBP o GIF. Máx. 5MB.</small>
+              <small class="text-muted"><strong>Formatos:</strong> JPG, PNG, WEBP o GIF. <strong>Máx:</strong> 5MB.</small>
+            </div>
+          </section>
+          <section class="recipe-step-card step-block inventario-lot-section mt-2 produccion-config-section">
+            <button type="button" class="inventario-collapse-head inventario-collapse-head-styled produccion-config-toggle" id="rneToggleBtn" aria-expanded="false">
+              <span><span class="recipe-step-number">3</span> <strong>RNE – Registro Nacional de Establecimiento</strong></span>
+              <span class="inventario-collapse-summary"><strong>Número, vencimiento, adjunto e historial</strong></span>
+            </button>
+            <div id="rneBody" class="step-content d-none">
+              <label class="form-label" for="produccionRneNumberInput"><strong>Número de RNE</strong></label>
+              <input id="produccionRneNumberInput" type="text" class="form-control ios-input" placeholder="Ej: 12-34567" value="${escapeHtml(currentRne.number || '')}">
+              <small class="text-muted">Se permiten números y guion (<strong>-</strong>).</small>
+              <label class="form-label mt-2" for="produccionRneExpiryInput"><strong>Fecha de caducidad</strong></label>
+              <input id="produccionRneExpiryInput" type="text" class="form-control ios-input" placeholder="Seleccionar fecha" value="${escapeHtml(currentRne.expiryDate || '')}">
+              <label class="form-label mt-2" for="produccionRneFile"><strong>Archivo adjunto</strong> (PDF o imagen)</label>
+              <div class="produccion-rne-file-row">
+                <input id="produccionRneFile" class="form-control ios-input image-file-input" type="file" accept="image/*,application/pdf">
+                <span id="produccionRneFileLoading" class="produccion-rne-upload-loading d-none"><img src="./IMG/Meta-ai-logo.webp" alt="Subiendo RNE" class="meta-spinner produccion-company-logo-spinner"></span>
+              </div>
+              <small class="text-muted">Si cargás un nuevo archivo podés guardar la versión anterior en el historial.</small>
+              <div class="produccion-config-actions">
+                <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionOpenRneViewerBtn" ${normalizeValue(currentRne.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i><span>Visualizar adjunto actual</span></button>
+              </div>
+              <div class="produccion-rne-history-wrap">
+                <h6><strong>Historial de RNE</strong></h6>
+                ${rneHistoryHtml}
+              </div>
             </div>
           </section>
         </div>`,
@@ -1040,10 +1075,25 @@
         popup: 'produccion-umbral-alert'
       },
       didOpen: (popup) => {
-        const toggleBtn = popup.querySelector('#logoCompanyToggleBtn');
-        const body = popup.querySelector('#logoCompanyBody');
+        const setupToggle = (btnId, bodyId) => {
+          const toggleBtn = popup.querySelector(btnId);
+          const body = popup.querySelector(bodyId);
+          toggleBtn?.addEventListener('click', () => {
+            const hidden = body?.classList.contains('d-none');
+            body?.classList.toggle('d-none', !hidden);
+            toggleBtn.setAttribute('aria-expanded', String(hidden));
+            toggleBtn.classList.toggle('is-open', Boolean(hidden));
+          });
+        };
+        setupToggle('#logoCompanyToggleBtn', '#logoCompanyBody');
+        setupToggle('#rneToggleBtn', '#rneBody');
+
         const fileInput = popup.querySelector('#produccionCompanyLogoFile');
         const preview = popup.querySelector('#produccionCompanyLogoPreview');
+        const logoViewerBtn = popup.querySelector('#produccionOpenLogoViewerBtn');
+        const rneViewerBtn = popup.querySelector('#produccionOpenRneViewerBtn');
+        const rneInput = popup.querySelector('#produccionRneNumberInput');
+
         const setLoading = () => {
           if (!preview) return;
           preview.innerHTML = '<span class="produccion-company-logo-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando logo" class="meta-spinner produccion-company-logo-spinner"></span>';
@@ -1072,11 +1122,6 @@
           };
         };
         setImage(state.config.companyLogoUrl);
-        toggleBtn?.addEventListener('click', () => {
-          const hidden = body?.classList.contains('d-none');
-          body?.classList.toggle('d-none', !hidden);
-          toggleBtn.setAttribute('aria-expanded', String(hidden));
-        });
         fileInput?.addEventListener('change', () => {
           const file = fileInput.files?.[0];
           if (!file) {
@@ -1086,6 +1131,41 @@
           const tempUrl = URL.createObjectURL(file);
           setImage(tempUrl);
         });
+        logoViewerBtn?.addEventListener('click', async () => {
+          const activeLogo = fileInput?.files?.[0] ? URL.createObjectURL(fileInput.files[0]) : normalizeValue(state.config.companyLogoUrl);
+          if (!activeLogo) return;
+          await window.laJamoneraOpenImageViewer?.([{ invoiceImageUrls: [activeLogo] }], 0, 'Logo empresa');
+        });
+        rneViewerBtn?.addEventListener('click', async () => {
+          const currentUrl = normalizeValue(state.config.rne?.attachmentUrl);
+          if (!currentUrl) return;
+          await window.laJamoneraOpenImageViewer?.([{ invoiceImageUrls: [currentUrl] }], 0, 'Adjunto RNE');
+        });
+        popup.querySelectorAll('[data-open-rne-history]').forEach((button) => {
+          button.addEventListener('click', async () => {
+            const index = Number(button.dataset.openRneHistory || -1);
+            const item = Array.isArray(state.config.rne?.history) ? state.config.rne.history[index] : null;
+            const attachment = normalizeValue(item?.attachmentUrl);
+            if (!attachment) return;
+            await window.laJamoneraOpenImageViewer?.([{ invoiceImageUrls: [attachment] }], 0, `Historial RNE #${index + 1}`);
+          });
+        });
+        rneInput?.addEventListener('input', () => {
+          rneInput.value = rneInput.value.replace(/[^0-9-]/g, '');
+        });
+        if (window.flatpickr) {
+          const locale = window.flatpickr.l10ns?.es || undefined;
+          const expiryInput = popup.querySelector('#produccionRneExpiryInput');
+          if (expiryInput) {
+            window.flatpickr(expiryInput, {
+              locale,
+              dateFormat: 'Y-m-d',
+              allowInput: true,
+              disableMobile: true,
+              defaultDate: normalizeValue(currentRne.expiryDate) || undefined
+            });
+          }
+        }
       },
       preConfirm: async () => {
         const value = document.getElementById('produccionGlobalMinInput')?.value;
@@ -1094,6 +1174,13 @@
           Swal.showValidationMessage('Ingresá un valor mayor a 0.');
           return false;
         }
+        const rneNumber = normalizeValue(document.getElementById('produccionRneNumberInput')?.value);
+        if (rneNumber && !/^[0-9-]+$/.test(rneNumber)) {
+          Swal.showValidationMessage('El número de RNE solo admite dígitos y guion (-).');
+          return false;
+        }
+        const rneExpiryDate = normalizeValue(document.getElementById('produccionRneExpiryInput')?.value);
+
         const file = document.getElementById('produccionCompanyLogoFile')?.files?.[0];
         let companyLogoUrl = normalizeValue(state.config.companyLogoUrl);
         if (file) {
@@ -1116,12 +1203,79 @@
             return false;
           }
         }
-        return { minKg: n, companyLogoUrl };
+
+        const rneFile = document.getElementById('produccionRneFile')?.files?.[0];
+        const rneLoading = document.getElementById('produccionRneFileLoading');
+        const previousRne = safeObject(state.config.rne);
+        let nextRneAttachmentUrl = normalizeValue(previousRne.attachmentUrl);
+        let nextRneAttachmentType = normalizeValue(previousRne.attachmentType);
+        const nextHistory = Array.isArray(previousRne.history) ? [...previousRne.history] : [];
+
+        if (rneFile) {
+          if (!ALLOWED_RNE_UPLOAD_TYPES.includes(rneFile.type)) {
+            Swal.showValidationMessage('Adjunto RNE inválido. Permitido: PDF o imagen.');
+            return false;
+          }
+          if (rneFile.size > MAX_UPLOAD_SIZE_BYTES) {
+            Swal.showValidationMessage('El adjunto de RNE supera 5MB.');
+            return false;
+          }
+          if (normalizeValue(previousRne.attachmentUrl)) {
+            const saveHistoryResult = await openIosSwal({
+              title: 'Reemplazar archivo de RNE',
+              html: '<p><strong>¿Querés guardar el RNE anterior en el historial?</strong></p>',
+              showCancelButton: true,
+              showDenyButton: true,
+              confirmButtonText: 'Sí, guardar historial',
+              denyButtonText: 'No guardar',
+              cancelButtonText: 'Cancelar',
+              focusConfirm: false
+            });
+            if (saveHistoryResult.isDismissed) return false;
+            if (saveHistoryResult.isConfirmed) {
+              nextHistory.unshift({
+                number: normalizeValue(previousRne.number),
+                validFrom: normalizeValue(previousRne.validFrom || toIsoDate(previousRne.updatedAt || nowTs())),
+                expiryDate: normalizeValue(previousRne.expiryDate),
+                attachmentUrl: normalizeValue(previousRne.attachmentUrl),
+                attachmentType: normalizeValue(previousRne.attachmentType),
+                savedAt: nowTs()
+              });
+            }
+          }
+          try {
+            rneLoading?.classList.remove('d-none');
+            nextRneAttachmentUrl = await uploadImageToStorage(rneFile, 'produccion/rne');
+            nextRneAttachmentType = rneFile.type;
+          } catch (error) {
+            Swal.showValidationMessage('No se pudo subir el archivo de RNE a Firebase Storage.');
+            return false;
+          } finally {
+            rneLoading?.classList.add('d-none');
+          }
+        }
+        return {
+          minKg: n,
+          companyLogoUrl,
+          rne: {
+            number: rneNumber,
+            expiryDate: rneExpiryDate,
+            attachmentUrl: nextRneAttachmentUrl,
+            attachmentType: nextRneAttachmentType,
+            updatedAt: nowTs(),
+            validFrom: normalizeValue(previousRne.validFrom) || toIsoDate(nowTs()),
+            history: nextHistory
+          }
+        };
       }
     });
     if (!result.isConfirmed) return;
     state.config.globalMinKg = Number(result.value.minKg.toFixed(2));
     state.config.companyLogoUrl = normalizeValue(result.value.companyLogoUrl);
+    state.config.rne = {
+      ...safeObject(state.config.rne),
+      ...safeObject(result.value.rne)
+    };
     await persistConfig();
     recomputeAnalysis();
     renderList();
@@ -2845,7 +2999,16 @@
       preferredManagersByRecipe: safeObject(config?.preferredManagersByRecipe),
       usersPreferences: safeObject(config?.usersPreferences),
       idConfig: { prefix: normalizeValue(config?.idConfig?.prefix) || 'PROD-LJ' },
-      companyLogoUrl: normalizeValue(config?.companyLogoUrl)
+      companyLogoUrl: normalizeValue(config?.companyLogoUrl),
+      rne: {
+        number: normalizeValue(config?.rne?.number),
+        expiryDate: normalizeValue(config?.rne?.expiryDate),
+        attachmentUrl: normalizeValue(config?.rne?.attachmentUrl),
+        attachmentType: normalizeValue(config?.rne?.attachmentType),
+        validFrom: normalizeValue(config?.rne?.validFrom),
+        updatedAt: Number(config?.rne?.updatedAt || 0),
+        history: Array.isArray(config?.rne?.history) ? config.rne.history : []
+      }
     };
     await cleanupExpiredReservations();
     await cleanupExpiredDrafts();
