@@ -1510,27 +1510,6 @@
     }
     return updated;
   };
-  const ensureTraceabilityDerivedData = async (registro) => {
-    if (!registro?.id) return registro;
-    const packaging = resolvePackagingFromRegistro(registro);
-    const needsPersist = packaging.agingDays > 0 && packaging.packagingDate
-      && (normalizeValue(registro.packagingDate) !== packaging.packagingDate
-        || Number(registro.agingDaysAtProduction || 0) !== Number(packaging.agingDays || 0));
-    if (!needsPersist) return registro;
-    const updated = {
-      ...registro,
-      packagingDate: packaging.packagingDate,
-      agingDaysAtProduction: Number(packaging.agingDays || 0)
-    };
-    state.registros[registro.id] = updated;
-    try {
-      const remote = safeObject(await window.dbLaJamoneraRest.read(REGISTROS_PATH));
-      remote[registro.id] = updated;
-      await window.dbLaJamoneraRest.write(REGISTROS_PATH, remote);
-    } catch (error) {
-    }
-    return updated;
-  };
   const openTraceability = async (registro) => {
     Swal.fire({
       title: 'Cargando trazabilidad...',
