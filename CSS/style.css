@@ -7003,3 +7003,199 @@ html.login-protected.auth-ok body {
 
 /* =========================================
    INVENTARIO · RNE · AJUSTES UX
+========================================= */
+.swal2-popup.inventario-provider-rne-alert,
+.swal2-popup.inventario-provider-form-alert,
+.swal2-popup.produccion-umbral-alert {
+  border-radius: 24px;
+  border: 1px solid #d8e1f5;
+  background: linear-gradient(180deg, #f8fbff 0%, #f3f6fd 100%);
+}
+
+.swal2-popup.inventario-provider-rne-alert .swal2-html-container,
+.swal2-popup.inventario-provider-form-alert .swal2-html-container,
+.swal2-popup.produccion-umbral-alert .swal2-html-container {
+  margin-top: 8px;
+  text-align: left;
+}
+
+.swal2-popup.inventario-provider-rne-alert :is(.swal2-input, .swal2-file, .swal2-textarea, .swal2-select),
+.swal2-popup.inventario-provider-form-alert :is(.swal2-input, .swal2-file, .swal2-textarea, .swal2-select),
+.swal2-popup.produccion-umbral-alert :is(.swal2-input, .swal2-file, .swal2-textarea, .swal2-select) {
+  width: 100%;
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.inventario-rne-alert-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #d6e2f7;
+  border-radius: 14px;
+  background: #f7faff;
+  padding: 8px;
+}
+
+.inventario-rne-inline-title,
+.inventario-rne-inline-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid #d5e0f4;
+  background: #fff;
+  padding: 5px 11px;
+  font-size: 0.78rem;
+  color: #466095;
+}
+
+.inventario-rne-inline-title {
+  font-weight: 700;
+  color: #2f4f90;
+  background: #edf3ff;
+}
+
+.inventario-rne-inline-item.is-info {
+  color: #245f96;
+}
+
+.inventario-rne-inline-item.is-warning {
+  color: #9a621d;
+  border-color: #f3d4ad;
+  background: #fff4e7;
+}
+
+.inventario-rne-inline-item.is-danger {
+  color: #a6324a;
+  border-color: #f2b4c0;
+  background: #ffecef;
+}
+
+.inventario-provider-manager-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.inventario-provider-manager-kicker {
+  margin: 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6f7fa2;
+}
+
+.inventario-provider-manager-copy {
+  margin: 2px 0 0;
+  color: #4f628f;
+  font-size: 0.9rem;
+}
+
+.inventario-provider-create-fab {
+  border-radius: 12px;
+  min-height: 42px;
+  gap: 8px;
+}
+
+.inventario-provider-form-html {
+  text-align: left;
+}
+
+.inventario-provider-form-html .form-label {
+  margin: 0;
+  color: #405783;
+}
+
+.inventario-provider-form-html small {
+  color: #667797;
+  margin-top: 2px;
+}
+
+.inventario-provider-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.inventario-provider-meta {
+  margin: 0;
+  border: 1px solid #dce5f7;
+  border-radius: 11px;
+  background: #f8fbff;
+  padding: 7px 9px;
+  display: grid;
+  gap: 2px;
+}
+
+.inventario-provider-meta span {
+  font-size: 0.71rem;
+  color: #6c7a99;
+  text-transform: uppercase;
+}
+
+.inventario-provider-meta strong {
+  color: #2f4678;
+  font-size: 0.9rem;
+}
+
+.inventario-provider-meta-helper {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin-top: 8px;
+}
+
+.produccion-config-toggle {
+  box-shadow: none;
+}
+
+.produccion-config-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.produccion-rne-history-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ios-btn.ios-icon-btn {
+  width: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  justify-content: center;
+  padding: 0;
+}
+
+@media (max-width: 768px) {
+  .inventario-provider-manager-head {
+    flex-direction: column;
+  }
+
+  .inventario-provider-create-fab {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .inventario-provider-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .produccion-rne-history-item {
+    flex-direction: column;
+  }
+
+  .produccion-rne-history-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
