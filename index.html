@@ -220,17 +220,21 @@
                 </div>
 
                 <div class="recetas-rnpa-filters" role="toolbar" aria-label="Filtros de RNPA">
-                  <button id="recetasFilterNoRnpaBtn" type="button" class="btn ios-btn recetas-rnpa-filter is-blue" data-rnpa-filter="none">
+                  <button type="button" class="inventario-status-btn tone-info" data-rnpa-filter="all">
+                    <span>Todos</span>
+                    <strong data-rnpa-filter-count="all">0</strong>
+                  </button>
+                  <button type="button" class="inventario-status-btn tone-info" data-rnpa-filter="none">
                     <span>Sin RNPA</span>
-                    <span class="recetas-rnpa-filter-count d-none" data-rnpa-filter-count="none">0</span>
+                    <strong data-rnpa-filter-count="none">0</strong>
                   </button>
-                  <button id="recetasFilterRnpaWarningBtn" type="button" class="btn ios-btn recetas-rnpa-filter is-orange" data-rnpa-filter="warning">
-                    <span>Vence &lt; 6 meses</span>
-                    <span class="recetas-rnpa-filter-count d-none" data-rnpa-filter-count="warning">0</span>
+                  <button type="button" class="inventario-status-btn tone-warning" data-rnpa-filter="warning">
+                    <span>Vence en menos de 6 meses</span>
+                    <strong data-rnpa-filter-count="warning">0</strong>
                   </button>
-                  <button id="recetasFilterRnpaDangerBtn" type="button" class="btn ios-btn recetas-rnpa-filter is-red" data-rnpa-filter="danger">
-                    <span>Vence &lt; 60 días</span>
-                    <span class="recetas-rnpa-filter-count d-none" data-rnpa-filter-count="danger">0</span>
+                  <button type="button" class="inventario-status-btn tone-danger" data-rnpa-filter="danger">
+                    <span>Vence en menos de 60 días</span>
+                    <strong data-rnpa-filter-count="danger">0</strong>
                   </button>
                 </div>
 
