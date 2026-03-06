@@ -219,6 +219,21 @@
                   </button>
                 </div>
 
+                <div class="recetas-rnpa-filters" role="toolbar" aria-label="Filtros de RNPA">
+                  <button id="recetasFilterNoRnpaBtn" type="button" class="btn ios-btn recetas-rnpa-filter is-blue" data-rnpa-filter="none">
+                    <span>Sin RNPA</span>
+                    <span class="recetas-rnpa-filter-count d-none" data-rnpa-filter-count="none">0</span>
+                  </button>
+                  <button id="recetasFilterRnpaWarningBtn" type="button" class="btn ios-btn recetas-rnpa-filter is-orange" data-rnpa-filter="warning">
+                    <span>Vence &lt; 6 meses</span>
+                    <span class="recetas-rnpa-filter-count d-none" data-rnpa-filter-count="warning">0</span>
+                  </button>
+                  <button id="recetasFilterRnpaDangerBtn" type="button" class="btn ios-btn recetas-rnpa-filter is-red" data-rnpa-filter="danger">
+                    <span>Vence &lt; 60 días</span>
+                    <span class="recetas-rnpa-filter-count d-none" data-rnpa-filter-count="danger">0</span>
+                  </button>
+                </div>
+
                 <div id="recetasList" class="recetas-list"></div>
               </div>
 

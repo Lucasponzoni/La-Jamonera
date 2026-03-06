@@ -30,6 +30,7 @@
     recipeBrands: [],
     recipeBusinessNames: [],
     search: '',
+    rnpaFilter: 'all',
     view: 'list',
     activeRecipeId: '',
     editor: null,
@@ -309,14 +310,41 @@
   const getRnpaStatus = (recipe) => {
     const rnpa = safeObject(recipe?.rnpa);
     const attachmentUrl = normalizeValue(rnpa.attachmentUrl);
-    if (!attachmentUrl) return { label: 'RNPA pendiente', className: 'is-pending', days: null, icon: 'fa-triangle-exclamation' };
+    if (!attachmentUrl) return { label: 'RNPA pendiente', className: 'is-pending', days: null, icon: 'fa-triangle-exclamation', filterBucket: 'none' };
     const expiryDate = normalizeValue(rnpa.expiryDate);
     const expiryTs = expiryDate ? new Date(`${expiryDate}T00:00:00`).getTime() : Number.NaN;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const days = Number.isFinite(expiryTs) ? Math.ceil((expiryTs - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
     const daysTone = days == null ? 'is-neutral' : days < 60 ? 'is-danger' : days < 180 ? 'is-warning' : 'is-ok';
-    return { label: 'RNPA adjunto', className: 'is-ok', days, daysTone, icon: 'fa-file-shield' };
+    const filterBucket = days == null ? 'none' : days < 60 ? 'danger' : days < 180 ? 'warning' : 'ok';
+    return { label: 'RNPA adjunto', className: 'is-ok', days, daysTone, icon: 'fa-file-shield', filterBucket };
+  };
+
+  const getRecipeRnpaFilterBucket = (recipe) => {
+    const status = getRnpaStatus(recipe);
+    return status.filterBucket || 'none';
+  };
+
+  const updateRnpaFilterButtons = (recipes = []) => {
+    const counts = recipes.reduce((acc, recipe) => {
+      const bucket = getRecipeRnpaFilterBucket(recipe);
+      if (bucket === 'none') acc.none += 1;
+      if (bucket === 'warning') acc.warning += 1;
+      if (bucket === 'danger') acc.danger += 1;
+      return acc;
+    }, { none: 0, warning: 0, danger: 0 });
+
+    ['none', 'warning', 'danger'].forEach((key) => {
+      const button = recetasData?.querySelector(`[data-rnpa-filter="${key}"]`);
+      const badge = recetasData?.querySelector(`[data-rnpa-filter-count="${key}"]`);
+      if (!button || !badge) return;
+      const count = counts[key] || 0;
+      button.classList.toggle('is-active', state.rnpaFilter === key);
+      button.disabled = count === 0;
+      badge.textContent = String(count);
+      badge.classList.toggle('d-none', count === 0);
+    });
   };
 
   const getRnpaSelectOptions = (list, selected = '', fieldLabel = 'opción') => {
@@ -333,9 +361,17 @@
 
   const renderRecetas = () => {
     const query = normalizeLower(state.search);
-    const source = getRecetasArray()
+    const baseSource = getRecetasArray()
       .filter((item) => !query || normalizeLower(item.title).includes(query) || normalizeLower(item.description).includes(query))
       .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+    updateRnpaFilterButtons(baseSource);
+
+    const source = baseSource.filter((item) => {
+      if (state.rnpaFilter === 'none') return getRecipeRnpaFilterBucket(item) === 'none';
+      if (state.rnpaFilter === 'warning') return getRecipeRnpaFilterBucket(item) === 'warning';
+      if (state.rnpaFilter === 'danger') return getRecipeRnpaFilterBucket(item) === 'danger';
+      return true;
+    });
 
     if (!source.length) {
       recetasList.innerHTML = '<div class="ingrediente-empty-list">No encontramos recetas con ese filtro.</div>';
@@ -2546,6 +2582,7 @@
 
   const loadRecetas = async () => {
     showState('loading');
+    state.rnpaFilter = 'all';
     recetasEditor?.classList.add('d-none');
     recetasData?.classList.add('d-none');
     recetasEmpty?.classList.add('d-none');
@@ -2639,6 +2676,13 @@
   emptyCreateRecipeBtn?.addEventListener('click', () => renderEditor());
 
   recetasData?.addEventListener('click', async (event) => {
+    const rnpaFilterBtn = event.target.closest('[data-rnpa-filter]');
+    if (rnpaFilterBtn) {
+      const selected = normalizeValue(rnpaFilterBtn.dataset.rnpaFilter);
+      state.rnpaFilter = state.rnpaFilter === selected ? 'all' : selected;
+      renderRecetas();
+      return;
+    }
     const printBtn = event.target.closest('[data-receta-print]');
     if (printBtn) {
       const recipe = state.recetas[printBtn.dataset.recetaId];

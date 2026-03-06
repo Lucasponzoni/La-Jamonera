@@ -2033,7 +2033,8 @@
     const text = days < 0
       ? `El RNE venció hace ${Math.abs(days)} días (${formatIsoEs(expiryIso)}).`
       : `El RNE vence en ${days} días (${formatIsoEs(expiryIso)}).`;
-    return { visible: true, days, tone, text, hasAttachment };
+    const visible = tone === 'warning' || tone === 'danger';
+    return { visible, days, tone, text, hasAttachment };
   };
 
   const renderRneExpiryAlert = () => {
