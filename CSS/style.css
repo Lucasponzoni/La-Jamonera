@@ -6503,6 +6503,21 @@ html.login-protected.auth-ok body {
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
+  padding: 6px;
+  border: 1px solid #dbe5f8;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(4px);
+}
+
+.produccion-trace-toolbar-zoom .inventario-threshold-btn {
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .produccion-trace-zoom-value {
@@ -6620,8 +6635,18 @@ html.login-protected.auth-ok body {
   }
 
   .produccion-trace-toolbar-zoom {
-    width: 100%;
-    justify-content: space-between;
+    width: fit-content;
+    max-width: 100%;
+    margin-inline: auto;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .produccion-trace-zoom-value {
+    min-width: 52px;
+    padding: 4px 6px;
+    font-size: 0.86rem;
   }
 
   .produccion-trace-lot-head {
