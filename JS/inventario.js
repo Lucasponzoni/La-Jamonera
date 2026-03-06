@@ -655,7 +655,7 @@
     nodes.providersRneAlert.classList.remove('d-none');
     nodes.providersRneAlert.innerHTML = `
       <div class="inventario-rne-alert-inline" aria-label="Resumen RNE proveedores">
-        <span class="inventario-rne-inline-title"><i class="fa-solid fa-file-shield"></i> RNE Proveedores</span>
+        <span class="inventario-rne-inline-title"><i class="fa-solid fa-file-shield"></i> Resumen informativo de RNE</span>
         <span class="inventario-rne-inline-item">Total <strong>${counts.all}</strong></span>
         <span class="inventario-rne-inline-item is-info">Sin RNE <strong>${counts.none}</strong></span>
         <span class="inventario-rne-inline-item is-warning">&lt; 6 meses <strong>${counts.warning}</strong></span>
@@ -2699,6 +2699,11 @@
           }
         }
       },
+      didOpen: (popup) => {
+        requestAnimationFrame(() => {
+          popup.querySelector('#providerNameInput')?.focus({ preventScroll: true });
+        });
+      },
       preConfirm: async () => {
         const name = normalizeUpper(document.getElementById('providerNameInput')?.value);
         const number = normalizeValue(document.getElementById('providerRneNumberInput')?.value);
@@ -2761,14 +2766,14 @@
 
   const openProvidersRneManager = async () => {
     const result = await openIosSwal({
-      title: 'RNE de proveedores',
+      title: 'Centro de proveedores · RNE',
       html: `<div class="inventario-provider-manager">
         <div class="inventario-provider-manager-head">
           <div class="inventario-provider-manager-copy-wrap">
             <p class="inventario-provider-manager-kicker">Proveedores</p>
-            <p class="inventario-provider-manager-copy">Gestión de RNE, vencimientos y adjuntos.</p>
+            <p class="inventario-provider-manager-copy">Gestión estética de RNE, vencimientos y adjuntos.</p>
           </div>
-          <button type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn inventario-provider-create-fab" id="inventarioProviderCreateBtn" aria-label="Nuevo proveedor"><i class="fa-solid fa-plus"></i></button>
+          <button type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn inventario-provider-create-fab" id="inventarioProviderCreateBtn" aria-label="Nuevo proveedor"><i class="fa-solid fa-plus"></i><span>Nuevo proveedor</span></button>
         </div>
         <div id="inventarioProviderRneFilters" class="inventario-status-filters"></div>
         <div id="inventarioProviderRneList" class="inventario-provider-rne-list"></div>
