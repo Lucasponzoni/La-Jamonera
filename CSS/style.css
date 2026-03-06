@@ -5182,6 +5182,7 @@ html.login-protected.auth-ok body {
   border-radius: 14px;
   background: #f8fbff;
   padding: 12px;
+  margin-bottom: 10px;
 }
 
 .produccion-trace-ingredients {
