@@ -474,7 +474,7 @@
         return acc;
       }, {});
       const row = ws.addRow(rowData);
-      const tone = data.__tone === 'trace' ? 'FFFFECEF' : data.__tone === 'resolution' ? 'FFDDEBFF' : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
+      const tone = data.__tone === 'trace' ? 'FFFFECEF' : data.__tone === 'resolution_blue' ? 'FFDDEBFF' : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
       row.eachCell((cell) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tone } };
         cell.border = {
@@ -500,6 +500,7 @@
     a.remove();
     URL.revokeObjectURL(url);
   };
+  const isBlueResolutionType = (type) => ['decommissioned', 'sold_counter'].includes(normalizeValue(type));
   const readMinKgForRecipe = (recipeId) => {
     const local = parseNumber(state.config.recipeMinKg?.[recipeId]);
     if (Number.isFinite(local) && local > 0) return local;
@@ -3265,7 +3266,7 @@
             'VTO producto': formatProductExpiryLabel(item),
             Trazabilidad: 'Resolución vencido',
             Acciones: '-',
-            __tone: 'resolution'
+            __tone: isBlueResolutionType(res.type) ? 'resolution_blue' : 'normal'
           }))));
       const traces = getTraceRowsFromRegistro(item).map((trace) => ({
         'ID producción': `↳ ${trace.index}`,

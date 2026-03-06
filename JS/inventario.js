@@ -850,6 +850,8 @@
     }
     return { badge: baseLabel, status };
   };
+  const isBlueResolutionStatus = (status) => ['decommissioned', 'sold_counter'].includes(normalizeValue(status));
+
   const getEntryResolutionRowData = (entry) => {
     const meta = getEntryResolutionMeta(entry);
     if (!meta.badge) return null;
@@ -861,6 +863,7 @@
     const resolvedKg = resolvedKgRaw > 0 ? resolvedKgRaw : Math.max(0, totalKg - availableKg);
     return {
       badge: meta.badge,
+      status: meta.status,
       at: Number(latest?.createdAt || entry?.createdAt || 0),
       resolvedKg: Number(resolvedKg.toFixed(2)),
       availableKg: Number(availableKg.toFixed(3))
@@ -953,7 +956,7 @@
           'N° factura': entry.invoiceNumber || '-',
           Proveedor: providerLabel(entry.provider),
           Imágenes: 'Resolución',
-          __tone: 'resolution'
+          __tone: isBlueResolutionStatus(resolutionRow.status) ? 'resolution_blue' : 'normal'
         });
       }
       if (includeTrace) {
@@ -1515,7 +1518,11 @@
         }, {});
         const row = ws.addRow(rowData);
         row.height = 21;
-        const tone = data.__tone === 'trace' ? 'FFEAF2FF' : data.__tone === 'resolution' ? 'FFDDEBFF' : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
+        const tone = data.__tone === 'trace'
+          ? 'FFFFECEF'
+          : data.__tone === 'resolution_blue'
+            ? 'FFDDEBFF'
+            : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
         row.eachCell((cell) => {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tone } };
           cell.border = {
@@ -2584,6 +2591,7 @@
   nodes.globalExcelBtn?.addEventListener('click', async () => {
     const rows = getGlobalFilteredEntries();
     const payload = rows.flatMap((row) => {
+      const resolutionRow = getEntryResolutionRowData(row);
       const main = {
         'Fecha y hora': row.entryDateTime,
         Producto: row.ingredientName,
@@ -2595,6 +2603,16 @@
         __firstImage: row.invoiceImageUrls[0] || '',
         __tone: 'normal'
       };
+      const resolution = resolutionRow ? {
+        'Fecha y hora': `↳ ${formatDateTime(resolutionRow.at)}`,
+        Producto: row.ingredientName,
+        Kilos: `-${resolutionRow.resolvedKg.toFixed(2)} kg`,
+        Cantidad: resolutionRow.badge,
+        'N° factura': row.invoiceNumber,
+        Proveedor: providerLabel(row.provider),
+        Imágenes: 'Resolución',
+        __tone: isBlueResolutionStatus(resolutionRow.status) ? 'resolution_blue' : 'normal'
+      } : null;
       const traces = buildTraceRowsForEntry(row).map((trace) => ({
         'Fecha y hora': `↳ ${trace.fechaHora}`,
         Producto: row.ingredientName,
@@ -2605,7 +2623,7 @@
         Imágenes: 'Trazabilidad',
         __tone: 'trace'
       }));
-      return [main, ...traces];
+      return [main, resolution, ...traces].filter(Boolean);
     });
     await makeWorkbook({
       fileName: `inventario_periodo_${Date.now()}.xlsx`,
