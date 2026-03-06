@@ -1167,6 +1167,7 @@
     const subcategory = normalizeLower(recipeEditorForm.querySelector('#recipeNutritionSubcategory')?.value || state.editor?.nutrition?.subcategory || '');
     const householdMeasure = normalizeLower(recipeEditorForm.querySelector('#recipeNutritionHouseholdMeasure')?.value || state.editor?.nutrition?.householdMeasure || '');
     const householdAmount = normalizeValue(recipeEditorForm.querySelector('#recipeNutritionHouseholdAmount')?.value || state.editor?.nutrition?.householdAmount || '');
+    const rnpaSource = safeObject(state.editor?.rnpa);
 
     const ingredients = (state.editor?.rows || [])
       .filter((row) => row.type === 'ingredient' && normalizeValue(row.ingredientName))
@@ -1181,16 +1182,16 @@
       description,
       ingredients,
       rnpa: {
-        denomination: normalizeValue(initial?.rnpa?.denomination),
-        brand: normalizeValue(initial?.rnpa?.brand),
-        businessName: normalizeValue(initial?.rnpa?.businessName),
-        city: normalizeValue(initial?.rnpa?.city || 'Rosario'),
-        province: normalizeValue(initial?.rnpa?.province || 'Santa Fe'),
+        denomination: normalizeValue(rnpaSource.denomination),
+        brand: normalizeValue(rnpaSource.brand),
+        businessName: normalizeValue(rnpaSource.businessName),
+        city: normalizeValue(rnpaSource.city || 'Rosario'),
+        province: normalizeValue(rnpaSource.province || 'Santa Fe'),
         country: RNPA_COUNTRY,
-        expiryDate: normalizeValue(initial?.rnpa?.expiryDate),
-        attachmentUrl: normalizeValue(initial?.rnpa?.attachmentUrl),
-        attachmentType: normalizeValue(initial?.rnpa?.attachmentType),
-        attachmentName: normalizeValue(initial?.rnpa?.attachmentName)
+        expiryDate: normalizeValue(rnpaSource.expiryDate),
+        attachmentUrl: normalizeValue(rnpaSource.attachmentUrl),
+        attachmentType: normalizeValue(rnpaSource.attachmentType),
+        attachmentName: normalizeValue(rnpaSource.attachmentName)
       },
       nutrition: {
         productType,
@@ -2071,6 +2072,18 @@
         : [{ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: getMeasureOptions()[0]?.value || '' }],
       orderMode: initial?.orderMode || 'desc',
       agingDays: normalizeValue(initial?.agingDays),
+      rnpa: {
+        denomination: normalizeValue(initial?.rnpa?.denomination),
+        brand: normalizeValue(initial?.rnpa?.brand),
+        businessName: normalizeValue(initial?.rnpa?.businessName),
+        city: normalizeValue(initial?.rnpa?.city || 'Rosario'),
+        province: normalizeValue(initial?.rnpa?.province || 'Santa Fe'),
+        country: RNPA_COUNTRY,
+        expiryDate: normalizeValue(initial?.rnpa?.expiryDate),
+        attachmentUrl: normalizeValue(initial?.rnpa?.attachmentUrl),
+        attachmentType: normalizeValue(initial?.rnpa?.attachmentType),
+        attachmentName: normalizeValue(initial?.rnpa?.attachmentName)
+      },
       nutrition: {
         productType: normalizeLower(initial?.nutrition?.productType || ''),
         category: normalizeLower(initial?.nutrition?.category || ''),
@@ -2093,6 +2106,18 @@
       householdMeasure: normalizeLower(state.editor.nutrition?.householdMeasure || 'unidad'),
       householdAmount: normalizeValue(state.editor.nutrition?.householdAmount || '1'),
       ai: safeObject(state.editor.nutrition?.ai)
+    };
+    state.editor.rnpa = {
+      denomination: normalizeValue(state.editor.rnpa?.denomination),
+      brand: normalizeValue(state.editor.rnpa?.brand),
+      businessName: normalizeValue(state.editor.rnpa?.businessName),
+      city: normalizeValue(state.editor.rnpa?.city || 'Rosario'),
+      province: normalizeValue(state.editor.rnpa?.province || 'Santa Fe'),
+      country: RNPA_COUNTRY,
+      expiryDate: normalizeValue(state.editor.rnpa?.expiryDate),
+      attachmentUrl: normalizeValue(state.editor.rnpa?.attachmentUrl),
+      attachmentType: normalizeValue(state.editor.rnpa?.attachmentType),
+      attachmentName: normalizeValue(state.editor.rnpa?.attachmentName)
     };
     state.editor.agingDays = normalizeValue(state.editor.agingDays);
     ensureMonographyAtEnd();
