@@ -4012,6 +4012,16 @@ html.login-protected.auth-ok body {
   margin-top: 2px;
 }
 
+.inventario-stock-line-expired strong {
+  color: #b42338;
+}
+
+.inventario-stock-line-expired em {
+  color: #b42338;
+  font-style: normal;
+  font-weight: 700;
+}
+
 .inventario-actions-row {
   margin-top: 8px;
   display: flex;
@@ -6127,6 +6137,7 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-draft-card small {
+  display: block;
   color: #6a7a9d;
 }
 
@@ -6259,6 +6270,50 @@ html.login-protected.auth-ok body {
   border-bottom: 1px solid #eed7dc !important;
   color: #4b5f8d;
   font-size: 0.82rem;
+}
+
+.inventario-row-tone.is-expired-row td {
+  background: #ffe06c7a !important;
+}
+
+.inventario-expired-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #a3162f;
+  background: #ffd5df;
+  border: 1px solid #f3a5b6;
+}
+
+.inventario-resolution-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #2156b8;
+  background: #e7efff;
+  border: 1px solid #bdd0ff;
+}
+
+.produccion-lote-expired-help {
+  grid-column: 1 / -1;
+  color: #b42338;
+  font-size: 0.82rem;
+}
+
+.produccion-lote-expired-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .inventario-trace-main {
