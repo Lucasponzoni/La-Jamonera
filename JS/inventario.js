@@ -2773,7 +2773,7 @@
             <p class="inventario-provider-manager-kicker">Proveedores</p>
             <p class="inventario-provider-manager-copy">Gestión estética de RNE, vencimientos y adjuntos.</p>
           </div>
-          <button type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn inventario-provider-create-fab" id="inventarioProviderCreateBtn" aria-label="Nuevo proveedor"><i class="fa-solid fa-plus"></i><span>Nuevo proveedor</span></button>
+          <button type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn inventario-provider-create-fab" id="inventarioProviderCreateBtn" aria-label="Nuevo proveedor"><i class="fa-solid fa-plus"></i><span>Proveedor</span></button>
         </div>
         <div id="inventarioProviderRneFilters" class="inventario-status-filters"></div>
         <div id="inventarioProviderRneList" class="inventario-provider-rne-list"></div>

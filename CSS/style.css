@@ -6596,6 +6596,7 @@ html.login-protected.auth-ok body {
 
 .produccion-rne-history-item {
   display: flex;
+  flex-direction: column;
   justify-content: space-between;
   gap: 10px;
   align-items: flex-start;
@@ -6945,7 +6946,7 @@ html.login-protected.auth-ok body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.7rem;
+  font-size: 1rem;
   margin-left: 4px;
 }
 
@@ -7032,10 +7033,6 @@ html.login-protected.auth-ok body {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  border: 1px solid #d6e2f7;
-  border-radius: 14px;
-  background: #f7faff;
-  padding: 8px;
 }
 
 .inventario-rne-inline-title,
