@@ -6521,8 +6521,12 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-trace-zoom-value {
+  display: flex;
+  justify-content: center;
+  align-items: center;
   min-width: 58px;
   text-align: center;
+  min-height: 36px;
   font-weight: 800;
   color: #2f4f8b;
   background: #eef3ff;
@@ -6644,7 +6648,11 @@ html.login-protected.auth-ok body {
   }
 
   .produccion-trace-zoom-value {
+    display: flex;
+    justify-content: center;
+    align-items: center;
     min-width: 52px;
+    min-height: 36px;
     padding: 4px 6px;
     font-size: 0.86rem;
   }
