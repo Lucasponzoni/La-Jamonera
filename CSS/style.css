@@ -3617,7 +3617,7 @@ html.login-protected.auth-ok body {
 .inventario-total-banner{
   background-color: rgb(244 238 254);
   padding: 5px 10px;
-  border-radius: 5px;
+  border-radius: 12px;
 }
 
 .inventario-total-banner small{
@@ -4117,7 +4117,7 @@ html.login-protected.auth-ok body {
   min-height: 34px;
   padding: 6px 10px;
   font-size: 0.78rem;
-  border-radius: 5px;
+  border-radius: 12px;
 }
 
 .inventory-production-action-btn.inventario-threshold-btn {
@@ -4129,17 +4129,18 @@ html.login-protected.auth-ok body {
 
 .inventario-actions-row .inventario-threshold-btn:not(.inventory-production-action-btn) {
   min-height: 34px;
-  background-color: rgb(230, 230, 230);
-  color: rgb(87, 87, 87);
+  background-color: #edf3ff;
+  color: #2a4ea3;
   padding: 6px 10px;
   font-size: 0.78rem;
-  border-radius: 16px;
-  font-size: 16px;
+  border-radius: 12px;
+  font-size: 0.82rem;
+  border: 1px solid #d3dbf0;
 }
 
 .inventario-actions-row .inventario-threshold-btn:not(.inventory-production-action-btn):hover {
-  background-color: rgb(210, 210, 210);
-  color: rgb(45, 45, 45);
+  background-color: #dce7ff;
+  color: #1f3e8a;
   cursor: pointer;
 }
 
@@ -4611,12 +4612,12 @@ html.login-protected.auth-ok body {
 .inventario-collapse-head-styled {
   margin-bottom: 10px;
   width: 100%;
-  border: 1px solid #d6def3;
-  border-radius: 14px;
-  background: #f4f7ff;
+  border: 1px solid #d8e1f5;
+  border-radius: 16px;
+  background: #f7faff;
   color: #2a3f70;
-  min-height: 44px;
-  padding: 10px 12px;
+  min-height: 46px;
+  padding: 10px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4641,7 +4642,7 @@ html.login-protected.auth-ok body {
   bottom: 1px;
   background: #2e7fe6;
   color: #fff;
-  border-radius: 5px;
+  border-radius: 12px;
   width: fit-content;
   font-size: 0.56rem;
   line-height: 1;
@@ -6583,6 +6584,12 @@ html.login-protected.auth-ok body {
   padding-top: 10px;
 }
 
+.produccion-rne-history {
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 .produccion-rne-history-item {
   display: flex;
   justify-content: space-between;
@@ -6861,3 +6868,16 @@ html.login-protected.auth-ok body {
     min-width: 520px;
   }
 }
+
+.produccion-rne-spinner{width:24px;height:24px;}
+
+.receta-rnpa-inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:4px 0;}
+.receta-rnpa-badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-size:.72rem;font-weight:700;border:1px solid #cfd8f0;background:#eef3ff;color:#30508f;}
+.receta-rnpa-badge.is-pending,.receta-rnpa-badge.is-danger{background:#ffecef;border-color:#f2b4c0;color:#a6324a;}
+.receta-rnpa-badge.is-warning{background:#fff4e7;border-color:#f3d4ad;color:#9a621d;}
+.receta-rnpa-badge.is-ok{background:#e9f8ef;border-color:#b6e4c4;color:#1f8a48;}
+.receta-rnpa-days{font-size:.75rem;color:#5f6a89;display:inline-flex;align-items:center;gap:4px;}
+.recipe-rnpa-block{border:1px solid #dbe3f6;border-radius:14px;padding:10px;background:#f8faff;}
+.recipe-rnpa-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+.recipe-rnpa-actions{grid-column:1 / -1;display:flex;justify-content:flex-start;}
+@media (max-width:768px){.recipe-rnpa-grid{grid-template-columns:1fr;}}

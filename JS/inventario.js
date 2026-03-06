@@ -11,7 +11,7 @@
     { key: 'siglas_personalizadas', label: 'Siglas personalizadas' }
   ];
   const LOT_SEPARATORS = ['.', '-', '_', ',', ';', '|'];
-  const PAGE_SIZE = 20;
+  const PAGE_SIZE = 10;
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -953,7 +953,7 @@
           'N° factura': entry.invoiceNumber || '-',
           Proveedor: providerLabel(entry.provider),
           Imágenes: 'Resolución',
-          __tone: 'trace'
+          __tone: 'resolution'
         });
       }
       if (includeTrace) {
@@ -1515,7 +1515,7 @@
         }, {});
         const row = ws.addRow(rowData);
         row.height = 21;
-        const tone = data.__tone === 'trace' ? 'FFFFECEF' : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
+        const tone = data.__tone === 'trace' ? 'FFEAF2FF' : data.__tone === 'resolution' ? 'FFDDEBFF' : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
         row.eachCell((cell) => {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tone } };
           cell.border = {
@@ -1970,7 +1970,7 @@
     nodes.editorForm.querySelector('#inventarioCollapseAllRowsBtn')?.addEventListener('click', () => {
       const map = { ...(state.entryCollapseByIngredient[ingredientId] || {}) };
       getFilteredEntries(Array.isArray(record.entries) ? record.entries : []).forEach((entry) => {
-        if (getEntryTraceRows(entry).length) map[entry.id] = true;
+        if (hasEntryDetailRows(entry)) map[entry.id] = true;
       });
       state.entryCollapseByIngredient[ingredientId] = map;
       rerenderEditorKeepViewport(ingredientId, state.editorDraft, '#inventarioEntriesSearch');
@@ -1979,7 +1979,7 @@
     nodes.editorForm.querySelector('#inventarioExpandAllRowsBtn')?.addEventListener('click', () => {
       const map = { ...(state.entryCollapseByIngredient[ingredientId] || {}) };
       getFilteredEntries(Array.isArray(record.entries) ? record.entries : []).forEach((entry) => {
-        if (getEntryTraceRows(entry).length) map[entry.id] = false;
+        if (hasEntryDetailRows(entry)) map[entry.id] = false;
       });
       state.entryCollapseByIngredient[ingredientId] = map;
       rerenderEditorKeepViewport(ingredientId, state.editorDraft, '#inventarioEntriesSearch');
@@ -2020,7 +2020,7 @@
           : '';
         const availableClass = getAvailableKg(entry) <= 0 ? 'is-zero' : '';
         const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(resolutionRow.at)}</div></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td></tr>` : '';
-        return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${formatDateTime(entry.createdAt)}</td><td>${entry.expiryDate || '-'} ${isExpiredAvailable ? '<span class="inventario-expired-badge">EXPIRADO</span>' : ''}</td><td><strong>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</strong><br><span class="inventario-available-line ${availableClass}">disp. ${getAvailableKg(entry).toFixed(3)} kg</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><div class="inventario-entry-actions">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expanded-entry-collapse="${entry.id}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(entryImageUrls(entry))}</div></td></tr>${resolutionHtml}${traceHtml}`;
+        return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${formatDateTime(entry.createdAt)}</td><td>${entry.expiryDate || '-'} ${isExpiredAvailable ? '<span class="inventario-expired-badge">EXPIRADO</span>' : ''}</td><td><strong>${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</strong><br><span class="inventario-available-line ${availableClass}">disp. ${getAvailableKg(entry).toFixed(3)} kg</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRow) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expanded-entry-collapse="${entry.id}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(entryImageUrls(entry))}</div></td></tr>${resolutionHtml}${traceHtml}`;
       }).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos para mostrar.</td></tr>';
       await openIosSwal({
         title: 'Historial ampliado',
@@ -2031,8 +2031,8 @@
           const renderContent = () => {
             const host = popup.querySelector('#inventarioExpandedEntryHost');
             if (!host) return;
-            const canCollapse = fullRows.some((entry) => getEntryTraceRows(entry).length && collapseMap[entry.id] !== true);
-            const canExpand = fullRows.some((entry) => getEntryTraceRows(entry).length && collapseMap[entry.id] === true);
+            const canCollapse = fullRows.some((entry) => hasEntryDetailRows(entry) && collapseMap[entry.id] !== true);
+            const canExpand = fullRows.some((entry) => hasEntryDetailRows(entry) && collapseMap[entry.id] === true);
             host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioExpandedEntryCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar todo</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioExpandedEntryExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar todo</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura</th><th>Proveedor</th><th>Imagen</th></tr></thead><tbody>${renderRows()}</tbody></table></div>`;
           };
           renderContent();
@@ -2046,14 +2046,14 @@
             }
             if (event.target.closest('#inventarioExpandedEntryCollapseAllRowsBtn')) {
               fullRows.forEach((entry) => {
-                if (getEntryTraceRows(entry).length) collapseMap[entry.id] = true;
+                if (hasEntryDetailRows(entry)) collapseMap[entry.id] = true;
               });
               renderContent();
               return;
             }
             if (event.target.closest('#inventarioExpandedEntryExpandAllRowsBtn')) {
               fullRows.forEach((entry) => {
-                if (getEntryTraceRows(entry).length) collapseMap[entry.id] = false;
+                if (hasEntryDetailRows(entry)) collapseMap[entry.id] = false;
               });
               renderContent();
               return;
