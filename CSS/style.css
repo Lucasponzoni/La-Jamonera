@@ -6024,7 +6024,6 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-lote-row > div {
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
