@@ -465,6 +465,14 @@
     return '';
   };
 
+  const getDefaultWeeklySheetConfig = () => ({
+    configured: false,
+    counterOnly: false,
+    egresoEnabled: true,
+    rotationDays: 7,
+    updatedAt: 0
+  });
+
   const getDefaultRecord = (ingredientId) => ({
     ingredientId,
     stockKg: 0,
@@ -484,7 +492,8 @@
       customAcronym: '',
       includeSeparator: false,
       separator: '-'
-    }
+    },
+    weeklySheetConfig: getDefaultWeeklySheetConfig()
   });
 
   const getRecord = (ingredientId) => {
@@ -493,7 +502,8 @@
     return {
       ...base,
       ...saved,
-      lotConfig: { ...base.lotConfig, ...safeObject(saved.lotConfig) }
+      lotConfig: { ...base.lotConfig, ...safeObject(saved.lotConfig) },
+      weeklySheetConfig: { ...getDefaultWeeklySheetConfig(), ...safeObject(saved.weeklySheetConfig) }
     };
   };
 
@@ -1315,6 +1325,63 @@
     const normalized = normalizeIsoDate(isoDate) || getArgentinaIsoDate();
     const [year, month, day] = normalized.split('-');
     return `${day || '01'}${month || '01'}${year || '1900'}`;
+  };
+
+  const openWeeklySheetConfig = async (ingredientId, { force = false } = {}) => {
+    const ingredient = state.ingredientes[ingredientId];
+    if (!ingredient) return false;
+    const record = getRecord(ingredientId);
+    const current = { ...getDefaultWeeklySheetConfig(), ...safeObject(record.weeklySheetConfig) };
+    if (!force && current.configured) {
+      const quick = await openIosSwal({
+        title: 'Planilla semanal',
+        html: `<p><strong>${escapeHtml(capitalize(ingredient.name))}</strong></p><p><small>Mostrador: <strong>${current.counterOnly ? 'Sí' : 'No'}</strong> · Egreso: <strong>${current.egresoEnabled ? 'Sí' : 'No'}</strong> · Rotación: <strong>${Number(current.rotationDays || 0)} día(s)</strong></small></p>`,
+        showDenyButton: true,
+        showCancelButton: true,
+        confirmButtonText: 'Editar',
+        denyButtonText: 'Cerrar',
+        cancelButtonText: 'Cancelar'
+      });
+      if (!quick.isConfirmed) return quick.isDenied;
+    }
+
+    const result = await openIosSwal({
+      title: 'Planilla Semanal',
+      html: `<div class="swal-stack-fields text-start">
+        <p class="mb-1"><strong>${escapeHtml(capitalize(ingredient.name))}</strong></p>
+        <label class="inventario-check-row"><input type="checkbox" id="invCounterOnly" ${current.counterOnly ? 'checked' : ''}><span>Solo venta en mostrador (no producible)</span></label>
+        <label class="inventario-check-row"><input type="checkbox" id="invEgresoEnabled" ${current.egresoEnabled ? 'checked' : ''}><span><i class="fa-solid fa-robot"></i> Habilitado para egreso</span></label>
+        <label class="form-label mt-2" for="invRotationDays">Días de rotación</label>
+        <input id="invRotationDays" class="swal2-input ios-input" type="number" min="0" step="1" value="${Number(current.rotationDays || 0)}">
+      </div>`,
+      showCancelButton: true,
+      confirmButtonText: 'Guardar',
+      cancelButtonText: 'Cancelar',
+      preConfirm: () => {
+        const rotationDays = Number(document.getElementById('invRotationDays')?.value || 0);
+        if (!Number.isFinite(rotationDays) || rotationDays < 0) {
+          Swal.showValidationMessage('Completá días de rotación con un número válido.');
+          return false;
+        }
+        return {
+          counterOnly: Boolean(document.getElementById('invCounterOnly')?.checked),
+          egresoEnabled: Boolean(document.getElementById('invEgresoEnabled')?.checked),
+          rotationDays: Math.round(rotationDays)
+        };
+      }
+    });
+
+    if (!result.isConfirmed) return false;
+    record.weeklySheetConfig = {
+      ...getDefaultWeeklySheetConfig(),
+      ...safeObject(record.weeklySheetConfig),
+      ...result.value,
+      configured: true,
+      updatedAt: Date.now()
+    };
+    state.inventario.items[ingredientId] = record;
+    await persistInventario();
+    return true;
   };
 
   const buildLotNumber = ({ lotConfig, invoiceNumber, entryDate }) => {
@@ -2356,10 +2423,10 @@
       </section>
 
       <section class="recipe-step-card step-block inventario-lot-section">
-        <button type="button" class="inventario-collapse-head inventario-collapse-head-styled" id="lotConfigToggleBtn" aria-expanded="${state.editorDraft.showLotConfig}">
+        <div class="d-flex flex-wrap gap-2 align-items-center"><button type="button" class="inventario-collapse-head inventario-collapse-head-styled" id="lotConfigToggleBtn" aria-expanded="${state.editorDraft.showLotConfig}">
           <span><span class="recipe-step-number">1</span> Configuración de lote</span>
           <span class="inventario-collapse-summary">${buildLotSummaryBadges(state.editorDraft)}</span>
-        </button>
+        </button><button type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn produccion-history-btn" id="inventarioWeeklySheetBtn"><i class="fa-regular fa-file-lines"></i><span>Planilla Semanal</span></button></div>
         <div id="lotConfigBody" class="step-content ${state.editorDraft.showLotConfig ? '' : 'd-none'}">
           <div class="inventario-check-grid">${lotOptionRows}</div>
           <div class="inventario-inline-fields">
@@ -2532,6 +2599,10 @@
 
     nodes.editorForm.querySelector('#inventarioProductThresholdBtn')?.addEventListener('click', async () => {
       await openProductThresholdConfig(ingredientId);
+    });
+    nodes.editorForm.querySelector('#inventarioWeeklySheetBtn')?.addEventListener('click', async () => {
+      await openWeeklySheetConfig(ingredientId, { force: true });
+      renderEditor(ingredientId, state.editorDraft);
     });
 
     nodes.editorForm.querySelectorAll('[data-lot-check]').forEach((input) => {
@@ -3097,6 +3168,12 @@
         confirmButtonText: 'Entendido'
       });
       return;
+    }
+
+    const weeklySheet = { ...getDefaultWeeklySheetConfig(), ...safeObject(record.weeklySheetConfig) };
+    if (!record.hasEntries && !weeklySheet.configured) {
+      const configured = await openWeeklySheetConfig(ingredientId, { force: true });
+      if (!configured) return;
     }
 
     if (!Number.isFinite(qty) || qty <= 0) {
