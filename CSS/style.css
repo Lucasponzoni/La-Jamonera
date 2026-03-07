@@ -586,8 +586,8 @@ html.login-protected.auth-ok body {
 }
 
 .family-circle-thumb {
-  width: 80px;
-  height: 80px;
+  width: 90px;
+  height: 90px;
   border-radius: 999px;
   border: 1px solid #d6deef;
   overflow: hidden;
@@ -707,8 +707,8 @@ html.login-protected.auth-ok body {
 }
 
 .ingrediente-avatar {
-  width: 54px;
-  height: 54px;
+  width: 75px;
+  height: 75px;
   border-radius: 999px;
   overflow: hidden;
   border: 1px solid #d6deef;
