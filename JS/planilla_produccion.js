@@ -82,26 +82,56 @@
   const resolveIngredientRows = (registro) => {
     const plans = Array.isArray(registro?.lots) ? registro.lots : [];
     const traceIngredients = Array.isArray(registro?.traceability?.ingredients) ? registro.traceability.ingredients : [];
+    const joinUnique = (items = []) => {
+      const normalized = items.map((item) => normalizeValue(item)).filter(Boolean);
+      const unique = [...new Set(normalized)];
+      return unique.length ? unique.join(' | ') : '-';
+    };
     return plans.map((plan) => {
-      const lot = (Array.isArray(plan?.lots) ? plan.lots : [])[0] || {};
       const traceIngredient = traceIngredients.find((row) => normalizeValue(row?.ingredientId) === normalizeValue(plan?.ingredientId));
-      const traceLot = ((Array.isArray(traceIngredient?.lots) ? traceIngredient.lots : [])[0]) || {};
-      const takeQty = Number(lot?.takeQty || traceLot?.takeQty || 0);
-      const availableQty = Number(lot?.availableQty || traceLot?.availableQty || 0);
+      const planLots = Array.isArray(plan?.lots) ? plan.lots : [];
+      const traceLots = Array.isArray(traceIngredient?.lots) ? traceIngredient.lots : [];
+      const mergedLots = planLots.length ? planLots : traceLots;
+      const lots = (mergedLots.length ? mergedLots : [{}]).map((lot, index) => ({
+        ...safeObject(traceLots[index]),
+        ...safeObject(lot)
+      }));
+      const lotNumbers = lots.map((lot) => lot?.lotNumber || lot?.entryId || '-');
+      const providers = lots.map((lot) => lot?.provider || '-');
+      const rnes = lots.map((lot) => lot?.providerRne?.number || '-');
+      const observationLots = lots.map((lot, lotIndex) => {
+        const usedQty = Number(lot?.takeQty || 0);
+        const unit = lot?.unit || plan?.ingredientUnit || plan?.unit || '';
+        return {
+          index: lotIndex + 1,
+          lotNumber: normalizeValue(lot?.lotNumber || lot?.entryId || '-'),
+          provider: normalizeValue(lot?.provider || '-'),
+          qtyLabel: formatQty(usedQty, unit)
+        };
+      });
+      const firstLot = lots[0] || {};
+      const takeQty = Number(firstLot?.takeQty || 0);
+      const availableQty = Number(firstLot?.availableQty || 0);
       const remainingQty = Math.max(0, availableQty - takeQty);
+      const hasMultiProvider = [...new Set(providers.map((item) => normalizeValue(item)).filter(Boolean))].length > 1;
+      const lotUsageSummary = observationLots.map((lot) => `${lot.qtyLabel} de lote ${lot.index} ${lot.lotNumber}`).join(', ');
+      const providersSummary = hasMultiProvider
+        ? `El proveedor es ${observationLots.map((lot) => `${lot.provider} para lote ${lot.index}`).join(' y ')}`
+        : `El proveedor es ${normalizeValue(providers[0] || '-')}`;
       return {
         ingredientName: plan?.ingredientName || traceIngredient?.ingredientName || 'INGREDIENTE',
         ingredientImage: normalizeValue(plan?.ingredientImageUrl || traceIngredient?.ingredientImageUrl),
-        provider: lot?.provider || traceLot?.provider || '-',
-        lotNumber: lot?.lotNumber || lot?.entryId || traceLot?.lotNumber || traceLot?.entryId || '-',
-        expiryDate: lot?.expiryDate || traceLot?.expiryDate || '-',
-        rne: normalizeValue(lot?.providerRne?.number || traceLot?.providerRne?.number || '-'),
+        provider: joinUnique(providers),
+        lotNumber: joinUnique(lotNumbers),
+        expiryDate: firstLot?.expiryDate || '-',
+        rne: joinUnique(rnes),
         qty: formatQty(plan?.neededQty ?? plan?.requiredQty, plan?.ingredientUnit || plan?.unit || ''),
         qtyKg: toKg(plan?.neededQty ?? plan?.requiredQty, plan?.ingredientUnit || plan?.unit || ''),
-        available: formatQty(availableQty, lot?.unit || plan?.ingredientUnit || plan?.unit || ''),
-        remaining: formatQty(remainingQty, lot?.unit || plan?.ingredientUnit || plan?.unit || ''),
-        invoiceNumber: normalizeValue(lot?.invoiceNumber || traceLot?.invoiceNumber || '-'),
-        entryDate: formatIsoEs(lot?.entryDate || traceLot?.entryDate || '-')
+        available: formatQty(availableQty, firstLot?.unit || plan?.ingredientUnit || plan?.unit || ''),
+        remaining: formatQty(remainingQty, firstLot?.unit || plan?.ingredientUnit || plan?.unit || ''),
+        invoiceNumber: normalizeValue(firstLot?.invoiceNumber || '-'),
+        entryDate: formatIsoEs(firstLot?.entryDate || '-'),
+        autoObservation: `${plan?.ingredientName || traceIngredient?.ingredientName || 'Ingrediente'}, se usó ${lotUsageSummary}. ${providersSummary}.`
       };
     });
   };
@@ -112,7 +142,13 @@
     const managerLabel = resolveManagerNames(registro, context.usersMap);
     const totalIngredients = ingredientRows.reduce((acc, row) => acc + Number(row.qtyKg || 0), 0);
     const merma = Math.max(0, totalIngredients - Number(registro?.quantityKg || 0));
-    const observations = normalizeValue(registro?.observations) || 'SIN OBSERVACIONES';
+    const autoObservations = ingredientRows
+      .map((row) => normalizeValue(row.autoObservation))
+      .filter(Boolean)
+      .join(' ');
+    const observations = [normalizeValue(registro?.observations), autoObservations]
+      .filter(Boolean)
+      .join(' · ') || 'SIN OBSERVACIONES';
 
     return `<div class="planilla-card planilla-print-a4" id="planillaProduccionPrintable">
       <header class="planilla-card-header"><h2>REGISTRO DE PROTOCOLO DE PRODUCCIÓN</h2><p>FRIGORIFICO • LA JAMONERA S.A.</p></header>
