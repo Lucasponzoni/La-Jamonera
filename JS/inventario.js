@@ -691,9 +691,13 @@
 
     const detailsCount = dangerRows.length + warningRows.length;
 
+    const alertMessage = dangerRows.length ? 'Hay RNE críticos por vencer.' : 'Hay RNE próximos a vencer.';
+
     nodes.providersRneAlert.classList.remove('d-none');
-    nodes.providersRneAlert.innerHTML = `<div class="produccion-rne-expiry-alert ${dangerRows.length ? 'is-danger' : 'is-ok'}"><i class="bi ${dangerRows.length ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill'}"></i><span>${dangerRows.length ? 'Hay RNE críticos por vencer.' : 'Hay RNE próximos a vencer.'}</span></div>
-      <button type="button" class="inventario-rne-alert-toggle" data-rne-alert-toggle aria-expanded="false"><span>Ver detalle (${detailsCount})</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button>
+    nodes.providersRneAlert.innerHTML = `<button type="button" class="produccion-rne-expiry-alert ${dangerRows.length ? 'is-danger' : 'is-ok'} is-collapsible" data-rne-alert-toggle aria-expanded="false">
+        <span class="produccion-rne-expiry-text"><i class="bi ${dangerRows.length ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill'}"></i><span>${alertMessage}</span></span>
+        <span class="produccion-rne-expiry-collapse-meta"><strong>${detailsCount}</strong><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
+      </button>
       <div class="inventario-rne-expiry-board" data-rne-alert-details hidden>
         ${dangerRows.length ? `<section class="inventario-rne-expiry-group"><h6><strong>Vencen en menos de 3 meses</strong></h6>${dangerRows.map((row) => rowHtml(row, 'is-danger')).join('')}</section>` : ''}
         ${warningRows.length ? `<section class="inventario-rne-expiry-group"><h6><strong>Vencen en menos de 6 meses</strong></h6>${warningRows.map((row) => rowHtml(row, 'is-warning')).join('')}</section>` : ''}
@@ -707,8 +711,6 @@
       toggleBtn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
       details.hidden = expanded;
       toggleBtn.classList.toggle('is-open', !expanded);
-      const label = toggleBtn.querySelector('span');
-      if (label) label.textContent = expanded ? `Ver detalle (${detailsCount})` : 'Ocultar detalle';
     });
   };
 
@@ -3488,7 +3490,6 @@
 
   inventarioModal.addEventListener('hide.bs.modal', () => {
     snapshotEditorDraft();
-    clearProviderRneAlertAutoscroll();
   });
   inventarioModal.addEventListener('hidden.bs.modal', () => inventarioModal.removeAttribute('inert'));
   nodes.imageViewerModal?.addEventListener('hidden.bs.modal', () => {

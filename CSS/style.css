@@ -6943,11 +6943,11 @@ html.login-protected.auth-ok body {
    INVENTARIO · RNE PROVEEDORES
 ========================================= */
 .inventario-rne-alert {
-  border: 1px solid #d8e2f7;
-  border-radius: 14px;
-  background: #f7faff;
-  padding: 10px;
-  margin-bottom: 10px;
+    /* border: 1px solid #d8e2f7; */
+    /* border-radius: 14px; */
+    /* background: #f7faff; */
+    /* padding: 10px; */
+    margin-bottom: 10px;
 }
 
 .inventario-rne-alert-title {
