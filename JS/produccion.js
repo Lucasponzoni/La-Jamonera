@@ -1701,7 +1701,7 @@
       ].map(esc).join('<br/>');
       const providerRne = resolveProviderRneFromLot(lot);
       lines.push(`${nodeId}["${nodeLabel}"]:::toneIngredient`);
-      lines.push(`${nodeId}RNE["<b>RNE PROVEEDOR</b><br/>${esc(providerRne.number || '-')}" ]:::toneRegistry`);
+      lines.push(`${nodeId}RNE["<b>RNE PROVEEDOR</b><br/>${esc(providerRne.number || '-')}"]:::toneRegistry`);
       lines.push(`${nodeId} -.-> ${nodeId}RNE`);
       lines.push(`I --> ${nodeId}`);
     });
