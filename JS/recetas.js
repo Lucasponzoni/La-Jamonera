@@ -91,6 +91,7 @@
   ];
 
   const RNPA_COUNTRY = 'Argentina';
+  const RNPA_NUMBER_REGEX = /^[0-9-]+$/;
   const ARGENTINA_PROVINCES = ['Buenos Aires','CABA','Catamarca','Chaco','Chubut','Córdoba','Corrientes','Entre Ríos','Formosa','Jujuy','La Pampa','La Rioja','Mendoza','Misiones','Neuquén','Río Negro','Salta','San Juan','San Luis','Santa Cruz','Santa Fe','Santiago del Estero','Tierra del Fuego','Tucumán'];
 
   const FRONT_LABELS_ALLOWED = [
@@ -1304,6 +1305,7 @@
       description,
       ingredients,
       rnpa: {
+        number: normalizeValue(rnpaSource.number),
         denomination: normalizeValue(rnpaSource.denomination),
         brand: normalizeValue(rnpaSource.brand),
         businessName: normalizeValue(rnpaSource.businessName),
@@ -1896,8 +1898,13 @@
           }
           return;
         }
-        if (['recipeRnpaDenomination','recipeRnpaBrand','recipeRnpaBusinessName','recipeRnpaExpiryDate'].includes(input.id)) {
+        if (['recipeRnpaNumber','recipeRnpaDenomination','recipeRnpaBrand','recipeRnpaBusinessName','recipeRnpaExpiryDate'].includes(input.id)) {
           state.editor.rnpa = state.editor.rnpa || {};
+          if (input.id === 'recipeRnpaNumber') {
+            const normalized = normalizeValue(input.value).replace(/[^0-9-]/g, '');
+            input.value = normalized;
+            state.editor.rnpa.number = normalized;
+          }
           if (input.id === 'recipeRnpaDenomination') state.editor.rnpa.denomination = normalizeValue(input.value);
           if (input.id === 'recipeRnpaBrand') state.editor.rnpa.brand = normalizeValue(input.value);
           if (input.id === 'recipeRnpaBusinessName') state.editor.rnpa.businessName = normalizeValue(input.value);
@@ -2123,7 +2130,10 @@
           markNutritionAiAsStaleIfNeeded();
           return;
         }
-        if (['recipeRnpaDenomination','recipeRnpaBrand','recipeRnpaBusinessName','recipeRnpaExpiryDate'].includes(input.id)) {
+        if (['recipeRnpaNumber','recipeRnpaDenomination','recipeRnpaBrand','recipeRnpaBusinessName','recipeRnpaExpiryDate'].includes(input.id)) {
+          if (input.id === 'recipeRnpaNumber') {
+            input.value = normalizeValue(input.value).replace(/[^0-9-]/g, '');
+          }
           markEditorDirty();
           return;
         }
@@ -2302,6 +2312,7 @@
       orderMode: initial?.orderMode || 'desc',
       agingDays: normalizeValue(initial?.agingDays),
       rnpa: {
+        number: normalizeValue(initial?.rnpa?.number),
         denomination: normalizeValue(initial?.rnpa?.denomination),
         brand: normalizeValue(initial?.rnpa?.brand),
         businessName: normalizeValue(initial?.rnpa?.businessName),
@@ -2337,6 +2348,7 @@
       ai: safeObject(state.editor.nutrition?.ai)
     };
     state.editor.rnpa = {
+      number: normalizeValue(state.editor.rnpa?.number),
       denomination: normalizeValue(state.editor.rnpa?.denomination),
       brand: normalizeValue(state.editor.rnpa?.brand),
       businessName: normalizeValue(state.editor.rnpa?.businessName),
@@ -2368,6 +2380,7 @@
           </div>
           <div class="recipe-field recipe-field-full recipe-rnpa-block"><p class="recipe-subsection-title">RNPA (opcional)</p>
             <div class="recipe-rnpa-grid">
+              <input id="recipeRnpaNumber" class="form-control ios-input" placeholder="Número RNPA (ej: 02-123456)" value="${escapeHtml(state.editor.rnpa?.number || '')}">
               <input id="recipeRnpaDenomination" class="form-control ios-input" placeholder="Denominación" value="${escapeHtml(state.editor.rnpa?.denomination || '')}">
               <select id="recipeRnpaBrand" class="form-select ios-input">${getRnpaSelectOptions(state.recipeBrands, state.editor.rnpa?.brand, 'Marca')}</select>
               <select id="recipeRnpaBusinessName" class="form-select ios-input">${getRnpaSelectOptions(state.recipeBusinessNames, state.editor.rnpa?.businessName, 'Razón social')}</select>
@@ -2561,6 +2574,7 @@
     const sortedRows = sortRowsByOrderMode(rows, orderMode);
 
     const rnpa = {
+      number: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaNumber')?.value),
       denomination: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaDenomination')?.value),
       brand: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaBrand')?.value) === '__new_value__' ? '' : normalizeValue(recipeEditorForm.querySelector('#recipeRnpaBrand')?.value),
       businessName: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaBusinessName')?.value) === '__new_value__' ? '' : normalizeValue(recipeEditorForm.querySelector('#recipeRnpaBusinessName')?.value),
@@ -2573,6 +2587,8 @@
       attachmentName: normalizeValue(state.editor?.rnpa?.attachmentName)
     };
 
+    if (rnpa.number && !RNPA_NUMBER_REGEX.test(rnpa.number)) throw new Error('RNPA inválido: solo se permiten números y guion (-).');
+
     const rnpaFile = recipeEditorForm.querySelector('#recipeRnpaAttachment')?.files?.[0];
     const rnpaFileValidation = validateRnpaFile(rnpaFile);
     if (rnpaFileValidation) throw new Error(rnpaFileValidation);
@@ -2581,7 +2597,7 @@
       rnpa.attachmentType = normalizeValue(rnpaFile.type);
       rnpa.attachmentName = normalizeValue(rnpaFile.name);
     }
-    const rnpaValues = [rnpa.denomination, rnpa.brand, rnpa.businessName, rnpa.city, rnpa.province, rnpa.expiryDate, rnpa.attachmentUrl];
+    const rnpaValues = [rnpa.number, rnpa.denomination, rnpa.brand, rnpa.businessName, rnpa.city, rnpa.province, rnpa.expiryDate, rnpa.attachmentUrl];
     const hasSomeRnpa = rnpaValues.some(Boolean);
     const hasAllRnpa = rnpaValues.every(Boolean);
     if (hasSomeRnpa && !hasAllRnpa) throw new Error('RNPA incompleto: completá todos los campos o dejalo totalmente pendiente.');
@@ -2627,7 +2643,7 @@
       }
     }
 
-    return { title, description, yieldQuantity, yieldUnit, shelfLifeDays, agingDays, orderMode, rows: sortedRows, nutrition, rnpa: hasAllRnpa ? rnpa : { denomination: '', brand: '', businessName: '', city: '', province: '', country: RNPA_COUNTRY, expiryDate: '', attachmentUrl: '', attachmentType: '', attachmentName: '' }, imageUrl };
+    return { title, description, yieldQuantity, yieldUnit, shelfLifeDays, agingDays, orderMode, rows: sortedRows, nutrition, rnpa: hasAllRnpa ? rnpa : { number: '', denomination: '', brand: '', businessName: '', city: '', province: '', country: RNPA_COUNTRY, expiryDate: '', attachmentUrl: '', attachmentType: '', attachmentName: '' }, imageUrl };
   };
 
   const removeRecipe = async (recipeId) => {
