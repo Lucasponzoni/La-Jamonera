@@ -4643,7 +4643,7 @@ html.login-protected.auth-ok body {
 }
 
 .inventario-day-kg.is-mixed {
-  background: green !important;
+  background: #7a5af8;
 }
 
 .flatpickr-day {
@@ -6269,6 +6269,11 @@ html.login-protected.auth-ok body {
   color: #6c7a98;
   font-size: 0.78rem;
   font-weight: 600;
+}
+
+.inventario-expired-strike {
+  text-decoration: line-through;
+  opacity: 0.72;
 }
 
 .inventario-trace-row td {
