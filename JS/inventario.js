@@ -13,6 +13,7 @@
   const LOT_SEPARATORS = ['.', '-', '_', ',', ';', '|'];
   const PAGE_SIZE = 10;
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  const ALLOWED_INVOICE_UPLOAD_TYPES = [...ALLOWED_UPLOAD_TYPES, 'application/pdf'];
   const ALLOWED_RNE_UPLOAD_TYPES = [...ALLOWED_UPLOAD_TYPES, 'application/pdf'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
   const PROVIDER_AVATAR_TONES = [
@@ -177,6 +178,27 @@
       return `<span class="inventario-expiry-days-badge is-danger">Expirado hace ${Math.abs(days)} día(s)</span>`;
     }
     return `<span class="inventario-expiry-days-badge ${tone}">Vence en ${days} día(s)</span>`;
+  };
+
+  const getExpiryBadgeText = (entry) => {
+    const available = getAvailableQty(entry);
+    if (!Number.isFinite(available) || available <= 0) return '';
+    const days = getDaysUntilIso(entry?.expiryDate);
+    if (!Number.isFinite(days)) return '';
+    if (days < 0) return `Expirado hace ${Math.abs(days)} día(s)`;
+    return `Vence en ${days} día(s)`;
+  };
+
+  const formatEntryDetailLabel = (entry) => {
+    const unit = normalizeValue(entry?.unit || '');
+    const qty = Number(entry?.qty || 0);
+    const available = Number(getAvailableInUnit(entry, unit));
+    const abbr = escapeHtml(getMeasureAbbr(unit || ''));
+    const pkg = Number(entry?.packageQty || 0) > 0 ? ` x${Number(entry.packageQty)}` : '';
+    return {
+      qtyLabel: `${qty.toFixed(2)} ${escapeHtml(unit)}`,
+      availableLabel: `disp. ${available.toFixed(2)} ${abbr}${pkg}`
+    };
   };
 
   const parseNumber = (value) => {
@@ -436,10 +458,10 @@
     return ref.getDownloadURL();
   };
 
-  const validateImageFile = (file) => {
-    if (!file) return 'Seleccioná una imagen.';
-    if (!ALLOWED_UPLOAD_TYPES.includes(file.type)) return 'Formato no válido (JPG, PNG, WEBP, GIF).';
-    if (file.size > MAX_UPLOAD_SIZE_BYTES) return 'La imagen supera 5MB.';
+  const validateInvoiceFile = (file) => {
+    if (!file) return '';
+    if (!ALLOWED_INVOICE_UPLOAD_TYPES.includes(file.type)) return 'Formato no válido (JPG, PNG, WEBP, GIF o PDF).';
+    if (file.size > MAX_UPLOAD_SIZE_BYTES) return 'El adjunto supera 5MB.';
     return '';
   };
 
@@ -1472,15 +1494,18 @@
     const rows = [];
     entries.forEach((entry) => {
       const resolutionRow = getEntryResolutionRowData(entry);
+      const expiryMeta = getEntryExpiryMeta(entry);
+      const detail = formatEntryDetailLabel(entry);
       rows.push({
         __isTrace: false,
-        __tone: 'normal',
+        __tone: expiryMeta.isExpired ? 'expired' : 'normal',
+        __expired: expiryMeta.isExpired,
         fechaHora: formatDateTime(entry.createdAt),
-        fechaCaducidad: entry.expiryDate || '-',
-        cantidad: `${Number(entry.qty || 0).toFixed(2)} ${entry.unit || ''} · disp. ${getAvailableKg(entry).toFixed(3)} kg`,
+        fechaCaducidad: [entry.expiryDate || '-', getExpiryBadgeText(entry)].filter(Boolean).join(' · '),
+        cantidad: `${detail.qtyLabel} · ${detail.availableLabel}`,
         factura: entry.invoiceNumber || '-',
         proveedor: providerLabel(entry.provider),
-        imagenes: entryImageUrls(entry).length ? `Ver adjunto (${entryImageUrls(entry).length})` : 'Sin imagen'
+        imagenes: entryImageUrls(entry).length ? `Ver adjunto (${entryImageUrls(entry).length})` : 'Sin adjunto'
       });
       if (resolutionRow) {
         rows.push({
@@ -1506,13 +1531,13 @@
       const resolutionRow = getEntryResolutionRowData(entry);
       rows.push({
         Fecha: formatDateTime(entry.createdAt),
-        'Fecha caducidad': entry.expiryDate || '-',
-        Cantidad: `${Number(entry.qty || 0).toFixed(2)} ${entry.unit || ''} · disp. ${getAvailableKg(entry).toFixed(3)} kg`,
+        'Fecha caducidad': [entry.expiryDate || '-', getExpiryBadgeText(entry)].filter(Boolean).join(' · '),
+        Cantidad: `${formatEntryDetailLabel(entry).qtyLabel} · ${formatEntryDetailLabel(entry).availableLabel}`,
         'N° factura': entry.invoiceNumber || '-',
         Proveedor: providerLabel(entry.provider),
         Imágenes: imageLinksText(entry),
         __firstImage: urls[0] || '',
-        __tone: 'normal'
+        __tone: getEntryExpiryMeta(entry).isExpired ? 'expired' : 'normal'
       });
       if (resolutionRow) {
         rows.push({
@@ -1549,9 +1574,18 @@
     }
   };
 
+  const applyViewerTransform = () => {
+    if (!nodes.viewerImage) return;
+    nodes.viewerImage.style.transform = `translate(${state.viewerOffsetX}px, ${state.viewerOffsetY}px) scale(${state.viewerScale})`;
+  };
+
   const setViewerScale = (value) => {
     state.viewerScale = Math.max(1, Math.min(4, value));
-    if (nodes.viewerImage) nodes.viewerImage.style.transform = `scale(${state.viewerScale})`;
+    if (state.viewerScale <= 1) {
+      state.viewerOffsetX = 0;
+      state.viewerOffsetY = 0;
+    }
+    applyViewerTransform();
   };
 
   const renderViewerImage = () => {
@@ -1571,6 +1605,9 @@
       nodes.viewerStageSpinner?.classList.add('d-none');
       return;
     }
+    state.viewerOffsetX = 0;
+    state.viewerOffsetY = 0;
+    applyViewerTransform();
     nodes.viewerImage.src = item.src;
   };
 
@@ -1585,12 +1622,84 @@
     nodes.imageViewerModal.querySelector('.ios-modal-title').textContent = title;
     state.viewerImages = images;
     state.viewerIndex = Math.min(Math.max(0, startIndex), images.length - 1);
+    state.viewerOffsetX = 0;
+    state.viewerOffsetY = 0;
     setViewerScale(1);
     renderViewerImage();
     imageViewerModal.show();
   };
 
   window.laJamoneraOpenImageViewer = openAttachmentViewer;
+
+
+  nodes.viewerImage?.addEventListener('wheel', (event) => {
+    event.preventDefault();
+    const delta = event.deltaY < 0 ? 0.2 : -0.2;
+    setViewerScale(state.viewerScale + delta);
+  }, { passive: false });
+
+  let pinchStartDistance = 0;
+  let pinchStartScale = 1;
+  const touchDistance = (touches) => {
+    if (!touches || touches.length < 2) return 0;
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt((dx * dx) + (dy * dy));
+  };
+
+  nodes.viewerImage?.addEventListener('touchstart', (event) => {
+    if (event.touches.length < 2) return;
+    pinchStartDistance = touchDistance(event.touches);
+    pinchStartScale = state.viewerScale;
+  }, { passive: true });
+
+  nodes.viewerImage?.addEventListener('touchmove', (event) => {
+    if (event.touches.length < 2 || !pinchStartDistance) return;
+    event.preventDefault();
+    const nextDistance = touchDistance(event.touches);
+    const ratio = nextDistance / pinchStartDistance;
+    setViewerScale(pinchStartScale * ratio);
+  }, { passive: false });
+
+  nodes.viewerImage?.addEventListener('touchend', (event) => {
+    if (pinchStartDistance && state.viewerScale <= 1) {
+      state.viewerOffsetX = 0;
+      state.viewerOffsetY = 0;
+      applyViewerTransform();
+    }
+    if ((event.touches?.length || 0) < 2) {
+      pinchStartDistance = 0;
+    }
+  });
+  nodes.viewerImage?.addEventListener('touchcancel', () => {
+    pinchStartDistance = 0;
+  });
+
+  nodes.viewerImage?.addEventListener('pointerdown', (event) => {
+    if (state.viewerScale <= 1) return;
+    state.viewerIsDragging = true;
+    state.viewerDragStartX = event.clientX - state.viewerOffsetX;
+    state.viewerDragStartY = event.clientY - state.viewerOffsetY;
+    nodes.viewerImage.setPointerCapture?.(event.pointerId);
+    nodes.viewerImage.classList.add('is-dragging');
+  });
+
+  nodes.viewerImage?.addEventListener('pointermove', (event) => {
+    if (!state.viewerIsDragging) return;
+    state.viewerOffsetX = event.clientX - state.viewerDragStartX;
+    state.viewerOffsetY = event.clientY - state.viewerDragStartY;
+    applyViewerTransform();
+  });
+
+  const stopViewerDrag = (event) => {
+    if (!state.viewerIsDragging) return;
+    state.viewerIsDragging = false;
+    nodes.viewerImage?.classList.remove('is-dragging');
+    nodes.viewerImage?.releasePointerCapture?.(event.pointerId);
+  };
+  nodes.viewerImage?.addEventListener('pointerup', stopViewerDrag);
+  nodes.viewerImage?.addEventListener('pointercancel', stopViewerDrag);
+  nodes.viewerImage?.addEventListener('pointerleave', stopViewerDrag);
 
   const inDateRange = (value, from, to) => {
     const dateIso = normalizeIsoDate(value);
@@ -1677,10 +1786,10 @@
 
     const printableRows = buildPrintableRowsForEntries(entries, includeTrace);
     const rows = printableRows.map((row, index) => `
-      <tr class="inventario-row-tone ${row.__tone === 'resolution' ? 'is-resolution-row-print' : row.__isTrace ? 'is-trace-row' : (index % 2 === 0 ? 'is-even-row' : 'is-odd-row')}">
+      <tr class="inventario-row-tone ${row.__tone === 'resolution' ? 'is-resolution-row-print' : row.__tone === 'expired' ? 'is-expired-row-print' : row.__isTrace ? 'is-trace-row' : (index % 2 === 0 ? 'is-even-row' : 'is-odd-row')}">
         <td>${escapeHtml(row.__isTrace ? `↳ ${row.fechaHora}` : row.fechaHora)}</td>
         <td>${escapeHtml(row.fechaCaducidad)}</td>
-        <td>${escapeHtml(row.cantidad)}</td>
+        <td class="${row.__expired ? 'is-strike-print' : ''}">${escapeHtml(row.cantidad)}</td>
         <td>${escapeHtml(row.factura)}</td>
         <td class="inventario-provider-cell">${escapeHtml(row.proveedor)}</td>
         <td>${row.__isTrace ? 'Trazabilidad' : (includeImages ? row.imagenes : (row.imagenes === 'Sin imagen' ? 'Sin imagen' : 'Posee adjuntos'))}</td>
@@ -1703,7 +1812,7 @@
             th,td{border:1px solid #d7def2;padding:8px;text-align:left;font-size:13px;vertical-align:top}
             th{background:#eef3ff}
             .is-trace-row td{background:#ffecef}
-            .is-resolution-row-print td{background:#fff6d9}
+            .is-resolution-row-print td{background:#fff6d9}.is-expired-row-print td{background:#ffecef}.is-strike-print{text-decoration:line-through;font-weight:700;color:#b42338}
           </style>
         </head>
         <body>
@@ -1821,7 +1930,7 @@
       const productRows = grouped[ingredientId];
       const head = productRows[0];
       const tableRows = productRows.flatMap((row) => {
-        const mainRow = `<tr><td>${escapeHtml(row.entryDateTime)}</td><td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}<br><small>disp. ${Number(row.availableQty || 0).toFixed(2)} ${escapeHtml(getMeasureAbbr(row.unit || ''))}${row.packageQty ? ` x${row.packageQty}` : ''}</small></td><td>${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td>${includeImages ? (row.invoiceImageUrls?.length ? `Ver adjunto (${row.invoiceImageUrls.length})` : 'Sin imagen') : (row.invoiceImageUrls?.length ? `Posee ${row.invoiceImageUrls.length} imagen/es` : 'Sin imagen')}</td></tr>`;
+        const expiryMeta = getEntryExpiryMeta(row); const expiryBadge = getExpiryBadgeText(row); const detail = formatEntryDetailLabel(row); const strikeClass = expiryMeta.isExpired ? ' style="text-decoration:line-through;font-weight:700;color:#b42338"' : ''; const mainRow = `<tr${expiryMeta.isExpired ? ' style="background:#ffecef"' : ''}><td>${escapeHtml(row.entryDateTime)}${expiryBadge ? `<br><small style="color:#b42338;font-weight:700">${escapeHtml(expiryBadge)}</small>` : ''}</td><td><span${strikeClass}>${escapeHtml(detail.qtyLabel)}</span><br><small${strikeClass}>${escapeHtml(detail.availableLabel)}</small></td><td><span${strikeClass}>${escapeHtml(detail.qtyLabel)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td>${includeImages ? (row.invoiceImageUrls?.length ? `Ver adjunto (${row.invoiceImageUrls.length})` : 'Sin adjunto') : (row.invoiceImageUrls?.length ? `Posee ${row.invoiceImageUrls.length} adjunto/s` : 'Sin adjunto')}</td></tr>`;
         const resolution = getEntryResolutionRowData(row);
         const resolutionRow = resolution ? `<tr style="background:#fff6d9;"><td>${escapeHtml(`↳ ${formatDateTime(resolution.at)}`)}</td><td>${escapeHtml(`-${resolution.resolvedKg.toFixed(2)} kilos`)}</td><td>${escapeHtml(resolution.badge)}</td><td>${escapeHtml(row.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(row.provider || '-')}</td><td>Resolución</td></tr>` : '';
         if (!includeTrace) return [mainRow, resolutionRow].filter(Boolean);
@@ -2097,7 +2206,9 @@
           ? 'FFFFECEF'
           : data.__tone === 'resolution_yellow'
             ? 'FFFFF6D9'
-            : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
+            : data.__tone === 'expired'
+              ? 'FFFFECEF'
+              : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
         row.eachCell((cell) => {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tone } };
           cell.border = {
@@ -2108,6 +2219,13 @@
           };
           cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
         });
+        if (data.__tone === 'expired') {
+          const qtyCol = headers.indexOf('Cantidad') + 1;
+          if (qtyCol > 0) {
+            const qtyCell = row.getCell(qtyCol);
+            qtyCell.font = { ...(qtyCell.font || {}), strike: true, bold: true, color: { argb: 'FFB42338' } };
+          }
+        }
 
         const imgCol = headers.indexOf('Imágenes') + 1;
         if (imgCol > 0 && data.__firstImage) {
@@ -2160,7 +2278,7 @@
       invoiceNumber: '',
       provider: '',
       invoiceImageFile: null,
-      invoiceImageCountLabel: 'Sin imágenes seleccionadas',
+      invoiceImageCountLabel: 'Sin archivos seleccionados',
       tokens: [...record.lotConfig.tokens],
       customAcronym: normalizeValue(record.lotConfig.customAcronym),
       includeSeparator: Boolean(record.lotConfig.includeSeparator),
@@ -2296,13 +2414,13 @@
             </select>
           </div>
           <div class="recipe-field recipe-field-full">
-            <label class="form-label" for="inventoryInvoiceImage"><i class="fa-regular fa-images inventario-step-icon"></i> Adjuntar foto(s)</label>
+            <label class="form-label" for="inventoryInvoiceImage"><i class="fa-regular fa-images inventario-step-icon"></i> Adjuntar archivos (imagen o PDF)</label>
             <label for="inventoryInvoiceImage" class="inventario-upload-dropzone">
               <i class="fa-regular fa-images"></i>
-              <span>Arrastrá imágenes o hacé click para seleccionar</span>
+              <span>Arrastrá adjuntos o hacé click para seleccionar</span>
             </label>
-            <input id="inventoryInvoiceImage" class="form-control image-file-input inventario-hidden-file-input" autocomplete="off" type="file" accept="image/*" multiple>
-            <small id="inventoryInvoiceImageFeedback" class="inventario-file-feedback">${escapeHtml(state.editorDraft.invoiceImageCountLabel || 'Sin imágenes seleccionadas')}</small>
+            <input id="inventoryInvoiceImage" class="form-control image-file-input inventario-hidden-file-input" autocomplete="off" type="file" accept="image/*,application/pdf" multiple>
+            <small id="inventoryInvoiceImageFeedback" class="inventario-file-feedback">${escapeHtml(state.editorDraft.invoiceImageCountLabel || 'Sin archivos seleccionados')}</small>
           </div>
         </div>
           <div class="recipe-table-actions inventario-save-inline">
@@ -2333,8 +2451,8 @@
       state.editorDraft.separator = nodes.editorForm.querySelector('#lotSeparator')?.value || '-';
       const files = [...(nodes.editorForm.querySelector('#inventoryInvoiceImage')?.files || [])];
       state.editorDraft.invoiceImageCountLabel = files.length
-        ? `${files.length} imagen${files.length === 1 ? '' : 'es'} adjunta${files.length === 1 ? '' : 's'} para subir`
-        : 'Sin imágenes seleccionadas';
+        ? `${files.length} archivo${files.length === 1 ? '' : 's'} adjunto${files.length === 1 ? '' : 's'} para subir`
+        : 'Sin archivos seleccionados';
       state.editorDirty = true;
     };
 
@@ -2601,8 +2719,34 @@
       syncDraft();
       const feedback = nodes.editorForm.querySelector('#inventoryInvoiceImageFeedback');
       if (feedback) {
-        feedback.textContent = state.editorDraft.invoiceImageCountLabel || 'Sin imágenes seleccionadas';
+        feedback.textContent = state.editorDraft.invoiceImageCountLabel || 'Sin archivos seleccionados';
       }
+    });
+    const invoiceInput = nodes.editorForm.querySelector('#inventoryInvoiceImage');
+    const invoiceDropzone = nodes.editorForm.querySelector('.inventario-upload-dropzone');
+    const assignDroppedFiles = (fileList) => {
+      if (!invoiceInput || !fileList?.length) return;
+      const dt = new DataTransfer();
+      [...fileList].forEach((file) => dt.items.add(file));
+      invoiceInput.files = dt.files;
+      invoiceInput.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    invoiceDropzone?.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      invoiceDropzone.classList.add('is-dragging');
+    });
+    invoiceDropzone?.addEventListener('dragleave', () => {
+      invoiceDropzone.classList.remove('is-dragging');
+    });
+    invoiceDropzone?.addEventListener('drop', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      invoiceDropzone.classList.remove('is-dragging');
+      assignDroppedFiles(event.dataTransfer?.files || []);
+    });
+    invoiceDropzone?.addEventListener('click', (event) => {
+      event.preventDefault();
+      invoiceInput?.click();
     });
     nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.addEventListener('change', async () => {
       const invoice = normalizeLower(nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value);
@@ -2994,9 +3138,9 @@
     }
 
     for (const file of files) {
-      const message = validateImageFile(file);
+      const message = validateInvoiceFile(file);
       if (message) {
-        await openIosSwal({ title: 'Imagen inválida', html: `<p>${message}</p>`, icon: 'warning', confirmButtonText: 'Entendido' });
+        await openIosSwal({ title: 'Adjunto inválido', html: `<p>${message}</p>`, icon: 'warning', confirmButtonText: 'Entendido' });
         return;
       }
     }
@@ -3077,7 +3221,7 @@
         qty: '',
         invoiceNumber: '',
         provider: '',
-        invoiceImageCountLabel: 'Sin imágenes seleccionadas',
+        invoiceImageCountLabel: 'Sin archivos seleccionados',
         expiryDate: addDaysToIso(getArgentinaIsoDate(), 5),
         entryDate: getArgentinaIsoDate()
       });
@@ -3278,7 +3422,7 @@
               ${hasRne ? `<p class="inventario-provider-line"><strong>N° RNE:</strong> ${escapeHtml(rne.number || 'Sin número')}</p><p class="inventario-provider-line"><strong>Vigencia:</strong> ${validityText}</p>` : ''}
               <div class="inventario-provider-actions inventario-provider-actions-top">
                 <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-edit="${provider.id}"><i class="fa-solid fa-file-pen"></i><span>${hasRne ? 'Editar registro' : 'Cargar Registro'}</span></button>
-                <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-view="${provider.id}" ${normalizeValue(rne.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i><span>Visualizar adjunto</span></button>
+                <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-photo-view="${provider.id}" ${sanitizeImageUrl(provider.photoUrl) ? '' : 'disabled'}><i class="fa-regular fa-image"></i><span>Ver foto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-view="${provider.id}" ${normalizeValue(rne.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i><span>Visualizar adjunto</span></button>
               </div>
             </div>
           </article>`;
@@ -3503,6 +3647,15 @@
             saveProviderInConfig(nextProvider);
             await persistInventario();
             ui.setMode('list');
+            return;
+          }
+
+          const photoViewBtn = event.target.closest('[data-provider-photo-view]');
+          if (photoViewBtn) {
+            const provider = findProviderById(photoViewBtn.dataset.providerPhotoView || '');
+            const photoUrl = sanitizeImageUrl(provider?.photoUrl);
+            if (!photoUrl) return;
+            await openAttachmentViewer([{ invoiceImageUrls: [photoUrl] }], 0, `Foto proveedor · ${provider.name}`);
             return;
           }
 
@@ -3833,12 +3986,12 @@
         'Fecha y hora': row.entryDateTime,
         Producto: row.ingredientName,
         Kilos: `${row.qtyKg.toFixed(2)} kg`,
-        Cantidad: `${row.qty.toFixed(2)} ${row.unit}`,
+        Cantidad: `${formatEntryDetailLabel(row).qtyLabel} · ${formatEntryDetailLabel(row).availableLabel}${getExpiryBadgeText(row) ? ` · ${getExpiryBadgeText(row)}` : ''}`,
         'N° factura': row.invoiceNumber,
         Proveedor: row.provider,
         Imágenes: row.invoiceImageUrls.length ? row.invoiceImageUrls.map((_, index) => `LINK ${index + 1}`).join(', ') : '-',
         __firstImage: row.invoiceImageUrls[0] || '',
-        __tone: 'normal'
+        __tone: getEntryExpiryMeta(row).isExpired ? 'expired' : 'normal'
       };
       const resolution = resolutionRow ? {
         'Fecha y hora': `↳ ${formatDateTime(resolutionRow.at)}`,
@@ -3920,12 +4073,16 @@
   nodes.viewerPrevBtn?.addEventListener('click', () => {
     if (!state.viewerImages.length) return;
     state.viewerIndex = (state.viewerIndex - 1 + state.viewerImages.length) % state.viewerImages.length;
+    state.viewerOffsetX = 0;
+    state.viewerOffsetY = 0;
     setViewerScale(1);
     renderViewerImage();
   });
   nodes.viewerNextBtn?.addEventListener('click', () => {
     if (!state.viewerImages.length) return;
     state.viewerIndex = (state.viewerIndex + 1) % state.viewerImages.length;
+    state.viewerOffsetX = 0;
+    state.viewerOffsetY = 0;
     setViewerScale(1);
     renderViewerImage();
   });

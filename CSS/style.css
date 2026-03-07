@@ -600,24 +600,23 @@ html.login-protected.auth-ok body {
 
 .family-circle-count {
   position: absolute;
-  /* bottom: 6px; */
-  left: -5px;
-  min-width: 24px;
-  height: 24px;
-  text-align: end;
-  border-radius: 0 5px 5px 0;
-  /* border: 1px solid #8a939d; */
-  background: linear-gradient(135deg, #ff4747, #dc0b49);
-  color: #ffffff;
-  font-size: 0.8rem;
+  top: 6px;
+  right: 6px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  background: linear-gradient(135deg, #4269e2, #6f7dff);
+  color: #fff;
+  font-size: 0.62rem;
   font-weight: 800;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  line-height: 2;
+  line-height: 1;
   padding: 0 4px;
   z-index: 3;
-  /* box-shadow: 0 4px 10px rgba(23, 37, 84, 0.25); */
+  box-shadow: 0 4px 10px rgba(23, 37, 84, 0.25);
 }
 
 .family-circle-thumb img {
@@ -1745,6 +1744,13 @@ html.login-protected.auth-ok body {
   max-width: 100%;
   max-height: 52vh;
   transform-origin: center center;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+#viewerImage.is-dragging {
+  cursor: grabbing;
 }
 
 .user-initials-preview {
@@ -4872,6 +4878,11 @@ html.login-protected.auth-ok body {
   cursor: pointer;
   text-align: center;
   padding: 12px;
+}
+
+.inventario-upload-dropzone.is-dragging {
+  border-color: #5e7de8;
+  background: #eaf1ff;
 }
 
 .inventario-hidden-file-input {
