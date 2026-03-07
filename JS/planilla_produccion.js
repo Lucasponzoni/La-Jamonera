@@ -175,24 +175,6 @@
     win.print();
   };
 
-  const printBatch = async (registros, context = {}, onProgress) => {
-    const rows = Array.isArray(registros) ? registros : [];
-    if (!rows.length) return;
-    const printNodes = [];
-    for (let index = 0; index < rows.length; index += 1) {
-      const node = await createPrintableNode(rows[index], context);
-      if (node) printNodes.push(node.outerHTML);
-      onProgress?.(Math.round(((index + 1) / rows.length) * 100));
-    }
-    const win = window.open('', '_blank', 'width=1240,height=900');
-    if (!win) return;
-    win.document.write(`<html><head><title>Planillas masivas</title><link rel="stylesheet" href="./CSS/style.css"></head><body style="padding:8px;background:#ffffff;display:grid;gap:12px;">${printNodes.map((html, index) => `<section style="${index ? 'page-break-before:always;' : ''}">${html}</section>`).join('')}</body></html>`);
-    win.document.close();
-    await waitImages(win.document.body);
-    win.focus();
-    win.print();
-  };
-
   const openByRegistro = async (registro, context = {}) => {
     if (!registro || typeof Swal === 'undefined') return;
     Swal.fire({ title: 'Generando planilla...', html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando planilla" class="meta-spinner-login"></div>', allowOutsideClick: false, showConfirmButton: false, customClass: { popup: 'ios-alert produccion-loading-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' } });
