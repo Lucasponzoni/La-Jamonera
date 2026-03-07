@@ -266,7 +266,7 @@
 
     await Swal.fire({
       title: `Planilla ${escapeHtml(registro.id || '')}`,
-      html: `<div class="planilla-toolbar"><button type="button" class="btn ios-btn ios-btn-secondary" id="planillaPrintBtn"><i class="fa-solid fa-print"></i><span>IMPRIMIR</span></button><button type="button" class="btn ios-btn ios-btn-primary" id="planillaPdfBtn"><i class="fa-solid fa-file-pdf"></i><span>DESCARGAR PDF</span></button></div>${html}`,
+      html: `<div class="planilla-toolbar"><button type="button" class="btn ios-btn ios-btn-secondary" id="planillaPrintBtn"><i class="fa-solid fa-print"></i><span>Imprimir</span></button><button type="button" class="btn ios-btn ios-btn-primary" id="planillaPdfBtn"><i class="fa-solid fa-file-pdf"></i><span>Descargar PDF</span></button></div>${html}`,
       width: '98vw',
       confirmButtonText: 'Cerrar',
       customClass: { popup: 'produccion-trace-alert planilla-modal', confirmButton: 'ios-btn ios-btn-secondary' },
@@ -275,7 +275,7 @@
         const qrTarget = popup.querySelector('#planillaQrTarget');
         if (qrTarget && window.QRCode) {
           // eslint-disable-next-line no-new
-          new window.QRCode(qrTarget, { text: getTraceUrl(registro), width: 170, height: 170, colorDark: '#111827', colorLight: '#ffffff' });
+          new window.QRCode(qrTarget, { text: getTraceUrl(registro), width: 130, height: 130, colorDark: '#111827', colorLight: '#ffffff' });
         }
         if (printable) {
           await waitImages(printable);
