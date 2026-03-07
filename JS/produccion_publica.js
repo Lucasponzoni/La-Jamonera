@@ -63,11 +63,14 @@
     return true;
   };
 
-  const buildDefinition = (registro) => {
+  const buildDefinition = (registro, config = {}) => {
     const ingredients = Array.isArray(registro?.lots) ? registro.lots : [];
     const totalIngredientsKg = ingredients.reduce((sum, item) => sum + Number(item?.neededQty || item?.requiredQty || 0), 0);
     const mermaKg = Math.max(0, totalIngredientsKg - Number(registro?.quantityKg || 0));
-    const manager = Array.isArray(registro?.managers) && registro.managers[0] ? registro.managers[0] : 'Responsable';
+    const managerToken = Array.isArray(registro?.managers) && registro.managers[0] ? registro.managers[0] : '';
+    const userMap = safeObject(config?.usersMap);
+    const managerUser = safeObject(userMap[managerToken]);
+    const manager = normalize(managerUser.fullName || managerUser.name || managerToken || 'Responsable');
     const companyRne = normalize(registro?.traceability?.company?.rne?.number || '-');
     const productRnpa = normalize(registro?.traceability?.product?.rnpa?.number || '-');
     const lines = [
@@ -95,8 +98,11 @@
       const lot = lots[0] || {};
       const nodeId = `ING_${idx + 1}`;
       const rneId = `ING_${idx + 1}_RNE`;
-      lines.push(`${nodeId}["<b>${idx + 1}. ${escapeHtml((plan?.ingredientName || 'Ingrediente').toUpperCase())}</b><br/><b>Usado:</b> ${escapeHtml(String(Number(plan?.neededQty || plan?.requiredQty || 0).toFixed(3)))} ${escapeHtml(plan?.ingredientUnit || plan?.unit || '')}<br/><b>Lote:</b> ${escapeHtml(lot?.lotNumber || lot?.entryId || '-')}<br/><b>Proveedor:</b> ${escapeHtml(lot?.provider || '-')}<br/><b>VTO lote:</b> ${escapeHtml(formatIsoEs(lot?.expiryDate || ''))}"]:::toneIngredient`);
-      lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${escapeHtml(lot?.providerRne?.number || '-')} "]:::toneRegistry`);
+      const traceIngredient = (Array.isArray(registro?.traceability?.ingredients) ? registro.traceability.ingredients : []).find((row) => normalize(row?.ingredientId) === normalize(plan?.ingredientId));
+      const traceLot = (Array.isArray(traceIngredient?.lots) ? traceIngredient.lots : [])[0] || {};
+      const providerRne = normalize(lot?.providerRne?.number || traceLot?.providerRne?.number || '-');
+      lines.push(`${nodeId}["<b>${idx + 1}. ${escapeHtml((plan?.ingredientName || traceIngredient?.ingredientName || 'Ingrediente').toUpperCase())}</b><br/><b>Usado:</b> ${escapeHtml(String(Number(plan?.neededQty || plan?.requiredQty || 0).toFixed(3)))} ${escapeHtml(plan?.ingredientUnit || plan?.unit || '')}<br/><b>Lote:</b> ${escapeHtml(lot?.lotNumber || traceLot?.lotNumber || lot?.entryId || traceLot?.entryId || '-')}<br/><b>Proveedor:</b> ${escapeHtml(lot?.provider || traceLot?.provider || '-')}<br/><b>VTO lote:</b> ${escapeHtml(formatIsoEs(lot?.expiryDate || traceLot?.expiryDate || ''))}"]:::toneIngredient`);
+      lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${escapeHtml(providerRne || '-')}"]:::toneRegistry`);
       lines.push(`I --> ${nodeId}`);
       lines.push(`${nodeId} -.-> ${rneId}`);
     });
@@ -310,8 +316,8 @@
         </div>
         <div class="public-trace-planilla-row"><button id="publicOpenPlanillaBtn" type="button" class="btn ios-btn ios-btn-primary public-open-planilla-btn"><i class="fa-regular fa-file-lines"></i><span>Ver planilla</span></button></div>
       </article>
-      <div class="produccion-trace-mermaid-wrap"><div class="produccion-trace-mermaid" data-public-mermaid><div class="produccion-trace-mermaid-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"><p>Renderizando diagrama...</p></div></div></div>
-      <div class="produccion-trace-ingredients">
+      <div class="produccion-trace-mermaid-wrap"><div class="produccion-trace-mermaid" data-public-mermaid><div class="produccion-trace-mermaid-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"><p>Renderizando diagrama...</p></div><button type="button" class="produccion-trace-mermaid-overlay" data-public-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button></div></div>
+      <p class="produccion-trace-swipe-hint"><i class="fa-solid fa-arrows-left-right"></i> Deslizá para ver más ingredientes</p><div class="produccion-trace-ingredients public-trace-ingredients-scroll">
         ${ingredients.map((item, idx) => {
           const lots = Array.isArray(item?.lots) ? item.lots : [];
           const traceIngredient = traceIngredients.find((row) => normalize(row?.ingredientId) === normalize(item?.ingredientId));
@@ -329,7 +335,7 @@
     </section>`;
 
     dataNode.querySelector('#publicOpenPlanillaBtn')?.addEventListener('click', async () => {
-      await window.laJamoneraPlanillaProduccion?.openByRegistro?.(registro, { usersMap: safeObject(config?.usersMap) });
+      await window.laJamoneraPlanillaProduccion?.openByRegistro?.(registro, { usersMap: safeObject(config?.usersMap), forceModalOnMobile: true });
     });
     dataNode.querySelector('#publicCompanyRneAttachmentBtn')?.addEventListener('click', async () => openWithMainViewer([companyRneAttachment], 'Adjunto RNE empresa'));
     dataNode.querySelector('#publicRnpaAttachmentBtn')?.addEventListener('click', async () => openWithMainViewer([rnpaAttachment], 'Adjunto RNPA'));
@@ -350,9 +356,14 @@
       const hasMermaid = await ensureMermaid();
       if (hasMermaid) {
         try {
-          const rendered = await window.mermaid.render(`public_trace_${Date.now()}`, buildDefinition(registro));
-          mermaidHost.innerHTML = rendered.svg;
-          initMermaidZoom(mermaidHost);
+          const rendered = await window.mermaid.render(`public_trace_${Date.now()}`, buildDefinition(registro, config));
+          mermaidHost.innerHTML = `${rendered.svg}<button type="button" class="produccion-trace-mermaid-overlay is-ready" data-public-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button>`;
+          const overlay = mermaidHost.querySelector('[data-public-mermaid-overlay]');
+          const activate = () => {
+            overlay?.classList.add('d-none');
+            initMermaidZoom(mermaidHost);
+          };
+          overlay?.addEventListener('click', activate, { once: true });
         } catch (error) {
           mermaidHost.innerHTML = '<p class="m-0">No se pudo renderizar el diagrama.</p>';
         }

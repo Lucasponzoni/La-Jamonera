@@ -182,7 +182,7 @@
     Swal.close();
     if (!printable) return;
 
-    if (window.matchMedia('(max-width: 768px)').matches) {
+    if (window.matchMedia('(max-width: 768px)').matches && !context.forceModalOnMobile) {
       await printPlanilla(printable, registro);
       return;
     }
