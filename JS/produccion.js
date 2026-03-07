@@ -1720,6 +1720,38 @@
     lines.push('classDef toneRegistry fill:#e7efff,stroke:#8eaedf,color:#173d73,stroke-width:1.35px;');
     return lines.join('\n');
   };
+  const renderTraceabilityFallbackDiagram = (registro) => {
+    const ingredients = Array.isArray(registro?.lots) ? registro.lots : [];
+    const manager = (Array.isArray(registro?.managers) && registro.managers[0])
+      ? getManagerDisplay(registro.managers[0]).name
+      : 'Sin encargado';
+    const productionDate = normalizeValue(registro?.productionDate) || toIsoDate(registro?.createdAt || nowTs());
+    const companyRne = resolveCompanyRneFromRegistro(registro);
+    const productRnpa = resolveRecipeRnpaFromRegistro(registro);
+    const totalIngredientsKg = ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0);
+    const mermaKg = Math.max(0, totalIngredientsKg - Number(registro?.quantityKg || 0));
+    const productLabel = normalizeValue(registro?.recipeTitle || 'Producto');
+    const ingredientRows = ingredients.map((item, index) => {
+      const firstLot = Array.isArray(item?.lots) && item.lots[0] ? item.lots[0] : {};
+      return `<li><strong>${index + 1}. ${escapeHtml(item?.ingredientName || 'Ingrediente')}</strong><span>${escapeHtml(formatCompactQty(item?.requiredQty ?? item?.neededQty, item?.unit || item?.ingredientUnit || ''))} · Lote ${escapeHtml(firstLot?.lotNumber || firstLot?.entryId || '-')}</span></li>`;
+    }).join('');
+    return `<div class="produccion-trace-fallback-diagram" aria-label="Diagrama alternativo de trazabilidad">
+      <div class="produccion-trace-fallback-flow">
+        <article class="produccion-trace-fallback-node"><small>Empresa</small><strong>${escapeHtml(COMPANY_LEGAL_NAME)}</strong><span>RNE ${escapeHtml(companyRne.number || '-')}</span></article>
+        <span class="produccion-trace-fallback-arrow">→</span>
+        <article class="produccion-trace-fallback-node"><small>Producto</small><strong>${escapeHtml(productLabel)}</strong><span>RNPA ${escapeHtml(productRnpa.number || '-')}</span></article>
+        <span class="produccion-trace-fallback-arrow">→</span>
+        <article class="produccion-trace-fallback-node"><small>Producción</small><strong>${Number(registro?.quantityKg || 0).toFixed(2)} kg</strong><span>${escapeHtml(formatIsoEs(productionDate))}</span></article>
+      </div>
+      <div class="produccion-trace-fallback-meta">
+        <p><strong>Encargado:</strong> ${escapeHtml(manager)}</p>
+        <p><strong>Total ingredientes:</strong> ${totalIngredientsKg.toFixed(3)} kg</p>
+        <p><strong>Merma:</strong> ${mermaKg.toFixed(3)} kg</p>
+      </div>
+      <ul class="produccion-trace-fallback-list">${ingredientRows || '<li><strong>Sin ingredientes</strong><span>No hay lotes asociados en este registro.</span></li>'}</ul>
+    </div>`;
+  };
+
   const renderTraceabilityTree = (registro) => {
     const companyRne = resolveCompanyRneFromRegistro(registro);
     const productRnpa = resolveRecipeRnpaFromRegistro(registro);
@@ -1808,20 +1840,34 @@
   const initTraceMermaidDiagram = async (popup, registro) => {
     const host = popup.querySelector('[data-trace-mermaid]');
     if (!host) return;
+    host.innerHTML = '<div class="produccion-trace-mermaid-loading" aria-live="polite"><img src="./IMG/Meta-ai-logo.webp" alt="Renderizando diagrama" class="meta-spinner-login"><p>Generando diagrama...</p></div>';
     const hasLib = await ensureTraceDiagramLib();
     if (!hasLib) {
       host.innerHTML = '<p class="m-0">No se pudo cargar Mermaid.</p>';
       return;
     }
     const source = buildTraceMermaidDefinition(registro);
-    host.innerHTML = `<pre class="mermaid">${source}</pre>`;
     try {
-      await window.mermaid.run({ nodes: [host.querySelector('.mermaid')] });
+      const renderId = `trace_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const rendered = await window.mermaid.render(renderId, source);
+      if (!rendered || !rendered.svg) throw new Error('Mermaid render vacío');
+      host.innerHTML = rendered.svg;
       host.dataset.traceScale = '1';
       host.style.transformOrigin = 'top left';
       host.style.transform = 'scale(1)';
-    } catch (error) {
-      host.innerHTML = '<p class="m-0">No se pudo renderizar el diagrama.</p>';
+      return;
+    } catch (primaryError) {
+      host.innerHTML = `<pre class="mermaid">${source}</pre>`;
+      try {
+        const node = host.querySelector('.mermaid');
+        if (!node) throw new Error('Nodo Mermaid ausente');
+        await window.mermaid.run({ nodes: [node] });
+        host.dataset.traceScale = '1';
+        host.style.transformOrigin = 'top left';
+        host.style.transform = 'scale(1)';
+      } catch (fallbackError) {
+        host.innerHTML = renderTraceabilityFallbackDiagram(registro);
+      }
     }
   };
   const initTraceMermaidZoomControls = (popup) => {
