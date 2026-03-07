@@ -2759,8 +2759,8 @@ html.login-protected.auth-ok body {
 }
 
 .receta-thumb-wrap {
-  width: 52px;
-  height: 52px;
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
   border: 1px solid #d8e1f6;
   background: #edf2fd;
