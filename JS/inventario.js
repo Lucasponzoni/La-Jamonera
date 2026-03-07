@@ -3409,8 +3409,8 @@
               const hasKg = summary.kg > 0.0001;
               const hasUnits = summary.units > 0.0001;
               bubble.className = `inventario-day-kg ${hasKg && hasUnits ? 'is-mixed' : ''}`;
-              bubble.style.top = (Number(dayElem.dateObj?.getDate() || 0) % 2 === 0) ? '4px' : 'auto';
-              bubble.style.bottom = (Number(dayElem.dateObj?.getDate() || 0) % 2 === 0) ? 'auto' : '4px';
+              bubble.style.top = (Number(dayElem.dateObj?.getDate() || 0) % 2 === 0) ? '-2px' : 'auto';
+              bubble.style.bottom = (Number(dayElem.dateObj?.getDate() || 0) % 2 === 0) ? 'auto' : '-2px';
               bubble.textContent = hasKg && hasUnits
                 ? `${Number(summary.kg || 0).toFixed(0)}kg + ${Number(summary.units || 0).toFixed(0)}u.`
                 : hasKg
