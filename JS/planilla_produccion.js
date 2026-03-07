@@ -9,8 +9,6 @@
     .replace(/'/g, '&#39;');
 
   const TRACE_BASE_URL = normalizeValue(window.TRACE_BASE_URL) || 'https://lucasponzoni.github.io/La-Jamonera/';
-  const CORS_PROXY_URL = normalizeValue(window.CORS_PROXY_URL) || 'https://proxy.cors.sh/';
-  const CORS_PROXY_KEY = normalizeValue(window.CORS_PROXY_KEY) || 'live_36d58f4c13cb7d838833506e8f6450623bf2605859ac089fa008cfeddd29d8dd';
 
   const formatIsoEs = (iso) => {
     const text = normalizeValue(iso);
@@ -119,50 +117,14 @@
     img.addEventListener('error', resolve, { once: true });
   }))));
 
-  const blobToDataUrl = (blob) => new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result || '');
-    reader.readAsDataURL(blob);
-  });
-
-  const showProgress = (title, value, text = '') => {
-    const safeValue = Math.max(0, Math.min(100, Number(value) || 0));
-    return Swal.fire({
-      title,
-      html: `<div class="planilla-progress-wrap"><div class="planilla-progress-bar"><span style="width:${safeValue}%;"></span></div><p class="planilla-progress-text">${safeValue}% ${escapeHtml(text)}</p></div>`,
-      allowOutsideClick: false,
-      showConfirmButton: false,
-      customClass: { popup: 'ios-alert produccion-loading-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' }
-    });
+  const renderQr = (host, registro) => {
+    if (!host || !window.QRCode) return;
+    host.innerHTML = '';
+    // eslint-disable-next-line no-new
+    new window.QRCode(host, { text: getTraceUrl(registro), width: 130, height: 130, colorDark: '#111827', colorLight: '#ffffff' });
   };
 
-  const fetchImageAsDataUrl = async (src) => {
-    if (!src || /^data:/i.test(src)) return src;
-    const proxyUrl = `${CORS_PROXY_URL}${encodeURIComponent(src)}`;
-    const response = await fetch(proxyUrl, { headers: { 'x-cors-api-key': CORS_PROXY_KEY } });
-    if (!response.ok) return '';
-    return blobToDataUrl(await response.blob());
-  };
-
-  const makePdfSafeClone = async (root, onProgress) => {
-    const clone = root.cloneNode(true);
-    const images = [...clone.querySelectorAll('img')];
-    for (let index = 0; index < images.length; index += 1) {
-      const img = images[index];
-      const src = normalizeValue(img.getAttribute('src'));
-      if (src && !/^data:/i.test(src)) {
-        try {
-          const dataUrl = await fetchImageAsDataUrl(src);
-          if (dataUrl) img.setAttribute('src', dataUrl);
-        } catch (error) {
-        }
-      }
-      onProgress?.(20 + Math.round(((index + 1) / Math.max(1, images.length)) * 40));
-    }
-    return clone;
-  };
-
-  const printPlanilla = async (root) => {
+  const printPlanilla = async (root, registro) => {
     const win = window.open('', '_blank', 'width=1240,height=900');
     if (!win) return;
     win.document.write(`<html><head><title>Planilla de producción</title><link rel="stylesheet" href="./CSS/style.css"></head><body style="padding:8px;background:#ffffff;">${root.outerHTML}</body></html>`);
@@ -170,6 +132,10 @@
     await new Promise((resolve) => setTimeout(resolve, 240));
     const printRoot = win.document.querySelector('#planillaProduccionPrintable');
     if (printRoot?.querySelector('.planilla-summary-grid')) printRoot.querySelector('.planilla-summary-grid').style.gridTemplateColumns = '1fr 1fr';
+    const qrHost = win.document.querySelector('#planillaQrTarget');
+    if (qrHost && window.QRCode) {
+      renderQr(qrHost, registro);
+    }
     await waitImages(win.document.body);
     win.focus();
     win.print();
@@ -178,37 +144,35 @@
   const createPrintableNode = async (registro, context = {}) => {
     await ensureQrLib();
     const wrapper = document.createElement('div');
+    wrapper.style.position = 'fixed';
+    wrapper.style.left = '-99999px';
+    wrapper.style.top = '0';
     wrapper.innerHTML = buildPlanillaHtml(registro, context);
+    document.body.appendChild(wrapper);
     const printable = wrapper.querySelector('#planillaProduccionPrintable');
-    if (!printable) return null;
-    const qrTarget = printable.querySelector('#planillaQrTarget');
-    if (qrTarget && window.QRCode) {
-      // eslint-disable-next-line no-new
-      new window.QRCode(qrTarget, { text: getTraceUrl(registro), width: 130, height: 130, colorDark: '#111827', colorLight: '#ffffff' });
-    }
-    return printable;
+    renderQr(printable?.querySelector('#planillaQrTarget'), registro);
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    const clone = printable ? printable.cloneNode(true) : null;
+    wrapper.remove();
+    return clone;
   };
 
-  const downloadPdf = async (root, id) => {
-    if (!window.html2canvas || !window.jspdf?.jsPDF) return;
-    await showProgress('Generando PDF...', 5, 'Iniciando');
-    const clone = await makePdfSafeClone(root, (value) => showProgress('Generando PDF...', value, 'Procesando adjuntos'));
-    clone.style.position = 'fixed';
-    clone.style.left = '-99999px';
-    clone.style.top = '0';
-    document.body.appendChild(clone);
-    await waitImages(clone);
-    await showProgress('Generando PDF...', 70, 'Renderizando');
-    const canvas = await window.html2canvas(clone, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-    clone.remove();
-    const pdf = new window.jspdf.jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const ratio = Math.min(pageWidth / canvas.width, pageHeight / canvas.height);
-    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', (pageWidth - (canvas.width * ratio)) / 2, 4, canvas.width * ratio, canvas.height * ratio);
-    await showProgress('Generando PDF...', 100, 'Listo');
-    pdf.save(`planilla_${normalizeValue(id) || Date.now()}.pdf`);
-    Swal.close();
+  const printBatch = async (registros, context = {}, onProgress) => {
+    const rows = Array.isArray(registros) ? registros : [];
+    if (!rows.length) return;
+    const printNodes = [];
+    for (let index = 0; index < rows.length; index += 1) {
+      const node = await createPrintableNode(rows[index], context);
+      if (node) printNodes.push(node.outerHTML);
+      onProgress?.(Math.round(((index + 1) / rows.length) * 100));
+    }
+    const win = window.open('', '_blank', 'width=1240,height=900');
+    if (!win) return;
+    win.document.write(`<html><head><title>Planillas masivas</title><link rel="stylesheet" href="./CSS/style.css"></head><body style="padding:8px;background:#ffffff;display:grid;gap:12px;">${printNodes.map((html, index) => `<section style="${index ? 'page-break-before:always;' : ''}">${html}</section>`).join('')}</body></html>`);
+    win.document.close();
+    await waitImages(win.document.body);
+    win.focus();
+    win.print();
   };
 
   const printBatch = async (registros, context = {}, onProgress) => {
@@ -237,22 +201,22 @@
     if (!printable) return;
 
     if (window.matchMedia('(max-width: 768px)').matches) {
-      await printPlanilla(printable);
+      await printPlanilla(printable, registro);
       return;
     }
 
     await Swal.fire({
       title: `Planilla ${escapeHtml(registro.id || '')}`,
-      html: `<div class="planilla-toolbar"><button type="button" class="btn ios-btn ios-btn-secondary" id="planillaPrintBtn"><i class="fa-solid fa-print"></i><span>Imprimir</span></button><button type="button" class="btn ios-btn ios-btn-primary" id="planillaPdfBtn"><i class="fa-solid fa-file-pdf"></i><span>Descargar PDF</span></button></div>${printable.outerHTML}`,
+      html: `<div class="planilla-toolbar"><button type="button" class="btn ios-btn ios-btn-secondary" id="planillaPrintBtn"><i class="fa-solid fa-print"></i><span>Imprimir</span></button></div>${printable.outerHTML}`,
       width: '98vw',
       confirmButtonText: 'Cerrar',
       customClass: { popup: 'produccion-trace-alert planilla-modal', confirmButton: 'ios-btn ios-btn-secondary' },
       didOpen: async (popup) => {
         const node = popup.querySelector('#planillaProduccionPrintable');
         if (!node) return;
+        renderQr(node.querySelector('#planillaQrTarget'), registro);
         await waitImages(node);
-        popup.querySelector('#planillaPrintBtn')?.addEventListener('click', async () => printPlanilla(node));
-        popup.querySelector('#planillaPdfBtn')?.addEventListener('click', async () => downloadPdf(node, registro.id));
+        popup.querySelector('#planillaPrintBtn')?.addEventListener('click', async () => printPlanilla(node, registro));
       }
     });
   };

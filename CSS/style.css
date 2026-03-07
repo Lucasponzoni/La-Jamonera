@@ -4977,6 +4977,11 @@ html.login-protected.auth-ok body {
     width: 100%;
   }
 
+  .inventario-period-actions-scroll {
+    width: 100%;
+    max-width: 100%;
+  }
+
   .inventario-collapse-head-styled {
     flex-direction: column;
     align-items: flex-start;
@@ -5015,6 +5020,7 @@ html.login-protected.auth-ok body {
   #produccionGlobalExcelBtn,
   #inventarioGlobalPrintBtn,
   #produccionGlobalPrintBtn,
+  #produccionGlobalMassPlanillasBtn,
   .inventario-period-divider {
     grid-row: auto;
   }

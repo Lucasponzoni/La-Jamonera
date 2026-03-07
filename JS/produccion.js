@@ -3555,7 +3555,11 @@
     const uniqueRecipes = Object.values(rows.reduce((acc, row) => {
       const id = normalizeValue(row.recipeId || row.recipeTitle || row.id);
       if (!id) return acc;
-      if (!acc[id]) acc[id] = { id, title: normalizeValue(row.recipeTitle) || 'Sin nombre' };
+      if (!acc[id]) {
+        const recipe = safeObject(state.recetas?.[row.recipeId]);
+        const imageUrl = normalizeValue(recipe.imageUrl || row?.traceability?.product?.imageUrl);
+        acc[id] = { id, title: normalizeValue(row.recipeTitle) || normalizeValue(recipe.title) || 'Sin nombre', imageUrl };
+      }
       return acc;
     }, {}));
 
@@ -3565,7 +3569,7 @@
         <label class="inventario-check-row"><input type="radio" name="massPlanillaScope" value="all" checked><span>Incluir todos los productos</span></label>
         <label class="inventario-check-row"><input type="radio" name="massPlanillaScope" value="exclude"><span>Excluir algunos productos</span></label>
         <div id="massPlanillasScope" class="notify-specific-users-list d-none">
-          <div class="step-block"><strong>Productos</strong>${uniqueRecipes.map((item) => `<label class="inventario-check-row inventario-selector-row"><input type="checkbox" data-mass-planilla-recipe value="${escapeHtml(item.id)}"><span>${escapeHtml(item.title)}</span></label>`).join('')}</div>
+          <div class="step-block"><strong>Productos</strong>${uniqueRecipes.map((item) => `<label class="inventario-check-row inventario-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}"></span>` : ''}<input type="checkbox" data-mass-planilla-recipe value="${escapeHtml(item.id)}"><span>${escapeHtml(item.title)}</span></label>`).join('')}</div>
         </div>
       </div>`,
       showCancelButton: true,
@@ -3578,6 +3582,7 @@
         const toggle = () => list?.classList.toggle('d-none', !exclude?.checked);
         all?.addEventListener('change', toggle);
         exclude?.addEventListener('change', toggle);
+        prepareThumbLoaders('.js-produccion-thumb');
       },
       preConfirm: () => {
         const mode = document.querySelector('input[name="massPlanillaScope"]:checked')?.value || 'all';
