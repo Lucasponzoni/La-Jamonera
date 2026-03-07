@@ -123,15 +123,38 @@
         await window.laJamoneraOpenImageViewer([{ invoiceImageUrls: cleanUrls }], 0, title);
         return;
       } catch (error) {
-        // fallback local cuando el visor principal no puede abrir en esta página pública
       }
     }
+    let index = 0;
+    const isPdf = (url) => /\.pdf($|\?)/i.test(String(url || ''));
+    const render = () => {
+      const current = cleanUrls[index];
+      const media = isPdf(current)
+        ? `<iframe src="${escapeHtml(current)}" class="public-viewer-doc" title="Documento PDF"></iframe>`
+        : `<img src="${escapeHtml(current)}" class="public-viewer-image" alt="Adjunto">`;
+      return `<div class="public-viewer-wrap"><div class="public-viewer-stage">${media}</div><div class="public-viewer-footer"><button type="button" class="btn ios-btn ios-btn-secondary" id="publicViewerPrevBtn" ${index <= 0 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>${index + 1} / ${cleanUrls.length}</span><button type="button" class="btn ios-btn ios-btn-secondary" id="publicViewerNextBtn" ${index >= cleanUrls.length - 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div></div>`;
+    };
     await Swal.fire({
       title,
-      html: `<div class="attachments-grid" style="grid-template-columns:1fr;">${cleanUrls.map((url) => `<article class="attachment-card" style="aspect-ratio:auto;"><img src="${escapeHtml(url)}" class="attachment-image is-loaded" style="opacity:1;max-height:72vh;object-fit:contain;" alt="Adjunto"></article>`).join('')}</div>`,
-      width: '92vw',
+      html: render(),
+      width: '94vw',
       confirmButtonText: 'Cerrar',
-      customClass: { popup: 'ios-alert ingredientes-alert', confirmButton: 'ios-btn ios-btn-secondary' }
+      customClass: { popup: 'produccion-trace-alert', confirmButton: 'ios-btn ios-btn-secondary' },
+      didOpen: (popup) => {
+        const bind = () => {
+          popup.querySelector('#publicViewerPrevBtn')?.addEventListener('click', () => {
+            index = Math.max(0, index - 1);
+            Swal.update({ html: render() });
+            bind();
+          });
+          popup.querySelector('#publicViewerNextBtn')?.addEventListener('click', () => {
+            index = Math.min(cleanUrls.length - 1, index + 1);
+            Swal.update({ html: render() });
+            bind();
+          });
+        };
+        bind();
+      }
     });
   };
 
