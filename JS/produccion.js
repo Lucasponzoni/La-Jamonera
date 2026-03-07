@@ -1717,21 +1717,28 @@
     }
 
     ingredients.forEach((item, index) => {
-      const lot = Array.isArray(item?.lots) && item.lots[0] ? item.lots[0] : {};
+      const lots = Array.isArray(item?.lots) && item.lots.length ? item.lots : [{}];
       const nodeId = safeNodeId(`ING_${index + 1}_${item?.ingredientId || ''}`, `ING_${index + 1}`);
-      const rneId = `${nodeId}_RNE`;
       const nodeLabel = [
         `<b>${index + 1}. ${esc((item?.ingredientName || 'Ingrediente').toUpperCase())}</b>`,
-        `<b>Usado:</b> ${esc(formatCompactQty(item?.requiredQty ?? item?.neededQty, item?.unit || item?.ingredientUnit || ''))}`,
-        `<b>Lote:</b> ${esc(lot?.lotNumber || lot?.entryId || '-')}`,
-        `<b>VTO lote:</b> ${esc(formatIsoEs(lot?.expiryDate) || '-')}`,
-        `<b>Proveedor:</b> ${esc(lot?.provider || '-')}`
+        `<b>Usado total:</b> ${esc(formatCompactQty(item?.requiredQty ?? item?.neededQty, item?.unit || item?.ingredientUnit || ''))}`,
+        `<b>Lotes usados:</b> ${lots.length}`
       ].join('<br/>');
-      const providerRne = resolveProviderRneFromLot(lot);
       lines.push(`${nodeId}["${nodeLabel}"]:::toneIngredient`);
-      lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${esc(providerRne.number || '-')}"]:::toneRegistry`);
       lines.push(`I --> ${nodeId}`);
-      lines.push(`${nodeId} -.-> ${rneId}`);
+      let previousLotNodeId = '';
+      lots.forEach((lot, lotIndex) => {
+        const lotNodeId = `${nodeId}_LOT_${lotIndex + 1}`;
+        const rneId = `${lotNodeId}_RNE`;
+        const providerRne = resolveProviderRneFromLot(lot);
+        const lotQty = Number(lot?.takeQty || 0);
+        lines.push(`${lotNodeId}["<b>LOTE ${lotIndex + 1}</b><br/>${esc(lot?.lotNumber || lot?.entryId || '-')}<br/><b>Usado:</b> ${esc(formatCompactQty(lotQty, lot?.unit || item?.unit || item?.ingredientUnit || ''))}<br/><b>Proveedor:</b> ${esc(lot?.provider || '-')}"]:::toneLot`);
+        lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${esc(providerRne.number || '-')}"]:::toneRegistry`);
+        lines.push(`${nodeId} -.->|LOTE ${lotIndex + 1}| ${lotNodeId}`);
+        lines.push(`${lotNodeId} -.->|RNE| ${rneId}`);
+        if (previousLotNodeId) lines.push(`${previousLotNodeId} -.-> ${lotNodeId}`);
+        previousLotNodeId = lotNodeId;
+      });
     });
 
     lines.push('linkStyle default stroke:#6e83a7,stroke-width:1.8px;');
@@ -2968,8 +2975,16 @@
       if (event.target.closest('#produccionRecipeHistoryExpandBtn')) {
         const rows = getRecipeHistoryRows();
         const collapseMap = { ...state.historyTraceCollapse };
-        const renderRows = () => rows.length
-          ? rows.map((item, index) => {
+        let expandedPage = 1;
+        const EXPANDED_PAGE_SIZE = 12;
+        const totalPages = () => Math.max(1, Math.ceil(rows.length / EXPANDED_PAGE_SIZE));
+        const getPageRows = () => {
+          expandedPage = Math.min(Math.max(1, expandedPage), totalPages());
+          const start = (expandedPage - 1) * EXPANDED_PAGE_SIZE;
+          return rows.slice(start, start + EXPANDED_PAGE_SIZE);
+        };
+        const renderRows = () => getPageRows().length
+          ? getPageRows().map((item, index) => {
             const manager = getManagerLabel(item);
             const traceRows = getTraceRowsFromRegistro(item);
             const isCollapsed = collapseMap[item.id] === true;
@@ -2986,7 +3001,8 @@
           const traceableRows = rows.filter((item) => getTraceRowsFromRegistro(item).length);
           const canCollapseRows = traceableRows.some((item) => collapseMap[item.id] !== true);
           const canExpandRows = traceableRows.some((item) => collapseMap[item.id] === true);
-          host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeExpandedHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeExpandedHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th></tr></thead><tbody>${renderRows()}</tbody></table></div>`;
+          const pages = totalPages();
+          host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeExpandedHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeExpandedHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th></tr></thead><tbody>${renderRows()}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-recipe-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-recipe-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
           prepareThumbLoaders('.js-produccion-thumb');
         };
         await openIosSwal({
@@ -3016,6 +3032,12 @@
               if (collapseBtn) {
                 const prodId = collapseBtn.dataset.recipeProdCollapse;
                 collapseMap[prodId] = !collapseMap[prodId];
+                renderExpandedContent(popup);
+                return;
+              }
+              const pageBtn = clickEvent.target.closest('[data-recipe-expanded-page]');
+              if (pageBtn) {
+                expandedPage += pageBtn.dataset.recipeExpandedPage === 'next' ? 1 : -1;
                 renderExpandedContent(popup);
                 return;
               }
@@ -3528,11 +3550,19 @@
   nodes.historyExpandBtn?.addEventListener('click', async () => {
     const rows = getHistoryRows();
     const collapseMap = { ...state.historyTraceCollapse };
+    let expandedPage = 1;
+    const EXPANDED_PAGE_SIZE = 12;
     rows.forEach((item) => {
       if (collapseMap[item.id] !== undefined) return;
       if (getTraceRowsFromRegistro(item).length) collapseMap[item.id] = true;
     });
-    const renderRows = () => rows.length ? rows.map((item, index) => {
+    const totalPages = () => Math.max(1, Math.ceil(rows.length / EXPANDED_PAGE_SIZE));
+    const getPageRows = () => {
+      expandedPage = Math.min(Math.max(1, expandedPage), totalPages());
+      const start = (expandedPage - 1) * EXPANDED_PAGE_SIZE;
+      return rows.slice(start, start + EXPANDED_PAGE_SIZE);
+    };
+    const renderRows = () => getPageRows().length ? getPageRows().map((item, index) => {
       const manager = getManagerLabel(item);
       const traceRows = getTraceRowsFromRegistro(item);
       const isCollapsed = collapseMap[item.id] === true;
@@ -3556,7 +3586,8 @@
       const traceableRows = rows.filter((item) => getTraceRowsFromRegistro(item).length);
       const canCollapseRows = traceableRows.some((item) => collapseMap[item.id] !== true);
       const canExpandRows = traceableRows.some((item) => collapseMap[item.id] === true);
-      host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionExpandedHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionExpandedHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th></tr></thead><tbody>${renderRows()}</tbody></table></div>`;
+      const pages = totalPages();
+      host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionExpandedHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionExpandedHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th></tr></thead><tbody>${renderRows()}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-prod-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-prod-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
       prepareThumbLoaders('.js-produccion-thumb');
     };
     await openIosSwal({
@@ -3585,6 +3616,12 @@
           if (collapseBtn) {
             const prodId = collapseBtn.dataset.prodExpandedCollapse;
             collapseMap[prodId] = !collapseMap[prodId];
+            renderExpandedContent(popup);
+            return;
+          }
+          const pageBtn = event.target.closest('[data-prod-expanded-page]');
+          if (pageBtn) {
+            expandedPage += pageBtn.dataset.prodExpandedPage === 'next' ? 1 : -1;
             renderExpandedContent(popup);
             return;
           }

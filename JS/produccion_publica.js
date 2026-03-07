@@ -120,17 +120,25 @@
       'I --> W'
     ];
     ingredients.forEach((plan, idx) => {
-      const lots = Array.isArray(plan?.lots) ? plan.lots : [];
-      const lot = lots[0] || {};
+      const lots = Array.isArray(plan?.lots) && plan.lots.length ? plan.lots : [{}];
       const nodeId = `ING_${idx + 1}`;
-      const rneId = `ING_${idx + 1}_RNE`;
       const traceIngredient = (Array.isArray(registro?.traceability?.ingredients) ? registro.traceability.ingredients : []).find((row) => normalize(row?.ingredientId) === normalize(plan?.ingredientId));
-      const traceLot = (Array.isArray(traceIngredient?.lots) ? traceIngredient.lots : [])[0] || {};
-      const providerRne = normalize(lot?.providerRne?.number || traceLot?.providerRne?.number || '-');
-      lines.push(`${nodeId}["<b>${idx + 1}. ${escapeHtml((plan?.ingredientName || traceIngredient?.ingredientName || 'Ingrediente').toUpperCase())}</b><br/><b>Usado:</b> ${escapeHtml(String(Number(plan?.neededQty || plan?.requiredQty || 0).toFixed(3)))} ${escapeHtml(plan?.ingredientUnit || plan?.unit || '')}<br/><b>Lote:</b> ${escapeHtml(lot?.lotNumber || traceLot?.lotNumber || lot?.entryId || traceLot?.entryId || '-')}<br/><b>Proveedor:</b> ${escapeHtml(lot?.provider || traceLot?.provider || '-')}<br/><b>VTO lote:</b> ${escapeHtml(formatIsoEs(lot?.expiryDate || traceLot?.expiryDate || ''))}"]:::toneIngredient`);
-      lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${escapeHtml(providerRne || '-')}"]:::toneRegistry`);
+      lines.push(`${nodeId}["<b>${idx + 1}. ${escapeHtml((plan?.ingredientName || traceIngredient?.ingredientName || 'Ingrediente').toUpperCase())}</b><br/><b>Usado total:</b> ${escapeHtml(String(Number(plan?.neededQty || plan?.requiredQty || 0).toFixed(3)))} ${escapeHtml(plan?.ingredientUnit || plan?.unit || '')}<br/><b>Lotes usados:</b> ${lots.length}"]:::toneIngredient`);
       lines.push(`I --> ${nodeId}`);
-      lines.push(`${nodeId} -.-> ${rneId}`);
+      let previousLotNodeId = '';
+      lots.forEach((lot, lotIndex) => {
+        const traceLot = (Array.isArray(traceIngredient?.lots) ? traceIngredient.lots : [])[lotIndex] || {};
+        const lotNodeId = `${nodeId}_LOT_${lotIndex + 1}`;
+        const rneId = `${lotNodeId}_RNE`;
+        const providerRne = normalize(lot?.providerRne?.number || traceLot?.providerRne?.number || '-');
+        const takeQty = Number(lot?.takeQty || traceLot?.takeQty || 0);
+        lines.push(`${lotNodeId}["<b>LOTE ${lotIndex + 1}</b><br/>${escapeHtml(lot?.lotNumber || traceLot?.lotNumber || lot?.entryId || traceLot?.entryId || '-')}<br/><b>Usado:</b> ${escapeHtml(takeQty.toFixed(3))} ${escapeHtml(lot?.unit || plan?.ingredientUnit || plan?.unit || '')}<br/><b>Proveedor:</b> ${escapeHtml(lot?.provider || traceLot?.provider || '-')}<br/><b>VTO:</b> ${escapeHtml(formatIsoEs(lot?.expiryDate || traceLot?.expiryDate || ''))}"]:::toneLot`);
+        lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${escapeHtml(providerRne || '-')}"]:::toneRegistry`);
+        lines.push(`${nodeId} -.->|LOTE ${lotIndex + 1}| ${lotNodeId}`);
+        lines.push(`${lotNodeId} -.->|RNE| ${rneId}`);
+        if (previousLotNodeId) lines.push(`${previousLotNodeId} -.-> ${lotNodeId}`);
+        previousLotNodeId = lotNodeId;
+      });
     });
     lines.push('linkStyle default stroke:#6e83a7,stroke-width:1.8px;');
     lines.push('classDef toneCompany fill:#2f6ecf,stroke:#1f57ad,color:#ffffff,stroke-width:1.8px;');

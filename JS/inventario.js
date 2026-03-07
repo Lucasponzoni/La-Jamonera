@@ -2417,6 +2417,7 @@
           </div>
           <div class="inventario-head-actions-row">
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-head-action" id="inventarioProductThresholdBtn"><i class="fa-solid fa-sliders"></i><span>Configurar umbrales</span></button>
+            <button type="button" class="btn ios-btn ios-btn-secondary inventario-head-action" id="inventarioWeeklySheetBtn"><i class="fa-regular fa-file-lines"></i><span>Planilla Semanal</span></button>
             <button type="button" id="inventarioEditIngredientBtn" class="btn ios-btn ios-btn-success inventario-head-action"><i class="fa-solid fa-pen"></i><span>Editar ingrediente</span></button>
           </div>
         </div>
