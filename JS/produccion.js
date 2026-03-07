@@ -1040,7 +1040,7 @@
           <section class="recipe-step-card step-block inventario-lot-section mt-2 produccion-config-section">
             <button type="button" class="inventario-collapse-head inventario-collapse-head-styled produccion-config-toggle" id="logoCompanyToggleBtn" aria-expanded="false">
               <span><span class="recipe-step-number">2</span> <i class="bi bi-building"></i> <strong>Logo Empresa</strong></span>
-              <span class="inventario-collapse-summary"><strong>Subir, reemplazar y visualizar</strong></span>
+              <span class="inventario-collapse-summary"><strong><i class="bi bi-arrows-fullscreen"></i></strong></span>
             </button>
             <div id="logoCompanyBody" class="step-content d-none">
               <div class="produccion-company-logo-preview-wrap">
@@ -1055,8 +1055,8 @@
           </section>
           <section class="recipe-step-card step-block inventario-lot-section mt-2 produccion-config-section">
             <button type="button" class="inventario-collapse-head inventario-collapse-head-styled produccion-config-toggle" id="rneToggleBtn" aria-expanded="false">
-              <span><span class="recipe-step-number">3</span> <i class="bi bi-shield-check"></i> <strong>RNE – Registro Nacional de Establecimiento</strong></span>
-              <span class="inventario-collapse-summary"><strong>Número, vencimiento, adjunto e historial</strong></span>
+              <span><span class="recipe-step-number">3</span> <i class="bi bi-shield-check"></i> <strong>RNE</strong> • Empresa</span>
+              <span class="inventario-collapse-summary"><strong><i class="bi bi-arrows-fullscreen"></i></strong></span>
             </button>
             <div id="rneBody" class="step-content d-none">
               <label class="form-label" for="produccionRneNumberInput"><strong>Número de RNE</strong></label>
