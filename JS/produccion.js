@@ -1655,7 +1655,8 @@
     const productRnpaNumber = normalizeValue(productRnpa.number || '-');
     const productRnpaLabel = normalizeValue(productRnpa.denomination || productRnpa.brand || productRnpa.businessName || registro?.recipeTitle || '-');
     const lines = [
-      'flowchart TD',
+      '%%{init: {"flowchart": {"curve": "basis", "nodeSpacing": 48, "rankSpacing": 74}} }%%',
+      'flowchart TB',
       `C["<b>${esc(COMPANY_LEGAL_NAME)}</b>"]:::toneCompany`,
       `P["<b>${esc((registro?.recipeTitle || 'Producto').toUpperCase())}</b>"]:::toneProduct`,
       `L["<b>LOTE:</b> ${esc(registro?.id || '-')}<br/><b>VTO:</b> ${esc(formatProductExpiryLabel(registro))}"]:::toneLot`,
@@ -1665,10 +1666,10 @@
       `W["<b>MERMA</b> ${mermaKg.toFixed(3)} KG"]:::toneWaste`,
       `CR["<b>RNE EMPRESA</b><br/>${esc(companyRne.number || '-')} "]:::toneRegistry`,
       `RNPA["<b>RNPA</b><br/>N° ${esc(productRnpaNumber)}<br/>${esc(productRnpaLabel)}"]:::toneRegistry`,
-      'C -.-> CR',
-      'CR -.-> P',
+      'C --> CR',
+      'CR --> P',
       'P --> R',
-      'P --> L',
+      'R --> L',
       'P -.-> RNPA',
       'R --> I',
       'R --> M',
@@ -1678,32 +1679,35 @@
       lines.push(`E["<b>ENVASADO</b><br/><b>+${packaging.agingDays} días</b><br/>${esc(formatIsoEs(packaging.packagingDate))}"]:::toneManager`);
       lines.push('R -.-> E');
     }
+    lines.push('subgraph ING_BLOCK["TRAZA DE INSUMOS"]');
+    lines.push('direction LR');
     ingredients.forEach((item, index) => {
       const lot = Array.isArray(item?.lots) && item.lots[0] ? item.lots[0] : {};
       const nodeId = `ING${index + 1}`;
       const nodeLabel = [
         `<b>${index + 1}. ${(item?.ingredientName || 'Ingrediente').toUpperCase()}</b>`,
-        `<b>Cantidad usada:</b> ${formatCompactQty(item?.requiredQty ?? item?.neededQty, item?.unit || item?.ingredientUnit || '')}`,
+        `<b>Usado:</b> ${formatCompactQty(item?.requiredQty ?? item?.neededQty, item?.unit || item?.ingredientUnit || '')}`,
         `<b>Lote:</b> ${lot?.lotNumber || lot?.entryId || '-'}`,
-        `<b>Vencimiento al elaborar:</b> ${formatIsoEs(lot?.expiryDate) || '-'}`,
+        `<b>VTO lote:</b> ${formatIsoEs(lot?.expiryDate) || '-'}`,
         `<b>Proveedor:</b> ${lot?.provider || '-'}`
       ].map(esc).join('<br/>');
       const providerRne = resolveProviderRneFromLot(lot);
       lines.push(`${nodeId}["${nodeLabel}"]:::toneIngredient`);
+      lines.push(`${nodeId}RNE["<b>RNE PROVEEDOR</b><br/>${esc(providerRne.number || '-')}" ]:::toneRegistry`);
+      lines.push(`${nodeId} -.-> ${nodeId}RNE`);
       lines.push(`I --> ${nodeId}`);
-      lines.push(`${nodeId}RNE["<b>RNE PROVEEDOR</b><br/>${esc(providerRne.number || '-')} "]:::toneRegistry`);
-      lines.push(`${nodeId} --> ${nodeId}RNE`);
     });
-    lines.push('linkStyle default stroke:#6e88bc,stroke-width:1.8px;');
-    lines.push('classDef toneCompany fill:#dbe8ff,stroke:#9fb8e8,color:#16366f,stroke-width:1.5px;');
-    lines.push('classDef toneProduct fill:#d5e6ff,stroke:#90b4ec,color:#123a72,stroke-width:1.5px;');
-    lines.push('classDef toneLot fill:#ffe9c9,stroke:#f2c987,color:#6f4a1f,stroke-width:1.4px;');
-    lines.push('classDef toneProduction fill:#fff0b8,stroke:#eacb72,color:#6a4c0d,stroke-width:1.4px;');
-    lines.push('classDef toneManager fill:#e8deff,stroke:#c3afea,color:#463273,stroke-width:1.3px;');
-    lines.push('classDef toneIngredients fill:#d5f2e2,stroke:#8fceab,color:#155f3c,stroke-width:1.4px;');
-    lines.push('classDef toneWaste fill:#ffd8de,stroke:#f09baa,color:#8a2438,stroke-width:1.4px;');
-    lines.push('classDef toneIngredient fill:#f8fbff,stroke:#c8d6ef,color:#1f3f72,stroke-width:1.3px;');
-    lines.push('classDef toneRegistry fill:#ecf3ff,stroke:#aac0ea,color:#1a3d74,stroke-width:1.3px;');
+    lines.push('end');
+    lines.push('linkStyle default stroke:#6e83a7,stroke-width:1.8px;');
+    lines.push('classDef toneCompany fill:#d9e8ff,stroke:#8caedd,color:#143a73,stroke-width:1.6px;');
+    lines.push('classDef toneProduct fill:#dce9ff,stroke:#93b3e5,color:#173b70,stroke-width:1.6px;');
+    lines.push('classDef toneLot fill:#ffe8c9,stroke:#efc48b,color:#6f4a20,stroke-width:1.4px;');
+    lines.push('classDef toneProduction fill:#fff2c7,stroke:#e6ca87,color:#6a5118,stroke-width:1.5px;');
+    lines.push('classDef toneManager fill:#efe6ff,stroke:#c8b2ea,color:#4c367b,stroke-width:1.35px;');
+    lines.push('classDef toneIngredients fill:#d8f3e5,stroke:#96cfb0,color:#16593c,stroke-width:1.45px;');
+    lines.push('classDef toneWaste fill:#ffd9de,stroke:#ee9cab,color:#7e2435,stroke-width:1.4px;');
+    lines.push('classDef toneIngredient fill:#f8fbff,stroke:#c4d4ee,color:#1f3f72,stroke-width:1.35px;');
+    lines.push('classDef toneRegistry fill:#edf3ff,stroke:#a7bfe8,color:#1a3f73,stroke-width:1.35px;');
     return lines.join('\n');
   };
   const renderTraceabilityTree = (registro) => {
