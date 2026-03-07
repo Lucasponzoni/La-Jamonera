@@ -7027,6 +7027,37 @@ html.login-protected.auth-ok body {
   padding-bottom: 10px;
 }
 
+.inventario-rne-alert-toggle {
+  width: 100%;
+  border: 1px solid #d5def2;
+  background: #fff;
+  color: #37548d;
+  border-radius: 12px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  margin: 8px 0 10px;
+  font-weight: 600;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.inventario-rne-alert-toggle:hover {
+  background: #edf3ff;
+  border-color: #c4d3f4;
+  color: #2e4d8a;
+}
+
+.inventario-rne-alert-toggle i {
+  transition: transform 0.2s ease;
+}
+
+.inventario-rne-alert-toggle.is-open i {
+  transform: rotate(180deg);
+}
+
 .inventario-rne-expiry-board {
   max-height: 168px;
   overflow-y: auto;

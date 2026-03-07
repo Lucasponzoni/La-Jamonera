@@ -197,3 +197,52 @@ Esto ordena el archivo por dominios de UI, facilita mantenimiento y minimiza col
 - ¿La jerarquía visual se logró sin sombras paralelas?
 - ¿Los estados hover/focus son visibles pero sutiles?
 - ¿El responsive quedó ubicado en la sección final sin mezclar reglas base?
+
+## 11) Mapa técnico profundo (código real)
+
+### 11.1 Firebase: contrato real en ejecución
+- Bootstrap centralizado en `JS/firebase-init.js`:
+  - `WORKER_BASE_URL = https://jamonera.lucasponzoninovogar.workers.dev`
+  - `GET /bootstrap` para recuperar `firebaseConfig`.
+  - Exposición global de `window.laJamoneraReady`, `window.dbLaJamoneraRest`, `window.storageLaJamonera`.
+- Wrapper REST uniforme:
+  - `read(path)` -> `GET /rtdb/read?path=`
+  - `write(path, value)` -> `POST /rtdb/write`
+  - `update(path, value)` -> `POST /rtdb/update`
+- Lectura directa de credenciales en login con fallback de rutas (`user`, `auth`, `/`) y normalización lower-case.
+
+### 11.2 Nodos RTDB usados por dominio
+- **Auth/Login**: `user`, `auth`, `/`, sesión local `laJamoneraSession` (8h).
+- **Ingredientes**: `/ingredientes`, subida de assets a Storage en `ingredientes/*`.
+- **Recetas**: `/recetas`, `/recetas_config`, `/ingredientes/config/measures`, uso de Storage para imágenes y lectura de `/deepseek`.
+- **Inventario**: `/inventario`, `/ingredientes/config/measures`, `/passGeneral/pass`.
+- **Producción**: `/produccion/config`, `/produccion/reservas`, `/produccion/drafts`, `/produccion/registros`, `/produccion/sequence` + sincronización con `/inventario` y lectura de `/informes/users`.
+- **Informes**: `/informes`, `/informes_index`, `/informes/users`, `/informes/email_preferences` + Storage para adjuntos.
+
+### 11.3 Estilo CSS realmente aplicado (estado actual)
+- Archivo único `CSS/style.css` con secciones extensas, manteniendo el encabezado:
+  - `/* ========================================= ... ========================================= */`
+- El patrón se mantiene desde bloques globales hasta módulos específicos:
+  - base (`CONFIGURACION GENERAL`, `LAYOUT BASE`)
+  - transversales (`COMPONENTES IOS`, `SPINNERS`, `RESPONSIVE`)
+  - features (`INFORMES`, `RECETAS`, `INVENTARIO`, `PRODUCCIÓN`).
+- Las sombras paralelas casi no se usan:
+  - predominan `box-shadow: none`.
+  - aparecen únicamente sombras **inset** puntuales (micro-contraste), alineadas con estética iOS suave.
+
+### 11.4 Reutilización efectiva de clases (limpieza)
+- Sistema principal por composición:
+  - `ios-btn` + variante semántica (`primary`, `secondary`, `success`, `warning`, `danger`).
+  - `ios-input`, `ios-input-group`, `ios-toggle-pass`.
+  - `ios-modal`, `ios-modal-header`, `ios-modal-body`, `ios-modal-title`, `ios-modal-close`.
+  - `ios-alert` + subclases para SweetAlert2.
+- Convención operativa recomendada:
+  1. Reutilizar base `ios-*`.
+  2. Añadir modificador de contexto (`.informes-*`, `.recetas-*`, `.inventario-*`, `.produccion-*`).
+  3. Evitar crear variantes aisladas si el patrón ya existe.
+
+### 11.5 Riesgos técnicos concretos observados
+- Escrituras de objeto completo en nodos grandes (ej. inventario/registros/index) sin control de concurrencia transaccional.
+- Dependencia total del Worker para toda E/S de RTDB (si cae el Worker, cae el backend lógico del cliente).
+- Sin política de reintentos/backoff global en `fetchJson`.
+- Múltiples módulos con alto volumen de lecturas secuenciales: oportunidad para agrupar/batchear lecturas donde aplique.

@@ -1160,11 +1160,15 @@
         });
 
         deleteRneBtn?.addEventListener('click', async () => {
-          const auth = await askSensitivePassword(
-            'Borrar RNE de Producción',
-            '<p><strong>Confirmación:</strong> se eliminará solo el RNE actual.</p><p><small>El historial se conservará para trazabilidad.</small></p>'
-          );
-          if (!auth.isConfirmed) return;
+          const confirmDelete = await openIosSwal({
+            title: 'Borrar RNE de Producción',
+            html: '<p><strong>Confirmación:</strong> se eliminará solo el RNE actual.</p><p><small>El historial se conservará para trazabilidad.</small></p>',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Eliminar',
+            cancelButtonText: 'Cancelar'
+          });
+          if (!confirmDelete.isConfirmed) return;
           state.config.rne = { ...safeObject(state.config.rne), number: '', expiryDate: '', attachmentUrl: '', attachmentType: '', validFrom: '', updatedAt: 0 };
           await persistConfig();
           Swal.close();
@@ -1185,11 +1189,15 @@
             const index = Number(button.dataset.deleteRneHistory || -1);
             const history = Array.isArray(state.config.rne?.history) ? [...state.config.rne.history] : [];
             if (index < 0 || index >= history.length) return;
-            const auth = await askSensitivePassword(
-              'Borrar versión de historial RNE',
-              '<p><strong>Confirmación:</strong> se eliminará solo esta versión del historial.</p><p><small>El RNE actual no se modifica.</small></p>'
-            );
-            if (!auth.isConfirmed) return;
+            const confirmDelete = await openIosSwal({
+              title: 'Borrar versión de historial RNE',
+              html: '<p><strong>Confirmación:</strong> se eliminará solo esta versión del historial.</p><p><small>El RNE actual no se modifica.</small></p>',
+              icon: 'warning',
+              showCancelButton: true,
+              confirmButtonText: 'Eliminar',
+              cancelButtonText: 'Cancelar'
+            });
+            if (!confirmDelete.isConfirmed) return;
             history.splice(index, 1);
             state.config.rne = { ...safeObject(state.config.rne), history };
             await persistConfig();
