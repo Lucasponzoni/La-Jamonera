@@ -32,6 +32,26 @@
   };
 
   const formatQty = (value, unit = '') => `${Number(value || 0).toFixed(3)} ${unit}`.trim();
+  const getUnitFactor = (unitRaw) => {
+    const unit = normalizeValue(unitRaw).toLowerCase();
+    const massMap = {
+      kg: 1000, kilo: 1000, kilos: 1000, kilogramo: 1000, kilogramos: 1000,
+      g: 1, gr: 1, gramo: 1, gramos: 1,
+      mg: 0.001, miligramo: 0.001, miligramos: 0.001
+    };
+    const volumeMap = {
+      l: 1000, lt: 1000, litro: 1000, litros: 1000,
+      ml: 1, mililitro: 1, mililitros: 1, cc: 1
+    };
+    if (massMap[unit]) return massMap[unit];
+    if (volumeMap[unit]) return volumeMap[unit];
+    return 1;
+  };
+  const toKg = (qty, unit) => {
+    const amount = Number(qty || 0);
+    if (!Number.isFinite(amount)) return 0;
+    return Number(((amount * getUnitFactor(unit)) / 1000).toFixed(6));
+  };
 
   const loadScript = (src, id) => new Promise((resolve) => {
     const existing = document.getElementById(id);
@@ -77,6 +97,7 @@
         expiryDate: lot?.expiryDate || traceLot?.expiryDate || '-',
         rne: normalizeValue(lot?.providerRne?.number || traceLot?.providerRne?.number || '-'),
         qty: formatQty(plan?.neededQty ?? plan?.requiredQty, plan?.ingredientUnit || plan?.unit || ''),
+        qtyKg: toKg(plan?.neededQty ?? plan?.requiredQty, plan?.ingredientUnit || plan?.unit || ''),
         available: formatQty(availableQty, lot?.unit || plan?.ingredientUnit || plan?.unit || ''),
         remaining: formatQty(remainingQty, lot?.unit || plan?.ingredientUnit || plan?.unit || ''),
         invoiceNumber: normalizeValue(lot?.invoiceNumber || traceLot?.invoiceNumber || '-'),
@@ -89,7 +110,7 @@
     const rnpa = safeObject(registro?.traceability?.product?.rnpa);
     const ingredientRows = resolveIngredientRows(registro);
     const managerLabel = resolveManagerNames(registro, context.usersMap);
-    const totalIngredients = ingredientRows.reduce((acc, row) => acc + (Number(String(row.qty || '').replace(/[^0-9.,-]/g, '').replace(',', '.')) || 0), 0);
+    const totalIngredients = ingredientRows.reduce((acc, row) => acc + Number(row.qtyKg || 0), 0);
     const merma = Math.max(0, totalIngredients - Number(registro?.quantityKg || 0));
     const observations = normalizeValue(registro?.observations) || 'SIN OBSERVACIONES';
 

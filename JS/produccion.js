@@ -211,6 +211,13 @@
     const digits = amount >= 10 ? 2 : 3;
     return `${amount.toFixed(digits)} ${unit}`.trim();
   };
+  const getIngredientPlanQtyKg = (item = {}) => {
+    const qty = Number(item?.requiredQty ?? item?.neededQty ?? 0);
+    const unit = normalizeValue(item?.unit || item?.ingredientUnit);
+    const base = toBase(qty, unit);
+    if (!Number.isFinite(base)) return 0;
+    return Number((base / 1000).toFixed(6));
+  };
   const toIsoDate = (value = nowTs()) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '';
@@ -1668,7 +1675,7 @@
       return /^[a-zA-Z_]/.test(base) ? base : `N_${base}`;
     };
     const ingredients = Array.isArray(registro?.lots) ? registro.lots : [];
-    const totalIngredientsKg = ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0);
+    const totalIngredientsKg = ingredients.reduce((sum, item) => sum + getIngredientPlanQtyKg(item), 0);
     const mermaKg = Math.max(0, totalIngredientsKg - Number(registro?.quantityKg || 0));
     const manager = (Array.isArray(registro?.managers) && registro.managers[0]) ? getManagerDisplay(registro.managers[0]).name : 'Sin encargado';
     const productionDate = normalizeValue(registro?.productionDate) || toIsoDate(registro?.createdAt || nowTs());
@@ -1743,7 +1750,7 @@
     const productionDate = normalizeValue(registro?.productionDate) || toIsoDate(registro?.createdAt || nowTs());
     const companyRne = resolveCompanyRneFromRegistro(registro);
     const productRnpa = resolveRecipeRnpaFromRegistro(registro);
-    const totalIngredientsKg = ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0);
+    const totalIngredientsKg = ingredients.reduce((sum, item) => sum + getIngredientPlanQtyKg(item), 0);
     const mermaKg = Math.max(0, totalIngredientsKg - Number(registro?.quantityKg || 0));
     const productLabel = normalizeValue(registro?.recipeTitle || 'Producto');
     const ingredientRows = ingredients.map((item, index) => {
