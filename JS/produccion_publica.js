@@ -317,7 +317,6 @@
         <div class="public-trace-planilla-row"><button id="publicOpenPlanillaBtn" type="button" class="btn ios-btn ios-btn-primary public-open-planilla-btn"><i class="fa-regular fa-file-lines"></i><span>Ver planilla</span></button></div>
       </article>
       <div class="produccion-trace-mermaid-wrap"><div class="produccion-trace-mermaid" data-public-mermaid><div class="produccion-trace-mermaid-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"><p>Renderizando diagrama...</p></div><button type="button" class="produccion-trace-mermaid-overlay" data-public-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button></div></div>
-      <p class="produccion-trace-swipe-hint"><i class="fa-solid fa-arrows-left-right"></i> Deslizá para ver más ingredientes</p><div class="produccion-trace-ingredients public-trace-ingredients-scroll">
         ${ingredients.map((item, idx) => {
           const lots = Array.isArray(item?.lots) ? item.lots : [];
           const traceIngredient = traceIngredients.find((row) => normalize(row?.ingredientId) === normalize(item?.ingredientId));

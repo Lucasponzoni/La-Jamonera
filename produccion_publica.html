@@ -15,18 +15,9 @@
 </head>
 <body>
   <main class="contenido py-3">
-    <header class="public-trace-header">
-      <img src="./IMG/La Jamonera Cerdito.webp" alt="La Jamonera" class="public-trace-header-logo">
-      <h1 class="public-trace-header-title">La Jamonera</h1>
-    </header>
     <div id="publicTraceLoading" class="public-trace-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"></div>
     <section id="publicTraceData" class="d-none"></section>
   </main>
-
-  <footer class="public-trace-footer">
-    <p>El uso de este sitio web implica la aceptación de los términos, condiciones y políticas de privacidad de Asesoria Bromatologica Rosario. Las imagenes son a modo ilustrativo.</p>
-    <p>© Copyright 2026 - Back Office para empresas, powered by ABR - Author: Ponzoni Lucas</p>
-  </footer>
 
   <div class="modal fade" id="imageViewerModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-xl">
@@ -53,6 +44,34 @@
     </div>
   </div>
 
+  <footer class="app-footer app-footer-white">
+    <div class="footer-main">
+        <div class="footer-brand-block">
+            <img src="./IMG/La Jamonera Cerdito.webp" alt="Logo La Jamonera" class="footer-brand-logo">
+            <div>
+              <h3 class="footer-brand-title">La Jamonera</h3>
+              <p class="footer-brand-text">Back Office</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer-divider" aria-hidden="true"></div>
+
+    <p class="footer-legal">
+          El uso de este sitio web implica la aceptación de los términos, condiciones y políticas de privacidad de
+      <a href="https://asesoriabromatologicaros.com.ar/index.html" target="_blank" rel="noopener noreferrer">Asesoria Bromatologica Rosario</a>.
+          Las imagenes son a modo ilustrativo.
+    </p>
+
+    <p class="footer-copy">
+          © Copyright <span id="currentYear"></span> - Back Office para empresas, powered by
+      <a href="https://asesoriabromatologicaros.com.ar/index.html" target="_blank" rel="noopener noreferrer">ABR</a>
+          - Author: Ponzoni Lucas
+          <a class="footer-mail" href="mailto:pablomanuelscalise@gmail.com" target="_blank" rel="noopener noreferrer" aria-label="Enviar email">
+            <i class="fa-regular fa-envelope"></i>
+      </a>
+    </p>
+  </footer>
 
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>

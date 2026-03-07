@@ -7799,3 +7799,36 @@ html.login-protected.auth-ok body {
 
 /* =========================================
    TRAZABILIDAD PUBLICA
+========================================= */
+.produccion-trace-mermaid {
+  position: relative;
+}
+
+.produccion-trace-mermaid-overlay {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgb(210 220 243 / 82%);
+  color: #2e4d8f;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.5rem;
+  z-index: 5;
+}
+
+.produccion-trace-mermaid-overlay i {
+  font-size: 3rem;
+}
+
+@media (max-width: 768px) {
+  .public-trace-ingredients-scroll {
+    grid-auto-columns: minmax(250px, 86vw);
+  }
+
+  .public-trace-footer {
+    width: calc(100% - 20px);
+  }
+}
