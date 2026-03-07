@@ -176,14 +176,35 @@
     }));
   };
 
-  const getMeasureSelectOptionsHtml = (selected = '') => {
-    const opts = getMeasureOptions();
+  const getUnitMeta = (unitRaw) => {
+    const unit = normalizeLower(unitRaw);
+    const mass = ['kg', 'kilo', 'kilos', 'kilogramo', 'kilogramos', 'g', 'gr', 'gramo', 'gramos', 'mg', 'miligramo', 'miligramos', 'onza', 'onzas', 'oz', 'cucharada', 'cucharadas', 'cda', 'cucharadita', 'cucharaditas', 'cdita', 'pizca', 'pizcas', 'pzc'];
+    const volume = ['l', 'lt', 'litro', 'litros', 'ml', 'mililitro', 'mililitros', 'cc', 'gota', 'gotas', 'gts'];
+    const unitary = ['u', 'un', 'unidad', 'unidades'];
+    if (mass.includes(unit)) return { category: 'mass' };
+    if (volume.includes(unit)) return { category: 'volume' };
+    if (unitary.includes(unit)) return { category: 'unit' };
+    return { category: 'other' };
+  };
+
+  const getCompatibleMeasureOptions = (ingredientId = '') => {
+    const ingredient = state.ingredientes[ingredientId];
+    if (!ingredient) return getMeasureOptions().map((item) => ({ ...item, disabled: false }));
+    const ingredientMeta = getUnitMeta(ingredient.measure);
+    return getMeasureOptions().map((item) => ({
+      ...item,
+      disabled: ingredientMeta.category !== 'other' && getUnitMeta(item.value).category !== ingredientMeta.category
+    }));
+  };
+
+  const getMeasureSelectOptionsHtml = (selected = '', ingredientId = '') => {
+    const opts = getCompatibleMeasureOptions(ingredientId);
     const selectedNorm = normalizeLower(selected);
     const hasSelectedInOptions = selectedNorm && opts.some((item) => item.value === selectedNorm);
     const selectedFallbackOption = selectedNorm && !hasSelectedInOptions
       ? `<option value="${selectedNorm}" selected>${capitalize(selectedNorm)}</option>`
       : '';
-    return `${selectedFallbackOption}${opts.map((item) => `<option value="${item.value}" ${selectedNorm === item.value ? 'selected' : ''}>${item.label}</option>`).join('')}<option value="${NEW_MEASURE_VALUE}">+ Agregar nueva medida</option>`;
+    return `${selectedFallbackOption}${opts.map((item) => `<option value="${item.value}" ${selectedNorm === item.value ? 'selected' : ''} ${item.disabled ? 'disabled' : ''}>${item.label}${item.disabled ? ' (no disponible)' : ''}</option>`).join('')}<option value="${NEW_MEASURE_VALUE}">+ Agregar nueva medida</option>`;
   };
 
   const getPreferredUnitForIngredient = (ingredient) => {
@@ -1136,8 +1157,8 @@
 
   const getUnitDimension = (unit) => {
     const value = normalizeLower(unit);
-    if (['kg', 'kilo', 'kilos', 'kilogramo', 'kilogramos', 'g', 'gr', 'gramo', 'gramos', 'mg', 'miligramo', 'miligramos'].includes(value)) return 'mass';
-    if (['l', 'lt', 'litro', 'litros', 'ml', 'mililitro', 'mililitros', 'cc'].includes(value)) return 'volume';
+    if (['kg', 'kilo', 'kilos', 'kilogramo', 'kilogramos', 'g', 'gr', 'gramo', 'gramos', 'mg', 'miligramo', 'miligramos', 'oz', 'onza', 'onzas', 'cda', 'cucharada', 'cucharadas', 'cdita', 'cucharadita', 'cucharaditas', 'pzc', 'pizca', 'pizcas'].includes(value)) return 'mass';
+    if (['l', 'lt', 'litro', 'litros', 'ml', 'mililitro', 'mililitros', 'cc', 'gota', 'gotas', 'gts'].includes(value)) return 'volume';
     return 'other';
   };
 
@@ -1158,6 +1179,18 @@
       mg: 0.001,
       miligramo: 0.001,
       miligramos: 0.001,
+      oz: 28.3495,
+      onza: 28.3495,
+      onzas: 28.3495,
+      cda: 15,
+      cucharada: 15,
+      cucharadas: 15,
+      cdita: 5,
+      cucharadita: 5,
+      cucharaditas: 5,
+      pzc: 0.5,
+      pizca: 0.5,
+      pizcas: 0.5,
       l: 1000,
       lt: 1000,
       litro: 1000,
@@ -1166,6 +1199,7 @@
       mililitro: 1,
       mililitros: 1,
       cc: 1
+      ,gota: 0.05, gotas: 0.05, gts: 0.05
     };
     const factor = map[unit] ?? 1;
     return quantity * factor;
@@ -1728,7 +1762,7 @@
           <td><i class="fa-solid fa-grip-lines"></i></td>
           <td><div class="recipe-ing-autocomplete"><div class="recipe-ing-input-wrap">${ingredientAvatarHtml(state.ingredientes[row.ingredientId])}<input class="form-control ios-input" data-ing-input="${row.id}" value="${row.ingredientName || ''}" placeholder="Buscar ingrediente..."></div></div></td>
           <td><input class="form-control ios-input" data-qty-input="${row.id}" value="${row.quantity || ''}" placeholder="0,00"></td>
-          <td><select class="form-select ios-input" data-unit-input="${row.id}">${getMeasureSelectOptionsHtml(row.unit)}</select></td>
+          <td><select class="form-select ios-input" data-unit-input="${row.id}">${getMeasureSelectOptionsHtml(row.unit, row.ingredientId)}</select></td>
           <td><button type="button" class="btn family-manage-btn" data-remove-row="${row.id}"><i class="fa-solid fa-trash"></i></button></td>
         </tr>`;
     }).join('');
