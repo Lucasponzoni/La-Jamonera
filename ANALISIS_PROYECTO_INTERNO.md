@@ -246,3 +246,31 @@ Esto ordena el archivo por dominios de UI, facilita mantenimiento y minimiza col
 - Dependencia total del Worker para toda E/S de RTDB (si cae el Worker, cae el backend lógico del cliente).
 - Sin política de reintentos/backoff global en `fetchJson`.
 - Múltiples módulos con alto volumen de lecturas secuenciales: oportunidad para agrupar/batchear lecturas donde aplique.
+
+## 12) Criterios de estilo CSS críticos para próximas implementaciones
+
+### 12.1 Encabezados de secciones (obligatorio)
+- Mantener siempre el formato exacto de bloque:
+
+```css
+/* =========================================
+   NOMBRE DEL BLOQUE
+========================================= */
+```
+
+- No mezclar reglas de distintos dominios dentro de un mismo bloque.
+- Dejar `RESPONSIVE` al final del archivo como zona única de media queries.
+
+### 12.2 Principios visuales tipo iOS (obligatorio)
+- Evitar **sombras paralelas** como recurso principal de jerarquía.
+- Priorizar separación visual con:
+  - bordes sutiles,
+  - fondos por capas tonales,
+  - contraste de color en estados `hover` / `active`.
+- Mantener radios amplios y consistentes (estética suave, no material dura).
+
+### 12.3 Reutilización de clases para limpieza
+- Reutilizar primero componentes base (`.ios-btn`, `.ios-input`, `.ios-modal`, `.ios-alert`).
+- Si surge una variante nueva, modelarla como modificador (`.is-*` o `--variant`) antes de duplicar.
+- Si un patrón aparece 3+ veces, extraer clase utilitaria compartida.
+- Evitar crear clases de una sola pantalla si el comportamiento visual ya existe en el sistema `ios-*`.
