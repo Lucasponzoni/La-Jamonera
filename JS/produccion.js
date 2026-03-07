@@ -1639,12 +1639,16 @@
     return window.__laJamoneraLoadingMermaid;
   };
   const buildTraceMermaidDefinition = (registro) => {
-    const isMobileTrace = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+    const isMobileTrace = Boolean(window.matchMedia && window.matchMedia('(max-width: 768px)').matches);
     const esc = (value) => String(value || '-')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+    const safeNodeId = (value, fallback) => {
+      const base = String(value || fallback || 'X').replace(/[^a-zA-Z0-9_]/g, '_');
+      return /^[a-zA-Z_]/.test(base) ? base : `N_${base}`;
+    };
     const ingredients = Array.isArray(registro?.lots) ? registro.lots : [];
     const totalIngredientsKg = ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0);
     const mermaKg = Math.max(0, totalIngredientsKg - Number(registro?.quantityKg || 0));
@@ -1655,59 +1659,51 @@
     const productRnpa = resolveRecipeRnpaFromRegistro(registro);
     const productRnpaNumber = normalizeValue(productRnpa.number || '-');
     const productRnpaLabel = normalizeValue(productRnpa.denomination || productRnpa.brand || productRnpa.businessName || registro?.recipeTitle || '-');
+
     const lines = [
-      `%%{init: {"flowchart": {"curve": "${isMobileTrace ? 'linear' : 'basis'}", "nodeSpacing": ${isMobileTrace ? 38 : 72}, "rankSpacing": ${isMobileTrace ? 58 : 110}} } }%%`,
-      `flowchart ${isMobileTrace ? 'TB' : 'TB'}`,
+      `flowchart ${isMobileTrace ? 'TB' : 'LR'}`,
       `C["<b>${esc(COMPANY_LEGAL_NAME)}</b>"]:::toneCompany`,
+      `CR["<b>RNE EMPRESA</b><br/>${esc(companyRne.number || '-')} "]:::toneRegistry`,
       `P["<b>${esc((registro?.recipeTitle || 'Producto').toUpperCase())}</b>"]:::toneProduct`,
-      `L["<b>LOTE:</b> ${esc(registro?.id || '-')}<br/><b>VTO:</b> ${esc(formatProductExpiryLabel(registro))}"]:::toneLot`,
+      `RNPA["<b>RNPA</b><br/>N° ${esc(productRnpaNumber)}<br/>${esc(productRnpaLabel)}"]:::toneRegistry`,
       `R["<b>PRODUCCIÓN</b> ${Number(registro?.quantityKg || 0).toFixed(2)} KG<br/><b>Fecha:</b> ${esc(formatIsoEs(productionDate))}"]:::toneProduction`,
+      `L["<b>LOTE:</b> ${esc(registro?.id || '-')}<br/><b>VTO:</b> ${esc(formatProductExpiryLabel(registro))}"]:::toneLot`,
       `M["<b>ENCARGADO:</b> ${esc(manager)}"]:::toneManager`,
       `I["<b>INGREDIENTES TOTALES</b> ${totalIngredientsKg.toFixed(3)} KG"]:::toneIngredients`,
       `W["<b>MERMA</b> ${mermaKg.toFixed(3)} KG"]:::toneWaste`,
-      `CR["<b>RNE EMPRESA</b><br/>${esc(companyRne.number || '-')} "]:::toneRegistry`,
-      `RNPA["<b>RNPA</b><br/>N° ${esc(productRnpaNumber)}<br/>${esc(productRnpaLabel)}"]:::toneRegistry`,
-      isMobileTrace ? 'C --> CR' : 'C --> CR',
+      'C --> CR',
       'C --> P',
+      'P -.-> RNPA',
       'P --> R',
       'R --> L',
-      'P -.-> RNPA',
-      'R --> I',
       'R --> M',
+      'R --> I',
       'I --> W'
     ];
+
     if (packaging.agingDays > 0 && packaging.packagingDate) {
       lines.push(`E["<b>ENVASADO</b><br/><b>+${packaging.agingDays} días</b><br/>${esc(formatIsoEs(packaging.packagingDate))}"]:::toneManager`);
       lines.push('R -.-> E');
     }
-    if (!isMobileTrace) {
-      lines.push('subgraph HEAD_ROW[""]');
-      lines.push('direction LR');
-      lines.push('C');
-      lines.push('CR');
-      lines.push('end');
-    }
-    lines.push(`subgraph ING_ROW[""]`);
-    lines.push(`direction ${isMobileTrace ? 'TB' : 'LR'}`);
+
     ingredients.forEach((item, index) => {
       const lot = Array.isArray(item?.lots) && item.lots[0] ? item.lots[0] : {};
-      const nodeId = `ING${index + 1}`;
+      const nodeId = safeNodeId(`ING_${index + 1}_${item?.ingredientId || ''}`, `ING_${index + 1}`);
+      const rneId = `${nodeId}_RNE`;
       const nodeLabel = [
-        `<b>${index + 1}. ${(item?.ingredientName || 'Ingrediente').toUpperCase()}</b>`,
-        `<b>Usado:</b> ${formatCompactQty(item?.requiredQty ?? item?.neededQty, item?.unit || item?.ingredientUnit || '')}`,
-        `<b>Lote:</b> ${lot?.lotNumber || lot?.entryId || '-'}`,
-        `<b>VTO lote:</b> ${formatIsoEs(lot?.expiryDate) || '-'}`,
-        `<b>Proveedor:</b> ${lot?.provider || '-'}`
-      ].map(esc).join('<br/>');
+        `<b>${index + 1}. ${esc((item?.ingredientName || 'Ingrediente').toUpperCase())}</b>`,
+        `<b>Usado:</b> ${esc(formatCompactQty(item?.requiredQty ?? item?.neededQty, item?.unit || item?.ingredientUnit || ''))}`,
+        `<b>Lote:</b> ${esc(lot?.lotNumber || lot?.entryId || '-')}`,
+        `<b>VTO lote:</b> ${esc(formatIsoEs(lot?.expiryDate) || '-')}`,
+        `<b>Proveedor:</b> ${esc(lot?.provider || '-')}`
+      ].join('<br/>');
       const providerRne = resolveProviderRneFromLot(lot);
       lines.push(`${nodeId}["${nodeLabel}"]:::toneIngredient`);
-      lines.push(`${nodeId}RNE["<b>RNE PROVEEDOR</b><br/>${esc(providerRne.number || '-')}"]:::toneRegistry`);
-      lines.push(`${nodeId} -.-> ${nodeId}RNE`);
+      lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${esc(providerRne.number || '-')}"]:::toneRegistry`);
       lines.push(`I --> ${nodeId}`);
+      lines.push(`${nodeId} -.-> ${rneId}`);
     });
-    lines.push('end');
-    if (!isMobileTrace) lines.push('style HEAD_ROW fill:transparent,stroke:transparent;');
-    lines.push('style ING_ROW fill:transparent,stroke:transparent;');
+
     lines.push('linkStyle default stroke:#6e83a7,stroke-width:1.8px;');
     lines.push('classDef toneCompany fill:#2f6ecf,stroke:#1f57ad,color:#ffffff,stroke-width:1.8px;');
     lines.push('classDef toneProduct fill:#3b82f6,stroke:#1f5ec4,color:#ffffff,stroke-width:1.7px;');
@@ -1720,6 +1716,39 @@
     lines.push('classDef toneRegistry fill:#e7efff,stroke:#8eaedf,color:#173d73,stroke-width:1.35px;');
     return lines.join('\n');
   };
+
+  const renderTraceabilityFallbackDiagram = (registro) => {
+    const ingredients = Array.isArray(registro?.lots) ? registro.lots : [];
+    const manager = (Array.isArray(registro?.managers) && registro.managers[0])
+      ? getManagerDisplay(registro.managers[0]).name
+      : 'Sin encargado';
+    const productionDate = normalizeValue(registro?.productionDate) || toIsoDate(registro?.createdAt || nowTs());
+    const companyRne = resolveCompanyRneFromRegistro(registro);
+    const productRnpa = resolveRecipeRnpaFromRegistro(registro);
+    const totalIngredientsKg = ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0);
+    const mermaKg = Math.max(0, totalIngredientsKg - Number(registro?.quantityKg || 0));
+    const productLabel = normalizeValue(registro?.recipeTitle || 'Producto');
+    const ingredientRows = ingredients.map((item, index) => {
+      const firstLot = Array.isArray(item?.lots) && item.lots[0] ? item.lots[0] : {};
+      return `<li><strong>${index + 1}. ${escapeHtml(item?.ingredientName || 'Ingrediente')}</strong><span>${escapeHtml(formatCompactQty(item?.requiredQty ?? item?.neededQty, item?.unit || item?.ingredientUnit || ''))} · Lote ${escapeHtml(firstLot?.lotNumber || firstLot?.entryId || '-')}</span></li>`;
+    }).join('');
+    return `<div class="produccion-trace-fallback-diagram" aria-label="Diagrama alternativo de trazabilidad">
+      <div class="produccion-trace-fallback-flow">
+        <article class="produccion-trace-fallback-node"><small>Empresa</small><strong>${escapeHtml(COMPANY_LEGAL_NAME)}</strong><span>RNE ${escapeHtml(companyRne.number || '-')}</span></article>
+        <span class="produccion-trace-fallback-arrow">→</span>
+        <article class="produccion-trace-fallback-node"><small>Producto</small><strong>${escapeHtml(productLabel)}</strong><span>RNPA ${escapeHtml(productRnpa.number || '-')}</span></article>
+        <span class="produccion-trace-fallback-arrow">→</span>
+        <article class="produccion-trace-fallback-node"><small>Producción</small><strong>${Number(registro?.quantityKg || 0).toFixed(2)} kg</strong><span>${escapeHtml(formatIsoEs(productionDate))}</span></article>
+      </div>
+      <div class="produccion-trace-fallback-meta">
+        <p><strong>Encargado:</strong> ${escapeHtml(manager)}</p>
+        <p><strong>Total ingredientes:</strong> ${totalIngredientsKg.toFixed(3)} kg</p>
+        <p><strong>Merma:</strong> ${mermaKg.toFixed(3)} kg</p>
+      </div>
+      <ul class="produccion-trace-fallback-list">${ingredientRows || '<li><strong>Sin ingredientes</strong><span>No hay lotes asociados en este registro.</span></li>'}</ul>
+    </div>`;
+  };
+
   const renderTraceabilityTree = (registro) => {
     const companyRne = resolveCompanyRneFromRegistro(registro);
     const productRnpa = resolveRecipeRnpaFromRegistro(registro);
@@ -1808,20 +1837,34 @@
   const initTraceMermaidDiagram = async (popup, registro) => {
     const host = popup.querySelector('[data-trace-mermaid]');
     if (!host) return;
+    host.innerHTML = '<div class="produccion-trace-mermaid-loading" aria-live="polite"><img src="./IMG/Meta-ai-logo.webp" alt="Renderizando diagrama" class="meta-spinner-login"><p>Generando diagrama...</p></div>';
     const hasLib = await ensureTraceDiagramLib();
     if (!hasLib) {
       host.innerHTML = '<p class="m-0">No se pudo cargar Mermaid.</p>';
       return;
     }
     const source = buildTraceMermaidDefinition(registro);
-    host.innerHTML = `<pre class="mermaid">${source}</pre>`;
     try {
-      await window.mermaid.run({ nodes: [host.querySelector('.mermaid')] });
+      const renderId = `trace_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const rendered = await window.mermaid.render(renderId, source);
+      if (!rendered || !rendered.svg) throw new Error('Mermaid render vacío');
+      host.innerHTML = rendered.svg;
       host.dataset.traceScale = '1';
       host.style.transformOrigin = 'top left';
       host.style.transform = 'scale(1)';
-    } catch (error) {
-      host.innerHTML = '<p class="m-0">No se pudo renderizar el diagrama.</p>';
+      return;
+    } catch (primaryError) {
+      host.innerHTML = `<pre class="mermaid">${source}</pre>`;
+      try {
+        const node = host.querySelector('.mermaid');
+        if (!node) throw new Error('Nodo Mermaid ausente');
+        await window.mermaid.run({ nodes: [node] });
+        host.dataset.traceScale = '1';
+        host.style.transformOrigin = 'top left';
+        host.style.transform = 'scale(1)';
+      } catch (fallbackError) {
+        host.innerHTML = renderTraceabilityFallbackDiagram(registro);
+      }
     }
   };
   const initTraceMermaidZoomControls = (popup) => {
