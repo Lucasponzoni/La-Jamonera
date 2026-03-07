@@ -6278,15 +6278,15 @@ html.login-protected.auth-ok body {
 
 .inventario-trace-row td {
   background: #f8ecee !important;
-  border-bottom: 1px solid #eed7dc !important;
-  color: #4b5f8d;
+  border-top: 1px dashed #b82646 !important;
+  color: #810c0c;
   font-size: 0.82rem;
 }
 
-.inventario-resolution-row td {
+resolution-row td {
   background: #eaf1ff !important;
-  border-bottom: 1px solid #d5e3ff !important;
-  color: #2f4f86;
+  border-top: 1px dashed #0c40a8 !important;
+  color: #002a73;
   font-size: 0.82rem;
 }
 
