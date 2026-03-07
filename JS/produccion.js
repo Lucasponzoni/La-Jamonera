@@ -121,6 +121,13 @@
     if (persisted.number || persisted.attachmentUrl) return persisted;
     return normalizeRneRecord(safeObject(state.config?.rne));
   };
+  const enrichIngredientPlansWithSnapshots = (ingredientPlans = []) => (Array.isArray(ingredientPlans) ? ingredientPlans : []).map((ingredientPlan) => ({
+    ...ingredientPlan,
+    lots: (Array.isArray(ingredientPlan?.lots) ? ingredientPlan.lots : []).map((lot) => ({
+      ...lot,
+      providerRne: normalizeRneRecord(safeObject(lot?.providerRne?.number || lot?.providerRne?.attachmentUrl ? lot.providerRne : findProviderFromTraceValue(lot?.provider)?.rne))
+    }))
+  }));
   const capitalize = (value) => normalizeLower(value).replace(/(^|\s)\S/g, (ch) => ch.toUpperCase());
   const parseNumber = (value) => {
     const parsed = Number(normalizeValue(value).replace(',', '.'));
@@ -223,6 +230,12 @@
   const getProductionDayMap = () => getRegistrosList().reduce((acc, item) => {
     const iso = getArgentinaIsoDate(new Date(Number(item?.createdAt || 0)));
     if (iso) acc[iso] = (acc[iso] || 0) + 1;
+    return acc;
+  }, {});
+  const getProductionKgDayMap = (rows = []) => (Array.isArray(rows) ? rows : []).reduce((acc, item) => {
+    const iso = getArgentinaIsoDate(new Date(Number(item?.createdAt || 0)));
+    if (!iso) return acc;
+    acc[iso] = Number((Number(acc[iso] || 0) + Number(item?.quantityKg || 0)).toFixed(3));
     return acc;
   }, {});
   const formatDate = (value) => {
@@ -400,6 +413,8 @@
             productionDate,
             expiryDateAtProduction: normalizeValue(entry.expiryDate),
             kilosUsed: Number((Number(lot.takeBaseQty || 0) / 1000).toFixed(4)),
+            usedQty: Number(lot.takeQty || 0),
+            usedUnit: normalizeValue(lot.unit || item.ingredientUnit || ''),
             lotNumber: normalizeValue(entry.lotNumber) || normalizeValue(entry.invoiceNumber) || entry.id,
             ingredientLot: normalizeValue(entry.lotNumber) || normalizeValue(entry.invoiceNumber) || entry.id,
             ingredientEntryId: entry.id,
@@ -1830,7 +1845,7 @@
             <div class="produccion-trace-managers">${(Array.isArray(registro.managers) ? registro.managers : []).map((token) => { const manager = getManagerDisplay(token); return `<span class="produccion-trace-chip"><i class="bi bi-person-badge fa-solid fa-user-tie"></i><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span>`; }).join('') || '<span class="produccion-trace-chip"><i class="bi bi-person-x fa-solid fa-user-xmark"></i><strong>Sin responsable</strong><small>Encargado</small></span>'}</div>
           </article>
           <div class="produccion-trace-mermaid-wrap">
-            <div class="produccion-trace-mermaid" data-trace-mermaid></div>
+            <div class="produccion-trace-mermaid" data-trace-mermaid><button type="button" class="produccion-trace-mermaid-overlay" data-trace-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button></div>
           </div>
           <div class="produccion-trace-ingredients">${ingredients || '<p class="m-0">Sin desglose de lotes para esta producción.</p>'}</div>
         </div>
@@ -1851,13 +1866,13 @@
       const renderId = `trace_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
       const rendered = await window.mermaid.render(renderId, source);
       if (!rendered || !rendered.svg) throw new Error('Mermaid render vacío');
-      host.innerHTML = rendered.svg;
+      host.innerHTML = `${rendered.svg}<button type="button" class="produccion-trace-mermaid-overlay is-ready" data-trace-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button>`;
       host.dataset.traceScale = '1';
       host.style.transformOrigin = 'top left';
       host.style.transform = 'scale(1)';
       return;
     } catch (primaryError) {
-      host.innerHTML = `<pre class="mermaid">${source}</pre>`;
+      host.innerHTML = `<pre class="mermaid">${source}</pre><button type="button" class="produccion-trace-mermaid-overlay is-ready" data-trace-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button>`;
       try {
         const node = host.querySelector('.mermaid');
         if (!node) throw new Error('Nodo Mermaid ausente');
@@ -2045,7 +2060,19 @@
       },
       didOpen: async (popup) => {
         await initTraceMermaidDiagram(popup, traceRegistro);
-        initTraceMermaidZoomControls(popup);
+        const overlay = popup.querySelector('[data-trace-mermaid-overlay]');
+        const activateTraceDiagram = () => {
+          overlay?.classList.add('d-none');
+          if (!popup.__traceZoomInitialized) {
+            initTraceMermaidZoomControls(popup);
+            popup.__traceZoomInitialized = true;
+          }
+        };
+        if (overlay) {
+          overlay.addEventListener('click', activateTraceDiagram, { once: true });
+        } else {
+          activateTraceDiagram();
+        }
         popup.querySelectorAll('[data-prod-trace-images]').forEach((btn) => {
           btn.addEventListener('click', async () => {
             const urls = JSON.parse(decodeURIComponent(btn.dataset.prodTraceImages || '[]'));
@@ -2197,17 +2224,39 @@
       : '';
     const registros = deepClone(state.registros);
     const prev = deepClone(registros[registro.id]);
+    const snapshotIngredientPlans = enrichIngredientPlansWithSnapshots(plan.ingredientPlans);
     registros[registro.id] = {
       ...registro,
       quantityKg: Number(form.value.qty.toFixed(2)),
       productionDate: form.value.date || toIsoDate(),
       observations: form.value.obs,
-      lots: plan.ingredientPlans,
+      lots: snapshotIngredientPlans,
       agingDaysAtProduction,
       packagingDate,
       editedAt: nowTs(),
       editedBy: getCurrentUserLabel(),
-      editReason: auth.value.reason
+      editReason: auth.value.reason,
+      traceability: {
+        ...safeObject(registro.traceability),
+        ingredients: snapshotIngredientPlans.map((ingredientPlan) => ({
+          ingredientId: ingredientPlan.ingredientId,
+          ingredientName: ingredientPlan.ingredientName,
+          ingredientImageUrl: normalizeValue(state.ingredientes[ingredientPlan.ingredientId]?.imageUrl || safeObject(registro.traceability).ingredients?.find((item) => normalizeValue(item?.ingredientId) === normalizeValue(ingredientPlan.ingredientId))?.ingredientImageUrl),
+          requiredQty: Number(ingredientPlan.neededQty || 0),
+          unit: normalizeValue(ingredientPlan.ingredientUnit || ''),
+          lots: (Array.isArray(ingredientPlan.lots) ? ingredientPlan.lots : []).map((lot) => ({
+            entryId: lot.entryId,
+            lotNumber: lot.lotNumber,
+            takeQty: lot.takeQty,
+            unit: lot.unit,
+            expiryDate: lot.expiryDate,
+            provider: lot.provider,
+            providerRne: normalizeRneRecord(safeObject(lot.providerRne)),
+            invoiceNumber: lot.invoiceNumber,
+            invoiceImageUrls: Array.isArray(lot.invoiceImageUrls) ? lot.invoiceImageUrls : []
+          }))
+        }))
+      }
     };
     await window.dbLaJamoneraRest.write('/inventario', consumed);
     await window.dbLaJamoneraRest.write(REGISTROS_PATH, registros);
@@ -2621,6 +2670,7 @@
         })
         .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
     };
+    const getRecipeCalendarKgMap = () => getProductionKgDayMap(getRegistrosList().filter((item) => normalizeValue(item.recipeId) === normalizeValue(recipe.id)));
     const printRecipeHistoryRows = async (rows) => {
       const ask = await openIosSwal({
         title: 'Imprimir período',
@@ -2742,12 +2792,22 @@
       const rangeNode = nodes.editor.querySelector('#produccionRecipeHistoryRange');
       if (window.flatpickr && rangeNode) {
         const locale = window.flatpickr.l10ns?.es || undefined;
+        const dayMap = getRecipeCalendarKgMap();
         window.flatpickr(rangeNode, {
           locale,
           mode: 'range',
           dateFormat: 'Y-m-d',
           allowInput: true,
           defaultDate: normalizeValue(recipeHistoryState.range).split(' a ').filter(Boolean),
+          onDayCreate: (_dObj, _dStr, _fp, dayElem) => {
+            const iso = dayElem?.dateObj ? getArgentinaIsoDate(dayElem.dateObj) : '';
+            const producedKg = Number(dayMap[iso] || 0);
+            if (producedKg <= 0) return;
+            const bubble = document.createElement('span');
+            bubble.className = 'inventario-day-kg';
+            bubble.textContent = `${producedKg.toFixed(2)}kg`;
+            dayElem.appendChild(bubble);
+          },
           onClose: (_dates, _str, instance) => {
             const from = instance.selectedDates[0] ? toIsoDate(instance.selectedDates[0].getTime()) : '';
             const to = instance.selectedDates[1] ? toIsoDate(instance.selectedDates[1].getTime()) : '';
@@ -3115,10 +3175,11 @@
         return `${escapeHtml(manager.name)} (${escapeHtml(manager.role)})`;
       }).join('<br>');
       const productExpiry = addDaysToIso(date, Number(recipe.shelfLifeDays || 0));
-      const summaryRows = revalidated.ingredientPlans.map((plan) => `<li><strong>${escapeHtml(plan.ingredientName)}</strong>: ${Number(plan.neededQty || 0).toFixed(2)} ${escapeHtml(plan.ingredientUnit || '')}</li>`).join('');
+      const summaryRows = revalidated.ingredientPlans.map((plan) => `<li><strong>${escapeHtml(plan.ingredientName)}</strong>: ${Number(plan.neededQty || 0).toFixed(3)} ${escapeHtml(plan.ingredientUnit || '')}</li>`).join('');
+      const qtyGrams = Number((qty * 1000).toFixed(3));
       const confirm = await openIosSwal({
         title: 'Confirmar producción final',
-        html: `<div class="text-start produccion-confirm-summary produccion-confirm-card"><div class="produccion-confirm-head"><span class="produccion-confirm-icon"><i class="bi bi-check2-circle"></i></span><div><p class="produccion-confirm-kicker">Validación final</p><p class="produccion-confirm-note">Se descontará stock real del inventario al confirmar.</p></div></div><p><strong><i class="bi bi-box-seam fa-solid fa-box-open"></i> Producto:</strong> <span>${escapeHtml(recipe.title || '-')}</span></p><p><strong><i class="bi bi-calendar-event"></i> Fecha:</strong> <span class="produccion-trace-date">${escapeHtml(formatIsoEs(date))}</span></p><p><strong><i class="bi bi-hourglass-split"></i> VTO producto:</strong> <span class="produccion-confirm-vto">${escapeHtml(formatIsoEs(productExpiry || ''))} (VTO)</span></p><p><strong><i class="bi bi-speedometer2"></i> Total a producir:</strong> <span class="produccion-confirm-total">${qty.toFixed(2)} kg</span></p><p><strong><i class="bi bi-people"></i> Encargado/s:</strong><br>${managerSummary}</p><p><strong><i class="bi bi-list-check"></i> Resumen de insumos:</strong></p><ul>${summaryRows}</ul></div>`,
+        html: `<div class="text-start produccion-confirm-summary produccion-confirm-card"><div class="produccion-confirm-head"><span class="produccion-confirm-icon"><i class="bi bi-check2-circle"></i></span><div><p class="produccion-confirm-kicker">Validación final</p><p class="produccion-confirm-note">Se descontará stock real del inventario al confirmar.</p></div></div><p><strong><i class="bi bi-box-seam fa-solid fa-box-open"></i> Producto:</strong> <span>${escapeHtml(recipe.title || '-')}</span></p><p><strong><i class="bi bi-calendar-event"></i> Fecha:</strong> <span class="produccion-trace-date">${escapeHtml(formatIsoEs(date))}</span></p><p><strong><i class="bi bi-hourglass-split"></i> VTO producto:</strong> <span class="produccion-confirm-vto">${escapeHtml(formatIsoEs(productExpiry || ''))} (VTO)</span></p><p><strong><i class="bi bi-speedometer2"></i> Total a producir:</strong> <span class="produccion-confirm-total">${qty.toFixed(3)} kg</span><br><small>${qtyGrams.toFixed(3)} gramos</small></p><p><strong><i class="bi bi-people"></i> Encargado/s:</strong><br>${managerSummary}</p><p><strong><i class="bi bi-list-check"></i> Resumen de insumos:</strong></p><ul>${summaryRows}</ul></div>`,
         showCancelButton: true,
         confirmButtonText: 'Confirmar',
         cancelButtonText: 'Cancelar',
@@ -3152,6 +3213,7 @@
         const packagingDate = agingDaysAtProduction > 0
           ? moveIsoFromSunday(addDaysToIso(toIsoDate(nowTs()), agingDaysAtProduction))
           : '';
+        const snapshotIngredientPlans = enrichIngredientPlansWithSnapshots(revalidated.ingredientPlans);
         const registro = {
         id: productionId,
         recipeId: recipe.id,
@@ -3164,7 +3226,7 @@
         quantityKg: qty,
         managers,
         observations,
-        lots: revalidated.ingredientPlans,
+        lots: snapshotIngredientPlans,
         traceability: {
           generatedAt: nowTs(),
           company: {
@@ -3186,7 +3248,7 @@
               attachmentName: normalizeValue(recipeRnpa.attachmentName)
             }
           },
-          ingredients: revalidated.ingredientPlans.map((ingredientPlan) => ({
+          ingredients: snapshotIngredientPlans.map((ingredientPlan) => ({
             ingredientId: ingredientPlan.ingredientId,
             ingredientName: ingredientPlan.ingredientName,
             ingredientImageUrl: normalizeValue(state.ingredientes[ingredientPlan.ingredientId]?.imageUrl),
@@ -3199,7 +3261,7 @@
               unit: lot.unit,
               expiryDate: lot.expiryDate,
               provider: lot.provider,
-              providerRne: normalizeRneRecord(findProviderFromTraceValue(lot.provider)?.rne),
+              providerRne: normalizeRneRecord(safeObject(lot.providerRne)),
               invoiceNumber: lot.invoiceNumber,
               invoiceImageUrls: Array.isArray(lot.invoiceImageUrls) ? lot.invoiceImageUrls : []
             }))
@@ -3232,7 +3294,18 @@
         await openIosSwal({ title: 'No se pudo confirmar', html: '<p>Ocurrió un error al guardar la producción.</p>', icon: 'error', confirmButtonText: 'Entendido' });
       }
     };
-    nodes.editor.querySelector('#produccionConfirmBtn').addEventListener('click', confirmProduction);
+    let isConfirmingProduction = false;
+    nodes.editor.querySelector('#produccionConfirmBtn').addEventListener('click', async () => {
+      if (isConfirmingProduction) return;
+      isConfirmingProduction = true;
+      confirmBtn.setAttribute('disabled', 'disabled');
+      try {
+        await confirmProduction();
+      } finally {
+        confirmBtn.removeAttribute('disabled');
+        isConfirmingProduction = false;
+      }
+    });
     nodes.editor.querySelector('#produccionBackBtn').addEventListener('click', async () => {
       const result = await openIosSwal({
         title: '¿Deseás abandonar esta producción?',
@@ -3265,15 +3338,23 @@
   const refreshData = async () => {
     setStateView('loading');
     await window.laJamoneraReady;
+    const safeRead = async (path, fallback = {}) => {
+      try {
+        const value = await window.dbLaJamoneraRest.read(path);
+        return value == null ? fallback : value;
+      } catch (error) {
+        return fallback;
+      }
+    };
     const [recetas, ingredientes, inventario, config, reservas, drafts, registros, users] = await Promise.all([
-      window.dbLaJamoneraRest.read('/recetas'),
-      window.dbLaJamoneraRest.read('/ingredientes/items'),
-      window.dbLaJamoneraRest.read('/inventario'),
-      window.dbLaJamoneraRest.read(CONFIG_PATH),
-      window.dbLaJamoneraRest.read(RESERVAS_PATH),
-      window.dbLaJamoneraRest.read(DRAFTS_PATH),
-      window.dbLaJamoneraRest.read(REGISTROS_PATH),
-      window.dbLaJamoneraRest.read('/informes/users')
+      safeRead('/recetas', {}),
+      safeRead('/ingredientes/items', {}),
+      safeRead('/inventario', {}),
+      safeRead(CONFIG_PATH, {}),
+      safeRead(RESERVAS_PATH, {}),
+      safeRead(DRAFTS_PATH, {}),
+      safeRead(REGISTROS_PATH, {}),
+      safeRead('/informes/users', {})
     ]);
     state.recetas = safeObject(recetas);
     state.ingredientes = safeObject(ingredientes);
