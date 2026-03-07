@@ -542,6 +542,30 @@
           unit: entry.unit,
           diffDays,
           expiryDate,
+          lotNumber: normalizeValue(entry.lotNumber),
+          packageQty: Number(entry.packageQty || record.packageQty || 0) || null
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.diffDays - b.diffDays);
+  };
+
+  const getExpiredEntries = (record) => {
+    const todayIso = getArgentinaIsoDate();
+    return (Array.isArray(record.entries) ? record.entries : [])
+      .map((entry) => {
+        const expiryDate = normalizeIsoDate(entry.expiryDate);
+        const availableQty = getAvailableQty(entry);
+        if (!expiryDate || !Number.isFinite(availableQty) || availableQty <= 0) return null;
+        if (expiryDate >= todayIso) return null;
+        const diffDays = Math.abs(Math.round((new Date(`${todayIso}T00:00:00`).getTime() - new Date(`${expiryDate}T00:00:00`).getTime()) / 86400000));
+        return {
+          entryId: entry.id,
+          qty: availableQty,
+          unit: entry.unit,
+          diffDays,
+          expiryDate,
+          lotNumber: normalizeValue(entry.lotNumber),
           packageQty: Number(entry.packageQty || record.packageQty || 0) || null
         };
       })
@@ -917,9 +941,25 @@
       const stockClass = stockQty <= 0 ? 'is-zero' : '';
       const thresholdBase = currentThresholdFor(record, stockUnit);
       const thresholdQty = fromBase(thresholdBase, stockUnit);
+      const packageSuffix = Number(record.packageQty) > 0 ? ` x${Number(record.packageQty)}` : '';
+      const expiredRows = getExpiredEntries(record);
       const expiringRows = getExpiringSoonEntries(record);
-      const expiringHtml = expiringRows.length
-        ? `<div class="inventario-expiring-list">${expiringRows.map((entry) => `<p class="inventario-expiring-line"><strong>${formatQtyUnit(entry.qty, entry.unit)}</strong>${entry.packageQty ? ` x${entry.packageQty}` : ''} ${getExpiryBadgeHtml({ expiryDate: entry.expiryDate, availableQty: entry.qty })}</p>`).join('')}</div>`
+      const expiredBase = expiredRows.reduce((acc, entry) => acc + toBase(entry.qty, entry.unit), 0);
+      const expiredQtyInStockUnit = fromBase(expiredBase, stockUnit);
+      const realAvailableQty = Math.max(0, stockQty - expiredQtyInStockUnit);
+      const expiryRows = [
+        ...expiredRows.map((entry) => ({ ...entry, type: 'expired' })),
+        ...expiringRows.map((entry) => ({ ...entry, type: 'soon' }))
+      ];
+      const expiringHtml = expiryRows.length
+        ? `<div class="inventario-expiring-list">${expiryRows.map((entry) => {
+          const pkg = entry.packageQty ? ` x${entry.packageQty}` : '';
+          const lot = entry.lotNumber ? ` · lote ${escapeHtml(entry.lotNumber)}` : '';
+          const when = entry.type === 'expired'
+            ? `Expirado hace ${entry.diffDays} día(s)`
+            : `Vence en ${entry.diffDays} día(s)`;
+          return `<p class="inventario-expiring-line ${entry.type === 'expired' ? 'is-expired' : 'is-soon'}"><strong>${formatQtyUnit(entry.qty, entry.unit)}${pkg}</strong><span>${when}${lot}${entry.expiryDate ? ` · ${formatIsoDateEs(entry.expiryDate)}` : ''}</span></p>`;
+        }).join('')}</div>`
         : '';
       return `
         <article class="ingrediente-card inventario-card ${status.className}" data-inventario-card="${item.id}">
@@ -931,7 +971,7 @@
             </div>
             <p class="ingrediente-meta">${capitalize(item.familyName)} · ${getMeasureLabel(item.measure || 'kilos')}</p>
             ${item.description ? `<p class="ingrediente-description">${sentenceCase(item.description)}</p>` : ''}
-            <p class="inventario-stock-line ${stockClass}"><strong>${stockQty.toFixed(2)}</strong><small class="inventario-stock-unit">${escapeHtml(getMeasureAbbr(stockUnit))}</small><span>Umbral bajo: ${thresholdQty.toFixed(2)} ${escapeHtml(getMeasureAbbr(stockUnit))} ${normalizeValue(record.lowThresholdMode) === 'custom' ? '(personalizado)' : '(global)'}</span></p>
+            <p class="inventario-stock-line ${stockClass}"><strong class="${expiredQtyInStockUnit > 0.0001 ? 'inventario-expired-strike' : ''}">${stockQty.toFixed(2)}</strong><small class="inventario-stock-unit ${expiredQtyInStockUnit > 0.0001 ? 'inventario-expired-strike' : ''}">${escapeHtml(getMeasureAbbr(stockUnit))}${packageSuffix}</small>${expiredQtyInStockUnit > 0.0001 ? `<span class="inventario-stock-real-line">Real ${realAvailableQty.toFixed(2)} ${escapeHtml(getMeasureAbbr(stockUnit))}${packageSuffix}</span>` : ''}<span>Umbral bajo: ${thresholdQty.toFixed(2)} ${escapeHtml(getMeasureAbbr(stockUnit))} ${normalizeValue(record.lowThresholdMode) === 'custom' ? '(personalizado)' : '(global)'}</span></p>
             ${expiringHtml}
             <div class="inventario-actions-row inventory-production-actions">
               <button type="button" class="btn ios-btn ios-btn-success inventory-production-action-btn is-main" data-inventario-open-editor="${item.id}"><i class="fa-solid fa-plus"></i><span>Ingresar Stock</span></button>
@@ -1303,7 +1343,9 @@
     const expiryIso = normalizeIsoDate(entry?.expiryDate);
     if (!expiryIso) return { isExpired: false, availableKg: getAvailableKg(entry), expiredKg: 0 };
     const availableKg = getAvailableKg(entry);
-    const isExpired = expiryIso < targetIso && availableKg > 0.0001;
+    const availableQty = getAvailableQty(entry);
+    const hasAvailable = (Number.isFinite(availableKg) && availableKg > 0.0001) || (Number.isFinite(availableQty) && availableQty > 0.0001);
+    const isExpired = expiryIso < targetIso && hasAvailable;
     return {
       isExpired,
       availableKg,
@@ -2075,7 +2117,6 @@
     if (!ingredient) return;
     const record = getRecord(ingredientId);
     const expiringDays = currentExpiringDaysFor(record);
-    const expiringKg = sumExpiringSoonKg(record);
 
     const baseDraft = {
       qty: '',
@@ -2099,11 +2140,27 @@
     setStateView('editor');
     nodes.editorTitle.textContent = `Inventario · ${capitalize(ingredient.name)}`;
 
-    const shouldShowExpiring = expiringKg > 0;
     const providers = sortedProviders();
     const stockUnit = record.stockUnit || ingredient.measure || state.editorDraft.unit || 'kilos';
     const stockBase = Number(record.stockBase || toBase(record.stockKg || 0, stockUnit)) || 0;
     const stockQty = fromBase(stockBase, stockUnit);
+    const expiredRows = getExpiredEntries(record);
+    const expiringRows = getExpiringSoonEntries(record);
+    const expiredBase = expiredRows.reduce((acc, entry) => acc + toBase(entry.qty, entry.unit), 0);
+    const expiredQtyInStockUnit = fromBase(expiredBase, stockUnit);
+    const realAvailableQty = Math.max(0, stockQty - expiredQtyInStockUnit);
+    const expiryRows = [
+      ...expiredRows.map((entry) => ({ ...entry, type: 'expired' })),
+      ...expiringRows.map((entry) => ({ ...entry, type: 'soon' }))
+    ];
+    const editorExpiryHtml = expiryRows.length
+      ? `<div class="inventario-expiring-list inventario-expiring-list-editor">${expiryRows.map((entry) => {
+        const pkg = entry.packageQty ? ` x${entry.packageQty}` : '';
+        const lot = entry.lotNumber ? ` · lote ${escapeHtml(entry.lotNumber)}` : '';
+        const when = entry.type === 'expired' ? `Expirado hace ${entry.diffDays} día(s)` : `Vence en ${entry.diffDays} día(s)`;
+        return `<p class="inventario-expiring-line ${entry.type === 'expired' ? 'is-expired' : 'is-soon'}"><strong>${formatQtyUnit(entry.qty, entry.unit)}${pkg}</strong><span>${when}${lot}${entry.expiryDate ? ` · ${formatIsoDateEs(entry.expiryDate)}` : ''}</span></p>`;
+      }).join('')}</div>`
+      : '';
     const packageUnit = state.editorDraft.unit || stockUnit;
     const shouldShowPackageQty = getUnitMeta(packageUnit).category === 'unidad' || Number(record.packageQty) > 0;
 
@@ -2133,10 +2190,11 @@
         <div class="inventario-product-head-stats">
           <div class="inventario-total-banner">
             <small>Stock total actual</small>
-            <strong>${formatQtyUnit(stockQty, stockUnit)}${record.packageQty ? ` x${record.packageQty}` : ''}</strong>
+            <strong class="${expiredQtyInStockUnit > 0.0001 ? 'inventario-expired-strike' : ''}">${formatQtyUnit(stockQty, stockUnit)}${record.packageQty ? ` x${record.packageQty}` : ''}</strong>
+            ${expiredQtyInStockUnit > 0.0001 ? `<span class="inventario-stock-real-line">Real ${formatQtyUnit(realAvailableQty, stockUnit)}${record.packageQty ? ` x${record.packageQty}` : ''}</span>` : ''}
           </div>
           <div class="inventario-stat-row">
-            ${shouldShowExpiring ? `<div class="inventario-stat-card is-alert"><small>Próximos a caducar (${expiringDays} días)</small><strong>${expiringKg.toFixed(2)} kg</strong></div>` : ''}
+            ${expiryRows.length ? `<div class="inventario-stat-card is-alert"><small>Lotes con vencimiento (${expiringDays} días)</small>${editorExpiryHtml}</div>` : ''}
           </div>
           <div class="inventario-head-actions-row">
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-head-action" id="inventarioProductThresholdBtn"><i class="fa-solid fa-sliders"></i><span>Configurar umbrales</span></button>

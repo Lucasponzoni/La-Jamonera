@@ -4021,10 +4021,36 @@ html.login-protected.auth-ok body {
   margin: 0;
   font-size: 0.75rem;
   color: #4f6596;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 2px 0;
 }
 
 .inventario-expiring-line strong {
   color: #2a4f9b;
+}
+
+.inventario-expiring-line.is-soon span {
+  color: #b56f08;
+  font-weight: 700;
+}
+
+.inventario-expiring-line.is-expired span {
+  color: #c62c45;
+  font-weight: 700;
+}
+
+.inventario-stock-real-line {
+  display: block;
+  margin-top: 2px;
+  font-weight: 700;
+  color: #0e8f42;
+}
+
+.inventario-expiring-list-editor {
+  margin-top: 0;
 }
 
 .inventario-stock-line-expired strong {
