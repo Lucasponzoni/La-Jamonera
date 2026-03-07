@@ -15,8 +15,6 @@
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const ALLOWED_RNE_UPLOAD_TYPES = [...ALLOWED_UPLOAD_TYPES, 'application/pdf'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
-  const RNE_ALERT_AUTOSCROLL_INTERVAL_MS = 35;
-  const RNE_ALERT_AUTOSCROLL_PAUSE_MS = 2200;
   const PROVIDER_AVATAR_TONES = [
     { bg: '#e9f1ff', border: '#bfd2ff', color: '#2f57b0' },
     { bg: '#e8f8ef', border: '#b9e8cb', color: '#167a43' },
@@ -91,14 +89,6 @@
     entryCollapseByIngredient: {},
     globalEntryCollapse: {},
     providerRneFilter: 'all'
-  };
-
-  let providerRneAlertAutoScrollTimer = null;
-  const clearProviderRneAlertAutoscroll = () => {
-    if (providerRneAlertAutoScrollTimer) {
-      clearInterval(providerRneAlertAutoScrollTimer);
-      providerRneAlertAutoScrollTimer = null;
-    }
   };
 
   const safeObject = (value) => (value && typeof value === 'object' ? value : {});
@@ -549,30 +539,20 @@
       }
     });
   };
-
   const getGeneralPassword = async () => {
     await window.laJamoneraReady;
     const value = await window.dbLaJamoneraRest.read('/passGeneral/pass');
     return normalizeValue(value);
   };
 
-  const requestGeneralPasswordConfirmation = async ({ title, text, subtext }) => {
+  const requestDeleteConfirmation = async ({ title, text, subtext }) => {
     const result = await openIosSwal({
       title,
-      html: `<div class="swal-stack-fields"><p>${text}</p><p><small>${subtext}</small></p><input id="inventarioSecurePass" type="password" class="swal2-input ios-input" placeholder="Contraseña general" autocomplete="new-password" name="inventario-secure-pass" autocapitalize="off" autocorrect="off" spellcheck="false"></div>`,
+      html: `<div class="swal-stack-fields"><p>${text}</p><p><small>${subtext}</small></p></div>`,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonText: 'Confirmar',
-      cancelButtonText: 'Cancelar',
-      preConfirm: async () => {
-        const entered = normalizeValue(document.getElementById('inventarioSecurePass')?.value);
-        const remote = await getGeneralPassword();
-        if (!entered || !remote || entered !== remote) {
-          Swal.showValidationMessage('Contraseña general incorrecta.');
-          return false;
-        }
-        return true;
-      }
+      confirmButtonText: 'Eliminar',
+      cancelButtonText: 'Cancelar'
     });
     return result.isConfirmed;
   };
@@ -674,8 +654,13 @@
       nodes.providersRneBtn.innerHTML = `<i class="fa-solid fa-file-shield"></i><span>RNE</span>${hasIssues ? `<strong class="inventario-rne-alert-badge">${counts.none + counts.warning + counts.danger}</strong>` : ''}`;
     }
 
-    clearProviderRneAlertAutoscroll();
-    if (!nodes.providersRneAlert) return;
+    if (!nodes.providersRneAlert || state.periodMode) {
+      if (nodes.providersRneAlert) {
+        nodes.providersRneAlert.classList.add('d-none');
+        nodes.providersRneAlert.innerHTML = '';
+      }
+      return;
+    }
 
     const providers = sortedProviders().map((provider) => {
       const expiryDate = normalizeValue(provider?.rne?.expiryDate);
@@ -704,41 +689,29 @@
 
     const rowHtml = (row, toneClass) => `<div class="inventario-rne-expiry-row ${toneClass}"><strong>${escapeHtml(row.name)}</strong><span>${escapeHtml(formatIsoDateEs(row.expiryDate))} · <strong>${row.remainingDays} día(s)</strong></span></div>`;
 
+    const detailsCount = dangerRows.length + warningRows.length;
+
+    const alertMessage = dangerRows.length ? 'Hay RNE críticos por vencer.' : 'Hay RNE próximos a vencer.';
+
     nodes.providersRneAlert.classList.remove('d-none');
-    nodes.providersRneAlert.innerHTML = `<div class="produccion-rne-expiry-alert ${dangerRows.length ? 'is-danger' : 'is-ok'}"><i class="bi ${dangerRows.length ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill'}"></i><span>${dangerRows.length ? 'Hay RNE críticos por vencer.' : 'Hay RNE próximos a vencer.'}</span></div>
-      <div class="inventario-rne-expiry-board">
+    nodes.providersRneAlert.innerHTML = `<button type="button" class="produccion-rne-expiry-alert ${dangerRows.length ? 'is-danger' : 'is-ok'} is-collapsible" data-rne-alert-toggle aria-expanded="false">
+        <span class="produccion-rne-expiry-text"><i class="bi ${dangerRows.length ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill'}"></i><span>${alertMessage}</span></span>
+        <span class="produccion-rne-expiry-collapse-meta"><strong>${detailsCount}</strong><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
+      </button>
+      <div class="inventario-rne-expiry-board" data-rne-alert-details hidden>
         ${dangerRows.length ? `<section class="inventario-rne-expiry-group"><h6><strong>Vencen en menos de 3 meses</strong></h6>${dangerRows.map((row) => rowHtml(row, 'is-danger')).join('')}</section>` : ''}
         ${warningRows.length ? `<section class="inventario-rne-expiry-group"><h6><strong>Vencen en menos de 6 meses</strong></h6>${warningRows.map((row) => rowHtml(row, 'is-warning')).join('')}</section>` : ''}
       </div>`;
 
-    const board = nodes.providersRneAlert.querySelector('.inventario-rne-expiry-board');
-    if (!board || board.scrollHeight <= board.clientHeight + 4) return;
-
-    let direction = 1;
-    let pauseUntil = 0;
-    providerRneAlertAutoScrollTimer = setInterval(() => {
-      const now = Date.now();
-      if (now < pauseUntil) return;
-      board.scrollTop += direction;
-      const atBottom = board.scrollTop + board.clientHeight >= board.scrollHeight - 2;
-      const atTop = board.scrollTop <= 0;
-      if (atBottom || atTop) {
-        direction *= -1;
-        pauseUntil = now + RNE_ALERT_AUTOSCROLL_PAUSE_MS;
-      }
-    }, RNE_ALERT_AUTOSCROLL_INTERVAL_MS);
-
-    let manualTimeout = null;
-    const pauseManual = () => {
-      pauseUntil = Date.now() + 5000;
-      if (manualTimeout) clearTimeout(manualTimeout);
-      manualTimeout = setTimeout(() => {
-        pauseUntil = Date.now() + 800;
-      }, 5000);
-    };
-    board.addEventListener('wheel', pauseManual, { passive: true });
-    board.addEventListener('touchmove', pauseManual, { passive: true });
-    board.addEventListener('pointerdown', pauseManual);
+    const toggleBtn = nodes.providersRneAlert.querySelector('[data-rne-alert-toggle]');
+    const details = nodes.providersRneAlert.querySelector('[data-rne-alert-details]');
+    toggleBtn?.addEventListener('click', () => {
+      if (!details) return;
+      const expanded = toggleBtn.getAttribute('aria-expanded') === 'true';
+      toggleBtn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+      details.hidden = expanded;
+      toggleBtn.classList.toggle('is-open', !expanded);
+    });
   };
 
 
@@ -3118,7 +3091,7 @@
             const index = Number(indexRaw);
             const selected = findProviderById(provId);
             if (!selected) return;
-            const ok = await requestGeneralPasswordConfirmation({
+            const ok = await requestDeleteConfirmation({
               title: 'Borrar versión del historial',
               text: `<strong>${escapeHtml(selected.name)}</strong>: se eliminará solo esta versión de historial.`,
               subtext: 'El RNE actual no será modificado.'
@@ -3138,7 +3111,7 @@
           if (deleteBtn) {
             const provider = findProviderById(deleteBtn.dataset.providerRneDelete || '');
             if (!provider) return;
-            const ok = await requestGeneralPasswordConfirmation({
+            const ok = await requestDeleteConfirmation({
               title: 'Borrar RNE actual del proveedor',
               text: `<strong>${escapeHtml(provider.name)}</strong>: se eliminará solo el RNE actual.`,
               subtext: 'El historial se conserva para trazabilidad y podés restaurar/cargar un nuevo RNE.'
@@ -3211,8 +3184,11 @@
     nodes.list?.classList.toggle('d-none', enabled);
     nodes.periodView?.classList.toggle('d-none', !enabled);
     if (enabled) {
+      nodes.providersRneAlert?.classList.add('d-none');
       nodes.globalClearBtn?.classList.toggle('d-none', !state.dashboardDateRange);
+      return;
     }
+    renderProviderRneAlert();
   };
 
   const loadInventario = async () => {
@@ -3514,7 +3490,6 @@
 
   inventarioModal.addEventListener('hide.bs.modal', () => {
     snapshotEditorDraft();
-    clearProviderRneAlertAutoscroll();
   });
   inventarioModal.addEventListener('hidden.bs.modal', () => inventarioModal.removeAttribute('inert'));
   nodes.imageViewerModal?.addEventListener('hidden.bs.modal', () => {
