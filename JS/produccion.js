@@ -1639,6 +1639,7 @@
     return window.__laJamoneraLoadingMermaid;
   };
   const buildTraceMermaidDefinition = (registro) => {
+    const isMobileTrace = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
     const esc = (value) => String(value || '-')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -1655,8 +1656,8 @@
     const productRnpaNumber = normalizeValue(productRnpa.number || '-');
     const productRnpaLabel = normalizeValue(productRnpa.denomination || productRnpa.brand || productRnpa.businessName || registro?.recipeTitle || '-');
     const lines = [
-      '%%{init: {"flowchart": {"curve": "basis", "nodeSpacing": 48, "rankSpacing": 74}} }%%',
-      'flowchart TB',
+      `%%{init: {"flowchart": {"curve": "${isMobileTrace ? 'linear' : 'basis'}", "nodeSpacing": ${isMobileTrace ? 38 : 72}, "rankSpacing": ${isMobileTrace ? 58 : 110}} } }%%`,
+      `flowchart ${isMobileTrace ? 'TB' : 'TB'}`,
       `C["<b>${esc(COMPANY_LEGAL_NAME)}</b>"]:::toneCompany`,
       `P["<b>${esc((registro?.recipeTitle || 'Producto').toUpperCase())}</b>"]:::toneProduct`,
       `L["<b>LOTE:</b> ${esc(registro?.id || '-')}<br/><b>VTO:</b> ${esc(formatProductExpiryLabel(registro))}"]:::toneLot`,
@@ -1666,8 +1667,8 @@
       `W["<b>MERMA</b> ${mermaKg.toFixed(3)} KG"]:::toneWaste`,
       `CR["<b>RNE EMPRESA</b><br/>${esc(companyRne.number || '-')} "]:::toneRegistry`,
       `RNPA["<b>RNPA</b><br/>N° ${esc(productRnpaNumber)}<br/>${esc(productRnpaLabel)}"]:::toneRegistry`,
-      'C --> CR',
-      'CR --> P',
+      isMobileTrace ? 'C --> CR' : 'C --> CR',
+      'C --> P',
       'P --> R',
       'R --> L',
       'P -.-> RNPA',
@@ -1679,8 +1680,15 @@
       lines.push(`E["<b>ENVASADO</b><br/><b>+${packaging.agingDays} días</b><br/>${esc(formatIsoEs(packaging.packagingDate))}"]:::toneManager`);
       lines.push('R -.-> E');
     }
-    lines.push('subgraph ING_BLOCK["TRAZA DE INSUMOS"]');
-    lines.push('direction LR');
+    if (!isMobileTrace) {
+      lines.push('subgraph HEAD_ROW[""]');
+      lines.push('direction LR');
+      lines.push('C');
+      lines.push('CR');
+      lines.push('end');
+    }
+    lines.push(`subgraph ING_ROW[""]`);
+    lines.push(`direction ${isMobileTrace ? 'TB' : 'LR'}`);
     ingredients.forEach((item, index) => {
       const lot = Array.isArray(item?.lots) && item.lots[0] ? item.lots[0] : {};
       const nodeId = `ING${index + 1}`;
@@ -1698,16 +1706,18 @@
       lines.push(`I --> ${nodeId}`);
     });
     lines.push('end');
+    if (!isMobileTrace) lines.push('style HEAD_ROW fill:transparent,stroke:transparent;');
+    lines.push('style ING_ROW fill:transparent,stroke:transparent;');
     lines.push('linkStyle default stroke:#6e83a7,stroke-width:1.8px;');
-    lines.push('classDef toneCompany fill:#d9e8ff,stroke:#8caedd,color:#143a73,stroke-width:1.6px;');
-    lines.push('classDef toneProduct fill:#dce9ff,stroke:#93b3e5,color:#173b70,stroke-width:1.6px;');
-    lines.push('classDef toneLot fill:#ffe8c9,stroke:#efc48b,color:#6f4a20,stroke-width:1.4px;');
-    lines.push('classDef toneProduction fill:#fff2c7,stroke:#e6ca87,color:#6a5118,stroke-width:1.5px;');
-    lines.push('classDef toneManager fill:#efe6ff,stroke:#c8b2ea,color:#4c367b,stroke-width:1.35px;');
-    lines.push('classDef toneIngredients fill:#d8f3e5,stroke:#96cfb0,color:#16593c,stroke-width:1.45px;');
-    lines.push('classDef toneWaste fill:#ffd9de,stroke:#ee9cab,color:#7e2435,stroke-width:1.4px;');
-    lines.push('classDef toneIngredient fill:#f8fbff,stroke:#c4d4ee,color:#1f3f72,stroke-width:1.35px;');
-    lines.push('classDef toneRegistry fill:#edf3ff,stroke:#a7bfe8,color:#1a3f73,stroke-width:1.35px;');
+    lines.push('classDef toneCompany fill:#2f6ecf,stroke:#1f57ad,color:#ffffff,stroke-width:1.8px;');
+    lines.push('classDef toneProduct fill:#3b82f6,stroke:#1f5ec4,color:#ffffff,stroke-width:1.7px;');
+    lines.push('classDef toneLot fill:#ffedd1,stroke:#e4b674,color:#704b1e,stroke-width:1.4px;');
+    lines.push('classDef toneProduction fill:#ffe7a9,stroke:#dbb867,color:#6b4f16,stroke-width:1.55px;');
+    lines.push('classDef toneManager fill:#ece0ff,stroke:#c0a2ea,color:#4f3a7d,stroke-width:1.35px;');
+    lines.push('classDef toneIngredients fill:#d1f2df,stroke:#89c8a5,color:#1a5e3f,stroke-width:1.45px;');
+    lines.push('classDef toneWaste fill:#ffd8de,stroke:#e994a4,color:#7d2233,stroke-width:1.4px;');
+    lines.push('classDef toneIngredient fill:#eaf1ff,stroke:#9fb9e6,color:#173f78,stroke-width:1.35px;');
+    lines.push('classDef toneRegistry fill:#e7efff,stroke:#8eaedf,color:#173d73,stroke-width:1.35px;');
     return lines.join('\n');
   };
   const renderTraceabilityTree = (registro) => {

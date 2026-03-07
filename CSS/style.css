@@ -6810,6 +6810,7 @@ html.login-protected.auth-ok body {
 .produccion-trace-mermaid .mermaid {
   min-width: 640px;
   width: max-content;
+  font-size: 14px;
 }
 
 .produccion-trace-mermaid svg {
@@ -6862,7 +6863,7 @@ html.login-protected.auth-ok body {
   }
 
   .produccion-trace-mermaid .mermaid {
-    min-width: 520px;
+    min-width: 320px;
   }
 }
 
