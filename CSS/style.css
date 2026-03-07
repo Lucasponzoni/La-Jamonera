@@ -614,10 +614,10 @@ html.login-protected.auth-ok body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  line-height: 2;
+  line-height: 1;
   padding: 0 4px;
   z-index: 3;
-  /* box-shadow: 0 4px 10px rgba(23, 37, 84, 0.25); */
+  box-shadow: 0 4px 10px rgba(23, 37, 84, 0.25);
 }
 
 .family-circle-thumb img {
