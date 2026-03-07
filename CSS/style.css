@@ -6613,9 +6613,9 @@ html.login-protected.auth-ok body {
   border: 1px solid #dfe6f8;
   border-radius: 16px;
   padding: 12px;
-  background-image: radial-gradient(circle at 1px 1px, rgba(112, 130, 170, 0.22) 1px, transparent 0);
+  background-image: radial-gradient(circle at 1px 1px, rgba(117, 136, 180, 0.16) 1px, transparent 0);
   background-size: 18px 18px;
-  background-color: #f7f9ff;
+  background-color: #f5f8ff;
 }
 
 .produccion-trace-ingredient-avatar {
@@ -6647,9 +6647,9 @@ html.login-protected.auth-ok body {
 .produccion-trace-diagram-wrap {
   max-height: 68vh;
   overflow: auto;
-  border: 1px solid #dbe4f8;
+  border: 1px solid #d2def6;
   border-radius: 14px;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.72);
   touch-action: pan-x pan-y;
 }
 
@@ -6787,9 +6787,9 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-trace-mermaid-wrap {
-  border: 2px dashed #cfdbf4;
+  border: 1px dashed #c7d5f1;
   border-radius: 16px;
-  background: transparent;
+  background: #f8fbff;
   padding: 12px;
   margin-bottom: 14px;
   overflow: hidden;

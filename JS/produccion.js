@@ -105,6 +105,7 @@
     const fallback = safeObject(recipe?.rnpa);
     const source = Object.keys(persisted).length ? persisted : fallback;
     return {
+      number: normalizeValue(source?.number),
       denomination: normalizeValue(source?.denomination),
       brand: normalizeValue(source?.brand),
       businessName: normalizeValue(source?.businessName),
@@ -1625,10 +1626,10 @@
         theme: 'base',
         securityLevel: 'loose',
         themeVariables: {
-          primaryColor: '#eef3ff',
-          primaryTextColor: '#26457d',
-          primaryBorderColor: '#cfdaf4',
-          lineColor: '#7f95c2',
+          primaryColor: '#eef4ff',
+          primaryTextColor: '#223f78',
+          primaryBorderColor: '#c4d5f5',
+          lineColor: '#6e88bc',
           tertiaryColor: '#ffffff',
           fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
         }
@@ -1651,7 +1652,8 @@
     const packaging = resolvePackagingFromRegistro(registro);
     const companyRne = resolveCompanyRneFromRegistro(registro);
     const productRnpa = resolveRecipeRnpaFromRegistro(registro);
-    const productRnpaLabel = normalizeValue(productRnpa.denomination || productRnpa.brand || productRnpa.businessName || '-');
+    const productRnpaNumber = normalizeValue(productRnpa.number || '-');
+    const productRnpaLabel = normalizeValue(productRnpa.denomination || productRnpa.brand || productRnpa.businessName || registro?.recipeTitle || '-');
     const lines = [
       'flowchart TD',
       `C["<b>${esc(COMPANY_LEGAL_NAME)}</b>"]:::toneCompany`,
@@ -1661,8 +1663,8 @@
       `M["<b>ENCARGADO:</b> ${esc(manager)}"]:::toneManager`,
       `I["<b>INGREDIENTES TOTALES</b> ${totalIngredientsKg.toFixed(3)} KG"]:::toneIngredients`,
       `W["<b>MERMA</b> ${mermaKg.toFixed(3)} KG"]:::toneWaste`,
-      `CR["<b>RNE EMPRESA:</b> ${esc(companyRne.number || '-')} "]:::toneRegistry`,
-      `RNPA["<b>RNPA:</b> ${esc(productRnpaLabel)}"]:::toneRegistry`,
+      `CR["<b>RNE EMPRESA</b><br/>${esc(companyRne.number || '-')} "]:::toneRegistry`,
+      `RNPA["<b>RNPA</b><br/>N° ${esc(productRnpaNumber)}<br/>${esc(productRnpaLabel)}"]:::toneRegistry`,
       'C -.-> CR',
       'CR -.-> P',
       'P --> R',
@@ -1688,24 +1690,26 @@
       ].map(esc).join('<br/>');
       const providerRne = resolveProviderRneFromLot(lot);
       lines.push(`${nodeId}["${nodeLabel}"]:::toneIngredient`);
-      lines.push(`${index === 0 ? 'I' : `ING${index}`} --> ${nodeId}`);
-      lines.push(`${nodeId}RNE["<b>RNE PROVEEDOR:</b> ${esc(providerRne.number || '-')} "]:::toneRegistry`);
-      lines.push(`${nodeId} -.-> ${nodeId}RNE`);
+      lines.push(`I --> ${nodeId}`);
+      lines.push(`${nodeId}RNE["<b>RNE PROVEEDOR</b><br/>${esc(providerRne.number || '-')} "]:::toneRegistry`);
+      lines.push(`${nodeId} --> ${nodeId}RNE`);
     });
-    lines.push('classDef toneCompany fill:#e4ebff,stroke:#bfcdf0,color:#223c72,stroke-width:1px;');
-    lines.push('classDef toneProduct fill:#dfeaff,stroke:#bdd0f5,color:#28467f,stroke-width:1px;');
-    lines.push('classDef toneLot fill:#ffeed9,stroke:#efd1aa,color:#6f4a1f,stroke-width:1px;');
-    lines.push('classDef toneProduction fill:#fff3c6,stroke:#e8d79d,color:#6c531a,stroke-width:1px;');
-    lines.push('classDef toneManager fill:#e8e1ff,stroke:#cbc0f4,color:#4f3d86,stroke-width:1px;');
-    lines.push('classDef toneIngredients fill:#d8f4e4,stroke:#b2e0c5,color:#1f6a46,stroke-width:1px;');
-    lines.push('classDef toneWaste fill:#ffdede,stroke:#f0bdbd,color:#8b2f3f,stroke-width:1px;');
-    lines.push('classDef toneIngredient fill:#f3f5f9,stroke:#d4dbe9,color:#2d426f,stroke-width:1px;');
-    lines.push('classDef toneRegistry fill:#edf2ff,stroke:#c8d4f4,color:#2d4b87,stroke-width:1px;');
+    lines.push('linkStyle default stroke:#6e88bc,stroke-width:1.8px;');
+    lines.push('classDef toneCompany fill:#dbe8ff,stroke:#9fb8e8,color:#16366f,stroke-width:1.5px;');
+    lines.push('classDef toneProduct fill:#d5e6ff,stroke:#90b4ec,color:#123a72,stroke-width:1.5px;');
+    lines.push('classDef toneLot fill:#ffe9c9,stroke:#f2c987,color:#6f4a1f,stroke-width:1.4px;');
+    lines.push('classDef toneProduction fill:#fff0b8,stroke:#eacb72,color:#6a4c0d,stroke-width:1.4px;');
+    lines.push('classDef toneManager fill:#e8deff,stroke:#c3afea,color:#463273,stroke-width:1.3px;');
+    lines.push('classDef toneIngredients fill:#d5f2e2,stroke:#8fceab,color:#155f3c,stroke-width:1.4px;');
+    lines.push('classDef toneWaste fill:#ffd8de,stroke:#f09baa,color:#8a2438,stroke-width:1.4px;');
+    lines.push('classDef toneIngredient fill:#f8fbff,stroke:#c8d6ef,color:#1f3f72,stroke-width:1.3px;');
+    lines.push('classDef toneRegistry fill:#ecf3ff,stroke:#aac0ea,color:#1a3d74,stroke-width:1.3px;');
     return lines.join('\n');
   };
   const renderTraceabilityTree = (registro) => {
     const companyRne = resolveCompanyRneFromRegistro(registro);
     const productRnpa = resolveRecipeRnpaFromRegistro(registro);
+    const productRnpaNumber = normalizeValue(productRnpa.number || '-');
     const productRnpaLabel = normalizeValue(productRnpa.denomination || productRnpa.brand || productRnpa.businessName || '-');
     const ingredients = (registro.lots || []).map((item, idx) => {
       const ingredientImage = normalizeValue(state.ingredientes[item.ingredientId]?.imageUrl);
@@ -1770,7 +1774,8 @@
               <p><strong>Empresa</strong><span>${escapeHtml(COMPANY_LEGAL_NAME)}</span></p>
               <p><strong>RNE empresa</strong><span>${escapeHtml(companyRne.number || '-')}</span></p>
               <p><strong>Producto</strong><span>${escapeHtml(registro.recipeTitle || '-')}</span></p>
-              <p><strong>RNPA</strong><span>${escapeHtml(productRnpaLabel || '-')}</span></p>
+              <p><strong>RNPA</strong><span>${escapeHtml(productRnpaNumber)}</span></p>
+              <p><strong>Detalle RNPA</strong><span>${escapeHtml(productRnpaLabel || '-')}</span></p>
               <p><strong>Cantidad final</strong><span>${Number(registro.quantityKg || 0).toFixed(2)} kg</span></p>
               <p><strong>Fecha</strong><span>${escapeHtml(formatDateTime(registro.createdAt))}</span></p>
               <p><strong>Estado</strong><span>${escapeHtml(registro.status || '-')}</span></p>
@@ -3094,6 +3099,7 @@
             title: recipe.title,
             imageUrl: normalizeValue(recipe.imageUrl),
             rnpa: {
+              number: normalizeValue(recipeRnpa.number),
               denomination: normalizeValue(recipeRnpa.denomination),
               brand: normalizeValue(recipeRnpa.brand),
               businessName: normalizeValue(recipeRnpa.businessName),
