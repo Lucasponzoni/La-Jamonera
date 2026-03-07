@@ -6807,10 +6807,11 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-trace-mermaid-wrap {
-  border: 1px dashed #c7d5f1;
+  border: 2px dashed #c7d5f1;
   border-radius: 16px;
-  background: #f8fbff;
-  padding: 12px;
+  background-image: radial-gradient(circle at 1px 1px, rgba(117, 136, 180, 0.16) 1px, transparent 0);
+  background-size: 18px 18px;
+  background-color: #fbfcff;
   margin-bottom: 14px;
   overflow: hidden;
 }
