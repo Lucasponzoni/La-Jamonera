@@ -6533,6 +6533,26 @@ html.login-protected.auth-ok body {
   border: 1px solid #ced8f1;
 }
 
+.swal2-popup.produccion-umbral-alert .inventario-collapse-head-styled {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.swal2-popup.produccion-umbral-alert .produccion-config-toggle > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.swal2-popup.produccion-umbral-alert .inventario-collapse-summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+}
+
 .produccion-config-actions {
   display: flex;
   justify-content: flex-end;
@@ -6803,6 +6823,102 @@ html.login-protected.auth-ok body {
   user-select: none;
 }
 
+.produccion-trace-mermaid-loading {
+  min-height: 240px;
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  text-align: center;
+  color: #53658c;
+}
+
+.produccion-trace-mermaid-loading .meta-spinner-login {
+  width: 58px;
+  height: 58px;
+}
+
+.produccion-trace-mermaid-loading p {
+  margin: 0;
+  font-weight: 600;
+}
+
+.produccion-trace-fallback-diagram {
+  display: grid;
+  gap: 10px;
+  text-align: left;
+}
+
+.produccion-trace-fallback-flow {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.produccion-trace-fallback-node {
+  border: 1px solid #d3def4;
+  border-radius: 12px;
+  background: #f4f8ff;
+  padding: 8px 10px;
+  min-width: 150px;
+  display: grid;
+  gap: 2px;
+  flex: 1 1 160px;
+}
+
+.produccion-trace-fallback-node small {
+  color: #667aa5;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.produccion-trace-fallback-node strong {
+  color: #234684;
+}
+
+.produccion-trace-fallback-node span {
+  color: #5f729b;
+  font-size: 0.8rem;
+}
+
+.produccion-trace-fallback-arrow {
+  align-self: center;
+  color: #5578ba;
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.produccion-trace-fallback-meta {
+  border: 1px solid #dbe4f8;
+  border-radius: 12px;
+  background: #fbfdff;
+  padding: 8px 10px;
+}
+
+.produccion-trace-fallback-meta p {
+  margin: 0;
+  color: #395487;
+  font-size: 0.84rem;
+}
+
+.produccion-trace-fallback-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.produccion-trace-fallback-list li {
+  color: #2e487d;
+  display: grid;
+  gap: 2px;
+}
+
+.produccion-trace-fallback-list li span {
+  color: #5f729b;
+  font-size: 0.82rem;
+}
+
 .produccion-trace-mermaid.is-dragging {
   cursor: grabbing;
 }
@@ -6820,6 +6936,35 @@ html.login-protected.auth-ok body {
 }
 
 @media (max-width: 768px) {
+  .swal2-popup.produccion-umbral-alert {
+    width: min(96vw, 560px) !important;
+    padding: 1rem 0.8rem 0.95rem;
+  }
+
+  .swal2-popup.produccion-umbral-alert .swal2-html-container {
+    padding-inline: 0;
+  }
+
+  .swal2-popup.produccion-umbral-alert .inventario-collapse-head-styled {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .swal2-popup.produccion-umbral-alert .produccion-config-actions .ios-btn {
+    width: 100%;
+    max-width: none;
+    justify-content: center;
+  }
+
+  .produccion-rne-file-row {
+    grid-template-columns: 1fr;
+  }
+
+  .produccion-trace-fallback-arrow {
+    width: 100%;
+    text-align: center;
+  }
+
   .produccion-trace-diagram {
     padding: 10px;
   }
@@ -7322,5 +7467,192 @@ html.login-protected.auth-ok body {
   .produccion-rne-history-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+}
+
+/* =========================================
+   PLANILLA DE PRODUCCIÓN
+========================================= */
+.planilla-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.planilla-produccion-wrap {
+  border: 1px solid #d5dff4;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+  color: #1f2a44;
+}
+
+.planilla-head h2 {
+  margin: 0;
+  font-size: 1.18rem;
+  font-weight: 800;
+}
+
+.planilla-head p {
+  margin: 2px 0 0;
+  font-size: 0.92rem;
+}
+
+.planilla-meta-grid {
+  border: 1px solid #d5def2;
+  border-radius: 12px;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 10px;
+  background: #f8fbff;
+}
+
+.planilla-meta-grid p {
+  margin: 0;
+  font-size: 0.84rem;
+}
+
+.planilla-product-chip {
+  border: 1px solid #d5def2;
+  border-radius: 12px;
+  background: #f8fbff;
+  padding: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.planilla-circle {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: 1px solid #d4def4;
+  background: #edf3ff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.planilla-circle img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.planilla-circle-sm {
+  width: 34px;
+  height: 34px;
+}
+
+.planilla-formula-wrap h3 {
+  margin: 0;
+  text-align: center;
+  font-size: 1.04rem;
+}
+
+.planilla-table-scroll {
+  overflow-x: auto;
+}
+
+.planilla-table {
+  width: 100%;
+  min-width: 820px;
+  border-collapse: collapse;
+}
+
+.planilla-table th,
+.planilla-table td {
+  border: 1px solid #d2d9ed;
+  padding: 6px;
+  font-size: 0.82rem;
+  vertical-align: middle;
+}
+
+.planilla-table th {
+  background: #0f172a;
+  color: #fff;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}
+
+.planilla-ingredient-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.planilla-notes-grid {
+  border: 1px solid #d5def2;
+  border-radius: 12px;
+  background: #f8fbff;
+  padding: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.planilla-notes-grid p {
+  margin: 0;
+  font-size: 0.84rem;
+}
+
+.planilla-sign-area {
+  min-height: 70px;
+  border-bottom: 1px solid #b9c8e7;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  padding-bottom: 6px;
+  font-weight: 700;
+}
+
+.planilla-bottom {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.planilla-qr-block,
+.planilla-company-logo {
+  border: 1px solid #d5def2;
+  border-radius: 12px;
+  background: #f8fbff;
+  padding: 10px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  gap: 8px;
+}
+
+.planilla-company-logo img {
+  width: min(220px, 100%);
+  max-height: 110px;
+  object-fit: contain;
+}
+
+.public-trace-spinner {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.public-trace-spinner .meta-spinner-login {
+  width: 90px;
+  height: 90px;
+}
+
+@media (max-width: 768px) {
+  .planilla-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .planilla-bottom {
+    grid-template-columns: 1fr;
   }
 }
