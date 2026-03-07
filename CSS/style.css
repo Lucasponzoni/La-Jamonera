@@ -6842,6 +6842,83 @@ html.login-protected.auth-ok body {
   font-weight: 600;
 }
 
+.produccion-trace-fallback-diagram {
+  display: grid;
+  gap: 10px;
+  text-align: left;
+}
+
+.produccion-trace-fallback-flow {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.produccion-trace-fallback-node {
+  border: 1px solid #d3def4;
+  border-radius: 12px;
+  background: #f4f8ff;
+  padding: 8px 10px;
+  min-width: 150px;
+  display: grid;
+  gap: 2px;
+  flex: 1 1 160px;
+}
+
+.produccion-trace-fallback-node small {
+  color: #667aa5;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.produccion-trace-fallback-node strong {
+  color: #234684;
+}
+
+.produccion-trace-fallback-node span {
+  color: #5f729b;
+  font-size: 0.8rem;
+}
+
+.produccion-trace-fallback-arrow {
+  align-self: center;
+  color: #5578ba;
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.produccion-trace-fallback-meta {
+  border: 1px solid #dbe4f8;
+  border-radius: 12px;
+  background: #fbfdff;
+  padding: 8px 10px;
+}
+
+.produccion-trace-fallback-meta p {
+  margin: 0;
+  color: #395487;
+  font-size: 0.84rem;
+}
+
+.produccion-trace-fallback-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.produccion-trace-fallback-list li {
+  color: #2e487d;
+  display: grid;
+  gap: 2px;
+}
+
+.produccion-trace-fallback-list li span {
+  color: #5f729b;
+  font-size: 0.82rem;
+}
+
 .produccion-trace-mermaid.is-dragging {
   cursor: grabbing;
 }
@@ -6881,6 +6958,11 @@ html.login-protected.auth-ok body {
 
   .produccion-rne-file-row {
     grid-template-columns: 1fr;
+  }
+
+  .produccion-trace-fallback-arrow {
+    width: 100%;
+    text-align: center;
   }
 
   .produccion-trace-diagram {

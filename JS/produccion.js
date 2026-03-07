@@ -1720,6 +1720,38 @@
     lines.push('classDef toneRegistry fill:#e7efff,stroke:#8eaedf,color:#173d73,stroke-width:1.35px;');
     return lines.join('\n');
   };
+  const renderTraceabilityFallbackDiagram = (registro) => {
+    const ingredients = Array.isArray(registro?.lots) ? registro.lots : [];
+    const manager = (Array.isArray(registro?.managers) && registro.managers[0])
+      ? getManagerDisplay(registro.managers[0]).name
+      : 'Sin encargado';
+    const productionDate = normalizeValue(registro?.productionDate) || toIsoDate(registro?.createdAt || nowTs());
+    const companyRne = resolveCompanyRneFromRegistro(registro);
+    const productRnpa = resolveRecipeRnpaFromRegistro(registro);
+    const totalIngredientsKg = ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0);
+    const mermaKg = Math.max(0, totalIngredientsKg - Number(registro?.quantityKg || 0));
+    const productLabel = normalizeValue(registro?.recipeTitle || 'Producto');
+    const ingredientRows = ingredients.map((item, index) => {
+      const firstLot = Array.isArray(item?.lots) && item.lots[0] ? item.lots[0] : {};
+      return `<li><strong>${index + 1}. ${escapeHtml(item?.ingredientName || 'Ingrediente')}</strong><span>${escapeHtml(formatCompactQty(item?.requiredQty ?? item?.neededQty, item?.unit || item?.ingredientUnit || ''))} · Lote ${escapeHtml(firstLot?.lotNumber || firstLot?.entryId || '-')}</span></li>`;
+    }).join('');
+    return `<div class="produccion-trace-fallback-diagram" aria-label="Diagrama alternativo de trazabilidad">
+      <div class="produccion-trace-fallback-flow">
+        <article class="produccion-trace-fallback-node"><small>Empresa</small><strong>${escapeHtml(COMPANY_LEGAL_NAME)}</strong><span>RNE ${escapeHtml(companyRne.number || '-')}</span></article>
+        <span class="produccion-trace-fallback-arrow">→</span>
+        <article class="produccion-trace-fallback-node"><small>Producto</small><strong>${escapeHtml(productLabel)}</strong><span>RNPA ${escapeHtml(productRnpa.number || '-')}</span></article>
+        <span class="produccion-trace-fallback-arrow">→</span>
+        <article class="produccion-trace-fallback-node"><small>Producción</small><strong>${Number(registro?.quantityKg || 0).toFixed(2)} kg</strong><span>${escapeHtml(formatIsoEs(productionDate))}</span></article>
+      </div>
+      <div class="produccion-trace-fallback-meta">
+        <p><strong>Encargado:</strong> ${escapeHtml(manager)}</p>
+        <p><strong>Total ingredientes:</strong> ${totalIngredientsKg.toFixed(3)} kg</p>
+        <p><strong>Merma:</strong> ${mermaKg.toFixed(3)} kg</p>
+      </div>
+      <ul class="produccion-trace-fallback-list">${ingredientRows || '<li><strong>Sin ingredientes</strong><span>No hay lotes asociados en este registro.</span></li>'}</ul>
+    </div>`;
+  };
+
   const renderTraceabilityTree = (registro) => {
     const companyRne = resolveCompanyRneFromRegistro(registro);
     const productRnpa = resolveRecipeRnpaFromRegistro(registro);
@@ -1834,7 +1866,7 @@
         host.style.transformOrigin = 'top left';
         host.style.transform = 'scale(1)';
       } catch (fallbackError) {
-        host.innerHTML = '<p class="m-0">No se pudo renderizar el diagrama.</p>';
+        host.innerHTML = renderTraceabilityFallbackDiagram(registro);
       }
     }
   };
