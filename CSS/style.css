@@ -7474,166 +7474,222 @@ html.login-protected.auth-ok body {
 /* =========================================
    PLANILLA DE PRODUCCIÓN
 ========================================= */
-.planilla-actions {
+.planilla-toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
   justify-content: flex-end;
-  margin-bottom: 10px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
-.planilla-produccion-wrap {
+.planilla-card {
   border: 1px solid #d5dff4;
-  border-radius: 14px;
+  border-radius: 20px;
   background: #ffffff;
-  padding: 10px;
+  padding: 16px;
   display: grid;
-  gap: 10px;
+  gap: 14px;
   color: #1f2a44;
 }
 
-.planilla-head h2 {
+.planilla-card-header {
+  text-align: center;
+  border-bottom: 1px solid #dbe4f8;
+  padding-bottom: 10px;
+}
+
+.planilla-card-header h2 {
   margin: 0;
-  font-size: 1.18rem;
+  font-size: clamp(1.18rem, 2vw, 1.5rem);
   font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
-.planilla-head p {
-  margin: 2px 0 0;
-  font-size: 0.92rem;
+.planilla-card-header p {
+  margin: 3px 0 0;
+  font-size: 1rem;
+  font-weight: 700;
 }
 
-.planilla-meta-grid {
-  border: 1px solid #d5def2;
-  border-radius: 12px;
-  padding: 8px;
+.planilla-summary-grid {
+  border: 1px solid #d6dff3;
+  border-radius: 14px;
+  background: #f7faff;
+  padding: 10px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 10px;
-  background: #f8fbff;
+  gap: 9px 14px;
 }
 
-.planilla-meta-grid p {
-  margin: 0;
-  font-size: 0.84rem;
+.planilla-summary-item {
+  display: grid;
+  gap: 2px;
 }
 
-.planilla-product-chip {
-  border: 1px solid #d5def2;
-  border-radius: 12px;
-  background: #f8fbff;
-  padding: 8px;
-  display: inline-flex;
+.planilla-summary-item strong {
+  color: #3a4a72;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.planilla-summary-item span {
+  color: #223760;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.planilla-product-hero {
+  border: 1px solid #d6dff3;
+  border-radius: 14px;
+  background: #f7faff;
+  padding: 10px;
+  display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
-.planilla-circle {
-  width: 56px;
-  height: 56px;
+.planilla-product-hero h3 {
+  margin: 0;
+  font-size: 1.45rem;
+  color: #203a70;
+}
+
+.planilla-product-hero p {
+  margin: 2px 0 0;
+  color: #516189;
+  font-size: 1rem;
+}
+
+.planilla-avatar {
+  width: 44px;
+  height: 44px;
   border-radius: 999px;
-  border: 1px solid #d4def4;
-  background: #edf3ff;
+  border: 1px solid #d2dbef;
+  background: #edf2ff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  color: #3d5b9f;
 }
 
-.planilla-circle img {
+.planilla-avatar-lg {
+  width: 72px;
+  height: 72px;
+}
+
+.planilla-avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.planilla-circle-sm {
-  width: 34px;
-  height: 34px;
+.planilla-formula-card {
+  border: 1px solid #d6dff3;
+  border-radius: 14px;
+  background: #f7faff;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
 }
 
-.planilla-formula-wrap h3 {
+.planilla-formula-card h3 {
   margin: 0;
   text-align: center;
-  font-size: 1.04rem;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #203a70;
 }
 
 .planilla-table-scroll {
+  width: 100%;
   overflow-x: auto;
 }
 
 .planilla-table {
   width: 100%;
-  min-width: 820px;
+  min-width: 920px;
   border-collapse: collapse;
 }
 
 .planilla-table th,
 .planilla-table td {
   border: 1px solid #d2d9ed;
-  padding: 6px;
-  font-size: 0.82rem;
+  padding: 8px;
+  font-size: 0.96rem;
   vertical-align: middle;
 }
 
 .planilla-table th {
   background: #0f172a;
   color: #fff;
-  font-size: 0.78rem;
-  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-size: 0.86rem;
+  letter-spacing: 0.04em;
 }
 
-.planilla-ingredient-cell {
+.planilla-ingredient-main {
   display: inline-flex;
   align-items: center;
+  gap: 10px;
+}
+
+.planilla-kpis-grid {
+  border: 1px solid #d6dff3;
+  border-radius: 14px;
+  background: #f7faff;
+  padding: 10px;
+  display: grid;
   gap: 8px;
 }
 
-.planilla-notes-grid {
-  border: 1px solid #d5def2;
-  border-radius: 12px;
-  background: #f8fbff;
-  padding: 8px;
-  display: grid;
-  gap: 6px;
-}
-
-.planilla-notes-grid p {
+.planilla-kpis-grid p {
   margin: 0;
-  font-size: 0.84rem;
+  font-size: 1.02rem;
 }
 
-.planilla-sign-area {
-  min-height: 70px;
-  border-bottom: 1px solid #b9c8e7;
+.planilla-signature {
+  min-height: 80px;
+  border-bottom: 1px solid #b7c7e6;
   display: flex;
   justify-content: flex-end;
   align-items: flex-end;
+  font-weight: 800;
+  color: #2b3f6f;
+  font-size: 1.12rem;
   padding-bottom: 6px;
-  font-weight: 700;
 }
 
-.planilla-bottom {
+.planilla-footer-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  align-items: stretch;
+  gap: 12px;
 }
 
-.planilla-qr-block,
-.planilla-company-logo {
-  border: 1px solid #d5def2;
-  border-radius: 12px;
-  background: #f8fbff;
-  padding: 10px;
+.planilla-qr-card,
+.planilla-logo-card {
+  border: 1px solid #d6dff3;
+  border-radius: 14px;
+  background: #f7faff;
+  min-height: 220px;
+  padding: 12px;
   display: grid;
   place-items: center;
   text-align: center;
-  gap: 8px;
+  gap: 10px;
 }
 
-.planilla-company-logo img {
-  width: min(220px, 100%);
-  max-height: 110px;
+.planilla-qr-card p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: #2f487c;
+}
+
+.planilla-logo-card img {
+  width: min(280px, 100%);
+  max-height: 130px;
   object-fit: contain;
 }
 
@@ -7649,11 +7705,30 @@ html.login-protected.auth-ok body {
 }
 
 @media (max-width: 768px) {
-  .planilla-meta-grid {
+  .planilla-toolbar {
+    justify-content: stretch;
+  }
+
+  .planilla-toolbar .ios-btn {
+    width: 100%;
+    max-width: none;
+  }
+
+  .planilla-card {
+    padding: 12px;
+  }
+
+  .planilla-summary-grid,
+  .planilla-footer-grid {
     grid-template-columns: 1fr;
   }
 
-  .planilla-bottom {
-    grid-template-columns: 1fr;
+  .planilla-product-hero h3 {
+    font-size: 1.22rem;
+  }
+
+  .planilla-product-hero p,
+  .planilla-kpis-grid p {
+    font-size: 0.94rem;
   }
 }
