@@ -1808,20 +1808,34 @@
   const initTraceMermaidDiagram = async (popup, registro) => {
     const host = popup.querySelector('[data-trace-mermaid]');
     if (!host) return;
+    host.innerHTML = '<div class="produccion-trace-mermaid-loading" aria-live="polite"><img src="./IMG/Meta-ai-logo.webp" alt="Renderizando diagrama" class="meta-spinner-login"><p>Generando diagrama...</p></div>';
     const hasLib = await ensureTraceDiagramLib();
     if (!hasLib) {
       host.innerHTML = '<p class="m-0">No se pudo cargar Mermaid.</p>';
       return;
     }
     const source = buildTraceMermaidDefinition(registro);
-    host.innerHTML = `<pre class="mermaid">${source}</pre>`;
     try {
-      await window.mermaid.run({ nodes: [host.querySelector('.mermaid')] });
+      const renderId = `trace_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const rendered = await window.mermaid.render(renderId, source);
+      if (!rendered || !rendered.svg) throw new Error('Mermaid render vacío');
+      host.innerHTML = rendered.svg;
       host.dataset.traceScale = '1';
       host.style.transformOrigin = 'top left';
       host.style.transform = 'scale(1)';
-    } catch (error) {
-      host.innerHTML = '<p class="m-0">No se pudo renderizar el diagrama.</p>';
+      return;
+    } catch (primaryError) {
+      host.innerHTML = `<pre class="mermaid">${source}</pre>`;
+      try {
+        const node = host.querySelector('.mermaid');
+        if (!node) throw new Error('Nodo Mermaid ausente');
+        await window.mermaid.run({ nodes: [node] });
+        host.dataset.traceScale = '1';
+        host.style.transformOrigin = 'top left';
+        host.style.transform = 'scale(1)';
+      } catch (fallbackError) {
+        host.innerHTML = '<p class="m-0">No se pudo renderizar el diagrama.</p>';
+      }
     }
   };
   const initTraceMermaidZoomControls = (popup) => {
