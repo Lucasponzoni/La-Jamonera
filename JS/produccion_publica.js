@@ -113,26 +113,98 @@
     return lines.join('\n');
   };
 
+  const ensureLocalImageViewer = () => {
+    if (typeof window.laJamoneraOpenImageViewer === 'function') return window.laJamoneraOpenImageViewer;
+
+    const viewerNodes = {
+      modal: document.getElementById('imageViewerModal'),
+      image: document.getElementById('viewerImage'),
+      spinner: document.getElementById('viewerStageSpinner'),
+      document: document.getElementById('viewerDocument'),
+      prev: document.getElementById('viewerPrevBtn'),
+      next: document.getElementById('viewerNextBtn'),
+      zoomIn: document.getElementById('viewerZoomInBtn'),
+      zoomOut: document.getElementById('viewerZoomOutBtn'),
+      back: document.getElementById('viewerBackBtn')
+    };
+
+    if (!viewerNodes.modal || !window.bootstrap?.Modal) return null;
+
+    const state = { images: [], index: 0, scale: 1 };
+    const modalInstance = window.bootstrap.Modal.getOrCreateInstance(viewerNodes.modal);
+
+    const setScale = (value) => {
+      state.scale = Math.max(1, Math.min(4, value));
+      if (viewerNodes.image) viewerNodes.image.style.transform = `scale(${state.scale})`;
+    };
+
+    const render = () => {
+      const item = state.images[state.index];
+      if (!item || !viewerNodes.image) return;
+      const isPdf = /\.pdf($|\?)/i.test(String(item.src || ''));
+      viewerNodes.document?.classList.toggle('d-none', !isPdf);
+      if (viewerNodes.document) viewerNodes.document.src = isPdf ? item.src : '';
+      viewerNodes.image.classList.toggle('d-none', isPdf);
+      viewerNodes.zoomIn?.classList.toggle('d-none', isPdf);
+      viewerNodes.zoomOut?.classList.toggle('d-none', isPdf);
+      viewerNodes.spinner?.classList.remove('d-none');
+      if (!isPdf) {
+        viewerNodes.image.classList.remove('is-loaded');
+        viewerNodes.image.src = item.src;
+      } else {
+        viewerNodes.spinner?.classList.add('d-none');
+      }
+    };
+
+    viewerNodes.image?.addEventListener('load', () => {
+      viewerNodes.spinner?.classList.add('d-none');
+      viewerNodes.image?.classList.add('is-loaded');
+    });
+    viewerNodes.image?.addEventListener('error', () => viewerNodes.spinner?.classList.add('d-none'));
+
+    viewerNodes.prev?.addEventListener('click', () => {
+      if (!state.images.length) return;
+      state.index = (state.index - 1 + state.images.length) % state.images.length;
+      setScale(1);
+      render();
+    });
+    viewerNodes.next?.addEventListener('click', () => {
+      if (!state.images.length) return;
+      state.index = (state.index + 1) % state.images.length;
+      setScale(1);
+      render();
+    });
+    viewerNodes.zoomIn?.addEventListener('click', () => setScale(state.scale + 0.2));
+    viewerNodes.zoomOut?.addEventListener('click', () => setScale(state.scale - 0.2));
+    viewerNodes.back?.addEventListener('click', () => modalInstance.hide());
+
+    const openAttachmentViewer = async (entries, startIndex = 0, title = 'Adjuntos') => {
+      const images = entries.flatMap((item) => (Array.isArray(item?.invoiceImageUrls) ? item.invoiceImageUrls : [])
+        .map((url) => normalize(url))
+        .filter(Boolean)
+        .map((src) => ({ src })));
+      if (!images.length) return;
+      const titleNode = viewerNodes.modal.querySelector('.ios-modal-title');
+      if (titleNode) titleNode.textContent = title;
+      state.images = images;
+      state.index = Math.min(Math.max(0, startIndex), images.length - 1);
+      setScale(1);
+      render();
+      modalInstance.show();
+    };
+
+    window.laJamoneraOpenImageViewer = openAttachmentViewer;
+    return openAttachmentViewer;
+  };
+
   const openWithMainViewer = async (urls, title) => {
     const cleanUrls = Array.isArray(urls)
       ? urls.map((url) => normalize(url)).filter(Boolean)
       : [];
     if (!cleanUrls.length) return;
-    if (typeof window.laJamoneraOpenImageViewer === 'function') {
-      try {
-        await window.laJamoneraOpenImageViewer([{ invoiceImageUrls: cleanUrls }], 0, title);
-        return;
-      } catch (error) {
-        // fallback local cuando el visor principal no puede abrir en esta página pública
-      }
-    }
-    await Swal.fire({
-      title,
-      html: `<div class="attachments-grid" style="grid-template-columns:1fr;">${cleanUrls.map((url) => `<article class="attachment-card" style="aspect-ratio:auto;"><img src="${escapeHtml(url)}" class="attachment-image is-loaded" style="opacity:1;max-height:72vh;object-fit:contain;" alt="Adjunto"></article>`).join('')}</div>`,
-      width: '92vw',
-      confirmButtonText: 'Cerrar',
-      customClass: { popup: 'ios-alert ingredientes-alert', confirmButton: 'ios-btn ios-btn-secondary' }
-    });
+    const viewer = ensureLocalImageViewer();
+    if (typeof viewer !== 'function') return;
+    await viewer([{ invoiceImageUrls: cleanUrls }], 0, title);
   };
 
   const initMermaidZoom = (container) => {
@@ -141,16 +213,20 @@
     let scale = 1;
     let tx = 0;
     let ty = 0;
+    container.style.touchAction = 'none';
+
     const apply = () => {
       svg.style.transformOrigin = '0 0';
       svg.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
     };
+
     container.addEventListener('wheel', (event) => {
       event.preventDefault();
       const delta = event.deltaY < 0 ? 0.12 : -0.12;
       scale = Math.max(0.65, Math.min(2.5, scale + delta));
       apply();
     }, { passive: false });
+
     let dragging = false;
     let sx = 0;
     let sy = 0;
@@ -168,8 +244,45 @@
     });
     container.addEventListener('pointerup', () => { dragging = false; });
     container.addEventListener('pointercancel', () => { dragging = false; });
+
+    const distance = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    let pinchStartDistance = 0;
+    let pinchStartScale = 1;
+    let pinchStartTx = 0;
+    let pinchStartTy = 0;
+    let pinchMidStart = { x: 0, y: 0 };
+
+    container.addEventListener('touchstart', (event) => {
+      if (event.touches.length === 2) {
+        const [t1, t2] = event.touches;
+        pinchStartDistance = distance(t1, t2);
+        pinchStartScale = scale;
+        pinchStartTx = tx;
+        pinchStartTy = ty;
+        pinchMidStart = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+      }
+    }, { passive: false });
+
+    container.addEventListener('touchmove', (event) => {
+      if (event.touches.length !== 2) return;
+      event.preventDefault();
+      const [t1, t2] = event.touches;
+      const mid = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+      const nextDistance = distance(t1, t2);
+      if (!pinchStartDistance) return;
+      scale = Math.max(0.65, Math.min(2.5, pinchStartScale * (nextDistance / pinchStartDistance)));
+      tx = pinchStartTx + (mid.x - pinchMidStart.x);
+      ty = pinchStartTy + (mid.y - pinchMidStart.y);
+      apply();
+    }, { passive: false });
+
+    container.addEventListener('touchend', () => {
+      pinchStartDistance = 0;
+    });
+
     apply();
   };
+
 
   const renderPublicTrace = async (registro, config) => {
     const companyRne = normalize(registro?.traceability?.company?.rne?.number || '-');
