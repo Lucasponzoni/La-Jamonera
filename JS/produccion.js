@@ -1476,7 +1476,7 @@
       ingredientName: normalizeValue(ingredientPlan?.ingredientName) || 'Ingrediente',
       ingredientImageUrl: normalizeValue(state.ingredientes?.[ingredientPlan?.ingredientId]?.imageUrl),
       expiryDate: normalizeValue(lot?.expiryDate) || '-',
-      amount: `${Number(lot?.takeQty || 0).toFixed(2)} ${lot?.unit || ingredientPlan?.unit || ''}`.trim(),
+      amount: `${Number(lot?.takeQty || 0).toFixed(3)} ${lot?.unit || ingredientPlan?.unit || ''}`.trim(),
       lotNumber: normalizeValue(lot?.lotNumber || lot?.entryId || lot?.invoiceNumber) || '-',
       invoiceImageUrls: Array.isArray(lot?.invoiceImageUrls) ? lot.invoiceImageUrls : []
     })));
