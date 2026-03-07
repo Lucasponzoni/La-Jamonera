@@ -4692,11 +4692,18 @@ html.login-protected.auth-ok body {
 }
 
 .inventario-day-kg.is-mixed {
-  background: #7a5af8;
+  background: #10b981;
 }
 
 .flatpickr-day {
   position: relative;
+}
+
+.flatpickr-day.today {
+    border-color: #ff4747;
+    background-color: #ff1010;
+    color: white;
+    font-weight: 700;
 }
 
 .inventario-period-head {
