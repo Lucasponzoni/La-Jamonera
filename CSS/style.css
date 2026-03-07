@@ -3613,6 +3613,9 @@ html.login-protected.auth-ok body {
 }
 
 .inventario-total-banner{
+  display: flex;
+  gap: 5px;
+  align-items: center;
   background-color: rgb(244 238 254);
   padding: 5px 10px;
   border-radius: 12px;
@@ -4045,8 +4048,9 @@ html.login-protected.auth-ok body {
 .inventario-stock-real-line {
   display: block;
   margin-top: 2px;
-  font-weight: 700;
-  color: #0e8f42;
+  font-weight: 900;
+  color: #3f2279;
+  font-size: 1rem;
 }
 
 .inventario-expiring-list-editor {
