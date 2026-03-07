@@ -4011,6 +4011,48 @@ html.login-protected.auth-ok body {
   margin-top: 2px;
 }
 
+.inventario-expiring-list {
+  margin-top: 6px;
+  display: grid;
+  gap: 2px;
+}
+
+.inventario-expiring-line {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #4f6596;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 2px 0;
+}
+
+.inventario-expiring-line strong {
+  color: #2a4f9b;
+}
+
+.inventario-expiring-line.is-soon span {
+  color: #b56f08;
+  font-weight: 700;
+}
+
+.inventario-expiring-line.is-expired span {
+  color: #c62c45;
+  font-weight: 700;
+}
+
+.inventario-stock-real-line {
+  display: block;
+  margin-top: 2px;
+  font-weight: 700;
+  color: #0e8f42;
+}
+
+.inventario-expiring-list-editor {
+  margin-top: 0;
+}
+
 .inventario-stock-line-expired strong {
   color: #b42338;
 }
@@ -4624,6 +4666,10 @@ html.login-protected.auth-ok body {
   padding: 2px 4px;
   pointer-events: none;
   text-wrap: nowrap;
+}
+
+.inventario-day-kg.is-mixed {
+  background: #7a5af8;
 }
 
 .flatpickr-day {
@@ -6251,6 +6297,11 @@ html.login-protected.auth-ok body {
   font-weight: 600;
 }
 
+.inventario-expired-strike {
+  text-decoration: line-through;
+  opacity: 0.72;
+}
+
 .inventario-trace-row td {
   background: #f8ecee !important;
   border-bottom: 1px solid #eed7dc !important;
@@ -6281,6 +6332,29 @@ html.login-protected.auth-ok body {
   color: #a3162f;
   background: #ffd5df;
   border: 1px solid #f3a5b6;
+}
+
+.inventario-expiry-days-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  margin-top: 2px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.inventario-expiry-days-badge.is-success {
+  background: linear-gradient(90deg, #30d158 0%, #34c759 100%);
+}
+
+.inventario-expiry-days-badge.is-warning {
+  background: linear-gradient(90deg, #ffb340 0%, #ff8a00 100%);
+}
+
+.inventario-expiry-days-badge.is-danger {
+  background: linear-gradient(90deg, #ff5e57 0%, #ff3b30 100%);
 }
 
 .inventario-resolution-badge {
