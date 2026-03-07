@@ -6561,7 +6561,7 @@ html.login-protected.auth-ok body {
 
 .produccion-config-actions {
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
   margin: 10px 0;
 }
 
@@ -6970,13 +6970,14 @@ html.login-protected.auth-ok body {
 }
 
 .inventario-provider-avatar {
-  width: 44px;
-  height: 44px;
+  width: 56px;
+  height: 56px;
   border-radius: 999px;
-  border: 1px solid #d4def4;
-  background: #eef3ff;
-  color: #2f57b0;
+  border: 1px solid var(--provider-avatar-border, #d4def4);
+  background: var(--provider-avatar-bg, #eef3ff);
+  color: var(--provider-avatar-color, #2f57b0);
   font-weight: 800;
+  font-size: 1rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -6988,6 +6989,86 @@ html.login-protected.auth-ok body {
   gap: 8px;
   align-items: center;
   justify-content: space-between;
+}
+
+.inventario-provider-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.inventario-provider-state {
+  margin: 6px 0 0;
+  color: #5e6f94;
+  font-size: 0.85rem;
+}
+
+.inventario-provider-line {
+  margin: 6px 0 0;
+  color: #3f527f;
+  font-size: 0.86rem;
+}
+
+.inventario-provider-editor-top {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 10px;
+}
+
+
+.inventario-rne-number-area {
+  resize: none;
+  overflow: hidden;
+  min-height: 44px;
+  line-height: 1.4;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.inventario-rne-expiry-board {
+  max-height: 168px;
+  overflow-y: auto;
+  padding-right: 4px;
+  display: grid;
+  gap: 10px;
+}
+
+.inventario-rne-expiry-group h6 {
+  margin: 0 0 6px;
+  color: #3e5586;
+  font-size: 0.84rem;
+}
+
+.inventario-rne-expiry-row {
+  border: 1px solid #dbe4fa;
+  border-radius: 11px;
+  background: #f8fbff;
+  padding: 7px 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  font-size: 0.83rem;
+}
+
+.inventario-rne-expiry-row strong {
+  color: #2f4678;
+}
+
+.inventario-rne-expiry-row span {
+  color: #5a6f99;
+}
+
+.inventario-rne-expiry-row.is-warning {
+  border-color: #f3d4ad;
+  background: #fff4e7;
+}
+
+.inventario-rne-expiry-row.is-danger {
+  border-color: #f2b4c0;
+  background: #ffecef;
 }
 
 .inventario-provider-meta {
@@ -7153,6 +7234,7 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-config-actions {
+  justify-content: flex-end;
   flex-wrap: wrap;
   gap: 8px;
 }

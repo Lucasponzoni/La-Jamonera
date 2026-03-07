@@ -23,7 +23,7 @@
     node.id = PARKING_NODE_ID;
     node.type = 'button';
     node.tabIndex = -1;
-    node.setAttribute('aria-hidden', 'true');
+    node.setAttribute('aria-label', 'focus parking');
     node.style.position = 'fixed';
     node.style.opacity = '0';
     node.style.pointerEvents = 'none';
