@@ -4626,6 +4626,10 @@ html.login-protected.auth-ok body {
   text-wrap: nowrap;
 }
 
+.inventario-day-kg.is-mixed {
+  background: #7a5af8;
+}
+
 .flatpickr-day {
   position: relative;
 }
