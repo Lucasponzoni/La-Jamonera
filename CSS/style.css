@@ -4281,24 +4281,6 @@ html.login-protected.auth-ok body {
 /* =========================================
    INVENTARIO AJUSTES V2
 ========================================= */
-#inventarioToolbarCreateIngredientBtn {
-  background: #ff8a2a;
-  color: #fff;
-}
-
-#inventarioToolbarCreateIngredientBtn:hover {
-  background: #f07c1b;
-  color: #fff;
-}
-
-#inventarioToolbarCreateIngredientBtn span {
-  letter-spacing: 0.01em;
-}
-
-#inventarioToolbarCreateIngredientBtn i {
-  margin-right: 2px;
-}
-
 .inventario-stock-line.is-zero strong {
   color: #cc3f52;
   font-size: 18px;
@@ -4443,8 +4425,8 @@ html.login-protected.auth-ok body {
 }
 
 .inventario-period-filters {
-  display: grid;
-  grid-template-columns: minmax(240px, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   margin-bottom: 10px;
   align-items: center;
@@ -4995,10 +4977,6 @@ html.login-protected.auth-ok body {
 
   .inventario-expand-btn {
     display: none;
-  }
-
-  .inventario-period-filters {
-    grid-template-columns: 1fr 1fr;
   }
 
   #inventarioGlobalRange,
@@ -7821,100 +7799,3 @@ html.login-protected.auth-ok body {
 
 /* =========================================
    TRAZABILIDAD PUBLICA
-========================================= */
-.public-trace-header {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.public-trace-header-logo {
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  object-fit: cover;
-}
-
-.public-trace-header-title {
-  margin: 0;
-  font-size: 1.35rem;
-  font-weight: 800;
-  color: #1f3158;
-}
-
-.public-trace-footer {
-  width: min(1200px, calc(100% - 32px));
-  margin: 0 auto 16px;
-  padding: 12px;
-  border: 1px solid #dbe4f8;
-  border-radius: 14px;
-  background: #f8fbff;
-}
-
-.public-trace-footer p {
-  margin: 0;
-  color: #5b6e95;
-  font-size: 0.82rem;
-  line-height: 1.5;
-}
-
-.public-trace-footer p + p {
-  margin-top: 6px;
-}
-
-.produccion-trace-swipe-hint {
-  margin: 0 0 8px;
-  color: #5f729b;
-  font-size: 0.84rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.public-trace-ingredients-scroll {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(280px, 340px);
-  overflow-x: auto;
-  overflow-y: hidden;
-  max-height: none;
-  padding-bottom: 8px;
-  -webkit-overflow-scrolling: touch;
-}
-
-.public-trace-ingredients-scroll .produccion-trace-ingredient-card {
-  min-height: 100%;
-}
-
-.produccion-trace-mermaid {
-  position: relative;
-}
-
-.produccion-trace-mermaid-overlay {
-  position: absolute;
-  inset: 0;
-  border: 0;
-  background: rgba(245, 248, 255, 0.92);
-  color: #2e4d8f;
-  display: grid;
-  place-content: center;
-  gap: 8px;
-  text-align: center;
-  font-weight: 700;
-  z-index: 5;
-}
-
-.produccion-trace-mermaid-overlay i {
-  font-size: 1.3rem;
-}
-
-@media (max-width: 768px) {
-  .public-trace-ingredients-scroll {
-    grid-auto-columns: minmax(250px, 86vw);
-  }
-
-  .public-trace-footer {
-    width: calc(100% - 20px);
-  }
-}
