@@ -71,6 +71,54 @@
   const safeObject = (value) => (value && typeof value === 'object' ? value : {});
   const normalizeValue = (value) => String(value || '').trim();
   const normalizeLower = (value) => normalizeValue(value).toLowerCase();
+  const normalizeUpper = (value) => normalizeValue(value).toUpperCase();
+  const COMPANY_LEGAL_NAME = 'FRIGORIFICO LA JAMONERA SA';
+  const getProvidersCatalog = () => (Array.isArray(state.inventario?.config?.providers) ? state.inventario.config.providers : []);
+  const normalizeRneRecord = (source = {}) => ({
+    number: normalizeValue(source?.number),
+    expiryDate: normalizeValue(source?.expiryDate),
+    attachmentUrl: normalizeValue(source?.attachmentUrl),
+    attachmentType: normalizeValue(source?.attachmentType),
+    validFrom: normalizeValue(source?.validFrom),
+    updatedAt: Number(source?.updatedAt || 0)
+  });
+  const findProviderFromTraceValue = (value) => {
+    const source = normalizeValue(value);
+    if (!source) return null;
+    const providers = getProvidersCatalog();
+    return providers.find((provider) => {
+      const byId = normalizeValue(provider?.id);
+      const byName = normalizeUpper(provider?.name);
+      return source === byId || normalizeUpper(source) === byName;
+    }) || null;
+  };
+  const resolveProviderRneFromLot = (lot = {}) => {
+    const persisted = normalizeRneRecord(safeObject(lot.providerRne));
+    if (persisted.number || persisted.attachmentUrl) return persisted;
+    const provider = findProviderFromTraceValue(lot.provider);
+    if (!provider) return normalizeRneRecord();
+    return normalizeRneRecord(safeObject(provider.rne));
+  };
+  const resolveRecipeRnpaFromRegistro = (registro = {}) => {
+    const persisted = safeObject(registro?.traceability?.product?.rnpa);
+    const recipe = safeObject(state.recetas?.[registro?.recipeId]);
+    const fallback = safeObject(recipe?.rnpa);
+    const source = Object.keys(persisted).length ? persisted : fallback;
+    return {
+      denomination: normalizeValue(source?.denomination),
+      brand: normalizeValue(source?.brand),
+      businessName: normalizeValue(source?.businessName),
+      expiryDate: normalizeValue(source?.expiryDate),
+      attachmentUrl: normalizeValue(source?.attachmentUrl),
+      attachmentType: normalizeValue(source?.attachmentType),
+      attachmentName: normalizeValue(source?.attachmentName)
+    };
+  };
+  const resolveCompanyRneFromRegistro = (registro = {}) => {
+    const persisted = normalizeRneRecord(safeObject(registro?.traceability?.company?.rne));
+    if (persisted.number || persisted.attachmentUrl) return persisted;
+    return normalizeRneRecord(safeObject(state.config?.rne));
+  };
   const capitalize = (value) => normalizeLower(value).replace(/(^|\s)\S/g, (ch) => ch.toUpperCase());
   const parseNumber = (value) => {
     const parsed = Number(normalizeValue(value).replace(',', '.'));
@@ -1601,16 +1649,25 @@
     const manager = (Array.isArray(registro?.managers) && registro.managers[0]) ? getManagerDisplay(registro.managers[0]).name : 'Sin encargado';
     const productionDate = normalizeValue(registro?.productionDate) || toIsoDate(registro?.createdAt || nowTs());
     const packaging = resolvePackagingFromRegistro(registro);
+    const companyRne = resolveCompanyRneFromRegistro(registro);
+    const productRnpa = resolveRecipeRnpaFromRegistro(registro);
+    const productRnpaLabel = normalizeValue(productRnpa.denomination || productRnpa.brand || productRnpa.businessName || '-');
     const lines = [
       'flowchart TD',
+      `C["<b>${esc(COMPANY_LEGAL_NAME)}</b>"]:::toneCompany`,
       `P["<b>${esc((registro?.recipeTitle || 'Producto').toUpperCase())}</b>"]:::toneProduct`,
       `L["<b>LOTE:</b> ${esc(registro?.id || '-')}<br/><b>VTO:</b> ${esc(formatProductExpiryLabel(registro))}"]:::toneLot`,
       `R["<b>PRODUCCIÓN</b> ${Number(registro?.quantityKg || 0).toFixed(2)} KG<br/><b>Fecha:</b> ${esc(formatIsoEs(productionDate))}"]:::toneProduction`,
       `M["<b>ENCARGADO:</b> ${esc(manager)}"]:::toneManager`,
       `I["<b>INGREDIENTES TOTALES</b> ${totalIngredientsKg.toFixed(3)} KG"]:::toneIngredients`,
       `W["<b>MERMA</b> ${mermaKg.toFixed(3)} KG"]:::toneWaste`,
+      `CR["<b>RNE EMPRESA:</b> ${esc(companyRne.number || '-')} "]:::toneRegistry`,
+      `RNPA["<b>RNPA:</b> ${esc(productRnpaLabel)}"]:::toneRegistry`,
+      'C -.-> CR',
+      'CR -.-> P',
       'P --> R',
       'P --> L',
+      'P -.-> RNPA',
       'R --> I',
       'R --> M',
       'I --> W'
@@ -1629,9 +1686,13 @@
         `<b>Vencimiento al elaborar:</b> ${formatIsoEs(lot?.expiryDate) || '-'}`,
         `<b>Proveedor:</b> ${lot?.provider || '-'}`
       ].map(esc).join('<br/>');
+      const providerRne = resolveProviderRneFromLot(lot);
       lines.push(`${nodeId}["${nodeLabel}"]:::toneIngredient`);
       lines.push(`${index === 0 ? 'I' : `ING${index}`} --> ${nodeId}`);
+      lines.push(`${nodeId}RNE["<b>RNE PROVEEDOR:</b> ${esc(providerRne.number || '-')} "]:::toneRegistry`);
+      lines.push(`${nodeId} -.-> ${nodeId}RNE`);
     });
+    lines.push('classDef toneCompany fill:#e4ebff,stroke:#bfcdf0,color:#223c72,stroke-width:1px;');
     lines.push('classDef toneProduct fill:#dfeaff,stroke:#bdd0f5,color:#28467f,stroke-width:1px;');
     lines.push('classDef toneLot fill:#ffeed9,stroke:#efd1aa,color:#6f4a1f,stroke-width:1px;');
     lines.push('classDef toneProduction fill:#fff3c6,stroke:#e8d79d,color:#6c531a,stroke-width:1px;');
@@ -1639,16 +1700,28 @@
     lines.push('classDef toneIngredients fill:#d8f4e4,stroke:#b2e0c5,color:#1f6a46,stroke-width:1px;');
     lines.push('classDef toneWaste fill:#ffdede,stroke:#f0bdbd,color:#8b2f3f,stroke-width:1px;');
     lines.push('classDef toneIngredient fill:#f3f5f9,stroke:#d4dbe9,color:#2d426f,stroke-width:1px;');
+    lines.push('classDef toneRegistry fill:#edf2ff,stroke:#c8d4f4,color:#2d4b87,stroke-width:1px;');
     return lines.join('\n');
   };
   const renderTraceabilityTree = (registro) => {
+    const companyRne = resolveCompanyRneFromRegistro(registro);
+    const productRnpa = resolveRecipeRnpaFromRegistro(registro);
+    const productRnpaLabel = normalizeValue(productRnpa.denomination || productRnpa.brand || productRnpa.businessName || '-');
     const ingredients = (registro.lots || []).map((item, idx) => {
       const ingredientImage = normalizeValue(state.ingredientes[item.ingredientId]?.imageUrl);
       const aggregatedImages = (item.lots || []).flatMap((lot) => Array.isArray(lot.invoiceImageUrls) ? lot.invoiceImageUrls : []);
+      const providerRneSummary = (item.lots || []).map((lot) => {
+        const providerRne = resolveProviderRneFromLot(lot);
+        return {
+          number: providerRne.number,
+          attachmentUrl: providerRne.attachmentUrl
+        };
+      }).find((row) => row.number || row.attachmentUrl) || { number: '', attachmentUrl: '' };
       const lotCards = (item.lots || []).map((lot) => {
         const takenQty = Number(lot.takeQty || 0);
         const availableQty = Number(lot.availableQty || 0);
         const remainingQty = Math.max(0, availableQty - takenQty);
+        const providerRne = resolveProviderRneFromLot(lot);
         return `<article class="produccion-trace-lot-card">
           <div class="produccion-trace-lot-head">
             <strong><i class="bi bi-upc-scan fa-solid fa-barcode"></i> Lote ${escapeHtml(lot.lotNumber || lot.entryId || '-')}</strong>
@@ -1659,10 +1732,11 @@
             <p><strong>Disponible</strong><span>${formatCompactQty(availableQty, lot.unit || item.unit || '')}</span></p>
             <p><strong>Remanente</strong><span>${formatCompactQty(remainingQty, lot.unit || item.unit || '')}</span></p>
             <p><strong>Proveedor</strong><span>${escapeHtml(lot.provider || 'Sin proveedor')}</span></p>
+            <p><strong>RNE proveedor</strong><span>${escapeHtml(providerRne.number || '-')}</span></p>
             <p><strong>Factura</strong><span>${escapeHtml(lot.invoiceNumber || '-')}</span></p>
             <p><strong>Ingreso</strong><span>${escapeHtml(lot.entryDate || '-')}</span></p>
           </div>
-          ${Array.isArray(lot.invoiceImageUrls) && lot.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}"><i class="bi bi-paperclip fa-solid fa-paperclip"></i><span>Ver adjunto (${lot.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}
+          <div class="produccion-trace-card-actions">${Array.isArray(lot.invoiceImageUrls) && lot.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}"><i class="bi bi-paperclip fa-solid fa-paperclip"></i><span>Ver adjunto (${lot.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}${providerRne.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify([providerRne.attachmentUrl]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE sin adjunto</button>'}</div>
         </article>`;
       }).join('');
       return `<article class="produccion-trace-ingredient-card">
@@ -1673,9 +1747,10 @@
             <div>
               <h6><i class="bi bi-box-seam fa-solid fa-box-open"></i> ${escapeHtml(item.ingredientName || item.ingredientId || 'Ingrediente')}</h6>
               <small>Cantidad usada: ${formatCompactQty(item.requiredQty ?? item.neededQty, item.unit || item.ingredientUnit || '')}</small>
+              <small>RNE proveedor: <strong>${escapeHtml(providerRneSummary.number || '-')}</strong></small>
             </div>
           </div>
-          ${aggregatedImages.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(aggregatedImages))}"><i class="bi bi-images fa-regular fa-images"></i><span>Ver adjunto (${aggregatedImages.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}
+          <div class="produccion-trace-card-actions">${aggregatedImages.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(aggregatedImages))}"><i class="bi bi-images fa-regular fa-images"></i><span>Ver adjunto (${aggregatedImages.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}${providerRneSummary.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify([providerRneSummary.attachmentUrl]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE sin adjunto</button>'}</div>
         </header>
         <div class="produccion-trace-lots">${lotCards || '<p class="m-0">Sin lotes asociados.</p>'}</div>
       </article>`;
@@ -1692,11 +1767,15 @@
           <article class="produccion-trace-summary">
             <h6><i class="bi bi-diagram-3 fa-solid fa-diagram-project"></i> Trazabilidad ${escapeHtml(registro.id)}</h6>
             <div class="produccion-trace-grid">
+              <p><strong>Empresa</strong><span>${escapeHtml(COMPANY_LEGAL_NAME)}</span></p>
+              <p><strong>RNE empresa</strong><span>${escapeHtml(companyRne.number || '-')}</span></p>
               <p><strong>Producto</strong><span>${escapeHtml(registro.recipeTitle || '-')}</span></p>
+              <p><strong>RNPA</strong><span>${escapeHtml(productRnpaLabel || '-')}</span></p>
               <p><strong>Cantidad final</strong><span>${Number(registro.quantityKg || 0).toFixed(2)} kg</span></p>
               <p><strong>Fecha</strong><span>${escapeHtml(formatDateTime(registro.createdAt))}</span></p>
               <p><strong>Estado</strong><span>${escapeHtml(registro.status || '-')}</span></p>
             </div>
+            <div class="produccion-trace-card-actions">${companyRne.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify([companyRne.attachmentUrl]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE empresa</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE empresa sin adjunto</button>'}${productRnpa.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify([productRnpa.attachmentUrl]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNPA</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNPA sin adjunto</button>'}</div>
             <div class="produccion-trace-managers">${(Array.isArray(registro.managers) ? registro.managers : []).map((token) => { const manager = getManagerDisplay(token); return `<span class="produccion-trace-chip"><i class="bi bi-person-badge fa-solid fa-user-tie"></i><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span>`; }).join('') || '<span class="produccion-trace-chip"><i class="bi bi-person-x fa-solid fa-user-xmark"></i><strong>Sin responsable</strong><small>Encargado</small></span>'}</div>
           </article>
           <div class="produccion-trace-mermaid-wrap">
@@ -2986,6 +3065,8 @@
         const inventoryWithResolutions = applyPendingExpiryActionsOnInventory(state.inventario);
         const inventarioNext = applyPlanOnInventory(inventoryWithResolutions, revalidated, productionId, date, 'consume');
         const agingDaysAtProduction = Number(recipe.agingDays || 0);
+        const recipeRnpa = safeObject(recipe.rnpa);
+        const companyRne = safeObject(state.config.rne);
         const packagingDate = agingDaysAtProduction > 0
           ? moveIsoFromSunday(addDaysToIso(toIsoDate(nowTs()), agingDaysAtProduction))
           : '';
@@ -3004,10 +3085,23 @@
         lots: revalidated.ingredientPlans,
         traceability: {
           generatedAt: nowTs(),
+          company: {
+            legalName: COMPANY_LEGAL_NAME,
+            rne: normalizeRneRecord(companyRne)
+          },
           product: {
             id: recipe.id,
             title: recipe.title,
-            imageUrl: normalizeValue(recipe.imageUrl)
+            imageUrl: normalizeValue(recipe.imageUrl),
+            rnpa: {
+              denomination: normalizeValue(recipeRnpa.denomination),
+              brand: normalizeValue(recipeRnpa.brand),
+              businessName: normalizeValue(recipeRnpa.businessName),
+              expiryDate: normalizeValue(recipeRnpa.expiryDate),
+              attachmentUrl: normalizeValue(recipeRnpa.attachmentUrl),
+              attachmentType: normalizeValue(recipeRnpa.attachmentType),
+              attachmentName: normalizeValue(recipeRnpa.attachmentName)
+            }
           },
           ingredients: revalidated.ingredientPlans.map((ingredientPlan) => ({
             ingredientId: ingredientPlan.ingredientId,
@@ -3022,6 +3116,7 @@
               unit: lot.unit,
               expiryDate: lot.expiryDate,
               provider: lot.provider,
+              providerRne: normalizeRneRecord(findProviderFromTraceValue(lot.provider)?.rne),
               invoiceNumber: lot.invoiceNumber,
               invoiceImageUrls: Array.isArray(lot.invoiceImageUrls) ? lot.invoiceImageUrls : []
             }))
