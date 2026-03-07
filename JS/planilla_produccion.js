@@ -114,7 +114,10 @@
       const availableQty = Number(firstLot?.availableQty || 0);
       const remainingQty = Math.max(0, availableQty - takeQty);
       const hasMultiProvider = [...new Set(providers.map((item) => normalizeValue(item)).filter(Boolean))].length > 1;
-      const lotUsageSummary = observationLots.map((lot) => `${lot.qtyLabel} de lote ${lot.index} ${lot.lotNumber}`).join(', ');
+      const lotUsageSummary = observationLots.map((lot, lotIdx) => {
+        const exp = formatIsoEs(lots[lotIdx]?.expiryDate || '-');
+        return `${lot.qtyLabel} de lote ${lot.index} ${lot.lotNumber} (vence ${exp})`;
+      }).join(', ');
       const providersSummary = hasMultiProvider
         ? `El proveedor es ${observationLots.map((lot) => `${lot.provider} para lote ${lot.index}`).join(' y ')}`
         : `El proveedor es ${normalizeValue(providers[0] || '-')}`;
@@ -131,7 +134,9 @@
         remaining: formatQty(remainingQty, firstLot?.unit || plan?.ingredientUnit || plan?.unit || ''),
         invoiceNumber: normalizeValue(firstLot?.invoiceNumber || '-'),
         entryDate: formatIsoEs(firstLot?.entryDate || '-'),
-        autoObservation: `${plan?.ingredientName || traceIngredient?.ingredientName || 'Ingrediente'}, se usó ${lotUsageSummary}. ${providersSummary}.`
+        autoObservation: lots.length > 1
+          ? `${plan?.ingredientName || traceIngredient?.ingredientName || 'Ingrediente'}, se usó ${lotUsageSummary}. ${providersSummary}.`
+          : ''
       };
     });
   };

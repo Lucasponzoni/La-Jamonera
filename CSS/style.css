@@ -1731,19 +1731,24 @@ html.login-protected.auth-ok body {
 }
 
 .viewer-stage {
-  min-height: 58vh;
+  min-height: min(62vh, 680px);
   border: 1px solid #dbe0ef;
   border-radius: 16px;
   background: #f7f9ff;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.viewer-stage.is-document {
   overflow: auto;
 }
 
 #viewerImage {
   max-width: 100%;
-  max-height: 52vh;
+  max-height: 100%;
   transform-origin: center center;
   cursor: grab;
   user-select: none;
@@ -4634,6 +4639,15 @@ html.login-protected.auth-ok body {
 .image-viewer-controls.image-viewer-controls-inventario {
   grid-template-columns: 2fr repeat(4, minmax(0, 1fr));
 }
+
+.image-viewer-modal .ios-modal-body {
+  max-height: calc(100vh - 120px);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+}
+
 
 @media (max-width: 991.98px) {
   .inventario-pagination.enhanced {

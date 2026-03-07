@@ -56,6 +56,7 @@
     globalTableWrap: $('inventarioGlobalTableWrap'),
     imageViewerModal: $('imageViewerModal'),
     viewerImage: $('viewerImage'),
+    viewerStage: $('viewerStage'),
     viewerStageSpinner: $('viewerStageSpinner'),
     viewerDocument: $('viewerDocument'),
     viewerPrevBtn: $('viewerPrevBtn'),
@@ -1641,8 +1642,23 @@
     }
   };
 
+  const clampViewerOffsets = () => {
+    if (!nodes.viewerImage || !nodes.viewerStage || state.viewerScale <= 1) return;
+    const stageRect = nodes.viewerStage.getBoundingClientRect();
+    const baseWidth = nodes.viewerImage.clientWidth;
+    const baseHeight = nodes.viewerImage.clientHeight;
+    if (!stageRect.width || !stageRect.height || !baseWidth || !baseHeight) return;
+    const scaledWidth = baseWidth * state.viewerScale;
+    const scaledHeight = baseHeight * state.viewerScale;
+    const maxOffsetX = Math.max(0, (scaledWidth - stageRect.width) / 2);
+    const maxOffsetY = Math.max(0, (scaledHeight - stageRect.height) / 2);
+    state.viewerOffsetX = Math.min(maxOffsetX, Math.max(-maxOffsetX, state.viewerOffsetX));
+    state.viewerOffsetY = Math.min(maxOffsetY, Math.max(-maxOffsetY, state.viewerOffsetY));
+  };
+
   const applyViewerTransform = () => {
     if (!nodes.viewerImage) return;
+    clampViewerOffsets();
     nodes.viewerImage.style.transform = `translate(${state.viewerOffsetX}px, ${state.viewerOffsetY}px) scale(${state.viewerScale})`;
   };
 
@@ -1659,6 +1675,8 @@
     const item = state.viewerImages[state.viewerIndex];
     if (!item || !nodes.viewerImage) return;
     const isPdf = /\.pdf($|\?)/i.test(String(item.src || ''));
+    nodes.viewerStage?.classList.toggle('is-document', isPdf);
+    nodes.viewerStage?.classList.toggle('is-image', !isPdf);
     if (nodes.viewerDocument) {
       nodes.viewerDocument.classList.toggle('d-none', !isPdf);
       nodes.viewerDocument.src = isPdf ? item.src : '';
@@ -4171,6 +4189,7 @@
   nodes.viewerImage?.addEventListener('load', () => {
     nodes.viewerImage.classList.add('is-loaded');
     nodes.viewerStageSpinner?.classList.add('d-none');
+    applyViewerTransform();
   });
   nodes.viewerImage?.addEventListener('error', () => {
     nodes.viewerStageSpinner?.classList.add('d-none');
@@ -4189,6 +4208,10 @@
     snapshotEditorDraft();
   });
   inventarioModal.addEventListener('hidden.bs.modal', () => inventarioModal.removeAttribute('inert'));
+  window.addEventListener('resize', () => {
+    if (state.viewerScale > 1) applyViewerTransform();
+  });
+
   nodes.imageViewerModal?.addEventListener('hidden.bs.modal', () => {
     document.querySelectorAll('.modal-backdrop.inventory-image-backdrop').forEach((backdrop) => backdrop.classList.remove('inventory-image-backdrop'));
   });
