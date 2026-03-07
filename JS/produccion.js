@@ -2392,7 +2392,7 @@
               </div>
             </div>
             ${Number(analysis.expiredKg || 0) > 0.0001 ? `<p class="produccion-last-line produccion-last-line-expired"><i class="fa-solid fa-triangle-exclamation"></i> <strong>Kilos expirados:</strong> <strong>${Number(analysis.expiredKg || 0).toFixed(2)} kg</strong></p>` : ''}
-            ${draftLock?.blockedKg > 0 ? `<p class="produccion-last-line"><i class="fa-solid fa-lock"></i> Bloqueado por borrador: <strong>${draftLock.blockedKg.toFixed(2)} kg</strong> · disponible en <strong>${formatCountdown(draftLock.remainingMs)}</strong></p>` : ''}
+            ${draftLock?.blockedKg > 0 ? `<p class="produccion-last-line" data-draft-lock-line="${recipe.id}"><i class="fa-solid fa-lock"></i> Bloqueado por borrador: <strong>${draftLock.blockedKg.toFixed(2)} kg</strong> · disponible en <strong data-draft-lock-time="${recipe.id}">${formatCountdown(draftLock.remainingMs)}</strong></p>` : ''}
             <p class="produccion-last-line"><i class="fa-regular fa-clock"></i> Última producción: <strong>${formatDate(lastProductionAt)}</strong></p>
             <div class="produccion-progress-wrap">
               <div class="produccion-progress-bar"><span class="${analysis.status === 'danger' ? 'is-danger' : analysis.progress >= 100 ? 'is-success' : 'is-warning'}" style="width:${analysis.progress.toFixed(1)}%"></span></div>
@@ -2454,10 +2454,24 @@
         if (expiryNode) expiryNode.textContent = draftCountdown ? `Borrador vence en: ${draftCountdown}` : 'Borrador vencido.';
         if (!draftCountdown) hasExpiredDraft = true;
       });
+      Object.keys(state.recetas || {}).forEach((recipeId) => {
+        const timerNode = nodes.list.querySelector(`[data-draft-lock-time="${recipeId}"]`);
+        if (!timerNode) return;
+        const lock = getRecipeDraftLockInfo(recipeId);
+        if (!lock?.blockedKg || lock.remainingMs <= 0) {
+          const lockLine = timerNode.closest('[data-draft-lock-line]');
+          lockLine?.remove();
+          return;
+        }
+        timerNode.textContent = formatCountdown(lock.remainingMs);
+      });
       if (hasExpiredDraft) {
         await cleanupExpiredDrafts();
         recomputeAnalysis();
-        renderList();
+        const activeDraftNodes = nodes.list.querySelectorAll('[data-draft-expiry-timer]');
+        if (activeDraftNodes.length) {
+          renderList();
+        }
       }
     }, 1000);
     setStateView('list');

@@ -198,6 +198,7 @@
     name: '',
     email: '',
     phone: '',
+    photoUrl: '',
     createdAt: Date.now(),
     rne: getDefaultProviderRne()
   });
@@ -275,6 +276,15 @@
   const providerAvatarStyle = (providerName) => {
     const tone = getProviderAvatarTone(providerName);
     return `--provider-avatar-bg:${tone.bg};--provider-avatar-border:${tone.border};--provider-avatar-color:${tone.color};`;
+  };
+
+  const providerAvatarHtml = (provider, opts = {}) => {
+    const sizeClass = opts.size === 'editor' ? 'inventario-provider-editor-avatar' : 'inventario-provider-avatar';
+    const photoUrl = normalizeValue(provider?.photoUrl);
+    if (photoUrl) {
+      return `<div class="${sizeClass}" style="${providerAvatarStyle(provider?.name)}"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb" src="${escapeHtml(photoUrl)}" alt="${escapeHtml(provider?.name || 'Proveedor')}"></div>`;
+    }
+    return `<div class="${sizeClass}" style="${providerAvatarStyle(provider?.name)}">${escapeHtml(providerInitials(provider?.name))}</div>`;
   };
 
   const getRneRemainingDays = (expiryIso) => {
@@ -705,7 +715,7 @@
 
   const initThumbLoading = (scope = document) => {
     scope.querySelectorAll('.js-inventario-thumb').forEach((img) => {
-      const parent = img.closest('.ingrediente-avatar, .family-circle-thumb, .recipe-inline-avatar-wrap, .receta-thumb-wrap, .recipe-suggest-avatar-wrap, .inventario-print-photo-wrap');
+      const parent = img.closest('.ingrediente-avatar, .family-circle-thumb, .recipe-inline-avatar-wrap, .receta-thumb-wrap, .recipe-suggest-avatar-wrap, .inventario-print-photo-wrap, .inventario-provider-avatar, .inventario-provider-editor-avatar');
       const loader = parent?.querySelector('.thumb-loading');
       const done = () => {
         img.classList.add('is-loaded');
@@ -905,6 +915,12 @@
 
   const renderFamilies = () => {
     const families = Object.values(state.familias).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    const ingredientCounts = Object.values(state.ingredientes).reduce((acc, item) => {
+      const familyId = normalizeValue(item?.familyId);
+      if (!familyId) return acc;
+      acc[familyId] = Number(acc[familyId] || 0) + 1;
+      return acc;
+    }, {});
     const allBtn = `
       <div class="family-circle-wrap">
         <button type="button" class="family-circle-item ${state.activeFamilyId === 'all' ? 'is-active' : ''}" data-inv-family-filter="all">
@@ -915,7 +931,7 @@
     nodes.families.innerHTML = allBtn + families.map((family) => `
       <div class="family-circle-wrap">
         <button type="button" class="family-circle-item ${state.activeFamilyId === family.id ? 'is-active' : ''}" data-inv-family-filter="${family.id}">
-          <span class="family-circle-thumb ${family.imageUrl ? '' : 'family-circle-thumb-placeholder'}">${family.imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb" src="${family.imageUrl}" alt="${capitalize(family.name)}">` : '<i class="fa-solid fa-carrot"></i>'}</span>
+          <span class="family-circle-thumb ${family.imageUrl ? '' : 'family-circle-thumb-placeholder'}">${family.imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb" src="${family.imageUrl}" alt="${capitalize(family.name)}">` : '<i class="fa-solid fa-carrot"></i>'}${ingredientCounts[family.id] > 0 ? `<span class="family-circle-count">${Math.min(99, ingredientCounts[family.id])}</span>` : ''}</span>
           <span class="family-circle-name">${capitalize(family.name)}</span>
         </button>
       </div>`).join('');
@@ -3234,7 +3250,7 @@
             : 'Sin vigencia registrada';
 
           return `<article class="inventario-provider-card ios-card-soft">
-            <div class="inventario-provider-avatar" style="${providerAvatarStyle(provider.name)}">${escapeHtml(providerInitials(provider.name))}</div>
+            ${providerAvatarHtml(provider)}
             <div class="inventario-provider-main">
               <div class="inventario-provider-head">
                 <strong>${escapeHtml(provider.name)}</strong>
@@ -3288,6 +3304,13 @@
             <section class="recipe-step-card step-block inventario-lot-section produccion-config-section">
               <div class="step-content">
                 <label class="form-label" for="providerNameInput"><strong>Proveedor</strong></label>
+                <div class="inventario-provider-editor-top mt-2 mb-2">
+                  ${providerAvatarHtml(provider, { size: 'editor' })}
+                </div>
+                <label class="form-label mt-2" for="providerPhotoInput"><strong>Foto de perfil</strong> (opcional)</label>
+                <div class="produccion-rne-file-row">
+                  <input id="providerPhotoInput" class="form-control ios-input image-file-input" type="file" accept="image/*">
+                </div>
                 <input id="providerNameInput" type="text" class="form-control ios-input" value="${escapeHtml(provider.name)}" placeholder="Nombre del proveedor">
                 <label class="form-label mt-2" for="providerEmailInput"><strong>Email</strong> (opcional)</label>
                 <input id="providerEmailInput" type="email" class="form-control ios-input" value="${escapeHtml(provider.email || '')}" placeholder="proveedor@email.com">
@@ -3390,7 +3413,9 @@
             const number = normalizeValue(root.querySelector('#providerRneNumberInput')?.value);
             const expiryDate = normalizeIsoDate(root.querySelector('#providerRneExpiryInput')?.value);
             const file = root.querySelector('#providerRneFileInput')?.files?.[0] || null;
+            const photoFile = root.querySelector('#providerPhotoInput')?.files?.[0] || null;
             const loadingNode = root.querySelector('#providerRneFileLoading');
+            const avatarNode = root.querySelector('.inventario-provider-editor-avatar');
 
             if (!name) {
               await openIosSwal({ title: 'Dato faltante', html: '<p>Completá el nombre del proveedor.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
@@ -3408,9 +3433,18 @@
               await openIosSwal({ title: 'Adjunto muy pesado', html: '<p>El adjunto RNE supera 5MB.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
               return;
             }
+            if (photoFile && !ALLOWED_UPLOAD_TYPES.includes(photoFile.type)) {
+              await openIosSwal({ title: 'Foto inválida', html: '<p>La foto de perfil debe ser JPG, PNG, WEBP o GIF.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+              return;
+            }
+            if (photoFile && photoFile.size > MAX_UPLOAD_SIZE_BYTES) {
+              await openIosSwal({ title: 'Foto muy pesada', html: '<p>La foto de perfil supera 5MB.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+              return;
+            }
 
             let attachmentUrl = normalizeValue(currentRne.attachmentUrl);
             let attachmentType = normalizeValue(currentRne.attachmentType);
+            let photoUrl = normalizeValue(provider.photoUrl);
             const history = Array.isArray(currentRne.history) ? [...currentRne.history] : [];
             if (file) {
               if (normalizeValue(currentRne.attachmentUrl) || normalizeValue(currentRne.number)) {
@@ -3421,12 +3455,19 @@
               attachmentType = file.type;
               loadingNode?.classList.add('d-none');
             }
+            if (photoFile) {
+              if (avatarNode) {
+                avatarNode.innerHTML = '<span class="produccion-company-logo-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Subiendo foto" class="meta-spinner produccion-company-logo-spinner"></span>';
+              }
+              photoUrl = await uploadImageToStorage(photoFile, 'inventario/proveedores/avatar');
+            }
 
             const nextProvider = {
               id: provider.id,
               name,
               email,
               phone,
+              photoUrl,
               createdAt: Number(provider.createdAt || Date.now()),
               rne: {
                 ...getDefaultProviderRne(),
