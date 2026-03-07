@@ -7750,3 +7750,65 @@ html.login-protected.auth-ok body {
     font-size: 13px !important;
   }
 }
+
+/* =========================================
+   PLANILLA - PROGRESO Y VISOR PUBLICO
+========================================= */
+.planilla-progress-wrap {
+  display: grid;
+  gap: 8px;
+}
+
+.planilla-progress-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: #e4e8f5;
+  overflow: hidden;
+}
+
+.planilla-progress-bar span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2f6ecf 0%, #6c85dd 55%, #9a8cf0 100%);
+  transition: width 0.2s ease;
+}
+
+.planilla-progress-text {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #415780;
+  text-align: center;
+}
+
+.public-viewer-wrap {
+  display: grid;
+  gap: 8px;
+}
+
+.public-viewer-stage {
+  min-height: min(72vh, 640px);
+  border: 1px solid #d8def0;
+  border-radius: 14px;
+  background: #f8f9fd;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.public-viewer-image,
+.public-viewer-doc {
+  width: 100%;
+  height: min(72vh, 640px);
+  border: 0;
+  object-fit: contain;
+  background: #ffffff;
+}
+
+.public-viewer-footer {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
