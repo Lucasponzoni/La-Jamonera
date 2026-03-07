@@ -334,7 +334,7 @@
     </section>`;
 
     dataNode.querySelector('#publicOpenPlanillaBtn')?.addEventListener('click', async () => {
-      await window.laJamoneraPlanillaProduccion?.openByRegistro?.(registro, { usersMap: safeObject(config?.usersMap), forceModalOnMobile: true });
+      await window.laJamoneraPlanillaProduccion?.openByRegistro?.(registro, { usersMap: safeObject(config?.usersMap) });
     });
     dataNode.querySelector('#publicCompanyRneAttachmentBtn')?.addEventListener('click', async () => openWithMainViewer([companyRneAttachment], 'Adjunto RNE empresa'));
     dataNode.querySelector('#publicRnpaAttachmentBtn')?.addEventListener('click', async () => openWithMainViewer([rnpaAttachment], 'Adjunto RNPA'));
