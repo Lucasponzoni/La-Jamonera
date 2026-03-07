@@ -1691,12 +1691,12 @@
       const nodeId = safeNodeId(`ING_${index + 1}_${item?.ingredientId || ''}`, `ING_${index + 1}`);
       const rneId = `${nodeId}_RNE`;
       const nodeLabel = [
-        `<b>${index + 1}. ${(item?.ingredientName || 'Ingrediente').toUpperCase()}</b>`,
-        `<b>Usado:</b> ${formatCompactQty(item?.requiredQty ?? item?.neededQty, item?.unit || item?.ingredientUnit || '')}`,
-        `<b>Lote:</b> ${lot?.lotNumber || lot?.entryId || '-'}`,
-        `<b>VTO lote:</b> ${formatIsoEs(lot?.expiryDate) || '-'}`,
-        `<b>Proveedor:</b> ${lot?.provider || '-'}`
-      ].map(esc).join('<br/>');
+        `<b>${index + 1}. ${esc((item?.ingredientName || 'Ingrediente').toUpperCase())}</b>`,
+        `<b>Usado:</b> ${esc(formatCompactQty(item?.requiredQty ?? item?.neededQty, item?.unit || item?.ingredientUnit || ''))}`,
+        `<b>Lote:</b> ${esc(lot?.lotNumber || lot?.entryId || '-')}`,
+        `<b>VTO lote:</b> ${esc(formatIsoEs(lot?.expiryDate) || '-')}`,
+        `<b>Proveedor:</b> ${esc(lot?.provider || '-')}`
+      ].join('<br/>');
       const providerRne = resolveProviderRneFromLot(lot);
       lines.push(`${nodeId}["${nodeLabel}"]:::toneIngredient`);
       lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${esc(providerRne.number || '-')}"]:::toneRegistry`);
