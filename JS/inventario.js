@@ -2424,10 +2424,10 @@
       </section>
 
       <section class="recipe-step-card step-block inventario-lot-section">
-        <button type="button" class="inventario-collapse-head inventario-collapse-head-styled" id="lotConfigToggleBtn" aria-expanded="${state.editorDraft.showLotConfig}">
+        <div class="d-flex flex-wrap gap-2 align-items-center"><button type="button" class="inventario-collapse-head inventario-collapse-head-styled" id="lotConfigToggleBtn" aria-expanded="${state.editorDraft.showLotConfig}">
           <span><span class="recipe-step-number">1</span> Configuración de lote</span>
           <span class="inventario-collapse-summary">${buildLotSummaryBadges(state.editorDraft)}</span>
-        </button>
+        </button><button type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn produccion-history-btn" id="inventarioWeeklySheetBtn"><i class="fa-regular fa-file-lines"></i><span>Planilla Semanal</span></button></div>
         <div id="lotConfigBody" class="step-content ${state.editorDraft.showLotConfig ? '' : 'd-none'}">
           <div class="inventario-check-grid">${lotOptionRows}</div>
           <div class="inventario-inline-fields">
