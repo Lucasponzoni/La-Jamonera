@@ -278,13 +278,22 @@
     return `--provider-avatar-bg:${tone.bg};--provider-avatar-border:${tone.border};--provider-avatar-color:${tone.color};`;
   };
 
+  const sanitizeImageUrl = (value) => {
+    const raw = normalizeValue(value);
+    if (!raw) return '';
+    const lower = raw.toLowerCase();
+    if (['null', 'undefined', 'nan', '[object object]'].includes(lower)) return '';
+    return raw;
+  };
+
   const providerAvatarHtml = (provider, opts = {}) => {
     const sizeClass = opts.size === 'editor' ? 'inventario-provider-editor-avatar' : 'inventario-provider-avatar';
-    const photoUrl = normalizeValue(provider?.photoUrl);
+    const photoUrl = sanitizeImageUrl(provider?.photoUrl);
+    const initials = escapeHtml(providerInitials(provider?.name));
     if (photoUrl) {
-      return `<div class="${sizeClass}" style="${providerAvatarStyle(provider?.name)}"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb" src="${escapeHtml(photoUrl)}" alt="${escapeHtml(provider?.name || 'Proveedor')}"></div>`;
+      return `<div class="${sizeClass}" data-provider-initials="${initials}" style="${providerAvatarStyle(provider?.name)}"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb" src="${escapeHtml(photoUrl)}" alt="${escapeHtml(provider?.name || 'Proveedor')}"></div>`;
     }
-    return `<div class="${sizeClass}" style="${providerAvatarStyle(provider?.name)}">${escapeHtml(providerInitials(provider?.name))}</div>`;
+    return `<div class="${sizeClass}" style="${providerAvatarStyle(provider?.name)}">${initials}</div>`;
   };
 
   const getRneRemainingDays = (expiryIso) => {
@@ -721,7 +730,13 @@
         img.classList.add('is-loaded');
         loader?.classList.add('d-none');
       };
-      const fail = () => loader?.classList.add('d-none');
+      const fail = () => {
+        loader?.classList.add('d-none');
+        if (parent?.matches('.inventario-provider-avatar, .inventario-provider-editor-avatar')) {
+          const fallbackInitials = normalizeValue(parent.dataset.providerInitials) || 'PR';
+          parent.innerHTML = escapeHtml(fallbackInitials);
+        }
+      };
       img.addEventListener('load', done, { once: true });
       img.addEventListener('error', fail, { once: true });
       if (img.complete && img.naturalWidth > 0) {
@@ -729,11 +744,13 @@
       } else if (img.complete) {
         fail();
       } else {
+        const isProviderAvatar = parent?.matches('.inventario-provider-avatar, .inventario-provider-editor-avatar');
+        const timeoutMs = isProviderAvatar ? 2500 : 7000;
         setTimeout(() => {
           if (!img.classList.contains('is-loaded')) {
             fail();
           }
-        }, 7000);
+        }, timeoutMs);
       }
     });
   };
@@ -3289,6 +3306,7 @@
           </div>
           <div id="inventarioProviderRneFilters" class="inventario-status-filters">${options.map((option) => `<button type="button" class="inventario-status-btn tone-${option.tone} ${state.providerRneFilter === option.key ? 'is-active' : ''}" data-provider-rne-filter="${option.key}" ${option.count === 0 ? "disabled" : ""}><span>${option.label}</span><strong>${option.count}</strong></button>`).join('')}</div>
           <div id="inventarioProviderRneList" class="inventario-provider-rne-list">${providers.length ? providers.map(renderProviderCard).join('') : '<div class="ingrediente-empty-list">No hay proveedores para este filtro.</div>'}</div>`;
+          initThumbLoading(root);
         };
 
         const renderEditor = (providerId) => {
@@ -3361,6 +3379,7 @@
             }
           }
 
+          initThumbLoading(root);
           requestAnimationFrame(() => {
             root.querySelector('#providerNameInput')?.focus({ preventScroll: true });
           });
@@ -3648,8 +3667,8 @@
               const hasKg = summary.kg > 0.0001;
               const hasUnits = summary.units > 0.0001;
               bubble.className = `inventario-day-kg ${hasKg && hasUnits ? 'is-mixed' : ''}`;
-              bubble.style.top = (Number(dayElem.dateObj?.getDate() || 0) % 2 === 0) ? '-2px' : 'auto';
-              bubble.style.bottom = (Number(dayElem.dateObj?.getDate() || 0) % 2 === 0) ? 'auto' : '-2px';
+              bubble.style.top = (Number(dayElem.dateObj?.getDate() || 0) % 2 === 0) ? '4px' : 'auto';
+              bubble.style.bottom = (Number(dayElem.dateObj?.getDate() || 0) % 2 === 0) ? 'auto' : '4px';
               bubble.textContent = hasKg && hasUnits
                 ? `${Number(summary.kg || 0).toFixed(0)}kg + ${Number(summary.units || 0).toFixed(0)}u.`
                 : hasKg
