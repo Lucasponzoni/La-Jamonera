@@ -4,6 +4,7 @@
   if (!loadingNode || !dataNode) return;
 
   const normalize = (v) => String(v || '').trim();
+  const safeObject = (value) => (value && typeof value === 'object' ? value : {});
   const escapeHtml = (value) => String(value || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -90,7 +91,8 @@
       'I --> W'
     ];
     ingredients.forEach((plan, idx) => {
-      const lot = Array.isArray(plan?.lots) && plan.lots[0] ? plan.lots[0] : {};
+      const lots = Array.isArray(plan?.lots) ? plan.lots : [];
+      const lot = lots[0] || {};
       const nodeId = `ING_${idx + 1}`;
       const rneId = `ING_${idx + 1}_RNE`;
       lines.push(`${nodeId}["<b>${idx + 1}. ${escapeHtml((plan?.ingredientName || 'Ingrediente').toUpperCase())}</b><br/><b>Usado:</b> ${escapeHtml(String(Number(plan?.neededQty || plan?.requiredQty || 0).toFixed(3)))} ${escapeHtml(plan?.ingredientUnit || plan?.unit || '')}<br/><b>Lote:</b> ${escapeHtml(lot?.lotNumber || lot?.entryId || '-')}<br/><b>Proveedor:</b> ${escapeHtml(lot?.provider || '-')}<br/><b>VTO lote:</b> ${escapeHtml(formatIsoEs(lot?.expiryDate || ''))}"]:::toneIngredient`);
@@ -111,27 +113,62 @@
     return lines.join('\n');
   };
 
-  const isImageUrl = (url) => /\.(png|jpe?g|webp|gif|bmp|svg)(\?|$)/i.test(normalize(url));
-  const isPdfUrl = (url) => /\.pdf(\?|$)/i.test(normalize(url));
-
-  const openAttachments = async (urls, title) => {
-    if (!Array.isArray(urls) || !urls.length) return;
-    const blocks = urls.map((url) => {
-      if (isPdfUrl(url)) {
-        return `<article class="attachment-card attachment-doc" style="aspect-ratio:auto;height:72vh;"><iframe src="${escapeHtml(url)}" class="viewer-document" title="PDF"></iframe></article>`;
+  const openWithMainViewer = async (urls, title) => {
+    const cleanUrls = Array.isArray(urls)
+      ? urls.map((url) => normalize(url)).filter(Boolean)
+      : [];
+    if (!cleanUrls.length) return;
+    if (typeof window.laJamoneraOpenImageViewer === 'function') {
+      try {
+        await window.laJamoneraOpenImageViewer([{ invoiceImageUrls: cleanUrls }], 0, title);
+        return;
+      } catch (error) {
+        // fallback local cuando el visor principal no puede abrir en esta página pública
       }
-      if (isImageUrl(url)) {
-        return `<article class="attachment-card" style="aspect-ratio:auto;"><img src="${escapeHtml(url)}" class="attachment-image is-loaded" style="opacity:1;max-height:72vh;object-fit:contain;" alt="Adjunto"></article>`;
-      }
-      return `<article class="attachment-card attachment-doc" style="aspect-ratio:auto;"><a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-up-right-from-square"></i><span>Abrir adjunto</span></a></article>`;
-    }).join('');
+    }
     await Swal.fire({
       title,
-      html: `<div class="attachments-grid" style="grid-template-columns:1fr;">${blocks}</div>`,
+      html: `<div class="attachments-grid" style="grid-template-columns:1fr;">${cleanUrls.map((url) => `<article class="attachment-card" style="aspect-ratio:auto;"><img src="${escapeHtml(url)}" class="attachment-image is-loaded" style="opacity:1;max-height:72vh;object-fit:contain;" alt="Adjunto"></article>`).join('')}</div>`,
       width: '92vw',
       confirmButtonText: 'Cerrar',
       customClass: { popup: 'ios-alert ingredientes-alert', confirmButton: 'ios-btn ios-btn-secondary' }
     });
+  };
+
+  const initMermaidZoom = (container) => {
+    const svg = container.querySelector('svg');
+    if (!svg) return;
+    let scale = 1;
+    let tx = 0;
+    let ty = 0;
+    const apply = () => {
+      svg.style.transformOrigin = '0 0';
+      svg.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+    };
+    container.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      const delta = event.deltaY < 0 ? 0.12 : -0.12;
+      scale = Math.max(0.65, Math.min(2.5, scale + delta));
+      apply();
+    }, { passive: false });
+    let dragging = false;
+    let sx = 0;
+    let sy = 0;
+    container.addEventListener('pointerdown', (event) => {
+      dragging = true;
+      sx = event.clientX - tx;
+      sy = event.clientY - ty;
+      container.setPointerCapture(event.pointerId);
+    });
+    container.addEventListener('pointermove', (event) => {
+      if (!dragging) return;
+      tx = event.clientX - sx;
+      ty = event.clientY - sy;
+      apply();
+    });
+    container.addEventListener('pointerup', () => { dragging = false; });
+    container.addEventListener('pointercancel', () => { dragging = false; });
+    apply();
   };
 
   const renderPublicTrace = async (registro, config) => {
@@ -140,6 +177,7 @@
     const companyRneAttachment = normalize(registro?.traceability?.company?.rne?.attachmentUrl);
     const rnpaAttachment = normalize(registro?.traceability?.product?.rnpa?.attachmentUrl);
     const ingredients = Array.isArray(registro?.lots) ? registro.lots : [];
+    const traceIngredients = Array.isArray(registro?.traceability?.ingredients) ? registro.traceability.ingredients : [];
 
     dataNode.innerHTML = `<section class="produccion-trace-v2 produccion-trace-apple-viewer">
       <article class="produccion-trace-summary">
@@ -156,30 +194,41 @@
         <div class="produccion-trace-card-actions">
           ${companyRneAttachment ? '<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="publicCompanyRneAttachmentBtn"><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE empresa</span></button>' : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE empresa sin adjunto</button>'}
           ${rnpaAttachment ? '<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="publicRnpaAttachmentBtn"><i class="fa-regular fa-eye"></i><span>Ver adjunto RNPA</span></button>' : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNPA sin adjunto</button>'}
-          <button id="publicOpenPlanillaBtn" type="button" class="btn ios-btn ios-btn-primary"><i class="fa-regular fa-file-lines"></i><span>Ver planilla</span></button>
         </div>
+        <div class="public-trace-planilla-row"><button id="publicOpenPlanillaBtn" type="button" class="btn ios-btn ios-btn-primary public-open-planilla-btn"><i class="fa-regular fa-file-lines"></i><span>Ver planilla</span></button></div>
       </article>
       <div class="produccion-trace-mermaid-wrap"><div class="produccion-trace-mermaid" data-public-mermaid><div class="produccion-trace-mermaid-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"><p>Renderizando diagrama...</p></div></div></div>
       <div class="produccion-trace-ingredients">
         ${ingredients.map((item, idx) => {
           const lots = Array.isArray(item?.lots) ? item.lots : [];
-          const ingredientImage = normalize(item?.ingredientImageUrl);
+          const traceIngredient = traceIngredients.find((row) => normalize(row?.ingredientId) === normalize(item?.ingredientId));
+          const ingredientImage = normalize(item?.ingredientImageUrl || traceIngredient?.ingredientImageUrl);
           const mergedAttachments = lots.flatMap((lot) => (Array.isArray(lot?.invoiceImageUrls) ? lot.invoiceImageUrls : []));
           const providerRneAttachment = normalize(lots.find((lot) => normalize(lot?.providerRne?.attachmentUrl))?.providerRne?.attachmentUrl);
-          return `<article class="produccion-trace-ingredient-card"><header><div class="produccion-trace-ingredient-head-main"><span class="produccion-trace-ingredient-index">${idx + 1}</span><span class="produccion-trace-ingredient-avatar">${ingredientImage ? `<img src="${escapeHtml(ingredientImage)}" alt="${escapeHtml(item?.ingredientName || 'Ingrediente')}">` : '<i class="bi bi-basket2-fill fa-solid fa-carrot"></i>'}</span><h6>${escapeHtml(item?.ingredientName || 'Ingrediente')}</h6></div></header><div class="produccion-trace-lots">${lots.map((lot) => `<article class="produccion-trace-lot-card"><div class="produccion-trace-lot-head"><strong><i class="bi bi-upc-scan fa-solid fa-barcode"></i> Lote ${escapeHtml(lot?.lotNumber || lot?.entryId || '-')}</strong><span class="produccion-trace-used-badge">Vencimiento al elaborar: ${escapeHtml(formatIsoEs(lot?.expiryDate || ''))}</span></div><div class="produccion-trace-grid"><p><strong>Usado</strong><span>${Number(lot?.takeQty || 0).toFixed(3)} ${escapeHtml(lot?.unit || item?.ingredientUnit || '')}</span></p><p><strong>Proveedor</strong><span>${escapeHtml(lot?.provider || '-')}</span></p><p><strong>N° factura</strong><span>${escapeHtml(lot?.invoiceNumber || '-')}</span></p><p><strong>RNE proveedor</strong><span>${escapeHtml(lot?.providerRne?.number || '-')}</span></p></div></article>`).join('') || '<p class="m-0">Sin lotes asociados.</p>'}</div><div class="produccion-trace-card-actions">${mergedAttachments.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-public-images='${encodeURIComponent(JSON.stringify(mergedAttachments))}'><i class="fa-regular fa-images"></i><span>Ver adjuntos (${mergedAttachments.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}${providerRneAttachment ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-public-images='${encodeURIComponent(JSON.stringify([providerRneAttachment]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE sin adjunto</button>'}</div></article>`;
+          return `<article class="produccion-trace-ingredient-card"><header><div class="produccion-trace-ingredient-head-main"><span class="produccion-trace-ingredient-index">${idx + 1}</span><span class="produccion-trace-ingredient-avatar">${ingredientImage ? `<img src="${escapeHtml(ingredientImage)}" alt="${escapeHtml(item?.ingredientName || 'Ingrediente')}">` : '<i class="bi bi-basket2-fill fa-solid fa-carrot"></i>'}</span><h6>${escapeHtml(item?.ingredientName || 'Ingrediente')}</h6></div></header><div class="produccion-trace-lots">${lots.map((lot) => {
+            const used = Number(lot?.takeQty || 0);
+            const available = Number(lot?.availableQty || 0);
+            const remaining = Math.max(0, available - used);
+            return `<article class="produccion-trace-lot-card"><div class="produccion-trace-lot-head"><strong><i class="bi bi-upc-scan fa-solid fa-barcode"></i> Lote ${escapeHtml(lot?.lotNumber || lot?.entryId || '-')}</strong><span class="produccion-trace-used-badge">Vencimiento al elaborar: ${escapeHtml(formatIsoEs(lot?.expiryDate || ''))}</span></div><div class="produccion-trace-grid"><p><strong>Usado</strong><span>${used.toFixed(3)} ${escapeHtml(lot?.unit || item?.ingredientUnit || '')}</span></p><p><strong>Disponible</strong><span>${available.toFixed(3)} ${escapeHtml(lot?.unit || item?.ingredientUnit || '')}</span></p><p><strong>Remanente</strong><span>${remaining.toFixed(3)} ${escapeHtml(lot?.unit || item?.ingredientUnit || '')}</span></p><p><strong>Proveedor</strong><span>${escapeHtml(lot?.provider || '-')}</span></p><p><strong>N° factura</strong><span>${escapeHtml(lot?.invoiceNumber || '-')}</span></p><p><strong>Ingreso</strong><span>${escapeHtml(formatIsoEs(lot?.entryDate || '-'))}</span></p><p><strong>RNE proveedor</strong><span>${escapeHtml(lot?.providerRne?.number || '-')}</span></p></div></article>`;
+          }).join('') || '<p class="m-0">Sin lotes asociados.</p>'}</div><div class="produccion-trace-card-actions">${mergedAttachments.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-public-images='${encodeURIComponent(JSON.stringify(mergedAttachments))}'><i class="fa-regular fa-images"></i><span>Ver adjuntos (${mergedAttachments.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}${providerRneAttachment ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-public-images='${encodeURIComponent(JSON.stringify([providerRneAttachment]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE sin adjunto</button>'}</div></article>`;
         }).join('') || '<p class="ingrediente-empty-list">Sin desglose de lotes para esta producción.</p>'}
       </div>
     </section>`;
 
     dataNode.querySelector('#publicOpenPlanillaBtn')?.addEventListener('click', async () => {
-      await window.laJamoneraPlanillaProduccion?.openByRegistro?.(registro, { companyLogoUrl: normalize(config?.companyLogoUrl), usersMap: safeObject(config?.usersMap) });
+      await window.laJamoneraPlanillaProduccion?.openByRegistro?.(registro, { usersMap: safeObject(config?.usersMap) });
     });
-    dataNode.querySelector('#publicCompanyRneAttachmentBtn')?.addEventListener('click', async () => openAttachments([companyRneAttachment], 'Adjunto RNE empresa'));
-    dataNode.querySelector('#publicRnpaAttachmentBtn')?.addEventListener('click', async () => openAttachments([rnpaAttachment], 'Adjunto RNPA'));
+    dataNode.querySelector('#publicCompanyRneAttachmentBtn')?.addEventListener('click', async () => openWithMainViewer([companyRneAttachment], 'Adjunto RNE empresa'));
+    dataNode.querySelector('#publicRnpaAttachmentBtn')?.addEventListener('click', async () => openWithMainViewer([rnpaAttachment], 'Adjunto RNPA'));
     dataNode.querySelectorAll('[data-public-images]').forEach((btn) => {
       btn.addEventListener('click', async () => {
-        const urls = JSON.parse(decodeURIComponent(btn.dataset.publicImages || '[]'));
-        await openAttachments(urls, 'Adjuntos');
+        let urls = [];
+        try {
+          urls = JSON.parse(decodeURIComponent(btn.dataset.publicImages || '[]'));
+        } catch (error) {
+          urls = [];
+        }
+        await openWithMainViewer(urls, 'Adjuntos');
       });
     });
 
@@ -190,6 +239,7 @@
         try {
           const rendered = await window.mermaid.render(`public_trace_${Date.now()}`, buildDefinition(registro));
           mermaidHost.innerHTML = rendered.svg;
+          initMermaidZoom(mermaidHost);
         } catch (error) {
           mermaidHost.innerHTML = '<p class="m-0">No se pudo renderizar el diagrama.</p>';
         }
@@ -198,8 +248,6 @@
       }
     }
   };
-
-  const safeObject = (value) => (value && typeof value === 'object' ? value : {});
 
   const run = async () => {
     const id = getId();

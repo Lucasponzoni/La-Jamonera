@@ -7685,3 +7685,68 @@ html.login-protected.auth-ok body {
     font-size: 1rem;
   }
 }
+
+.planilla-modal {
+  width: min(98vw, 1280px) !important;
+}
+
+.planilla-toolbar {
+  justify-content: center;
+}
+
+.planilla-toolbar .ios-btn {
+  min-width: 230px;
+  justify-content: center;
+}
+
+.planilla-product-hero-no-image {
+  justify-content: center;
+}
+
+.planilla-footer-grid-single {
+  display: block;
+}
+
+.public-trace-planilla-row {
+  margin-top: 14px;
+  display: flex;
+  justify-content: center;
+}
+
+.public-open-planilla-btn {
+  min-width: 240px;
+  justify-content: center;
+}
+
+@media print {
+  body {
+    background: #fff !important;
+  }
+
+  .planilla-print-a4 {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 6px !important;
+    gap: 6px !important;
+    border-radius: 0;
+  }
+
+  .planilla-summary-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .planilla-table {
+    min-width: 0 !important;
+  }
+
+  .planilla-table th,
+  .planilla-table td {
+    font-size: 10px !important;
+    padding: 4px !important;
+  }
+
+  .planilla-qr-note {
+    font-size: 13px !important;
+  }
+}
