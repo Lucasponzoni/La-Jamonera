@@ -1784,16 +1784,20 @@
       await preloadImages(entries.flatMap((entry) => entryImageUrls(entry)).concat([ingredient.imageUrl]));
     }
 
-    const printableRows = buildPrintableRowsForEntries(entries, includeTrace);
-    const rows = printableRows.map((row, index) => `
-      <tr class="inventario-row-tone ${row.__tone === 'resolution' ? 'is-resolution-row-print' : row.__tone === 'expired' ? 'is-expired-row-print' : row.__isTrace ? 'is-trace-row' : (index % 2 === 0 ? 'is-even-row' : 'is-odd-row')}">
-        <td>${escapeHtml(row.__isTrace ? `↳ ${row.fechaHora}` : row.fechaHora)}</td>
-        <td>${escapeHtml(row.fechaCaducidad)}</td>
-        <td class="${row.__expired ? 'is-strike-print' : ''}">${escapeHtml(row.cantidad)}</td>
-        <td>${escapeHtml(row.factura)}</td>
-        <td class="inventario-provider-cell">${escapeHtml(row.proveedor)}</td>
-        <td>${row.__isTrace ? 'Trazabilidad' : (includeImages ? row.imagenes : (row.imagenes === 'Sin imagen' ? 'Sin imagen' : 'Posee adjuntos'))}</td>
-      </tr>`).join('');
+    const tableRows = entries.flatMap((entry, index) => {
+      const expiryMeta = getEntryExpiryMeta(entry);
+      const expiryBadge = getExpiryBadgeText(entry);
+      const detail = formatEntryDetailLabel(entry);
+      const strikeClass = expiryMeta.isExpired ? ' style="text-decoration:line-through;font-weight:700;color:#b42338"' : '';
+      const mainRow = `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}${expiryMeta.isExpired ? ' is-expired-row-print' : ''}"><td>${escapeHtml(formatDateTime(entry.createdAt))}</td><td>${escapeHtml(entry.expiryDate || '-')}${expiryBadge ? `<br><small style="color:#b42338;font-weight:700">${escapeHtml(expiryBadge)}</small>` : ''}</td><td><span${strikeClass}>${escapeHtml(detail.qtyLabel)}</span><br><small${strikeClass}>${escapeHtml(detail.availableLabel)}</small></td><td><span${strikeClass}>${escapeHtml(detail.qtyLabel)}</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td>${includeImages ? (entryImageUrls(entry).length ? `Ver adjunto (${entryImageUrls(entry).length})` : 'Sin adjunto') : (entryImageUrls(entry).length ? `Posee ${entryImageUrls(entry).length} adjunto/s` : 'Sin adjunto')}</td></tr>`;
+      const resolution = getEntryResolutionRowData(entry);
+      const resolutionRow = resolution
+        ? `<tr class="is-resolution-row-print"><td>${escapeHtml(`↳ ${formatDateTime(resolution.at)}`)}</td><td>${escapeHtml(entry.expiryDate || '-')}</td><td>${escapeHtml(`-${resolution.resolvedKg.toFixed(2)} kilos`)}</td><td>${escapeHtml(resolution.badge)}</td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td>Resolución</td></tr>`
+        : '';
+      if (!includeTrace) return [mainRow, resolutionRow].filter(Boolean);
+      const traceRows = buildTraceRowsForEntry(entry).map((trace) => `<tr class="is-trace-row"><td>${escapeHtml(`↳ ${trace.fechaHora}`)}</td><td>${escapeHtml(trace.fechaCaducidad || '-')}</td><td>${escapeHtml(trace.cantidad)}</td><td>${escapeHtml(trace.factura)}</td><td>${escapeHtml(trace.proveedor)}</td><td class="inventario-provider-cell">Trazabilidad</td><td></td></tr>`);
+      return [mainRow, resolutionRow, ...traceRows].filter(Boolean);
+    }).join('');
 
     const imagesHtml = includeImages
       ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${entries.flatMap((entry) => entryImageUrls(entry).map((url, idx) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><img src="${url}" style="width:100%;max-height:320px;object-fit:contain;border-radius:10px;"/><figcaption style="font-size:12px;color:#4b5f8e;margin-top:6px;">${escapeHtml(entry.invoiceNumber || '-')} · ${escapeHtml(entry.entryDate || '-')} · ${idx + 1}</figcaption></figure>`)).join('')}</div></section>`
@@ -1806,27 +1810,24 @@
         <head>
           <title>Historial inventario - ${escapeHtml(capitalize(ingredient.name))}</title>
           <style>
-            body{font-family:Inter,Arial,sans-serif;padding:24px;color:#1f2a44}
-            h1{font-size:22px;margin:0 0 12px}
+            body{font-family:Inter,Arial,sans-serif;padding:20px;color:#1f2a44}
             table{width:100%;border-collapse:collapse}
-            th,td{border:1px solid #d7def2;padding:8px;text-align:left;font-size:13px;vertical-align:top}
-            th{background:#eef3ff}
+            th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}
+            th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}
             .is-trace-row td{background:#ffecef}
-            .is-resolution-row-print td{background:#fff6d9}.is-expired-row-print td{background:#ffecef}.is-strike-print{text-decoration:line-through;font-weight:700;color:#b42338}
+            .is-resolution-row-print td{background:#fff6d9}
+            .is-expired-row-print td{background:#ffecef}
           </style>
         </head>
         <body>
-          <section style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-            ${ingredient.imageUrl ? `<img src="${ingredient.imageUrl}" alt="${escapeHtml(capitalize(ingredient.name))}" style="width:74px;height:74px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}
-            <div>
-              <h1 style="margin:0 0 4px;">${escapeHtml(capitalize(ingredient.name))} · Historial de ingresos</h1>
-              <p style="margin:0;color:#55607f;">${escapeHtml(sentenceCase(ingredient.description || 'Sin descripción'))}</p>
-            </div>
+          <h1>Ingresos por período • La Jamonera</h1>
+          <section style="margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">${ingredient.imageUrl ? `<img src="${ingredient.imageUrl}" style="width:62px;height:62px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<div><h2 style="margin:0;font-size:18px;">${escapeHtml(capitalize(ingredient.name))}</h2><p style="margin:0;color:#55607f;font-size:12px;">${escapeHtml(sentenceCase(ingredient.description || 'Sin descripción'))}</p></div></div>
+            <table>
+              <thead><tr><th>Fecha y hora</th><th>Fecha vencimiento</th><th>Cantidad / Disp.</th><th>Cantidad</th><th>N° factura</th><th>Proveedor</th><th>Imagen</th></tr></thead>
+              <tbody>${tableRows || '<tr><td colspan="7">Sin datos</td></tr>'}</tbody>
+            </table>
           </section>
-          <table>
-            <thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>N° factura</th><th>Proveedor</th><th>Imagen</th></tr></thead>
-            <tbody>${rows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody>
-          </table>
           ${imagesHtml}
         </body>
       </html>`);
@@ -1930,14 +1931,14 @@
       const productRows = grouped[ingredientId];
       const head = productRows[0];
       const tableRows = productRows.flatMap((row) => {
-        const expiryMeta = getEntryExpiryMeta(row); const expiryBadge = getExpiryBadgeText(row); const detail = formatEntryDetailLabel(row); const strikeClass = expiryMeta.isExpired ? ' style="text-decoration:line-through;font-weight:700;color:#b42338"' : ''; const mainRow = `<tr${expiryMeta.isExpired ? ' style="background:#ffecef"' : ''}><td>${escapeHtml(row.entryDateTime)}${expiryBadge ? `<br><small style="color:#b42338;font-weight:700">${escapeHtml(expiryBadge)}</small>` : ''}</td><td><span${strikeClass}>${escapeHtml(detail.qtyLabel)}</span><br><small${strikeClass}>${escapeHtml(detail.availableLabel)}</small></td><td><span${strikeClass}>${escapeHtml(detail.qtyLabel)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td>${includeImages ? (row.invoiceImageUrls?.length ? `Ver adjunto (${row.invoiceImageUrls.length})` : 'Sin adjunto') : (row.invoiceImageUrls?.length ? `Posee ${row.invoiceImageUrls.length} adjunto/s` : 'Sin adjunto')}</td></tr>`;
+        const expiryMeta = getEntryExpiryMeta(row); const expiryBadge = getExpiryBadgeText(row); const detail = formatEntryDetailLabel(row); const strikeClass = expiryMeta.isExpired ? ' style="text-decoration:line-through;font-weight:700;color:#b42338"' : ''; const mainRow = `<tr${expiryMeta.isExpired ? ' style="background:#ffecef"' : ''}><td>${escapeHtml(row.entryDateTime)}</td><td>${escapeHtml(row.expiryDate || '-')}${expiryBadge ? `<br><small style="color:#b42338;font-weight:700">${escapeHtml(expiryBadge)}</small>` : ''}</td><td><span${strikeClass}>${escapeHtml(detail.qtyLabel)}</span><br><small${strikeClass}>${escapeHtml(detail.availableLabel)}</small></td><td><span${strikeClass}>${escapeHtml(detail.qtyLabel)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td>${includeImages ? (row.invoiceImageUrls?.length ? `Ver adjunto (${row.invoiceImageUrls.length})` : 'Sin adjunto') : (row.invoiceImageUrls?.length ? `Posee ${row.invoiceImageUrls.length} adjunto/s` : 'Sin adjunto')}</td></tr>`;
         const resolution = getEntryResolutionRowData(row);
-        const resolutionRow = resolution ? `<tr style="background:#fff6d9;"><td>${escapeHtml(`↳ ${formatDateTime(resolution.at)}`)}</td><td>${escapeHtml(`-${resolution.resolvedKg.toFixed(2)} kilos`)}</td><td>${escapeHtml(resolution.badge)}</td><td>${escapeHtml(row.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(row.provider || '-')}</td><td>Resolución</td></tr>` : '';
+        const resolutionRow = resolution ? `<tr style="background:#fff6d9;"><td>${escapeHtml(`↳ ${formatDateTime(resolution.at)}`)}</td><td>${escapeHtml(row.expiryDate || '-')}</td><td>${escapeHtml(`-${resolution.resolvedKg.toFixed(2)} kilos`)}</td><td>${escapeHtml(resolution.badge)}</td><td>${escapeHtml(row.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(row.provider || '-')}</td><td>Resolución</td></tr>` : '';
         if (!includeTrace) return [mainRow, resolutionRow].filter(Boolean);
-        const traceRows = buildTraceRowsForEntry(row).map((trace) => `<tr style="background:#ffecef;"><td>${escapeHtml(`↳ ${trace.fechaHora}`)}</td><td>${escapeHtml(trace.cantidad)}</td><td>${escapeHtml(trace.factura)}</td><td>${escapeHtml(trace.proveedor)}</td><td class="inventario-provider-cell">Trazabilidad</td><td></td></tr>`);
+        const traceRows = buildTraceRowsForEntry(row).map((trace) => `<tr style="background:#ffecef;"><td>${escapeHtml(`↳ ${trace.fechaHora}`)}</td><td>${escapeHtml(trace.fechaCaducidad || '-')}</td><td>${escapeHtml(trace.cantidad)}</td><td>${escapeHtml(trace.factura)}</td><td>${escapeHtml(trace.proveedor)}</td><td class="inventario-provider-cell">Trazabilidad</td><td></td></tr>`);
         return [mainRow, resolutionRow, ...traceRows].filter(Boolean);
       }).join('');
-      return `<section style="margin-bottom:14px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">${head.ingredientImageUrl ? `<img src="${head.ingredientImageUrl}" style="width:62px;height:62px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<div><h2 style="margin:0;font-size:18px;">${escapeHtml(head.ingredientName)}</h2><p style="margin:0;color:#55607f;font-size:12px;">${escapeHtml(head.ingredientDescription)}</p></div></div><table><thead><tr><th>Fecha y hora</th><th>Cantidad / Disp.</th><th>Cantidad</th><th>N° factura</th><th>Proveedor</th><th>Imagen</th></tr></thead><tbody>${tableRows}</tbody></table></section>`;
+      return `<section style="margin-bottom:14px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">${head.ingredientImageUrl ? `<img src="${head.ingredientImageUrl}" style="width:62px;height:62px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<div><h2 style="margin:0;font-size:18px;">${escapeHtml(head.ingredientName)}</h2><p style="margin:0;color:#55607f;font-size:12px;">${escapeHtml(head.ingredientDescription)}</p></div></div><table><thead><tr><th>Fecha y hora</th><th>Fecha vencimiento</th><th>Cantidad / Disp.</th><th>Cantidad</th><th>N° factura</th><th>Proveedor</th><th>Imagen</th></tr></thead><tbody>${tableRows}</tbody></table></section>`;
     }).join('');
 
     const imagesHtml = includeImages
