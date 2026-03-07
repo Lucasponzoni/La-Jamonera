@@ -6764,6 +6764,18 @@ html.login-protected.auth-ok body {
   white-space: nowrap;
 }
 
+.produccion-trace-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.produccion-trace-card-actions .inventario-no-photo-btn,
+.produccion-trace-card-actions .inventario-threshold-btn {
+  margin: 0;
+}
+
 .produccion-trace-used-badge {
   border: 1px solid #d7e2f8;
   border-radius: 999px;
