@@ -586,8 +586,8 @@ html.login-protected.auth-ok body {
 }
 
 .family-circle-thumb {
-  width: 68px;
-  height: 68px;
+  width: 80px;
+  height: 80px;
   border-radius: 999px;
   border: 1px solid #d6deef;
   overflow: hidden;
@@ -600,23 +600,24 @@ html.login-protected.auth-ok body {
 
 .family-circle-count {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  min-width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  border: 2px solid #fff;
-  background: linear-gradient(135deg, #4269e2, #6f7dff);
-  color: #fff;
-  font-size: 0.62rem;
+  /* bottom: 6px; */
+  left: -5px;
+  min-width: 24px;
+  height: 24px;
+  text-align: end;
+  border-radius: 0 5px 5px 0;
+  /* border: 1px solid #8a939d; */
+  background: linear-gradient(135deg, #ff4747, #dc0b49);
+  color: #ffffff;
+  font-size: 0.8rem;
   font-weight: 800;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  line-height: 1;
+  line-height: 2;
   padding: 0 4px;
   z-index: 3;
-  box-shadow: 0 4px 10px rgba(23, 37, 84, 0.25);
+  /* box-shadow: 0 4px 10px rgba(23, 37, 84, 0.25); */
 }
 
 .family-circle-thumb img {
@@ -655,7 +656,8 @@ html.login-protected.auth-ok body {
 }
 
 .family-circle-item.is-active .family-circle-thumb {
-  border-color: #8b5cf6;
+  border-color: #dc0b49 !important;
+  border: 2px solid;
 }
 
 .family-circle-item:focus,
