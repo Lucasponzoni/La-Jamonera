@@ -1,8 +1,4 @@
 (function planillaProduccionModule() {
-  const TRACE_BASE_URL = 'https://lucasponzoni.github.io/La-Jamonera/';
-  const CORS_PROXY_URL = 'https://proxy.cors.sh/';
-  const CORS_PROXY_KEY = 'live_36d58f4c13cb7d838833506e8f6450623bf2605859ac089fa008cfeddd29d8dd';
-
   const safeObject = (value) => (value && typeof value === 'object' ? value : {});
   const normalizeValue = (value) => String(value || '').trim();
   const escapeHtml = (value) => String(value || '')
