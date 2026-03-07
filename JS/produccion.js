@@ -2074,8 +2074,8 @@
     const days = Math.ceil((expiryTs - today.getTime()) / (1000 * 60 * 60 * 24));
     const tone = days < 0 ? 'danger' : days < 60 ? 'danger' : days < 180 ? 'warning' : 'ok';
     const text = days < 0
-      ? `El RNE venció hace ${Math.abs(days)} días (${formatIsoEs(expiryIso)}).`
-      : `El RNE vence en ${days} días (${formatIsoEs(expiryIso)}).`;
+      ? `El RNE de la Jamonera venció hace ${Math.abs(days)} días (${formatIsoEs(expiryIso)}).`
+      : `El RNE de la Jamonera vence en ${days} días (${formatIsoEs(expiryIso)}).`;
     const visible = tone === 'warning' || tone === 'danger';
     return { visible, days, tone, text, hasAttachment };
   };

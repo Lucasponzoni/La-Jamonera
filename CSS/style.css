@@ -2843,6 +2843,13 @@ html.login-protected.auth-ok body {
   padding-top: 12px;
 }
 
+.recipe-step-card .form-label {
+  margin: 0; 
+  color: #4f5f84; 
+  font-weight: 500;
+  font-size: 1rem;
+}
+
 .recipe-main-step {
   border-top: 1px solid #dbe4f8 !important;
 }
@@ -5136,13 +5143,6 @@ html.login-protected.auth-ok body {
   gap: 8px;
 }
 
-.produccion-toolbar-icon-btn {
-  width: 44px;
-  min-width: 44px;
-  max-width: 44px;
-  padding: 0;
-}
-
 .produccion-history-btn {
   width: fit-content;
   max-width: none;
@@ -7043,6 +7043,7 @@ html.login-protected.auth-ok body {
 
 .inventario-rne-expiry-row {
   border: 1px solid #dbe4fa;
+  margin-bottom: 5px;
   border-radius: 11px;
   background: #f8fbff;
   padding: 7px 10px;

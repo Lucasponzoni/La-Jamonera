@@ -702,7 +702,7 @@
       return;
     }
 
-    const rowHtml = (row, toneClass) => `<div class="inventario-rne-expiry-row ${toneClass}"><strong>${escapeHtml(row.name)}</strong><span>${escapeHtml(formatIsoDateEs(row.expiryDate))} · ${row.remainingDays} día(s)</span></div>`;
+    const rowHtml = (row, toneClass) => `<div class="inventario-rne-expiry-row ${toneClass}"><strong>${escapeHtml(row.name)}</strong><span>${escapeHtml(formatIsoDateEs(row.expiryDate))} · <strong>${row.remainingDays} día(s)</strong></span></div>`;
 
     nodes.providersRneAlert.classList.remove('d-none');
     nodes.providersRneAlert.innerHTML = `<div class="produccion-rne-expiry-alert ${dangerRows.length ? 'is-danger' : 'is-ok'}"><i class="bi ${dangerRows.length ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill'}"></i><span>${dangerRows.length ? 'Hay RNE críticos por vencer.' : 'Hay RNE próximos a vencer.'}</span></div>
@@ -2963,7 +2963,7 @@
                   ${historyHtml}
                 </div>
                 <div class="produccion-config-actions mt-3">
-                  <button type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn" data-provider-rne-save="${provider.id}"><i class="fa-solid fa-floppy-disk"></i><span>Guardar</span></button>
+                  <button type="button" class="btn ios-btn ios-btn-success" data-provider-rne-save="${provider.id}"><i class="fa-solid fa-floppy-disk"></i><span>Guardar</span></button>
                 </div>
               </div>
             </section>`;
