@@ -360,12 +360,17 @@
 
     const rows = recipes
       .map((recipe) => {
+        const rnpa = safeObject(recipe?.rnpa);
+        const attachmentUrl = normalizeValue(rnpa.attachmentUrl);
+        if (!attachmentUrl) return null;
+
         const status = getRnpaStatus(recipe);
-        const days = Number(status.days);
+        const days = status.days;
         if (!Number.isFinite(days) || days < 0 || days >= 180) return null;
+
         return {
           name: normalizeValue(recipe?.title) || 'Receta sin nombre',
-          expiryDate: normalizeValue(recipe?.rnpa?.expiryDate),
+          expiryDate: normalizeValue(rnpa.expiryDate),
           remainingDays: days,
           tone: days < 60 ? 'danger' : 'warning'
         };
@@ -382,13 +387,18 @@
 
     const rowHtml = (row, toneClass) => `<div class="inventario-rne-expiry-row ${toneClass}"><strong>${escapeHtml(row.name)}</strong><span>${escapeHtml(row.expiryDate)} · <strong>${row.remainingDays} día(s)</strong></span></div>`;
     const detailsCount = dangerRows.length + warningRows.length;
+    const alertMessage = dangerRows.length ? 'Hay RNPA críticos por vencer.' : 'Hay RNPA próximos a vencer.';
+
     recetasRnpaAlert.classList.remove('d-none');
-    recetasRnpaAlert.innerHTML = `<div class="produccion-rne-expiry-alert ${dangerRows.length ? 'is-danger' : 'is-ok'}"><i class="bi ${dangerRows.length ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill'}"></i><span>${dangerRows.length ? 'Hay RNPA críticos por vencer.' : 'Hay RNPA próximos a vencer.'}</span></div>
-      <button type="button" class="inventario-rne-alert-toggle" data-rnpa-alert-toggle aria-expanded="false"><span>Ver detalle (${detailsCount})</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button>
+    recetasRnpaAlert.innerHTML = `<button type="button" class="produccion-rne-expiry-alert ${dangerRows.length ? 'is-danger' : 'is-ok'} is-collapsible" data-rnpa-alert-toggle aria-expanded="false">
+        <span class="produccion-rne-expiry-text"><i class="bi ${dangerRows.length ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill'}"></i><span>${alertMessage}</span></span>
+        <span class="produccion-rne-expiry-collapse-meta"><strong>${detailsCount}</strong><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
+      </button>
       <div class="inventario-rne-expiry-board" data-rnpa-alert-details hidden>
         ${dangerRows.length ? `<section class="inventario-rne-expiry-group"><h6><strong>Vencen en menos de 60 días</strong></h6>${dangerRows.map((row) => rowHtml(row, 'is-danger')).join('')}</section>` : ''}
         ${warningRows.length ? `<section class="inventario-rne-expiry-group"><h6><strong>Vencen en menos de 6 meses</strong></h6>${warningRows.map((row) => rowHtml(row, 'is-warning')).join('')}</section>` : ''}
       </div>`;
+
     const toggleBtn = recetasRnpaAlert.querySelector('[data-rnpa-alert-toggle]');
     const details = recetasRnpaAlert.querySelector('[data-rnpa-alert-details]');
     toggleBtn?.addEventListener('click', () => {
@@ -397,8 +407,6 @@
       toggleBtn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
       details.hidden = expanded;
       toggleBtn.classList.toggle('is-open', !expanded);
-      const label = toggleBtn.querySelector('span');
-      if (label) label.textContent = expanded ? `Ver detalle (${detailsCount})` : 'Ocultar detalle';
     });
   };
 
