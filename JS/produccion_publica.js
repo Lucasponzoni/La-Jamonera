@@ -22,6 +22,32 @@
     if (!match) return text || '-';
     return `${match[3]}-${match[2]}-${match[1]}`;
   };
+  const getUnitMeta = (unitRaw) => {
+    const unit = normalize(unitRaw).toLowerCase();
+    const massMap = {
+      kg: 1000, kilo: 1000, kilos: 1000, kilogramo: 1000, kilogramos: 1000,
+      g: 1, gr: 1, gramo: 1, gramos: 1,
+      mg: 0.001, miligramo: 0.001, miligramos: 0.001
+    };
+    const volumeMap = {
+      l: 1000, lt: 1000, litro: 1000, litros: 1000,
+      ml: 1, mililitro: 1, mililitros: 1, cc: 1
+    };
+    if (massMap[unit]) return { factor: massMap[unit] };
+    if (volumeMap[unit]) return { factor: volumeMap[unit] };
+    return { factor: 1 };
+  };
+  const toBase = (qty, unit) => {
+    const amount = Number(qty || 0);
+    if (!Number.isFinite(amount)) return Number.NaN;
+    return amount * getUnitMeta(unit).factor;
+  };
+  const getIngredientPlanQtyKg = (item = {}) => {
+    const qty = Number(item?.neededQty ?? item?.requiredQty ?? 0);
+    const base = toBase(qty, item?.ingredientUnit || item?.unit);
+    if (!Number.isFinite(base)) return 0;
+    return Number((base / 1000).toFixed(6));
+  };
 
   const getId = () => {
     const params = new URLSearchParams(window.location.search);
@@ -65,7 +91,7 @@
 
   const buildDefinition = (registro, config = {}) => {
     const ingredients = Array.isArray(registro?.lots) ? registro.lots : [];
-    const totalIngredientsKg = ingredients.reduce((sum, item) => sum + Number(item?.neededQty || item?.requiredQty || 0), 0);
+    const totalIngredientsKg = ingredients.reduce((sum, item) => sum + getIngredientPlanQtyKg(item), 0);
     const mermaKg = Math.max(0, totalIngredientsKg - Number(registro?.quantityKg || 0));
     const managerToken = Array.isArray(registro?.managers) && registro.managers[0] ? registro.managers[0] : '';
     const userMap = safeObject(config?.usersMap);
@@ -334,7 +360,7 @@
     </section>`;
 
     dataNode.querySelector('#publicOpenPlanillaBtn')?.addEventListener('click', async () => {
-      await window.laJamoneraPlanillaProduccion?.openByRegistro?.(registro, { usersMap: safeObject(config?.usersMap), forceModalOnMobile: true });
+      await window.laJamoneraPlanillaProduccion?.openByRegistro?.(registro, { usersMap: safeObject(config?.usersMap) });
     });
     dataNode.querySelector('#publicCompanyRneAttachmentBtn')?.addEventListener('click', async () => openWithMainViewer([companyRneAttachment], 'Adjunto RNE empresa'));
     dataNode.querySelector('#publicRnpaAttachmentBtn')?.addEventListener('click', async () => openWithMainViewer([rnpaAttachment], 'Adjunto RNPA'));
