@@ -14,6 +14,7 @@
   const recetasData = document.getElementById('recetasData');
   const recetasEditor = document.getElementById('recetasEditor');
   const recetasList = document.getElementById('recetasList');
+  const recetasRnpaAlert = document.getElementById('recetasRnpaAlert');
   const recetasSearchInput = document.getElementById('recetasSearchInput');
   const createRecipeBtn = document.getElementById('createRecipeBtn');
   const emptyCreateRecipeBtn = document.getElementById('emptyCreateRecipeBtn');
@@ -347,6 +348,68 @@
     });
   };
 
+
+  const renderRnpaAlert = (recipes = []) => {
+    if (!recetasRnpaAlert || state.rnpaFilter !== 'all') {
+      if (recetasRnpaAlert) {
+        recetasRnpaAlert.classList.add('d-none');
+        recetasRnpaAlert.innerHTML = '';
+      }
+      return;
+    }
+
+    const rows = recipes
+      .map((recipe) => {
+        const rnpa = safeObject(recipe?.rnpa);
+        const attachmentUrl = normalizeValue(rnpa.attachmentUrl);
+        if (!attachmentUrl) return null;
+
+        const status = getRnpaStatus(recipe);
+        const days = status.days;
+        if (!Number.isFinite(days) || days < 0 || days >= 180) return null;
+
+        return {
+          name: normalizeValue(recipe?.title) || 'Receta sin nombre',
+          expiryDate: normalizeValue(rnpa.expiryDate),
+          remainingDays: days,
+          tone: days < 60 ? 'danger' : 'warning'
+        };
+      })
+      .filter(Boolean);
+
+    const dangerRows = rows.filter((item) => item.tone === 'danger').sort((a, b) => a.remainingDays - b.remainingDays);
+    const warningRows = rows.filter((item) => item.tone === 'warning').sort((a, b) => a.remainingDays - b.remainingDays);
+    if (!dangerRows.length && !warningRows.length) {
+      recetasRnpaAlert.classList.add('d-none');
+      recetasRnpaAlert.innerHTML = '';
+      return;
+    }
+
+    const rowHtml = (row, toneClass) => `<div class="inventario-rne-expiry-row ${toneClass}"><strong>${escapeHtml(row.name)}</strong><span>${escapeHtml(row.expiryDate)} · <strong>${row.remainingDays} día(s)</strong></span></div>`;
+    const detailsCount = dangerRows.length + warningRows.length;
+    const alertMessage = dangerRows.length ? 'Hay RNPA críticos por vencer.' : 'Hay RNPA próximos a vencer.';
+
+    recetasRnpaAlert.classList.remove('d-none');
+    recetasRnpaAlert.innerHTML = `<button type="button" class="produccion-rne-expiry-alert ${dangerRows.length ? 'is-danger' : 'is-ok'} is-collapsible" data-rnpa-alert-toggle aria-expanded="false">
+        <span class="produccion-rne-expiry-text"><i class="bi ${dangerRows.length ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill'}"></i><span>${alertMessage}</span></span>
+        <span class="produccion-rne-expiry-collapse-meta"><strong>${detailsCount}</strong><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
+      </button>
+      <div class="inventario-rne-expiry-board" data-rnpa-alert-details hidden>
+        ${dangerRows.length ? `<section class="inventario-rne-expiry-group"><h6><strong>Vencen en menos de 60 días</strong></h6>${dangerRows.map((row) => rowHtml(row, 'is-danger')).join('')}</section>` : ''}
+        ${warningRows.length ? `<section class="inventario-rne-expiry-group"><h6><strong>Vencen en menos de 6 meses</strong></h6>${warningRows.map((row) => rowHtml(row, 'is-warning')).join('')}</section>` : ''}
+      </div>`;
+
+    const toggleBtn = recetasRnpaAlert.querySelector('[data-rnpa-alert-toggle]');
+    const details = recetasRnpaAlert.querySelector('[data-rnpa-alert-details]');
+    toggleBtn?.addEventListener('click', () => {
+      if (!details) return;
+      const expanded = toggleBtn.getAttribute('aria-expanded') === 'true';
+      toggleBtn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+      details.hidden = expanded;
+      toggleBtn.classList.toggle('is-open', !expanded);
+    });
+  };
+
   const getRnpaSelectOptions = (list, selected = '', fieldLabel = 'opción') => {
     const chosen = normalizeValue(selected);
     const merged = Array.from(new Set([...(Array.isArray(list) ? list.map((item) => normalizeValue(item)).filter(Boolean) : []), chosen].filter(Boolean))).sort((a, b) => a.localeCompare(b, 'es'));
@@ -365,6 +428,7 @@
       .filter((item) => !query || normalizeLower(item.title).includes(query) || normalizeLower(item.description).includes(query))
       .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
     updateRnpaFilterButtons(baseSource);
+    renderRnpaAlert(baseSource);
 
     const source = baseSource.filter((item) => {
       if (state.rnpaFilter === 'none') return getRecipeRnpaFilterBucket(item) === 'none';
