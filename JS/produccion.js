@@ -1639,12 +1639,16 @@
     return window.__laJamoneraLoadingMermaid;
   };
   const buildTraceMermaidDefinition = (registro) => {
-    const isMobileTrace = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+    const isMobileTrace = Boolean(window.matchMedia && window.matchMedia('(max-width: 768px)').matches);
     const esc = (value) => String(value || '-')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+    const safeNodeId = (value, fallback) => {
+      const base = String(value || fallback || 'X').replace(/[^a-zA-Z0-9_]/g, '_');
+      return /^[a-zA-Z_]/.test(base) ? base : `N_${base}`;
+    };
     const ingredients = Array.isArray(registro?.lots) ? registro.lots : [];
     const totalIngredientsKg = ingredients.reduce((sum, item) => sum + Number(item.requiredQty || item.neededQty || 0), 0);
     const mermaKg = Math.max(0, totalIngredientsKg - Number(registro?.quantityKg || 0));
@@ -1655,43 +1659,37 @@
     const productRnpa = resolveRecipeRnpaFromRegistro(registro);
     const productRnpaNumber = normalizeValue(productRnpa.number || '-');
     const productRnpaLabel = normalizeValue(productRnpa.denomination || productRnpa.brand || productRnpa.businessName || registro?.recipeTitle || '-');
+
     const lines = [
-      `%%{init: {"flowchart": {"curve": "${isMobileTrace ? 'linear' : 'basis'}", "nodeSpacing": ${isMobileTrace ? 38 : 72}, "rankSpacing": ${isMobileTrace ? 58 : 110}} } }%%`,
-      `flowchart ${isMobileTrace ? 'TB' : 'TB'}`,
+      `flowchart ${isMobileTrace ? 'TB' : 'LR'}`,
       `C["<b>${esc(COMPANY_LEGAL_NAME)}</b>"]:::toneCompany`,
+      `CR["<b>RNE EMPRESA</b><br/>${esc(companyRne.number || '-')} "]:::toneRegistry`,
       `P["<b>${esc((registro?.recipeTitle || 'Producto').toUpperCase())}</b>"]:::toneProduct`,
-      `L["<b>LOTE:</b> ${esc(registro?.id || '-')}<br/><b>VTO:</b> ${esc(formatProductExpiryLabel(registro))}"]:::toneLot`,
+      `RNPA["<b>RNPA</b><br/>N° ${esc(productRnpaNumber)}<br/>${esc(productRnpaLabel)}"]:::toneRegistry`,
       `R["<b>PRODUCCIÓN</b> ${Number(registro?.quantityKg || 0).toFixed(2)} KG<br/><b>Fecha:</b> ${esc(formatIsoEs(productionDate))}"]:::toneProduction`,
+      `L["<b>LOTE:</b> ${esc(registro?.id || '-')}<br/><b>VTO:</b> ${esc(formatProductExpiryLabel(registro))}"]:::toneLot`,
       `M["<b>ENCARGADO:</b> ${esc(manager)}"]:::toneManager`,
       `I["<b>INGREDIENTES TOTALES</b> ${totalIngredientsKg.toFixed(3)} KG"]:::toneIngredients`,
       `W["<b>MERMA</b> ${mermaKg.toFixed(3)} KG"]:::toneWaste`,
-      `CR["<b>RNE EMPRESA</b><br/>${esc(companyRne.number || '-')} "]:::toneRegistry`,
-      `RNPA["<b>RNPA</b><br/>N° ${esc(productRnpaNumber)}<br/>${esc(productRnpaLabel)}"]:::toneRegistry`,
-      isMobileTrace ? 'C --> CR' : 'C --> CR',
+      'C --> CR',
       'C --> P',
+      'P -.-> RNPA',
       'P --> R',
       'R --> L',
-      'P -.-> RNPA',
-      'R --> I',
       'R --> M',
+      'R --> I',
       'I --> W'
     ];
+
     if (packaging.agingDays > 0 && packaging.packagingDate) {
       lines.push(`E["<b>ENVASADO</b><br/><b>+${packaging.agingDays} días</b><br/>${esc(formatIsoEs(packaging.packagingDate))}"]:::toneManager`);
       lines.push('R -.-> E');
     }
-    if (!isMobileTrace) {
-      lines.push('subgraph HEAD_ROW[""]');
-      lines.push('direction LR');
-      lines.push('C');
-      lines.push('CR');
-      lines.push('end');
-    }
-    lines.push(`subgraph ING_ROW[""]`);
-    lines.push(`direction ${isMobileTrace ? 'TB' : 'LR'}`);
+
     ingredients.forEach((item, index) => {
       const lot = Array.isArray(item?.lots) && item.lots[0] ? item.lots[0] : {};
-      const nodeId = `ING${index + 1}`;
+      const nodeId = safeNodeId(`ING_${index + 1}_${item?.ingredientId || ''}`, `ING_${index + 1}`);
+      const rneId = `${nodeId}_RNE`;
       const nodeLabel = [
         `<b>${index + 1}. ${(item?.ingredientName || 'Ingrediente').toUpperCase()}</b>`,
         `<b>Usado:</b> ${formatCompactQty(item?.requiredQty ?? item?.neededQty, item?.unit || item?.ingredientUnit || '')}`,
@@ -1701,13 +1699,11 @@
       ].map(esc).join('<br/>');
       const providerRne = resolveProviderRneFromLot(lot);
       lines.push(`${nodeId}["${nodeLabel}"]:::toneIngredient`);
-      lines.push(`${nodeId}RNE["<b>RNE PROVEEDOR</b><br/>${esc(providerRne.number || '-')}"]:::toneRegistry`);
-      lines.push(`${nodeId} -.-> ${nodeId}RNE`);
+      lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${esc(providerRne.number || '-')}"]:::toneRegistry`);
       lines.push(`I --> ${nodeId}`);
+      lines.push(`${nodeId} -.-> ${rneId}`);
     });
-    lines.push('end');
-    if (!isMobileTrace) lines.push('style HEAD_ROW fill:transparent,stroke:transparent;');
-    lines.push('style ING_ROW fill:transparent,stroke:transparent;');
+
     lines.push('linkStyle default stroke:#6e83a7,stroke-width:1.8px;');
     lines.push('classDef toneCompany fill:#2f6ecf,stroke:#1f57ad,color:#ffffff,stroke-width:1.8px;');
     lines.push('classDef toneProduct fill:#3b82f6,stroke:#1f5ec4,color:#ffffff,stroke-width:1.7px;');
@@ -1720,6 +1716,7 @@
     lines.push('classDef toneRegistry fill:#e7efff,stroke:#8eaedf,color:#173d73,stroke-width:1.35px;');
     return lines.join('\n');
   };
+
   const renderTraceabilityFallbackDiagram = (registro) => {
     const ingredients = Array.isArray(registro?.lots) ? registro.lots : [];
     const manager = (Array.isArray(registro?.managers) && registro.managers[0])
