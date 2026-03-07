@@ -153,11 +153,16 @@
     const massMap = {
       kg: 1000, kilo: 1000, kilos: 1000, kilogramo: 1000, kilogramos: 1000,
       g: 1, gr: 1, gramo: 1, gramos: 1,
-      mg: 0.001, miligramo: 0.001, miligramos: 0.001
+      mg: 0.001, miligramo: 0.001, miligramos: 0.001,
+      oz: 28.3495, onza: 28.3495, onzas: 28.3495,
+      cda: 15, cucharada: 15, cucharadas: 15,
+      cdita: 5, cucharadita: 5, cucharaditas: 5,
+      pzc: 0.5, pizca: 0.5, pizcas: 0.5
     };
     const volumeMap = {
       l: 1000, lt: 1000, litro: 1000, litros: 1000,
-      ml: 1, mililitro: 1, mililitros: 1, cc: 1
+      ml: 1, mililitro: 1, mililitros: 1, cc: 1,
+      gota: 0.05, gotas: 0.05, gts: 0.05
     };
     if (massMap[unit]) return { category: 'peso', factor: massMap[unit], label: unit || 'g' };
     if (volumeMap[unit]) return { category: 'volumen', factor: volumeMap[unit], label: unit || 'ml' };
@@ -1505,7 +1510,7 @@
       ${(item.lots || []).map((lot) => `<tr>
         <td>${escapeHtml(lot.entryId || '-')}</td>
         <td>${escapeHtml(lot.entryDate || '-')}</td>
-        <td>${escapeHtml(lot.expiryDate || '-')}</td>
+        <td>${escapeHtml(formatIsoEs(lot.expiryDate) || '-')}</td>
         <td>${Number(lot.takeQty || 0).toFixed(2)}</td>
         <td>${escapeHtml(lot.unit || '')}</td>
         <td>${escapeHtml(lot.provider || '-')}</td>
@@ -2502,7 +2507,7 @@
           <div class="produccion-lote-row tone-${lot.status}">
             <div><strong class="produccion-lote-key">Lote:</strong> <span class="produccion-lote-value">${lot.lotNumber}</span></div>
             <div><strong>Ingreso:</strong> ${lot.entryDate || formatDateTime(lot.createdAt)}</div>
-            <div><strong>Vence:</strong> ${lot.expiryDate || '-'} ${getExpiryBadge(lot.expiryDate)}</div>
+            <div><strong>Vence:</strong> ${formatIsoEs(lot.expiryDate) || '-'} ${getExpiryBadge(lot.expiryDate)}</div>
             <div><strong>Usar:</strong> ${formatCompactQty(lot.takeQty, lot.unit)}</div>
             ${lot.status === 'expired' ? `<div class="produccion-lote-expired-help"><strong>Lote expirado:</strong> no se usará con fecha ${plan.productionDate}. Cambiá la fecha o resolvelo manualmente ${formatValidProductionRange(lot.entryDate, lot.expiryDate)}.</div>` : ''}
             <div><strong class="produccion-provider-key">Proveedor:</strong> ${lot.provider || '-'}</div>
