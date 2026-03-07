@@ -63,11 +63,14 @@
     return true;
   };
 
-  const buildDefinition = (registro) => {
+  const buildDefinition = (registro, config = {}) => {
     const ingredients = Array.isArray(registro?.lots) ? registro.lots : [];
     const totalIngredientsKg = ingredients.reduce((sum, item) => sum + Number(item?.neededQty || item?.requiredQty || 0), 0);
     const mermaKg = Math.max(0, totalIngredientsKg - Number(registro?.quantityKg || 0));
-    const manager = Array.isArray(registro?.managers) && registro.managers[0] ? registro.managers[0] : 'Responsable';
+    const managerToken = Array.isArray(registro?.managers) && registro.managers[0] ? registro.managers[0] : '';
+    const userMap = safeObject(config?.usersMap);
+    const managerUser = safeObject(userMap[managerToken]);
+    const manager = normalize(managerUser.fullName || managerUser.name || managerToken || 'Responsable');
     const companyRne = normalize(registro?.traceability?.company?.rne?.number || '-');
     const productRnpa = normalize(registro?.traceability?.product?.rnpa?.number || '-');
     const lines = [
@@ -95,8 +98,11 @@
       const lot = lots[0] || {};
       const nodeId = `ING_${idx + 1}`;
       const rneId = `ING_${idx + 1}_RNE`;
-      lines.push(`${nodeId}["<b>${idx + 1}. ${escapeHtml((plan?.ingredientName || 'Ingrediente').toUpperCase())}</b><br/><b>Usado:</b> ${escapeHtml(String(Number(plan?.neededQty || plan?.requiredQty || 0).toFixed(3)))} ${escapeHtml(plan?.ingredientUnit || plan?.unit || '')}<br/><b>Lote:</b> ${escapeHtml(lot?.lotNumber || lot?.entryId || '-')}<br/><b>Proveedor:</b> ${escapeHtml(lot?.provider || '-')}<br/><b>VTO lote:</b> ${escapeHtml(formatIsoEs(lot?.expiryDate || ''))}"]:::toneIngredient`);
-      lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${escapeHtml(lot?.providerRne?.number || '-')} "]:::toneRegistry`);
+      const traceIngredient = (Array.isArray(registro?.traceability?.ingredients) ? registro.traceability.ingredients : []).find((row) => normalize(row?.ingredientId) === normalize(plan?.ingredientId));
+      const traceLot = (Array.isArray(traceIngredient?.lots) ? traceIngredient.lots : [])[0] || {};
+      const providerRne = normalize(lot?.providerRne?.number || traceLot?.providerRne?.number || '-');
+      lines.push(`${nodeId}["<b>${idx + 1}. ${escapeHtml((plan?.ingredientName || traceIngredient?.ingredientName || 'Ingrediente').toUpperCase())}</b><br/><b>Usado:</b> ${escapeHtml(String(Number(plan?.neededQty || plan?.requiredQty || 0).toFixed(3)))} ${escapeHtml(plan?.ingredientUnit || plan?.unit || '')}<br/><b>Lote:</b> ${escapeHtml(lot?.lotNumber || traceLot?.lotNumber || lot?.entryId || traceLot?.entryId || '-')}<br/><b>Proveedor:</b> ${escapeHtml(lot?.provider || traceLot?.provider || '-')}<br/><b>VTO lote:</b> ${escapeHtml(formatIsoEs(lot?.expiryDate || traceLot?.expiryDate || ''))}"]:::toneIngredient`);
+      lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${escapeHtml(providerRne || '-')}"]:::toneRegistry`);
       lines.push(`I --> ${nodeId}`);
       lines.push(`${nodeId} -.-> ${rneId}`);
     });
@@ -113,26 +119,98 @@
     return lines.join('\n');
   };
 
+  const ensureLocalImageViewer = () => {
+    if (typeof window.laJamoneraOpenImageViewer === 'function') return window.laJamoneraOpenImageViewer;
+
+    const viewerNodes = {
+      modal: document.getElementById('imageViewerModal'),
+      image: document.getElementById('viewerImage'),
+      spinner: document.getElementById('viewerStageSpinner'),
+      document: document.getElementById('viewerDocument'),
+      prev: document.getElementById('viewerPrevBtn'),
+      next: document.getElementById('viewerNextBtn'),
+      zoomIn: document.getElementById('viewerZoomInBtn'),
+      zoomOut: document.getElementById('viewerZoomOutBtn'),
+      back: document.getElementById('viewerBackBtn')
+    };
+
+    if (!viewerNodes.modal || !window.bootstrap?.Modal) return null;
+
+    const state = { images: [], index: 0, scale: 1 };
+    const modalInstance = window.bootstrap.Modal.getOrCreateInstance(viewerNodes.modal);
+
+    const setScale = (value) => {
+      state.scale = Math.max(1, Math.min(4, value));
+      if (viewerNodes.image) viewerNodes.image.style.transform = `scale(${state.scale})`;
+    };
+
+    const render = () => {
+      const item = state.images[state.index];
+      if (!item || !viewerNodes.image) return;
+      const isPdf = /\.pdf($|\?)/i.test(String(item.src || ''));
+      viewerNodes.document?.classList.toggle('d-none', !isPdf);
+      if (viewerNodes.document) viewerNodes.document.src = isPdf ? item.src : '';
+      viewerNodes.image.classList.toggle('d-none', isPdf);
+      viewerNodes.zoomIn?.classList.toggle('d-none', isPdf);
+      viewerNodes.zoomOut?.classList.toggle('d-none', isPdf);
+      viewerNodes.spinner?.classList.remove('d-none');
+      if (!isPdf) {
+        viewerNodes.image.classList.remove('is-loaded');
+        viewerNodes.image.src = item.src;
+      } else {
+        viewerNodes.spinner?.classList.add('d-none');
+      }
+    };
+
+    viewerNodes.image?.addEventListener('load', () => {
+      viewerNodes.spinner?.classList.add('d-none');
+      viewerNodes.image?.classList.add('is-loaded');
+    });
+    viewerNodes.image?.addEventListener('error', () => viewerNodes.spinner?.classList.add('d-none'));
+
+    viewerNodes.prev?.addEventListener('click', () => {
+      if (!state.images.length) return;
+      state.index = (state.index - 1 + state.images.length) % state.images.length;
+      setScale(1);
+      render();
+    });
+    viewerNodes.next?.addEventListener('click', () => {
+      if (!state.images.length) return;
+      state.index = (state.index + 1) % state.images.length;
+      setScale(1);
+      render();
+    });
+    viewerNodes.zoomIn?.addEventListener('click', () => setScale(state.scale + 0.2));
+    viewerNodes.zoomOut?.addEventListener('click', () => setScale(state.scale - 0.2));
+    viewerNodes.back?.addEventListener('click', () => modalInstance.hide());
+
+    const openAttachmentViewer = async (entries, startIndex = 0, title = 'Adjuntos') => {
+      const images = entries.flatMap((item) => (Array.isArray(item?.invoiceImageUrls) ? item.invoiceImageUrls : [])
+        .map((url) => normalize(url))
+        .filter(Boolean)
+        .map((src) => ({ src })));
+      if (!images.length) return;
+      const titleNode = viewerNodes.modal.querySelector('.ios-modal-title');
+      if (titleNode) titleNode.textContent = title;
+      state.images = images;
+      state.index = Math.min(Math.max(0, startIndex), images.length - 1);
+      setScale(1);
+      render();
+      modalInstance.show();
+    };
+
+    window.laJamoneraOpenImageViewer = openAttachmentViewer;
+    return openAttachmentViewer;
+  };
+
   const openWithMainViewer = async (urls, title) => {
     const cleanUrls = Array.isArray(urls)
       ? urls.map((url) => normalize(url)).filter(Boolean)
       : [];
     if (!cleanUrls.length) return;
-    if (typeof window.laJamoneraOpenImageViewer === 'function') {
-      try {
-        await window.laJamoneraOpenImageViewer([{ invoiceImageUrls: cleanUrls }], 0, title);
-        return;
-      } catch (error) {
-        // fallback local cuando el visor principal no puede abrir en esta página pública
-      }
-    }
-    await Swal.fire({
-      title,
-      html: `<div class="attachments-grid" style="grid-template-columns:1fr;">${cleanUrls.map((url) => `<article class="attachment-card" style="aspect-ratio:auto;"><img src="${escapeHtml(url)}" class="attachment-image is-loaded" style="opacity:1;max-height:72vh;object-fit:contain;" alt="Adjunto"></article>`).join('')}</div>`,
-      width: '92vw',
-      confirmButtonText: 'Cerrar',
-      customClass: { popup: 'ios-alert ingredientes-alert', confirmButton: 'ios-btn ios-btn-secondary' }
-    });
+    const viewer = ensureLocalImageViewer();
+    if (typeof viewer !== 'function') return;
+    await viewer([{ invoiceImageUrls: cleanUrls }], 0, title);
   };
 
   const initMermaidZoom = (container) => {
@@ -141,16 +219,20 @@
     let scale = 1;
     let tx = 0;
     let ty = 0;
+    container.style.touchAction = 'none';
+
     const apply = () => {
       svg.style.transformOrigin = '0 0';
       svg.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
     };
+
     container.addEventListener('wheel', (event) => {
       event.preventDefault();
       const delta = event.deltaY < 0 ? 0.12 : -0.12;
       scale = Math.max(0.65, Math.min(2.5, scale + delta));
       apply();
     }, { passive: false });
+
     let dragging = false;
     let sx = 0;
     let sy = 0;
@@ -168,8 +250,45 @@
     });
     container.addEventListener('pointerup', () => { dragging = false; });
     container.addEventListener('pointercancel', () => { dragging = false; });
+
+    const distance = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    let pinchStartDistance = 0;
+    let pinchStartScale = 1;
+    let pinchStartTx = 0;
+    let pinchStartTy = 0;
+    let pinchMidStart = { x: 0, y: 0 };
+
+    container.addEventListener('touchstart', (event) => {
+      if (event.touches.length === 2) {
+        const [t1, t2] = event.touches;
+        pinchStartDistance = distance(t1, t2);
+        pinchStartScale = scale;
+        pinchStartTx = tx;
+        pinchStartTy = ty;
+        pinchMidStart = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+      }
+    }, { passive: false });
+
+    container.addEventListener('touchmove', (event) => {
+      if (event.touches.length !== 2) return;
+      event.preventDefault();
+      const [t1, t2] = event.touches;
+      const mid = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+      const nextDistance = distance(t1, t2);
+      if (!pinchStartDistance) return;
+      scale = Math.max(0.65, Math.min(2.5, pinchStartScale * (nextDistance / pinchStartDistance)));
+      tx = pinchStartTx + (mid.x - pinchMidStart.x);
+      ty = pinchStartTy + (mid.y - pinchMidStart.y);
+      apply();
+    }, { passive: false });
+
+    container.addEventListener('touchend', () => {
+      pinchStartDistance = 0;
+    });
+
     apply();
   };
+
 
   const renderPublicTrace = async (registro, config) => {
     const companyRne = normalize(registro?.traceability?.company?.rne?.number || '-');
@@ -197,8 +316,8 @@
         </div>
         <div class="public-trace-planilla-row"><button id="publicOpenPlanillaBtn" type="button" class="btn ios-btn ios-btn-primary public-open-planilla-btn"><i class="fa-regular fa-file-lines"></i><span>Ver planilla</span></button></div>
       </article>
-      <div class="produccion-trace-mermaid-wrap"><div class="produccion-trace-mermaid" data-public-mermaid><div class="produccion-trace-mermaid-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"><p>Renderizando diagrama...</p></div></div></div>
-      <div class="produccion-trace-ingredients">
+      <div class="produccion-trace-mermaid-wrap"><div class="produccion-trace-mermaid" data-public-mermaid><div class="produccion-trace-mermaid-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"><p>Renderizando diagrama...</p></div><button type="button" class="produccion-trace-mermaid-overlay" data-public-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button></div></div>
+      <p class="produccion-trace-swipe-hint"><i class="fa-solid fa-arrows-left-right"></i> Deslizá para ver más ingredientes</p><div class="produccion-trace-ingredients public-trace-ingredients-scroll">
         ${ingredients.map((item, idx) => {
           const lots = Array.isArray(item?.lots) ? item.lots : [];
           const traceIngredient = traceIngredients.find((row) => normalize(row?.ingredientId) === normalize(item?.ingredientId));
@@ -216,7 +335,7 @@
     </section>`;
 
     dataNode.querySelector('#publicOpenPlanillaBtn')?.addEventListener('click', async () => {
-      await window.laJamoneraPlanillaProduccion?.openByRegistro?.(registro, { usersMap: safeObject(config?.usersMap) });
+      await window.laJamoneraPlanillaProduccion?.openByRegistro?.(registro, { usersMap: safeObject(config?.usersMap), forceModalOnMobile: true });
     });
     dataNode.querySelector('#publicCompanyRneAttachmentBtn')?.addEventListener('click', async () => openWithMainViewer([companyRneAttachment], 'Adjunto RNE empresa'));
     dataNode.querySelector('#publicRnpaAttachmentBtn')?.addEventListener('click', async () => openWithMainViewer([rnpaAttachment], 'Adjunto RNPA'));
@@ -237,9 +356,14 @@
       const hasMermaid = await ensureMermaid();
       if (hasMermaid) {
         try {
-          const rendered = await window.mermaid.render(`public_trace_${Date.now()}`, buildDefinition(registro));
-          mermaidHost.innerHTML = rendered.svg;
-          initMermaidZoom(mermaidHost);
+          const rendered = await window.mermaid.render(`public_trace_${Date.now()}`, buildDefinition(registro, config));
+          mermaidHost.innerHTML = `${rendered.svg}<button type="button" class="produccion-trace-mermaid-overlay is-ready" data-public-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button>`;
+          const overlay = mermaidHost.querySelector('[data-public-mermaid-overlay]');
+          const activate = () => {
+            overlay?.classList.add('d-none');
+            initMermaidZoom(mermaidHost);
+          };
+          overlay?.addEventListener('click', activate, { once: true });
         } catch (error) {
           mermaidHost.innerHTML = '<p class="m-0">No se pudo renderizar el diagrama.</p>';
         }

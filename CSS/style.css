@@ -4977,6 +4977,11 @@ html.login-protected.auth-ok body {
     width: 100%;
   }
 
+  .inventario-period-actions-scroll {
+    width: 100%;
+    max-width: 100%;
+  }
+
   .inventario-collapse-head-styled {
     flex-direction: column;
     align-items: flex-start;
@@ -5015,6 +5020,7 @@ html.login-protected.auth-ok body {
   #produccionGlobalExcelBtn,
   #inventarioGlobalPrintBtn,
   #produccionGlobalPrintBtn,
+  #produccionGlobalMassPlanillasBtn,
   .inventario-period-divider {
     grid-row: auto;
   }
@@ -7748,5 +7754,167 @@ html.login-protected.auth-ok body {
 
   .planilla-qr-note {
     font-size: 13px !important;
+  }
+}
+
+/* =========================================
+   PLANILLA - PROGRESO Y VISOR PUBLICO
+========================================= */
+.planilla-progress-wrap {
+  display: grid;
+  gap: 8px;
+}
+
+.planilla-progress-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: #e4e8f5;
+  overflow: hidden;
+}
+
+.planilla-progress-bar span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2f6ecf 0%, #6c85dd 55%, #9a8cf0 100%);
+  transition: width 0.2s ease;
+}
+
+.planilla-progress-text {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #415780;
+  text-align: center;
+}
+
+.public-viewer-wrap {
+  display: grid;
+  gap: 8px;
+}
+
+.public-viewer-stage {
+  min-height: min(72vh, 640px);
+  border: 1px solid #d8def0;
+  border-radius: 14px;
+  background: #f8f9fd;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.public-viewer-image,
+.public-viewer-doc {
+  width: 100%;
+  height: min(72vh, 640px);
+  border: 0;
+  object-fit: contain;
+  background: #ffffff;
+}
+
+.public-viewer-footer {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+/* =========================================
+   TRAZABILIDAD PUBLICA
+========================================= */
+.public-trace-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.public-trace-header-logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.public-trace-header-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #1f3158;
+}
+
+.public-trace-footer {
+  width: min(1200px, calc(100% - 32px));
+  margin: 0 auto 16px;
+  padding: 12px;
+  border: 1px solid #dbe4f8;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.public-trace-footer p {
+  margin: 0;
+  color: #5b6e95;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.public-trace-footer p + p {
+  margin-top: 6px;
+}
+
+.produccion-trace-swipe-hint {
+  margin: 0 0 8px;
+  color: #5f729b;
+  font-size: 0.84rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.public-trace-ingredients-scroll {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(280px, 340px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-height: none;
+  padding-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.public-trace-ingredients-scroll .produccion-trace-ingredient-card {
+  min-height: 100%;
+}
+
+.produccion-trace-mermaid {
+  position: relative;
+}
+
+.produccion-trace-mermaid-overlay {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(245, 248, 255, 0.92);
+  color: #2e4d8f;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  text-align: center;
+  font-weight: 700;
+  z-index: 5;
+}
+
+.produccion-trace-mermaid-overlay i {
+  font-size: 1.3rem;
+}
+
+@media (max-width: 768px) {
+  .public-trace-ingredients-scroll {
+    grid-auto-columns: minmax(250px, 86vw);
+  }
+
+  .public-trace-footer {
+    width: calc(100% - 20px);
   }
 }
