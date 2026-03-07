@@ -49,12 +49,12 @@
 
   const resolveManagerNames = (registro, usersMap = {}) => {
     const tokens = Array.isArray(registro?.managers) ? registro.managers : [];
-    if (!tokens.length) return '-';
+    if (!tokens.length) return 'SIN RESPONSABLE';
     const users = safeObject(usersMap);
     const labels = tokens.map((token) => {
       const user = safeObject(users[token]);
       const full = normalizeValue(user.fullName || user.name || token);
-      const role = normalizeValue(user.role || user.position || 'Responsable');
+      const role = normalizeValue(user.role || user.position || 'RESPONSABLE');
       return `${full} (${role})`;
     });
     return labels.join(', ');
@@ -62,25 +62,25 @@
 
   const resolveIngredientRows = (registro) => {
     const plans = Array.isArray(registro?.lots) ? registro.lots : [];
+    const traceIngredients = Array.isArray(registro?.traceability?.ingredients) ? registro.traceability.ingredients : [];
     return plans.map((plan) => {
       const lot = Array.isArray(plan?.lots) && plan.lots[0] ? plan.lots[0] : {};
-      const providerRne = safeObject(lot?.providerRne);
-      const traceIngredient = (Array.isArray(registro?.traceability?.ingredients) ? registro.traceability.ingredients : [])
-        .find((row) => normalizeValue(row?.ingredientId) === normalizeValue(plan?.ingredientId));
+      const traceIngredient = traceIngredients.find((row) => normalizeValue(row?.ingredientId) === normalizeValue(plan?.ingredientId));
+      const traceLot = Array.isArray(traceIngredient?.lots) && traceIngredient.lots[0] ? traceIngredient.lots[0] : {};
+      const providerRne = normalizeValue(lot?.providerRne?.number || traceLot?.providerRne?.number || '-');
       return {
-        ingredientName: plan?.ingredientName || traceIngredient?.ingredientName || 'Ingrediente',
+        ingredientName: plan?.ingredientName || traceIngredient?.ingredientName || 'INGREDIENTE',
         ingredientImage: normalizeValue(plan?.ingredientImageUrl || traceIngredient?.ingredientImageUrl),
-        provider: lot?.provider || '-',
-        lotNumber: lot?.lotNumber || lot?.entryId || '-',
-        expiryDate: lot?.expiryDate || '-',
-        rne: providerRne?.number || '-',
+        provider: lot?.provider || traceLot?.provider || '-',
+        lotNumber: lot?.lotNumber || lot?.entryId || traceLot?.lotNumber || traceLot?.entryId || '-',
+        expiryDate: lot?.expiryDate || traceLot?.expiryDate || '-',
+        rne: providerRne,
         qty: formatQty(plan?.neededQty ?? plan?.requiredQty, plan?.ingredientUnit || plan?.unit || '')
       };
     });
   };
 
   const buildPlanillaHtml = (registro, context = {}) => {
-    const companyLogo = normalizeValue(context.companyLogoUrl);
     const productImage = normalizeValue(registro?.traceability?.product?.imageUrl);
     const rnpa = safeObject(registro?.traceability?.product?.rnpa);
     const ingredientRows = resolveIngredientRows(registro);
@@ -90,26 +90,27 @@
       return acc + (Number.isFinite(numeric) ? numeric : 0);
     }, 0);
     const merma = Math.max(0, totalIngredients - Number(registro?.quantityKg || 0));
+    const observations = normalizeValue(registro?.observations) || 'SIN OBSERVACIONES';
 
-    return `<div class="planilla-card" id="planillaProduccionPrintable">
+    return `<div class="planilla-card planilla-print-a4" id="planillaProduccionPrintable">
       <header class="planilla-card-header">
         <h2>REGISTRO DE PROTOCOLO DE PRODUCCIÓN</h2>
         <p>FRIGORIFICO • LA JAMONERA S.A.</p>
       </header>
 
       <section class="planilla-summary-grid">
-        <div class="planilla-summary-item"><strong>Periodo de elaboración</strong><span>${escapeHtml(formatIsoEs(registro?.productionDate || ''))}</span></div>
+        <div class="planilla-summary-item"><strong>PERIODO DE ELABORACIÓN</strong><span>${escapeHtml(formatIsoEs(registro?.productionDate || ''))}</span></div>
         <div class="planilla-summary-item"><strong>RNE</strong><span>${escapeHtml(registro?.traceability?.company?.rne?.number || '-')}</span></div>
-        <div class="planilla-summary-item"><strong>Fecha elaboración</strong><span>${escapeHtml(formatIsoEs(registro?.productionDate || ''))}</span></div>
-        <div class="planilla-summary-item"><strong>Fecha envasado</strong><span>${escapeHtml(formatIsoEs(registro?.packagingDate || ''))}</span></div>
-        <div class="planilla-summary-item"><strong>Producto</strong><span>${escapeHtml(registro?.recipeTitle || '-')}</span></div>
-        <div class="planilla-summary-item"><strong>N° lote asignado</strong><span>${escapeHtml(registro?.id || '-')}</span></div>
-        <div class="planilla-summary-item"><strong>Fecha vencimiento</strong><span>${escapeHtml(formatIsoEs(registro?.productExpiryDate || ''))}</span></div>
-        <div class="planilla-summary-item"><strong>RNPA producto</strong><span>${escapeHtml(rnpa.number || '-')}</span></div>
+        <div class="planilla-summary-item"><strong>FECHA ELABORACIÓN</strong><span>${escapeHtml(formatIsoEs(registro?.productionDate || ''))}</span></div>
+        <div class="planilla-summary-item"><strong>FECHA ENVASADO</strong><span>${escapeHtml(formatIsoEs(registro?.packagingDate || ''))}</span></div>
+        <div class="planilla-summary-item"><strong>PRODUCTO</strong><span>${escapeHtml(registro?.recipeTitle || '-')}</span></div>
+        <div class="planilla-summary-item"><strong>N° LOTE</strong><span>${escapeHtml(registro?.id || '-')}</span></div>
+        <div class="planilla-summary-item"><strong>VENCIMIENTO</strong><span>${escapeHtml(formatIsoEs(registro?.productExpiryDate || ''))}</span></div>
+        <div class="planilla-summary-item"><strong>RNPA PRODUCTO</strong><span>${escapeHtml(rnpa.number || '-')}</span></div>
       </section>
 
       <section class="planilla-product-hero">
-        <span class="planilla-avatar planilla-avatar-lg">${productImage ? `<img src="${escapeHtml(productImage)}" alt="Producto">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span>
+        <span class="planilla-avatar planilla-avatar-lg">${productImage ? `<img src="${escapeHtml(productImage)}" alt="PRODUCTO">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span>
         <div>
           <h3>${escapeHtml(registro?.recipeTitle || '-')}</h3>
           <p>${escapeHtml(registro?.id || '-')} • ${escapeHtml(formatDateTime(registro?.createdAt))}</p>
@@ -120,43 +121,26 @@
         <h3>FÓRMULA</h3>
         <div class="planilla-table-scroll">
           <table class="planilla-table">
-            <thead>
-              <tr><th>Materia prima</th><th>Proveedor</th><th>Lote</th><th>Vencimiento</th><th>RNE</th><th>Cantidad</th></tr>
-            </thead>
+            <thead><tr><th>MATERIA PRIMA</th><th>PROVEEDOR</th><th>LOTE</th><th>VENCIMIENTO</th><th>RNE</th><th>CANTIDAD</th></tr></thead>
             <tbody>
-              ${ingredientRows.map((row) => `<tr>
-                <td>
-                  <div class="planilla-ingredient-main">
-                    <span class="planilla-avatar">${row.ingredientImage ? `<img src="${escapeHtml(row.ingredientImage)}" alt="${escapeHtml(row.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span>
-                    <strong>${escapeHtml(row.ingredientName)}</strong>
-                  </div>
-                </td>
-                <td>${escapeHtml(row.provider)}</td>
-                <td>${escapeHtml(row.lotNumber)}</td>
-                <td>${escapeHtml(formatIsoEs(row.expiryDate))}</td>
-                <td>${escapeHtml(row.rne)}</td>
-                <td>${escapeHtml(row.qty)}</td>
-              </tr>`).join('') || '<tr><td colspan="6">Sin ingredientes cargados.</td></tr>'}
+              ${ingredientRows.map((row) => `<tr><td><div class="planilla-ingredient-main"><span class="planilla-avatar">${row.ingredientImage ? `<img src="${escapeHtml(row.ingredientImage)}" alt="${escapeHtml(row.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><strong>${escapeHtml(row.ingredientName)}</strong></div></td><td>${escapeHtml(row.provider)}</td><td>${escapeHtml(row.lotNumber)}</td><td>${escapeHtml(formatIsoEs(row.expiryDate))}</td><td>${escapeHtml(row.rne)}</td><td>${escapeHtml(row.qty)}</td></tr>`).join('') || '<tr><td colspan="6">SIN INGREDIENTES CARGADOS.</td></tr>'}
             </tbody>
           </table>
         </div>
       </section>
 
       <section class="planilla-kpis-grid">
-        <p><strong>Cantidad total obtenida:</strong> ${Number(registro?.quantityKg || 0).toFixed(2)} kg</p>
-        <p><strong>Merma:</strong> ${merma.toFixed(3)} kg</p>
-        <p><strong>Responsable:</strong> ${escapeHtml(managerLabel)}</p>
-        <p><strong>Observaciones:</strong> ${escapeHtml(registro?.observations || '-')}</p>
+        <p><strong>CANTIDAD TOTAL OBTENIDA:</strong> ${Number(registro?.quantityKg || 0).toFixed(2)} KG</p>
+        <p><strong>MERMA:</strong> ${merma.toFixed(3)} KG</p>
+        <p><strong>RESPONSABLE:</strong> ${escapeHtml(managerLabel)}</p>
+        <p><strong>OBSERVACIONES:</strong> ${escapeHtml(observations)}</p>
       </section>
 
-      <section class="planilla-signature">FIRMA Y ACLARACIÓN RESPONSABLE</section>
-
-      <section class="planilla-footer-grid">
+      <section class="planilla-footer-grid planilla-footer-grid-single">
         <article class="planilla-qr-card">
           <div id="planillaQrTarget"></div>
-          <p>Escaneá el <strong>QR con tu celular</strong> para acceder a la trazabilidad completa del producto.</p>
+          <p class="planilla-qr-note">ESCANEÁ EL QR CON TU CELULAR PARA ACCEDER A LA TRAZABILIDAD COMPLETA DEL PRODUCTO.</p>
         </article>
-        <article class="planilla-logo-card">${companyLogo ? `<img src="${escapeHtml(companyLogo)}" alt="Logo empresa">` : '<span>LOGO EMPRESA</span>'}</article>
       </section>
     </div>`;
   };
@@ -171,11 +155,11 @@
   };
 
   const printPlanilla = async (root) => {
-    const win = window.open('', '_blank', 'width=1366,height=900');
+    const win = window.open('', '_blank', 'width=1240,height=900');
     if (!win) return;
-    win.document.write(`<html><head><title>Planilla de producción</title><link rel="stylesheet" href="./CSS/style.css"></head><body style="padding:16px;background:#f3f6fc;">${root.outerHTML}</body></html>`);
+    win.document.write(`<html><head><title>Planilla de producción</title><link rel="stylesheet" href="./CSS/style.css"></head><body style="padding:8px;background:#ffffff;">${root.outerHTML}</body></html>`);
     win.document.close();
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await new Promise((resolve) => setTimeout(resolve, 220));
     const images = [...win.document.querySelectorAll('img')];
     await Promise.all(images.map((img) => (img.complete ? Promise.resolve() : new Promise((resolve) => {
       img.addEventListener('load', resolve, { once: true });
@@ -196,7 +180,7 @@
     const ratio = Math.min(pageWidth / canvas.width, pageHeight / canvas.height);
     const w = canvas.width * ratio;
     const h = canvas.height * ratio;
-    pdf.addImage(img, 'PNG', (pageWidth - w) / 2, 6, w, h);
+    pdf.addImage(img, 'PNG', (pageWidth - w) / 2, 4, w, h);
     pdf.save(`planilla_${normalizeValue(id) || Date.now()}.pdf`);
   };
 
@@ -216,7 +200,7 @@
 
     await Swal.fire({
       title: `Planilla ${escapeHtml(registro.id || '')}`,
-      html: `<div class="planilla-toolbar"><button type="button" class="btn ios-btn ios-btn-secondary" id="planillaPrintBtn"><i class="fa-solid fa-print"></i><span>Imprimir</span></button><button type="button" class="btn ios-btn ios-btn-primary" id="planillaPdfBtn"><i class="fa-solid fa-file-pdf"></i><span>Descargar PDF</span></button></div>${html}`,
+      html: `<div class="planilla-toolbar"><button type="button" class="btn ios-btn ios-btn-secondary" id="planillaPrintBtn"><i class="fa-solid fa-print"></i><span>IMPRIMIR</span></button><button type="button" class="btn ios-btn ios-btn-primary" id="planillaPdfBtn"><i class="fa-solid fa-file-pdf"></i><span>DESCARGAR PDF</span></button></div>${html}`,
       width: '96vw',
       confirmButtonText: 'Cerrar',
       customClass: { popup: 'produccion-trace-alert', confirmButton: 'ios-btn ios-btn-secondary' },
@@ -225,13 +209,7 @@
         const qrTarget = popup.querySelector('#planillaQrTarget');
         if (qrTarget && window.QRCode) {
           // eslint-disable-next-line no-new
-          new window.QRCode(qrTarget, {
-            text: getTraceUrl(registro),
-            width: 156,
-            height: 156,
-            colorDark: '#1f2a44',
-            colorLight: '#ffffff'
-          });
+          new window.QRCode(qrTarget, { text: getTraceUrl(registro), width: 170, height: 170, colorDark: '#111827', colorLight: '#ffffff' });
         }
         if (printable) {
           await waitImages(printable);

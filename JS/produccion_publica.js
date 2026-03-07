@@ -111,12 +111,24 @@
     return lines.join('\n');
   };
 
+  const isImageUrl = (url) => /\.(png|jpe?g|webp|gif|bmp|svg)(\?|$)/i.test(normalize(url));
+  const isPdfUrl = (url) => /\.pdf(\?|$)/i.test(normalize(url));
+
   const openAttachments = async (urls, title) => {
     if (!Array.isArray(urls) || !urls.length) return;
+    const blocks = urls.map((url) => {
+      if (isPdfUrl(url)) {
+        return `<article class="attachment-card attachment-doc" style="aspect-ratio:auto;height:72vh;"><iframe src="${escapeHtml(url)}" class="viewer-document" title="PDF"></iframe></article>`;
+      }
+      if (isImageUrl(url)) {
+        return `<article class="attachment-card" style="aspect-ratio:auto;"><img src="${escapeHtml(url)}" class="attachment-image is-loaded" style="opacity:1;max-height:72vh;object-fit:contain;" alt="Adjunto"></article>`;
+      }
+      return `<article class="attachment-card attachment-doc" style="aspect-ratio:auto;"><a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-up-right-from-square"></i><span>Abrir adjunto</span></a></article>`;
+    }).join('');
     await Swal.fire({
       title,
-      html: `<div class="attachments-grid">${urls.map((url) => `<img src="${escapeHtml(url)}" class="attachment-image is-loaded" style="opacity:1;" alt="Adjunto">`).join('')}</div>`,
-      width: '90vw',
+      html: `<div class="attachments-grid" style="grid-template-columns:1fr;">${blocks}</div>`,
+      width: '92vw',
       confirmButtonText: 'Cerrar',
       customClass: { popup: 'ios-alert ingredientes-alert', confirmButton: 'ios-btn ios-btn-secondary' }
     });
