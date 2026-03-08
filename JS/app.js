@@ -4,6 +4,14 @@
   const logoutButtons = document.querySelectorAll('.js-logout');
   const yearNode = document.getElementById('currentYear');
   const footerCountdown = document.getElementById('sessionCountdown');
+  const homeActionButtons = document.querySelectorAll('.home-actions-scroll .home-action-btn');
+
+  const setHomeActionsDisabled = (disabled) => {
+    homeActionButtons.forEach((button) => {
+      button.disabled = Boolean(disabled);
+      button.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+    });
+  };
 
   const readSession = () => {
     const raw = localStorage.getItem(SESSION_KEY);
@@ -47,6 +55,11 @@
 
   updateSessionCountdown();
   setInterval(updateSessionCountdown, 1000);
+
+  setHomeActionsDisabled(true);
+  Promise.resolve(window.laJamoneraReady)
+    .catch(() => null)
+    .finally(() => setHomeActionsDisabled(false));
 
   const closeSession = async () => {
     const result = await Swal.fire({

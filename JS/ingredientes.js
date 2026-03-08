@@ -186,12 +186,21 @@
   const getFamiliasArray = () => Object.values(safeObject(state.ingredientes.familias));
   const getIngredientesArray = () => Object.values(safeObject(state.ingredientes.items));
 
-  const familyAvatar = (url, alt) => url
-    ? `<span class="family-circle-thumb"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-family-thumb" src="${url}" alt="${alt}" loading="lazy"></span>`
-    : `<span class="family-circle-thumb family-circle-thumb-placeholder">${PLACEHOLDER_ICON}</span>`;
+  const familyAvatar = (url, alt, itemCount = 0) => {
+    const countBadge = Number(itemCount) > 0 ? `<span class="family-circle-count">${Math.min(99, Number(itemCount))}</span>` : '';
+    return url
+      ? `<span class="family-circle-thumb"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-family-thumb" src="${url}" alt="${alt}" loading="lazy">${countBadge}</span>`
+      : `<span class="family-circle-thumb family-circle-thumb-placeholder">${PLACEHOLDER_ICON}${countBadge}</span>`;
+  };
 
   const renderFamilies = () => {
     const families = getFamiliasArray().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    const ingredientCounts = getIngredientesArray().reduce((acc, item) => {
+      const familyId = normalizeValue(item?.familyId);
+      if (!familyId) return acc;
+      acc[familyId] = Number(acc[familyId] || 0) + 1;
+      return acc;
+    }, {});
 
     const allButton = `
       <div class="family-circle-wrap">
@@ -205,7 +214,7 @@
     const familyButtons = families.map((family) => `
       <div class="family-circle-wrap">
         <button type="button" class="family-circle-item ${state.activeFamilyId === family.id ? 'is-active' : ''}" data-family-filter="${family.id}">
-          ${familyAvatar(family.imageUrl, capitalizeLabel(family.name))}
+          ${familyAvatar(family.imageUrl, capitalizeLabel(family.name), ingredientCounts[family.id] || 0)}
           <span class="family-circle-name">${capitalizeLabel(family.name)}</span>
         </button>
         <div class="family-circle-actions">
