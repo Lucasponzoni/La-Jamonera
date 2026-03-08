@@ -120,9 +120,8 @@ html.login-protected.auth-ok body {
 .barra-vertical {
   display: inline-block;
   width: 1px;
-  height: 16px;
-  background: #d2d7e6;
-  margin: 0 6px;
+  background: #c2c5ce;
+  margin: 0 3px;
   vertical-align: middle;
 }
 
@@ -255,6 +254,10 @@ html.login-protected.auth-ok body {
 
 .icon-gray {
   color: #8e97ad;
+}
+
+.icon-blue {
+  color: #4b78e8;
 }
 
 /* =========================================
