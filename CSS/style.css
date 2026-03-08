@@ -8201,3 +8201,38 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
     width: calc(100% - 20px);
   }
 }
+
+/* =========================================
+   INVENTARIO · AJUSTES UX 2026
+========================================= */
+.inventario-status-divider {
+  align-self: center;
+  height: 24px;
+}
+
+.inventario-provider-search,
+.inventario-weekly-search {
+  max-width: none;
+  margin-bottom: 10px;
+}
+
+.inventario-bulk-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.inventario-bulk-row {
+  border: 1px solid #dbe0ef;
+  border-radius: 14px;
+  background: #fdfdff;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.inventario-bulk-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
