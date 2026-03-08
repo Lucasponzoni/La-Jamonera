@@ -759,9 +759,28 @@
   };
 
   const loadData = async () => {
-    await window.laJamoneraReady;
-    const ing = await window.laJamoneraIngredientesAPI?.getIngredientesSnapshot?.();
-    const inv = safeObject(await window.dbLaJamoneraRest.read('/inventario'));
+    try {
+      await window.laJamoneraReady;
+    } catch (error) {
+      console.error('[Inventario] Firebase no estuvo disponible al cargar.', error);
+    }
+    let ing = {};
+    let inv = {};
+
+    try {
+      ing = await window.laJamoneraIngredientesAPI?.getIngredientesSnapshot?.() || {};
+    } catch (error) {
+      console.error('[Inventario] No se pudo leer snapshot de ingredientes.', error);
+      ing = {};
+    }
+
+    try {
+      inv = safeObject(await window.dbLaJamoneraRest.read('/inventario'));
+    } catch (error) {
+      console.error('[Inventario] No se pudo leer /inventario desde Firebase.', error);
+      inv = {};
+    }
+
     state.ingredientes = safeObject(ing?.items);
     state.familias = safeObject(ing?.familias);
     state.measures = Array.isArray(ing?.measures) ? ing.measures : [];
