@@ -4563,10 +4563,6 @@ html.login-protected.auth-ok body {
   min-width: 120px;
 }
 
-.swal2-popup.inventario-edit-entry-alert .swal2-html-container {
-  padding: 0 !important;
-}
-
 .swal2-popup.inventario-edit-entry-alert .swal2-input,
 .swal2-popup.inventario-edit-entry-alert .swal2-select,
 .swal2-popup.inventario-edit-entry-alert .swal2-file {

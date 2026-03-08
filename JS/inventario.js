@@ -484,19 +484,28 @@
 
   const formatQtyUnit = (qty, unit, digits = 2) => `${Number(qty || 0).toFixed(digits)} ${getMeasureAbbr(unit)}`;
 
-  const openIosSwal = (options) => Swal.fire({
-    ...options,
-    returnFocus: false,
-    customClass: {
-      popup: `ios-alert ingredientes-alert ${options?.customClass?.popup || ''}`.trim(),
-      title: 'ios-alert-title',
-      htmlContainer: 'ios-alert-text',
-      confirmButton: 'ios-btn ios-btn-primary',
-      cancelButton: 'ios-btn ios-btn-secondary',
-      ...options.customClass
-    },
-    buttonsStyling: false
-  });
+  const openIosSwal = (options) => {
+    const incomingCustomClass = safeObject(options?.customClass);
+    const joinClass = (base, extra) => [base, extra].filter(Boolean).join(' ').trim();
+    const reservedKeys = new Set(['popup', 'title', 'htmlContainer', 'confirmButton', 'cancelButton']);
+    const passthroughCustomClass = Object.fromEntries(
+      Object.entries(incomingCustomClass).filter(([key]) => !reservedKeys.has(key))
+    );
+
+    return Swal.fire({
+      ...options,
+      returnFocus: false,
+      customClass: {
+        ...passthroughCustomClass,
+        popup: joinClass('ios-alert ingredientes-alert', incomingCustomClass.popup),
+        title: joinClass('ios-alert-title', incomingCustomClass.title),
+        htmlContainer: joinClass('ios-alert-text', incomingCustomClass.htmlContainer),
+        confirmButton: joinClass('ios-btn ios-btn-primary', incomingCustomClass.confirmButton),
+        cancelButton: joinClass('ios-btn ios-btn-secondary', incomingCustomClass.cancelButton)
+      },
+      buttonsStyling: false
+    });
+  };
 
   const setStateView = (view) => {
     state.view = view;
