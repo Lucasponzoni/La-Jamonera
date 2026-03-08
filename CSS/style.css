@@ -120,9 +120,8 @@ html.login-protected.auth-ok body {
 .barra-vertical {
   display: inline-block;
   width: 1px;
-  height: 16px;
-  background: #d2d7e6;
-  margin: 0 6px;
+  background: #c2c5ce;
+  margin: 0 3px;
   vertical-align: middle;
 }
 
@@ -255,6 +254,10 @@ html.login-protected.auth-ok body {
 
 .icon-gray {
   color: #8e97ad;
+}
+
+.icon-blue {
+  color: #4b78e8;
 }
 
 /* =========================================
@@ -2935,6 +2938,7 @@ html.login-protected.auth-ok body {
   border: 1px solid #cfdcf8;
   border-radius: 14px 14px 0 0;
   overflow: hidden;
+  margin-top: 10px;
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
 
@@ -8239,75 +8243,3 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 
 /* =========================================
    USUARIOS / AJUSTES INVENTARIO-PRODUCCION
-========================================= */
-.icon-blue {
-  color: #2f7df6;
-}
-
-.home-actions-divider,
-.produccion-actions-divider {
-  align-self: center;
-  height: 22px;
-}
-
-.inventario-filter-separator {
-  border: 0;
-  border-top: 1px solid #d4def4;
-  margin: 10px 0 8px;
-}
-
-.inventario-filter-helper {
-  margin: 0 0 12px;
-  font-size: 0.85rem;
-  color: #5f6f95;
-  font-weight: 600;
-  text-align: center;
-}
-
-.inventario-bulk-row-extras {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 0;
-  align-items: center;
-}
-
-.inventario-bulk-row-extras .inventario-check-row {
-  margin: 0;
-}
-
-.inventario-bulk-unit-cell {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.inventario-bulk-secondary-row td {
-  background: #f8faff;
-  border-top: 0;
-  padding-top: 2px;
-  padding-bottom: 8px;
-}
-
-.inventario-bulk-main-row + .inventario-bulk-secondary-row .inventario-bulk-row-extras {
-  padding-left: 2px;
-}
-
-.inventario-outside-match-btn {
-  width: 100%;
-  justify-content: flex-start;
-  margin-bottom: 6px;
-}
-
-.inventario-provider-editor-avatar img,
-.inventario-provider-editor-avatar .thumb-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.produccion-users-btn {
-  background: #e9f1ff;
-  color: #2a60c0;
-  border: 1px solid #cfdcff;
-}
