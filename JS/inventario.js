@@ -52,6 +52,7 @@
     globalExpandBtn: $('inventarioGlobalExpandBtn'),
     globalLoading: $('inventarioGlobalLoading'),
     globalPrintBtn: $('inventarioGlobalPrintBtn'),
+    globalSheetBtn: $('inventarioGlobalSheetBtn'),
     globalExcelBtn: $('inventarioGlobalExcelBtn'),
     globalTableWrap: $('inventarioGlobalTableWrap'),
     imageViewerModal: $('imageViewerModal'),
@@ -162,6 +163,9 @@
     return Math.round((new Date(`${normalized}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86400000);
   };
 
+  const isEntryNoPerecedero = (entry) => Boolean(entry?.noPerecedero);
+  const isEntryUsoInterno = (entry) => Boolean(entry?.usoInternoEmpresa);
+
   const getExpiryBadgeTone = (days) => {
     if (!Number.isFinite(days)) return '';
     if (days <= 2) return 'is-danger';
@@ -172,6 +176,7 @@
   const getExpiryBadgeHtml = (entry) => {
     const available = getAvailableQty(entry);
     if (!Number.isFinite(available) || available <= 0) return '';
+    if (isEntryNoPerecedero(entry)) return '<span class="inventario-expiry-days-badge is-neutral">No perecedero</span>';
     const days = getDaysUntilIso(entry?.expiryDate);
     if (!Number.isFinite(days)) return '';
     const tone = getExpiryBadgeTone(days);
@@ -184,6 +189,7 @@
   const getExpiryBadgeText = (entry) => {
     const available = getAvailableQty(entry);
     if (!Number.isFinite(available) || available <= 0) return '';
+    if (isEntryNoPerecedero(entry)) return 'No perecedero';
     const days = getDaysUntilIso(entry?.expiryDate);
     if (!Number.isFinite(days)) return '';
     if (days < 0) return `Expirado hace ${Math.abs(days)} día(s)`;
@@ -219,6 +225,7 @@
   const getDefaultProviderRne = () => ({
     number: '',
     expiryDate: '',
+    infiniteExpiry: false,
     attachmentUrl: '',
     attachmentType: '',
     updatedAt: 0,
@@ -342,6 +349,9 @@
     if (!hasRne) {
       return { key: 'none', label: 'Sin RNE', tone: 'info', helper: 'Podés cargarlo más tarde.' };
     }
+    if (Boolean(rne?.infiniteExpiry)) {
+      return { key: 'all', label: 'RNE ∞', tone: 'info', helper: 'Vencimiento infinito.' };
+    }
     const remainingDays = getRneRemainingDays(rne.expiryDate);
     if (remainingDays == null) {
       return { key: 'all', label: 'RNE cargado', tone: 'info', helper: 'Sin fecha de caducidad declarada.' };
@@ -374,6 +384,7 @@
   const buildProviderRneHistoryEntry = (source) => ({
     number: normalizeValue(source?.number),
     expiryDate: normalizeValue(source?.expiryDate),
+    infiniteExpiry: Boolean(source?.infiniteExpiry),
     attachmentUrl: normalizeValue(source?.attachmentUrl),
     attachmentType: normalizeValue(source?.attachmentType),
     savedAt: Date.now()
@@ -574,6 +585,7 @@
   };
 
   const isEntryExpiringSoon = (entry, days) => {
+    if (isEntryNoPerecedero(entry)) return false;
     const expiry = new Date(entry.expiryDate || '');
     if (Number.isNaN(expiry.getTime())) return false;
     const today = new Date();
@@ -594,6 +606,7 @@
       .map((entry) => {
         const expiryDate = normalizeIsoDate(entry.expiryDate);
         const availableQty = getAvailableQty(entry);
+        if (isEntryNoPerecedero(entry)) return null;
         if (!expiryDate || !Number.isFinite(availableQty) || availableQty <= 0) return null;
         if (expiryDate < todayIso) return null;
         const diffDays = Math.round((new Date(`${expiryDate}T00:00:00`).getTime() - new Date(`${todayIso}T00:00:00`).getTime()) / 86400000);
@@ -618,6 +631,7 @@
       .map((entry) => {
         const expiryDate = normalizeIsoDate(entry.expiryDate);
         const availableQty = getAvailableQty(entry);
+        if (isEntryNoPerecedero(entry)) return null;
         if (!expiryDate || !Number.isFinite(availableQty) || availableQty <= 0) return null;
         if (expiryDate >= todayIso) return null;
         const diffDays = Math.abs(Math.round((new Date(`${todayIso}T00:00:00`).getTime() - new Date(`${expiryDate}T00:00:00`).getTime()) / 86400000));
@@ -828,6 +842,198 @@
         setTimeout(resolve, 6000);
       });
     }));
+  };
+
+  const parseAiJsonFromText = (text) => {
+    const content = String(text || '').trim();
+    if (!content) return null;
+    try {
+      return JSON.parse(content);
+    } catch (error) {
+      const block = content.match(/```json([\s\S]*?)```/i) || content.match(/```([\s\S]*?)```/);
+      if (block?.[1]) {
+        try { return JSON.parse(block[1].trim()); } catch (innerError) { }
+      }
+      const first = content.indexOf('{');
+      const last = content.lastIndexOf('}');
+      if (first >= 0 && last > first) {
+        try { return JSON.parse(content.slice(first, last + 1)); } catch (innerError) { }
+      }
+      return null;
+    }
+  };
+
+  const callDeepseekWithFallback = async (payload, apiKey, corsConfig) => {
+    const direct = async () => fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify(payload)
+    });
+    const proxyUrl = normalizeValue(corsConfig?.url || corsConfig?.url_corsh || '');
+    const proxyKey = normalizeValue(corsConfig?.key || corsConfig?.cosh_api_key || '');
+    try {
+      const res = await direct();
+      if (res.ok) return res;
+      const txt = await res.text();
+      throw new Error(`DeepSeek ${res.status}: ${txt}`);
+    } catch (error) {
+      if (!proxyUrl) throw error;
+      const endpoint = `${proxyUrl}${proxyUrl.endsWith('/') ? '' : '/'}https://api.deepseek.com/chat/completions`;
+      const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` };
+      if (proxyKey) headers['x-cors-api-key'] = proxyKey;
+      const proxyRes = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(payload) });
+      if (!proxyRes.ok) {
+        const txt = await proxyRes.text();
+        throw new Error(`CORS proxy ${proxyRes.status}: ${txt}`);
+      }
+      return proxyRes;
+    }
+  };
+
+  const mondayStartIso = (isoDate) => {
+    const normalized = normalizeIsoDate(isoDate);
+    if (!normalized) return '';
+    const date = new Date(`${normalized}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return '';
+    const day = date.getDay();
+    const diffToMonday = (day + 6) % 7;
+    date.setDate(date.getDate() - diffToMonday);
+    return getArgentinaIsoDate(date);
+  };
+
+  const addIsoDays = (isoDate, days) => addDaysToIso(isoDate, days);
+
+  const openProductsScopeSelector = async (title = 'Selector de productos') => openIosSwal({
+    title,
+    html: `<div class="swal-stack-fields text-start">
+      <label class="inventario-check-row"><input type="radio" name="printScope" value="all" checked><span>Incluir todos los productos</span></label>
+      <label class="inventario-check-row"><input type="radio" name="printScope" value="exclude"><span>Excluir algunos productos</span></label>
+      <div id="printProductsScope" class="notify-specific-users-list d-none">
+        <div class="step-block"><strong>Familias</strong>${Object.values(state.familias).map((family) => `<label class="inventario-check-row inventario-selector-row">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb inventario-print-photo" src="${family.imageUrl}" alt="${escapeHtml(capitalize(family.name))}"></span>` : ''}<input type="checkbox" data-print-family value="${family.id}"><span>${escapeHtml(capitalize(family.name))}</span></label>`).join('')}</div>
+        <div class="step-block"><strong>Productos</strong>${Object.values(state.ingredientes).map((item) => `<label class="inventario-check-row inventario-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb inventario-print-photo" src="${item.imageUrl}" alt="${escapeHtml(capitalize(item.name))}"></span>` : ''}<input type="checkbox" data-print-product data-family-id="${item.familyId || ''}" value="${item.id}"><span>${escapeHtml(capitalize(item.name))}</span></label>`).join('')}</div>
+      </div>
+    </div>`,
+    showCancelButton: true,
+    confirmButtonText: 'Continuar',
+    cancelButtonText: 'Cancelar',
+    didOpen: () => {
+      const all = document.querySelector('input[name="printScope"][value="all"]');
+      const exclude = document.querySelector('input[name="printScope"][value="exclude"]');
+      const list = document.getElementById('printProductsScope');
+      const toggle = () => list?.classList.toggle('d-none', !exclude?.checked);
+      all?.addEventListener('change', toggle);
+      exclude?.addEventListener('change', toggle);
+      document.querySelectorAll('[data-print-family]').forEach((familyCheckbox) => {
+        familyCheckbox.addEventListener('change', () => {
+          const familyId = familyCheckbox.value;
+          document.querySelectorAll(`[data-print-product][data-family-id="${familyId}"]`).forEach((productCheckbox) => {
+            productCheckbox.checked = familyCheckbox.checked;
+          });
+        });
+      });
+      initThumbLoading(Swal.getHtmlContainer() || document);
+    },
+    preConfirm: () => {
+      const mode = document.querySelector('input[name="printScope"]:checked')?.value || 'all';
+      const selected = [...document.querySelectorAll('[data-print-product]:checked')].map((node) => node.value);
+      if (mode === 'exclude' && !selected.length) {
+        Swal.showValidationMessage('Seleccioná al menos un producto para excluir.');
+        return false;
+      }
+      return { mode, selected };
+    }
+  });
+
+  const openManagersSelector = async () => {
+    await window.laJamoneraReady;
+    const usersMap = safeObject(await window.dbLaJamoneraRest.read('/informes/users'));
+    const users = Object.values(usersMap)
+      .map((item) => ({
+        id: normalizeValue(item.id || item.email || makeId('user')),
+        fullName: normalizeValue(item.fullName || item.name || item.email || 'Usuario'),
+        role: normalizeValue(item.position || item.role || item.sector || 'Sin cargo'),
+        photoUrl: normalizeValue(item.photoUrl || '')
+      }))
+      .sort((a, b) => a.fullName.localeCompare(b.fullName, 'es'));
+
+    const selector = await openIosSwal({
+      title: 'Seleccionar encargados',
+      html: `<div class="swal-stack-fields text-start">
+        <input id="ingresosManagersSearch" class="swal2-input ios-input" placeholder="Buscar encargado...">
+        <div id="ingresosManagersList" class="notify-specific-users-list" style="max-height:300px;overflow:auto;padding-right:4px;">${users.map((user) => `<label class="inventario-check-row inventario-selector-row" data-ingreso-user-row><input type="checkbox" data-ingreso-user value="${escapeHtml(user.id)}"><span style="display:inline-flex;align-items:center;gap:8px;">${user.photoUrl ? `<span class="user-avatar-thumb" style="width:30px;height:30px;"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb" src="${escapeHtml(user.photoUrl)}" alt="${escapeHtml(user.fullName)}"></span>` : `<span class="user-avatar-fallback" style="width:30px;height:30px;border-radius:999px;border:1px solid #d7def2;display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:#3b4b73;background:#eef3ff;">${escapeHtml((user.fullName.split(' ').filter(Boolean).map((p) => p[0]).join('').slice(0, 2) || 'US').toUpperCase())}</span>`}<span><strong>${escapeHtml(user.fullName)}</strong><small style="display:block;color:#6d7b9a;">${escapeHtml(user.role)}</small></span></span></label>`).join('') || '<p class="text-muted">No hay usuarios cargados.</p>'}</div>
+      </div>`,
+      showCancelButton: true,
+      confirmButtonText: 'Continuar',
+      cancelButtonText: 'Cancelar',
+      didOpen: () => {
+        const search = document.getElementById('ingresosManagersSearch');
+        const rows = [...document.querySelectorAll('[data-ingreso-user-row]')];
+        initThumbLoading(Swal.getHtmlContainer() || document);
+        search?.addEventListener('input', () => {
+          const q = normalizeLower(search.value);
+          rows.forEach((row) => {
+            row.classList.toggle('d-none', q && !normalizeLower(row.textContent).includes(q));
+          });
+        });
+      },
+      preConfirm: () => {
+        const ids = [...document.querySelectorAll('[data-ingreso-user]:checked')].map((node) => node.value);
+        return { users, ids };
+      }
+    });
+    if (!selector.isConfirmed) return null;
+    const selectedUsers = selector.value.users.filter((user) => selector.value.ids.includes(user.id));
+    const managersLabel = selectedUsers.length ? selectedUsers.map((user) => `${user.fullName} (${user.role})`).join(', ') : 'Sin encargado';
+    return { selectedUsers, managersLabel };
+  };
+
+  const estimateIngresoTemperatures = async (rows) => {
+    const fallback = rows.reduce((acc, row) => {
+      const key = `${row.ingredientId}|${row.entryId}`;
+      const name = normalizeLower(row.ingredientName || '');
+      const isMeat = /(carne|pollo|cerdo|vacuno|res|chacin|hamburguesa|bondiola|jamon)/i.test(name);
+      const seed = (normalizeValue(row.ingredientId).length + normalizeValue(row.entryId).length + Math.round(Number(row.qty || 0) * 10)) % 10;
+      const value = isMeat ? (0.8 + (seed * 0.3)) : (4.2 + (seed * 0.4));
+      acc[key] = Math.min(isMeat ? 4 : 12, value).toFixed(1);
+      return acc;
+    }, {});
+    try {
+      await window.laJamoneraReady;
+      const keyNode = await window.dbLaJamoneraRest.read('/deepseek/apiKey');
+      const apiKey = typeof keyNode === 'string' ? normalizeValue(keyNode) : normalizeValue(keyNode?.apiKey);
+      if (!apiKey) return fallback;
+      const deepseekNode = safeObject(await window.dbLaJamoneraRest.read('/deepseek'));
+      const compactRows = rows.map((row) => ({
+        key: `${row.ingredientId}|${row.entryId}`,
+        producto: row.ingredientName,
+        proveedor: row.provider,
+        unidad: row.unit,
+        cantidad: Number(row.qty || 0)
+      }));
+      const payload = {
+        model: 'deepseek-chat',
+        messages: [
+          { role: 'system', content: 'Sos un empleado de un frigorífico recepcionando productos. Respondé SOLO JSON válido.' },
+          { role: 'user', content: `Completá temperaturas de ingreso (°C) para cada item. Para carnes, temperatura máxima 4°C. No fuerces todos los valores al mismo número; variá por producto/proveedor/lote. Devolvé SOLO JSON con esta estructura: {"temperaturas":{"KEY":"X.X"}}. Items: ${JSON.stringify(compactRows)}` }
+        ],
+        temperature: 0.1
+      };
+      const res = await callDeepseekWithFallback(payload, apiKey, { url_corsh: deepseekNode.url_corsh, cosh_api_key: deepseekNode.cosh_api_key });
+      const data = await res.json();
+      const parsed = parseAiJsonFromText(data?.choices?.[0]?.message?.content || '');
+      const map = safeObject(parsed?.temperaturas);
+      rows.forEach((row) => {
+        const key = `${row.ingredientId}|${row.entryId}`;
+        const raw = Number(String(map[key] || '').replace(',', '.'));
+        const name = normalizeLower(row.ingredientName || '');
+        const isMeat = /(carne|pollo|cerdo|vacuno|res|chacin|hamburguesa|bondiola|jamon)/i.test(name);
+        if (!Number.isFinite(raw)) return;
+        const capped = isMeat ? Math.min(raw, 4) : raw;
+        fallback[key] = capped.toFixed(1);
+      });
+    } catch (error) {
+    }
+    return fallback;
   };
 
 
@@ -1095,7 +1301,9 @@
           entryDate: entry.entryDate || '-',
           entryDateTime: formatDateTime(entry.createdAt),
           createdAt: entry.createdAt,
-          expiryDate: entry.expiryDate || '-',
+          expiryDate: entry.expiryDate || '',
+          noPerecedero: Boolean(entry.noPerecedero),
+          usoInternoEmpresa: Boolean(entry.usoInternoEmpresa),
           qtyKg: Number(entry.qtyKg || 0),
           qty: Number(entry.qty || 0),
           availableKg: getAvailableKg(entry),
@@ -1177,14 +1385,14 @@
       const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
       const traceHtml = (!isCollapsed && traces.length)
         ? traces.map((trace) => `
-      <tr class="inventario-trace-row">
+      <tr class="${trace.internalUse ? 'inventario-internal-use-row' : 'inventario-trace-row'}">
         <td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(trace.createdAt))}</div></td>
         <td>${escapeHtml(row.ingredientName)}</td>
         <td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td>
-        <td>${escapeHtml(trace.expiryDateAtProduction || '-')}</td>
+        <td>${trace.internalUse ? '<span class="inventario-resolution-badge">Uso interno en empresa</span>' : escapeHtml(trace.expiryDateAtProduction || 'No perecedero')}</td>
         <td>${escapeHtml(trace.ingredientLot)}</td>
-        <td>${escapeHtml(trace.productionId)}</td>
-        <td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button></td>
+        <td>${escapeHtml(trace.internalUse ? row.provider : trace.productionId)}</td>
+        <td>${trace.internalUse ? '<span class="inventario-internal-no-trace">Sin trazabilidad</span>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td>
       </tr>`).join('') : '';
 
       const availableClass = Number(row.availableQty || 0) <= 0 ? 'is-zero' : '';
@@ -1193,7 +1401,7 @@
         <td>${escapeHtml(row.entryDateTime)}${getExpiryBadgeHtml(row) ? `<br><small>${getExpiryBadgeHtml(row)}</small>` : ''}</td>
         <td>${escapeHtml(row.ingredientName)}</td>
         <td><strong class="${expiredQtyClass}">${Number(row.qty || 0).toFixed(2)} ${escapeHtml(row.unit || '')}</strong><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${Number(row.availableQty || 0).toFixed(2)} ${escapeHtml(getMeasureAbbr(row.unit || ''))}${row.packageQty ? ` x${row.packageQty}` : ''}</span></td>
-        <td>${escapeHtml(row.expiryDate || '-')} </td>
+        <td>${escapeHtml(row.noPerecedero ? 'No perecedero' : (row.expiryDate || '-'))} </td>
         <td>${escapeHtml(row.invoiceNumber)}</td>
         <td class="inventario-provider-cell">${escapeHtml(row.provider)}</td>
         <td><div class="inventario-entry-actions">${(traces.length || resolutionRow) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-toggle-global-collapse="${row.entryId}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${row.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-global-images="${encodeURIComponent(JSON.stringify(row.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Ver (${row.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>No posee foto</button>'}</div></td>
@@ -1475,6 +1683,7 @@
 
   const getEntryUsages = (entry) => Array.isArray(entry?.productionUsage) ? entry.productionUsage : [];
   const getEntryExpiryMeta = (entry, targetIso = getArgentinaIsoDate()) => {
+    if (isEntryNoPerecedero(entry)) return { isExpired: false, availableKg: getAvailableKg(entry), expiredKg: 0 };
     const expiryIso = normalizeIsoDate(entry?.expiryDate);
     if (!expiryIso) return { isExpired: false, availableKg: getAvailableKg(entry), expiredKg: 0 };
     const availableKg = getAvailableKg(entry);
@@ -1537,13 +1746,14 @@
     id: usage.id || makeId('usage_row'),
     createdAt: Number(usage.producedAt || usage.createdAt || 0),
     productionDate: normalizeValue(usage.productionDate) || '-',
-    expiryDateAtProduction: normalizeValue(usage.expiryDateAtProduction) || '-',
+    expiryDateAtProduction: normalizeValue(usage.expiryDateAtProduction) || (isEntryNoPerecedero(entry) ? 'No perecedero' : '-'),
     kilosUsed: Number(usage.kilosUsed || 0),
     usedQty: Number(usage.usedQty || 0),
     usedUnit: normalizeValue(usage.usedUnit),
     displayAmount: formatRawUsageAmount(usage.usedQty, usage.usedUnit) || formatUsageAmount(usage.kilosUsed),
     ingredientLot: normalizeValue(usage.ingredientLot || usage.lotNumber) || normalizeValue(entry.lotNumber) || '-',
-    productionId: normalizeValue(usage.productionId) || '-'
+    productionId: normalizeValue(usage.productionId) || '-',
+    internalUse: Boolean(usage.internalUse)
   })).sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
 
   const hasEntryDetailRows = (entry) => getEntryTraceRows(entry).length > 0 || Boolean(getEntryResolutionRowData(entry));
@@ -1562,12 +1772,13 @@
   const buildTraceRowsForEntry = (entry) => getEntryTraceRows(entry).map((trace) => ({
     __isTrace: true,
     fechaHora: formatDateTime(trace.createdAt),
-    fechaCaducidad: trace.expiryDateAtProduction || '-',
+    fechaCaducidad: trace.internalUse ? 'Uso interno en empresa' : (trace.expiryDateAtProduction || 'No perecedero'),
     cantidad: `-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}`,
     factura: trace.ingredientLot || '-',
-    proveedor: trace.productionId || '-',
+    proveedor: trace.internalUse ? providerLabel(entry.provider) : (trace.productionId || '-'),
     imagenes: 'Trazabilidad',
-    productionId: trace.productionId || '-'
+    productionId: trace.internalUse ? providerLabel(entry.provider) : (trace.productionId || '-'),
+    internalUse: Boolean(trace.internalUse)
   }));
 
   const buildPrintableRowsForEntries = (entries, includeTrace = false) => {
@@ -1973,46 +2184,7 @@
     if (!askTrace.isConfirmed && !askTrace.isDenied) return;
     const includeTrace = askTrace.isConfirmed;
 
-    const selector = await openIosSwal({
-      title: 'Selector de productos',
-      html: `<div class="swal-stack-fields text-start">
-        <label class="inventario-check-row"><input type="radio" name="printScope" value="all" checked><span>Incluir todos los productos</span></label>
-        <label class="inventario-check-row"><input type="radio" name="printScope" value="exclude"><span>Excluir algunos productos</span></label>
-        <div id="printProductsScope" class="notify-specific-users-list d-none">
-          <div class="step-block"><strong>Familias</strong>${Object.values(state.familias).map((family) => `<label class="inventario-check-row inventario-selector-row">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb inventario-print-photo" src="${family.imageUrl}" alt="${escapeHtml(capitalize(family.name))}"></span>` : ''}<input type="checkbox" data-print-family value="${family.id}"><span>${escapeHtml(capitalize(family.name))}</span></label>`).join('')}</div>
-          <div class="step-block"><strong>Productos</strong>${Object.values(state.ingredientes).map((item) => `<label class="inventario-check-row inventario-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb inventario-print-photo" src="${item.imageUrl}" alt="${escapeHtml(capitalize(item.name))}"></span>` : ''}<input type="checkbox" data-print-product data-family-id="${item.familyId || ''}" value="${item.id}"><span>${escapeHtml(capitalize(item.name))}</span></label>`).join('')}</div>
-        </div>
-      </div>`,
-      showCancelButton: true,
-      confirmButtonText: 'Continuar',
-      cancelButtonText: 'Cancelar',
-      didOpen: () => {
-        const all = document.querySelector('input[name="printScope"][value="all"]');
-        const exclude = document.querySelector('input[name="printScope"][value="exclude"]');
-        const list = document.getElementById('printProductsScope');
-        const toggle = () => list?.classList.toggle('d-none', !exclude?.checked);
-        all?.addEventListener('change', toggle);
-        exclude?.addEventListener('change', toggle);
-        document.querySelectorAll('[data-print-family]').forEach((familyCheckbox) => {
-          familyCheckbox.addEventListener('change', () => {
-            const familyId = familyCheckbox.value;
-            document.querySelectorAll(`[data-print-product][data-family-id="${familyId}"]`).forEach((productCheckbox) => {
-              productCheckbox.checked = familyCheckbox.checked;
-            });
-          });
-        });
-        initThumbLoading(Swal.getHtmlContainer() || document);
-      },
-      preConfirm: () => {
-        const mode = document.querySelector('input[name="printScope"]:checked')?.value || 'all';
-        const selected = [...document.querySelectorAll('[data-print-product]:checked')].map((node) => node.value);
-        if (mode === 'exclude' && !selected.length) {
-          Swal.showValidationMessage('Seleccioná al menos un producto para excluir.');
-          return false;
-        }
-        return { mode, selected };
-      }
-    });
+    const selector = await openProductsScopeSelector('Selector de productos');
     if (!selector.isConfirmed) return;
 
     const excluded = new Set(selector.value.mode === 'exclude' ? selector.value.selected : []);
@@ -2031,9 +2203,9 @@
       const productRows = grouped[ingredientId];
       const head = productRows[0];
       const tableRows = productRows.flatMap((row) => {
-        const expiryMeta = getEntryExpiryMeta(row); const expiryBadge = getExpiryBadgeText(row); const detail = formatEntryDetailLabel(row); const strikeClass = expiryMeta.isExpired ? ' style="text-decoration:line-through;font-weight:700;color:#b42338"' : ''; const mainRow = `<tr${expiryMeta.isExpired ? ' style="background:#ffecef"' : ''}><td>${escapeHtml(row.entryDateTime)}</td><td>${escapeHtml(row.expiryDate || '-')}${expiryBadge ? `<br><small style="color:#b42338;font-weight:700">${escapeHtml(expiryBadge)}</small>` : ''}</td><td><span${strikeClass}>${escapeHtml(detail.qtyLabel)}</span><br><small${strikeClass}>${escapeHtml(detail.availableLabel)}</small></td><td><span${strikeClass}>${escapeHtml(detail.qtyLabel)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td>${includeImages ? (row.invoiceImageUrls?.length ? `Ver adjunto (${row.invoiceImageUrls.length})` : 'Sin adjunto') : (row.invoiceImageUrls?.length ? `Posee ${row.invoiceImageUrls.length} adjunto/s` : 'Sin adjunto')}</td></tr>`;
+        const expiryMeta = getEntryExpiryMeta(row); const expiryBadge = getExpiryBadgeText(row); const detail = formatEntryDetailLabel(row); const strikeClass = expiryMeta.isExpired ? ' style="text-decoration:line-through;font-weight:700;color:#b42338"' : ''; const mainRow = `<tr${expiryMeta.isExpired ? ' style="background:#ffecef"' : ''}><td>${escapeHtml(row.entryDateTime)}</td><td>${escapeHtml(row.noPerecedero ? 'No perecedero' : (row.expiryDate || 'No perecedero'))}${expiryBadge ? `<br><small style="color:#b42338;font-weight:700">${escapeHtml(expiryBadge)}</small>` : ''}</td><td><span${strikeClass}>${escapeHtml(detail.qtyLabel)}</span><br><small${strikeClass}>${escapeHtml(detail.availableLabel)}</small></td><td><span${strikeClass}>${escapeHtml(detail.qtyLabel)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td>${includeImages ? (row.invoiceImageUrls?.length ? `Ver adjunto (${row.invoiceImageUrls.length})` : 'Sin adjunto') : (row.invoiceImageUrls?.length ? `Posee ${row.invoiceImageUrls.length} adjunto/s` : 'Sin adjunto')}</td></tr>`;
         const resolution = getEntryResolutionRowData(row);
-        const resolutionRow = resolution ? `<tr style="background:#fff6d9;"><td>${escapeHtml(`↳ ${formatDateTime(resolution.at)}`)}</td><td>${escapeHtml(row.expiryDate || '-')}</td><td>${escapeHtml(`-${resolution.resolvedKg.toFixed(2)} kilos`)}</td><td>${escapeHtml(resolution.badge)}</td><td>${escapeHtml(row.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(row.provider || '-')}</td><td>Resolución</td></tr>` : '';
+        const resolutionRow = resolution ? `<tr style="background:#fff6d9;"><td>${escapeHtml(`↳ ${formatDateTime(resolution.at)}`)}</td><td>${escapeHtml(row.noPerecedero ? 'No perecedero' : (row.expiryDate || 'No perecedero'))}</td><td>${escapeHtml(`-${resolution.resolvedKg.toFixed(2)} kilos`)}</td><td>${escapeHtml(resolution.badge)}</td><td>${escapeHtml(row.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(row.provider || '-')}</td><td>Resolución</td></tr>` : '';
         if (!includeTrace) return [mainRow, resolutionRow].filter(Boolean);
         const traceRows = buildTraceRowsForEntry(row).map((trace) => `<tr style="background:#ffecef;"><td>${escapeHtml(`↳ ${trace.fechaHora}`)}</td><td>${escapeHtml(trace.fechaCaducidad || '-')}</td><td>${escapeHtml(trace.cantidad)}</td><td>${escapeHtml(trace.factura)}</td><td>${escapeHtml(trace.proveedor)}</td><td class="inventario-provider-cell">Trazabilidad</td><td></td></tr>`);
         return [mainRow, resolutionRow, ...traceRows].filter(Boolean);
@@ -2054,6 +2226,137 @@
     win.focus();
     await waitPrintAssets(win);
     win.print();
+  };
+
+  const openIngresosWeeklySheet = async (rows) => {
+    const typeAsk = await openIosSwal({
+      title: 'Generar planilla de artículos',
+      html: '<p>Perecederos - No perecederos</p>',
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: 'Perecederos',
+      denyButtonText: 'No perecederos',
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        confirmButton: 'ios-btn ios-btn-success',
+        denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical',
+        cancelButton: 'ios-btn ios-btn-secondary'
+      }
+    });
+    if (!typeAsk.isConfirmed && !typeAsk.isDenied) return;
+    const targetPerishable = typeAsk.isConfirmed;
+
+    const selector = await openProductsScopeSelector('Selector de productos');
+    if (!selector.isConfirmed) return;
+
+    const managers = await openManagersSelector();
+    if (!managers) return;
+
+    const excluded = new Set(selector.value.mode === 'exclude' ? selector.value.selected : []);
+    const resolveIngredientPerishable = (ingredientId) => {
+      const recordCfg = safeObject(state.inventario?.items?.[ingredientId]?.weeklySheetConfig);
+      if (typeof recordCfg.perishable === 'boolean') return recordCfg.perishable;
+      const ingredientCfg = safeObject(state.ingredientes?.[ingredientId]);
+      if (typeof ingredientCfg.perishable === 'boolean') return ingredientCfg.perishable;
+      return true;
+    };
+
+    const scopedRows = rows
+      .filter((row) => !excluded.has(row.ingredientId))
+      .filter((row) => {
+        const perishable = resolveIngredientPerishable(row.ingredientId);
+        return targetPerishable ? perishable : !perishable;
+      });
+
+    if (!scopedRows.length) {
+      await openIosSwal({ title: 'Sin resultados', html: '<p>No hay ingresos para el tipo de artículo seleccionado.</p>', icon: 'warning' });
+      return;
+    }
+
+    const groupedWeeks = scopedRows.reduce((acc, row) => {
+      const weekStart = mondayStartIso(row.entryDate || row.entryDateTime || '');
+      if (!weekStart) return acc;
+      const weekEnd = addIsoDays(weekStart, 6);
+      const key = `${weekStart}|${weekEnd}`;
+      if (!acc[key]) acc[key] = { weekStart, weekEnd, rows: [] };
+      acc[key].rows.push(row);
+      return acc;
+    }, {});
+
+    const weeks = Object.values(groupedWeeks).sort((a, b) => a.weekStart.localeCompare(b.weekStart));
+    const allRows = weeks.flatMap((week) => week.rows);
+    await preloadImages(allRows.map((row) => row.ingredientImageUrl).filter(Boolean));
+
+    await Swal.fire({
+      title: 'Generando planilla...',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Generando" class="meta-spinner-login"></div>',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      customClass: { popup: 'ios-alert produccion-loading-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' },
+      didOpen: async () => {
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          Swal.update({ html: '<div class="informes-saving-spinner"><img src="./IMG/ia-unscreen.gif" alt="IA" class="recipe-ai-static-gif"></div><p>Obteniendo temperaturas...</p>' });
+          const tempMap = await estimateIngresoTemperatures(allRows);
+          const weekSections = weeks.map((week, weekIndex) => {
+            const rowsHtml = week.rows.map((row) => {
+              const tempKey = `${row.ingredientId}|${row.entryId}`;
+              const temp = tempMap[tempKey] || '-';
+              const vtoLabel = row.noPerecedero ? 'No perecedero' : (row.expiryDate || 'No perecedero');
+              const productImage = row.ingredientImageUrl
+                ? `<span style="display:inline-flex;width:28px;height:28px;border-radius:999px;overflow:hidden;border:1px solid #d7def2;vertical-align:middle;margin-right:6px;"><img src="${escapeHtml(row.ingredientImageUrl)}" style="width:100%;height:100%;object-fit:cover;"></span>`
+                : '';
+              const qtyLabel = `${Number(row.qty || 0).toFixed(2)} ${getMeasureAbbr(row.unit || '')}${row.packageQty ? ` X${row.packageQty}` : ''}`;
+              const providerUp = String(row.provider || '-').toUpperCase();
+              const productUp = String(row.ingredientName || '-').toUpperCase();
+              const loteUp = String(row.lotNumber || row.invoiceNumber || '-').toUpperCase();
+              const vtoUp = String(vtoLabel || 'NO PERECEDERO').toUpperCase();
+              const managersUp = String(managers.managersLabel || 'SIN ENCARGADO').toUpperCase();
+              return `<tr>
+                <td><strong>${escapeHtml(String(row.entryDateTime || '-').toUpperCase())}</strong></td>
+                <td>${productImage}<strong>${escapeHtml(productUp)}</strong></td>
+                <td><strong>${escapeHtml(providerUp)}</strong></td>
+                <td><strong>${escapeHtml(qtyLabel.toUpperCase())}</strong></td>
+                <td>${escapeHtml(loteUp)}</td>
+                <td>${escapeHtml(vtoUp)}</td>
+                <td><strong>${escapeHtml(`${temp} °C`)}</strong></td>
+                <td>${escapeHtml(managersUp)}</td>
+                <td>${escapeHtml('SIN OBSERVACIONES')}</td>
+              </tr>`;
+            }).join('');
+            const from = formatIsoDateEs(week.weekStart);
+            const to = formatIsoDateEs(week.weekEnd);
+            const tipoHeader = targetPerishable ? 'PERECEDERAS' : 'NO PERECEDERAS';
+            const footer = targetPerishable
+              ? '*LOTE: MATERIAS PRIMAS CONGELADAS O AL VACIO (CON ROTULO)<br>CS: CERTIFICADO SANITARIO'
+              : 'LOTE. SI LA MATERIA PRIMA TRAE NUMERO DE LOTE SE COPIA.<br>SI NO VIENE CON NUMERO DE LOTE, SE TOMA FECHA DE VENCIMIENTO COMO NUMERO DE LOTE.<br>RECHAZO, SI ES SI, COLOCAR EN OBSERVACIONES MOTIVOS, EJ: CERCANO A SU FECHA DE VENCIMIENTO, PAQUETES DAÑADOS, ETC.';
+            return `<section style="${weekIndex ? 'page-break-before:always;' : ''}">
+              <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-bottom:10px;border:1px solid #b8c4e3;">
+                <div style="padding:10px;border-right:1px solid #b8c4e3;"><strong>FRIGORIFICO • LA JAMONERA S.A.</strong></div>
+                <div style="padding:10px;"><strong>REGISTRO INGRESO DE MATERIAS PRIMAS<br>${tipoHeader}</strong></div>
+              </div>
+              <h2 style="font-size:16px;margin:0 0 10px;"><strong>SEMANA DE ${from} A ${to}</strong></h2>
+              <table style="width:100%;border-collapse:collapse;">
+                <thead><tr><th>FECHA Y HORA</th><th>PRODUCTO</th><th>PROVEEDOR</th><th>CANTIDAD</th><th>LOTE / CS</th><th>VTO.</th><th>TEMP. °C</th><th>ENCARGADOS</th><th>OBSERVACIONES</th></tr></thead>
+                <tbody>${rowsHtml || '<tr><td colspan="9">Sin ingresos</td></tr>'}</tbody>
+              </table>
+              <p style="margin-top:10px;font-size:11px;line-height:1.35;">${footer}</p>
+            </section>`;
+          }).join('');
+
+          const win = window.open('', '_blank', 'width=1400,height=900');
+          if (!win) return;
+          win.document.write(`<html><head><title>Planilla de ingresos</title><style>@page{size:landscape;margin:12mm;}body{font-family:Inter,Arial,sans-serif;color:#1f2a44;padding:8px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #c8d2eb;padding:6px;font-size:11px;vertical-align:middle;}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em;text-align:left;}</style></head><body>${weekSections}</body></html>`);
+          win.document.close();
+          await waitPrintAssets(win);
+          win.focus();
+          win.print();
+        } finally {
+          Swal.close();
+        }
+      }
+    });
   };
 
   const removeEntryWithSecurity = async (ingredientId, entryId) => {
@@ -2138,13 +2441,13 @@
       const resolutionRow = getEntryResolutionRowData(entry);
       const traceHtml = (!isCollapsed && traceRows.length)
         ? traceRows.map((trace) => `
-        <tr class="inventario-trace-row">
+        <tr class="${trace.internalUse ? 'inventario-internal-use-row' : 'inventario-trace-row'}">
           <td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(trace.createdAt)}</div></td>
-          <td>${escapeHtml(trace.expiryDateAtProduction || '-')}</td>
+          <td>${trace.internalUse ? '<span class="inventario-resolution-badge">Uso interno en empresa</span>' : escapeHtml(trace.expiryDateAtProduction || 'No perecedero')}</td>
           <td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td>
           <td>${escapeHtml(trace.ingredientLot)}</td>
-          <td>${escapeHtml(trace.productionId)}</td>
-          <td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button></td>
+          <td>${escapeHtml(trace.internalUse ? providerLabel(entry.provider) : trace.productionId)}</td>
+          <td>${trace.internalUse ? '<span class="inventario-internal-no-trace">Sin trazabilidad</span>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td>
           <td></td>
         </tr>`).join('') : '';
 
@@ -2154,7 +2457,7 @@
       return `
       <tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
         <td>${formatDateTime(entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}</td>
-        <td>${entry.expiryDate || '-'} </td>
+        <td>${entry.noPerecedero ? 'No perecedero' : (entry.expiryDate || '-')} </td>
         <td><strong class="${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</strong><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td>
         <td>${escapeHtml(entry.invoiceNumber || '-')}</td>
         <td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td>
@@ -2376,6 +2679,8 @@
       packageQty: record.packageQty ?? '',
       entryDate: getArgentinaIsoDate(),
       expiryDate: addDaysToIso(getArgentinaIsoDate(), 5),
+      noPerecedero: false,
+      usoInternoEmpresa: false,
       invoiceNumber: '',
       provider: '',
       invoiceImageFile: null,
@@ -2501,7 +2806,8 @@
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryExpiryDate"><i class="fa-regular fa-calendar-check inventario-step-icon"></i> Fecha de caducidad</label>
-            <input id="inventoryExpiryDate" class="form-control ios-input" autocomplete="off" value="${escapeHtml(state.editorDraft.expiryDate)}" placeholder="Seleccionar fecha">
+            <input id="inventoryExpiryDate" class="form-control ios-input" autocomplete="off" value="${escapeHtml(state.editorDraft.expiryDate)}" placeholder="Seleccionar fecha" ${state.editorDraft.noPerecedero ? 'disabled' : ''}>
+            <label class="inventario-check-row inventario-check-row-compact mt-2"><input type="checkbox" id="inventoryNoPerecedero" ${state.editorDraft.noPerecedero ? 'checked' : ''}><span>No perecedero</span></label>
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryInvoiceNumber"><i class="fa-solid fa-file-invoice inventario-step-icon"></i> Número de factura/remito</label>
@@ -2514,6 +2820,10 @@
               ${providers.map((provider) => `<option value="${escapeHtml(provider.id)}" ${normalizeValue(state.editorDraft.provider) === provider.id ? 'selected' : ''}>${escapeHtml(provider.name)}</option>`).join('')}
               <option value="add_provider">+ Agregar proveedor</option>
             </select>
+          </div>
+          <div class="recipe-field recipe-field-full inventario-internal-switch-wrap">
+            <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="inventoryUsoInternoEmpresa" ${state.editorDraft.usoInternoEmpresa ? 'checked' : ''}><span>Envases primarios & más</span></label>
+            <small class="text-muted">Auto egreso</small>
           </div>
           <div class="recipe-field recipe-field-full">
             <label class="form-label" for="inventoryInvoiceImage"><i class="fa-regular fa-images inventario-step-icon"></i> Adjuntar archivos (imagen o PDF)</label>
@@ -2546,6 +2856,8 @@
       state.editorDraft.packageQty = nodes.editorForm.querySelector('#inventoryPackageQty')?.value || '';
       state.editorDraft.entryDate = nodes.editorForm.querySelector('#inventoryEntryDate')?.value || '';
       state.editorDraft.expiryDate = nodes.editorForm.querySelector('#inventoryExpiryDate')?.value || '';
+      state.editorDraft.noPerecedero = Boolean(nodes.editorForm.querySelector('#inventoryNoPerecedero')?.checked);
+      state.editorDraft.usoInternoEmpresa = Boolean(nodes.editorForm.querySelector('#inventoryUsoInternoEmpresa')?.checked);
       state.editorDraft.invoiceNumber = nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value || '';
       state.editorDraft.provider = nodes.editorForm.querySelector('#inventoryProvider')?.value || '';
       state.editorDraft.customAcronym = nodes.editorForm.querySelector('#lotCustomAcronym')?.value || '';
@@ -2585,6 +2897,16 @@
       const pattern = state.editorDraft.tokens.map((token) => '${' + lotTokenLabelFor(token, state.editorDraft.customAcronym).replaceAll(' ', '_') + '}').join(separator);
       nodes.editorForm.querySelector('#lotPatternPreview').textContent = pattern || 'Sin patrón definido';
       nodes.editorForm.querySelector('.inventario-collapse-summary').innerHTML = buildLotSummaryBadges(state.editorDraft);
+    };
+
+    const syncNoPerecederoState = () => {
+      const noPerecedero = Boolean(nodes.editorForm.querySelector('#inventoryNoPerecedero')?.checked);
+      const expiryInput = nodes.editorForm.querySelector('#inventoryExpiryDate');
+      if (!expiryInput) return;
+      expiryInput.disabled = noPerecedero;
+      if (noPerecedero) expiryInput.value = '';
+      state.editorDraft.noPerecedero = noPerecedero;
+      if (noPerecedero) state.editorDraft.expiryDate = '';
     };
 
     const wireTokenDrag = () => {
@@ -2821,6 +3143,11 @@
       el.addEventListener('input', syncDraft);
       el.addEventListener('change', syncDraft);
     });
+    nodes.editorForm.querySelector('#inventoryNoPerecedero')?.addEventListener('change', () => {
+      syncNoPerecederoState();
+      syncDraft();
+    });
+    syncNoPerecederoState();
     nodes.editorForm.querySelector('#inventoryInvoiceImage')?.addEventListener('change', () => {
       syncDraft();
       const feedback = nodes.editorForm.querySelector('#inventoryInvoiceImageFeedback');
@@ -2967,12 +3294,12 @@
         const resolutionLabel = resolutionMeta.badge;
         const resolutionRow = getEntryResolutionRowData(entry);
         const traceHtml = (!isCollapsed && traceRows.length)
-          ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(trace.createdAt)}</div></td><td>${escapeHtml(trace.expiryDateAtProduction || '-')}</td><td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml(trace.productionId)}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button></td><td></td></tr>`).join('')
+          ? traceRows.map((trace) => `<tr class="${trace.internalUse ? 'inventario-internal-use-row' : 'inventario-trace-row'}"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(trace.createdAt)}</div></td><td>${trace.internalUse ? '<span class="inventario-resolution-badge">Uso interno en empresa</span>' : escapeHtml(trace.expiryDateAtProduction || 'No perecedero')}</td><td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml(trace.internalUse ? providerLabel(entry.provider) : trace.productionId)}</td><td>${trace.internalUse ? '<span class="inventario-internal-no-trace">Sin trazabilidad</span>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td><td></td></tr>`).join('')
           : '';
         const availableClass = getAvailableKg(entry) <= 0 ? 'is-zero' : '';
         const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
         const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(resolutionRow.at)}</div></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td></tr>` : '';
-        return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${formatDateTime(entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}</td><td>${entry.expiryDate || '-'} </td><td><strong class="${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</strong><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRow) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expanded-entry-collapse="${entry.id}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(entryImageUrls(entry))}</div></td></tr>${resolutionHtml}${traceHtml}`;
+        return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${formatDateTime(entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}</td><td>${entry.noPerecedero ? 'No perecedero' : (entry.expiryDate || '-')} </td><td><strong class="${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</strong><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRow) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expanded-entry-collapse="${entry.id}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(entryImageUrls(entry))}</div></td></tr>${resolutionHtml}${traceHtml}`;
       }).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos para mostrar.</td></tr>';
       await openIosSwal({
         title: 'Historial ampliado',
@@ -3190,6 +3517,8 @@
     const packageQty = packageQtyRaw ? Number.parseInt(packageQtyRaw, 10) : null;
     const entryDate = normalizeValue(nodes.editorForm.querySelector('#inventoryEntryDate')?.value);
     const expiryDate = normalizeValue(nodes.editorForm.querySelector('#inventoryExpiryDate')?.value);
+    const noPerecedero = Boolean(nodes.editorForm.querySelector('#inventoryNoPerecedero')?.checked);
+    const usoInternoEmpresa = Boolean(nodes.editorForm.querySelector('#inventoryUsoInternoEmpresa')?.checked);
     const invoiceNumber = normalizeValue(nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value);
     const providerValue = normalizeValue(nodes.editorForm.querySelector('#inventoryProvider')?.value);
     const provider = providerLabel(providerValue);
@@ -3231,8 +3560,8 @@
       return;
     }
 
-    if (!entryDate || !expiryDate) {
-      await openIosSwal({ title: 'Fechas incompletas', html: '<p>Completá fecha de ingreso y caducidad.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+    if (!entryDate || (!noPerecedero && !expiryDate)) {
+      await openIosSwal({ title: 'Fechas incompletas', html: `<p>Completá fecha de ingreso ${noPerecedero ? '' : 'y caducidad'}.</p>`, icon: 'warning', confirmButtonText: 'Entendido' });
       return;
     }
 
@@ -3298,8 +3627,10 @@
         availableKg: qtyKg,
         packageQty: Number.isFinite(packageQty) ? packageQty : (record.packageQty || null),
         productionUsage: [],
+        noPerecedero,
+        usoInternoEmpresa,
         entryDate,
-        expiryDate,
+        expiryDate: noPerecedero ? '' : expiryDate,
         invoiceNumber,
         lotNumber,
         provider,
@@ -3309,13 +3640,35 @@
         createdAt: Date.now()
       };
 
+      if (usoInternoEmpresa) {
+        const internalUsage = {
+          id: makeId('usage_internal'),
+          createdAt: Date.now(),
+          producedAt: Date.now(),
+          productionDate: entryDate,
+          expiryDateAtProduction: 'Uso interno en empresa',
+          kilosUsed: qtyKg,
+          usedQty: Number(qty.toFixed(2)),
+          usedUnit: unit,
+          lotNumber,
+          ingredientLot: lotNumber,
+          productionId: '-',
+          internalUse: true,
+          note: 'Auto egreso · Envases primarios & más'
+        };
+        entry.productionUsage = [internalUsage];
+        entry.availableQty = 0;
+        entry.availableBase = 0;
+        entry.availableKg = 0;
+        entry.lotStatus = 'sin_trazabilidad';
+      }
+
       record.entries = Array.isArray(record.entries) ? record.entries : [];
       record.entries.unshift(entry);
-      record.stockKg = Number(((Number(record.stockKg) || 0) + qtyKg).toFixed(4));
       record.stockUnit = record.stockUnit || unit;
       record.packageQty = record.packageQty || (Number.isFinite(packageQty) ? packageQty : null);
-      record.stockBase = Number(((Number(record.stockBase) || 0) + qtyBase).toFixed(6));
       record.hasEntries = true;
+      recomputeRecordStock(record, record.stockUnit || unit);
       record.lotConfig = {
         configured: state.editorDraft.tokens.length > 0,
         collapsed: state.editorDraft.tokens.length > 0,
@@ -3336,6 +3689,8 @@
         invoiceNumber: '',
         provider: '',
         invoiceImageCountLabel: 'Sin archivos seleccionados',
+        noPerecedero: false,
+        usoInternoEmpresa: false,
         expiryDate: addDaysToIso(getArgentinaIsoDate(), 5),
         entryDate: getArgentinaIsoDate()
       });
@@ -3383,6 +3738,7 @@
         <input id="providerRneNumberInput" class="swal2-input ios-input" value="${escapeHtml(currentRne.number || '')}" placeholder="Número de registro (admite guiones)">
         <label class="form-label" for="providerRneExpiryInput"><strong>Fecha de caducidad</strong></label>
         <input id="providerRneExpiryInput" class="swal2-input ios-input" value="${escapeHtml(currentRne.expiryDate || '')}" placeholder="Seleccionar fecha">
+        <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="providerRneInfiniteInput" ${currentRne.infiniteExpiry ? 'checked' : ''}><span>Vencimiento infinito (∞)</span></label>
         <label class="form-label" for="providerRneFileInput"><strong>Adjunto PDF o imagen</strong></label>
         <input id="providerRneFileInput" class="form-control ios-input image-file-input" type="file" accept="image/*,application/pdf">
         ${normalizeValue(currentRne.attachmentUrl) ? '<small>Si subís un nuevo archivo, el actual pasa al historial.</small>' : '<small>Podés cargar el archivo más tarde.</small>'}
@@ -3413,6 +3769,15 @@
             });
           }
         }
+        const infiniteInput = document.getElementById('providerRneInfiniteInput');
+        const expiryInput = document.getElementById('providerRneExpiryInput');
+        const syncInfinite = () => {
+          if (!expiryInput) return;
+          expiryInput.disabled = Boolean(infiniteInput?.checked);
+          if (infiniteInput?.checked) expiryInput.value = '';
+        };
+        infiniteInput?.addEventListener('change', syncInfinite);
+        syncInfinite();
       },
       didOpen: (popup) => {
         requestAnimationFrame(() => {
@@ -3422,7 +3787,8 @@
       preConfirm: async () => {
         const name = normalizeUpper(document.getElementById('providerNameInput')?.value);
         const number = normalizeValue(document.getElementById('providerRneNumberInput')?.value);
-        const expiryDate = normalizeIsoDate(document.getElementById('providerRneExpiryInput')?.value);
+        const infiniteExpiry = Boolean(document.getElementById('providerRneInfiniteInput')?.checked);
+        const expiryDate = infiniteExpiry ? '' : normalizeIsoDate(document.getElementById('providerRneExpiryInput')?.value);
         const file = document.getElementById('providerRneFileInput')?.files?.[0] || null;
 
         if (!name) {
@@ -3463,6 +3829,7 @@
             ...currentRne,
             number,
             expiryDate,
+            infiniteExpiry,
             attachmentUrl,
             attachmentType,
             history,
@@ -3513,15 +3880,18 @@
           const rne = safeObject(provider.rne);
           const hasRne = Boolean(normalizeValue(rne.number) || normalizeValue(rne.attachmentUrl));
           const remainingDays = getRneRemainingDays(rne.expiryDate);
+          const isInfinite = Boolean(rne.infiniteExpiry);
           const daysTone = getDaysTone(remainingDays);
-          const daysBadge = (hasRne && Number.isFinite(remainingDays))
+          const daysBadge = (hasRne && isInfinite)
+            ? '<span class="receta-rnpa-days is-ok"><i class="bi bi-infinity"></i>∞</span>'
+            : (hasRne && Number.isFinite(remainingDays))
             ? `<span class="receta-rnpa-days ${daysTone}"><i class="bi bi-clock-history"></i>${escapeHtml(String(remainingDays))} días</span>`
             : '';
           const pendingBadge = '<span class="receta-rnpa-badge is-pending"><i class="fa-solid fa-triangle-exclamation"></i>RNE pendiente</span>';
           const okBadge = '<span class="receta-rnpa-badge is-ok"><i class="fa-solid fa-file-shield"></i>RNE adjunto</span>';
           const validFrom = normalizeValue(rne.validFrom);
           const validityText = hasRne
-            ? `${rne.expiryDate ? `${escapeHtml(formatIsoDateEs(validFrom || rne.expiryDate))} → ${escapeHtml(formatIsoDateEs(rne.expiryDate))}` : `${escapeHtml(formatIsoDateEs(validFrom || ''))} → Sin caducidad`}`
+            ? `${isInfinite ? `${escapeHtml(formatIsoDateEs(validFrom || ''))} → ∞` : (rne.expiryDate ? `${escapeHtml(formatIsoDateEs(validFrom || rne.expiryDate))} → ${escapeHtml(formatIsoDateEs(rne.expiryDate))}` : `${escapeHtml(formatIsoDateEs(validFrom || ''))} → Sin caducidad`)}`
             : 'Sin vigencia registrada';
 
           return `<article class="inventario-provider-card ios-card-soft">
@@ -3597,6 +3967,7 @@
                 <small class="text-muted">Se permiten números y guion (<strong>-</strong>).</small>
                 <label class="form-label mt-2" for="providerRneExpiryInput"><strong>Fecha de caducidad</strong></label>
                 <input id="providerRneExpiryInput" type="text" class="form-control ios-input" value="${escapeHtml(rne.expiryDate || '')}" placeholder="Seleccionar fecha">
+                <label class="inventario-check-row inventario-check-row-compact mt-2"><input type="checkbox" id="providerRneInfiniteInput" ${rne.infiniteExpiry ? 'checked' : ''}><span>Vencimiento infinito (∞)</span></label>
                 <label class="form-label mt-2" for="providerRneFileInput"><strong>Archivo adjunto</strong> (PDF o imagen)</label>
                 <div class="produccion-rne-file-row">
                   <input id="providerRneFileInput" class="form-control ios-input image-file-input" type="file" accept="image/*,application/pdf">
@@ -3636,6 +4007,15 @@
               });
             }
           }
+          const infiniteInput = root.querySelector('#providerRneInfiniteInput');
+          const expiryInput = root.querySelector('#providerRneExpiryInput');
+          const syncInfinite = () => {
+            if (!expiryInput) return;
+            expiryInput.disabled = Boolean(infiniteInput?.checked);
+            if (infiniteInput?.checked) expiryInput.value = '';
+          };
+          infiniteInput?.addEventListener('change', syncInfinite);
+          syncInfinite();
 
           initThumbLoading(root);
           requestAnimationFrame(() => {
@@ -3688,7 +4068,8 @@
             const email = normalizeValue(root.querySelector('#providerEmailInput')?.value);
             const phone = normalizeValue(root.querySelector('#providerPhoneInput')?.value);
             const number = normalizeValue(root.querySelector('#providerRneNumberInput')?.value);
-            const expiryDate = normalizeIsoDate(root.querySelector('#providerRneExpiryInput')?.value);
+            const infiniteExpiry = Boolean(root.querySelector('#providerRneInfiniteInput')?.checked);
+            const expiryDate = infiniteExpiry ? '' : normalizeIsoDate(root.querySelector('#providerRneExpiryInput')?.value);
             const file = root.querySelector('#providerRneFileInput')?.files?.[0] || null;
             const photoFile = root.querySelector('#providerPhotoInput')?.files?.[0] || null;
             const loadingNode = root.querySelector('#providerRneFileLoading');
@@ -3751,6 +4132,7 @@
                 ...currentRne,
                 number,
                 expiryDate,
+                infiniteExpiry,
                 attachmentUrl,
                 attachmentType,
                 validFrom: normalizeValue(currentRne.validFrom) || getArgentinaIsoDate(),
@@ -4015,7 +4397,7 @@
       const resolutionRow = getEntryResolutionRowData(row);
       const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
       const traceHtml = (!isCollapsed && traceRows.length)
-        ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(trace.createdAt))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td>${escapeHtml(trace.expiryDateAtProduction || '-')}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml(trace.productionId)}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button></td></tr>`).join('') : '';
+        ? traceRows.map((trace) => `<tr class="${trace.internalUse ? 'inventario-internal-use-row' : 'inventario-trace-row'}"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(trace.createdAt))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td>${trace.internalUse ? '<span class="inventario-resolution-badge">Uso interno en empresa</span>' : escapeHtml(trace.expiryDateAtProduction || 'No perecedero')}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml(trace.internalUse ? row.provider : trace.productionId)}</td><td>${trace.internalUse ? '<span class="inventario-internal-no-trace">Sin trazabilidad</span>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td></tr>`).join('') : '';
       const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(resolutionRow.at))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td></tr>` : '';
       return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(row.entryDateTime)}${getExpiryBadgeHtml(row) ? `<br><small>${getExpiryBadgeHtml(row)}</small>` : ''}</td><td>${escapeHtml(row.ingredientName)}</td><td><span class="${expiredQtyClass}">${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</span></td><td><span class="${expiredQtyClass}">${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</span><br><span class="inventario-available-line ${Number(row.availableQty || 0) <= 0 ? 'is-zero' : ''} ${expiredQtyClass}">disp. ${Number(row.availableQty || 0).toFixed(2)} ${escapeHtml(getMeasureAbbr(row.unit || ''))}${row.packageQty ? ` x${row.packageQty}` : ''}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRow) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expand-toggle-collapse="${row.entryId}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(row.invoiceImageUrls)}</div></td></tr>${resolutionHtml}${traceHtml}`;
     }).join('') : '<tr><td colspan="7" class="text-center">Sin ingresos en ese rango.</td></tr>';
@@ -4092,6 +4474,9 @@
 
   nodes.globalPrintBtn?.addEventListener('click', async () => {
     await openPrintGlobalPeriod(getGlobalFilteredEntries());
+  });
+  nodes.globalSheetBtn?.addEventListener('click', async () => {
+    await openIngresosWeeklySheet(getGlobalFilteredEntries());
   });
   nodes.globalExcelBtn?.addEventListener('click', async () => {
     const rows = getGlobalFilteredEntries();

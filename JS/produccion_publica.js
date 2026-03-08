@@ -22,6 +22,12 @@
     if (!match) return text || '-';
     return `${match[3]}-${match[2]}-${match[1]}`;
   };
+  const formatExpiryHuman = (value) => {
+    const raw = normalize(value);
+    if (!raw) return '-';
+    if (raw.toLowerCase() === 'no perecedero') return 'No perecedero';
+    return formatIsoEs(raw);
+  };
   const getUnitMeta = (unitRaw) => {
     const unit = normalize(unitRaw).toLowerCase();
     const massMap = {
@@ -132,7 +138,7 @@
         const rneId = `${lotNodeId}_RNE`;
         const providerRne = normalize(lot?.providerRne?.number || traceLot?.providerRne?.number || '-');
         const takeQty = Number(lot?.takeQty || traceLot?.takeQty || 0);
-        lines.push(`${lotNodeId}["<b>LOTE ${lotIndex + 1}</b><br/>${escapeHtml(lot?.lotNumber || traceLot?.lotNumber || lot?.entryId || traceLot?.entryId || '-')}<br/><b>Usado:</b> ${escapeHtml(takeQty.toFixed(3))} ${escapeHtml(lot?.unit || plan?.ingredientUnit || plan?.unit || '')}<br/><b>Proveedor:</b> ${escapeHtml(lot?.provider || traceLot?.provider || '-')}<br/><b>VTO:</b> ${escapeHtml(formatIsoEs(lot?.expiryDate || traceLot?.expiryDate || ''))}"]:::toneLot`);
+        lines.push(`${lotNodeId}["<b>LOTE ${lotIndex + 1}</b><br/>${escapeHtml(lot?.lotNumber || traceLot?.lotNumber || lot?.entryId || traceLot?.entryId || '-')}<br/><b>Usado:</b> ${escapeHtml(takeQty.toFixed(3))} ${escapeHtml(lot?.unit || plan?.ingredientUnit || plan?.unit || '')}<br/><b>Proveedor:</b> ${escapeHtml(lot?.provider || traceLot?.provider || '-')}<br/><b>VTO:</b> ${escapeHtml(formatExpiryHuman(lot?.expiryDate || traceLot?.expiryDate || ''))}"]:::toneLot`);
         lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${escapeHtml(providerRne || '-')}"]:::toneRegistry`);
         lines.push(`${nodeId} -.->|LOTE ${lotIndex + 1}| ${lotNodeId}`);
         lines.push(`${lotNodeId} -.->|RNE| ${rneId}`);
