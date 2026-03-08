@@ -162,6 +162,9 @@
     return Math.round((new Date(`${normalized}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86400000);
   };
 
+  const isEntryNoPerecedero = (entry) => Boolean(entry?.noPerecedero);
+  const isEntryUsoInterno = (entry) => Boolean(entry?.usoInternoEmpresa);
+
   const getExpiryBadgeTone = (days) => {
     if (!Number.isFinite(days)) return '';
     if (days <= 2) return 'is-danger';
@@ -172,6 +175,7 @@
   const getExpiryBadgeHtml = (entry) => {
     const available = getAvailableQty(entry);
     if (!Number.isFinite(available) || available <= 0) return '';
+    if (isEntryNoPerecedero(entry)) return '<span class="inventario-expiry-days-badge is-neutral">No perecedero</span>';
     const days = getDaysUntilIso(entry?.expiryDate);
     if (!Number.isFinite(days)) return '';
     const tone = getExpiryBadgeTone(days);
@@ -184,6 +188,7 @@
   const getExpiryBadgeText = (entry) => {
     const available = getAvailableQty(entry);
     if (!Number.isFinite(available) || available <= 0) return '';
+    if (isEntryNoPerecedero(entry)) return 'No perecedero';
     const days = getDaysUntilIso(entry?.expiryDate);
     if (!Number.isFinite(days)) return '';
     if (days < 0) return `Expirado hace ${Math.abs(days)} día(s)`;
@@ -219,6 +224,7 @@
   const getDefaultProviderRne = () => ({
     number: '',
     expiryDate: '',
+    infiniteExpiry: false,
     attachmentUrl: '',
     attachmentType: '',
     updatedAt: 0,
@@ -342,6 +348,9 @@
     if (!hasRne) {
       return { key: 'none', label: 'Sin RNE', tone: 'info', helper: 'Podés cargarlo más tarde.' };
     }
+    if (Boolean(rne?.infiniteExpiry)) {
+      return { key: 'all', label: 'RNE ∞', tone: 'info', helper: 'Vencimiento infinito.' };
+    }
     const remainingDays = getRneRemainingDays(rne.expiryDate);
     if (remainingDays == null) {
       return { key: 'all', label: 'RNE cargado', tone: 'info', helper: 'Sin fecha de caducidad declarada.' };
@@ -374,6 +383,7 @@
   const buildProviderRneHistoryEntry = (source) => ({
     number: normalizeValue(source?.number),
     expiryDate: normalizeValue(source?.expiryDate),
+    infiniteExpiry: Boolean(source?.infiniteExpiry),
     attachmentUrl: normalizeValue(source?.attachmentUrl),
     attachmentType: normalizeValue(source?.attachmentType),
     savedAt: Date.now()
@@ -574,6 +584,7 @@
   };
 
   const isEntryExpiringSoon = (entry, days) => {
+    if (isEntryNoPerecedero(entry)) return false;
     const expiry = new Date(entry.expiryDate || '');
     if (Number.isNaN(expiry.getTime())) return false;
     const today = new Date();
@@ -594,6 +605,7 @@
       .map((entry) => {
         const expiryDate = normalizeIsoDate(entry.expiryDate);
         const availableQty = getAvailableQty(entry);
+        if (isEntryNoPerecedero(entry)) return null;
         if (!expiryDate || !Number.isFinite(availableQty) || availableQty <= 0) return null;
         if (expiryDate < todayIso) return null;
         const diffDays = Math.round((new Date(`${expiryDate}T00:00:00`).getTime() - new Date(`${todayIso}T00:00:00`).getTime()) / 86400000);
@@ -618,6 +630,7 @@
       .map((entry) => {
         const expiryDate = normalizeIsoDate(entry.expiryDate);
         const availableQty = getAvailableQty(entry);
+        if (isEntryNoPerecedero(entry)) return null;
         if (!expiryDate || !Number.isFinite(availableQty) || availableQty <= 0) return null;
         if (expiryDate >= todayIso) return null;
         const diffDays = Math.abs(Math.round((new Date(`${todayIso}T00:00:00`).getTime() - new Date(`${expiryDate}T00:00:00`).getTime()) / 86400000));
@@ -1177,14 +1190,14 @@
       const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
       const traceHtml = (!isCollapsed && traces.length)
         ? traces.map((trace) => `
-      <tr class="inventario-trace-row">
+      <tr class="${trace.internalUse ? 'inventario-internal-use-row' : 'inventario-trace-row'}">
         <td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(trace.createdAt))}</div></td>
         <td>${escapeHtml(row.ingredientName)}</td>
         <td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td>
-        <td>${escapeHtml(trace.expiryDateAtProduction || '-')}</td>
+        <td>${trace.internalUse ? '<span class="inventario-resolution-badge">Uso interno en empresa</span>' : escapeHtml(trace.expiryDateAtProduction || 'No perecedero')}</td>
         <td>${escapeHtml(trace.ingredientLot)}</td>
-        <td>${escapeHtml(trace.productionId)}</td>
-        <td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button></td>
+        <td>${escapeHtml(trace.internalUse ? row.provider : trace.productionId)}</td>
+        <td>${trace.internalUse ? '<span class="inventario-internal-no-trace">Sin trazabilidad</span>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td>
       </tr>`).join('') : '';
 
       const availableClass = Number(row.availableQty || 0) <= 0 ? 'is-zero' : '';
@@ -1193,7 +1206,7 @@
         <td>${escapeHtml(row.entryDateTime)}${getExpiryBadgeHtml(row) ? `<br><small>${getExpiryBadgeHtml(row)}</small>` : ''}</td>
         <td>${escapeHtml(row.ingredientName)}</td>
         <td><strong class="${expiredQtyClass}">${Number(row.qty || 0).toFixed(2)} ${escapeHtml(row.unit || '')}</strong><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${Number(row.availableQty || 0).toFixed(2)} ${escapeHtml(getMeasureAbbr(row.unit || ''))}${row.packageQty ? ` x${row.packageQty}` : ''}</span></td>
-        <td>${escapeHtml(row.expiryDate || '-')} </td>
+        <td>${escapeHtml(row.noPerecedero ? 'No perecedero' : (row.expiryDate || '-'))} </td>
         <td>${escapeHtml(row.invoiceNumber)}</td>
         <td class="inventario-provider-cell">${escapeHtml(row.provider)}</td>
         <td><div class="inventario-entry-actions">${(traces.length || resolutionRow) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-toggle-global-collapse="${row.entryId}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${row.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-global-images="${encodeURIComponent(JSON.stringify(row.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Ver (${row.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>No posee foto</button>'}</div></td>
@@ -1475,6 +1488,7 @@
 
   const getEntryUsages = (entry) => Array.isArray(entry?.productionUsage) ? entry.productionUsage : [];
   const getEntryExpiryMeta = (entry, targetIso = getArgentinaIsoDate()) => {
+    if (isEntryNoPerecedero(entry)) return { isExpired: false, availableKg: getAvailableKg(entry), expiredKg: 0 };
     const expiryIso = normalizeIsoDate(entry?.expiryDate);
     if (!expiryIso) return { isExpired: false, availableKg: getAvailableKg(entry), expiredKg: 0 };
     const availableKg = getAvailableKg(entry);
@@ -1537,13 +1551,14 @@
     id: usage.id || makeId('usage_row'),
     createdAt: Number(usage.producedAt || usage.createdAt || 0),
     productionDate: normalizeValue(usage.productionDate) || '-',
-    expiryDateAtProduction: normalizeValue(usage.expiryDateAtProduction) || '-',
+    expiryDateAtProduction: normalizeValue(usage.expiryDateAtProduction) || (isEntryNoPerecedero(entry) ? 'No perecedero' : '-'),
     kilosUsed: Number(usage.kilosUsed || 0),
     usedQty: Number(usage.usedQty || 0),
     usedUnit: normalizeValue(usage.usedUnit),
     displayAmount: formatRawUsageAmount(usage.usedQty, usage.usedUnit) || formatUsageAmount(usage.kilosUsed),
     ingredientLot: normalizeValue(usage.ingredientLot || usage.lotNumber) || normalizeValue(entry.lotNumber) || '-',
-    productionId: normalizeValue(usage.productionId) || '-'
+    productionId: normalizeValue(usage.productionId) || '-',
+    internalUse: Boolean(usage.internalUse)
   })).sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
 
   const hasEntryDetailRows = (entry) => getEntryTraceRows(entry).length > 0 || Boolean(getEntryResolutionRowData(entry));
@@ -1562,12 +1577,13 @@
   const buildTraceRowsForEntry = (entry) => getEntryTraceRows(entry).map((trace) => ({
     __isTrace: true,
     fechaHora: formatDateTime(trace.createdAt),
-    fechaCaducidad: trace.expiryDateAtProduction || '-',
+    fechaCaducidad: trace.internalUse ? 'Uso interno en empresa' : (trace.expiryDateAtProduction || 'No perecedero'),
     cantidad: `-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}`,
     factura: trace.ingredientLot || '-',
-    proveedor: trace.productionId || '-',
+    proveedor: trace.internalUse ? providerLabel(entry.provider) : (trace.productionId || '-'),
     imagenes: 'Trazabilidad',
-    productionId: trace.productionId || '-'
+    productionId: trace.internalUse ? providerLabel(entry.provider) : (trace.productionId || '-'),
+    internalUse: Boolean(trace.internalUse)
   }));
 
   const buildPrintableRowsForEntries = (entries, includeTrace = false) => {
@@ -2138,13 +2154,13 @@
       const resolutionRow = getEntryResolutionRowData(entry);
       const traceHtml = (!isCollapsed && traceRows.length)
         ? traceRows.map((trace) => `
-        <tr class="inventario-trace-row">
+        <tr class="${trace.internalUse ? 'inventario-internal-use-row' : 'inventario-trace-row'}">
           <td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(trace.createdAt)}</div></td>
-          <td>${escapeHtml(trace.expiryDateAtProduction || '-')}</td>
+          <td>${trace.internalUse ? '<span class="inventario-resolution-badge">Uso interno en empresa</span>' : escapeHtml(trace.expiryDateAtProduction || 'No perecedero')}</td>
           <td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td>
           <td>${escapeHtml(trace.ingredientLot)}</td>
-          <td>${escapeHtml(trace.productionId)}</td>
-          <td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button></td>
+          <td>${escapeHtml(trace.internalUse ? providerLabel(entry.provider) : trace.productionId)}</td>
+          <td>${trace.internalUse ? '<span class="inventario-internal-no-trace">Sin trazabilidad</span>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td>
           <td></td>
         </tr>`).join('') : '';
 
@@ -2154,7 +2170,7 @@
       return `
       <tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
         <td>${formatDateTime(entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}</td>
-        <td>${entry.expiryDate || '-'} </td>
+        <td>${entry.noPerecedero ? 'No perecedero' : (entry.expiryDate || '-')} </td>
         <td><strong class="${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</strong><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td>
         <td>${escapeHtml(entry.invoiceNumber || '-')}</td>
         <td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td>
@@ -2376,6 +2392,8 @@
       packageQty: record.packageQty ?? '',
       entryDate: getArgentinaIsoDate(),
       expiryDate: addDaysToIso(getArgentinaIsoDate(), 5),
+      noPerecedero: false,
+      usoInternoEmpresa: false,
       invoiceNumber: '',
       provider: '',
       invoiceImageFile: null,
@@ -2501,7 +2519,8 @@
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryExpiryDate"><i class="fa-regular fa-calendar-check inventario-step-icon"></i> Fecha de caducidad</label>
-            <input id="inventoryExpiryDate" class="form-control ios-input" autocomplete="off" value="${escapeHtml(state.editorDraft.expiryDate)}" placeholder="Seleccionar fecha">
+            <input id="inventoryExpiryDate" class="form-control ios-input" autocomplete="off" value="${escapeHtml(state.editorDraft.expiryDate)}" placeholder="Seleccionar fecha" ${state.editorDraft.noPerecedero ? 'disabled' : ''}>
+            <label class="inventario-check-row inventario-check-row-compact mt-2"><input type="checkbox" id="inventoryNoPerecedero" ${state.editorDraft.noPerecedero ? 'checked' : ''}><span>No perecedero</span></label>
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryInvoiceNumber"><i class="fa-solid fa-file-invoice inventario-step-icon"></i> Número de factura/remito</label>
@@ -2514,6 +2533,10 @@
               ${providers.map((provider) => `<option value="${escapeHtml(provider.id)}" ${normalizeValue(state.editorDraft.provider) === provider.id ? 'selected' : ''}>${escapeHtml(provider.name)}</option>`).join('')}
               <option value="add_provider">+ Agregar proveedor</option>
             </select>
+          </div>
+          <div class="recipe-field recipe-field-full inventario-internal-switch-wrap">
+            <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="inventoryUsoInternoEmpresa" ${state.editorDraft.usoInternoEmpresa ? 'checked' : ''}><span>Envases primarios & más</span></label>
+            <small class="text-muted">Auto egreso</small>
           </div>
           <div class="recipe-field recipe-field-full">
             <label class="form-label" for="inventoryInvoiceImage"><i class="fa-regular fa-images inventario-step-icon"></i> Adjuntar archivos (imagen o PDF)</label>
@@ -2546,6 +2569,8 @@
       state.editorDraft.packageQty = nodes.editorForm.querySelector('#inventoryPackageQty')?.value || '';
       state.editorDraft.entryDate = nodes.editorForm.querySelector('#inventoryEntryDate')?.value || '';
       state.editorDraft.expiryDate = nodes.editorForm.querySelector('#inventoryExpiryDate')?.value || '';
+      state.editorDraft.noPerecedero = Boolean(nodes.editorForm.querySelector('#inventoryNoPerecedero')?.checked);
+      state.editorDraft.usoInternoEmpresa = Boolean(nodes.editorForm.querySelector('#inventoryUsoInternoEmpresa')?.checked);
       state.editorDraft.invoiceNumber = nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value || '';
       state.editorDraft.provider = nodes.editorForm.querySelector('#inventoryProvider')?.value || '';
       state.editorDraft.customAcronym = nodes.editorForm.querySelector('#lotCustomAcronym')?.value || '';
@@ -2585,6 +2610,16 @@
       const pattern = state.editorDraft.tokens.map((token) => '${' + lotTokenLabelFor(token, state.editorDraft.customAcronym).replaceAll(' ', '_') + '}').join(separator);
       nodes.editorForm.querySelector('#lotPatternPreview').textContent = pattern || 'Sin patrón definido';
       nodes.editorForm.querySelector('.inventario-collapse-summary').innerHTML = buildLotSummaryBadges(state.editorDraft);
+    };
+
+    const syncNoPerecederoState = () => {
+      const noPerecedero = Boolean(nodes.editorForm.querySelector('#inventoryNoPerecedero')?.checked);
+      const expiryInput = nodes.editorForm.querySelector('#inventoryExpiryDate');
+      if (!expiryInput) return;
+      expiryInput.disabled = noPerecedero;
+      if (noPerecedero) expiryInput.value = '';
+      state.editorDraft.noPerecedero = noPerecedero;
+      if (noPerecedero) state.editorDraft.expiryDate = '';
     };
 
     const wireTokenDrag = () => {
@@ -2821,6 +2856,11 @@
       el.addEventListener('input', syncDraft);
       el.addEventListener('change', syncDraft);
     });
+    nodes.editorForm.querySelector('#inventoryNoPerecedero')?.addEventListener('change', () => {
+      syncNoPerecederoState();
+      syncDraft();
+    });
+    syncNoPerecederoState();
     nodes.editorForm.querySelector('#inventoryInvoiceImage')?.addEventListener('change', () => {
       syncDraft();
       const feedback = nodes.editorForm.querySelector('#inventoryInvoiceImageFeedback');
@@ -2967,12 +3007,12 @@
         const resolutionLabel = resolutionMeta.badge;
         const resolutionRow = getEntryResolutionRowData(entry);
         const traceHtml = (!isCollapsed && traceRows.length)
-          ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(trace.createdAt)}</div></td><td>${escapeHtml(trace.expiryDateAtProduction || '-')}</td><td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml(trace.productionId)}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button></td><td></td></tr>`).join('')
+          ? traceRows.map((trace) => `<tr class="${trace.internalUse ? 'inventario-internal-use-row' : 'inventario-trace-row'}"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(trace.createdAt)}</div></td><td>${trace.internalUse ? '<span class="inventario-resolution-badge">Uso interno en empresa</span>' : escapeHtml(trace.expiryDateAtProduction || 'No perecedero')}</td><td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml(trace.internalUse ? providerLabel(entry.provider) : trace.productionId)}</td><td>${trace.internalUse ? '<span class="inventario-internal-no-trace">Sin trazabilidad</span>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td><td></td></tr>`).join('')
           : '';
         const availableClass = getAvailableKg(entry) <= 0 ? 'is-zero' : '';
         const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
         const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(resolutionRow.at)}</div></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td></tr>` : '';
-        return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${formatDateTime(entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}</td><td>${entry.expiryDate || '-'} </td><td><strong class="${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</strong><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRow) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expanded-entry-collapse="${entry.id}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(entryImageUrls(entry))}</div></td></tr>${resolutionHtml}${traceHtml}`;
+        return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${formatDateTime(entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}</td><td>${entry.noPerecedero ? 'No perecedero' : (entry.expiryDate || '-')} </td><td><strong class="${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</strong><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRow) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expanded-entry-collapse="${entry.id}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(entryImageUrls(entry))}</div></td></tr>${resolutionHtml}${traceHtml}`;
       }).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos para mostrar.</td></tr>';
       await openIosSwal({
         title: 'Historial ampliado',
@@ -3190,6 +3230,8 @@
     const packageQty = packageQtyRaw ? Number.parseInt(packageQtyRaw, 10) : null;
     const entryDate = normalizeValue(nodes.editorForm.querySelector('#inventoryEntryDate')?.value);
     const expiryDate = normalizeValue(nodes.editorForm.querySelector('#inventoryExpiryDate')?.value);
+    const noPerecedero = Boolean(nodes.editorForm.querySelector('#inventoryNoPerecedero')?.checked);
+    const usoInternoEmpresa = Boolean(nodes.editorForm.querySelector('#inventoryUsoInternoEmpresa')?.checked);
     const invoiceNumber = normalizeValue(nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value);
     const providerValue = normalizeValue(nodes.editorForm.querySelector('#inventoryProvider')?.value);
     const provider = providerLabel(providerValue);
@@ -3231,8 +3273,8 @@
       return;
     }
 
-    if (!entryDate || !expiryDate) {
-      await openIosSwal({ title: 'Fechas incompletas', html: '<p>Completá fecha de ingreso y caducidad.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+    if (!entryDate || (!noPerecedero && !expiryDate)) {
+      await openIosSwal({ title: 'Fechas incompletas', html: `<p>Completá fecha de ingreso ${noPerecedero ? '' : 'y caducidad'}.</p>`, icon: 'warning', confirmButtonText: 'Entendido' });
       return;
     }
 
@@ -3298,8 +3340,10 @@
         availableKg: qtyKg,
         packageQty: Number.isFinite(packageQty) ? packageQty : (record.packageQty || null),
         productionUsage: [],
+        noPerecedero,
+        usoInternoEmpresa,
         entryDate,
-        expiryDate,
+        expiryDate: noPerecedero ? '' : expiryDate,
         invoiceNumber,
         lotNumber,
         provider,
@@ -3309,13 +3353,35 @@
         createdAt: Date.now()
       };
 
+      if (usoInternoEmpresa) {
+        const internalUsage = {
+          id: makeId('usage_internal'),
+          createdAt: Date.now(),
+          producedAt: Date.now(),
+          productionDate: entryDate,
+          expiryDateAtProduction: 'Uso interno en empresa',
+          kilosUsed: qtyKg,
+          usedQty: Number(qty.toFixed(2)),
+          usedUnit: unit,
+          lotNumber,
+          ingredientLot: lotNumber,
+          productionId: '-',
+          internalUse: true,
+          note: 'Auto egreso · Envases primarios & más'
+        };
+        entry.productionUsage = [internalUsage];
+        entry.availableQty = 0;
+        entry.availableBase = 0;
+        entry.availableKg = 0;
+        entry.lotStatus = 'sin_trazabilidad';
+      }
+
       record.entries = Array.isArray(record.entries) ? record.entries : [];
       record.entries.unshift(entry);
-      record.stockKg = Number(((Number(record.stockKg) || 0) + qtyKg).toFixed(4));
       record.stockUnit = record.stockUnit || unit;
       record.packageQty = record.packageQty || (Number.isFinite(packageQty) ? packageQty : null);
-      record.stockBase = Number(((Number(record.stockBase) || 0) + qtyBase).toFixed(6));
       record.hasEntries = true;
+      recomputeRecordStock(record, record.stockUnit || unit);
       record.lotConfig = {
         configured: state.editorDraft.tokens.length > 0,
         collapsed: state.editorDraft.tokens.length > 0,
@@ -3336,6 +3402,8 @@
         invoiceNumber: '',
         provider: '',
         invoiceImageCountLabel: 'Sin archivos seleccionados',
+        noPerecedero: false,
+        usoInternoEmpresa: false,
         expiryDate: addDaysToIso(getArgentinaIsoDate(), 5),
         entryDate: getArgentinaIsoDate()
       });
@@ -3383,6 +3451,7 @@
         <input id="providerRneNumberInput" class="swal2-input ios-input" value="${escapeHtml(currentRne.number || '')}" placeholder="Número de registro (admite guiones)">
         <label class="form-label" for="providerRneExpiryInput"><strong>Fecha de caducidad</strong></label>
         <input id="providerRneExpiryInput" class="swal2-input ios-input" value="${escapeHtml(currentRne.expiryDate || '')}" placeholder="Seleccionar fecha">
+        <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="providerRneInfiniteInput" ${currentRne.infiniteExpiry ? 'checked' : ''}><span>Vencimiento infinito (∞)</span></label>
         <label class="form-label" for="providerRneFileInput"><strong>Adjunto PDF o imagen</strong></label>
         <input id="providerRneFileInput" class="form-control ios-input image-file-input" type="file" accept="image/*,application/pdf">
         ${normalizeValue(currentRne.attachmentUrl) ? '<small>Si subís un nuevo archivo, el actual pasa al historial.</small>' : '<small>Podés cargar el archivo más tarde.</small>'}
@@ -3413,6 +3482,15 @@
             });
           }
         }
+        const infiniteInput = document.getElementById('providerRneInfiniteInput');
+        const expiryInput = document.getElementById('providerRneExpiryInput');
+        const syncInfinite = () => {
+          if (!expiryInput) return;
+          expiryInput.disabled = Boolean(infiniteInput?.checked);
+          if (infiniteInput?.checked) expiryInput.value = '';
+        };
+        infiniteInput?.addEventListener('change', syncInfinite);
+        syncInfinite();
       },
       didOpen: (popup) => {
         requestAnimationFrame(() => {
@@ -3422,7 +3500,8 @@
       preConfirm: async () => {
         const name = normalizeUpper(document.getElementById('providerNameInput')?.value);
         const number = normalizeValue(document.getElementById('providerRneNumberInput')?.value);
-        const expiryDate = normalizeIsoDate(document.getElementById('providerRneExpiryInput')?.value);
+        const infiniteExpiry = Boolean(document.getElementById('providerRneInfiniteInput')?.checked);
+        const expiryDate = infiniteExpiry ? '' : normalizeIsoDate(document.getElementById('providerRneExpiryInput')?.value);
         const file = document.getElementById('providerRneFileInput')?.files?.[0] || null;
 
         if (!name) {
@@ -3463,6 +3542,7 @@
             ...currentRne,
             number,
             expiryDate,
+            infiniteExpiry,
             attachmentUrl,
             attachmentType,
             history,
@@ -3513,15 +3593,18 @@
           const rne = safeObject(provider.rne);
           const hasRne = Boolean(normalizeValue(rne.number) || normalizeValue(rne.attachmentUrl));
           const remainingDays = getRneRemainingDays(rne.expiryDate);
+          const isInfinite = Boolean(rne.infiniteExpiry);
           const daysTone = getDaysTone(remainingDays);
-          const daysBadge = (hasRne && Number.isFinite(remainingDays))
+          const daysBadge = (hasRne && isInfinite)
+            ? '<span class="receta-rnpa-days is-ok"><i class="bi bi-infinity"></i>∞</span>'
+            : (hasRne && Number.isFinite(remainingDays))
             ? `<span class="receta-rnpa-days ${daysTone}"><i class="bi bi-clock-history"></i>${escapeHtml(String(remainingDays))} días</span>`
             : '';
           const pendingBadge = '<span class="receta-rnpa-badge is-pending"><i class="fa-solid fa-triangle-exclamation"></i>RNE pendiente</span>';
           const okBadge = '<span class="receta-rnpa-badge is-ok"><i class="fa-solid fa-file-shield"></i>RNE adjunto</span>';
           const validFrom = normalizeValue(rne.validFrom);
           const validityText = hasRne
-            ? `${rne.expiryDate ? `${escapeHtml(formatIsoDateEs(validFrom || rne.expiryDate))} → ${escapeHtml(formatIsoDateEs(rne.expiryDate))}` : `${escapeHtml(formatIsoDateEs(validFrom || ''))} → Sin caducidad`}`
+            ? `${isInfinite ? `${escapeHtml(formatIsoDateEs(validFrom || ''))} → ∞` : (rne.expiryDate ? `${escapeHtml(formatIsoDateEs(validFrom || rne.expiryDate))} → ${escapeHtml(formatIsoDateEs(rne.expiryDate))}` : `${escapeHtml(formatIsoDateEs(validFrom || ''))} → Sin caducidad`)}`
             : 'Sin vigencia registrada';
 
           return `<article class="inventario-provider-card ios-card-soft">
@@ -3597,6 +3680,7 @@
                 <small class="text-muted">Se permiten números y guion (<strong>-</strong>).</small>
                 <label class="form-label mt-2" for="providerRneExpiryInput"><strong>Fecha de caducidad</strong></label>
                 <input id="providerRneExpiryInput" type="text" class="form-control ios-input" value="${escapeHtml(rne.expiryDate || '')}" placeholder="Seleccionar fecha">
+                <label class="inventario-check-row inventario-check-row-compact mt-2"><input type="checkbox" id="providerRneInfiniteInput" ${rne.infiniteExpiry ? 'checked' : ''}><span>Vencimiento infinito (∞)</span></label>
                 <label class="form-label mt-2" for="providerRneFileInput"><strong>Archivo adjunto</strong> (PDF o imagen)</label>
                 <div class="produccion-rne-file-row">
                   <input id="providerRneFileInput" class="form-control ios-input image-file-input" type="file" accept="image/*,application/pdf">
@@ -3636,6 +3720,15 @@
               });
             }
           }
+          const infiniteInput = root.querySelector('#providerRneInfiniteInput');
+          const expiryInput = root.querySelector('#providerRneExpiryInput');
+          const syncInfinite = () => {
+            if (!expiryInput) return;
+            expiryInput.disabled = Boolean(infiniteInput?.checked);
+            if (infiniteInput?.checked) expiryInput.value = '';
+          };
+          infiniteInput?.addEventListener('change', syncInfinite);
+          syncInfinite();
 
           initThumbLoading(root);
           requestAnimationFrame(() => {
@@ -3688,7 +3781,8 @@
             const email = normalizeValue(root.querySelector('#providerEmailInput')?.value);
             const phone = normalizeValue(root.querySelector('#providerPhoneInput')?.value);
             const number = normalizeValue(root.querySelector('#providerRneNumberInput')?.value);
-            const expiryDate = normalizeIsoDate(root.querySelector('#providerRneExpiryInput')?.value);
+            const infiniteExpiry = Boolean(root.querySelector('#providerRneInfiniteInput')?.checked);
+            const expiryDate = infiniteExpiry ? '' : normalizeIsoDate(root.querySelector('#providerRneExpiryInput')?.value);
             const file = root.querySelector('#providerRneFileInput')?.files?.[0] || null;
             const photoFile = root.querySelector('#providerPhotoInput')?.files?.[0] || null;
             const loadingNode = root.querySelector('#providerRneFileLoading');
@@ -3751,6 +3845,7 @@
                 ...currentRne,
                 number,
                 expiryDate,
+                infiniteExpiry,
                 attachmentUrl,
                 attachmentType,
                 validFrom: normalizeValue(currentRne.validFrom) || getArgentinaIsoDate(),
@@ -4015,7 +4110,7 @@
       const resolutionRow = getEntryResolutionRowData(row);
       const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
       const traceHtml = (!isCollapsed && traceRows.length)
-        ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(trace.createdAt))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td>${escapeHtml(trace.expiryDateAtProduction || '-')}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml(trace.productionId)}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button></td></tr>`).join('') : '';
+        ? traceRows.map((trace) => `<tr class="${trace.internalUse ? 'inventario-internal-use-row' : 'inventario-trace-row'}"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(trace.createdAt))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td>${trace.internalUse ? '<span class="inventario-resolution-badge">Uso interno en empresa</span>' : escapeHtml(trace.expiryDateAtProduction || 'No perecedero')}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml(trace.internalUse ? row.provider : trace.productionId)}</td><td>${trace.internalUse ? '<span class="inventario-internal-no-trace">Sin trazabilidad</span>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td></tr>`).join('') : '';
       const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(resolutionRow.at))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td></tr>` : '';
       return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(row.entryDateTime)}${getExpiryBadgeHtml(row) ? `<br><small>${getExpiryBadgeHtml(row)}</small>` : ''}</td><td>${escapeHtml(row.ingredientName)}</td><td><span class="${expiredQtyClass}">${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</span></td><td><span class="${expiredQtyClass}">${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</span><br><span class="inventario-available-line ${Number(row.availableQty || 0) <= 0 ? 'is-zero' : ''} ${expiredQtyClass}">disp. ${Number(row.availableQty || 0).toFixed(2)} ${escapeHtml(getMeasureAbbr(row.unit || ''))}${row.packageQty ? ` x${row.packageQty}` : ''}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRow) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expand-toggle-collapse="${row.entryId}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(row.invoiceImageUrls)}</div></td></tr>${resolutionHtml}${traceHtml}`;
     }).join('') : '<tr><td colspan="7" class="text-center">Sin ingresos en ese rango.</td></tr>';
