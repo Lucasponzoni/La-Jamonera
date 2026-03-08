@@ -6509,6 +6509,7 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 
 .inventario-available-line.is-zero {
   color: #cc3f52;
+  text-decoration: line-through;
 }
 
 .produccion-visualizar-btn {
