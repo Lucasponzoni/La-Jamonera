@@ -1342,7 +1342,7 @@
         : [];
       if (outsideMatches.length) {
         visibleItems = outsideMatches;
-        helperHtml = '<div class="ingrediente-empty-list">No hay resultados con los filtros actuales.</div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del filtro seleccionado</strong></p>';
+        helperHtml = '<div class="ingrediente-empty-list">No hay resultados con los filtros actuales.</div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias fuera del filtro seleccionado</p>';
       } else {
         nodes.list.innerHTML = '<div class="ingrediente-empty-list">No encontramos ingredientes para inventario.</div>';
         updateListScrollHint();
@@ -3297,41 +3297,38 @@
           <div class="recipe-table-wrap inventario-bulk-table-wrap">
             <div class="recipe-table-scroll" aria-label="Tabla de productos en factura">
               <table class="recipe-table inventario-bulk-table">
-                <thead><tr><th style="width:40px">↕</th><th style="min-width:290px">Producto</th><th style="width:210px">Cantidad</th><th style="width:180px">Unidad</th><th style="width:72px">Acción</th></tr></thead>
+                <thead><tr><th style="width:40px">↕</th><th style="min-width:260px">Producto</th><th style="width:160px">Fecha</th><th style="width:160px">Cantidad</th><th style="width:260px">Unidad</th><th style="width:72px">Acción</th></tr></thead>
                 <tbody>${(Array.isArray(state.editorDraft.bulkEntries) ? state.editorDraft.bulkEntries : []).map((extra, idx) => {
             const extraIngredient = state.ingredientes[extra.ingredientId] || null;
             const extraRecord = extraIngredient ? getRecord(extraIngredient.id) : null;
             const defaultUnit = normalizeValue(extra.unit || extraRecord?.stockUnit || extraIngredient?.measure || stockUnit || 'kilos');
             const isUnit = getUnitMeta(defaultUnit).category === 'unidad';
-            const packageLocked = Number(extraRecord?.packageQty) > 0;
+            const packageLocked = isUnit && Number(extraRecord?.packageQty) > 0;
             const packageVal = normalizeValue(extra.packageQty || (packageLocked ? extraRecord.packageQty : ''));
             const avatarHtml = extraIngredient?.imageUrl
               ? `<span class="recipe-inline-avatar-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-inventario-thumb" src="${escapeHtml(extraIngredient.imageUrl)}" alt="${escapeHtml(capitalize(extraIngredient.name))}" loading="lazy"></span>`
-              : '<span class="recipe-inline-avatar-wrap recipe-inline-avatar-fallback"><span class="image-placeholder-circle-2"><i class="fa-solid fa-bowl-food"></i></span></span>';
-            return `<tr data-bulk-index="${idx}">
+              : '<span class="recipe-inline-avatar-wrap recipe-inline-avatar-fallback"><span class="recipe-small-placeholder"><i class="fa-solid fa-bowl-food"></i></span></span>';
+            return `<tr data-bulk-index="${idx}" class="inventario-bulk-main-row">
               <td><i class="fa-solid fa-grip-lines"></i></td>
               <td>
                 <div class="recipe-ing-autocomplete"><div class="recipe-ing-input-wrap">${avatarHtml}<input type="search" class="form-control ios-input" data-bulk-search="${idx}" placeholder="Buscar producto..." value="${escapeHtml(extraIngredient ? capitalize(extraIngredient.name) : '')}"></div></div>
                 <select class="form-select ios-input d-none" data-bulk-ingredient="${idx}"><option value="">Seleccionar producto</option>${Object.values(state.ingredientes).map((ing) => `<option value="${escapeHtml(ing.id)}" ${ing.id === extra.ingredientId ? 'selected' : ''}>${escapeHtml(capitalize(ing.name))}</option>`).join('')}</select>
-                <div class="inventario-bulk-row-extras">
-                  <input class="form-control ios-input" type="text" data-bulk-expiry-date="${idx}" value="${escapeHtml(extra.expiryDate || state.editorDraft.expiryDate)}" placeholder="Caducidad" ${extra.noPerecedero ? 'disabled' : ''}>
-                  <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" data-bulk-no-perecedero="${idx}" ${extra.noPerecedero ? 'checked' : ''}><span>No perecedero</span></label>
-                  <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" data-bulk-auto-egreso="${idx}" ${extra.usoInternoEmpresa ? 'checked' : ''}><span>Autoegreso</span></label>
-                </div>
               </td>
-              <td>
-                <input class="form-control ios-input mb-2" type="number" min="0" step="0.01" data-bulk-qty="${idx}" placeholder="Cantidad" value="${escapeHtml(extra.qty || '')}">
-                <div class="${isUnit || packageLocked ? '' : 'd-none'}" data-bulk-package-wrap="${idx}"><input class="form-control ios-input" type="number" min="1" step="1" data-bulk-package="${idx}" placeholder="Cant. por paquete" value="${escapeHtml(packageVal)}" ${packageLocked ? 'disabled' : ''}></div>
-              </td>
-              <td><select class="form-select ios-input" data-bulk-unit="${idx}" ${(extraRecord?.stockUnit || packageLocked) ? 'disabled' : ''}>${state.measures.map((m) => `<option value="${escapeHtml(m.name)}" ${measureKey(m.name) === measureKey(defaultUnit) ? 'selected' : ''}>${escapeHtml(getMeasureLabel(m.name))}</option>`).join('')}</select></td>
+              <td><input class="form-control ios-input" type="text" data-bulk-expiry-date="${idx}" value="${escapeHtml(extra.expiryDate || state.editorDraft.expiryDate)}" placeholder="Caducidad" ${extra.noPerecedero ? 'disabled' : ''}></td>
+              <td><input class="form-control ios-input" type="number" min="0" step="0.01" data-bulk-qty="${idx}" placeholder="Cantidad" value="${escapeHtml(extra.qty || '')}"></td>
+              <td><div class="inventario-bulk-unit-cell"><select class="form-select ios-input" data-bulk-unit="${idx}" ${(extraRecord?.stockUnit || packageLocked) ? 'disabled' : ''}>${state.measures.map((m) => `<option value="${escapeHtml(m.name)}" ${measureKey(m.name) === measureKey(defaultUnit) ? 'selected' : ''}>${escapeHtml(getMeasureLabel(m.name))}</option>`).join('')}</select><div class="${isUnit ? '' : 'd-none'}" data-bulk-package-wrap="${idx}"><input class="form-control ios-input" type="number" min="1" step="1" data-bulk-package="${idx}" placeholder="Cant. por paquete" value="${escapeHtml(packageVal)}" ${packageLocked ? 'disabled' : ''}></div></div></td>
               <td><button type="button" class="btn family-manage-btn" data-bulk-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td>
+            </tr>
+            <tr class="inventario-bulk-secondary-row">
+              <td></td>
+              <td colspan="5"><div class="inventario-bulk-row-extras"><label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" data-bulk-no-perecedero="${idx}" ${extra.noPerecedero ? 'checked' : ''}><span>No perecedero</span></label><label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" data-bulk-auto-egreso="${idx}" ${extra.usoInternoEmpresa ? 'checked' : ''}><span>Autoegreso</span></label></div></td>
             </tr>`;
           }).join('')}</tbody>
               </table>
             </div>
           </div>
           <div class="recipe-table-actions inventario-save-inline">
-            <button type="button" id="addBulkInventoryBtn" class="btn ios-btn ios-btn-secondary recipe-table-action-btn recipe-table-action-btn-primary"><i class="fa-solid fa-plus"></i><span>Productos en factura</span></button>
+            <button type="button" id="addBulkInventoryBtn" class="btn ios-btn ios-btn-success recipe-table-action-btn recipe-table-action-btn-primary"><i class="fa-solid fa-plus"></i><span>Productos en factura</span></button>
             <button type="submit" id="saveInventoryBtn" class="btn ios-btn ios-btn-success recipe-table-action-btn recipe-table-action-btn-primary">
               <img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner d-none" id="saveInventorySpinner">
               <i class="fa-solid fa-floppy-disk" id="saveInventoryIcon"></i>
@@ -3849,11 +3846,27 @@
           unitSelect.value = defaultUnit;
           unitSelect.disabled = Boolean(extraRecord.stockUnit);
         }
-        const isUnit = getUnitMeta(defaultUnit).category === 'unidad' || Number(extraRecord.packageQty) > 0;
+        const isUnit = getUnitMeta(defaultUnit).category === 'unidad';
         packageWrap?.classList.toggle('d-none', !isUnit);
         if (packageInput) {
-          packageInput.value = Number(extraRecord.packageQty) > 0 ? String(extraRecord.packageQty) : '';
-          packageInput.disabled = Number(extraRecord.packageQty) > 0;
+          packageInput.value = isUnit && Number(extraRecord.packageQty) > 0 ? String(extraRecord.packageQty) : '';
+          packageInput.disabled = isUnit && Number(extraRecord.packageQty) > 0;
+          if (!isUnit) packageInput.value = '';
+        }
+        syncDraft();
+      });
+    });
+
+    nodes.editorForm.querySelectorAll('[data-bulk-unit]').forEach((select) => {
+      select.addEventListener('change', () => {
+        const idx = Number(select.dataset.bulkUnit);
+        const packageWrap = nodes.editorForm.querySelector(`[data-bulk-package-wrap="${idx}"]`);
+        const packageInput = nodes.editorForm.querySelector(`[data-bulk-package="${idx}"]`);
+        const isUnit = getUnitMeta(select.value).category === 'unidad';
+        packageWrap?.classList.toggle('d-none', !isUnit);
+        if (!isUnit && packageInput) {
+          packageInput.value = '';
+          packageInput.disabled = false;
         }
         syncDraft();
       });

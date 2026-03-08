@@ -8241,7 +8241,5 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   gap: 8px;
 }
 
-p.inventario-filter-helper {
-    text-align: center;
-    color: #e61d49;
-}
+/* =========================================
+   USUARIOS / AJUSTES INVENTARIO-PRODUCCION
