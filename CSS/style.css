@@ -5782,6 +5782,16 @@ html.login-protected.auth-ok body {
   color: #1f3f82;
 }
 
+.produccion-stat-block.is-stock-up small,
+.produccion-stat-block.is-stock-up strong {
+  color: #1f8a48;
+}
+
+.produccion-stat-block.is-stock-down small,
+.produccion-stat-block.is-stock-down strong {
+  color: #b8353f;
+}
+
 .produccion-stat-sep {
   width: 1px;
   align-self: stretch;
@@ -5800,6 +5810,20 @@ html.login-protected.auth-ok body {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 6px;
+}
+
+.produccion-dispatch-filter {
+  border-radius: 5px !important;
+}
+
+.produccion-dispatch-ok {
+  color: #1f8a48;
+  font-weight: 700;
+}
+
+.produccion-dispatch-missing {
+  color: #b8353f;
+  font-weight: 700;
 }
 
 .produccion-check-item {
