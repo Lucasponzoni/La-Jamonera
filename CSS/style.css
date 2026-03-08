@@ -6412,6 +6412,12 @@ html.login-protected.auth-ok body {
   font-weight: 600;
 }
 
+.inventario-internal-no-trace {
+  color: #9a4f0a;
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
 tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   background: #fff4d1 !important;
 }
