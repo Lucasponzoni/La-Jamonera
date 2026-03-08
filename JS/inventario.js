@@ -3297,11 +3297,11 @@
           <div class="recipe-table-wrap inventario-bulk-table-wrap">
             <div class="recipe-table-scroll" aria-label="Tabla de productos en factura">
               <table class="recipe-table inventario-bulk-table">
-                <thead><tr><th style="width:40px">↕</th><th style="min-width:260px">Producto</th><th style="width:160px">Fecha</th><th style="width:160px">Cantidad</th><th style="width:260px">Unidad</th><th style="width:72px">Acción</th></tr></thead>
+                <thead><tr><th style="width:40px">↕</th><th style="min-width:320px">Producto</th><th style="width:180px">Fecha</th><th style="width:170px">Cantidad</th><th style="width:300px">Unidad</th><th style="width:72px">Acción</th></tr></thead>
                 <tbody>${(Array.isArray(state.editorDraft.bulkEntries) ? state.editorDraft.bulkEntries : []).map((extra, idx) => {
             const extraIngredient = state.ingredientes[extra.ingredientId] || null;
             const extraRecord = extraIngredient ? getRecord(extraIngredient.id) : null;
-            const defaultUnit = normalizeValue(extra.unit || extraRecord?.stockUnit || extraIngredient?.measure || stockUnit || 'kilos');
+            const defaultUnit = normalizeValue(extra.unit || extraRecord?.stockUnit || extraIngredient?.measure || 'kilos');
             const isUnit = getUnitMeta(defaultUnit).category === 'unidad';
             const packageLocked = isUnit && Number(extraRecord?.packageQty) > 0;
             const packageVal = normalizeValue(extra.packageQty || (packageLocked ? extraRecord.packageQty : ''));
@@ -3314,7 +3314,7 @@
                 <div class="recipe-ing-autocomplete"><div class="recipe-ing-input-wrap">${avatarHtml}<input type="search" class="form-control ios-input" data-bulk-search="${idx}" placeholder="Buscar producto..." value="${escapeHtml(extraIngredient ? capitalize(extraIngredient.name) : '')}"></div></div>
                 <select class="form-select ios-input d-none" data-bulk-ingredient="${idx}"><option value="">Seleccionar producto</option>${Object.values(state.ingredientes).map((ing) => `<option value="${escapeHtml(ing.id)}" ${ing.id === extra.ingredientId ? 'selected' : ''}>${escapeHtml(capitalize(ing.name))}</option>`).join('')}</select>
               </td>
-              <td><input class="form-control ios-input" type="text" data-bulk-expiry-date="${idx}" value="${escapeHtml(extra.expiryDate || state.editorDraft.expiryDate)}" placeholder="Caducidad" ${extra.noPerecedero ? 'disabled' : ''}></td>
+              <td><input class="form-control ios-input" type="text" data-bulk-entry-date="${idx}" value="${escapeHtml(extra.entryDate || state.editorDraft.entryDate)}" placeholder="Fecha"></td>
               <td><input class="form-control ios-input" type="number" min="0" step="0.01" data-bulk-qty="${idx}" placeholder="Cantidad" value="${escapeHtml(extra.qty || '')}"></td>
               <td><div class="inventario-bulk-unit-cell"><select class="form-select ios-input" data-bulk-unit="${idx}" ${(extraRecord?.stockUnit || packageLocked) ? 'disabled' : ''}>${state.measures.map((m) => `<option value="${escapeHtml(m.name)}" ${measureKey(m.name) === measureKey(defaultUnit) ? 'selected' : ''}>${escapeHtml(getMeasureLabel(m.name))}</option>`).join('')}</select><div class="${isUnit ? '' : 'd-none'}" data-bulk-package-wrap="${idx}"><input class="form-control ios-input" type="number" min="1" step="1" data-bulk-package="${idx}" placeholder="Cant. por paquete" value="${escapeHtml(packageVal)}" ${packageLocked ? 'disabled' : ''}></div></div></td>
               <td><button type="button" class="btn family-manage-btn" data-bulk-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td>
@@ -3328,7 +3328,7 @@
             </div>
           </div>
           <div class="recipe-table-actions inventario-save-inline">
-            <button type="button" id="addBulkInventoryBtn" class="btn ios-btn ios-btn-success recipe-table-action-btn recipe-table-action-btn-primary"><i class="fa-solid fa-plus"></i><span>Productos en factura</span></button>
+            <button type="button" id="addBulkInventoryBtn" class="btn ios-btn ios-btn-success recipe-table-action-btn inventario-add-bulk-btn"><i class="fa-solid fa-plus"></i><span>Productos en factura</span></button>
             <button type="submit" id="saveInventoryBtn" class="btn ios-btn ios-btn-success recipe-table-action-btn recipe-table-action-btn-primary">
               <img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner d-none" id="saveInventorySpinner">
               <i class="fa-solid fa-floppy-disk" id="saveInventoryIcon"></i>
@@ -3362,6 +3362,7 @@
         : 'Sin archivos seleccionados';
       state.editorDraft.bulkEntries = [...nodes.editorForm.querySelectorAll('[data-bulk-index]')].map((row) => {
         const idx = row.dataset.bulkIndex;
+        const current = Array.isArray(state.editorDraft.bulkEntries) ? state.editorDraft.bulkEntries[idx] : null;
         return {
           id: `bulk_${idx}`,
           ingredientId: normalizeValue(nodes.editorForm.querySelector(`[data-bulk-ingredient="${idx}"]`)?.value),
@@ -3370,8 +3371,8 @@
           packageQty: normalizeValue(nodes.editorForm.querySelector(`[data-bulk-package="${idx}"]`)?.value),
           noPerecedero: Boolean(nodes.editorForm.querySelector(`[data-bulk-no-perecedero="${idx}"]`)?.checked),
           usoInternoEmpresa: Boolean(nodes.editorForm.querySelector(`[data-bulk-auto-egreso="${idx}"]`)?.checked),
-          entryDate: state.editorDraft.entryDate,
-          expiryDate: normalizeValue(nodes.editorForm.querySelector(`[data-bulk-expiry-date="${idx}"]`)?.value)
+          entryDate: normalizeValue(nodes.editorForm.querySelector(`[data-bulk-entry-date="${idx}"]`)?.value) || state.editorDraft.entryDate,
+          expiryDate: normalizeValue(current?.expiryDate || state.editorDraft.expiryDate)
         };
       });
       state.editorDirty = true;
@@ -3873,14 +3874,7 @@
     });
 
     nodes.editorForm.querySelectorAll('[data-bulk-no-perecedero]').forEach((check) => {
-      check.addEventListener('change', () => {
-        const idx = check.dataset.bulkNoPerecedero;
-        const expiryInput = nodes.editorForm.querySelector(`[data-bulk-expiry-date="${idx}"]`);
-        if (!expiryInput) return;
-        expiryInput.disabled = check.checked;
-        if (check.checked) expiryInput.value = '';
-        syncDraft();
-      });
+      check.addEventListener('change', syncDraft);
     });
 
     nodes.editorForm.querySelector('#inventoryInvoiceImage')?.addEventListener('change', () => {
@@ -4186,14 +4180,13 @@
         allowInput: true,
         minDate: 'today'
       });
-      nodes.editorForm.querySelectorAll('[data-bulk-expiry-date]').forEach((input) => {
+      nodes.editorForm.querySelectorAll('[data-bulk-entry-date]').forEach((input) => {
         window.flatpickr(input, {
           locale,
           dateFormat: 'Y-m-d',
           altInput: true,
           altFormat: 'd/m/Y',
-          allowInput: true,
-          minDate: 'today'
+          allowInput: true
         });
       });
     }
