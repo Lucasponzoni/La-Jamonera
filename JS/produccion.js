@@ -2396,6 +2396,7 @@
       const draftLock = getRecipeDraftLockInfo(recipe.id);
       const statusClass = analysis.status === 'success' ? 'tone-success' : analysis.status === 'warning' ? 'tone-warning' : 'tone-danger';
       const action = `<button type="button" class="btn ios-btn ios-btn-success produccion-main-btn ${analysis.canProduce ? '' : 'is-disabled'}" data-open-produccion="${recipe.id}" ${analysis.canProduce ? '' : 'disabled'}><i class="bi bi-plus-lg"></i><span>Producir</span></button>`;
+      const usersAction = `<button type="button" class="btn ios-btn ios-btn-secondary produccion-users-btn" data-open-users-manager><i class="fa-solid fa-users icon-blue"></i><span>Usuarios</span></button>`;
       const inventoryAction = analysis.canProduce
         ? ''
         : `<button type="button" class="btn ios-btn inventory-production-action-btn is-inventory" data-open-inventario="1"><i class="fa-solid fa-boxes-stacked"></i><span>Inventario</span></button>`;
@@ -2446,6 +2447,8 @@
             ${analysis.errors.length ? `<p class="produccion-error">${analysis.errors[0]}</p>` : missingHtml}
             <div class="produccion-actions-row inventory-production-actions">
               ${action.replace('produccion-main-btn', 'produccion-main-btn inventory-production-action-btn is-main')}
+              <span class="barra-vertical produccion-actions-divider" aria-hidden="true"></span>
+              ${usersAction}
               ${inventoryAction}
               ${viewAction.replace('produccion-visualizar-btn', 'produccion-visualizar-btn inventory-production-action-btn is-view')}
               <button type="button" class="btn ios-btn inventory-production-action-btn is-threshold" data-set-recipe-min="${recipe.id}"><i class="fa-solid fa-sliders"></i><span>Umbral</span></button>
@@ -3526,6 +3529,16 @@
       renderList();
       return;
     }
+    const usersBtn = event.target.closest('[data-open-users-manager]');
+    if (usersBtn) {
+      const modal = document.getElementById('usersManagerModal');
+      if (window.bootstrap && modal) {
+        const instance = bootstrap.Modal.getOrCreateInstance(modal);
+        instance.show();
+      }
+      return;
+    }
+
     const produceBtn = event.target.closest('[data-open-produccion]');
     if (produceBtn) {
       state.activeRecipeId = produceBtn.dataset.openProduccion;
