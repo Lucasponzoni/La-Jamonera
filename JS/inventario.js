@@ -3294,7 +3294,7 @@
             <textarea id="inventoryInvoiceNumber" name="inventory_code_free" class="form-control ios-input inventario-invoice-textarea" rows="1" placeholder="Ej: A-000123" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text">${escapeHtml(state.editorDraft.invoiceNumber)}</textarea>
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryProviderSearch"><i class="fa-solid fa-truck-field inventario-step-icon"></i> Proveedor</label>
+            <label class="form-label" for="inventoryProviderSearch"><i class="bi bi-box-seam-fill inventario-step-icon"></i> Proveedor</label>
             <div class="recipe-ing-autocomplete">
               <div class="recipe-ing-input-wrap">
                 <span class="recipe-inline-avatar-wrap recipe-inline-avatar-fallback"><span class="recipe-small-placeholder"><i class="fa-solid fa-truck-field"></i></span></span>
@@ -3304,7 +3304,7 @@
             <select id="inventoryProvider" class="form-select ios-input d-none" autocomplete="off">
               <option value="">Seleccionar proveedor (opcional)</option>
               ${providers.map((provider) => `<option value="${escapeHtml(provider.id)}" ${normalizeValue(state.editorDraft.provider) === provider.id ? 'selected' : ''}>${escapeHtml(provider.name)}</option>`).join('')}
-              <option value="add_provider">+ nuevo proveedor</option>
+              <option value="add_provider">nuevo proveedor</option>
             </select>
           </div>
           <div class="recipe-field recipe-field-full inventario-internal-switch-wrap">
@@ -3630,7 +3630,7 @@
           ? `<span class="recipe-suggest-avatar-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-suggest-avatar js-inventario-thumb" src="${escapeHtml(sanitizeImageUrl(provider.photoUrl))}" alt="${escapeHtml(provider.name)}" loading="lazy"></span>`
           : '<span class="recipe-suggest-avatar-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-truck-field"></i></span></span>';
         return `<button type="button" class="recipe-suggest-item" data-provider-pick="${escapeHtml(provider.id)}">${avatar}<span>${escapeHtml(provider.name)}</span></button>`;
-      }).join('')}<button type="button" class="recipe-suggest-item recipe-suggest-create" data-provider-create="1"><i class="fa-solid fa-plus"></i><span>+ nuevo proveedor</span></button>`;
+      }).join('')}<button type="button" class="recipe-suggest-item recipe-suggest-create" data-provider-create="1"><i class="fa-solid fa-plus"></i><span>nuevo proveedor</span></button>`;
       document.body.appendChild(dropdown);
       positionProviderSuggestions(dropdown, providerSearchInput);
       initThumbLoading(dropdown);
