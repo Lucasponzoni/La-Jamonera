@@ -1286,7 +1286,6 @@
       const stockUnit = record.stockUnit || item.measure || 'kilos';
       const stockBase = Number(record.stockBase || toBase(record.stockKg || 0, stockUnit)) || 0;
       const stockQty = fromBase(stockBase, stockUnit);
-      const stockClass = stockQty <= 0 ? 'is-zero' : '';
       const thresholdBase = currentThresholdFor(record, stockUnit);
       const thresholdQty = fromBase(thresholdBase, stockUnit);
       const packageSuffix = Number(record.packageQty) > 0 ? ` x${Number(record.packageQty)}` : '';
@@ -1295,6 +1294,7 @@
       const expiredBase = expiredRows.reduce((acc, entry) => acc + toBase(entry.qty, entry.unit), 0);
       const expiredQtyInStockUnit = fromBase(expiredBase, stockUnit);
       const realAvailableQty = Math.max(0, stockQty - expiredQtyInStockUnit);
+      const stockClass = (stockQty <= 0.0001 && realAvailableQty <= 0.0001) ? 'is-zero' : '';
       const expiryRows = [
         ...expiredRows.map((entry) => ({ ...entry, type: 'expired' })),
         ...expiringRows.map((entry) => ({ ...entry, type: 'soon' }))
@@ -1708,7 +1708,9 @@
       confirmButtonText: 'Guardar cambios',
       cancelButtonText: 'Cancelar',
       customClass: {
-        popup: 'ios-alert inventario-weekly-bulk-alert'
+        popup: 'ios-alert inventario-weekly-bulk-alert',
+        confirmButton: 'ios-btn ios-btn-primary inventario-weekly-save-btn',
+        cancelButton: 'ios-btn ios-btn-secondary inventario-weekly-cancel-btn'
       },
       didOpen: (popup) => {
         initThumbLoading(popup);
@@ -2473,6 +2475,7 @@
               const qtyLabel = `${Number(row.qty || 0).toFixed(2)} ${String(row.unit || '').toUpperCase()}${row.packageQty ? ` X${row.packageQty}` : ''}`;
               const provider = resolveProvider(row.provider);
               const providerName = provider?.name || String(row.provider || '-').toUpperCase();
+              const providerRne = normalizeValue(provider?.rne?.number);
               const providerMeta = normalizeValue(provider?.email || provider?.phone || '');
               const providerPhotoUrl = sanitizeImageUrl(provider?.photoUrl);
               const providerInitial = providerInitials(providerName);
@@ -2494,19 +2497,34 @@
                       : `<span class="sheet-provider-avatar sheet-provider-avatar-fallback">${escapeHtml(providerInitial)}</span>`}
                     <div class="sheet-provider-copy">
                       <strong>${escapeHtml(providerName)}</strong>
-                      <small>${escapeHtml(providerMeta || 'Proveedor')}</small>
+                      <small>${escapeHtml(providerMeta || 'Proveedor')}${providerRne ? ` · RNE ${escapeHtml(providerRne)}` : ''}</small>
                     </div>
                   </div>
                 </header>
-                <dl class="sheet-entry-data-grid">
-                  <div><dt>Fecha y hora</dt><dd>${escapeHtml(formatShortDateTimeEs(row.createdAt))}</dd></div>
-                  <div><dt>Cantidad</dt><dd>${escapeHtml(qtyLabel)}</dd></div>
-                  <div><dt>Lote / Remito</dt><dd>${escapeHtml(loteUp)}</dd></div>
-                  <div><dt>Vencimiento</dt><dd>${escapeHtml(vtoUp)}</dd></div>
-                  <div><dt>Temperatura</dt><dd>${escapeHtml(`${temp} °C`)}</dd></div>
-                  <div><dt>Recibió</dt><dd>${escapeHtml(managersUp)}</dd></div>
-                  <div class="sheet-observaciones"><dt>Observaciones</dt><dd>SIN OBSERVACIONES</dd></div>
-                </dl>
+                <table class="sheet-entry-data-table">
+                  <thead>
+                    <tr>
+                      <th>Fecha y hora</th>
+                      <th>Cantidad</th>
+                      <th>Lote / Remito</th>
+                      <th>Vencimiento</th>
+                      <th>Temperatura</th>
+                      <th>Recibió</th>
+                      <th>Observaciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>${escapeHtml(formatShortDateTimeEs(row.createdAt))}</td>
+                      <td>${escapeHtml(qtyLabel)}</td>
+                      <td>${escapeHtml(loteUp)}</td>
+                      <td>${escapeHtml(vtoUp)}</td>
+                      <td>${escapeHtml(`${temp} °C`)}</td>
+                      <td>${escapeHtml(managersUp)}</td>
+                      <td>SIN OBSERVACIONES</td>
+                    </tr>
+                  </tbody>
+                </table>
               </article>`;
             }).join('');
             const from = formatIsoDateEs(week.weekStart);
@@ -2525,7 +2543,7 @@
 
           const win = window.open('', '_blank', 'width=1400,height=900');
           if (!win) return;
-          win.document.write(`<html><head><title>Planilla de ingresos</title><style>@page{size:portrait;margin:12mm;}body{font-family:Inter,Arial,sans-serif;color:#1f2a44;padding:8px;background:#f7f9ff;}.sheet-main-week{font-size:20px;margin:0 0 10px;letter-spacing:.04em;}.sheet-company-block{border:1px solid #c8d4f0;border-radius:12px;background:#fff;padding:10px 12px;margin-bottom:12px;line-height:1.35;}.sheet-entries-wrap{display:grid;gap:10px;}.sheet-entry-card{border:1px solid #d3def4;border-radius:16px;background:#fff;padding:10px;}.sheet-entry-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}.sheet-entry-product-wrap{display:flex;gap:10px;align-items:center;min-width:0;}.sheet-mini-avatar,.sheet-provider-avatar{width:52px;height:52px;border-radius:999px;border:1px solid #d2dbef;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;background:#edf2ff;color:#3a5898;flex-shrink:0;}.sheet-mini-avatar img,.sheet-provider-avatar img{width:100%;height:100%;object-fit:cover;}.sheet-mini-avatar-empty{font-size:20px;}.sheet-entry-product-copy{min-width:0;}.sheet-entry-product-copy h3{margin:0;font-size:18px;line-height:1.2;}.sheet-entry-product-copy p{margin:2px 0 0;color:#5a6b90;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:420px;}.sheet-entry-provider-wrap{display:flex;gap:8px;align-items:center;}.sheet-provider-avatar-fallback{background:#eef3ff;font-weight:800;color:#2f5db1;}.sheet-provider-copy strong{display:block;font-size:12px;}.sheet-provider-copy small{display:block;color:#6f7fa3;font-size:10px;}.sheet-entry-data-grid{margin-top:10px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px;}.sheet-entry-data-grid div{border:1px solid #e1e7f6;border-radius:10px;padding:7px 8px;background:#fafcff;}.sheet-entry-data-grid dt{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#6e7ea1;font-weight:700;margin:0 0 2px;}.sheet-entry-data-grid dd{margin:0;font-size:12px;font-weight:700;color:#27375b;}.sheet-entry-data-grid .sheet-observaciones{grid-column:1 / -1;}footer{break-inside:avoid;}</style></head><body>${weekSections}</body></html>`);
+          win.document.write(`<html><head><title>Planilla de ingresos</title><style>@page{size:portrait;margin:12mm;}body{font-family:Inter,Arial,sans-serif;color:#1f2a44;padding:8px;background:#f7f9ff;}.sheet-main-week{font-size:20px;margin:0 0 10px;letter-spacing:.04em;}.sheet-company-block{border:1px solid #c8d4f0;border-radius:12px;background:#fff;padding:10px 12px;margin-bottom:12px;line-height:1.35;}.sheet-entries-wrap{display:grid;gap:10px;}.sheet-entry-card{border:1px solid #d3def4;border-radius:16px;background:#fff;padding:10px;}.sheet-entry-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}.sheet-entry-product-wrap{display:flex;gap:10px;align-items:center;min-width:0;}.sheet-mini-avatar,.sheet-provider-avatar{width:52px;height:52px;border-radius:999px;border:1px solid #d2dbef;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;background:#edf2ff;color:#3a5898;flex-shrink:0;}.sheet-mini-avatar img,.sheet-provider-avatar img{width:100%;height:100%;object-fit:cover;}.sheet-mini-avatar-empty{font-size:20px;}.sheet-entry-product-copy{min-width:0;}.sheet-entry-product-copy h3{margin:0;font-size:18px;line-height:1.2;}.sheet-entry-product-copy p{margin:2px 0 0;color:#5a6b90;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:420px;}.sheet-entry-provider-wrap{display:flex;gap:8px;align-items:center;}.sheet-provider-avatar-fallback{background:#eef3ff;font-weight:800;color:#2f5db1;}.sheet-provider-copy strong{display:block;font-size:12px;}.sheet-provider-copy small{display:block;color:#6f7fa3;font-size:10px;}.sheet-entry-data-table{width:100%;margin-top:8px;border-collapse:collapse;table-layout:fixed;}.sheet-entry-data-table th,.sheet-entry-data-table td{border:1px solid #dbe4f6;padding:5px 6px;font-size:10px;vertical-align:middle;word-break:break-word;}.sheet-entry-data-table th{background:#eef3ff;font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#3c5182;}footer{break-inside:avoid;}</style></head><body>${weekSections}</body></html>`);
           win.document.close();
           await waitPrintAssets(win);
           win.focus();
