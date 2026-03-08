@@ -1331,6 +1331,8 @@
     renderStatusFilters();
     renderProviderRneAlert();
     const items = filteredIngredients();
+    let visibleItems = items;
+    let helperHtml = '';
     if (!items.length) {
       const outsideMatches = state.search
         ? Object.values(state.ingredientes).filter((item) => {
@@ -1339,15 +1341,16 @@
         })
         : [];
       if (outsideMatches.length) {
-        nodes.list.innerHTML = `<div class="ingrediente-empty-list">No hay resultados con los filtros actuales.</div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias fuera del filtro seleccionado</p>${outsideMatches.map((item) => `<button type="button" class="btn ios-btn ios-btn-secondary inventario-outside-match-btn" data-inventario-open-editor="${item.id}"><i class="fa-solid fa-magnifying-glass"></i><span>${escapeHtml(capitalize(item.name))}</span></button>`).join('')}`;
+        visibleItems = outsideMatches;
+        helperHtml = '<div class="ingrediente-empty-list">No hay resultados con los filtros actuales.</div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias fuera del filtro seleccionado</p>';
       } else {
         nodes.list.innerHTML = '<div class="ingrediente-empty-list">No encontramos ingredientes para inventario.</div>';
+        updateListScrollHint();
+        return;
       }
-      updateListScrollHint();
-      return;
     }
 
-    nodes.list.innerHTML = items.map((item) => {
+    nodes.list.innerHTML = `${helperHtml}${visibleItems.map((item) => {
       const record = getRecord(item.id);
       const status = stockStatusFor(record, item.measure || 'kilos');
       const stockUnit = record.stockUnit || item.measure || 'kilos';
@@ -1395,7 +1398,7 @@
             </div>
           </div>
         </article>`;
-    }).join('');
+    }).join('')}`;
 
     updateListScrollHint();
     initThumbLoading(nodes.list);
@@ -3291,26 +3294,44 @@
             <small id="inventoryInvoiceImageFeedback" class="inventario-file-feedback">${escapeHtml(state.editorDraft.invoiceImageCountLabel || 'Sin archivos seleccionados')}</small>
           </div>
         </div>
-          <div class="inventario-bulk-list">${(Array.isArray(state.editorDraft.bulkEntries) ? state.editorDraft.bulkEntries : []).map((extra, idx) => {
+          <div class="recipe-table-wrap inventario-bulk-table-wrap">
+            <div class="recipe-table-scroll" aria-label="Tabla de productos en factura">
+              <table class="recipe-table inventario-bulk-table">
+                <thead><tr><th style="width:40px">↕</th><th style="min-width:290px">Producto</th><th style="width:210px">Cantidad</th><th style="width:180px">Unidad</th><th style="width:72px">Acción</th></tr></thead>
+                <tbody>${(Array.isArray(state.editorDraft.bulkEntries) ? state.editorDraft.bulkEntries : []).map((extra, idx) => {
             const extraIngredient = state.ingredientes[extra.ingredientId] || null;
             const extraRecord = extraIngredient ? getRecord(extraIngredient.id) : null;
             const defaultUnit = normalizeValue(extra.unit || extraRecord?.stockUnit || extraIngredient?.measure || stockUnit || 'kilos');
             const isUnit = getUnitMeta(defaultUnit).category === 'unidad';
             const packageLocked = Number(extraRecord?.packageQty) > 0;
             const packageVal = normalizeValue(extra.packageQty || (packageLocked ? extraRecord.packageQty : ''));
-            return `<article class="inventario-bulk-row" data-bulk-index="${idx}">
-              <div class="input-group ios-input-group ingredientes-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input type="search" list="bulkSuggestions_${idx}" class="form-control ios-input ingredientes-search-input" data-bulk-search="${idx}" placeholder="Buscar producto" value="${escapeHtml(extraIngredient ? capitalize(extraIngredient.name) : '')}"></div>
-              <datalist id="bulkSuggestions_${idx}">${Object.values(state.ingredientes).map((ing) => `<option value="${escapeHtml(capitalize(ing.name))}"></option>`).join('')}<option value="+ ingrediente"></option></datalist>
-              <select class="form-select ios-input d-none" data-bulk-ingredient="${idx}"><option value="">Seleccionar producto</option>${Object.values(state.ingredientes).map((ing) => `<option value="${escapeHtml(ing.id)}" ${ing.id === extra.ingredientId ? 'selected' : ''}>${escapeHtml(capitalize(ing.name))}</option>`).join('')}</select>
-              <div class="inventario-bulk-grid"><input class="form-control ios-input" type="number" min="0" step="0.01" data-bulk-qty="${idx}" placeholder="Cantidad" value="${escapeHtml(extra.qty || '')}"><select class="form-select ios-input" data-bulk-unit="${idx}" ${(extraRecord?.stockUnit || packageLocked) ? 'disabled' : ''}>${state.measures.map((m) => `<option value="${escapeHtml(m.name)}" ${measureKey(m.name) === measureKey(defaultUnit) ? 'selected' : ''}>${escapeHtml(getMeasureLabel(m.name))}</option>`).join('')}</select></div>
-              <div class="inventario-bulk-grid ${isUnit || packageLocked ? '' : 'd-none'}" data-bulk-package-wrap="${idx}"><input class="form-control ios-input" type="number" min="1" step="1" data-bulk-package="${idx}" placeholder="Cant. por paquete" value="${escapeHtml(packageVal)}" ${packageLocked ? 'disabled' : ''}><input class="form-control ios-input" type="text" data-bulk-entry-date="${idx}" value="${escapeHtml(extra.entryDate || state.editorDraft.entryDate)}" placeholder="Fecha ingreso"></div>
-              <div class="inventario-bulk-grid"><input class="form-control ios-input" type="text" data-bulk-expiry-date="${idx}" value="${escapeHtml(extra.expiryDate || state.editorDraft.expiryDate)}" placeholder="Caducidad" ${extra.noPerecedero ? 'disabled' : ''}><button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn" data-bulk-remove="${idx}"><i class="fa-solid fa-trash"></i></button></div>
-              <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" data-bulk-no-perecedero="${idx}" ${extra.noPerecedero ? 'checked' : ''}><span>No perecedero</span></label>
-              <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" data-bulk-auto-egreso="${idx}" ${extra.usoInternoEmpresa ? 'checked' : ''}><span>Autoegreso</span></label>
-            </article>`;
-          }).join('')}</div>
+            const avatarHtml = extraIngredient?.imageUrl
+              ? `<span class="recipe-inline-avatar-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-inventario-thumb" src="${escapeHtml(extraIngredient.imageUrl)}" alt="${escapeHtml(capitalize(extraIngredient.name))}" loading="lazy"></span>`
+              : '<span class="recipe-inline-avatar-wrap recipe-inline-avatar-fallback"><span class="image-placeholder-circle-2"><i class="fa-solid fa-bowl-food"></i></span></span>';
+            return `<tr data-bulk-index="${idx}">
+              <td><i class="fa-solid fa-grip-lines"></i></td>
+              <td>
+                <div class="recipe-ing-autocomplete"><div class="recipe-ing-input-wrap">${avatarHtml}<input type="search" class="form-control ios-input" data-bulk-search="${idx}" placeholder="Buscar producto..." value="${escapeHtml(extraIngredient ? capitalize(extraIngredient.name) : '')}"></div></div>
+                <select class="form-select ios-input d-none" data-bulk-ingredient="${idx}"><option value="">Seleccionar producto</option>${Object.values(state.ingredientes).map((ing) => `<option value="${escapeHtml(ing.id)}" ${ing.id === extra.ingredientId ? 'selected' : ''}>${escapeHtml(capitalize(ing.name))}</option>`).join('')}</select>
+                <div class="inventario-bulk-row-extras">
+                  <input class="form-control ios-input" type="text" data-bulk-expiry-date="${idx}" value="${escapeHtml(extra.expiryDate || state.editorDraft.expiryDate)}" placeholder="Caducidad" ${extra.noPerecedero ? 'disabled' : ''}>
+                  <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" data-bulk-no-perecedero="${idx}" ${extra.noPerecedero ? 'checked' : ''}><span>No perecedero</span></label>
+                  <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" data-bulk-auto-egreso="${idx}" ${extra.usoInternoEmpresa ? 'checked' : ''}><span>Autoegreso</span></label>
+                </div>
+              </td>
+              <td>
+                <input class="form-control ios-input mb-2" type="number" min="0" step="0.01" data-bulk-qty="${idx}" placeholder="Cantidad" value="${escapeHtml(extra.qty || '')}">
+                <div class="${isUnit || packageLocked ? '' : 'd-none'}" data-bulk-package-wrap="${idx}"><input class="form-control ios-input" type="number" min="1" step="1" data-bulk-package="${idx}" placeholder="Cant. por paquete" value="${escapeHtml(packageVal)}" ${packageLocked ? 'disabled' : ''}></div>
+              </td>
+              <td><select class="form-select ios-input" data-bulk-unit="${idx}" ${(extraRecord?.stockUnit || packageLocked) ? 'disabled' : ''}>${state.measures.map((m) => `<option value="${escapeHtml(m.name)}" ${measureKey(m.name) === measureKey(defaultUnit) ? 'selected' : ''}>${escapeHtml(getMeasureLabel(m.name))}</option>`).join('')}</select></td>
+              <td><button type="button" class="btn family-manage-btn" data-bulk-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td>
+            </tr>`;
+          }).join('')}</tbody>
+              </table>
+            </div>
+          </div>
           <div class="recipe-table-actions inventario-save-inline">
-            <button type="button" id="addBulkInventoryBtn" class="btn ios-btn ios-btn-secondary recipe-table-action-btn"><i class="fa-solid fa-plus"></i><span>Productos en factura</span></button>
+            <button type="button" id="addBulkInventoryBtn" class="btn ios-btn ios-btn-secondary recipe-table-action-btn recipe-table-action-btn-primary"><i class="fa-solid fa-plus"></i><span>Productos en factura</span></button>
             <button type="submit" id="saveInventoryBtn" class="btn ios-btn ios-btn-success recipe-table-action-btn recipe-table-action-btn-primary">
               <img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner d-none" id="saveInventorySpinner">
               <i class="fa-solid fa-floppy-disk" id="saveInventoryIcon"></i>
@@ -3352,7 +3373,7 @@
           packageQty: normalizeValue(nodes.editorForm.querySelector(`[data-bulk-package="${idx}"]`)?.value),
           noPerecedero: Boolean(nodes.editorForm.querySelector(`[data-bulk-no-perecedero="${idx}"]`)?.checked),
           usoInternoEmpresa: Boolean(nodes.editorForm.querySelector(`[data-bulk-auto-egreso="${idx}"]`)?.checked),
-          entryDate: normalizeValue(nodes.editorForm.querySelector(`[data-bulk-entry-date="${idx}"]`)?.value),
+          entryDate: state.editorDraft.entryDate,
           expiryDate: normalizeValue(nodes.editorForm.querySelector(`[data-bulk-expiry-date="${idx}"]`)?.value)
         };
       });
@@ -3713,30 +3734,101 @@
       });
     });
 
-    nodes.editorForm.querySelectorAll('[data-bulk-search]').forEach((input) => {
-      input.addEventListener('input', async () => {
-        const idx = Number(input.dataset.bulkSearch);
-        const query = normalizeLower(input.value);
-        if (query === '+ ingrediente') {
-          inventarioModal.setAttribute('inert', '');
-          try {
-            await window.laJamoneraIngredientesAPI?.openIngredientForm?.();
-          } finally {
-            inventarioModal.removeAttribute('inert');
-          }
-          await loadData();
-          renderEditor(ingredientId, state.editorDraft);
+    let bulkSuggestDropdown = null;
+    const closeBulkSuggestions = () => {
+      if (bulkSuggestDropdown) {
+        bulkSuggestDropdown.remove();
+        bulkSuggestDropdown = null;
+      }
+    };
+    const positionBulkSuggestions = (dropdown, input) => {
+      const rect = input.getBoundingClientRect();
+      dropdown.style.position = 'fixed';
+      dropdown.style.left = `${Math.max(12, rect.left)}px`;
+      dropdown.style.top = `${rect.bottom + 6}px`;
+      dropdown.style.width = `${Math.max(rect.width, 240)}px`;
+    };
+    const applyBulkIngredient = (idx, ingredient) => {
+      const select = nodes.editorForm.querySelector(`[data-bulk-ingredient="${idx}"]`);
+      const input = nodes.editorForm.querySelector(`[data-bulk-search="${idx}"]`);
+      if (!select || !input) return;
+      select.value = ingredient.id;
+      input.value = capitalize(ingredient.name);
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    const openBulkSuggestions = (input, idx, query) => {
+      closeBulkSuggestions();
+      const source = Object.values(state.ingredientes)
+        .filter((item) => normalizeLower(item.name).includes(normalizeLower(query)))
+        .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'es'))
+        .slice(0, 10);
+      if (!source.length && normalizeValue(query).length < 2) return;
+
+      const dropdown = document.createElement('div');
+      dropdown.className = 'recipe-suggest-floating';
+      dropdown.innerHTML = `${source.map((item) => `
+        <button type="button" class="recipe-suggest-item" data-bulk-pick="${idx}" data-ing-id="${item.id}">
+          <span class="recipe-suggest-avatar-wrap">${item.imageUrl
+            ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-suggest-avatar js-inventario-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(capitalize(item.name))}" loading="lazy">`
+            : '<span class="image-placeholder-circle-2"><i class="fa-solid fa-bowl-food"></i></span>'}</span>
+          <span>${escapeHtml(capitalize(item.name))}</span>
+        </button>`).join('')}
+        <button type="button" class="recipe-suggest-item recipe-suggest-create" data-bulk-create="${idx}"><i class="fa-solid fa-plus"></i><span>Crear ingrediente</span></button>`;
+      document.body.appendChild(dropdown);
+      positionBulkSuggestions(dropdown, input);
+      initThumbLoading(dropdown);
+      dropdown.addEventListener('click', async (event) => {
+        const pick = event.target.closest('[data-bulk-pick]');
+        if (pick) {
+          const ingredientPick = state.ingredientes[pick.dataset.ingId];
+          if (ingredientPick) applyBulkIngredient(Number(pick.dataset.bulkPick), ingredientPick);
+          closeBulkSuggestions();
           return;
         }
-        const found = Object.values(state.ingredientes).find((ing) => normalizeLower(ing.name) === query)
-          || Object.values(state.ingredientes).find((ing) => normalizeLower(ing.name).includes(query));
-        if (!found) return;
-        const select = nodes.editorForm.querySelector(`[data-bulk-ingredient="${idx}"]`);
-        if (!select) return;
-        select.value = found.id;
-        input.value = capitalize(found.name);
-        select.dispatchEvent(new Event('change', { bubbles: true }));
+        const create = event.target.closest('[data-bulk-create]');
+        if (!create) return;
+        closeBulkSuggestions();
+        inventarioModal.setAttribute('inert', '');
+        try {
+          await window.laJamoneraIngredientesAPI?.openIngredientForm?.();
+        } finally {
+          inventarioModal.removeAttribute('inert');
+        }
+        await loadData();
+        renderEditor(ingredientId, state.editorDraft);
       });
+      bulkSuggestDropdown = dropdown;
+    };
+
+    nodes.editorForm.querySelectorAll('[data-bulk-search]').forEach((input) => {
+      input.addEventListener('input', () => {
+        const idx = Number(input.dataset.bulkSearch);
+        const query = normalizeValue(input.value);
+        if (!query) {
+          closeBulkSuggestions();
+          return;
+        }
+        const exact = Object.values(state.ingredientes).find((ing) => normalizeLower(ing.name) === normalizeLower(query));
+        if (exact) {
+          applyBulkIngredient(idx, exact);
+          closeBulkSuggestions();
+          return;
+        }
+        openBulkSuggestions(input, idx, query);
+      });
+      input.addEventListener('focus', () => {
+        const query = normalizeValue(input.value);
+        if (query.length >= 1) openBulkSuggestions(input, Number(input.dataset.bulkSearch), query);
+      });
+      input.addEventListener('blur', () => {
+        setTimeout(() => closeBulkSuggestions(), 140);
+      });
+    });
+
+    nodes.editorForm.addEventListener('click', (event) => {
+      if (!bulkSuggestDropdown) return;
+      if (event.target.closest('[data-bulk-search]')) return;
+      closeBulkSuggestions();
     });
 
     nodes.editorForm.querySelectorAll('[data-bulk-ingredient]').forEach((select) => {
@@ -4081,14 +4173,14 @@
         allowInput: true,
         minDate: 'today'
       });
-      nodes.editorForm.querySelectorAll('[data-bulk-entry-date],[data-bulk-expiry-date]').forEach((input) => {
+      nodes.editorForm.querySelectorAll('[data-bulk-expiry-date]').forEach((input) => {
         window.flatpickr(input, {
           locale,
           dateFormat: 'Y-m-d',
           altInput: true,
           altFormat: 'd/m/Y',
           allowInput: true,
-          minDate: input.hasAttribute('data-bulk-expiry-date') ? 'today' : undefined
+          minDate: 'today'
         });
       });
     }

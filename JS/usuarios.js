@@ -104,47 +104,78 @@
   const openUserForm = async (initial = null) => {
     let pendingFile = null;
     const result = await openIosSwal({
-      title: initial ? 'Editar usuario' : 'Crear usuario',
-      html: `<div class="swal-stack-fields text-start">
-        <input id="userFullName" class="swal2-input ios-input" placeholder="Nombre completo" value="${escapeHtml(initial?.fullName || '')}">
-        <input id="userPosition" class="swal2-input ios-input" placeholder="Puesto" value="${escapeHtml(initial?.position || '')}">
-        <input id="userEmail" class="swal2-input ios-input" type="email" placeholder="Email" value="${escapeHtml(initial?.email || '')}">
-        <input id="userPin" class="swal2-input ios-input" maxlength="4" placeholder="Clave (4 dígitos)" value="${escapeHtml(initial?.pin || '')}">
-        <label class="inventario-upload-dropzone" for="userPhotoInput"><i class="fa-regular fa-image"></i><span>Foto de perfil: click o arrastrá</span></label>
-        <input id="userPhotoInput" class="form-control image-file-input inventario-hidden-file-input" type="file" accept="image/*">
+      title: initial ? 'Editar usuario' : 'Cargar usuario',
+      customClass: { popup: 'informes-user-form-alert ingredientes-alert' },
+      html: `<div class="ingrediente-form-grid">
+        <section class="step-block">
+          <h6 class="step-title">1) Datos personales</h6>
+          <div class="step-content">
+            <label for="userFullName">Nombre y apellido *</label>
+            <input id="userFullName" class="swal2-input ios-input" autocomplete="off" placeholder="Ej: Juan Pérez" value="${escapeHtml(initial?.fullName || '')}">
+            <label for="userPosition">Puesto en la empresa *</label>
+            <input id="userPosition" class="swal2-input ios-input" autocomplete="off" placeholder="Ej: Bromatólogo" value="${escapeHtml(initial?.position || '')}">
+            <label for="userEmail">Email *</label>
+            <input id="userEmail" class="swal2-input ios-input" autocomplete="off" type="email" placeholder="Ej: usuario@empresa.com" value="${escapeHtml(initial?.email || '')}">
+            <label for="userPin">Clave de 4 dígitos *</label>
+            <div class="ios-input-group d-flex align-items-center px-2">
+              <input id="userPin" class="swal2-input ios-input border-0 bg-transparent flex-grow-1" type="password" maxlength="4" inputmode="numeric" autocomplete="new-password" placeholder="4 dígitos" value="${escapeHtml(initial?.pin || '')}">
+              <button id="toggleUserPin" type="button" class="btn ios-toggle-pass" aria-label="Ver u ocultar clave"><i class="fa-solid fa-eye"></i></button>
+            </div>
+          </div>
+        </section>
+        <section class="step-block">
+          <h6 class="step-title">2) Fotografía (opcional)</h6>
+          <div class="step-content">
+            <div id="userPhotoPreview" class="image-preview-circle">${initial?.photoUrl ? `<img src="${escapeHtml(initial.photoUrl)}" alt="Foto">` : '<span class="image-placeholder-circle-2 user-initials-preview"><i class="bi bi-person-fill"></i></span>'}</div>
+            <input id="userPhotoInput" type="file" class="form-control image-file-input" accept="image/*">
+          </div>
+        </section>
       </div>`,
       showCancelButton: true,
       confirmButtonText: initial ? 'Guardar cambios' : 'Crear usuario',
       cancelButtonText: 'Cancelar',
       didOpen: () => {
-        const input = document.getElementById('userPhotoInput');
-        const dropzone = document.querySelector('#userPhotoInput')?.previousElementSibling;
-        input?.addEventListener('change', () => {
-          pendingFile = input.files?.[0] || null;
+        const fullNameInput = document.getElementById('userFullName');
+        const photoInput = document.getElementById('userPhotoInput');
+        const preview = document.getElementById('userPhotoPreview');
+        const pinInput = document.getElementById('userPin');
+        const togglePin = document.getElementById('toggleUserPin');
+        const updateInitials = () => {
+          if (pendingFile || normalizeValue(initial?.photoUrl)) return;
+          const initials = initialsFromName(fullNameInput?.value);
+          preview.innerHTML = initials
+            ? `<span class="image-placeholder-circle-2 user-initials-preview">${escapeHtml(initials)}</span>`
+            : '<span class="image-placeholder-circle-2 user-initials-preview"><i class="bi bi-person-fill"></i></span>';
+        };
+        togglePin?.addEventListener('click', () => {
+          const hidden = pinInput.type === 'password';
+          pinInput.type = hidden ? 'text' : 'password';
+          togglePin.innerHTML = hidden ? '<i class="fa-solid fa-eye-slash"></i>' : '<i class="fa-solid fa-eye"></i>';
         });
-        dropzone?.addEventListener('dragover', (event) => {
-          event.preventDefault();
-          dropzone.classList.add('is-dragging');
-        });
-        dropzone?.addEventListener('dragleave', () => dropzone.classList.remove('is-dragging'));
-        dropzone?.addEventListener('drop', (event) => {
-          event.preventDefault();
-          dropzone.classList.remove('is-dragging');
-          const file = event.dataTransfer?.files?.[0];
-          if (!file || !input) return;
-          const dt = new DataTransfer();
-          dt.items.add(file);
-          input.files = dt.files;
+        fullNameInput?.addEventListener('input', updateInitials);
+        photoInput?.addEventListener('change', () => {
+          const file = photoInput.files?.[0] || null;
+          if (!file) return;
+          if (!USER_PHOTO_TYPES.includes(file.type) || file.size > MAX_UPLOAD_SIZE_BYTES) {
+            photoInput.value = '';
+            return;
+          }
           pendingFile = file;
+          preview.innerHTML = '<span class="image-preview-overlay"><img src="./IMG/Meta-ai-logo.webp" alt="Subiendo" class="meta-spinner-login"></span>';
+          const tempUrl = URL.createObjectURL(file);
+          setTimeout(() => {
+            preview.innerHTML = `<img src="${tempUrl}" alt="Vista previa">`;
+          }, 450);
         });
+        updateInitials();
       },
       preConfirm: async () => {
         const fullName = normalizeValue(document.getElementById('userFullName')?.value);
         const position = normalizeValue(document.getElementById('userPosition')?.value);
         const email = normalizeValue(document.getElementById('userEmail')?.value);
         const pin = normalizeValue(document.getElementById('userPin')?.value);
-        if (!fullName) return Swal.showValidationMessage('Completá el nombre.');
-        if (!position) return Swal.showValidationMessage('Completá el puesto.');
+        if (!fullName || !position || !email) return Swal.showValidationMessage('Completá nombre, puesto e email.');
+        if (!/^\S+@\S+\.\S+$/.test(email)) return Swal.showValidationMessage('Ingresá un email válido.');
         if (!/^\d{4}$/.test(pin)) return Swal.showValidationMessage('La clave debe tener 4 dígitos.');
         let photoUrl = normalizeValue(initial?.photoUrl);
         if (pendingFile) {
