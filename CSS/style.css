@@ -4454,6 +4454,15 @@ html.login-protected.auth-ok body {
   height: 18px;
 }
 
+.inventario-check-row-compact {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.inventario-internal-switch-wrap {
+  padding-top: 2px;
+}
+
 .inventario-inline-fields {
   margin-top: 8px;
 }
@@ -6384,6 +6393,25 @@ html.login-protected.auth-ok body {
   font-size: 0.82rem;
 }
 
+.inventario-internal-use-row td {
+  background: #fff2e3 !important;
+  border-top: 1px dashed #ef8f27 !important;
+  color: #9a4f0a;
+  font-size: 0.82rem;
+}
+
+.inventario-internal-meta {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.inventario-internal-meta small {
+  color: #9a4f0a;
+  font-weight: 600;
+}
+
 tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   background: #fff4d1 !important;
 }
@@ -6423,6 +6451,10 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 
 .inventario-expiry-days-badge.is-danger {
   background: linear-gradient(90deg, #ff5e57 0%, #ff3b30 100%);
+}
+
+.inventario-expiry-days-badge.is-neutral {
+  background: #8e97ad;
 }
 
 .inventario-resolution-badge {
