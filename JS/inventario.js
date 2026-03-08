@@ -3597,7 +3597,7 @@
           const isInfinite = Boolean(rne.infiniteExpiry);
           const daysTone = getDaysTone(remainingDays);
           const daysBadge = (hasRne && isInfinite)
-            ? '<span class="receta-rnpa-days is-ok"><i class="bi bi-infinity"></i>∞</span>'
+            ? '<span class="receta-rnpa-days is-ok"><i class="bi bi-infinity"></i></span>'
             : (hasRne && Number.isFinite(remainingDays))
             ? `<span class="receta-rnpa-days ${daysTone}"><i class="bi bi-clock-history"></i>${escapeHtml(String(remainingDays))} días</span>`
             : '';
