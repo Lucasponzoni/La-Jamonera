@@ -1746,6 +1746,14 @@ html.login-protected.auth-ok body {
   overflow: auto;
 }
 
+.viewer-stage.is-image {
+  cursor: grab;
+}
+
+.viewer-stage.is-image.is-dragging {
+  cursor: grabbing;
+}
+
 #viewerImage {
   max-width: 100%;
   max-height: 100%;
@@ -1753,6 +1761,7 @@ html.login-protected.auth-ok body {
   cursor: grab;
   user-select: none;
   touch-action: none;
+  -webkit-user-drag: none;
 }
 
 #viewerImage.is-dragging {

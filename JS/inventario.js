@@ -470,6 +470,7 @@
     configured: false,
     counterOnly: false,
     egresoEnabled: true,
+    perishable: true,
     rotationDays: 7,
     updatedAt: 0
   });
@@ -1336,7 +1337,7 @@
     if (!force && current.configured) {
       const quick = await openIosSwal({
         title: 'Planilla semanal',
-        html: `<p><strong>${escapeHtml(capitalize(ingredient.name))}</strong></p><p><small>Mostrador: <strong>${current.counterOnly ? 'Sí' : 'No'}</strong> · Egreso: <strong>${current.egresoEnabled ? 'Sí' : 'No'}</strong> · Rotación: <strong>${Number(current.rotationDays || 0)} día(s)</strong></small></p>`,
+        html: `<p><strong>${escapeHtml(capitalize(ingredient.name))}</strong></p><p><small>Perecedero: <strong>${current.perishable ? 'Sí' : 'No'}</strong> · Mostrador: <strong>${current.counterOnly ? 'Sí' : 'No'}</strong> · Egreso: <strong>${current.egresoEnabled ? 'Sí' : 'No'}</strong> · Rotación: <strong>${Number(current.rotationDays || 0)} día(s)</strong></small></p>`,
         showDenyButton: true,
         showCancelButton: true,
         confirmButtonText: 'Editar',
@@ -1350,6 +1351,7 @@
       title: 'Planilla Semanal',
       html: `<div class="swal-stack-fields text-start">
         <p class="mb-1"><strong>${escapeHtml(capitalize(ingredient.name))}</strong></p>
+        <label class="inventario-check-row"><input type="checkbox" id="invPerishable" ${current.perishable ? 'checked' : ''}><span>Producto perecedero</span></label>
         <label class="inventario-check-row"><input type="checkbox" id="invCounterOnly" ${current.counterOnly ? 'checked' : ''}><span>Solo venta en mostrador (no producible)</span></label>
         <label class="inventario-check-row"><input type="checkbox" id="invEgresoEnabled" ${current.egresoEnabled ? 'checked' : ''}><span><i class="fa-solid fa-robot"></i> Habilitado para egreso</span></label>
         <label class="form-label mt-2" for="invRotationDays">Días de rotación</label>
@@ -1365,6 +1367,7 @@
           return false;
         }
         return {
+          perishable: Boolean(document.getElementById('invPerishable')?.checked),
           counterOnly: Boolean(document.getElementById('invCounterOnly')?.checked),
           egresoEnabled: Boolean(document.getElementById('invEgresoEnabled')?.checked),
           rotationDays: Math.round(rotationDays)
@@ -1682,6 +1685,7 @@
       nodes.viewerDocument.src = isPdf ? item.src : '';
     }
     nodes.viewerImage.classList.toggle('d-none', isPdf);
+    nodes.viewerImage.setAttribute('draggable', 'false');
     nodes.viewerZoomInBtn?.classList.toggle('d-none', isPdf);
     nodes.viewerZoomOutBtn?.classList.toggle('d-none', isPdf);
     nodes.viewerStageSpinner?.classList.remove('d-none');
@@ -1717,7 +1721,8 @@
   window.laJamoneraOpenImageViewer = openAttachmentViewer;
 
 
-  nodes.viewerImage?.addEventListener('wheel', (event) => {
+  nodes.viewerStage?.addEventListener('wheel', (event) => {
+    if (!state.viewerImages.length || nodes.viewerImage?.classList.contains('d-none')) return;
     event.preventDefault();
     const delta = event.deltaY < 0 ? 0.2 : -0.2;
     setViewerScale(state.viewerScale + delta);
@@ -1732,13 +1737,13 @@
     return Math.sqrt((dx * dx) + (dy * dy));
   };
 
-  nodes.viewerImage?.addEventListener('touchstart', (event) => {
+  nodes.viewerStage?.addEventListener('touchstart', (event) => {
     if (event.touches.length < 2) return;
     pinchStartDistance = touchDistance(event.touches);
     pinchStartScale = state.viewerScale;
   }, { passive: true });
 
-  nodes.viewerImage?.addEventListener('touchmove', (event) => {
+  nodes.viewerStage?.addEventListener('touchmove', (event) => {
     if (event.touches.length < 2 || !pinchStartDistance) return;
     event.preventDefault();
     const nextDistance = touchDistance(event.touches);
@@ -1746,7 +1751,7 @@
     setViewerScale(pinchStartScale * ratio);
   }, { passive: false });
 
-  nodes.viewerImage?.addEventListener('touchend', (event) => {
+  nodes.viewerStage?.addEventListener('touchend', (event) => {
     if (pinchStartDistance && state.viewerScale <= 1) {
       state.viewerOffsetX = 0;
       state.viewerOffsetY = 0;
@@ -1756,20 +1761,21 @@
       pinchStartDistance = 0;
     }
   });
-  nodes.viewerImage?.addEventListener('touchcancel', () => {
+  nodes.viewerStage?.addEventListener('touchcancel', () => {
     pinchStartDistance = 0;
   });
 
-  nodes.viewerImage?.addEventListener('pointerdown', (event) => {
+  nodes.viewerStage?.addEventListener('pointerdown', (event) => {
     if (state.viewerScale <= 1) return;
     state.viewerIsDragging = true;
     state.viewerDragStartX = event.clientX - state.viewerOffsetX;
     state.viewerDragStartY = event.clientY - state.viewerOffsetY;
-    nodes.viewerImage.setPointerCapture?.(event.pointerId);
-    nodes.viewerImage.classList.add('is-dragging');
+    event.preventDefault();
+    nodes.viewerStage?.setPointerCapture?.(event.pointerId);
+    nodes.viewerStage?.classList.add('is-dragging');
   });
 
-  nodes.viewerImage?.addEventListener('pointermove', (event) => {
+  nodes.viewerStage?.addEventListener('pointermove', (event) => {
     if (!state.viewerIsDragging) return;
     state.viewerOffsetX = event.clientX - state.viewerDragStartX;
     state.viewerOffsetY = event.clientY - state.viewerDragStartY;
@@ -1779,12 +1785,12 @@
   const stopViewerDrag = (event) => {
     if (!state.viewerIsDragging) return;
     state.viewerIsDragging = false;
-    nodes.viewerImage?.classList.remove('is-dragging');
-    nodes.viewerImage?.releasePointerCapture?.(event.pointerId);
+    nodes.viewerStage?.classList.remove('is-dragging');
+    nodes.viewerStage?.releasePointerCapture?.(event.pointerId);
   };
-  nodes.viewerImage?.addEventListener('pointerup', stopViewerDrag);
-  nodes.viewerImage?.addEventListener('pointercancel', stopViewerDrag);
-  nodes.viewerImage?.addEventListener('pointerleave', stopViewerDrag);
+  nodes.viewerStage?.addEventListener('pointerup', stopViewerDrag);
+  nodes.viewerStage?.addEventListener('pointercancel', stopViewerDrag);
+  nodes.viewerStage?.addEventListener('pointerleave', stopViewerDrag);
 
   const inDateRange = (value, from, to) => {
     const dateIso = normalizeIsoDate(value);
