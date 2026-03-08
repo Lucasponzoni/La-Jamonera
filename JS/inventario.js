@@ -38,6 +38,7 @@
     toolbarCreateBtn: $('inventarioToolbarCreateIngredientBtn'),
     configBtn: $('inventarioConfigBtn'),
     providersRneBtn: $('inventarioProvidersRneBtn'),
+    weeklyConfigBtn: $('inventarioWeeklyConfigBtn'),
     providersRneAlert: $('inventarioProvidersRneAlert'),
     editorWrap: $('inventarioEditor'),
     editorForm: $('inventarioEditorForm'),
@@ -154,6 +155,24 @@
     const match = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(normalizeValue(isoDate));
     if (!match) return '-';
     return `${match[3]}/${match[2]}/${match[1]}`;
+  };
+
+  const formatShortDateTimeEs = (value) => {
+    const date = value instanceof Date ? value : new Date(Number(value) || value);
+    if (Number.isNaN(date.getTime())) return '-';
+    const datePart = new Intl.DateTimeFormat('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit',
+      timeZone: AR_TIMEZONE
+    }).format(date);
+    const timePart = new Intl.DateTimeFormat('es-AR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: AR_TIMEZONE
+    }).format(date).replace(' a. m.', ' a. m.').replace(' p. m.', ' p. m.');
+    return `${datePart}, ${timePart}`;
   };
 
   const getDaysUntilIso = (isoDate) => {
@@ -1267,7 +1286,6 @@
       const stockUnit = record.stockUnit || item.measure || 'kilos';
       const stockBase = Number(record.stockBase || toBase(record.stockKg || 0, stockUnit)) || 0;
       const stockQty = fromBase(stockBase, stockUnit);
-      const stockClass = stockQty <= 0 ? 'is-zero' : '';
       const thresholdBase = currentThresholdFor(record, stockUnit);
       const thresholdQty = fromBase(thresholdBase, stockUnit);
       const packageSuffix = Number(record.packageQty) > 0 ? ` x${Number(record.packageQty)}` : '';
@@ -1276,6 +1294,7 @@
       const expiredBase = expiredRows.reduce((acc, entry) => acc + toBase(entry.qty, entry.unit), 0);
       const expiredQtyInStockUnit = fromBase(expiredBase, stockUnit);
       const realAvailableQty = Math.max(0, stockQty - expiredQtyInStockUnit);
+      const stockClass = (stockQty <= 0.0001 && realAvailableQty <= 0.0001) ? 'is-zero' : '';
       const expiryRows = [
         ...expiredRows.map((entry) => ({ ...entry, type: 'expired' })),
         ...expiringRows.map((entry) => ({ ...entry, type: 'soon' }))
@@ -1650,6 +1669,108 @@
     state.inventario.items[ingredientId] = record;
     await persistInventario();
     return true;
+  };
+
+  const buildWeeklyConfigBulkRows = () => Object.values(state.ingredientes)
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'es'))
+    .map((ingredient) => {
+      const record = getRecord(ingredient.id);
+      const cfg = { ...getDefaultWeeklySheetConfig(), ...safeObject(record.weeklySheetConfig) };
+      const perishableClass = cfg.perishable ? 'is-perishable' : 'is-non-perishable';
+      return `<article class="inventario-weekly-row ${perishableClass}" data-weekly-row="${escapeHtml(ingredient.id)}">
+        <div class="inventario-weekly-product-head">
+          <span class="inventario-print-photo-wrap inventario-weekly-thumb-wrap">${ingredient.imageUrl ? `<span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb" src="${escapeHtml(ingredient.imageUrl)}" alt="${escapeHtml(capitalize(ingredient.name))}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span>
+          <div>
+            <h6>${escapeHtml(capitalize(ingredient.name))}</h6>
+            <p>${escapeHtml(sentenceCase(ingredient.description || 'Sin descripción'))}</p>
+          </div>
+        </div>
+        <div class="inventario-weekly-grid">
+          <label class="inventario-check-row"><input type="checkbox" data-weekly-perishable="${escapeHtml(ingredient.id)}" ${cfg.perishable ? 'checked' : ''}><span>Producto perecedero</span></label>
+          <label class="inventario-check-row"><input type="checkbox" data-weekly-counter="${escapeHtml(ingredient.id)}" ${cfg.counterOnly ? 'checked' : ''}><span>Solo venta en mostrador (no producible)</span></label>
+          <label class="inventario-check-row"><input type="checkbox" data-weekly-egreso="${escapeHtml(ingredient.id)}" ${cfg.egresoEnabled ? 'checked' : ''}><span>Habilitado para egreso</span></label>
+          <label class="inventario-weekly-rotation" for="weeklyRotation_${escapeHtml(ingredient.id)}">Días de rotación
+            <input id="weeklyRotation_${escapeHtml(ingredient.id)}" class="swal2-input ios-input" type="number" min="0" step="1" value="${Number(cfg.rotationDays || 0)}" data-weekly-rotation="${escapeHtml(ingredient.id)}">
+          </label>
+        </div>
+      </article>`;
+    }).join('');
+
+  const openWeeklyConfigManager = async () => {
+    const result = await openIosSwal({
+      title: 'Planilla semanal · Productos',
+      html: `<div class="inventario-weekly-bulk-wrap">
+        <p class="inventario-weekly-bulk-intro">Editá en masa la configuración de todos los productos. Las filas perecederas se marcan en verde y las no perecederas en azul.</p>
+        <div class="inventario-weekly-bulk-list">${buildWeeklyConfigBulkRows()}</div>
+      </div>`,
+      width: 'min(1100px, 96vw)',
+      showCancelButton: true,
+      confirmButtonText: 'Guardar cambios',
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        popup: 'ios-alert inventario-weekly-bulk-alert',
+        confirmButton: 'ios-btn ios-btn-primary inventario-weekly-save-btn',
+        cancelButton: 'ios-btn ios-btn-secondary inventario-weekly-cancel-btn'
+      },
+      didOpen: (popup) => {
+        initThumbLoading(popup);
+        popup.querySelectorAll('[data-weekly-perishable]').forEach((checkbox) => {
+          checkbox.addEventListener('change', (event) => {
+            const ingredientId = event.target.dataset.weeklyPerishable;
+            popup.querySelector(`[data-weekly-row="${ingredientId}"]`)?.classList.toggle('is-perishable', event.target.checked);
+            popup.querySelector(`[data-weekly-row="${ingredientId}"]`)?.classList.toggle('is-non-perishable', !event.target.checked);
+          });
+        });
+      },
+      preConfirm: () => {
+        const payload = {};
+        const errors = [];
+        popupLoop: for (const ingredient of Object.values(state.ingredientes)) {
+          const ingredientId = ingredient.id;
+          const perishable = Boolean(document.querySelector(`[data-weekly-perishable="${ingredientId}"]`)?.checked);
+          const counterOnly = Boolean(document.querySelector(`[data-weekly-counter="${ingredientId}"]`)?.checked);
+          const egresoEnabled = Boolean(document.querySelector(`[data-weekly-egreso="${ingredientId}"]`)?.checked);
+          const rotationRaw = document.querySelector(`[data-weekly-rotation="${ingredientId}"]`)?.value;
+          const rotationDays = Number(rotationRaw || 0);
+          if (!Number.isFinite(rotationDays) || rotationDays < 0) {
+            errors.push(capitalize(ingredient.name));
+            if (errors.length > 2) break popupLoop;
+            continue;
+          }
+          payload[ingredientId] = {
+            perishable,
+            counterOnly,
+            egresoEnabled,
+            rotationDays: Math.round(rotationDays)
+          };
+        }
+        if (errors.length) {
+          Swal.showValidationMessage(`Revisá días de rotación en: ${errors.join(', ')}.`);
+          return false;
+        }
+        return payload;
+      }
+    });
+
+    if (!result.isConfirmed) return;
+    Object.entries(result.value || {}).forEach(([ingredientId, cfg]) => {
+      const record = getRecord(ingredientId);
+      record.weeklySheetConfig = {
+        ...getDefaultWeeklySheetConfig(),
+        ...safeObject(record.weeklySheetConfig),
+        ...cfg,
+        configured: true,
+        updatedAt: Date.now()
+      };
+      state.inventario.items[ingredientId] = record;
+    });
+    await persistInventario();
+    await openIosSwal({
+      title: 'Configuración guardada',
+      html: '<p>La planilla semanal quedó actualizada para todos los productos editados.</p>',
+      icon: 'success',
+      confirmButtonText: 'Entendido'
+    });
   };
 
   const buildLotNumber = ({ lotConfig, invoiceNumber, entryDate }) => {
@@ -2347,26 +2468,64 @@
               const tempKey = `${row.ingredientId}|${row.entryId}`;
               const temp = tempMap[tempKey] || '-';
               const vtoLabel = row.noPerecedero ? 'No perecedero' : (row.expiryDate || 'No perecedero');
-              const productImage = row.ingredientImageUrl
-                ? `<span style="display:inline-flex;width:28px;height:28px;border-radius:999px;overflow:hidden;border:1px solid #d7def2;vertical-align:middle;margin-right:6px;"><img src="${escapeHtml(row.ingredientImageUrl)}" style="width:100%;height:100%;object-fit:cover;"></span>`
-                : '';
-              const qtyLabel = `${Number(row.qty || 0).toFixed(2)} ${getMeasureAbbr(row.unit || '')}${row.packageQty ? ` X${row.packageQty}` : ''}`;
-              const providerUp = String(row.provider || '-').toUpperCase();
               const productUp = String(row.ingredientName || '-').toUpperCase();
+              const productImage = row.ingredientImageUrl
+                ? `<span class="sheet-mini-avatar"><img src="${escapeHtml(row.ingredientImageUrl)}" alt="${escapeHtml(productUp)}"></span>`
+                : '';
+              const qtyLabel = `${Number(row.qty || 0).toFixed(2)} ${String(row.unit || '').toUpperCase()}${row.packageQty ? ` X${row.packageQty}` : ''}`;
+              const provider = resolveProvider(row.provider);
+              const providerName = provider?.name || String(row.provider || '-').toUpperCase();
+              const providerRne = normalizeValue(provider?.rne?.number);
+              const providerMeta = normalizeValue(provider?.email || provider?.phone || '');
+              const providerPhotoUrl = sanitizeImageUrl(provider?.photoUrl);
+              const providerInitial = providerInitials(providerName);
               const loteUp = String(row.lotNumber || row.invoiceNumber || '-').toUpperCase();
               const vtoUp = String(vtoLabel || 'NO PERECEDERO').toUpperCase();
               const managersUp = String(managers.managersLabel || 'SIN ENCARGADO').toUpperCase();
-              return `<tr>
-                <td><strong>${escapeHtml(String(row.entryDateTime || '-').toUpperCase())}</strong></td>
-                <td>${productImage}<strong style="font-size:13px;letter-spacing:.02em;">${escapeHtml(productUp)}</strong><br><small style="color:#5c6f9e;font-weight:600;">INGRESO DE MATERIA PRIMA</small></td>
-                <td><strong>${escapeHtml(providerUp)}</strong></td>
-                <td><strong>${escapeHtml(qtyLabel.toUpperCase())}</strong></td>
-                <td>${escapeHtml(loteUp)}</td>
-                <td>${escapeHtml(vtoUp)}</td>
-                <td><strong>${escapeHtml(`${temp} °C`)}</strong></td>
-                <td>${escapeHtml(managersUp)}</td>
-                <td>${escapeHtml('SIN OBSERVACIONES')}</td>
-              </tr>`;
+              return `<article class="sheet-entry-card">
+                <header class="sheet-entry-head">
+                  <div class="sheet-entry-product-wrap">
+                    ${productImage || '<span class="sheet-mini-avatar sheet-mini-avatar-empty"><i class="fa-solid fa-box"></i></span>'}
+                    <div class="sheet-entry-product-copy">
+                      <h3>${escapeHtml(productUp)}</h3>
+                      <p title="${escapeHtml(row.ingredientDescription || '')}">${escapeHtml(row.ingredientDescription || 'Sin descripción')}</p>
+                    </div>
+                  </div>
+                  <div class="sheet-entry-provider-wrap">
+                    ${providerPhotoUrl
+                      ? `<span class="sheet-provider-avatar"><img src="${escapeHtml(providerPhotoUrl)}" alt="${escapeHtml(providerName)}"></span>`
+                      : `<span class="sheet-provider-avatar sheet-provider-avatar-fallback">${escapeHtml(providerInitial)}</span>`}
+                    <div class="sheet-provider-copy">
+                      <strong>${escapeHtml(providerName)}</strong>
+                      <small>${escapeHtml(providerMeta || 'Proveedor')}${providerRne ? ` · RNE ${escapeHtml(providerRne)}` : ''}</small>
+                    </div>
+                  </div>
+                </header>
+                <table class="sheet-entry-data-table">
+                  <thead>
+                    <tr>
+                      <th>Fecha y hora</th>
+                      <th>Cantidad</th>
+                      <th>Lote / Remito</th>
+                      <th>Vencimiento</th>
+                      <th>Temperatura</th>
+                      <th>Recibió</th>
+                      <th>Observaciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>${escapeHtml(formatShortDateTimeEs(row.createdAt))}</td>
+                      <td>${escapeHtml(qtyLabel)}</td>
+                      <td>${escapeHtml(loteUp)}</td>
+                      <td>${escapeHtml(vtoUp)}</td>
+                      <td>${escapeHtml(`${temp} °C`)}</td>
+                      <td>${escapeHtml(managersUp)}</td>
+                      <td>SIN OBSERVACIONES</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </article>`;
             }).join('');
             const from = formatIsoDateEs(week.weekStart);
             const to = formatIsoDateEs(week.weekEnd);
@@ -2375,22 +2534,21 @@
               ? '*LOTE: MATERIAS PRIMAS CONGELADAS O AL VACIO (CON ROTULO)<br>CS: CERTIFICADO SANITARIO'
               : 'LOTE. SI LA MATERIA PRIMA TRAE NUMERO DE LOTE SE COPIA.<br>SI NO VIENE CON NUMERO DE LOTE, SE TOMA FECHA DE VENCIMIENTO COMO NUMERO DE LOTE.<br>RECHAZO, SI ES SI, COLOCAR EN OBSERVACIONES MOTIVOS, EJ: CERCANO A SU FECHA DE VENCIMIENTO, PAQUETES DAÑADOS, ETC.';
             return `<section style="${weekIndex ? 'page-break-before:always;' : ''}">
-              <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-bottom:10px;border:1px solid #b8c4e3;">
-                <div style="padding:10px;border-right:1px solid #b8c4e3;"><strong>FRIGORIFICO • LA JAMONERA S.A.</strong></div>
-                <div style="padding:10px;"><strong>REGISTRO INGRESO DE MATERIAS PRIMAS<br>${tipoHeader}</strong></div>
-              </div>
-              <h2 style="font-size:16px;margin:0 0 10px;"><strong>SEMANA DE ${from} A ${to}</strong></h2>
-              <table style="width:100%;border-collapse:collapse;">
-                <thead><tr><th>FECHA Y HORA</th><th>PRODUCTO</th><th>PROVEEDOR</th><th>CANTIDAD</th><th>LOTE / CS</th><th>VTO.</th><th>TEMP. °C</th><th>ENCARGADOS</th><th>OBSERVACIONES</th></tr></thead>
-                <tbody>${rowsHtml || '<tr><td colspan="9">Sin ingresos</td></tr>'}</tbody>
-              </table>
+              <header class="sheet-header">
+                <div class="sheet-week-block">
+                  <p class="sheet-week-label">Planilla semanal</p>
+                  <h1 class="sheet-main-week">SEMANA DE ${from} A ${to}</h1>
+                </div>
+                <div class="sheet-company-block"><strong>FRIGORÍFICO • LA JAMONERA S.A.</strong><small>REGISTRO INGRESO DE MATERIAS PRIMAS</small><small>${tipoHeader}</small></div>
+              </header>
+              <div class="sheet-entries-wrap">${rowsHtml || '<p>Sin ingresos</p>'}</div>
               <footer style="margin-top:12px;border-top:1px dashed #aebde4;padding-top:8px;font-size:11px;line-height:1.4;color:#293b68;"><strong>NOTAS:</strong><br>${footer}</footer>
             </section>`;
           }).join('');
 
           const win = window.open('', '_blank', 'width=1400,height=900');
           if (!win) return;
-          win.document.write(`<html><head><title>Planilla de ingresos</title><style>@page{size:landscape;margin:12mm;}body{font-family:Inter,Arial,sans-serif;color:#1f2a44;padding:8px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #c8d2eb;padding:6px;font-size:11px;vertical-align:middle;}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em;text-align:left;}</style></head><body>${weekSections}</body></html>`);
+          win.document.write(`<html><head><title>Planilla de ingresos</title><style>@page{size:portrait;margin:8mm;}body{font-family:Inter,Arial,sans-serif;color:#1f2a44;padding:4px;background:#f7f9ff;}.sheet-header{display:flex;justify-content:space-between;align-items:stretch;gap:8px;margin-bottom:8px;}.sheet-week-block{border:1px solid #c8d4f0;border-radius:10px;background:#fff;padding:7px 10px;display:grid;align-content:center;min-width:0;}.sheet-week-label{margin:0 0 2px;color:#6073a1;font-size:10px;text-transform:uppercase;letter-spacing:.04em;}.sheet-main-week{font-size:16px;margin:0;letter-spacing:.03em;line-height:1.15;}.sheet-company-block{border:1px solid #c8d4f0;border-radius:10px;background:#fff;padding:7px 10px;line-height:1.2;display:grid;align-content:center;min-width:260px;}.sheet-company-block strong{font-size:11px;}.sheet-company-block small{font-size:9px;color:#4f628f;font-weight:700;}.sheet-entries-wrap{display:grid;gap:6px;}.sheet-entry-card{border:1px solid #d3def4;border-radius:12px;background:#fff;padding:7px;}.sheet-entry-head{display:flex;justify-content:space-between;gap:8px;align-items:center;}.sheet-entry-product-wrap{display:flex;gap:8px;align-items:center;min-width:0;}.sheet-mini-avatar,.sheet-provider-avatar{width:38px;height:38px;border-radius:999px;border:1px solid #d2dbef;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;background:#edf2ff;color:#3a5898;flex-shrink:0;}.sheet-mini-avatar img,.sheet-provider-avatar img{width:100%;height:100%;object-fit:cover;}.sheet-mini-avatar-empty{font-size:14px;}.sheet-entry-product-copy{min-width:0;}.sheet-entry-product-copy h3{margin:0;font-size:13px;line-height:1.1;}.sheet-entry-product-copy p{margin:1px 0 0;color:#5a6b90;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:290px;}.sheet-entry-provider-wrap{display:flex;gap:6px;align-items:center;}.sheet-provider-avatar-fallback{background:#eef3ff;font-weight:800;color:#2f5db1;}.sheet-provider-copy strong{display:block;font-size:10px;line-height:1.1;}.sheet-provider-copy small{display:block;color:#6f7fa3;font-size:8px;line-height:1.1;}.sheet-entry-data-table{width:100%;margin-top:5px;border-collapse:collapse;table-layout:fixed;}.sheet-entry-data-table th,.sheet-entry-data-table td{border:1px solid #dbe4f6;padding:3px 4px;font-size:8px;vertical-align:middle;word-break:break-word;line-height:1.15;}.sheet-entry-data-table th{background:#eef3ff;font-size:7px;text-transform:uppercase;letter-spacing:.03em;color:#3c5182;}footer{break-inside:avoid;margin-top:8px !important;padding-top:6px !important;font-size:9px !important;line-height:1.25 !important;}</style></head><body>${weekSections}</body></html>`);
           win.document.close();
           await waitPrintAssets(win);
           win.focus();
@@ -2494,7 +2652,8 @@
           <td></td>
         </tr>`).join('') : '';
 
-      const availableClass = getAvailableKg(entry) <= 0 ? 'is-zero' : '';
+      const availableQtyInUnit = getAvailableInUnit(entry, entry.unit || '');
+      const availableClass = availableQtyInUnit <= 0.0001 ? 'is-zero' : '';
       const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
       const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(resolutionRow.at)}</div></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td><td></td></tr>` : '';
       return `
@@ -3339,7 +3498,8 @@
         const traceHtml = (!isCollapsed && traceRows.length)
           ? traceRows.map((trace) => `<tr class="${trace.internalUse ? 'inventario-internal-use-row' : 'inventario-trace-row'}"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(trace.createdAt)}</div></td><td>${trace.internalUse ? '<span class="inventario-resolution-badge">Uso interno en empresa</span>' : escapeHtml(trace.expiryDateAtProduction || 'No perecedero')}</td><td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml(trace.internalUse ? providerLabel(entry.provider) : trace.productionId)}</td><td>${trace.internalUse ? '<span class="inventario-internal-no-trace">Sin trazabilidad</span>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td><td></td></tr>`).join('')
           : '';
-        const availableClass = getAvailableKg(entry) <= 0 ? 'is-zero' : '';
+        const availableQtyInUnit = getAvailableInUnit(entry, entry.unit || '');
+      const availableClass = availableQtyInUnit <= 0.0001 ? 'is-zero' : '';
         const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
         const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(resolutionRow.at)}</div></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td></tr>` : '';
         return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${formatDateTime(entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}</td><td>${entry.noPerecedero ? 'No perecedero' : (entry.expiryDate || '-')} </td><td><strong class="${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</strong><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRow) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expanded-entry-collapse="${entry.id}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(entryImageUrls(entry))}</div></td></tr>${resolutionHtml}${traceHtml}`;
@@ -4393,6 +4553,7 @@
   nodes.list?.addEventListener('scroll', updateListScrollHint);
   nodes.configBtn?.addEventListener('click', openGlobalConfig);
   nodes.providersRneBtn?.addEventListener('click', openProvidersRneManager);
+  nodes.weeklyConfigBtn?.addEventListener('click', openWeeklyConfigManager);
   nodes.createIngredientBtn?.addEventListener('click', openCreateIngredient);
   nodes.toolbarCreateBtn?.addEventListener('click', openCreateIngredient);
   nodes.backBtn?.addEventListener('click', backToList);
