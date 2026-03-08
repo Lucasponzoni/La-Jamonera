@@ -484,19 +484,28 @@
 
   const formatQtyUnit = (qty, unit, digits = 2) => `${Number(qty || 0).toFixed(digits)} ${getMeasureAbbr(unit)}`;
 
-  const openIosSwal = (options) => Swal.fire({
-    ...options,
-    returnFocus: false,
-    customClass: {
-      popup: `ios-alert ingredientes-alert ${options?.customClass?.popup || ''}`.trim(),
-      title: 'ios-alert-title',
-      htmlContainer: 'ios-alert-text',
-      confirmButton: 'ios-btn ios-btn-primary',
-      cancelButton: 'ios-btn ios-btn-secondary',
-      ...options.customClass
-    },
-    buttonsStyling: false
-  });
+  const openIosSwal = (options) => {
+    const incomingCustomClass = safeObject(options?.customClass);
+    const joinClass = (base, extra) => [base, extra].filter(Boolean).join(' ').trim();
+    const reservedKeys = new Set(['popup', 'title', 'htmlContainer', 'confirmButton', 'cancelButton']);
+    const passthroughCustomClass = Object.fromEntries(
+      Object.entries(incomingCustomClass).filter(([key]) => !reservedKeys.has(key))
+    );
+
+    return Swal.fire({
+      ...options,
+      returnFocus: false,
+      customClass: {
+        ...passthroughCustomClass,
+        popup: joinClass('ios-alert ingredientes-alert', incomingCustomClass.popup),
+        title: joinClass('ios-alert-title', incomingCustomClass.title),
+        htmlContainer: joinClass('ios-alert-text', incomingCustomClass.htmlContainer),
+        confirmButton: joinClass('ios-btn ios-btn-primary', incomingCustomClass.confirmButton),
+        cancelButton: joinClass('ios-btn ios-btn-secondary', incomingCustomClass.cancelButton)
+      },
+      buttonsStyling: false
+    });
+  };
 
   const setStateView = (view) => {
     state.view = view;
@@ -530,6 +539,13 @@
     if (!ALLOWED_INVOICE_UPLOAD_TYPES.includes(file.type)) return 'Formato no válido (JPG, PNG, WEBP, GIF o PDF).';
     if (file.size > MAX_UPLOAD_SIZE_BYTES) return 'El adjunto supera 5MB.';
     return '';
+  };
+
+  const setFilesOnInput = (input, files = []) => {
+    if (!input || !files?.length) return;
+    const dt = new DataTransfer();
+    [...files].forEach((file) => dt.items.add(file));
+    input.files = dt.files;
   };
 
   const getDefaultWeeklySheetConfig = () => ({
@@ -2816,16 +2832,45 @@
         <div class="inventario-bulk-grid"><input id="editInventoryQty" class="swal2-input ios-input" type="number" min="0" step="0.01" value="${Number(entry.qty || 0)}"><input id="editInventoryInvoice" class="swal2-input ios-input" value="${escapeHtml(entry.invoiceNumber || '')}" placeholder="Factura/remito"></div>
         <div class="inventario-bulk-grid"><input id="editInventoryEntryDate" class="swal2-input ios-input" value="${escapeHtml(entry.entryDate || '')}" placeholder="Fecha ingreso"><input id="editInventoryExpiryDate" class="swal2-input ios-input" value="${escapeHtml(entry.expiryDate || '')}" placeholder="Fecha caducidad"></div>
         <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="editInventoryNoPerecedero" ${entry.noPerecedero ? 'checked' : ''}><span>No perecedero</span></label>
+        <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="editInventoryUsoInternoEmpresa" ${entry.usoInternoEmpresa ? 'checked' : ''}><span>Envases primarios & más</span></label>
+        <small class="text-muted">Auto egreso</small>
         <select id="editInventoryProvider" class="swal2-select ios-input"><option value="">Seleccionar proveedor</option>${sortedProviders().map((provider) => `<option value="${escapeHtml(provider.id)}" ${normalizeValue(entry.provider) === provider.id || normalizeUpper(entry.provider) === normalizeUpper(provider.name) ? 'selected' : ''}>${escapeHtml(provider.name)}</option>`).join('')}</select>
-        <input id="editInventoryFiles" class="swal2-input ios-input image-file-input" type="file" accept="image/*,application/pdf" multiple>
+        <label for="editInventoryFiles" class="inventario-upload-dropzone" id="editInventoryFilesDropzone"><i class="fa-regular fa-file-lines"></i><span>Adjuntar archivos (click o arrastrá)</span></label>
+        <input id="editInventoryFiles" class="form-control image-file-input inventario-hidden-file-input" type="file" accept="image/*,application/pdf" multiple>
+        <small id="editInventoryFilesFeedback" class="inventario-file-feedback">Sin archivos seleccionados</small>
         <div class="inventario-bulk-grid"><select id="editInventoryUser" class="swal2-select ios-input"><option value="">Usuario que modifica</option>${users.map((user) => `<option value="${escapeHtml(user.id)}">${escapeHtml(user.fullName || user.email || user.id)}</option>`).join('')}</select><input id="editInventoryPin" class="swal2-input ios-input" type="password" maxlength="4" placeholder="Clave del usuario"></div>
       </div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar cambios',
       cancelButtonText: 'Cancelar',
+      customClass: {
+        popup: 'inventario-edit-entry-alert'
+      },
       didOpen: () => {
         const noPer = document.getElementById('editInventoryNoPerecedero');
         const exp = document.getElementById('editInventoryExpiryDate');
+        const fileInput = document.getElementById('editInventoryFiles');
+        const dropzone = document.getElementById('editInventoryFilesDropzone');
+        const feedback = document.getElementById('editInventoryFilesFeedback');
+
+        const updateFilesFeedback = () => {
+          const count = fileInput?.files?.length || 0;
+          if (!feedback) return;
+          feedback.textContent = count ? `${count} archivo(s) seleccionado(s)` : 'Sin archivos seleccionados';
+        };
+
+        fileInput?.addEventListener('change', updateFilesFeedback);
+        dropzone?.addEventListener('dragover', (event) => {
+          event.preventDefault();
+          dropzone.classList.add('is-dragging');
+        });
+        dropzone?.addEventListener('dragleave', () => dropzone.classList.remove('is-dragging'));
+        dropzone?.addEventListener('drop', (event) => {
+          event.preventDefault();
+          dropzone.classList.remove('is-dragging');
+          setFilesOnInput(fileInput, event.dataTransfer?.files || []);
+          updateFilesFeedback();
+        });
         const sync = () => {
           if (!exp) return;
           exp.disabled = Boolean(noPer?.checked);
@@ -2846,6 +2891,7 @@
         const invoice = normalizeValue(document.getElementById('editInventoryInvoice')?.value);
         const entryDate = normalizeValue(document.getElementById('editInventoryEntryDate')?.value);
         const noPerecedero = Boolean(document.getElementById('editInventoryNoPerecedero')?.checked);
+        const usoInternoEmpresa = Boolean(document.getElementById('editInventoryUsoInternoEmpresa')?.checked);
         const expiryDate = noPerecedero ? '' : normalizeValue(document.getElementById('editInventoryExpiryDate')?.value);
         const provider = providerLabel(normalizeValue(document.getElementById('editInventoryProvider')?.value));
         const userId = normalizeValue(document.getElementById('editInventoryUser')?.value);
@@ -2865,7 +2911,7 @@
           const uploaded = await uploadImageToStorage(file, 'inventario/facturas');
           if (uploaded) urls.push(uploaded);
         }
-        return { qty, invoice, entryDate, expiryDate, noPerecedero, provider, userId, urls };
+        return { qty, invoice, entryDate, expiryDate, noPerecedero, usoInternoEmpresa, provider, userId, urls };
       }
     });
 
@@ -2881,6 +2927,7 @@
     entry.entryDate = form.value.entryDate;
     entry.expiryDate = form.value.noPerecedero ? '' : form.value.expiryDate;
     entry.noPerecedero = Boolean(form.value.noPerecedero);
+    entry.usoInternoEmpresa = Boolean(form.value.usoInternoEmpresa);
     entry.provider = form.value.provider;
     entry.invoiceImageUrls = form.value.urls;
     entry.invoiceImageUrl = form.value.urls[0] || '';
@@ -3673,6 +3720,7 @@
           <label for="newProviderPhoto" class="inventario-upload-dropzone"><i class="fa-regular fa-image"></i><span>Foto de perfil: click o arrastrá</span></label><input id="newProviderPhoto" class="form-control image-file-input inventario-hidden-file-input" type="file" accept="image/*"><small id="newProviderPhotoFeedback" class="inventario-file-feedback">Sin foto seleccionada</small>
           <p class="text-start"><small><strong>Opcional:</strong> podés cargar el RNE ahora o hacerlo más tarde.</small></p>
           <input id="newProviderRneNumber" class="swal2-input ios-input" placeholder="RNE (opcional)">
+          <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="newProviderRneInfinite"><span>Vencimiento infinito (∞)</span></label>
           <input id="newProviderRneExpiry" class="swal2-input ios-input" placeholder="Vencimiento RNE (opcional)">
           <label for="newProviderRneFile" class="inventario-upload-dropzone"><i class="fa-regular fa-file"></i><span>Adjunto RNE: click o arrastrá</span></label><input id="newProviderRneFile" class="form-control image-file-input inventario-hidden-file-input" type="file" accept="image/*,application/pdf"><small id="newProviderRneFeedback" class="inventario-file-feedback">Sin adjunto seleccionado</small>
         </div>`,
@@ -3682,9 +3730,17 @@
         willOpen: () => {
           const expiryInput = document.getElementById('newProviderRneExpiry');
           const numberInput = document.getElementById('newProviderRneNumber');
+          const infiniteInput = document.getElementById('newProviderRneInfinite');
           numberInput?.addEventListener('input', () => {
             numberInput.value = numberInput.value.replace(/[^0-9-]/g, '');
           });
+          const syncInfinite = () => {
+            if (!expiryInput) return;
+            expiryInput.disabled = Boolean(infiniteInput?.checked);
+            if (infiniteInput?.checked) expiryInput.value = '';
+          };
+          infiniteInput?.addEventListener('change', syncInfinite);
+          syncInfinite();
           const wireDrop = (inputId, feedbackId) => {
             const input = document.getElementById(inputId);
             const dropzone = document.querySelector(`label[for="${inputId}"]`);
@@ -3728,8 +3784,9 @@
           const email = normalizeValue(document.getElementById('newProviderEmail')?.value);
           const phone = normalizeValue(document.getElementById('newProviderPhone')?.value);
           const nonFoodCategory = Boolean(document.getElementById('newProviderNonFood')?.checked);
+          const infiniteExpiry = Boolean(document.getElementById('newProviderRneInfinite')?.checked);
           const rneNumber = nonFoodCategory ? '' : normalizeValue(document.getElementById('newProviderRneNumber')?.value);
-          const rneExpiry = nonFoodCategory ? '' : normalizeIsoDate(document.getElementById('newProviderRneExpiry')?.value);
+          const rneExpiry = nonFoodCategory || infiniteExpiry ? '' : normalizeIsoDate(document.getElementById('newProviderRneExpiry')?.value);
           const rneFile = nonFoodCategory ? null : (document.getElementById('newProviderRneFile')?.files?.[0] || null);
           const photoFile = document.getElementById('newProviderPhoto')?.files?.[0] || null;
 
@@ -3777,6 +3834,7 @@
               ...getDefaultProviderRne(),
               number: rneNumber,
               expiryDate: rneExpiry,
+              infiniteExpiry: nonFoodCategory ? false : infiniteExpiry,
               attachmentUrl,
               attachmentType: rneFile?.type || '',
               updatedAt: Date.now()
@@ -4513,7 +4571,10 @@
 
     for (const extra of bulkEntries) {
       const extraIngredientId = normalizeValue(extra.ingredientId);
-      if (!extraIngredientId) continue;
+      if (!extraIngredientId) {
+        await openIosSwal({ title: 'Producto faltante', html: '<p>Completá el producto en "Productos en factura" o eliminá la fila vacía.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+        return;
+      }
       const extraQty = parseNumber(extra.qty);
       if (!Number.isFinite(extraQty) || extraQty <= 0) {
         await openIosSwal({ title: 'Cantidad inválida', html: '<p>Revisá la cantidad en productos adicionales.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
