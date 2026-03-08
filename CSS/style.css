@@ -5475,6 +5475,20 @@ html.login-protected.auth-ok body {
   color: #fff;
 }
 
+.produccion-dispatch-btn {
+  width: fit-content;
+  max-width: none;
+  background: #eaf1ff;
+  color: #2a4ea3;
+  border: 1px solid #cdd9f6;
+}
+
+.produccion-dispatch-btn:hover {
+  background: #dfe9ff;
+  color: #24448f;
+  border-color: #bcccf3;
+}
+
 .produccion-history-btn:hover {
   background: #ef7c1e;
   color: #fff;
@@ -5814,6 +5828,10 @@ html.login-protected.auth-ok body {
 
 .produccion-dispatch-filter {
   border-radius: 5px !important;
+}
+
+.produccion-dispatch-head .step-title {
+  margin-right: auto;
 }
 
 .produccion-dispatch-ok {
