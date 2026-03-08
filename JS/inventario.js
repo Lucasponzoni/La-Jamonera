@@ -4304,7 +4304,7 @@
         altFormat: 'd/m/Y',
         allowInput: true
       });
-      nodes.editorForm.querySelectorAll('[data-bulk-expiry-date]').forEach((input) => {
+      nodes.editorForm.querySelectorAll('[data-bulk-entry-date]').forEach((input) => {
         window.flatpickr(input, {
           locale,
           dateFormat: 'Y-m-d',
