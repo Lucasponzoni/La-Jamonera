@@ -38,6 +38,7 @@
     toolbarCreateBtn: $('inventarioToolbarCreateIngredientBtn'),
     configBtn: $('inventarioConfigBtn'),
     providersRneBtn: $('inventarioProvidersRneBtn'),
+    weeklyConfigBtn: $('inventarioWeeklyConfigBtn'),
     providersRneAlert: $('inventarioProvidersRneAlert'),
     editorWrap: $('inventarioEditor'),
     editorForm: $('inventarioEditorForm'),
@@ -154,6 +155,24 @@
     const match = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(normalizeValue(isoDate));
     if (!match) return '-';
     return `${match[3]}/${match[2]}/${match[1]}`;
+  };
+
+  const formatShortDateTimeEs = (value) => {
+    const date = value instanceof Date ? value : new Date(Number(value) || value);
+    if (Number.isNaN(date.getTime())) return '-';
+    const datePart = new Intl.DateTimeFormat('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit',
+      timeZone: AR_TIMEZONE
+    }).format(date);
+    const timePart = new Intl.DateTimeFormat('es-AR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: AR_TIMEZONE
+    }).format(date).replace(' a. m.', ' a. m.').replace(' p. m.', ' p. m.');
+    return `${datePart}, ${timePart}`;
   };
 
   const getDaysUntilIso = (isoDate) => {
@@ -1652,6 +1671,106 @@
     return true;
   };
 
+  const buildWeeklyConfigBulkRows = () => Object.values(state.ingredientes)
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'es'))
+    .map((ingredient) => {
+      const record = getRecord(ingredient.id);
+      const cfg = { ...getDefaultWeeklySheetConfig(), ...safeObject(record.weeklySheetConfig) };
+      const perishableClass = cfg.perishable ? 'is-perishable' : 'is-non-perishable';
+      return `<article class="inventario-weekly-row ${perishableClass}" data-weekly-row="${escapeHtml(ingredient.id)}">
+        <div class="inventario-weekly-product-head">
+          <span class="inventario-print-photo-wrap inventario-weekly-thumb-wrap">${ingredient.imageUrl ? `<span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb" src="${escapeHtml(ingredient.imageUrl)}" alt="${escapeHtml(capitalize(ingredient.name))}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span>
+          <div>
+            <h6>${escapeHtml(capitalize(ingredient.name))}</h6>
+            <p>${escapeHtml(sentenceCase(ingredient.description || 'Sin descripción'))}</p>
+          </div>
+        </div>
+        <div class="inventario-weekly-grid">
+          <label class="inventario-check-row"><input type="checkbox" data-weekly-perishable="${escapeHtml(ingredient.id)}" ${cfg.perishable ? 'checked' : ''}><span>Producto perecedero</span></label>
+          <label class="inventario-check-row"><input type="checkbox" data-weekly-counter="${escapeHtml(ingredient.id)}" ${cfg.counterOnly ? 'checked' : ''}><span>Solo venta en mostrador (no producible)</span></label>
+          <label class="inventario-check-row"><input type="checkbox" data-weekly-egreso="${escapeHtml(ingredient.id)}" ${cfg.egresoEnabled ? 'checked' : ''}><span>Habilitado para egreso</span></label>
+          <label class="inventario-weekly-rotation" for="weeklyRotation_${escapeHtml(ingredient.id)}">Días de rotación
+            <input id="weeklyRotation_${escapeHtml(ingredient.id)}" class="swal2-input ios-input" type="number" min="0" step="1" value="${Number(cfg.rotationDays || 0)}" data-weekly-rotation="${escapeHtml(ingredient.id)}">
+          </label>
+        </div>
+      </article>`;
+    }).join('');
+
+  const openWeeklyConfigManager = async () => {
+    const result = await openIosSwal({
+      title: 'Planilla semanal · Productos',
+      html: `<div class="inventario-weekly-bulk-wrap">
+        <p class="inventario-weekly-bulk-intro">Editá en masa la configuración de todos los productos. Las filas perecederas se marcan en verde y las no perecederas en azul.</p>
+        <div class="inventario-weekly-bulk-list">${buildWeeklyConfigBulkRows()}</div>
+      </div>`,
+      width: 'min(1100px, 96vw)',
+      showCancelButton: true,
+      confirmButtonText: 'Guardar cambios',
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        popup: 'ios-alert inventario-weekly-bulk-alert'
+      },
+      didOpen: (popup) => {
+        initThumbLoading(popup);
+        popup.querySelectorAll('[data-weekly-perishable]').forEach((checkbox) => {
+          checkbox.addEventListener('change', (event) => {
+            const ingredientId = event.target.dataset.weeklyPerishable;
+            popup.querySelector(`[data-weekly-row="${ingredientId}"]`)?.classList.toggle('is-perishable', event.target.checked);
+            popup.querySelector(`[data-weekly-row="${ingredientId}"]`)?.classList.toggle('is-non-perishable', !event.target.checked);
+          });
+        });
+      },
+      preConfirm: () => {
+        const payload = {};
+        const errors = [];
+        popupLoop: for (const ingredient of Object.values(state.ingredientes)) {
+          const ingredientId = ingredient.id;
+          const perishable = Boolean(document.querySelector(`[data-weekly-perishable="${ingredientId}"]`)?.checked);
+          const counterOnly = Boolean(document.querySelector(`[data-weekly-counter="${ingredientId}"]`)?.checked);
+          const egresoEnabled = Boolean(document.querySelector(`[data-weekly-egreso="${ingredientId}"]`)?.checked);
+          const rotationRaw = document.querySelector(`[data-weekly-rotation="${ingredientId}"]`)?.value;
+          const rotationDays = Number(rotationRaw || 0);
+          if (!Number.isFinite(rotationDays) || rotationDays < 0) {
+            errors.push(capitalize(ingredient.name));
+            if (errors.length > 2) break popupLoop;
+            continue;
+          }
+          payload[ingredientId] = {
+            perishable,
+            counterOnly,
+            egresoEnabled,
+            rotationDays: Math.round(rotationDays)
+          };
+        }
+        if (errors.length) {
+          Swal.showValidationMessage(`Revisá días de rotación en: ${errors.join(', ')}.`);
+          return false;
+        }
+        return payload;
+      }
+    });
+
+    if (!result.isConfirmed) return;
+    Object.entries(result.value || {}).forEach(([ingredientId, cfg]) => {
+      const record = getRecord(ingredientId);
+      record.weeklySheetConfig = {
+        ...getDefaultWeeklySheetConfig(),
+        ...safeObject(record.weeklySheetConfig),
+        ...cfg,
+        configured: true,
+        updatedAt: Date.now()
+      };
+      state.inventario.items[ingredientId] = record;
+    });
+    await persistInventario();
+    await openIosSwal({
+      title: 'Configuración guardada',
+      html: '<p>La planilla semanal quedó actualizada para todos los productos editados.</p>',
+      icon: 'success',
+      confirmButtonText: 'Entendido'
+    });
+  };
+
   const buildLotNumber = ({ lotConfig, invoiceNumber, entryDate }) => {
     const config = safeObject(lotConfig);
     const tokens = Array.isArray(config.tokens) ? config.tokens : [];
@@ -2347,26 +2466,48 @@
               const tempKey = `${row.ingredientId}|${row.entryId}`;
               const temp = tempMap[tempKey] || '-';
               const vtoLabel = row.noPerecedero ? 'No perecedero' : (row.expiryDate || 'No perecedero');
-              const productImage = row.ingredientImageUrl
-                ? `<span style="display:inline-flex;width:28px;height:28px;border-radius:999px;overflow:hidden;border:1px solid #d7def2;vertical-align:middle;margin-right:6px;"><img src="${escapeHtml(row.ingredientImageUrl)}" style="width:100%;height:100%;object-fit:cover;"></span>`
-                : '';
-              const qtyLabel = `${Number(row.qty || 0).toFixed(2)} ${getMeasureAbbr(row.unit || '')}${row.packageQty ? ` X${row.packageQty}` : ''}`;
-              const providerUp = String(row.provider || '-').toUpperCase();
               const productUp = String(row.ingredientName || '-').toUpperCase();
+              const productImage = row.ingredientImageUrl
+                ? `<span class="sheet-mini-avatar"><img src="${escapeHtml(row.ingredientImageUrl)}" alt="${escapeHtml(productUp)}"></span>`
+                : '';
+              const qtyLabel = `${Number(row.qty || 0).toFixed(2)} ${String(row.unit || '').toUpperCase()}${row.packageQty ? ` X${row.packageQty}` : ''}`;
+              const provider = resolveProvider(row.provider);
+              const providerName = provider?.name || String(row.provider || '-').toUpperCase();
+              const providerMeta = normalizeValue(provider?.email || provider?.phone || '');
+              const providerPhotoUrl = sanitizeImageUrl(provider?.photoUrl);
+              const providerInitial = providerInitials(providerName);
               const loteUp = String(row.lotNumber || row.invoiceNumber || '-').toUpperCase();
               const vtoUp = String(vtoLabel || 'NO PERECEDERO').toUpperCase();
               const managersUp = String(managers.managersLabel || 'SIN ENCARGADO').toUpperCase();
-              return `<tr>
-                <td><strong>${escapeHtml(String(row.entryDateTime || '-').toUpperCase())}</strong></td>
-                <td>${productImage}<strong style="font-size:13px;letter-spacing:.02em;">${escapeHtml(productUp)}</strong><br><small style="color:#5c6f9e;font-weight:600;">INGRESO DE MATERIA PRIMA</small></td>
-                <td><strong>${escapeHtml(providerUp)}</strong></td>
-                <td><strong>${escapeHtml(qtyLabel.toUpperCase())}</strong></td>
-                <td>${escapeHtml(loteUp)}</td>
-                <td>${escapeHtml(vtoUp)}</td>
-                <td><strong>${escapeHtml(`${temp} °C`)}</strong></td>
-                <td>${escapeHtml(managersUp)}</td>
-                <td>${escapeHtml('SIN OBSERVACIONES')}</td>
-              </tr>`;
+              return `<article class="sheet-entry-card">
+                <header class="sheet-entry-head">
+                  <div class="sheet-entry-product-wrap">
+                    ${productImage || '<span class="sheet-mini-avatar sheet-mini-avatar-empty"><i class="fa-solid fa-box"></i></span>'}
+                    <div class="sheet-entry-product-copy">
+                      <h3>${escapeHtml(productUp)}</h3>
+                      <p title="${escapeHtml(row.ingredientDescription || '')}">${escapeHtml(row.ingredientDescription || 'Sin descripción')}</p>
+                    </div>
+                  </div>
+                  <div class="sheet-entry-provider-wrap">
+                    ${providerPhotoUrl
+                      ? `<span class="sheet-provider-avatar"><img src="${escapeHtml(providerPhotoUrl)}" alt="${escapeHtml(providerName)}"></span>`
+                      : `<span class="sheet-provider-avatar sheet-provider-avatar-fallback">${escapeHtml(providerInitial)}</span>`}
+                    <div class="sheet-provider-copy">
+                      <strong>${escapeHtml(providerName)}</strong>
+                      <small>${escapeHtml(providerMeta || 'Proveedor')}</small>
+                    </div>
+                  </div>
+                </header>
+                <dl class="sheet-entry-data-grid">
+                  <div><dt>Fecha y hora</dt><dd>${escapeHtml(formatShortDateTimeEs(row.createdAt))}</dd></div>
+                  <div><dt>Cantidad</dt><dd>${escapeHtml(qtyLabel)}</dd></div>
+                  <div><dt>Lote / Remito</dt><dd>${escapeHtml(loteUp)}</dd></div>
+                  <div><dt>Vencimiento</dt><dd>${escapeHtml(vtoUp)}</dd></div>
+                  <div><dt>Temperatura</dt><dd>${escapeHtml(`${temp} °C`)}</dd></div>
+                  <div><dt>Recibió</dt><dd>${escapeHtml(managersUp)}</dd></div>
+                  <div class="sheet-observaciones"><dt>Observaciones</dt><dd>SIN OBSERVACIONES</dd></div>
+                </dl>
+              </article>`;
             }).join('');
             const from = formatIsoDateEs(week.weekStart);
             const to = formatIsoDateEs(week.weekEnd);
@@ -2375,22 +2516,16 @@
               ? '*LOTE: MATERIAS PRIMAS CONGELADAS O AL VACIO (CON ROTULO)<br>CS: CERTIFICADO SANITARIO'
               : 'LOTE. SI LA MATERIA PRIMA TRAE NUMERO DE LOTE SE COPIA.<br>SI NO VIENE CON NUMERO DE LOTE, SE TOMA FECHA DE VENCIMIENTO COMO NUMERO DE LOTE.<br>RECHAZO, SI ES SI, COLOCAR EN OBSERVACIONES MOTIVOS, EJ: CERCANO A SU FECHA DE VENCIMIENTO, PAQUETES DAÑADOS, ETC.';
             return `<section style="${weekIndex ? 'page-break-before:always;' : ''}">
-              <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-bottom:10px;border:1px solid #b8c4e3;">
-                <div style="padding:10px;border-right:1px solid #b8c4e3;"><strong>FRIGORIFICO • LA JAMONERA S.A.</strong></div>
-                <div style="padding:10px;"><strong>REGISTRO INGRESO DE MATERIAS PRIMAS<br>${tipoHeader}</strong></div>
-              </div>
-              <h2 style="font-size:16px;margin:0 0 10px;"><strong>SEMANA DE ${from} A ${to}</strong></h2>
-              <table style="width:100%;border-collapse:collapse;">
-                <thead><tr><th>FECHA Y HORA</th><th>PRODUCTO</th><th>PROVEEDOR</th><th>CANTIDAD</th><th>LOTE / CS</th><th>VTO.</th><th>TEMP. °C</th><th>ENCARGADOS</th><th>OBSERVACIONES</th></tr></thead>
-                <tbody>${rowsHtml || '<tr><td colspan="9">Sin ingresos</td></tr>'}</tbody>
-              </table>
+              <h1 class="sheet-main-week">SEMANA DE ${from} A ${to}</h1>
+              <div class="sheet-company-block"><strong>FRIGORÍFICO • LA JAMONERA S.A.</strong><br><strong>REGISTRO INGRESO DE MATERIAS PRIMAS</strong><br><strong>${tipoHeader}</strong></div>
+              <div class="sheet-entries-wrap">${rowsHtml || '<p>Sin ingresos</p>'}</div>
               <footer style="margin-top:12px;border-top:1px dashed #aebde4;padding-top:8px;font-size:11px;line-height:1.4;color:#293b68;"><strong>NOTAS:</strong><br>${footer}</footer>
             </section>`;
           }).join('');
 
           const win = window.open('', '_blank', 'width=1400,height=900');
           if (!win) return;
-          win.document.write(`<html><head><title>Planilla de ingresos</title><style>@page{size:landscape;margin:12mm;}body{font-family:Inter,Arial,sans-serif;color:#1f2a44;padding:8px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #c8d2eb;padding:6px;font-size:11px;vertical-align:middle;}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em;text-align:left;}</style></head><body>${weekSections}</body></html>`);
+          win.document.write(`<html><head><title>Planilla de ingresos</title><style>@page{size:portrait;margin:12mm;}body{font-family:Inter,Arial,sans-serif;color:#1f2a44;padding:8px;background:#f7f9ff;}.sheet-main-week{font-size:20px;margin:0 0 10px;letter-spacing:.04em;}.sheet-company-block{border:1px solid #c8d4f0;border-radius:12px;background:#fff;padding:10px 12px;margin-bottom:12px;line-height:1.35;}.sheet-entries-wrap{display:grid;gap:10px;}.sheet-entry-card{border:1px solid #d3def4;border-radius:16px;background:#fff;padding:10px;}.sheet-entry-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}.sheet-entry-product-wrap{display:flex;gap:10px;align-items:center;min-width:0;}.sheet-mini-avatar,.sheet-provider-avatar{width:52px;height:52px;border-radius:999px;border:1px solid #d2dbef;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;background:#edf2ff;color:#3a5898;flex-shrink:0;}.sheet-mini-avatar img,.sheet-provider-avatar img{width:100%;height:100%;object-fit:cover;}.sheet-mini-avatar-empty{font-size:20px;}.sheet-entry-product-copy{min-width:0;}.sheet-entry-product-copy h3{margin:0;font-size:18px;line-height:1.2;}.sheet-entry-product-copy p{margin:2px 0 0;color:#5a6b90;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:420px;}.sheet-entry-provider-wrap{display:flex;gap:8px;align-items:center;}.sheet-provider-avatar-fallback{background:#eef3ff;font-weight:800;color:#2f5db1;}.sheet-provider-copy strong{display:block;font-size:12px;}.sheet-provider-copy small{display:block;color:#6f7fa3;font-size:10px;}.sheet-entry-data-grid{margin-top:10px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px;}.sheet-entry-data-grid div{border:1px solid #e1e7f6;border-radius:10px;padding:7px 8px;background:#fafcff;}.sheet-entry-data-grid dt{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#6e7ea1;font-weight:700;margin:0 0 2px;}.sheet-entry-data-grid dd{margin:0;font-size:12px;font-weight:700;color:#27375b;}.sheet-entry-data-grid .sheet-observaciones{grid-column:1 / -1;}footer{break-inside:avoid;}</style></head><body>${weekSections}</body></html>`);
           win.document.close();
           await waitPrintAssets(win);
           win.focus();
@@ -4393,6 +4528,7 @@
   nodes.list?.addEventListener('scroll', updateListScrollHint);
   nodes.configBtn?.addEventListener('click', openGlobalConfig);
   nodes.providersRneBtn?.addEventListener('click', openProvidersRneManager);
+  nodes.weeklyConfigBtn?.addEventListener('click', openWeeklyConfigManager);
   nodes.createIngredientBtn?.addEventListener('click', openCreateIngredient);
   nodes.toolbarCreateBtn?.addEventListener('click', openCreateIngredient);
   nodes.backBtn?.addEventListener('click', backToList);
