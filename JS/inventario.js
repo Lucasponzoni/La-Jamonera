@@ -2917,10 +2917,14 @@
 
     if (!form.isConfirmed || !form.value) return false;
     const qtyValue = Number(form.value.qty.toFixed(2));
+    const previousQty = Number(entry.qty || 0);
+    const previousAvailable = Number(getAvailableQty(entry) || 0);
+    const consumedQty = Math.max(0, previousQty - previousAvailable);
+    const nextAvailableQty = Number(Math.max(0, qtyValue - consumedQty).toFixed(2));
     entry.qty = qtyValue;
     entry.qtyBase = Number(toBase(qtyValue, entry.unit || 'kilos').toFixed(6));
     entry.qtyKg = Number(convertToKg(qtyValue, entry.unit || 'kilos').toFixed(4));
-    entry.availableQty = Math.min(qtyValue, Number(entry.availableQty || qtyValue));
+    entry.availableQty = Math.min(qtyValue, nextAvailableQty);
     entry.availableBase = Number(toBase(entry.availableQty, entry.unit || 'kilos').toFixed(6));
     entry.availableKg = Number(convertToKg(entry.availableQty, entry.unit || 'kilos').toFixed(4));
     entry.invoiceNumber = form.value.invoice;
@@ -2977,6 +2981,7 @@
       const availableClass = availableQtyInUnit <= 0.0001 ? 'is-zero' : '';
       const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
       const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(resolutionRow.at)}</div></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td><td></td></tr>` : '';
+      const canEditEntry = availableQtyInUnit > 0.0001;
       return `
       <tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
         <td>${formatEntryDateTime(entry.entryDate, entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}</td>
@@ -2989,7 +2994,7 @@
           <div class="inventario-entry-actions">
             ${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-toggle-entry-collapse="${entry.id}" aria-label="Colapsar desglose"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-print-entry="${entry.id}" aria-label="Imprimir ingreso"><i class="fa-solid fa-print"></i></button>
-            <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-edit-entry="${entry.id}" aria-label="Editar ingreso"><i class="fa-solid fa-pen"></i></button>
+            <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn ${canEditEntry ? '' : 'is-disabled'}" data-edit-entry="${entry.id}" aria-label="Editar ingreso" ${canEditEntry ? '' : 'disabled'}><i class="fa-solid fa-pen"></i></button>
             <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn inventario-icon-only-btn" data-delete-entry="${entry.id}" aria-label="Eliminar ingreso"><i class="fa-solid fa-trash"></i></button>
           </div>
         </td>
