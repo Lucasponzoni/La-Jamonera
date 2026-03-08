@@ -2506,6 +2506,11 @@
               const providerName = provider?.name || String(row.provider || '-').toUpperCase();
               const providerRne = normalizeValue(provider?.rne?.number);
               const providerMeta = normalizeValue(provider?.email || provider?.phone || '');
+              const providerPhoto = sanitizeImageUrl(provider?.photoUrl);
+              const providerInitial = providerInitials(providerName);
+              const providerAvatarHtml = providerPhoto
+                ? `<span class="sheet-provider-avatar"><img src="${escapeHtml(providerPhoto)}" alt="${escapeHtml(providerName)}"></span>`
+                : `<span class="sheet-provider-avatar sheet-provider-avatar-fallback">${escapeHtml(providerInitial)}</span>`;
               const loteUp = String(row.lotNumber || row.invoiceNumber || '-').toUpperCase();
               const vtoUp = String(vtoLabel || 'NO PERECEDERO').toUpperCase();
               return `<tr class="sheet-product-row">
@@ -2522,9 +2527,7 @@
               <tr>
                 <td>
                   <div class="sheet-provider-wrap">
-                    ${providerPhotoUrl
-                      ? `<span class="sheet-provider-avatar"><img src="${escapeHtml(providerPhotoUrl)}" alt="${escapeHtml(providerName)}"></span>`
-                      : `<span class="sheet-provider-avatar sheet-provider-avatar-fallback">${escapeHtml(providerInitial)}</span>`}
+                    ${providerAvatarHtml}
                     <div class="sheet-provider-copy">
                       <strong>${escapeHtml(providerName)}</strong>
                       <small>${providerRne ? `RNE ${escapeHtml(providerRne)}` : escapeHtml(providerMeta || 'PROVEEDOR')}</small>
