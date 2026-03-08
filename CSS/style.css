@@ -4471,6 +4471,10 @@ html.login-protected.auth-ok body {
   width: min(1100px, 96vw);
 }
 
+.inventario-weekly-bulk-alert .swal2-html-container {
+  padding: 0 !important;
+}
+
 .inventario-weekly-config-btn {
   white-space: nowrap;
 }
@@ -4557,6 +4561,16 @@ html.login-protected.auth-ok body {
 
 .inventario-weekly-bulk-alert .swal2-actions .inventario-weekly-cancel-btn {
   min-width: 120px;
+}
+
+.swal2-popup.inventario-edit-entry-alert .swal2-html-container {
+  padding: 0 !important;
+}
+
+.swal2-popup.inventario-edit-entry-alert .swal2-input,
+.swal2-popup.inventario-edit-entry-alert .swal2-select,
+.swal2-popup.inventario-edit-entry-alert .swal2-file {
+  margin: 0 !important;
 }
 
 .inventario-weekly-product-head h6 {
