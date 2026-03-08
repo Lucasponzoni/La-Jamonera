@@ -140,6 +140,17 @@
               <i class="fa-solid fa-industry icon-green" aria-hidden="true"></i>
               <span>Producir</span>
             </button>
+            <span class="barra-vertical home-actions-divider" aria-hidden="true"></span>
+            <button
+              id="openUsersManagerModal"
+              type="button"
+              class="btn btn-light home-action-btn"
+              data-bs-toggle="modal"
+              data-bs-target="#usersManagerModal"
+            >
+              <i class="fa-solid fa-users icon-blue" aria-hidden="true"></i>
+              <span>Usuarios</span>
+            </button>
           </div>
         </div>
         <div class="home-content">
@@ -446,6 +457,28 @@
       </div>
       <!-- // FIN MODAL PRODUCCIÓN -->
 
+      <div class="modal fade" id="usersManagerModal" tabindex="-1" aria-labelledby="usersManagerModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content ios-modal informes-modal">
+            <div class="modal-header ios-modal-header">
+              <h5 class="modal-title ios-modal-title" id="usersManagerModalLabel">Usuarios</h5>
+              <button type="button" class="btn-close ios-modal-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body ios-modal-body">
+              <div id="usersManagerLoading" class="informes-loading" aria-live="polite">
+                <img src="./IMG/Meta-ai-logo.webp" alt="Cargando usuarios" class="meta-spinner-login">
+              </div>
+              <div id="usersManagerData" class="informes-data d-none" aria-live="polite">
+                <div class="informes-toolbar">
+                  <button id="usersManagerCreateBtn" type="button" class="btn ios-btn ios-btn-success"><i class="fa-solid fa-user-plus"></i><span>Crear usuario</span></button>
+                </div>
+                <div id="usersManagerList" class="informes-users-list"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <footer class="app-footer app-footer-white">
         <div class="footer-main">
           <div class="footer-brand-block">
@@ -507,6 +540,7 @@
   <script src="./JS/inventario.js"></script>
   <script src="./JS/produccion.js"></script>
   <script src="./JS/planilla_produccion.js"></script>
+  <script src="./JS/usuarios.js"></script>
   <script src="./JS/app.js"></script>
 </body>
 </html>
