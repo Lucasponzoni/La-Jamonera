@@ -586,8 +586,8 @@ html.login-protected.auth-ok body {
 }
 
 .family-circle-thumb {
-  width: 68px;
-  height: 68px;
+  width: 90px;
+  height: 90px;
   border-radius: 999px;
   border: 1px solid #d6deef;
   overflow: hidden;
@@ -600,15 +600,16 @@ html.login-protected.auth-ok body {
 
 .family-circle-count {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  min-width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  border: 2px solid #fff;
-  background: linear-gradient(135deg, #4269e2, #6f7dff);
-  color: #fff;
-  font-size: 0.62rem;
+  /* bottom: 6px; */
+  left: -5px;
+  min-width: 24px;
+  height: 24px;
+  text-align: end;
+  border-radius: 0 5px 5px 0;
+  /* border: 1px solid #8a939d; */
+  background: linear-gradient(135deg, #ff4747, #dc0b49);
+  color: #ffffff;
+  font-size: 0.8rem;
   font-weight: 800;
   display: inline-flex;
   align-items: center;
@@ -655,7 +656,8 @@ html.login-protected.auth-ok body {
 }
 
 .family-circle-item.is-active .family-circle-thumb {
-  border-color: #8b5cf6;
+  border-color: #dc0b49 !important;
+  border: 2px solid;
 }
 
 .family-circle-item:focus,
@@ -705,8 +707,8 @@ html.login-protected.auth-ok body {
 }
 
 .ingrediente-avatar {
-  width: 54px;
-  height: 54px;
+  width: 75px;
+  height: 75px;
   border-radius: 999px;
   overflow: hidden;
   border: 1px solid #d6deef;
@@ -2771,8 +2773,8 @@ html.login-protected.auth-ok body {
 }
 
 .receta-thumb-wrap {
-  width: 52px;
-  height: 52px;
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
   border: 1px solid #d8e1f6;
   background: #edf2fd;
@@ -3655,6 +3657,9 @@ html.login-protected.auth-ok body {
 }
 
 .inventario-total-banner{
+  display: flex;
+  gap: 5px;
+  align-items: center;
   background-color: rgb(244 238 254);
   padding: 5px 10px;
   border-radius: 12px;
@@ -4720,11 +4725,18 @@ html.login-protected.auth-ok body {
 }
 
 .inventario-day-kg.is-mixed {
-  background: #7a5af8;
+  background: #10b981;
 }
 
 .flatpickr-day {
   position: relative;
+}
+
+.flatpickr-day.today {
+    border-color: #ff4747;
+    background-color: #ff1010;
+    color: white;
+    font-weight: 700;
 }
 
 .inventario-period-head {
@@ -6360,20 +6372,20 @@ html.login-protected.auth-ok body {
 
 .inventario-trace-row td {
   background: #f8ecee !important;
-  border-bottom: 1px solid #eed7dc !important;
-  color: #4b5f8d;
+  border-top: 1px dashed #b82646 !important;
+  color: #810c0c;
   font-size: 0.82rem;
 }
 
 .inventario-resolution-row td {
   background: #eaf1ff !important;
-  border-bottom: 1px solid #d5e3ff !important;
-  color: #2f4f86;
+  border-top: 1px dashed #0c40a8 !important;
+  color: #002a73;
   font-size: 0.82rem;
 }
 
-.inventario-row-tone.is-expired-row td {
-  background: #ffe06c7a !important;
+tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
+  background: #fff4d1 !important;
 }
 
 .inventario-expired-badge {
