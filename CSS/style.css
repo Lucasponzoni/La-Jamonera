@@ -617,6 +617,7 @@ html.login-protected.auth-ok body {
   line-height: 1;
   padding: 0 4px;
   z-index: 3;
+  padding-left: 10px;
   box-shadow: 0 4px 10px rgba(23, 37, 84, 0.25);
 }
 
