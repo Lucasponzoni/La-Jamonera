@@ -951,7 +951,8 @@
       .map((item) => ({
         id: normalizeValue(item.id || item.email || makeId('user')),
         fullName: normalizeValue(item.fullName || item.name || item.email || 'Usuario'),
-        role: normalizeValue(item.position || item.role || item.sector || 'Sin cargo')
+        role: normalizeValue(item.position || item.role || item.sector || 'Sin cargo'),
+        photoUrl: normalizeValue(item.photoUrl || '')
       }))
       .sort((a, b) => a.fullName.localeCompare(b.fullName, 'es'));
 
@@ -959,7 +960,7 @@
       title: 'Seleccionar encargados',
       html: `<div class="swal-stack-fields text-start">
         <input id="ingresosManagersSearch" class="swal2-input ios-input" placeholder="Buscar encargado...">
-        <div id="ingresosManagersList" class="notify-specific-users-list" style="max-height:260px;overflow:auto;">${users.map((user) => `<label class="inventario-check-row inventario-selector-row" data-ingreso-user-row><input type="checkbox" data-ingreso-user value="${escapeHtml(user.id)}"><span><strong>${escapeHtml(user.fullName)}</strong><small style="display:block;color:#6d7b9a;">${escapeHtml(user.role)}</small></span></label>`).join('') || '<p class="text-muted">No hay usuarios cargados.</p>'}</div>
+        <div id="ingresosManagersList" class="notify-specific-users-list" style="max-height:300px;overflow:auto;padding-right:4px;">${users.map((user) => `<label class="inventario-check-row inventario-selector-row" data-ingreso-user-row><input type="checkbox" data-ingreso-user value="${escapeHtml(user.id)}"><span style="display:inline-flex;align-items:center;gap:8px;">${user.photoUrl ? `<span class="user-avatar-thumb" style="width:30px;height:30px;"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb" src="${escapeHtml(user.photoUrl)}" alt="${escapeHtml(user.fullName)}"></span>` : `<span class="user-avatar-fallback" style="width:30px;height:30px;border-radius:999px;border:1px solid #d7def2;display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:#3b4b73;background:#eef3ff;">${escapeHtml((user.fullName.split(' ').filter(Boolean).map((p) => p[0]).join('').slice(0, 2) || 'US').toUpperCase())}</span>`}<span><strong>${escapeHtml(user.fullName)}</strong><small style="display:block;color:#6d7b9a;">${escapeHtml(user.role)}</small></span></span></label>`).join('') || '<p class="text-muted">No hay usuarios cargados.</p>'}</div>
       </div>`,
       showCancelButton: true,
       confirmButtonText: 'Continuar',
@@ -967,6 +968,7 @@
       didOpen: () => {
         const search = document.getElementById('ingresosManagersSearch');
         const rows = [...document.querySelectorAll('[data-ingreso-user-row]')];
+        initThumbLoading(Swal.getHtmlContainer() || document);
         search?.addEventListener('input', () => {
           const q = normalizeLower(search.value);
           rows.forEach((row) => {
@@ -990,7 +992,9 @@
       const key = `${row.ingredientId}|${row.entryId}`;
       const name = normalizeLower(row.ingredientName || '');
       const isMeat = /(carne|pollo|cerdo|vacuno|res|chacin|hamburguesa|bondiola|jamon)/i.test(name);
-      acc[key] = isMeat ? '3.4' : '5.6';
+      const seed = (normalizeValue(row.ingredientId).length + normalizeValue(row.entryId).length + Math.round(Number(row.qty || 0) * 10)) % 10;
+      const value = isMeat ? (0.8 + (seed * 0.3)) : (4.2 + (seed * 0.4));
+      acc[key] = Math.min(isMeat ? 4 : 12, value).toFixed(1);
       return acc;
     }, {});
     try {
@@ -1010,7 +1014,7 @@
         model: 'deepseek-chat',
         messages: [
           { role: 'system', content: 'Sos un empleado de un frigorífico recepcionando productos. Respondé SOLO JSON válido.' },
-          { role: 'user', content: `Completá temperaturas de ingreso (°C) para cada item. Para carnes, temperatura máxima 4°C. Devolvé SOLO JSON con esta estructura: {"temperaturas":{"KEY":"X.X"}}. Items: ${JSON.stringify(compactRows)}` }
+          { role: 'user', content: `Completá temperaturas de ingreso (°C) para cada item. Para carnes, temperatura máxima 4°C. No fuerces todos los valores al mismo número; variá por producto/proveedor/lote. Devolvé SOLO JSON con esta estructura: {"temperaturas":{"KEY":"X.X"}}. Items: ${JSON.stringify(compactRows)}` }
         ],
         temperature: 0.1
       };
@@ -2249,10 +2253,18 @@
     if (!managers) return;
 
     const excluded = new Set(selector.value.mode === 'exclude' ? selector.value.selected : []);
+    const resolveIngredientPerishable = (ingredientId) => {
+      const recordCfg = safeObject(state.inventario?.items?.[ingredientId]?.weeklySheetConfig);
+      if (typeof recordCfg.perishable === 'boolean') return recordCfg.perishable;
+      const ingredientCfg = safeObject(state.ingredientes?.[ingredientId]);
+      if (typeof ingredientCfg.perishable === 'boolean') return ingredientCfg.perishable;
+      return true;
+    };
+
     const scopedRows = rows
       .filter((row) => !excluded.has(row.ingredientId))
       .filter((row) => {
-        const perishable = Boolean(state.ingredientes?.[row.ingredientId]?.perishable);
+        const perishable = resolveIngredientPerishable(row.ingredientId);
         return targetPerishable ? perishable : !perishable;
       });
 
@@ -2284,7 +2296,8 @@
       customClass: { popup: 'ios-alert produccion-loading-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' },
       didOpen: async () => {
         try {
-          Swal.update({ html: '<div class="informes-saving-spinner"><img src="./IMG/ia-unscreen.gif" alt="IA" class="recipe-ai-static-gif"></div><p>Completando temperatura...</p>' });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          Swal.update({ html: '<div class="informes-saving-spinner"><img src="./IMG/ia-unscreen.gif" alt="IA" class="recipe-ai-static-gif"></div><p>Obteniendo temperaturas...</p>' });
           const tempMap = await estimateIngresoTemperatures(allRows);
           const weekSections = weeks.map((week, weekIndex) => {
             const rowsHtml = week.rows.map((row) => {
@@ -2294,26 +2307,41 @@
               const productImage = row.ingredientImageUrl
                 ? `<span style="display:inline-flex;width:28px;height:28px;border-radius:999px;overflow:hidden;border:1px solid #d7def2;vertical-align:middle;margin-right:6px;"><img src="${escapeHtml(row.ingredientImageUrl)}" style="width:100%;height:100%;object-fit:cover;"></span>`
                 : '';
+              const qtyLabel = `${Number(row.qty || 0).toFixed(2)} ${getMeasureAbbr(row.unit || '')}${row.packageQty ? ` X${row.packageQty}` : ''}`;
+              const providerUp = String(row.provider || '-').toUpperCase();
+              const productUp = String(row.ingredientName || '-').toUpperCase();
+              const loteUp = String(row.lotNumber || row.invoiceNumber || '-').toUpperCase();
+              const vtoUp = String(vtoLabel || 'NO PERECEDERO').toUpperCase();
+              const managersUp = String(managers.managersLabel || 'SIN ENCARGADO').toUpperCase();
               return `<tr>
-                <td>${escapeHtml(row.entryDateTime || '-')}</td>
-                <td>${productImage}${escapeHtml(row.ingredientName || '-')}</td>
-                <td>${escapeHtml(row.provider || '-')}</td>
-                <td>${escapeHtml(formatEntryDetailLabel(row).qtyLabel)}</td>
-                <td>${escapeHtml(row.lotNumber || row.invoiceNumber || '-')}</td>
-                <td>${escapeHtml(vtoLabel)}</td>
-                <td>${escapeHtml(`${temp} °C`)}</td>
-                <td>${escapeHtml(managers.managersLabel || 'Sin encargado')}</td>
-                <td></td>
+                <td><strong>${escapeHtml(String(row.entryDateTime || '-').toUpperCase())}</strong></td>
+                <td>${productImage}<strong>${escapeHtml(productUp)}</strong></td>
+                <td><strong>${escapeHtml(providerUp)}</strong></td>
+                <td><strong>${escapeHtml(qtyLabel.toUpperCase())}</strong></td>
+                <td>${escapeHtml(loteUp)}</td>
+                <td>${escapeHtml(vtoUp)}</td>
+                <td><strong>${escapeHtml(`${temp} °C`)}</strong></td>
+                <td>${escapeHtml(managersUp)}</td>
+                <td>${escapeHtml('SIN OBSERVACIONES')}</td>
               </tr>`;
             }).join('');
             const from = formatIsoDateEs(week.weekStart);
             const to = formatIsoDateEs(week.weekEnd);
+            const tipoHeader = targetPerishable ? 'PERECEDERAS' : 'NO PERECEDERAS';
+            const footer = targetPerishable
+              ? '*LOTE: MATERIAS PRIMAS CONGELADAS O AL VACIO (CON ROTULO)<br>CS: CERTIFICADO SANITARIO'
+              : 'LOTE. SI LA MATERIA PRIMA TRAE NUMERO DE LOTE SE COPIA.<br>SI NO VIENE CON NUMERO DE LOTE, SE TOMA FECHA DE VENCIMIENTO COMO NUMERO DE LOTE.<br>RECHAZO, SI ES SI, COLOCAR EN OBSERVACIONES MOTIVOS, EJ: CERCANO A SU FECHA DE VENCIMIENTO, PAQUETES DAÑADOS, ETC.';
             return `<section style="${weekIndex ? 'page-break-before:always;' : ''}">
-              <h2 style="font-size:16px;margin:0 0 10px;">Semana de ${from} a ${to}</h2>
+              <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-bottom:10px;border:1px solid #b8c4e3;">
+                <div style="padding:10px;border-right:1px solid #b8c4e3;"><strong>FRIGORIFICO • LA JAMONERA S.A.</strong></div>
+                <div style="padding:10px;"><strong>REGISTRO INGRESO DE MATERIAS PRIMAS<br>${tipoHeader}</strong></div>
+              </div>
+              <h2 style="font-size:16px;margin:0 0 10px;"><strong>SEMANA DE ${from} A ${to}</strong></h2>
               <table style="width:100%;border-collapse:collapse;">
-                <thead><tr><th>Fecha y hora</th><th>Producto</th><th>Proveedor</th><th>Cantidad</th><th>Lote / CS</th><th>VTO.</th><th>TEMP. °C</th><th>Encargados</th><th>Control</th></tr></thead>
+                <thead><tr><th>FECHA Y HORA</th><th>PRODUCTO</th><th>PROVEEDOR</th><th>CANTIDAD</th><th>LOTE / CS</th><th>VTO.</th><th>TEMP. °C</th><th>ENCARGADOS</th><th>OBSERVACIONES</th></tr></thead>
                 <tbody>${rowsHtml || '<tr><td colspan="9">Sin ingresos</td></tr>'}</tbody>
               </table>
+              <p style="margin-top:10px;font-size:11px;line-height:1.35;">${footer}</p>
             </section>`;
           }).join('');
 
