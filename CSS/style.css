@@ -4455,6 +4455,104 @@ html.login-protected.auth-ok body {
   height: 18px;
 }
 
+.inventario-weekly-bulk-alert {
+  width: min(1100px, 96vw);
+}
+
+.inventario-weekly-bulk-wrap {
+  text-align: left;
+}
+
+.inventario-weekly-bulk-intro {
+  margin: 0 0 12px;
+  color: #566684;
+}
+
+.inventario-weekly-bulk-list {
+  display: grid;
+  gap: 10px;
+  max-height: 62vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.inventario-weekly-row {
+  border: 1px solid #c9daf5;
+  border-radius: 16px;
+  padding: 10px;
+  background: #f5f9ff;
+  display: grid;
+  gap: 10px;
+}
+
+.inventario-weekly-row.is-perishable {
+  border-color: #b9e8cb;
+  background: #ecfaf2;
+}
+
+.inventario-weekly-row.is-non-perishable {
+  border-color: #c7d9ff;
+  background: #edf4ff;
+}
+
+.inventario-weekly-product-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.inventario-weekly-thumb-wrap {
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  border: 1px solid #d2dbef;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #edf2ff;
+  color: #355899;
+}
+
+.inventario-weekly-product-head h6 {
+  margin: 0;
+  color: #26395d;
+}
+
+.inventario-weekly-product-head p {
+  margin: 1px 0 0;
+  color: #60739d;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.inventario-weekly-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+.inventario-weekly-rotation {
+  color: #36507f;
+  font-weight: 600;
+}
+
+.inventario-weekly-rotation .swal2-input {
+  margin: 6px 0 0;
+  min-height: 42px;
+}
+
+@media (max-width: 768px) {
+  .inventario-weekly-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .inventario-check-row-compact {
   font-size: 0.9rem;
   font-weight: 600;
