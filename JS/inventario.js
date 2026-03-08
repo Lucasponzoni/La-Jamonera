@@ -781,7 +781,7 @@
 
   const initThumbLoading = (scope = document) => {
     scope.querySelectorAll('.js-inventario-thumb').forEach((img) => {
-      const parent = img.closest('.ingrediente-avatar, .family-circle-thumb, .recipe-inline-avatar-wrap, .receta-thumb-wrap, .recipe-suggest-avatar-wrap, .inventario-print-photo-wrap, .inventario-provider-avatar, .inventario-provider-editor-avatar');
+      const parent = img.closest('.ingrediente-avatar, .family-circle-thumb, .recipe-inline-avatar-wrap, .receta-thumb-wrap, .recipe-suggest-avatar-wrap, .inventario-print-photo-wrap, .inventario-provider-avatar, .inventario-provider-editor-avatar, .user-avatar-thumb');
       const loader = parent?.querySelector('.thumb-loading');
       const done = () => {
         img.classList.add('is-loaded');
