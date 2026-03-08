@@ -3627,8 +3627,21 @@
 
     if (window.flatpickr) {
       const locale = window.flatpickr.l10ns?.es || undefined;
-      window.flatpickr(nodes.editorForm.querySelector('#inventoryEntryDate'), { locale, dateFormat: 'Y-m-d', allowInput: true });
-      window.flatpickr(nodes.editorForm.querySelector('#inventoryExpiryDate'), { locale, dateFormat: 'Y-m-d', allowInput: true, minDate: 'today' });
+      window.flatpickr(nodes.editorForm.querySelector('#inventoryEntryDate'), {
+        locale,
+        dateFormat: 'Y-m-d',
+        altInput: true,
+        altFormat: 'd/m/Y',
+        allowInput: true
+      });
+      window.flatpickr(nodes.editorForm.querySelector('#inventoryExpiryDate'), {
+        locale,
+        dateFormat: 'Y-m-d',
+        altInput: true,
+        altFormat: 'd/m/Y',
+        allowInput: true,
+        minDate: 'today'
+      });
     }
 
     wireTokenDrag();
