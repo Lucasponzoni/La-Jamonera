@@ -1025,13 +1025,21 @@
   };
 
   const estimateIngresoTemperatures = async (rows) => {
+    const isBreadLikeProduct = (name) => /(\bpan\b|lactal|panificado|pan de|boll|baguette|figazza|figaza|tostado|miga)/i.test(normalizeLower(name || ''));
     const fallback = rows.reduce((acc, row) => {
       const key = `${row.ingredientId}|${row.entryId}`;
       const name = normalizeLower(row.ingredientName || '');
       const isMeat = /(carne|pollo|cerdo|vacuno|res|chacin|hamburguesa|bondiola|jamon)/i.test(name);
+      const isBread = isBreadLikeProduct(name);
       const seed = (normalizeValue(row.ingredientId).length + normalizeValue(row.entryId).length + Math.round(Number(row.qty || 0) * 10)) % 10;
-      const value = isMeat ? (0.8 + (seed * 0.3)) : (4.2 + (seed * 0.4));
-      acc[key] = Math.min(isMeat ? 4 : 12, value).toFixed(1);
+      const value = isMeat ? (0.8 + (seed * 0.3)) : isBread ? (16 + (seed * 0.7)) : (4.2 + (seed * 0.4));
+      if (isMeat) {
+        acc[key] = Math.min(4, value).toFixed(1);
+      } else if (isBread) {
+        acc[key] = Math.max(12, Math.min(26, value)).toFixed(1);
+      } else {
+        acc[key] = Math.min(12, value).toFixed(1);
+      }
       return acc;
     }, {});
     try {
@@ -1051,7 +1059,7 @@
         model: 'deepseek-chat',
         messages: [
           { role: 'system', content: 'Sos un empleado de un frigorífico recepcionando productos. Respondé SOLO JSON válido.' },
-          { role: 'user', content: `Completá temperaturas de ingreso (°C) para cada item. Para carnes, temperatura máxima 4°C. No fuerces todos los valores al mismo número; variá por producto/proveedor/lote. Devolvé SOLO JSON con esta estructura: {"temperaturas":{"KEY":"X.X"}}. Items: ${JSON.stringify(compactRows)}` }
+          { role: 'user', content: `Completá temperaturas de ingreso (°C) para cada item. Para carnes, temperatura máxima 4°C. Para panes/panificados (ej: pan lactal en bolsa) NO usar grados bajos: devolver siempre 12°C o más. No fuerces todos los valores al mismo número; variá por producto/proveedor/lote. Devolvé SOLO JSON con esta estructura: {"temperaturas":{"KEY":"X.X"}}. Items: ${JSON.stringify(compactRows)}` }
         ],
         temperature: 0.1
       };
@@ -1067,9 +1075,17 @@
         const raw = Number(String(map[key] || '').replace(',', '.'));
         const name = normalizeLower(row.ingredientName || '');
         const isMeat = /(carne|pollo|cerdo|vacuno|res|chacin|hamburguesa|bondiola|jamon)/i.test(name);
+        const isBread = isBreadLikeProduct(name);
         if (!Number.isFinite(raw)) return;
-        const capped = isMeat ? Math.min(raw, 4) : raw;
-        fallback[key] = capped.toFixed(1);
+        if (isMeat) {
+          fallback[key] = Math.min(raw, 4).toFixed(1);
+          return;
+        }
+        if (isBread) {
+          fallback[key] = Math.max(12, raw).toFixed(1);
+          return;
+        }
+        fallback[key] = raw.toFixed(1);
       });
     } catch (error) {
     }
@@ -2468,11 +2484,20 @@
           Swal.update({ html: '<div class="informes-saving-spinner"><img src="./IMG/ia-unscreen.gif" alt="IA" class="recipe-ai-static-gif"></div><p>Obteniendo temperaturas...</p>' });
           const tempMap = await estimateIngresoTemperatures(allRows);
           const weekSections = weeks.map((week, weekIndex) => {
+            const managersPrintHtml = managers.selectedUsers.length
+              ? managers.selectedUsers.map((user) => `
+                <span class="sheet-manager-line">
+                  <strong>${escapeHtml(String(user.fullName || '').toUpperCase())}</strong>
+                  <small>${escapeHtml(String(user.role || 'ENCARGADO').toUpperCase())}</small>
+                </span>
+              `).join('')
+              : '<span class="sheet-manager-line"><strong>SIN ENCARGADO</strong></span>';
             const rowsHtml = week.rows.map((row) => {
               const tempKey = `${row.ingredientId}|${row.entryId}`;
               const temp = tempMap[tempKey] || '-';
               const vtoLabel = row.noPerecedero ? 'No perecedero' : (row.expiryDate || 'No perecedero');
               const productUp = String(row.ingredientName || '-').toUpperCase();
+              const productDescription = normalizeValue(row.ingredientDescription || 'SIN DESCRIPCIÓN');
               const productImage = row.ingredientImageUrl
                 ? `<span class="sheet-mini-avatar"><img src="${escapeHtml(row.ingredientImageUrl)}" alt="${escapeHtml(productUp)}"></span>`
                 : '';
@@ -2481,55 +2506,42 @@
               const providerName = provider?.name || String(row.provider || '-').toUpperCase();
               const providerRne = normalizeValue(provider?.rne?.number);
               const providerMeta = normalizeValue(provider?.email || provider?.phone || '');
-              const providerPhotoUrl = sanitizeImageUrl(provider?.photoUrl);
+              const providerPhoto = sanitizeImageUrl(provider?.photoUrl);
               const providerInitial = providerInitials(providerName);
+              const providerAvatarHtml = providerPhoto
+                ? `<span class="sheet-provider-avatar"><img src="${escapeHtml(providerPhoto)}" alt="${escapeHtml(providerName)}"></span>`
+                : `<span class="sheet-provider-avatar sheet-provider-avatar-fallback">${escapeHtml(providerInitial)}</span>`;
               const loteUp = String(row.lotNumber || row.invoiceNumber || '-').toUpperCase();
               const vtoUp = String(vtoLabel || 'NO PERECEDERO').toUpperCase();
-              const managersUp = String(managers.managersLabel || 'SIN ENCARGADO').toUpperCase();
-              return `<article class="sheet-entry-card">
-                <header class="sheet-entry-head">
-                  <div class="sheet-entry-product-wrap">
+              return `<tr class="sheet-product-row">
+                <td colspan="8">
+                  <div class="sheet-entry-product-wrap sheet-entry-product-wrap-full">
                     ${productImage || '<span class="sheet-mini-avatar sheet-mini-avatar-empty"><i class="fa-solid fa-box"></i></span>'}
                     <div class="sheet-entry-product-copy">
                       <h3>${escapeHtml(productUp)}</h3>
-                      <p title="${escapeHtml(row.ingredientDescription || '')}">${escapeHtml(row.ingredientDescription || 'Sin descripción')}</p>
+                      <p class="sheet-entry-product-description" title="${escapeHtml(productDescription)}"><span class="sheet-entry-product-divider" aria-hidden="true"></span><span>${escapeHtml(productDescription)}</span></p>
                     </div>
                   </div>
-                  <div class="sheet-entry-provider-wrap">
-                    ${providerPhotoUrl
-                      ? `<span class="sheet-provider-avatar"><img src="${escapeHtml(providerPhotoUrl)}" alt="${escapeHtml(providerName)}"></span>`
-                      : `<span class="sheet-provider-avatar sheet-provider-avatar-fallback">${escapeHtml(providerInitial)}</span>`}
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="sheet-provider-wrap">
+                    ${providerAvatarHtml}
                     <div class="sheet-provider-copy">
                       <strong>${escapeHtml(providerName)}</strong>
-                      <small>${escapeHtml(providerMeta || 'Proveedor')}${providerRne ? ` · RNE ${escapeHtml(providerRne)}` : ''}</small>
+                      <small>${providerRne ? `RNE ${escapeHtml(providerRne)}` : escapeHtml(providerMeta || 'PROVEEDOR')}</small>
                     </div>
                   </div>
-                </header>
-                <table class="sheet-entry-data-table">
-                  <thead>
-                    <tr>
-                      <th>Fecha y hora</th>
-                      <th>Cantidad</th>
-                      <th>Lote / Remito</th>
-                      <th>Vencimiento</th>
-                      <th>Temperatura</th>
-                      <th>Recibió</th>
-                      <th>Observaciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>${escapeHtml(formatShortDateTimeEs(row.createdAt))}</td>
-                      <td>${escapeHtml(qtyLabel)}</td>
-                      <td>${escapeHtml(loteUp)}</td>
-                      <td>${escapeHtml(vtoUp)}</td>
-                      <td>${escapeHtml(`${temp} °C`)}</td>
-                      <td>${escapeHtml(managersUp)}</td>
-                      <td>SIN OBSERVACIONES</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </article>`;
+                </td>
+                <td>${escapeHtml(formatShortDateTimeEs(row.createdAt))}</td>
+                <td>${escapeHtml(qtyLabel)}</td>
+                <td>${escapeHtml(loteUp)}</td>
+                <td>${escapeHtml(vtoUp)}</td>
+                <td>${escapeHtml(`${temp} °C`)}</td>
+                <td><div class="sheet-manager-cell">${managersPrintHtml}</div></td>
+                <td>SIN OBSERVACIONES</td>
+              </tr>`;
             }).join('');
             const from = formatIsoDateEs(week.weekStart);
             const to = formatIsoDateEs(week.weekEnd);
@@ -2545,14 +2557,30 @@
                 </div>
                 <div class="sheet-company-block"><strong>FRIGORÍFICO • LA JAMONERA S.A.</strong><small>REGISTRO INGRESO DE MATERIAS PRIMAS</small><small>${tipoHeader}</small></div>
               </header>
-              <div class="sheet-entries-wrap">${rowsHtml || '<p>Sin ingresos</p>'}</div>
+              <div class="sheet-entries-wrap">${rowsHtml
+                ? `<table class="sheet-entry-data-table">
+                    <thead>
+                      <tr>
+                        <th>Producto</th>
+                        <th>Fecha y hora</th>
+                        <th>Cantidad</th>
+                        <th>Lote / Remito</th>
+                        <th>Vencimiento</th>
+                        <th>Temperatura</th>
+                        <th>Recibió</th>
+                        <th>Observaciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                  </table>`
+                : '<p>Sin ingresos</p>'}</div>
               <footer style="margin-top:12px;border-top:1px dashed #aebde4;padding-top:8px;font-size:11px;line-height:1.4;color:#293b68;"><strong>NOTAS:</strong><br>${footer}</footer>
             </section>`;
           }).join('');
 
           const win = window.open('', '_blank', 'width=1400,height=900');
           if (!win) return;
-          win.document.write(`<html><head><title>Planilla de ingresos</title><style>@page{size:portrait;margin:8mm;}body{font-family:Inter,Arial,sans-serif;color:#1f2a44;padding:4px;background:#f7f9ff;}.sheet-header{display:flex;justify-content:space-between;align-items:stretch;gap:8px;margin-bottom:8px;}.sheet-week-block{border:1px solid #c8d4f0;border-radius:10px;background:#fff;padding:7px 10px;display:grid;align-content:center;min-width:0;}.sheet-week-label{margin:0 0 2px;color:#6073a1;font-size:10px;text-transform:uppercase;letter-spacing:.04em;}.sheet-main-week{font-size:16px;margin:0;letter-spacing:.03em;line-height:1.15;}.sheet-company-block{border:1px solid #c8d4f0;border-radius:10px;background:#fff;padding:7px 10px;line-height:1.2;display:grid;align-content:center;min-width:260px;}.sheet-company-block strong{font-size:11px;}.sheet-company-block small{font-size:9px;color:#4f628f;font-weight:700;}.sheet-entries-wrap{display:grid;gap:0;}.sheet-entry-card{padding-top:1px;}.sheet-entry-head{display:flex;justify-content:space-between;gap:4px;align-items:center;}.sheet-entry-product-wrap{display:flex;gap:6px;align-items:center;min-width:0;}.sheet-mini-avatar,.sheet-provider-avatar{width:25px;height:25px;border-radius:999px;border:1px solid #d2dbef;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;background:#edf2ff;color:#3a5898;flex-shrink:0;}.sheet-mini-avatar img,.sheet-provider-avatar img{width:100%;height:100%;object-fit:cover;}.sheet-mini-avatar-empty{font-size:10px;}.sheet-entry-product-copy{min-width:0;}.sheet-entry-product-copy h3{margin:0;font-size:10px;line-height:1.1;}.sheet-entry-product-copy p{margin:1px 0 0;color:#5a6b90;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:290px;}.sheet-entry-provider-wrap{display:flex;gap:6px;align-items:center;}.sheet-provider-avatar-fallback{background:#eef3ff;font-weight:800;color:#2f5db1;}.sheet-provider-copy strong{display:block;font-size:10px;line-height:1.1;}.sheet-provider-copy small{display:block;color:#6f7fa3;font-size:8px;line-height:1.1;}.sheet-entry-data-table{width:100%;margin-top:5px;border-collapse:collapse;table-layout:fixed;}.sheet-entry-data-table th,.sheet-entry-data-table td{border:1px solid #dbe4f6;padding:3px 0 0 0;font-size:8px;width:fit-content;line-height:1.15;}.sheet-entry-data-table th{background:#eef3ff;font-size:7px;text-transform:uppercase;letter-spacing:.03em;color:#3c5182;text-align:center;}.sheet-entry-data-table td:nth-child(2),.sheet-entry-data-table td:nth-child(3),.sheet-entry-data-table td:nth-child(4),.sheet-entry-data-table td:nth-child(5){font-weight:700;}footer{break-inside:avoid;margin-top:8px !important;padding-top:6px !important;font-size:9px !important;line-height:1.25 !important;}</style></head><body>${weekSections}</body></html>`);
+          win.document.write(`<html><head><title>Planilla de ingresos</title><style>@page{size:portrait;margin:8mm;}body{font-family:Inter,Arial,sans-serif;color:#1f2a44;padding:4px;background:#f7f9ff;}.sheet-header{display:flex;justify-content:space-between;align-items:stretch;gap:8px;margin-bottom:8px;}.sheet-week-block{border:1px solid #c8d4f0;border-radius:10px;background:#fff;padding:7px 10px;display:grid;align-content:center;min-width:0;}.sheet-week-label{margin:0 0 2px;color:#6073a1;font-size:10px;text-transform:uppercase;letter-spacing:.04em;}.sheet-main-week{font-size:16px;margin:0;letter-spacing:.03em;line-height:1.15;}.sheet-company-block{border:1px solid #c8d4f0;border-radius:10px;background:#fff;padding:7px 10px;line-height:1.2;display:grid;align-content:center;min-width:260px;}.sheet-company-block strong{font-size:11px;}.sheet-company-block small{font-size:9px;color:#4f628f;font-weight:700;}.sheet-entries-wrap{display:grid;gap:0;}.sheet-entry-product-wrap{display:flex;gap:8px;align-items:center;justify-content:center;min-width:0;}.sheet-entry-product-wrap-full{justify-content:flex-start;}.sheet-mini-avatar,.sheet-provider-avatar{width:25px;height:25px;border-radius:999px;border:1px solid #d2dbef;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;background:#edf2ff;color:#3a5898;flex-shrink:0;}.sheet-mini-avatar img,.sheet-provider-avatar img{width:100%;height:100%;object-fit:cover;}.sheet-mini-avatar-empty{font-size:10px;}.sheet-entry-product-copy{min-width:0;max-width:100%;text-align:left;display:flex;align-items:center;gap:8px;}.sheet-entry-product-copy h3{margin:0;font-size:13px;line-height:1.1;white-space:nowrap;}.sheet-entry-product-description{margin:0;display:flex;align-items:center;gap:8px;min-width:0;max-width:100%;color:#586a92;font-size:9px;font-weight:700;}.sheet-entry-product-description span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;}.sheet-entry-product-divider{display:inline-block;width:1px;height:14px;background:#9baed9;flex-shrink:0;}.sheet-provider-wrap{display:flex;gap:6px;align-items:center;justify-content:center;}.sheet-provider-avatar-fallback{font-size:10px;font-weight:800;color:#2f5db1;}.sheet-provider-copy{text-align:center;}.sheet-provider-copy strong{display:block;font-size:10px;line-height:1.1;}.sheet-provider-copy small{display:block;color:#6f7fa3;font-size:8px;line-height:1.1;}.sheet-entry-data-table{width:100%;margin-top:5px;border-collapse:collapse;table-layout:fixed;}.sheet-entry-data-table thead{display:table-header-group;}.sheet-entry-data-table th,.sheet-entry-data-table td{border:1px solid #dbe4f6;padding:4px 3px;font-size:8px;line-height:1.15;text-align:center;vertical-align:middle;}.sheet-entry-data-table th{background:#fff;color:#000;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;}.sheet-product-row td{background:#f4f7ff;font-weight:800;}.sheet-entry-data-table td:nth-child(3),.sheet-entry-data-table td:nth-child(4),.sheet-entry-data-table td:nth-child(5),.sheet-entry-data-table td:nth-child(6){font-weight:700;}.sheet-manager-cell{display:grid;gap:2px;justify-items:center;}.sheet-manager-line{display:grid;line-height:1.1;}.sheet-manager-line strong{font-size:8px;}.sheet-manager-line small{font-size:7px;color:#5f7097;font-weight:700;}footer{break-inside:avoid;margin-top:8px !important;padding-top:6px !important;font-size:9px !important;line-height:1.25 !important;}</style></head><body>${weekSections}</body></html>`);
           win.document.close();
           await waitPrintAssets(win);
           win.focus();
