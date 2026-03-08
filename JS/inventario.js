@@ -1242,8 +1242,6 @@
 
   const getProviderRneCounts = () => {
     const providers = sortedProviders();
-    const selectedProvider = findProviderById(state.editorDraft.provider);
-    const bulkEntries = Array.isArray(state.editorDraft.bulkEntries) ? state.editorDraft.bulkEntries : [];
     return providers.reduce((acc, provider) => {
       const status = getProviderRneStatus(provider);
       acc.all += 1;
