@@ -1223,6 +1223,8 @@
 
   const getProviderRneCounts = () => {
     const providers = sortedProviders();
+    const selectedProvider = findProviderById(state.editorDraft.provider);
+    const bulkEntries = Array.isArray(state.editorDraft.bulkEntries) ? state.editorDraft.bulkEntries : [];
     return providers.reduce((acc, provider) => {
       const status = getProviderRneStatus(provider);
       acc.all += 1;
@@ -3273,11 +3275,17 @@
             <textarea id="inventoryInvoiceNumber" name="inventory_code_free" class="form-control ios-input inventario-invoice-textarea" rows="1" placeholder="Ej: A-000123" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text">${escapeHtml(state.editorDraft.invoiceNumber)}</textarea>
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryProvider"><i class="fa-solid fa-truck-field inventario-step-icon"></i> Proveedor</label>
-            <select id="inventoryProvider" class="form-select ios-input" autocomplete="off">
-              <option value="">Seleccionar proveedor (opcional, podés cargar el RNE más tarde)</option>
+            <label class="form-label" for="inventoryProviderSearch"><i class="fa-solid fa-truck-field inventario-step-icon"></i> Proveedor</label>
+            <div class="recipe-ing-autocomplete">
+              <div class="recipe-ing-input-wrap">
+                <span class="recipe-inline-avatar-wrap recipe-inline-avatar-fallback"><span class="recipe-small-placeholder"><i class="fa-solid fa-truck-field"></i></span></span>
+                <input id="inventoryProviderSearch" type="search" class="form-control ios-input" placeholder="Buscar proveedor..." value="${escapeHtml(selectedProvider?.name || '')}" autocomplete="off">
+              </div>
+            </div>
+            <select id="inventoryProvider" class="form-select ios-input d-none" autocomplete="off">
+              <option value="">Seleccionar proveedor (opcional)</option>
               ${providers.map((provider) => `<option value="${escapeHtml(provider.id)}" ${normalizeValue(state.editorDraft.provider) === provider.id ? 'selected' : ''}>${escapeHtml(provider.name)}</option>`).join('')}
-              <option value="add_provider">+ Agregar proveedor</option>
+              <option value="add_provider">+ nuevo proveedor</option>
             </select>
           </div>
           <div class="recipe-field recipe-field-full inventario-internal-switch-wrap">
@@ -3294,11 +3302,11 @@
             <small id="inventoryInvoiceImageFeedback" class="inventario-file-feedback">${escapeHtml(state.editorDraft.invoiceImageCountLabel || 'Sin archivos seleccionados')}</small>
           </div>
         </div>
-          <div class="recipe-table-wrap inventario-bulk-table-wrap">
+          <div class="recipe-table-wrap inventario-bulk-table-wrap ${bulkEntries.length ? '' : 'd-none'}" id="inventarioBulkTableWrap">
             <div class="recipe-table-scroll" aria-label="Tabla de productos en factura">
               <table class="recipe-table inventario-bulk-table">
-                <thead><tr><th style="width:40px">↕</th><th style="min-width:320px">Producto</th><th style="width:180px">Vencimiento</th><th style="width:170px">Cantidad</th><th style="width:300px">Unidad</th><th style="width:72px">Acción</th></tr></thead>
-                <tbody>${(Array.isArray(state.editorDraft.bulkEntries) ? state.editorDraft.bulkEntries : []).map((extra, idx) => {
+                <thead><tr><th style="width:40px">↕</th><th style="min-width:320px">Producto</th><th style="width:180px">Fecha</th><th style="width:170px">Cantidad</th><th style="width:300px">Unidad</th><th style="width:72px">Acción</th></tr></thead>
+                <tbody>${bulkEntries.map((extra, idx) => {
             const extraIngredient = state.ingredientes[extra.ingredientId] || null;
             const extraRecord = extraIngredient ? getRecord(extraIngredient.id) : null;
             const defaultUnit = normalizeValue(extra.unit || extraRecord?.stockUnit || extraIngredient?.measure || 'kilos');
@@ -3314,7 +3322,7 @@
                 <div class="recipe-ing-autocomplete"><div class="recipe-ing-input-wrap">${avatarHtml}<input type="search" class="form-control ios-input" data-bulk-search="${idx}" placeholder="Buscar producto..." value="${escapeHtml(extraIngredient ? capitalize(extraIngredient.name) : '')}"></div></div>
                 <select class="form-select ios-input d-none" data-bulk-ingredient="${idx}"><option value="">Seleccionar producto</option>${Object.values(state.ingredientes).map((ing) => `<option value="${escapeHtml(ing.id)}" ${ing.id === extra.ingredientId ? 'selected' : ''}>${escapeHtml(capitalize(ing.name))}</option>`).join('')}</select>
               </td>
-              <td><input class="form-control ios-input" type="text" data-bulk-expiry-date="${idx}" value="${escapeHtml(extra.expiryDate || state.editorDraft.expiryDate)}" placeholder="Vencimiento" ${extra.noPerecedero ? 'disabled' : ''}></td>
+              <td><input class="form-control ios-input" type="text" data-bulk-expiry-date="${idx}" value="${escapeHtml(extra.expiryDate || state.editorDraft.expiryDate)}" placeholder="Fecha" ${extra.noPerecedero ? 'disabled' : ''}></td>
               <td><input class="form-control ios-input" type="number" min="0" step="0.01" data-bulk-qty="${idx}" placeholder="Cantidad" value="${escapeHtml(extra.qty || '')}"></td>
               <td><div class="inventario-bulk-unit-cell"><select class="form-select ios-input" data-bulk-unit="${idx}" ${(extraRecord?.stockUnit || packageLocked) ? 'disabled' : ''}>${state.measures.map((m) => `<option value="${escapeHtml(m.name)}" ${measureKey(m.name) === measureKey(defaultUnit) ? 'selected' : ''}>${escapeHtml(getMeasureLabel(m.name))}</option>`).join('')}</select><div class="${isUnit ? '' : 'd-none'}" data-bulk-package-wrap="${idx}"><input class="form-control ios-input" type="number" min="1" step="1" data-bulk-package="${idx}" placeholder="Cant. por paquete" value="${escapeHtml(packageVal)}" ${packageLocked ? 'disabled' : ''}></div></div></td>
               <td><button type="button" class="btn family-manage-btn" data-bulk-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td>
@@ -3542,6 +3550,94 @@
       renderEditor(ingredientId, state.editorDraft);
     });
 
+    let providerSuggestDropdown = null;
+    const closeProviderSuggestions = () => {
+      if (providerSuggestDropdown) {
+        providerSuggestDropdown.remove();
+        providerSuggestDropdown = null;
+      }
+    };
+    const positionProviderSuggestions = (dropdown, input) => {
+      const rect = input.getBoundingClientRect();
+      dropdown.style.position = 'fixed';
+      dropdown.style.left = `${Math.max(12, rect.left)}px`;
+      dropdown.style.top = `${rect.bottom + 6}px`;
+      dropdown.style.width = `${Math.max(rect.width, 260)}px`;
+    };
+    const applyProviderSelection = (providerId = '') => {
+      const providerSelect = nodes.editorForm.querySelector('#inventoryProvider');
+      const providerSearch = nodes.editorForm.querySelector('#inventoryProviderSearch');
+      if (!providerSelect || !providerSearch) return;
+      if (providerId === 'add_provider') {
+        providerSelect.value = 'add_provider';
+        providerSearch.value = '';
+      } else {
+        const provider = findProviderById(providerId);
+        providerSelect.value = provider?.id || '';
+        providerSearch.value = provider?.name || '';
+      }
+      providerSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    const providerSearchInput = nodes.editorForm.querySelector('#inventoryProviderSearch');
+    providerSearchInput?.addEventListener('input', () => {
+      const query = normalizeValue(providerSearchInput.value);
+      const providerSelect = nodes.editorForm.querySelector('#inventoryProvider');
+      if (!query) {
+        closeProviderSuggestions();
+        if (providerSelect) {
+          providerSelect.value = '';
+          syncDraft();
+        }
+        return;
+      }
+
+      const source = sortedProviders()
+        .filter((provider) => normalizeLower(provider.name).includes(normalizeLower(query)))
+        .slice(0, 10);
+
+      const exact = sortedProviders().find((provider) => normalizeLower(provider.name) === normalizeLower(query));
+      if (exact) {
+        applyProviderSelection(exact.id);
+        closeProviderSuggestions();
+        return;
+      }
+
+      closeProviderSuggestions();
+      const dropdown = document.createElement('div');
+      dropdown.className = 'recipe-suggest-floating';
+      dropdown.innerHTML = `${source.map((provider) => {
+        const avatar = sanitizeImageUrl(provider?.photoUrl)
+          ? `<span class="recipe-suggest-avatar-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-suggest-avatar js-inventario-thumb" src="${escapeHtml(sanitizeImageUrl(provider.photoUrl))}" alt="${escapeHtml(provider.name)}" loading="lazy"></span>`
+          : '<span class="recipe-suggest-avatar-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-truck-field"></i></span></span>';
+        return `<button type="button" class="recipe-suggest-item" data-provider-pick="${escapeHtml(provider.id)}">${avatar}<span>${escapeHtml(provider.name)}</span></button>`;
+      }).join('')}<button type="button" class="recipe-suggest-item recipe-suggest-create" data-provider-create="1"><i class="fa-solid fa-plus"></i><span>+ nuevo proveedor</span></button>`;
+      document.body.appendChild(dropdown);
+      positionProviderSuggestions(dropdown, providerSearchInput);
+      initThumbLoading(dropdown);
+      dropdown.addEventListener('click', (event) => {
+        const pick = event.target.closest('[data-provider-pick]');
+        if (pick) {
+          applyProviderSelection(pick.dataset.providerPick || '');
+          closeProviderSuggestions();
+          return;
+        }
+        if (event.target.closest('[data-provider-create]')) {
+          applyProviderSelection('add_provider');
+          closeProviderSuggestions();
+        }
+      });
+      providerSuggestDropdown = dropdown;
+    });
+    providerSearchInput?.addEventListener('focus', () => {
+      if (normalizeValue(providerSearchInput.value).length) {
+        providerSearchInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    });
+    providerSearchInput?.addEventListener('blur', () => {
+      setTimeout(() => closeProviderSuggestions(), 140);
+    });
+
     nodes.editorForm.querySelector('#inventoryProvider')?.addEventListener('change', async (event) => {
       if (event.target.value !== 'add_provider') {
         syncDraft();
@@ -3712,6 +3808,7 @@
 
     nodes.editorForm.querySelector('#addBulkInventoryBtn')?.addEventListener('click', () => {
       const currentBulk = Array.isArray(state.editorDraft.bulkEntries) ? state.editorDraft.bulkEntries : [];
+      const nextIndex = currentBulk.length;
       state.editorDraft.bulkEntries = [...currentBulk, {
         ...getDefaultBulkEntryDraft(''),
         entryDate: state.editorDraft.entryDate,
@@ -3719,6 +3816,7 @@
         noPerecedero: Boolean(state.editorDraft.noPerecedero),
         usoInternoEmpresa: Boolean(state.editorDraft.usoInternoEmpresa)
       }];
+      state.editorDraft.focusBulkSearchIndex = nextIndex;
       renderEditor(ingredientId, state.editorDraft);
     });
 
@@ -3824,9 +3922,12 @@
     });
 
     nodes.editorForm.addEventListener('click', (event) => {
-      if (!bulkSuggestDropdown) return;
-      if (event.target.closest('[data-bulk-search]')) return;
-      closeBulkSuggestions();
+      if (!event.target.closest('[data-bulk-search]')) {
+        closeBulkSuggestions();
+      }
+      if (!event.target.closest('#inventoryProviderSearch')) {
+        closeProviderSuggestions();
+      }
     });
 
     nodes.editorForm.querySelectorAll('[data-bulk-ingredient]').forEach((select) => {
@@ -4229,6 +4330,15 @@
     wireTokenDrag();
     renderPattern();
     initThumbLoading(nodes.editorForm);
+
+    const focusBulkIdx = Number(state.editorDraft.focusBulkSearchIndex);
+    if (Number.isInteger(focusBulkIdx) && focusBulkIdx >= 0) {
+      const focusInput = nodes.editorForm.querySelector(`[data-bulk-search="${focusBulkIdx}"]`);
+      if (focusInput) {
+        focusInput.focus();
+      }
+      state.editorDraft.focusBulkSearchIndex = null;
+    }
   };
 
   const convertToKg = (qty, unit) => {
