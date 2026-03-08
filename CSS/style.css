@@ -4507,6 +4507,11 @@ html.login-protected.auth-ok body {
   min-width: 0;
 }
 
+.inventario-weekly-product-head > div {
+  min-width: 0;
+  flex: 1;
+}
+
 .inventario-weekly-thumb-wrap {
   width: 54px;
   height: 54px;
@@ -4551,10 +4556,12 @@ html.login-protected.auth-ok body {
   margin: 1px 0 0;
   color: #60739d;
   font-size: 0.78rem;
-  line-height: 1.2;
-  white-space: nowrap;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  word-break: break-word;
   max-width: 100%;
 }
 
@@ -4562,6 +4569,10 @@ html.login-protected.auth-ok body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px 10px;
+}
+
+.inventario-weekly-grid .inventario-check-row span {
+  overflow-wrap: anywhere;
 }
 
 .inventario-weekly-rotation {
