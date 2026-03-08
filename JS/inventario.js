@@ -903,14 +903,26 @@
 
   const addIsoDays = (isoDate, days) => addDaysToIso(isoDate, days);
 
-  const openProductsScopeSelector = async (title = 'Selector de productos') => openIosSwal({
+  const resolveIngredientPerishableFlag = (ingredientId) => {
+    const recordCfg = safeObject(state.inventario?.items?.[ingredientId]?.weeklySheetConfig);
+    if (typeof recordCfg.perishable === 'boolean') return recordCfg.perishable;
+    const ingredientCfg = safeObject(state.ingredientes?.[ingredientId]);
+    if (typeof ingredientCfg.perishable === 'boolean') return ingredientCfg.perishable;
+    return true;
+  };
+
+  const openProductsScopeSelector = async (title = 'Selector de productos', options = {}) => openIosSwal({
     title,
     html: `<div class="swal-stack-fields text-start">
       <label class="inventario-check-row"><input type="radio" name="printScope" value="all" checked><span>Incluir todos los productos</span></label>
       <label class="inventario-check-row"><input type="radio" name="printScope" value="exclude"><span>Excluir algunos productos</span></label>
       <div id="printProductsScope" class="notify-specific-users-list d-none">
         <div class="step-block"><strong>Familias</strong>${Object.values(state.familias).map((family) => `<label class="inventario-check-row inventario-selector-row">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb inventario-print-photo" src="${family.imageUrl}" alt="${escapeHtml(capitalize(family.name))}"></span>` : ''}<input type="checkbox" data-print-family value="${family.id}"><span>${escapeHtml(capitalize(family.name))}</span></label>`).join('')}</div>
-        <div class="step-block"><strong>Productos</strong>${Object.values(state.ingredientes).map((item) => `<label class="inventario-check-row inventario-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb inventario-print-photo" src="${item.imageUrl}" alt="${escapeHtml(capitalize(item.name))}"></span>` : ''}<input type="checkbox" data-print-product data-family-id="${item.familyId || ''}" value="${item.id}"><span>${escapeHtml(capitalize(item.name))}</span></label>`).join('')}</div>
+        <div class="step-block"><strong>Productos</strong>${Object.values(state.ingredientes).map((item) => {
+          const perishable = resolveIngredientPerishableFlag(item.id);
+          const disabledByType = typeof options.targetPerishable === 'boolean' ? perishable !== options.targetPerishable : false;
+          return `<label class="inventario-check-row inventario-selector-row ${disabledByType ? 'is-disabled-by-perishable' : ''}" style="${disabledByType ? 'opacity:.55;text-decoration:line-through;' : ''}">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb inventario-print-photo" src="${item.imageUrl}" alt="${escapeHtml(capitalize(item.name))}"></span>` : ''}<input type="checkbox" data-print-product data-family-id="${item.familyId || ''}" value="${item.id}" ${disabledByType ? 'disabled' : ''}><span>${escapeHtml(capitalize(item.name))}${disabledByType ? ` <small>(${options.targetPerishable ? 'No perecedero' : 'Perecedero'})</small>` : ''}</span></label>`;
+        }).join('')}</div>
       </div>
     </div>`,
     showCancelButton: true,
@@ -1018,7 +1030,10 @@
         ],
         temperature: 0.1
       };
-      const res = await callDeepseekWithFallback(payload, apiKey, { url_corsh: deepseekNode.url_corsh, cosh_api_key: deepseekNode.cosh_api_key });
+      const res = await Promise.race([
+        callDeepseekWithFallback(payload, apiKey, { url_corsh: deepseekNode.url_corsh, cosh_api_key: deepseekNode.cosh_api_key }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout_deepseek')), 12000))
+      ]);
       const data = await res.json();
       const parsed = parseAiJsonFromText(data?.choices?.[0]?.message?.content || '');
       const map = safeObject(parsed?.temperaturas);
@@ -1034,6 +1049,38 @@
     } catch (error) {
     }
     return fallback;
+  };
+
+  const askRequiredRangeForIngresosSheet = async () => {
+    const picker = await openIosSwal({
+      title: 'Rango obligatorio para planilla',
+      html: '<p>Para evitar procesar datos infinitos, seleccioná un rango de fechas antes de continuar.</p><input id="sheetRangeInput" class="swal2-input ios-input" placeholder="Seleccionar rango">',
+      showCancelButton: true,
+      confirmButtonText: 'Continuar',
+      cancelButtonText: 'Cancelar',
+      didOpen: () => {
+        const input = document.getElementById('sheetRangeInput');
+        if (window.flatpickr && input) {
+          window.flatpickr(input, {
+            locale: window.flatpickr.l10ns?.es || undefined,
+            mode: 'range',
+            dateFormat: 'Y-m-d',
+            allowInput: false,
+            disableMobile: true
+          });
+        }
+      },
+      preConfirm: () => {
+        const raw = normalizeValue(document.getElementById('sheetRangeInput')?.value);
+        const parsed = parseRangeValue(raw);
+        if (!parsed.from || !parsed.to) {
+          Swal.showValidationMessage('Debés seleccionar un rango completo (desde y hasta).');
+          return false;
+        }
+        return parsed;
+      }
+    });
+    return picker.isConfirmed ? picker.value : null;
   };
 
 
@@ -2229,9 +2276,13 @@
   };
 
   const openIngresosWeeklySheet = async (rows) => {
+    const forcedRange = await askRequiredRangeForIngresosSheet();
+    if (!forcedRange) return;
+    const rangedRows = (Array.isArray(rows) ? rows : []).filter((row) => inDateRange(row.entryDate, forcedRange.from, forcedRange.to));
+
     const typeAsk = await openIosSwal({
       title: 'Generar planilla de artículos',
-      html: '<p>Perecederos - No perecederos</p>',
+      html: '<p>Elegí el tipo de materias primas a incluir en esta planilla semanal. Se procesarán únicamente ingresos dentro del rango seleccionado y luego se completarán temperaturas estimadas para recepción.</p>',
       showCancelButton: true,
       showDenyButton: true,
       confirmButtonText: 'Perecederos',
@@ -2246,25 +2297,17 @@
     if (!typeAsk.isConfirmed && !typeAsk.isDenied) return;
     const targetPerishable = typeAsk.isConfirmed;
 
-    const selector = await openProductsScopeSelector('Selector de productos');
+    const selector = await openProductsScopeSelector('Selector de productos', { targetPerishable });
     if (!selector.isConfirmed) return;
 
     const managers = await openManagersSelector();
     if (!managers) return;
 
     const excluded = new Set(selector.value.mode === 'exclude' ? selector.value.selected : []);
-    const resolveIngredientPerishable = (ingredientId) => {
-      const recordCfg = safeObject(state.inventario?.items?.[ingredientId]?.weeklySheetConfig);
-      if (typeof recordCfg.perishable === 'boolean') return recordCfg.perishable;
-      const ingredientCfg = safeObject(state.ingredientes?.[ingredientId]);
-      if (typeof ingredientCfg.perishable === 'boolean') return ingredientCfg.perishable;
-      return true;
-    };
-
-    const scopedRows = rows
+    const scopedRows = rangedRows
       .filter((row) => !excluded.has(row.ingredientId))
       .filter((row) => {
-        const perishable = resolveIngredientPerishable(row.ingredientId);
+        const perishable = resolveIngredientPerishableFlag(row.ingredientId);
         return targetPerishable ? perishable : !perishable;
       });
 
@@ -2315,7 +2358,7 @@
               const managersUp = String(managers.managersLabel || 'SIN ENCARGADO').toUpperCase();
               return `<tr>
                 <td><strong>${escapeHtml(String(row.entryDateTime || '-').toUpperCase())}</strong></td>
-                <td>${productImage}<strong>${escapeHtml(productUp)}</strong></td>
+                <td>${productImage}<strong style="font-size:13px;letter-spacing:.02em;">${escapeHtml(productUp)}</strong><br><small style="color:#5c6f9e;font-weight:600;">INGRESO DE MATERIA PRIMA</small></td>
                 <td><strong>${escapeHtml(providerUp)}</strong></td>
                 <td><strong>${escapeHtml(qtyLabel.toUpperCase())}</strong></td>
                 <td>${escapeHtml(loteUp)}</td>
@@ -2341,7 +2384,7 @@
                 <thead><tr><th>FECHA Y HORA</th><th>PRODUCTO</th><th>PROVEEDOR</th><th>CANTIDAD</th><th>LOTE / CS</th><th>VTO.</th><th>TEMP. °C</th><th>ENCARGADOS</th><th>OBSERVACIONES</th></tr></thead>
                 <tbody>${rowsHtml || '<tr><td colspan="9">Sin ingresos</td></tr>'}</tbody>
               </table>
-              <p style="margin-top:10px;font-size:11px;line-height:1.35;">${footer}</p>
+              <footer style="margin-top:12px;border-top:1px dashed #aebde4;padding-top:8px;font-size:11px;line-height:1.4;color:#293b68;"><strong>NOTAS:</strong><br>${footer}</footer>
             </section>`;
           }).join('');
 
