@@ -1242,8 +1242,6 @@
 
   const getProviderRneCounts = () => {
     const providers = sortedProviders();
-    const selectedProvider = findProviderById(state.editorDraft.provider);
-    const bulkEntries = Array.isArray(state.editorDraft.bulkEntries) ? state.editorDraft.bulkEntries : [];
     return providers.reduce((acc, provider) => {
       const status = getProviderRneStatus(provider);
       acc.all += 1;
@@ -3178,6 +3176,8 @@
     nodes.editorTitle.textContent = `Inventario · ${capitalize(ingredient.name)}`;
 
     const providers = sortedProviders();
+    const selectedProvider = findProviderById(state.editorDraft.provider);
+    const bulkEntries = Array.isArray(state.editorDraft.bulkEntries) ? state.editorDraft.bulkEntries : [];
     const stockUnit = record.stockUnit || ingredient.measure || state.editorDraft.unit || 'kilos';
     const stockBase = Number(record.stockBase || toBase(record.stockKg || 0, stockUnit)) || 0;
     const stockQty = fromBase(stockBase, stockUnit);
