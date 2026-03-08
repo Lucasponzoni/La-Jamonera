@@ -2935,6 +2935,7 @@ html.login-protected.auth-ok body {
   border: 1px solid #cfdcf8;
   border-radius: 14px 14px 0 0;
   overflow: hidden;
+  margin-top: 10px;
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
 
@@ -8237,5 +8238,7 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   gap: 8px;
 }
 
-/* =========================================
-   USUARIOS / AJUSTES INVENTARIO-PRODUCCION
+p.inventario-filter-helper {
+    text-align: center;
+    color: #e61d49;
+}

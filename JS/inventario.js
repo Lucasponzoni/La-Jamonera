@@ -1342,7 +1342,7 @@
         : [];
       if (outsideMatches.length) {
         visibleItems = outsideMatches;
-        helperHtml = '<div class="ingrediente-empty-list">No hay resultados con los filtros actuales.</div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias fuera del filtro seleccionado</p>';
+        helperHtml = '<div class="ingrediente-empty-list">No hay resultados con los filtros actuales.</div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del filtro seleccionado</strong></p>';
       } else {
         nodes.list.innerHTML = '<div class="ingrediente-empty-list">No encontramos ingredientes para inventario.</div>';
         updateListScrollHint();
