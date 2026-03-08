@@ -206,6 +206,15 @@
     const parsed = Number(normalizeValue(value).replace(',', '.'));
     return Number.isFinite(parsed) ? parsed : NaN;
   };
+  const disableCalendarSuggestions = (input) => {
+    if (!input) return;
+    input.setAttribute('autocomplete', 'new-password');
+    input.setAttribute('autocapitalize', 'off');
+    input.setAttribute('autocorrect', 'off');
+    input.setAttribute('spellcheck', 'false');
+    input.setAttribute('inputmode', 'none');
+    input.setAttribute('readonly', 'readonly');
+  };
 
   const getDefaultProviderRne = () => ({
     number: '',
@@ -2867,11 +2876,13 @@
     if (window.flatpickr) {
       const locale = window.flatpickr.l10ns?.es || undefined;
       const dayMap = getDaySummaryMap(Array.isArray(record.entries) ? record.entries : []);
-      window.flatpickr(nodes.editorForm.querySelector('#inventarioEntriesRange'), {
+      const entriesRangeInput = nodes.editorForm.querySelector('#inventarioEntriesRange');
+      disableCalendarSuggestions(entriesRangeInput);
+      window.flatpickr(entriesRangeInput, {
         locale,
         mode: 'range',
         dateFormat: 'Y-m-d',
-        allowInput: true,
+        allowInput: false,
         defaultDate: getDefaultRangeDates(state.tableDateRange),
         onDayCreate: (_dObj, _dStr, _fp, dayElem) => {
           const date = dayElem.dateObj ? getArgentinaIsoDate(dayElem.dateObj) : '';
@@ -3909,11 +3920,12 @@
       if (window.flatpickr) {
         const locale = window.flatpickr.l10ns?.es || undefined;
         const dayMapGlobal = getDaySummaryMap(getGlobalFilteredEntries(true));
+        disableCalendarSuggestions(nodes.globalRange);
         window.flatpickr(nodes.globalRange, {
           locale,
           mode: 'range',
           dateFormat: 'Y-m-d',
-          allowInput: true,
+          allowInput: false,
           defaultDate: getDefaultRangeDates(state.dashboardDateRange),
           onDayCreate: (_dObj, _dStr, fp, dayElem) => {
             const date = dayElem.dateObj ? getArgentinaIsoDate(dayElem.dateObj) : '';

@@ -133,6 +133,15 @@
     const parsed = Number(normalizeValue(value).replace(',', '.'));
     return Number.isFinite(parsed) ? parsed : Number.NaN;
   };
+  const disableCalendarSuggestions = (input) => {
+    if (!input) return;
+    input.setAttribute('autocomplete', 'new-password');
+    input.setAttribute('autocapitalize', 'off');
+    input.setAttribute('autocorrect', 'off');
+    input.setAttribute('spellcheck', 'false');
+    input.setAttribute('inputmode', 'none');
+    input.setAttribute('readonly', 'readonly');
+  };
   const parsePositive = (value, fallback = 1) => {
     const n = parseNumber(value);
     return Number.isFinite(n) && n > 0 ? n : fallback;
@@ -2826,11 +2835,12 @@
       if (window.flatpickr && rangeNode) {
         const locale = window.flatpickr.l10ns?.es || undefined;
         const dayMap = getRecipeCalendarKgMap();
+        disableCalendarSuggestions(rangeNode);
         window.flatpickr(rangeNode, {
           locale,
           mode: 'range',
           dateFormat: 'Y-m-d',
-          allowInput: true,
+          allowInput: false,
           defaultDate: normalizeValue(recipeHistoryState.range).split(' a ').filter(Boolean),
           onDayCreate: (_dObj, _dStr, _fp, dayElem) => {
             const iso = dayElem?.dateObj ? getArgentinaIsoDate(dayElem.dateObj) : '';
@@ -3933,11 +3943,12 @@
       if (window.flatpickr && nodes.historyRange) {
         const locale = window.flatpickr.l10ns?.es || undefined;
         const dayMap = getProductionDayMap();
+        disableCalendarSuggestions(nodes.historyRange);
         window.flatpickr(nodes.historyRange, {
           locale,
           mode: 'range',
           dateFormat: 'Y-m-d',
-          allowInput: true,
+          allowInput: false,
           defaultDate: normalizeValue(state.historyRange).split(' a ').filter(Boolean),
           onDayCreate: (_dObj, _dStr, _fp, dayElem) => {
             const date = dayElem.dateObj ? getArgentinaIsoDate(dayElem.dateObj) : '';
