@@ -1242,8 +1242,6 @@
 
   const getProviderRneCounts = () => {
     const providers = sortedProviders();
-    const selectedProvider = findProviderById(state.editorDraft.provider);
-    const bulkEntries = Array.isArray(state.editorDraft.bulkEntries) ? state.editorDraft.bulkEntries : [];
     return providers.reduce((acc, provider) => {
       const status = getProviderRneStatus(provider);
       acc.all += 1;
@@ -3178,6 +3176,8 @@
     nodes.editorTitle.textContent = `Inventario · ${capitalize(ingredient.name)}`;
 
     const providers = sortedProviders();
+    const providerSearchValue = findProviderById(state.editorDraft?.provider)?.name || '';
+    const bulkEntries = Array.isArray(state.editorDraft?.bulkEntries) ? state.editorDraft.bulkEntries : [];
     const stockUnit = record.stockUnit || ingredient.measure || state.editorDraft.unit || 'kilos';
     const stockBase = Number(record.stockBase || toBase(record.stockKg || 0, stockUnit)) || 0;
     const stockQty = fromBase(stockBase, stockUnit);
@@ -3298,7 +3298,7 @@
             <div class="recipe-ing-autocomplete">
               <div class="recipe-ing-input-wrap">
                 <span class="recipe-inline-avatar-wrap recipe-inline-avatar-fallback"><span class="recipe-small-placeholder"><i class="fa-solid fa-truck-field"></i></span></span>
-                <input id="inventoryProviderSearch" type="search" class="form-control ios-input" placeholder="Buscar proveedor..." value="${escapeHtml(selectedProvider?.name || '')}" autocomplete="off">
+                <input id="inventoryProviderSearch" type="search" class="form-control ios-input" placeholder="Buscar proveedor..." value="${escapeHtml(providerSearchValue)}" autocomplete="off">
               </div>
             </div>
             <select id="inventoryProvider" class="form-select ios-input d-none" autocomplete="off">
