@@ -5325,7 +5325,7 @@
         renderStatusFilters();
         renderList();
       }
-      if (window.flatpickr) {
+      if (window.flatpickr && nodes.globalRange) {
         const locale = window.flatpickr.l10ns?.es || undefined;
         const dayMapGlobal = getDaySummaryMap(getGlobalFilteredEntries(true));
         disableCalendarSuggestions(nodes.globalRange);
@@ -5361,8 +5361,9 @@
         });
       }
     } catch (error) {
+      console.error('[Inventario] Error en loadInventario:', error);
       setStateView('empty');
-      await openIosSwal({ title: 'No se pudo cargar', html: '<p>Error leyendo inventario desde Firebase.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      renderProviderRneAlert();
     }
   };
 
