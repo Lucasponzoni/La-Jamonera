@@ -1620,7 +1620,7 @@
     if (!force && current.configured) {
       const quick = await openIosSwal({
         title: 'Planilla semanal',
-        html: `<p><strong>${escapeHtml(capitalize(ingredient.name))}</strong></p><p><small>Perecedero: <strong>${current.perishable ? 'Sí' : 'No'}</strong> · Mostrador: <strong>${current.counterOnly ? 'Sí' : 'No'}</strong> · Egreso: <strong>${current.egresoEnabled ? 'Sí' : 'No'}</strong> · Rotación: <strong>${Number(current.rotationDays || 0)} día(s)</strong></small></p>`,
+        html: `<p><strong>${escapeHtml(capitalize(ingredient.name))}</strong></p><p><small>Perecedero: <strong>${current.perishable ? 'Sí' : 'No'}</strong> · Egreso: <strong>${current.egresoEnabled ? 'Sí' : 'No'}</strong> · Rotación: <strong>${Number(current.rotationDays || 0)} día(s)</strong></small></p>`,
         showDenyButton: true,
         showCancelButton: true,
         confirmButtonText: 'Editar',
@@ -1635,7 +1635,6 @@
       html: `<div class="swal-stack-fields text-start">
         <p class="mb-1"><strong>${escapeHtml(capitalize(ingredient.name))}</strong></p>
         <label class="inventario-check-row"><input type="checkbox" id="invPerishable" ${current.perishable ? 'checked' : ''}><span>Producto perecedero</span></label>
-        <label class="inventario-check-row"><input type="checkbox" id="invCounterOnly" ${current.counterOnly ? 'checked' : ''}><span>Solo venta en mostrador (no producible)</span></label>
         <label class="inventario-check-row"><input type="checkbox" id="invEgresoEnabled" ${current.egresoEnabled ? 'checked' : ''}><span><i class="fa-solid fa-robot"></i> Habilitado para egreso</span></label>
         <label class="form-label mt-2" for="invRotationDays">Días de rotación</label>
         <input id="invRotationDays" class="swal2-input ios-input" type="number" min="0" step="1" value="${Number(current.rotationDays || 0)}">
@@ -1651,7 +1650,7 @@
         }
         return {
           perishable: Boolean(document.getElementById('invPerishable')?.checked),
-          counterOnly: Boolean(document.getElementById('invCounterOnly')?.checked),
+          counterOnly: Boolean(current.counterOnly),
           egresoEnabled: Boolean(document.getElementById('invEgresoEnabled')?.checked),
           rotationDays: Math.round(rotationDays)
         };
@@ -1687,8 +1686,7 @@
         </div>
         <div class="inventario-weekly-grid">
           <label class="inventario-check-row"><input type="checkbox" data-weekly-perishable="${escapeHtml(ingredient.id)}" ${cfg.perishable ? 'checked' : ''}><span>Producto perecedero</span></label>
-          <label class="inventario-check-row"><input type="checkbox" data-weekly-counter="${escapeHtml(ingredient.id)}" ${cfg.counterOnly ? 'checked' : ''}><span>Solo venta en mostrador (no producible)</span></label>
-          <label class="inventario-check-row"><input type="checkbox" data-weekly-egreso="${escapeHtml(ingredient.id)}" ${cfg.egresoEnabled ? 'checked' : ''}><span>Habilitado para egreso</span></label>
+          <label class="inventario-check-row"><input type="checkbox" data-weekly-egreso="${escapeHtml(ingredient.id)}" ${cfg.egresoEnabled ? 'checked' : ''}><span><i class="fa-solid fa-robot"></i> Habilitado para egreso</span></label>
           <label class="inventario-weekly-rotation" for="weeklyRotation_${escapeHtml(ingredient.id)}">Días de rotación
             <input id="weeklyRotation_${escapeHtml(ingredient.id)}" class="swal2-input ios-input" type="number" min="0" step="1" value="${Number(cfg.rotationDays || 0)}" data-weekly-rotation="${escapeHtml(ingredient.id)}">
           </label>
@@ -1728,7 +1726,7 @@
         popupLoop: for (const ingredient of Object.values(state.ingredientes)) {
           const ingredientId = ingredient.id;
           const perishable = Boolean(document.querySelector(`[data-weekly-perishable="${ingredientId}"]`)?.checked);
-          const counterOnly = Boolean(document.querySelector(`[data-weekly-counter="${ingredientId}"]`)?.checked);
+          const counterOnly = Boolean(getRecord(ingredientId).weeklySheetConfig?.counterOnly);
           const egresoEnabled = Boolean(document.querySelector(`[data-weekly-egreso="${ingredientId}"]`)?.checked);
           const rotationRaw = document.querySelector(`[data-weekly-rotation="${ingredientId}"]`)?.value;
           const rotationDays = Number(rotationRaw || 0);
