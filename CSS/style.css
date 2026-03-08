@@ -4946,6 +4946,18 @@ html.login-protected.auth-ok body {
   justify-content: flex-end;
 }
 
+.inventario-add-bulk-btn {
+  background: #1fb35f;
+  border-color: #1fb35f;
+  color: #fff;
+}
+
+.inventario-add-bulk-btn:hover {
+  background: #17934d;
+  border-color: #17934d;
+  color: #fff;
+}
+
 #saveInventorySpinner {
   width: 22px;
   height: 22px;
@@ -5011,6 +5023,64 @@ html.login-protected.auth-ok body {
 .inventario-selector-row {
   justify-content: flex-start;
   width: 100%;
+}
+
+.inventario-bulk-table-wrap {
+  margin-top: 10px;
+}
+
+.inventario-bulk-table thead th {
+  background: #e8eefb;
+  color: #36569b;
+  font-weight: 700;
+  border-bottom: 1px solid #d1ddf5;
+}
+
+.inventario-bulk-main-row td {
+  vertical-align: middle;
+}
+
+.inventario-bulk-main-row .recipe-ing-input-wrap {
+  grid-template-columns: 32px 1fr;
+  gap: 12px;
+}
+
+.inventario-bulk-main-row .recipe-inline-avatar-wrap {
+  width: 32px;
+  height: 32px;
+}
+
+.inventario-bulk-main-row .recipe-small-placeholder i {
+  font-size: 0.7rem;
+}
+
+.inventario-bulk-unit-cell {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(125px, auto);
+  gap: 8px;
+  align-items: center;
+}
+
+.inventario-bulk-secondary-row td {
+  border-top: 0;
+  padding-top: 2px;
+  padding-bottom: 10px;
+}
+
+.inventario-bulk-row-extras {
+  display: inline-flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid #d7def2;
+  background: #f6f8ff;
+}
+
+@media (max-width: 991.98px) {
+  .inventario-bulk-unit-cell {
+    grid-template-columns: 1fr;
+  }
 }
 
 .inventario-expand-btn {
