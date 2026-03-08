@@ -8236,3 +8236,6 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
+
+/* =========================================
+   USUARIOS / AJUSTES INVENTARIO-PRODUCCION

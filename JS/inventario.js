@@ -1332,7 +1332,17 @@
     renderProviderRneAlert();
     const items = filteredIngredients();
     if (!items.length) {
-      nodes.list.innerHTML = '<div class="ingrediente-empty-list">No encontramos ingredientes para inventario.</div>';
+      const outsideMatches = state.search
+        ? Object.values(state.ingredientes).filter((item) => {
+          const text = [item.name, item.description, item.familyName, item.measure].map(normalizeLower).join(' ');
+          return text.includes(state.search);
+        })
+        : [];
+      if (outsideMatches.length) {
+        nodes.list.innerHTML = `<div class="ingrediente-empty-list">No hay resultados con los filtros actuales.</div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias fuera del filtro seleccionado</p>${outsideMatches.map((item) => `<button type="button" class="btn ios-btn ios-btn-secondary inventario-outside-match-btn" data-inventario-open-editor="${item.id}"><i class="fa-solid fa-magnifying-glass"></i><span>${escapeHtml(capitalize(item.name))}</span></button>`).join('')}`;
+      } else {
+        nodes.list.innerHTML = '<div class="ingrediente-empty-list">No encontramos ingredientes para inventario.</div>';
+      }
       updateListScrollHint();
       return;
     }
@@ -2633,6 +2643,13 @@
                 </td>
               </tr>
               <tr>
+                <td>${escapeHtml(productUp)}</td>
+                <td>${escapeHtml(formatShortDateTimeEs(row.createdAt))}</td>
+                <td>${escapeHtml(qtyLabel)}</td>
+                <td>${escapeHtml(loteUp)}</td>
+                <td>${escapeHtml(vtoUp)}</td>
+                <td>${escapeHtml(`${temp} °C`)}</td>
+                <td><div class="sheet-manager-cell">${managersPrintHtml}</div></td>
                 <td>
                   <div class="sheet-provider-wrap">
                     ${providerAvatarHtml}
@@ -2642,13 +2659,6 @@
                     </div>
                   </div>
                 </td>
-                <td>${escapeHtml(formatShortDateTimeEs(row.createdAt))}</td>
-                <td>${escapeHtml(qtyLabel)}</td>
-                <td>${escapeHtml(loteUp)}</td>
-                <td>${escapeHtml(vtoUp)}</td>
-                <td>${escapeHtml(`${temp} °C`)}</td>
-                <td><div class="sheet-manager-cell">${managersPrintHtml}</div></td>
-                <td>SIN OBSERVACIONES</td>
               </tr>`;
             }).join('');
             const from = formatIsoDateEs(week.weekStart);
@@ -2676,7 +2686,7 @@
                         <th>Vencimiento</th>
                         <th>Temperatura</th>
                         <th>Recibió</th>
-                        <th>Observaciones</th>
+                        <th>Proveedor</th>
                       </tr>
                     </thead>
                     <tbody>${rowsHtml}</tbody>
@@ -2762,6 +2772,108 @@
   };
 
 
+
+  const editEntryWithSecurity = async (ingredientId, entryId) => {
+    const record = getRecord(ingredientId);
+    const entries = Array.isArray(record.entries) ? [...record.entries] : [];
+    const idx = entries.findIndex((item) => item.id === entryId);
+    if (idx < 0) return false;
+    const entry = { ...entries[idx] };
+    await window.laJamoneraReady;
+    const usersMap = safeObject(await window.dbLaJamoneraRest.read('/informes/users'));
+    const users = Object.values(usersMap).filter((user) => normalizeValue(user?.id) && normalizeValue(user?.pin));
+    if (!users.length) {
+      await openIosSwal({ title: 'Sin usuarios', html: '<p>No hay usuarios con clave para autorizar la edición.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+      return false;
+    }
+
+    const form = await openIosSwal({
+      title: 'Editar ingreso',
+      width: 'min(760px, 96vw)',
+      html: `<div class="swal-stack-fields text-start">
+        <div class="inventario-bulk-grid"><input id="editInventoryQty" class="swal2-input ios-input" type="number" min="0" step="0.01" value="${Number(entry.qty || 0)}"><input id="editInventoryInvoice" class="swal2-input ios-input" value="${escapeHtml(entry.invoiceNumber || '')}" placeholder="Factura/remito"></div>
+        <div class="inventario-bulk-grid"><input id="editInventoryEntryDate" class="swal2-input ios-input" value="${escapeHtml(entry.entryDate || '')}" placeholder="Fecha ingreso"><input id="editInventoryExpiryDate" class="swal2-input ios-input" value="${escapeHtml(entry.expiryDate || '')}" placeholder="Fecha caducidad"></div>
+        <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="editInventoryNoPerecedero" ${entry.noPerecedero ? 'checked' : ''}><span>No perecedero</span></label>
+        <select id="editInventoryProvider" class="swal2-select ios-input"><option value="">Seleccionar proveedor</option>${sortedProviders().map((provider) => `<option value="${escapeHtml(provider.id)}" ${normalizeValue(entry.provider) === provider.id || normalizeUpper(entry.provider) === normalizeUpper(provider.name) ? 'selected' : ''}>${escapeHtml(provider.name)}</option>`).join('')}</select>
+        <input id="editInventoryFiles" class="swal2-input ios-input image-file-input" type="file" accept="image/*,application/pdf" multiple>
+        <div class="inventario-bulk-grid"><select id="editInventoryUser" class="swal2-select ios-input"><option value="">Usuario que modifica</option>${users.map((user) => `<option value="${escapeHtml(user.id)}">${escapeHtml(user.fullName || user.email || user.id)}</option>`).join('')}</select><input id="editInventoryPin" class="swal2-input ios-input" type="password" maxlength="4" placeholder="Clave del usuario"></div>
+      </div>`,
+      showCancelButton: true,
+      confirmButtonText: 'Guardar cambios',
+      cancelButtonText: 'Cancelar',
+      didOpen: () => {
+        const noPer = document.getElementById('editInventoryNoPerecedero');
+        const exp = document.getElementById('editInventoryExpiryDate');
+        const sync = () => {
+          if (!exp) return;
+          exp.disabled = Boolean(noPer?.checked);
+          if (noPer?.checked) exp.value = '';
+        };
+        noPer?.addEventListener('change', sync);
+        sync();
+        if (window.flatpickr) {
+          ['editInventoryEntryDate', 'editInventoryExpiryDate'].forEach((id) => {
+            const input = document.getElementById(id);
+            if (!input) return;
+            window.flatpickr(input, { locale: window.flatpickr.l10ns?.es || undefined, dateFormat: 'Y-m-d', altInput: true, altFormat: 'd/m/Y', allowInput: true, disableMobile: true });
+          });
+        }
+      },
+      preConfirm: async () => {
+        const qty = parseNumber(document.getElementById('editInventoryQty')?.value);
+        const invoice = normalizeValue(document.getElementById('editInventoryInvoice')?.value);
+        const entryDate = normalizeValue(document.getElementById('editInventoryEntryDate')?.value);
+        const noPerecedero = Boolean(document.getElementById('editInventoryNoPerecedero')?.checked);
+        const expiryDate = noPerecedero ? '' : normalizeValue(document.getElementById('editInventoryExpiryDate')?.value);
+        const provider = providerLabel(normalizeValue(document.getElementById('editInventoryProvider')?.value));
+        const userId = normalizeValue(document.getElementById('editInventoryUser')?.value);
+        const pin = normalizeValue(document.getElementById('editInventoryPin')?.value);
+        const files = [...(document.getElementById('editInventoryFiles')?.files || [])];
+        if (!Number.isFinite(qty) || qty <= 0) return Swal.showValidationMessage('Cantidad inválida.');
+        if (!invoice) return Swal.showValidationMessage('Factura/remito obligatorio.');
+        if (!entryDate) return Swal.showValidationMessage('Fecha de ingreso obligatoria.');
+        if (!noPerecedero && !expiryDate) return Swal.showValidationMessage('Fecha de caducidad obligatoria.');
+        if (!provider) return Swal.showValidationMessage('Proveedor obligatorio.');
+        if (!userId || !usersMap[userId]) return Swal.showValidationMessage('Seleccioná usuario.');
+        if (pin !== String(usersMap[userId].pin || '')) return Swal.showValidationMessage('Clave incorrecta.');
+        const urls = [...entryImageUrls(entry)];
+        for (const file of files) {
+          const message = validateInvoiceFile(file);
+          if (message) return Swal.showValidationMessage(message);
+          const uploaded = await uploadImageToStorage(file, 'inventario/facturas');
+          if (uploaded) urls.push(uploaded);
+        }
+        return { qty, invoice, entryDate, expiryDate, noPerecedero, provider, userId, urls };
+      }
+    });
+
+    if (!form.isConfirmed || !form.value) return false;
+    const qtyValue = Number(form.value.qty.toFixed(2));
+    entry.qty = qtyValue;
+    entry.qtyBase = Number(toBase(qtyValue, entry.unit || 'kilos').toFixed(6));
+    entry.qtyKg = Number(convertToKg(qtyValue, entry.unit || 'kilos').toFixed(4));
+    entry.availableQty = Math.min(qtyValue, Number(entry.availableQty || qtyValue));
+    entry.availableBase = Number(toBase(entry.availableQty, entry.unit || 'kilos').toFixed(6));
+    entry.availableKg = Number(convertToKg(entry.availableQty, entry.unit || 'kilos').toFixed(4));
+    entry.invoiceNumber = form.value.invoice;
+    entry.entryDate = form.value.entryDate;
+    entry.expiryDate = form.value.noPerecedero ? '' : form.value.expiryDate;
+    entry.noPerecedero = Boolean(form.value.noPerecedero);
+    entry.provider = form.value.provider;
+    entry.invoiceImageUrls = form.value.urls;
+    entry.invoiceImageUrl = form.value.urls[0] || '';
+    entry.lastEditedAt = Date.now();
+    entry.lastEditedBy = form.value.userId;
+
+    entries[idx] = entry;
+    record.entries = entries;
+    recomputeRecordStock(record, record.stockUnit || entry.unit || 'kilos');
+    state.inventario.items[ingredientId] = record;
+    rebuildInventarioIndexes();
+    await persistInventario();
+    return true;
+  };
+
   const renderEntryTable = (record) => {
     const source = Array.isArray(record.entries) ? [...record.entries] : [];
     const filtered = getFilteredEntries(source);
@@ -2808,6 +2920,7 @@
           <div class="inventario-entry-actions">
             ${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-toggle-entry-collapse="${entry.id}" aria-label="Colapsar desglose"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-print-entry="${entry.id}" aria-label="Imprimir ingreso"><i class="fa-solid fa-print"></i></button>
+            <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-edit-entry="${entry.id}" aria-label="Editar ingreso"><i class="fa-solid fa-pen"></i></button>
             <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn inventario-icon-only-btn" data-delete-entry="${entry.id}" aria-label="Eliminar ingreso"><i class="fa-solid fa-trash"></i></button>
           </div>
         </td>
@@ -3186,8 +3299,9 @@
             const packageLocked = Number(extraRecord?.packageQty) > 0;
             const packageVal = normalizeValue(extra.packageQty || (packageLocked ? extraRecord.packageQty : ''));
             return `<article class="inventario-bulk-row" data-bulk-index="${idx}">
-              <div class="input-group ios-input-group ingredientes-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input type="search" class="form-control ios-input ingredientes-search-input" data-bulk-search="${idx}" placeholder="Buscar producto" value="${escapeHtml(extraIngredient ? capitalize(extraIngredient.name) : '')}"></div>
-              <select class="form-select ios-input" data-bulk-ingredient="${idx}"><option value="">Seleccionar producto</option>${Object.values(state.ingredientes).map((ing) => `<option value="${escapeHtml(ing.id)}" ${ing.id === extra.ingredientId ? 'selected' : ''}>${escapeHtml(capitalize(ing.name))}</option>`).join('')}</select>
+              <div class="input-group ios-input-group ingredientes-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input type="search" list="bulkSuggestions_${idx}" class="form-control ios-input ingredientes-search-input" data-bulk-search="${idx}" placeholder="Buscar producto" value="${escapeHtml(extraIngredient ? capitalize(extraIngredient.name) : '')}"></div>
+              <datalist id="bulkSuggestions_${idx}">${Object.values(state.ingredientes).map((ing) => `<option value="${escapeHtml(capitalize(ing.name))}"></option>`).join('')}<option value="+ ingrediente"></option></datalist>
+              <select class="form-select ios-input d-none" data-bulk-ingredient="${idx}"><option value="">Seleccionar producto</option>${Object.values(state.ingredientes).map((ing) => `<option value="${escapeHtml(ing.id)}" ${ing.id === extra.ingredientId ? 'selected' : ''}>${escapeHtml(capitalize(ing.name))}</option>`).join('')}</select>
               <div class="inventario-bulk-grid"><input class="form-control ios-input" type="number" min="0" step="0.01" data-bulk-qty="${idx}" placeholder="Cantidad" value="${escapeHtml(extra.qty || '')}"><select class="form-select ios-input" data-bulk-unit="${idx}" ${(extraRecord?.stockUnit || packageLocked) ? 'disabled' : ''}>${state.measures.map((m) => `<option value="${escapeHtml(m.name)}" ${measureKey(m.name) === measureKey(defaultUnit) ? 'selected' : ''}>${escapeHtml(getMeasureLabel(m.name))}</option>`).join('')}</select></div>
               <div class="inventario-bulk-grid ${isUnit || packageLocked ? '' : 'd-none'}" data-bulk-package-wrap="${idx}"><input class="form-control ios-input" type="number" min="1" step="1" data-bulk-package="${idx}" placeholder="Cant. por paquete" value="${escapeHtml(packageVal)}" ${packageLocked ? 'disabled' : ''}><input class="form-control ios-input" type="text" data-bulk-entry-date="${idx}" value="${escapeHtml(extra.entryDate || state.editorDraft.entryDate)}" placeholder="Fecha ingreso"></div>
               <div class="inventario-bulk-grid"><input class="form-control ios-input" type="text" data-bulk-expiry-date="${idx}" value="${escapeHtml(extra.expiryDate || state.editorDraft.expiryDate)}" placeholder="Caducidad" ${extra.noPerecedero ? 'disabled' : ''}><button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn" data-bulk-remove="${idx}"><i class="fa-solid fa-trash"></i></button></div>
@@ -3422,11 +3536,11 @@
           <input id="newProviderEmail" class="swal2-input ios-input" placeholder="Email (opcional)">
           <input id="newProviderPhone" class="swal2-input ios-input" placeholder="Teléfono (opcional)">
           <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="newProviderNonFood"><span>No pertenece al rubro alimentos</span></label>
-          <input id="newProviderPhoto" class="swal2-input ios-input image-file-input" type="file" accept="image/*">
+          <label for="newProviderPhoto" class="inventario-upload-dropzone"><i class="fa-regular fa-image"></i><span>Foto de perfil: click o arrastrá</span></label><input id="newProviderPhoto" class="form-control image-file-input inventario-hidden-file-input" type="file" accept="image/*"><small id="newProviderPhotoFeedback" class="inventario-file-feedback">Sin foto seleccionada</small>
           <p class="text-start"><small><strong>Opcional:</strong> podés cargar el RNE ahora o hacerlo más tarde.</small></p>
           <input id="newProviderRneNumber" class="swal2-input ios-input" placeholder="RNE (opcional)">
           <input id="newProviderRneExpiry" class="swal2-input ios-input" placeholder="Vencimiento RNE (opcional)">
-          <input id="newProviderRneFile" class="swal2-input ios-input image-file-input" type="file" accept="image/*,application/pdf">
+          <label for="newProviderRneFile" class="inventario-upload-dropzone"><i class="fa-regular fa-file"></i><span>Adjunto RNE: click o arrastrá</span></label><input id="newProviderRneFile" class="form-control image-file-input inventario-hidden-file-input" type="file" accept="image/*,application/pdf"><small id="newProviderRneFeedback" class="inventario-file-feedback">Sin adjunto seleccionado</small>
         </div>`,
         showCancelButton: true,
         confirmButtonText: 'Guardar',
@@ -3437,6 +3551,33 @@
           numberInput?.addEventListener('input', () => {
             numberInput.value = numberInput.value.replace(/[^0-9-]/g, '');
           });
+          const wireDrop = (inputId, feedbackId) => {
+            const input = document.getElementById(inputId);
+            const dropzone = document.querySelector(`label[for="${inputId}"]`);
+            const feedback = document.getElementById(feedbackId);
+            const update = () => {
+              const file = input?.files?.[0];
+              if (feedback) feedback.textContent = file ? file.name : 'Sin archivo seleccionado';
+            };
+            input?.addEventListener('change', update);
+            dropzone?.addEventListener('dragover', (event) => {
+              event.preventDefault();
+              dropzone.classList.add('is-dragging');
+            });
+            dropzone?.addEventListener('dragleave', () => dropzone.classList.remove('is-dragging'));
+            dropzone?.addEventListener('drop', (event) => {
+              event.preventDefault();
+              dropzone.classList.remove('is-dragging');
+              const file = event.dataTransfer?.files?.[0];
+              if (!file || !input) return;
+              const dt = new DataTransfer();
+              dt.items.add(file);
+              input.files = dt.files;
+              update();
+            });
+          };
+          wireDrop('newProviderPhoto', 'newProviderPhotoFeedback');
+          wireDrop('newProviderRneFile', 'newProviderRneFeedback');
           if (window.flatpickr && expiryInput) {
             window.flatpickr(expiryInput, {
               locale: window.flatpickr.l10ns?.es || undefined,
@@ -3538,6 +3679,12 @@
       el.addEventListener('input', syncDraft);
       el.addEventListener('change', syncDraft);
     });
+    nodes.editorForm.querySelectorAll('input[type="number"]').forEach((input) => {
+      input.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        input.blur();
+      }, { passive: false });
+    });
     nodes.editorForm.querySelector('#inventoryNoPerecedero')?.addEventListener('change', () => {
       syncNoPerecederoState();
       syncDraft();
@@ -3567,14 +3714,27 @@
     });
 
     nodes.editorForm.querySelectorAll('[data-bulk-search]').forEach((input) => {
-      input.addEventListener('input', () => {
+      input.addEventListener('input', async () => {
         const idx = Number(input.dataset.bulkSearch);
         const query = normalizeLower(input.value);
-        const found = Object.values(state.ingredientes).find((ing) => normalizeLower(ing.name).includes(query));
+        if (query === '+ ingrediente') {
+          inventarioModal.setAttribute('inert', '');
+          try {
+            await window.laJamoneraIngredientesAPI?.openIngredientForm?.();
+          } finally {
+            inventarioModal.removeAttribute('inert');
+          }
+          await loadData();
+          renderEditor(ingredientId, state.editorDraft);
+          return;
+        }
+        const found = Object.values(state.ingredientes).find((ing) => normalizeLower(ing.name) === query)
+          || Object.values(state.ingredientes).find((ing) => normalizeLower(ing.name).includes(query));
         if (!found) return;
         const select = nodes.editorForm.querySelector(`[data-bulk-ingredient="${idx}"]`);
         if (!select) return;
         select.value = found.id;
+        input.value = capitalize(found.name);
         select.dispatchEvent(new Event('change', { bubbles: true }));
       });
     });
@@ -3876,6 +4036,15 @@
       });
     });
 
+    nodes.editorForm.querySelectorAll('[data-edit-entry]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const edited = await editEntryWithSecurity(ingredientId, btn.dataset.editEntry);
+        if (!edited) return;
+        await loadData();
+        renderEditor(ingredientId, state.editorDraft);
+      });
+    });
+
     nodes.editorForm.querySelectorAll('[data-delete-entry]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const deleted = await removeEntryWithSecurity(ingredientId, btn.dataset.deleteEntry);
@@ -3911,6 +4080,16 @@
         altFormat: 'd/m/Y',
         allowInput: true,
         minDate: 'today'
+      });
+      nodes.editorForm.querySelectorAll('[data-bulk-entry-date],[data-bulk-expiry-date]').forEach((input) => {
+        window.flatpickr(input, {
+          locale,
+          dateFormat: 'Y-m-d',
+          altInput: true,
+          altFormat: 'd/m/Y',
+          allowInput: true,
+          minDate: input.hasAttribute('data-bulk-expiry-date') ? 'today' : undefined
+        });
       });
     }
 
@@ -4052,6 +4231,11 @@
 
     if (!invoiceNumber) {
       await openIosSwal({ title: 'Dato faltante', html: '<p>Completá el número de factura o remito.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+      return;
+    }
+
+    if (!provider) {
+      await openIosSwal({ title: 'Proveedor requerido', html: '<p>Seleccioná un proveedor para guardar el ingreso.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
       return;
     }
 
