@@ -1196,8 +1196,8 @@
         <td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td>
         <td>${escapeHtml(trace.internalUse ? 'Uso interno en empresa' : (trace.expiryDateAtProduction || '-'))}</td>
         <td>${escapeHtml(trace.ingredientLot)}</td>
-        <td>${escapeHtml(trace.productionId)}</td>
-        <td>${trace.internalUse ? '<span class="inventario-resolution-badge">Sin trazabilidad</span>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td>
+        <td>${escapeHtml(trace.internalUse ? row.provider : trace.productionId)}</td>
+        <td>${trace.internalUse ? '<div class="inventario-internal-meta"><span class="inventario-resolution-badge">Uso interno en empresa</span><span class="inventario-internal-no-trace">Sin trazabilidad</span></div>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td>
       </tr>`).join('') : '';
 
       const availableClass = Number(row.availableQty || 0) <= 0 ? 'is-zero' : '';
@@ -1580,9 +1580,9 @@
     fechaCaducidad: trace.expiryDateAtProduction || '-',
     cantidad: `-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}`,
     factura: trace.ingredientLot || '-',
-    proveedor: trace.productionId || '-',
+    proveedor: trace.internalUse ? providerLabel(entry.provider) : (trace.productionId || '-'),
     imagenes: 'Trazabilidad',
-    productionId: trace.productionId || '-',
+    productionId: trace.internalUse ? providerLabel(entry.provider) : (trace.productionId || '-'),
     internalUse: Boolean(trace.internalUse)
   }));
 
@@ -2159,8 +2159,8 @@
           <td>${escapeHtml(trace.internalUse ? 'Uso interno en empresa' : (trace.expiryDateAtProduction || '-'))}</td>
           <td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td>
           <td>${escapeHtml(trace.ingredientLot)}</td>
-          <td>${escapeHtml(trace.productionId)}</td>
-          <td>${trace.internalUse ? '<span class="inventario-resolution-badge">Sin trazabilidad</span>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td>
+          <td>${escapeHtml(trace.internalUse ? providerLabel(entry.provider) : trace.productionId)}</td>
+          <td>${trace.internalUse ? '<div class="inventario-internal-meta"><span class="inventario-resolution-badge">Uso interno en empresa</span><span class="inventario-internal-no-trace">Sin trazabilidad</span></div>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td>
           <td></td>
         </tr>`).join('') : '';
 
@@ -2523,10 +2523,6 @@
             <label class="inventario-check-row inventario-check-row-compact mt-2"><input type="checkbox" id="inventoryNoPerecedero" ${state.editorDraft.noPerecedero ? 'checked' : ''}><span>No perecedero</span></label>
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="inventario-check-row inventario-check-row-compact mt-4"><input type="checkbox" id="inventoryUsoInternoEmpresa" ${state.editorDraft.usoInternoEmpresa ? 'checked' : ''}><span>Envases primarios & más</span></label>
-            <small class="text-muted">Auto egreso</small>
-          </div>
-          <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryInvoiceNumber"><i class="fa-solid fa-file-invoice inventario-step-icon"></i> Número de factura/remito</label>
             <textarea id="inventoryInvoiceNumber" name="inventory_code_free" class="form-control ios-input inventario-invoice-textarea" rows="1" placeholder="Ej: A-000123" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text">${escapeHtml(state.editorDraft.invoiceNumber)}</textarea>
           </div>
@@ -2537,6 +2533,10 @@
               ${providers.map((provider) => `<option value="${escapeHtml(provider.id)}" ${normalizeValue(state.editorDraft.provider) === provider.id ? 'selected' : ''}>${escapeHtml(provider.name)}</option>`).join('')}
               <option value="add_provider">+ Agregar proveedor</option>
             </select>
+          </div>
+          <div class="recipe-field recipe-field-full inventario-internal-switch-wrap">
+            <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="inventoryUsoInternoEmpresa" ${state.editorDraft.usoInternoEmpresa ? 'checked' : ''}><span>Envases primarios & más</span></label>
+            <small class="text-muted">Auto egreso</small>
           </div>
           <div class="recipe-field recipe-field-full">
             <label class="form-label" for="inventoryInvoiceImage"><i class="fa-regular fa-images inventario-step-icon"></i> Adjuntar archivos (imagen o PDF)</label>
@@ -3007,7 +3007,7 @@
         const resolutionLabel = resolutionMeta.badge;
         const resolutionRow = getEntryResolutionRowData(entry);
         const traceHtml = (!isCollapsed && traceRows.length)
-          ? traceRows.map((trace) => `<tr class="${trace.internalUse ? 'inventario-internal-use-row' : 'inventario-trace-row'}"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(trace.createdAt)}</div></td><td>${escapeHtml(trace.internalUse ? 'Uso interno en empresa' : (trace.expiryDateAtProduction || '-'))}</td><td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml(trace.productionId)}</td><td>${trace.internalUse ? '<span class="inventario-resolution-badge">Sin trazabilidad</span>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td><td></td></tr>`).join('')
+          ? traceRows.map((trace) => `<tr class="${trace.internalUse ? 'inventario-internal-use-row' : 'inventario-trace-row'}"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(trace.createdAt)}</div></td><td>${escapeHtml(trace.internalUse ? 'Uso interno en empresa' : (trace.expiryDateAtProduction || '-'))}</td><td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml(trace.internalUse ? providerLabel(entry.provider) : trace.productionId)}</td><td>${trace.internalUse ? '<div class="inventario-internal-meta"><span class="inventario-resolution-badge">Uso interno en empresa</span><span class="inventario-internal-no-trace">Sin trazabilidad</span></div>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td><td></td></tr>`).join('')
           : '';
         const availableClass = getAvailableKg(entry) <= 0 ? 'is-zero' : '';
         const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
@@ -3378,11 +3378,10 @@
 
       record.entries = Array.isArray(record.entries) ? record.entries : [];
       record.entries.unshift(entry);
-      record.stockKg = Number(((Number(record.stockKg) || 0) + qtyKg).toFixed(4));
       record.stockUnit = record.stockUnit || unit;
       record.packageQty = record.packageQty || (Number.isFinite(packageQty) ? packageQty : null);
-      record.stockBase = Number(((Number(record.stockBase) || 0) + qtyBase).toFixed(6));
       record.hasEntries = true;
+      recomputeRecordStock(record, record.stockUnit || unit);
       record.lotConfig = {
         configured: state.editorDraft.tokens.length > 0,
         collapsed: state.editorDraft.tokens.length > 0,
@@ -4111,7 +4110,7 @@
       const resolutionRow = getEntryResolutionRowData(row);
       const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
       const traceHtml = (!isCollapsed && traceRows.length)
-        ? traceRows.map((trace) => `<tr class="${trace.internalUse ? 'inventario-internal-use-row' : 'inventario-trace-row'}"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(trace.createdAt))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td>${escapeHtml(trace.internalUse ? 'Uso interno en empresa' : (trace.expiryDateAtProduction || '-'))}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml(trace.productionId)}</td><td>${trace.internalUse ? '<span class="inventario-resolution-badge">Sin trazabilidad</span>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td></tr>`).join('') : '';
+        ? traceRows.map((trace) => `<tr class="${trace.internalUse ? 'inventario-internal-use-row' : 'inventario-trace-row'}"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(trace.createdAt))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td>${escapeHtml(trace.internalUse ? 'Uso interno en empresa' : (trace.expiryDateAtProduction || '-'))}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml(trace.internalUse ? row.provider : trace.productionId)}</td><td>${trace.internalUse ? '<div class="inventario-internal-meta"><span class="inventario-resolution-badge">Uso interno en empresa</span><span class="inventario-internal-no-trace">Sin trazabilidad</span></div>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td></tr>`).join('') : '';
       const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(resolutionRow.at))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td></tr>` : '';
       return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(row.entryDateTime)}${getExpiryBadgeHtml(row) ? `<br><small>${getExpiryBadgeHtml(row)}</small>` : ''}</td><td>${escapeHtml(row.ingredientName)}</td><td><span class="${expiredQtyClass}">${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</span></td><td><span class="${expiredQtyClass}">${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</span><br><span class="inventario-available-line ${Number(row.availableQty || 0) <= 0 ? 'is-zero' : ''} ${expiredQtyClass}">disp. ${Number(row.availableQty || 0).toFixed(2)} ${escapeHtml(getMeasureAbbr(row.unit || ''))}${row.packageQty ? ` x${row.packageQty}` : ''}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRow) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expand-toggle-collapse="${row.entryId}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(row.invoiceImageUrls)}</div></td></tr>${resolutionHtml}${traceHtml}`;
     }).join('') : '<tr><td colspan="7" class="text-center">Sin ingresos en ese rango.</td></tr>';
