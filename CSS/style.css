@@ -5041,12 +5041,13 @@ html.login-protected.auth-ok body {
 }
 
 .inventario-bulk-main-row .recipe-ing-input-wrap {
-  grid-template-columns: 28px 1fr;
+  grid-template-columns: 32px 1fr;
+  gap: 12px;
 }
 
 .inventario-bulk-main-row .recipe-inline-avatar-wrap {
-  width: 22px;
-  height: 22px;
+  width: 32px;
+  height: 32px;
 }
 
 .inventario-bulk-main-row .recipe-small-placeholder i {
