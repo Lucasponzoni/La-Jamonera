@@ -2354,7 +2354,7 @@
     const attachmentLabel = meta.hasAttachment ? 'RNE adjunto' : 'Sin adjunto';
     let expiryBadge = '';
     if (meta.infinite) {
-      expiryBadge = '<span class="produccion-modal-rne-badge is-ok"><i class="bi bi-infinity"></i>RNE</span>';
+      expiryBadge = '<span class="produccion-modal-rne-badge is-ok"><i class="bi bi-infinity"></i>RNE ∞</span>';
     } else if (meta.days != null) {
       const expiryLabel = meta.days < 0 ? `Vencido hace ${Math.abs(meta.days)} días` : `Vence en ${meta.days} días`;
       expiryBadge = `<span class="produccion-modal-rne-badge ${meta.tone === 'danger' ? 'is-danger' : meta.tone === 'warning' ? 'is-warning' : 'is-ok'}"><i class="bi bi-clock-history"></i>${escapeHtml(expiryLabel)}</span>`;

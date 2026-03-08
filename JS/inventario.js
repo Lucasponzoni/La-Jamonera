@@ -52,6 +52,7 @@
     globalExpandBtn: $('inventarioGlobalExpandBtn'),
     globalLoading: $('inventarioGlobalLoading'),
     globalPrintBtn: $('inventarioGlobalPrintBtn'),
+    globalSheetBtn: $('inventarioGlobalSheetBtn'),
     globalExcelBtn: $('inventarioGlobalExcelBtn'),
     globalTableWrap: $('inventarioGlobalTableWrap'),
     imageViewerModal: $('imageViewerModal'),
@@ -843,6 +844,194 @@
     }));
   };
 
+  const parseAiJsonFromText = (text) => {
+    const content = String(text || '').trim();
+    if (!content) return null;
+    try {
+      return JSON.parse(content);
+    } catch (error) {
+      const block = content.match(/```json([\s\S]*?)```/i) || content.match(/```([\s\S]*?)```/);
+      if (block?.[1]) {
+        try { return JSON.parse(block[1].trim()); } catch (innerError) { }
+      }
+      const first = content.indexOf('{');
+      const last = content.lastIndexOf('}');
+      if (first >= 0 && last > first) {
+        try { return JSON.parse(content.slice(first, last + 1)); } catch (innerError) { }
+      }
+      return null;
+    }
+  };
+
+  const callDeepseekWithFallback = async (payload, apiKey, corsConfig) => {
+    const direct = async () => fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify(payload)
+    });
+    const proxyUrl = normalizeValue(corsConfig?.url || corsConfig?.url_corsh || '');
+    const proxyKey = normalizeValue(corsConfig?.key || corsConfig?.cosh_api_key || '');
+    try {
+      const res = await direct();
+      if (res.ok) return res;
+      const txt = await res.text();
+      throw new Error(`DeepSeek ${res.status}: ${txt}`);
+    } catch (error) {
+      if (!proxyUrl) throw error;
+      const endpoint = `${proxyUrl}${proxyUrl.endsWith('/') ? '' : '/'}https://api.deepseek.com/chat/completions`;
+      const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` };
+      if (proxyKey) headers['x-cors-api-key'] = proxyKey;
+      const proxyRes = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(payload) });
+      if (!proxyRes.ok) {
+        const txt = await proxyRes.text();
+        throw new Error(`CORS proxy ${proxyRes.status}: ${txt}`);
+      }
+      return proxyRes;
+    }
+  };
+
+  const mondayStartIso = (isoDate) => {
+    const normalized = normalizeIsoDate(isoDate);
+    if (!normalized) return '';
+    const date = new Date(`${normalized}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return '';
+    const day = date.getDay();
+    const diffToMonday = (day + 6) % 7;
+    date.setDate(date.getDate() - diffToMonday);
+    return getArgentinaIsoDate(date);
+  };
+
+  const addIsoDays = (isoDate, days) => addDaysToIso(isoDate, days);
+
+  const openProductsScopeSelector = async (title = 'Selector de productos') => openIosSwal({
+    title,
+    html: `<div class="swal-stack-fields text-start">
+      <label class="inventario-check-row"><input type="radio" name="printScope" value="all" checked><span>Incluir todos los productos</span></label>
+      <label class="inventario-check-row"><input type="radio" name="printScope" value="exclude"><span>Excluir algunos productos</span></label>
+      <div id="printProductsScope" class="notify-specific-users-list d-none">
+        <div class="step-block"><strong>Familias</strong>${Object.values(state.familias).map((family) => `<label class="inventario-check-row inventario-selector-row">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb inventario-print-photo" src="${family.imageUrl}" alt="${escapeHtml(capitalize(family.name))}"></span>` : ''}<input type="checkbox" data-print-family value="${family.id}"><span>${escapeHtml(capitalize(family.name))}</span></label>`).join('')}</div>
+        <div class="step-block"><strong>Productos</strong>${Object.values(state.ingredientes).map((item) => `<label class="inventario-check-row inventario-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb inventario-print-photo" src="${item.imageUrl}" alt="${escapeHtml(capitalize(item.name))}"></span>` : ''}<input type="checkbox" data-print-product data-family-id="${item.familyId || ''}" value="${item.id}"><span>${escapeHtml(capitalize(item.name))}</span></label>`).join('')}</div>
+      </div>
+    </div>`,
+    showCancelButton: true,
+    confirmButtonText: 'Continuar',
+    cancelButtonText: 'Cancelar',
+    didOpen: () => {
+      const all = document.querySelector('input[name="printScope"][value="all"]');
+      const exclude = document.querySelector('input[name="printScope"][value="exclude"]');
+      const list = document.getElementById('printProductsScope');
+      const toggle = () => list?.classList.toggle('d-none', !exclude?.checked);
+      all?.addEventListener('change', toggle);
+      exclude?.addEventListener('change', toggle);
+      document.querySelectorAll('[data-print-family]').forEach((familyCheckbox) => {
+        familyCheckbox.addEventListener('change', () => {
+          const familyId = familyCheckbox.value;
+          document.querySelectorAll(`[data-print-product][data-family-id="${familyId}"]`).forEach((productCheckbox) => {
+            productCheckbox.checked = familyCheckbox.checked;
+          });
+        });
+      });
+      initThumbLoading(Swal.getHtmlContainer() || document);
+    },
+    preConfirm: () => {
+      const mode = document.querySelector('input[name="printScope"]:checked')?.value || 'all';
+      const selected = [...document.querySelectorAll('[data-print-product]:checked')].map((node) => node.value);
+      if (mode === 'exclude' && !selected.length) {
+        Swal.showValidationMessage('Seleccioná al menos un producto para excluir.');
+        return false;
+      }
+      return { mode, selected };
+    }
+  });
+
+  const openManagersSelector = async () => {
+    await window.laJamoneraReady;
+    const usersMap = safeObject(await window.dbLaJamoneraRest.read('/informes/users'));
+    const users = Object.values(usersMap)
+      .map((item) => ({
+        id: normalizeValue(item.id || item.email || makeId('user')),
+        fullName: normalizeValue(item.fullName || item.name || item.email || 'Usuario'),
+        role: normalizeValue(item.position || item.role || item.sector || 'Sin cargo')
+      }))
+      .sort((a, b) => a.fullName.localeCompare(b.fullName, 'es'));
+
+    const selector = await openIosSwal({
+      title: 'Seleccionar encargados',
+      html: `<div class="swal-stack-fields text-start">
+        <input id="ingresosManagersSearch" class="swal2-input ios-input" placeholder="Buscar encargado...">
+        <div id="ingresosManagersList" class="notify-specific-users-list" style="max-height:260px;overflow:auto;">${users.map((user) => `<label class="inventario-check-row inventario-selector-row" data-ingreso-user-row><input type="checkbox" data-ingreso-user value="${escapeHtml(user.id)}"><span><strong>${escapeHtml(user.fullName)}</strong><small style="display:block;color:#6d7b9a;">${escapeHtml(user.role)}</small></span></label>`).join('') || '<p class="text-muted">No hay usuarios cargados.</p>'}</div>
+      </div>`,
+      showCancelButton: true,
+      confirmButtonText: 'Continuar',
+      cancelButtonText: 'Cancelar',
+      didOpen: () => {
+        const search = document.getElementById('ingresosManagersSearch');
+        const rows = [...document.querySelectorAll('[data-ingreso-user-row]')];
+        search?.addEventListener('input', () => {
+          const q = normalizeLower(search.value);
+          rows.forEach((row) => {
+            row.classList.toggle('d-none', q && !normalizeLower(row.textContent).includes(q));
+          });
+        });
+      },
+      preConfirm: () => {
+        const ids = [...document.querySelectorAll('[data-ingreso-user]:checked')].map((node) => node.value);
+        return { users, ids };
+      }
+    });
+    if (!selector.isConfirmed) return null;
+    const selectedUsers = selector.value.users.filter((user) => selector.value.ids.includes(user.id));
+    const managersLabel = selectedUsers.length ? selectedUsers.map((user) => `${user.fullName} (${user.role})`).join(', ') : 'Sin encargado';
+    return { selectedUsers, managersLabel };
+  };
+
+  const estimateIngresoTemperatures = async (rows) => {
+    const fallback = rows.reduce((acc, row) => {
+      const key = `${row.ingredientId}|${row.entryId}`;
+      const name = normalizeLower(row.ingredientName || '');
+      const isMeat = /(carne|pollo|cerdo|vacuno|res|chacin|hamburguesa|bondiola|jamon)/i.test(name);
+      acc[key] = isMeat ? '3.4' : '5.6';
+      return acc;
+    }, {});
+    try {
+      await window.laJamoneraReady;
+      const keyNode = await window.dbLaJamoneraRest.read('/deepseek/apiKey');
+      const apiKey = typeof keyNode === 'string' ? normalizeValue(keyNode) : normalizeValue(keyNode?.apiKey);
+      if (!apiKey) return fallback;
+      const deepseekNode = safeObject(await window.dbLaJamoneraRest.read('/deepseek'));
+      const compactRows = rows.map((row) => ({
+        key: `${row.ingredientId}|${row.entryId}`,
+        producto: row.ingredientName,
+        proveedor: row.provider,
+        unidad: row.unit,
+        cantidad: Number(row.qty || 0)
+      }));
+      const payload = {
+        model: 'deepseek-chat',
+        messages: [
+          { role: 'system', content: 'Sos un empleado de un frigorífico recepcionando productos. Respondé SOLO JSON válido.' },
+          { role: 'user', content: `Completá temperaturas de ingreso (°C) para cada item. Para carnes, temperatura máxima 4°C. Devolvé SOLO JSON con esta estructura: {"temperaturas":{"KEY":"X.X"}}. Items: ${JSON.stringify(compactRows)}` }
+        ],
+        temperature: 0.1
+      };
+      const res = await callDeepseekWithFallback(payload, apiKey, { url_corsh: deepseekNode.url_corsh, cosh_api_key: deepseekNode.cosh_api_key });
+      const data = await res.json();
+      const parsed = parseAiJsonFromText(data?.choices?.[0]?.message?.content || '');
+      const map = safeObject(parsed?.temperaturas);
+      rows.forEach((row) => {
+        const key = `${row.ingredientId}|${row.entryId}`;
+        const raw = Number(String(map[key] || '').replace(',', '.'));
+        const name = normalizeLower(row.ingredientName || '');
+        const isMeat = /(carne|pollo|cerdo|vacuno|res|chacin|hamburguesa|bondiola|jamon)/i.test(name);
+        if (!Number.isFinite(raw)) return;
+        const capped = isMeat ? Math.min(raw, 4) : raw;
+        fallback[key] = capped.toFixed(1);
+      });
+    } catch (error) {
+    }
+    return fallback;
+  };
+
 
   const entryImageUrls = (entry) => {
     if (Array.isArray(entry?.invoiceImageUrls) && entry.invoiceImageUrls.length) {
@@ -1108,7 +1297,9 @@
           entryDate: entry.entryDate || '-',
           entryDateTime: formatDateTime(entry.createdAt),
           createdAt: entry.createdAt,
-          expiryDate: entry.expiryDate || '-',
+          expiryDate: entry.expiryDate || '',
+          noPerecedero: Boolean(entry.noPerecedero),
+          usoInternoEmpresa: Boolean(entry.usoInternoEmpresa),
           qtyKg: Number(entry.qtyKg || 0),
           qty: Number(entry.qty || 0),
           availableKg: getAvailableKg(entry),
@@ -1989,46 +2180,7 @@
     if (!askTrace.isConfirmed && !askTrace.isDenied) return;
     const includeTrace = askTrace.isConfirmed;
 
-    const selector = await openIosSwal({
-      title: 'Selector de productos',
-      html: `<div class="swal-stack-fields text-start">
-        <label class="inventario-check-row"><input type="radio" name="printScope" value="all" checked><span>Incluir todos los productos</span></label>
-        <label class="inventario-check-row"><input type="radio" name="printScope" value="exclude"><span>Excluir algunos productos</span></label>
-        <div id="printProductsScope" class="notify-specific-users-list d-none">
-          <div class="step-block"><strong>Familias</strong>${Object.values(state.familias).map((family) => `<label class="inventario-check-row inventario-selector-row">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb inventario-print-photo" src="${family.imageUrl}" alt="${escapeHtml(capitalize(family.name))}"></span>` : ''}<input type="checkbox" data-print-family value="${family.id}"><span>${escapeHtml(capitalize(family.name))}</span></label>`).join('')}</div>
-          <div class="step-block"><strong>Productos</strong>${Object.values(state.ingredientes).map((item) => `<label class="inventario-check-row inventario-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb inventario-print-photo" src="${item.imageUrl}" alt="${escapeHtml(capitalize(item.name))}"></span>` : ''}<input type="checkbox" data-print-product data-family-id="${item.familyId || ''}" value="${item.id}"><span>${escapeHtml(capitalize(item.name))}</span></label>`).join('')}</div>
-        </div>
-      </div>`,
-      showCancelButton: true,
-      confirmButtonText: 'Continuar',
-      cancelButtonText: 'Cancelar',
-      didOpen: () => {
-        const all = document.querySelector('input[name="printScope"][value="all"]');
-        const exclude = document.querySelector('input[name="printScope"][value="exclude"]');
-        const list = document.getElementById('printProductsScope');
-        const toggle = () => list?.classList.toggle('d-none', !exclude?.checked);
-        all?.addEventListener('change', toggle);
-        exclude?.addEventListener('change', toggle);
-        document.querySelectorAll('[data-print-family]').forEach((familyCheckbox) => {
-          familyCheckbox.addEventListener('change', () => {
-            const familyId = familyCheckbox.value;
-            document.querySelectorAll(`[data-print-product][data-family-id="${familyId}"]`).forEach((productCheckbox) => {
-              productCheckbox.checked = familyCheckbox.checked;
-            });
-          });
-        });
-        initThumbLoading(Swal.getHtmlContainer() || document);
-      },
-      preConfirm: () => {
-        const mode = document.querySelector('input[name="printScope"]:checked')?.value || 'all';
-        const selected = [...document.querySelectorAll('[data-print-product]:checked')].map((node) => node.value);
-        if (mode === 'exclude' && !selected.length) {
-          Swal.showValidationMessage('Seleccioná al menos un producto para excluir.');
-          return false;
-        }
-        return { mode, selected };
-      }
-    });
+    const selector = await openProductsScopeSelector('Selector de productos');
     if (!selector.isConfirmed) return;
 
     const excluded = new Set(selector.value.mode === 'exclude' ? selector.value.selected : []);
@@ -2047,9 +2199,9 @@
       const productRows = grouped[ingredientId];
       const head = productRows[0];
       const tableRows = productRows.flatMap((row) => {
-        const expiryMeta = getEntryExpiryMeta(row); const expiryBadge = getExpiryBadgeText(row); const detail = formatEntryDetailLabel(row); const strikeClass = expiryMeta.isExpired ? ' style="text-decoration:line-through;font-weight:700;color:#b42338"' : ''; const mainRow = `<tr${expiryMeta.isExpired ? ' style="background:#ffecef"' : ''}><td>${escapeHtml(row.entryDateTime)}</td><td>${escapeHtml(row.expiryDate || '-')}${expiryBadge ? `<br><small style="color:#b42338;font-weight:700">${escapeHtml(expiryBadge)}</small>` : ''}</td><td><span${strikeClass}>${escapeHtml(detail.qtyLabel)}</span><br><small${strikeClass}>${escapeHtml(detail.availableLabel)}</small></td><td><span${strikeClass}>${escapeHtml(detail.qtyLabel)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td>${includeImages ? (row.invoiceImageUrls?.length ? `Ver adjunto (${row.invoiceImageUrls.length})` : 'Sin adjunto') : (row.invoiceImageUrls?.length ? `Posee ${row.invoiceImageUrls.length} adjunto/s` : 'Sin adjunto')}</td></tr>`;
+        const expiryMeta = getEntryExpiryMeta(row); const expiryBadge = getExpiryBadgeText(row); const detail = formatEntryDetailLabel(row); const strikeClass = expiryMeta.isExpired ? ' style="text-decoration:line-through;font-weight:700;color:#b42338"' : ''; const mainRow = `<tr${expiryMeta.isExpired ? ' style="background:#ffecef"' : ''}><td>${escapeHtml(row.entryDateTime)}</td><td>${escapeHtml(row.noPerecedero ? 'No perecedero' : (row.expiryDate || 'No perecedero'))}${expiryBadge ? `<br><small style="color:#b42338;font-weight:700">${escapeHtml(expiryBadge)}</small>` : ''}</td><td><span${strikeClass}>${escapeHtml(detail.qtyLabel)}</span><br><small${strikeClass}>${escapeHtml(detail.availableLabel)}</small></td><td><span${strikeClass}>${escapeHtml(detail.qtyLabel)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td>${includeImages ? (row.invoiceImageUrls?.length ? `Ver adjunto (${row.invoiceImageUrls.length})` : 'Sin adjunto') : (row.invoiceImageUrls?.length ? `Posee ${row.invoiceImageUrls.length} adjunto/s` : 'Sin adjunto')}</td></tr>`;
         const resolution = getEntryResolutionRowData(row);
-        const resolutionRow = resolution ? `<tr style="background:#fff6d9;"><td>${escapeHtml(`↳ ${formatDateTime(resolution.at)}`)}</td><td>${escapeHtml(row.expiryDate || '-')}</td><td>${escapeHtml(`-${resolution.resolvedKg.toFixed(2)} kilos`)}</td><td>${escapeHtml(resolution.badge)}</td><td>${escapeHtml(row.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(row.provider || '-')}</td><td>Resolución</td></tr>` : '';
+        const resolutionRow = resolution ? `<tr style="background:#fff6d9;"><td>${escapeHtml(`↳ ${formatDateTime(resolution.at)}`)}</td><td>${escapeHtml(row.noPerecedero ? 'No perecedero' : (row.expiryDate || 'No perecedero'))}</td><td>${escapeHtml(`-${resolution.resolvedKg.toFixed(2)} kilos`)}</td><td>${escapeHtml(resolution.badge)}</td><td>${escapeHtml(row.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(row.provider || '-')}</td><td>Resolución</td></tr>` : '';
         if (!includeTrace) return [mainRow, resolutionRow].filter(Boolean);
         const traceRows = buildTraceRowsForEntry(row).map((trace) => `<tr style="background:#ffecef;"><td>${escapeHtml(`↳ ${trace.fechaHora}`)}</td><td>${escapeHtml(trace.fechaCaducidad || '-')}</td><td>${escapeHtml(trace.cantidad)}</td><td>${escapeHtml(trace.factura)}</td><td>${escapeHtml(trace.proveedor)}</td><td class="inventario-provider-cell">Trazabilidad</td><td></td></tr>`);
         return [mainRow, resolutionRow, ...traceRows].filter(Boolean);
@@ -2070,6 +2222,113 @@
     win.focus();
     await waitPrintAssets(win);
     win.print();
+  };
+
+  const openIngresosWeeklySheet = async (rows) => {
+    const typeAsk = await openIosSwal({
+      title: 'Generar planilla de artículos',
+      html: '<p>Perecederos - No perecederos</p>',
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: 'Perecederos',
+      denyButtonText: 'No perecederos',
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        confirmButton: 'ios-btn ios-btn-success',
+        denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical',
+        cancelButton: 'ios-btn ios-btn-secondary'
+      }
+    });
+    if (!typeAsk.isConfirmed && !typeAsk.isDenied) return;
+    const targetPerishable = typeAsk.isConfirmed;
+
+    const selector = await openProductsScopeSelector('Selector de productos');
+    if (!selector.isConfirmed) return;
+
+    const managers = await openManagersSelector();
+    if (!managers) return;
+
+    const excluded = new Set(selector.value.mode === 'exclude' ? selector.value.selected : []);
+    const scopedRows = rows
+      .filter((row) => !excluded.has(row.ingredientId))
+      .filter((row) => {
+        const perishable = Boolean(state.ingredientes?.[row.ingredientId]?.perishable);
+        return targetPerishable ? perishable : !perishable;
+      });
+
+    if (!scopedRows.length) {
+      await openIosSwal({ title: 'Sin resultados', html: '<p>No hay ingresos para el tipo de artículo seleccionado.</p>', icon: 'warning' });
+      return;
+    }
+
+    const groupedWeeks = scopedRows.reduce((acc, row) => {
+      const weekStart = mondayStartIso(row.entryDate || row.entryDateTime || '');
+      if (!weekStart) return acc;
+      const weekEnd = addIsoDays(weekStart, 6);
+      const key = `${weekStart}|${weekEnd}`;
+      if (!acc[key]) acc[key] = { weekStart, weekEnd, rows: [] };
+      acc[key].rows.push(row);
+      return acc;
+    }, {});
+
+    const weeks = Object.values(groupedWeeks).sort((a, b) => a.weekStart.localeCompare(b.weekStart));
+    const allRows = weeks.flatMap((week) => week.rows);
+    await preloadImages(allRows.map((row) => row.ingredientImageUrl).filter(Boolean));
+
+    await Swal.fire({
+      title: 'Generando planilla...',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Generando" class="meta-spinner-login"></div>',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      customClass: { popup: 'ios-alert produccion-loading-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' },
+      didOpen: async () => {
+        try {
+          Swal.update({ html: '<div class="informes-saving-spinner"><img src="./IMG/ia-unscreen.gif" alt="IA" class="recipe-ai-static-gif"></div><p>Completando temperatura...</p>' });
+          const tempMap = await estimateIngresoTemperatures(allRows);
+          const weekSections = weeks.map((week, weekIndex) => {
+            const rowsHtml = week.rows.map((row) => {
+              const tempKey = `${row.ingredientId}|${row.entryId}`;
+              const temp = tempMap[tempKey] || '-';
+              const vtoLabel = row.noPerecedero ? 'No perecedero' : (row.expiryDate || 'No perecedero');
+              const productImage = row.ingredientImageUrl
+                ? `<span style="display:inline-flex;width:28px;height:28px;border-radius:999px;overflow:hidden;border:1px solid #d7def2;vertical-align:middle;margin-right:6px;"><img src="${escapeHtml(row.ingredientImageUrl)}" style="width:100%;height:100%;object-fit:cover;"></span>`
+                : '';
+              return `<tr>
+                <td>${escapeHtml(row.entryDateTime || '-')}</td>
+                <td>${productImage}${escapeHtml(row.ingredientName || '-')}</td>
+                <td>${escapeHtml(row.provider || '-')}</td>
+                <td>${escapeHtml(formatEntryDetailLabel(row).qtyLabel)}</td>
+                <td>${escapeHtml(row.lotNumber || row.invoiceNumber || '-')}</td>
+                <td>${escapeHtml(vtoLabel)}</td>
+                <td>${escapeHtml(`${temp} °C`)}</td>
+                <td>${escapeHtml(managers.managersLabel || 'Sin encargado')}</td>
+                <td></td>
+              </tr>`;
+            }).join('');
+            const from = formatIsoDateEs(week.weekStart);
+            const to = formatIsoDateEs(week.weekEnd);
+            return `<section style="${weekIndex ? 'page-break-before:always;' : ''}">
+              <h2 style="font-size:16px;margin:0 0 10px;">Semana de ${from} a ${to}</h2>
+              <table style="width:100%;border-collapse:collapse;">
+                <thead><tr><th>Fecha y hora</th><th>Producto</th><th>Proveedor</th><th>Cantidad</th><th>Lote / CS</th><th>VTO.</th><th>TEMP. °C</th><th>Encargados</th><th>Control</th></tr></thead>
+                <tbody>${rowsHtml || '<tr><td colspan="9">Sin ingresos</td></tr>'}</tbody>
+              </table>
+            </section>`;
+          }).join('');
+
+          const win = window.open('', '_blank', 'width=1400,height=900');
+          if (!win) return;
+          win.document.write(`<html><head><title>Planilla de ingresos</title><style>@page{size:landscape;margin:12mm;}body{font-family:Inter,Arial,sans-serif;color:#1f2a44;padding:8px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #c8d2eb;padding:6px;font-size:11px;vertical-align:middle;}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em;text-align:left;}</style></head><body>${weekSections}</body></html>`);
+          win.document.close();
+          await waitPrintAssets(win);
+          win.focus();
+          win.print();
+        } finally {
+          Swal.close();
+        }
+      }
+    });
   };
 
   const removeEntryWithSecurity = async (ingredientId, entryId) => {
@@ -4187,6 +4446,9 @@
 
   nodes.globalPrintBtn?.addEventListener('click', async () => {
     await openPrintGlobalPeriod(getGlobalFilteredEntries());
+  });
+  nodes.globalSheetBtn?.addEventListener('click', async () => {
+    await openIngresosWeeklySheet(getGlobalFilteredEntries());
   });
   nodes.globalExcelBtn?.addEventListener('click', async () => {
     const rows = getGlobalFilteredEntries();
