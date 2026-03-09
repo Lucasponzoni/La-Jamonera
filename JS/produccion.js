@@ -581,11 +581,13 @@
             return;
           }
           entry.availableQty = Number(Math.min(maxQty, currentAvailableQty + safeAmount).toFixed(4));
+          entry.availableBase = Number(Math.max(0, toBase(entry.availableQty, entryUnit)).toFixed(6));
         } else {
           const amountInEntryUnit = fromBase(lot.takeBaseQty, entryUnit);
           safeAmount = Number.isFinite(amountInEntryUnit) ? Number(amountInEntryUnit.toFixed(4)) : 0;
           if (safeAmount <= 0) return;
           entry.availableQty = Number(Math.max(0, currentAvailableQty - safeAmount).toFixed(4));
+          entry.availableBase = Number(Math.max(0, toBase(entry.availableQty, entryUnit)).toFixed(6));
           entry.productionUsage.unshift({
             id: makeId('usage'),
             productionId,
@@ -601,6 +603,9 @@
             ingredientEntryId: entry.id,
             ingredientId: item.ingredientId
           });
+        }
+        if (!Number.isFinite(Number(entry.availableBase))) {
+          entry.availableBase = Number(Math.max(0, toBase(entry.availableQty, entryUnit)).toFixed(6));
         }
         const nextAvailableKg = Number((toBase(entry.availableQty, entryUnit) / 1000).toFixed(4));
         entry.availableKg = nextAvailableKg;
@@ -618,10 +623,16 @@
           observation: mode === 'consume' ? 'Consumo FEFO en producción' : 'Restitución por anulación/edición'
         });
       });
+      const stockBase = nextEntries.reduce((acc, entry) => {
+        const availableBase = Number(entry?.availableBase);
+        if (Number.isFinite(availableBase) && availableBase >= 0) return acc + availableBase;
+        return acc + Math.max(0, Number(toBase(getEntryAvailableQty(entry), entry?.unit || record.stockUnit || item.ingredientUnit || 'kilos') || 0));
+      }, 0);
       const stockKg = nextEntries.reduce((acc, entry) => acc + getEntryAvailableKg(entry), 0);
       inventoryNext.items[item.ingredientId] = {
         ...record,
         entries: nextEntries,
+        stockBase: Number(stockBase.toFixed(6)),
         stockKg: Number(stockKg.toFixed(4))
       };
     });
