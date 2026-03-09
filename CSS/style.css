@@ -5488,13 +5488,10 @@ html.login-protected.auth-ok body {
 .produccion-dispatch-btn {
   width: fit-content;
   max-width: none;
-  background: #eef3ff;
-  color: #2a4ea3;
-  border: 1px solid #d3dbf0;
-  border-radius: 14px;
-  min-height: 48px;
-  font-weight: 700;
   white-space: nowrap;
+  background: #1f7ae8;
+  border: 1px solid #1f7ae8;
+  color: #fff;
 }
 
 .produccion-dispatch-btn span,
@@ -5503,9 +5500,9 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-dispatch-btn:hover {
-  background: #e4ecff;
-  color: #24448f;
-  border-color: #c5d3f3;
+  background: #166ad0;
+  color: #fff;
+  border: 1px solid #1f7ae8;
 }
 
 .produccion-history-btn:hover {
@@ -6055,6 +6052,19 @@ html.login-protected.auth-ok body {
   font-size: 0.78rem;
   max-width: none;
   width: auto;
+}
+
+.dispatch-actions-row #dispatchAddProductBtn {
+  margin-left: auto;
+}
+
+.dispatch-comment-row td {
+  background: #fff8ef !important;
+}
+
+.dispatch-comment-row input {
+  border-color: #f3d6ae;
+  background: #fff;
 }
 
 .produccion-dispatch-floating-suggest {
@@ -6780,6 +6790,7 @@ html.login-protected.auth-ok body {
   margin-top: 10px;
   display: flex;
   flex-wrap: wrap;
+  justify-content: end;
   gap: 8px;
 }
 
