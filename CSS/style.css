@@ -9013,3 +9013,47 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
     justify-content: flex-start;
   }
 }
+
+.weekly-production-sheet {
+  display: grid;
+  gap: 16px;
+}
+
+.weekly-sheet-block h3,
+.weekly-sheet-block h4 {
+  text-align: center;
+  margin: 0;
+  font-weight: 800;
+}
+
+.weekly-sheet-block h4 { margin-bottom: 8px; }
+
+.weekly-sheet-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+
+.weekly-sheet-table th,
+.weekly-sheet-table td {
+  border: 1px solid #2f2f2f;
+  padding: 6px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.weekly-sheet-table th { background: #0b4f92; color: #fff; }
+.weekly-sheet-table td.is-missing { background: #ffe8ea; }
+.weekly-sheet-table td.is-ok { background: #eef2f7; }
+.weekly-sheet-table .weekly-total { font-weight: 800; }
+
+.weekly-product-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.weekly-product-cell img {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  object-fit: cover;
+}

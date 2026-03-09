@@ -18,6 +18,7 @@
     historyExcelBtn: document.getElementById('produccionGlobalExcelBtn'),
     historyPrintBtn: document.getElementById('produccionGlobalPrintBtn'),
     historyMassPlanillasBtn: document.getElementById('produccionGlobalMassPlanillasBtn'),
+    historyWeeklyPlanillaBtn: document.getElementById('produccionGlobalWeeklyPlanillaBtn'),
     historyLoading: document.getElementById('produccionGlobalLoading'),
     historyTableWrap: document.getElementById('produccionGlobalTableWrap'),
     dispatchBtn: document.getElementById('produccionDispatchBtn'),
@@ -5406,6 +5407,132 @@
     });
   };
 
+
+  const parseWeeklyRangeValue = (value = '') => {
+    const raw = normalizeValue(value);
+    if (!raw.includes(' a ')) return { from: '', to: '' };
+    const [from, to] = raw.split(' a ').map((item) => normalizeValue(item));
+    return { from, to };
+  };
+  const addIsoDays = (isoDate, days = 0) => {
+    const date = new Date(`${normalizeValue(isoDate)}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return '';
+    date.setDate(date.getDate() + Number(days || 0));
+    return toIsoDate(date.getTime());
+  };
+  const askRequiredRangeForWeeklyProductionSheet = async () => {
+    const picker = await openIosSwal({
+      title: 'Rango obligatorio para planilla',
+      html: '<p>Para evitar procesar datos infinitos, seleccioná un rango de fechas antes de continuar.</p><input id="weeklySheetRangeInput" class="swal2-input ios-input" placeholder="Seleccionar rango">',
+      showCancelButton: true,
+      confirmButtonText: 'Continuar',
+      cancelButtonText: 'Cancelar',
+      didOpen: () => {
+        const input = document.getElementById('weeklySheetRangeInput');
+        if (window.flatpickr && input) {
+          window.flatpickr(input, { locale: window.flatpickr.l10ns?.es || undefined, mode: 'range', dateFormat: 'Y-m-d', allowInput: false, disableMobile: true });
+        }
+      },
+      preConfirm: () => {
+        const parsed = parseWeeklyRangeValue(normalizeValue(document.getElementById('weeklySheetRangeInput')?.value));
+        if (!parsed.from || !parsed.to) {
+          Swal.showValidationMessage('Debés seleccionar un rango completo (desde y hasta).');
+          return false;
+        }
+        return parsed;
+      }
+    });
+    return picker.isConfirmed ? picker.value : null;
+  };
+  const openWeeklyProductionPlanillaByPeriod = async () => {
+    const range = await askRequiredRangeForWeeklyProductionSheet();
+    if (!range) return;
+    const allRows = Object.values(safeObject(state.registros || {}));
+    const uniqueRecipes = Object.values(allRows.reduce((acc, row) => {
+      const id = normalizeValue(row.recipeId || row.recipeTitle || row.id);
+      if (!id) return acc;
+      if (!acc[id]) {
+        const recipe = safeObject(state.recetas?.[row.recipeId]);
+        acc[id] = {
+          id,
+          title: normalizeValue(row.recipeTitle) || normalizeValue(recipe.title) || 'Sin nombre',
+          imageUrl: normalizeValue(recipe.imageUrl || row?.traceability?.product?.imageUrl),
+          category: normalizeValue(recipe?.nutrition?.category || 'sin-categoria'),
+          subcategory: normalizeValue(recipe?.nutrition?.subcategory || 'sin-subcategoria')
+        };
+      }
+      return acc;
+    }, {}));
+    const selector = await openIosSwal({
+      title: 'Selector de productos',
+      html: `<div class="swal-stack-fields text-start"><label class="inventario-check-row"><input type="radio" name="weeklyPlanillaScope" value="all" checked><span>Incluir todos los productos</span></label><label class="inventario-check-row"><input type="radio" name="weeklyPlanillaScope" value="exclude"><span>Excluir algunos productos</span></label><div id="weeklyPlanillasScope" class="notify-specific-users-list d-none"><div class="step-block"><strong>Productos</strong>${uniqueRecipes.map((item) => `<label class="inventario-check-row inventario-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-weekly-production-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}"></span>` : ''}<input type="checkbox" data-weekly-planilla-recipe value="${escapeHtml(item.id)}"><span>${escapeHtml(item.title)}</span></label>`).join('')}</div></div></div>`,
+      showCancelButton: true,
+      confirmButtonText: 'Continuar',
+      cancelButtonText: 'Cancelar',
+      didOpen: () => {
+        const all = document.querySelector('input[name="weeklyPlanillaScope"][value="all"]');
+        const exclude = document.querySelector('input[name="weeklyPlanillaScope"][value="exclude"]');
+        const list = document.getElementById('weeklyPlanillasScope');
+        const toggle = () => list?.classList.toggle('d-none', !exclude?.checked);
+        all?.addEventListener('change', toggle);
+        exclude?.addEventListener('change', toggle);
+        prepareThumbLoaders('.js-weekly-production-thumb');
+      },
+      preConfirm: () => {
+        const mode = document.querySelector('input[name="weeklyPlanillaScope"]:checked')?.value || 'all';
+        const selected = [...document.querySelectorAll('[data-weekly-planilla-recipe]:checked')].map((node) => node.value);
+        if (mode === 'exclude' && !selected.length) {
+          Swal.showValidationMessage('Seleccioná al menos un producto para excluir.');
+          return false;
+        }
+        return { mode, selected };
+      }
+    });
+    if (!selector.isConfirmed) return;
+    const excluded = new Set(selector.value.mode === 'exclude' ? selector.value.selected : []);
+    const products = uniqueRecipes.filter((item) => !excluded.has(item.id));
+    if (!products.length) return;
+    const rowsInRange = allRows.filter((row) => {
+      const date = normalizeValue(row.productionDate);
+      return date && date >= range.from && date <= range.to;
+    });
+    const weeks = [];
+    let weekStart = getWeekStartIso(range.from);
+    while (weekStart && weekStart <= range.to) {
+      weeks.push(weekStart);
+      weekStart = addIsoDays(weekStart, 7);
+    }
+    const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+    const html = `<div class="weekly-production-sheet">${weeks.map((week, idx) => {
+      const dayIsos = days.map((_, i) => addIsoDays(week, i));
+      const rowsHtml = products.slice().sort((a,b)=> `${a.subcategory}|${a.title}`.localeCompare(`${b.subcategory}|${b.title}`,'es')).map((product) => {
+        const daily = dayIsos.map((dayIso) => rowsInRange.filter((row) => normalizeValue(row.recipeId || row.recipeTitle || row.id) === product.id && normalizeValue(row.productionDate) === dayIso).reduce((acc, row) => acc + Number(row.quantityKg || 0), 0));
+        const total = daily.reduce((acc, value) => acc + value, 0);
+        return `<tr><td>${escapeHtml(capitalize(product.category.replaceAll('-', ' ')))}</td><td>${escapeHtml(capitalize(product.subcategory))}</td><td><div class="weekly-product-cell">${product.imageUrl ? `<img src="${escapeHtml(product.imageUrl)}" alt="${escapeHtml(product.title)}">` : ''}<span>${escapeHtml(product.title)}</span></div></td>${daily.map((kg) => `<td class="${kg > 0 ? 'is-ok' : 'is-missing'}">${kg > 0 ? `${kg.toFixed(2)}KG` : ''}</td>`).join('')}<td class="weekly-total">${total.toFixed(2)}KG</td></tr>`;
+      }).join('');
+      return `<section class="weekly-sheet-block ${idx ? 'page-break' : ''}"><h3>FRIGORIFICO LA JAMONERA • PLANILLA DE PRODUCCION SEMANAL</h3><h4>SEMANA DE ${formatIsoEs(week)} A ${formatIsoEs(addIsoDays(week, 6))}</h4><div class="table-responsive"><table class="weekly-sheet-table"><thead><tr><th>CATEGORIA</th><th>SUBCATEGORIA</th><th>PRODUCTO</th>${days.map((d) => `<th>${d.toUpperCase()}</th>`).join('')}<th>TOTAL</th></tr></thead><tbody>${rowsHtml || '<tr><td colspan="9">Sin datos.</td></tr>'}</tbody></table></div></section>`;
+    }).join('')}</div>`;
+    await Swal.fire({ title: 'Generando planilla...', html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando planilla" class="meta-spinner-login"></div>', allowOutsideClick: false, showConfirmButton: false, customClass: { popup: 'ios-alert produccion-loading-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' } });
+    Swal.close();
+    await openIosSwal({
+      title: 'Planilla de Producción Semanal',
+      width: 'min(1400px,98vw)',
+      html: `<div class="planilla-toolbar"><button type="button" class="btn ios-btn ios-btn-secondary" id="weeklyProductionPrintBtn"><i class="fa-solid fa-print"></i><span>Imprimir</span></button></div><div class="planilla-card">${html}</div>`,
+      confirmButtonText: 'Cerrar',
+      customClass: { popup: 'produccion-trace-alert planilla-modal', confirmButton: 'ios-btn ios-btn-secondary' },
+      didOpen: (popup) => {
+        popup.querySelector('#weeklyProductionPrintBtn')?.addEventListener('click', () => {
+          const win = window.open('', '_blank', 'noopener,noreferrer,width=1300,height=900');
+          if (!win) return;
+          win.document.write(`<html><head><title>Planilla de producción semanal</title><style>@page{size:landscape;margin:10mm}body{font-family:Inter,Arial,sans-serif;margin:0;padding:8px}.page-break{page-break-before:always;break-before:page}</style></head><body>${html}</body></html>`);
+          win.document.close();
+          win.focus();
+          setTimeout(() => win.print(), 250);
+        });
+      }
+    });
+  };
+
   nodes.historyPrintBtn?.addEventListener('click', async () => {
     const ask = await openIosSwal({
       title: 'Imprimir período',
@@ -5473,6 +5600,7 @@
     win.print();
   });
   nodes.historyMassPlanillasBtn?.addEventListener('click', openMassPlanillasByPeriod);
+  nodes.historyWeeklyPlanillaBtn?.addEventListener('click', openWeeklyProductionPlanillaByPeriod);
 
   nodes.dispatchView?.addEventListener('click', (event) => {
     if (!state.dispatchCreateMode || !state.dispatchDraft) return;

@@ -59,7 +59,7 @@
 
   const MONOGRAPHY_ROW_TYPE = 'monography';
   const FOOD_CATEGORIES_AR = {
-    'carnes-y-derivados': ['Carnes frescas', 'Chacinados embutidos', 'Fiambres y cocidos', 'Menudencias y vísceras'],
+    'carnes-y-derivados': ['Carnes frescas', 'Chacinados embutidos', 'Fiambres y cocidos', 'Menudencias y vísceras', 'Elaboraciones propias'],
     lacteos: ['Leche fluida', 'Leche en polvo', 'Quesos', 'Yogures y fermentados'],
     panificados: ['Panificados', 'Pastas frescas', 'Galletitas y crackers'],
     conservas: ['Conservas vegetales', 'Conservas cárnicas', 'Semiconservas'],
