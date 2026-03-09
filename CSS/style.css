@@ -5494,7 +5494,7 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-history-btn {
-  width: fit-content;
+  width: auto;
   max-width: none;
   background: #ff8a2a;
   border: 1px solid #f2c08a;
@@ -5522,6 +5522,23 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-history-btn:hover {
+  color: inherit;
+}
+
+.produccion-product-history-btn {
+  width: auto;
+  border: 1px solid #f2c08a;
+  background: #ff8a2a;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.86rem;
+  padding: 2px 9px;
+  line-height: 1.1;
+  border-radius: 999px;
+  text-decoration: none;
+}
+
+.produccion-product-history-btn:hover {
   background: #ef7c1e;
   color: #fff;
 }
