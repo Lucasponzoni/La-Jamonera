@@ -6642,6 +6642,7 @@ html.login-protected.auth-ok body {
   margin-top: 10px;
   display: flex;
   flex-wrap: wrap;
+  justify-content: end;
   gap: 8px;
 }
 
