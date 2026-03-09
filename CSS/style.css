@@ -4463,6 +4463,10 @@ html.login-protected.auth-ok body {
   width: min(1100px, 96vw);
 }
 
+.inventario-weekly-bulk-alert .swal2-html-container {
+  padding: 0 !important;
+}
+
 .inventario-weekly-config-btn {
   white-space: nowrap;
 }
@@ -4549,6 +4553,12 @@ html.login-protected.auth-ok body {
 
 .inventario-weekly-bulk-alert .swal2-actions .inventario-weekly-cancel-btn {
   min-width: 120px;
+}
+
+.swal2-popup.inventario-edit-entry-alert .swal2-input,
+.swal2-popup.inventario-edit-entry-alert .swal2-select,
+.swal2-popup.inventario-edit-entry-alert .swal2-file {
+  margin: 0 !important;
 }
 
 .inventario-weekly-product-head h6 {
@@ -5457,6 +5467,20 @@ html.login-protected.auth-ok body {
   color: #fff;
 }
 
+.produccion-dispatch-btn {
+  width: fit-content;
+  max-width: none;
+  background: #eaf1ff;
+  color: #2a4ea3;
+  border: 1px solid #cdd9f6;
+}
+
+.produccion-dispatch-btn:hover {
+  background: #dfe9ff;
+  color: #24448f;
+  border-color: #bcccf3;
+}
+
 .produccion-history-btn:hover {
   background: #ef7c1e;
   color: #fff;
@@ -5764,6 +5788,16 @@ html.login-protected.auth-ok body {
   color: #1f3f82;
 }
 
+.produccion-stat-block.is-stock-up small,
+.produccion-stat-block.is-stock-up strong {
+  color: #1f8a48;
+}
+
+.produccion-stat-block.is-stock-down small,
+.produccion-stat-block.is-stock-down strong {
+  color: #b8353f;
+}
+
 .produccion-stat-sep {
   width: 1px;
   align-self: stretch;
@@ -5782,6 +5816,57 @@ html.login-protected.auth-ok body {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 6px;
+}
+
+.produccion-dispatch-filter {
+  border-radius: 5px !important;
+}
+
+.produccion-dispatch-head .step-title {
+  margin-right: auto;
+}
+
+.dispatch-client-alert .swal2-html-container,
+.dispatch-vehicle-alert .swal2-html-container {
+  padding: 0 !important;
+  text-align: left !important;
+}
+
+.dispatch-client-alert :is(.swal2-input, .swal2-select, .swal2-file),
+.dispatch-vehicle-alert :is(.swal2-input, .swal2-select, .swal2-file) {
+  margin: 0 0 10px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+
+.dispatch-vehicle-alert .inventario-upload-dropzone {
+  margin-bottom: 10px;
+}
+
+.recipe-suggest-item small.text-danger {
+  color: #c23b45 !important;
+  font-weight: 700;
+}
+
+.produccion-dispatch-create .dispatch-products-table,
+.produccion-dispatch-create .recipe-table-wrap {
+  overflow: visible;
+}
+
+.produccion-dispatch-floating-suggest {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.produccion-dispatch-ok {
+  color: #1f8a48;
+  font-weight: 700;
+}
+
+.produccion-dispatch-missing {
+  color: #b8353f;
+  font-weight: 700;
 }
 
 .produccion-check-item {
