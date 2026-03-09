@@ -2438,10 +2438,10 @@
         const traceBtn = normalizeValue(allocation.productionId)
           ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button>`
           : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
-        return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${Number(allocation.qtyKg || 0).toFixed(2)} kg</span></div></td><td>${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
+        return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${Number(allocation.qtyKg || 0).toFixed(2)} kg</span></div></td><td>${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${Number(getRegistro(allocation.productionId)?.quantityKg || allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
       }).join('') : '';
       const locationParts = [client.address, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean);
-      const customerDoc = normalizeValue(client.dni || client.cuit || client.document || client.taxId);
+      const customerDoc = normalizeValue(client.doc || client.dni || client.cuit || client.cuil || client.document || client.taxId);
       const locationMeta = [normalizeValue(client.name), customerDoc].filter(Boolean).join(' · ');
       const locationRow = !collapsed && (locationParts.length || locationMeta)
         ? `<tr class="inventario-internal-use-row"><td colspan="6"><i class="fa-solid fa-house"></i> ${escapeHtml(locationParts.join(' • '))}${locationMeta ? ` • ${escapeHtml(locationMeta)}` : ''}</td></tr>`
@@ -2450,7 +2450,7 @@
     }).join('') : '<tr><td colspan="6" class="text-center">Sin repartos para el filtro seleccionado.</td></tr>';
     const tableWrap = nodes.dispatchView.querySelector('#produccionDispatchTableWrap');
     if (!tableWrap) return;
-    tableWrap.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioGlobalCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar todo</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioGlobalExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar todo</span></button></div><div class="table-responsive inventario-global-table inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha de reparto</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th></tr></thead><tbody>${htmlRows}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-page="prev" ${state.dispatchPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${state.dispatchPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-page="next" ${state.dispatchPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+    tableWrap.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioGlobalCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar todo</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioGlobalExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar todo</span></button></div><div class="table-responsive inventario-global-table inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0 produccion-dispatch-table-center"><thead><tr><th>Fecha de reparto</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th></tr></thead><tbody>${htmlRows}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-page="prev" ${state.dispatchPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${state.dispatchPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-page="next" ${state.dispatchPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
     prepareThumbLoaders('.js-produccion-thumb');
   };
   const renderDispatchMain = () => {
@@ -4659,6 +4659,7 @@
         clientSnapshot: {
           id: draft.clientId,
           name: draft.clientName,
+          doc: normalizeValue(getDispatchClient(draft.clientId)?.doc),
           address: draft.clientAddress,
           city: draft.clientCity,
           province: draft.clientProvince,
@@ -4767,12 +4768,18 @@
                   const traceBtn = normalizeValue(allocation.productionId)
                     ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button>`
                     : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
-                  return `<tr class="inventario-trace-row"><td>${escapeHtml(item.recipeTitle || '-')} ${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
+                  return `<tr class="inventario-trace-row"><td>${escapeHtml(item.recipeTitle || '-')} ${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${Number(getRegistro(allocation.productionId)?.quantityKg || allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
                 });
               }).join('') : '';
-              return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${products.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-collapse="${escapeHtml(row.id)}"><i class="fa-solid ${collapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(formatDateTime(row.createdAt))}</span></div></td><td>${products.length === 1 ? '1 producto' : `${products.length} productos`}</td><td>${kg.toFixed(2)} kg</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || '-')}</td><td>${escapeHtml(client.name || '-')}</td></tr>${detail}`;
+              const locationParts = [client.address, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean);
+              const customerDoc = normalizeValue(client.doc || client.dni || client.cuit || client.cuil || client.document || client.taxId);
+              const locationMeta = [normalizeValue(client.name), customerDoc].filter(Boolean).join(' · ');
+              const locationRow = !collapsed && (locationParts.length || locationMeta)
+                ? `<tr class="inventario-internal-use-row"><td colspan="6"><i class="fa-solid fa-house"></i> ${escapeHtml(locationParts.join(' • '))}${locationMeta ? ` • ${escapeHtml(locationMeta)}` : ''}</td></tr>`
+                : '';
+              return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${products.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-collapse="${escapeHtml(row.id)}"><i class="fa-solid ${collapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(formatDateTime(row.createdAt))}</span></div></td><td>${products.length === 1 ? '1 producto' : `${products.length} productos`}</td><td>${kg.toFixed(2)} kg</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || '-')}</td><td>${escapeHtml(client.name || '-')}</td></tr>${detail}${locationRow}`;
             }).join('') || '<tr><td colspan="6">Sin datos.</td></tr>';
-            popup.querySelector('#dispatchExpandedWrap').innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-collapse-all ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-expand-all ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha de reparto</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th></tr></thead><tbody>${body}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+            popup.querySelector('#dispatchExpandedWrap').innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-collapse-all ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-expand-all ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0 produccion-dispatch-table-center"><thead><tr><th>Fecha de reparto</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th></tr></thead><tbody>${body}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
           };
           renderExpanded();
           popup.addEventListener('click', async (expandedEvent) => {
@@ -4805,7 +4812,8 @@
             }
             const traceBtn = expandedEvent.target.closest('[data-prod-trace]');
             if (traceBtn) {
-              await openProductionTraceModal(traceBtn.dataset.prodTrace);
+              const reg = getRegistro(traceBtn.dataset.prodTrace);
+              if (reg) await openTraceability(reg);
             }
           });
         }
@@ -4838,7 +4846,8 @@
     }
     const traceBtn = event.target.closest('[data-prod-trace]');
     if (traceBtn) {
-      await openProductionTraceModal(traceBtn.dataset.prodTrace);
+      const reg = getRegistro(traceBtn.dataset.prodTrace);
+      if (reg) await openTraceability(reg);
       return;
     }
   });
