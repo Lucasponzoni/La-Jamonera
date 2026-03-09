@@ -2437,8 +2437,21 @@
     renderHistoryTable();
   };
   const openRecipeQuickHistory = async (recipeId) => {
+    Swal.fire({
+      title: 'Cargando historial...',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando historial" class="meta-spinner-login"></div>',
+      allowOutsideClick: false,
+      showConfirmButton: false,
+      customClass: {
+        popup: 'ios-alert produccion-loading-alert',
+        title: 'ios-alert-title',
+        htmlContainer: 'ios-alert-text'
+      }
+    });
+    await new Promise((resolve) => setTimeout(resolve, 120));
     const recipe = safeObject(state.recetas?.[recipeId]);
     const rows = getRecipeHistoryRows(recipeId);
+    Swal.close();
     let page = 1;
     const PAGE_SIZE = 12;
     let query = '';
@@ -2453,10 +2466,14 @@
       const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
       const body = popup.querySelector('[data-recipe-history-body]');
       const pager = popup.querySelector('[data-recipe-history-pager]');
+      const prevBtn = popup.querySelector('[data-recipe-history-prev]');
+      const nextBtn = popup.querySelector('[data-recipe-history-next]');
       if (body) {
-        body.innerHTML = pageRows.map((item) => `<div class="dispatch-client-manager-card ${item.type === 'egreso' ? 'tone-danger' : 'tone-success'}"><p><strong>${item.type === 'egreso' ? '↓ Egreso' : '↑ Ingreso'}</strong> · ${Number(item.qtyKg || 0).toFixed(2)} kg</p><small>${escapeHtml(formatDateTime(item.at || 0))} · ${escapeHtml(item.sourceCode || item.sourceId || '-')}</small></div>`).join('') || '<p class="text-muted mb-0">Sin movimientos para el filtro.</p>';
+        body.innerHTML = `<div class="table-responsive inventario-global-table inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Tipo</th><th>Fecha y hora</th><th>Código</th><th>Cantidad</th></tr></thead><tbody>${pageRows.map((item) => `<tr><td><span class="${item.type === 'egreso' ? 'text-danger' : 'text-success'}"><i class="fa-solid ${item.type === 'egreso' ? 'fa-arrow-down' : 'fa-arrow-up'}"></i> ${item.type === 'egreso' ? 'Egreso' : 'Ingreso'}</span></td><td>${escapeHtml(formatDateTime(item.at || 0))}</td><td>${escapeHtml(item.sourceCode || item.sourceId || '-')}</td><td><strong>${Number(item.qtyKg || 0).toFixed(2)} kg</strong></td></tr>`).join('') || '<tr><td colspan="4" class="text-center">Sin movimientos para el filtro.</td></tr>'}</tbody></table></div>`;
       }
       if (pager) pager.textContent = `Página ${page} de ${pages}`;
+      if (prevBtn) prevBtn.disabled = page <= 1;
+      if (nextBtn) nextBtn.disabled = page >= pages;
     };
     await openIosSwal({
       title: `Historial rápido · ${escapeHtml(capitalize(recipe.title || 'Producto'))}`,
@@ -4964,6 +4981,34 @@
           allocations: allocated.allocations
         });
       }
+      const selectedClient = getDispatchClient(draft.clientId);
+      const selectedVehicle = getDispatchVehicle(draft.vehicleId);
+      const managerSummary = draft.managers.map((token) => {
+        const manager = getManagerDisplay(token);
+        return `${escapeHtml(manager.name)} (${escapeHtml(manager.role)})`;
+      }).join('<br>');
+      const productsSummaryRows = normalizedProducts.map((item) => `<li><strong>${escapeHtml(item.recipeTitle || 'Producto')}</strong>: ${Number(item.qtyKg || 0).toFixed(2)} kg</li>`).join('');
+      const confirmSaveDispatch = await openIosSwal({
+        title: 'Confirmar reparto final',
+        html: `<div class="text-start produccion-confirm-summary produccion-confirm-card"><div class="produccion-confirm-head"><span class="produccion-confirm-icon"><i class="bi bi-truck"></i></span><div><p class="produccion-confirm-kicker">Validación final</p><p class="produccion-confirm-note">Se descontará stock de productos al guardar el reparto.</p></div></div><p><strong><i class="bi bi-calendar-event"></i> Fecha:</strong> <span>${escapeHtml(formatIsoEs(draft.dispatchDate || ''))}</span></p><p><strong><i class="fa-solid fa-user"></i> Cliente:</strong> <span>${escapeHtml(draft.clientName || selectedClient.name || '-')}</span></p><p><strong><i class="fa-solid fa-truck"></i> UTA/URA:</strong> <span>${escapeHtml(formatDispatchVehicleLabel(selectedVehicle))}</span></p><p><strong><i class="bi bi-people"></i> Responsables:</strong><br>${managerSummary || '-'}</p><p><strong><i class="bi bi-box-seam"></i> Productos:</strong></p><ul>${productsSummaryRows}</ul></div>`,
+        showCancelButton: true,
+        confirmButtonText: 'Guardar reparto',
+        cancelButtonText: 'Cancelar',
+        customClass: { popup: 'produccion-confirm-alert', confirmButton: 'ios-btn ios-btn-success', cancelButton: 'ios-btn ios-btn-secondary' }
+      });
+      if (!confirmSaveDispatch.isConfirmed) return;
+      Swal.fire({
+        title: 'Guardando reparto...',
+        html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Guardando reparto" class="meta-spinner-login"></div>',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        customClass: {
+          popup: 'ios-alert produccion-loading-alert',
+          title: 'ios-alert-title',
+          htmlContainer: 'ios-alert-text'
+        }
+      });
+      try {
       const dayToken = formatIsoToDmyCompact(draft.dispatchDate);
       const seq = Number(state.reparto.sequenceByDate?.[dayToken] || 0) + 1;
       state.reparto.sequenceByDate[dayToken] = seq;
@@ -5011,7 +5056,12 @@
       await refreshData();
       state.dispatchDraft = null;
       renderDispatchMain();
+      Swal.close();
       await openIosSwal({ title: 'Reparto guardado', html: `<p>Código generado: <strong>${code}</strong></p>`, icon: 'success' });
+      } catch (error) {
+        Swal.close();
+        await openIosSwal({ title: 'No se pudo guardar', html: '<p>Ocurrió un error al guardar el reparto. Intentá nuevamente.</p>', icon: 'error' });
+      }
       return;
     }
     if (event.target.closest('#produccionDispatchApplyBtn')) {
