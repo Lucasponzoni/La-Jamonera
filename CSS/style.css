@@ -4140,12 +4140,8 @@ html.login-protected.auth-ok body {
   display: flex;
   gap: 8px;
   align-items: center;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: visible;
   white-space: nowrap;
-  padding-bottom: 4px;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
 }
 
 .toolbar-scroll-x > * {
@@ -5316,6 +5312,18 @@ html.login-protected.auth-ok body {
 
   .toolbar-scroll-x {
     width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  .inventario-toolbar-actions,
+  .produccion-toolbar-actions {
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
   }
 
   .inventario-period-actions-scroll {
@@ -5478,9 +5486,15 @@ html.login-protected.auth-ok body {
 .produccion-dispatch-btn {
   width: fit-content;
   max-width: none;
-  background: #eaf1ff;
+  background: #f4f7ff;
   color: #2a4ea3;
-  border: 1px solid #cdd9f6;
+  border: 1px solid #d6def3;
+  white-space: nowrap;
+}
+
+.produccion-dispatch-btn span,
+.produccion-history-btn span {
+  white-space: nowrap;
 }
 
 .produccion-dispatch-btn:hover {
@@ -5840,6 +5854,18 @@ html.login-protected.auth-ok body {
   text-align: left !important;
 }
 
+.dispatch-client-preview {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 12px;
+}
+
+.dispatch-client-preview-avatar {
+  width: 52px;
+  height: 52px;
+  font-size: 1rem;
+}
+
 .dispatch-client-alert :is(.swal2-input, .swal2-select, .swal2-file),
 .dispatch-vehicle-alert :is(.swal2-input, .swal2-select, .swal2-file) {
   margin: 0 0 10px !important;
@@ -5860,6 +5886,19 @@ html.login-protected.auth-ok body {
 .produccion-dispatch-create .dispatch-products-table,
 .produccion-dispatch-create .recipe-table-wrap {
   overflow: visible;
+}
+
+.dispatch-product-input-wrap {
+  grid-template-columns: 30px minmax(180px, 1fr);
+}
+
+.dispatch-product-search-input {
+  min-width: 180px;
+}
+
+.dispatch-actions-row {
+  justify-content: flex-start;
+  gap: 8px;
 }
 
 .produccion-dispatch-floating-suggest {
@@ -8403,3 +8442,15 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
+
+.dispatch-product-input-wrap .recipe-inline-avatar { object-fit: contain; padding: 2px; background: #fff; }
+.recipe-suggest-avatar.js-dispatch-suggest-thumb { object-fit: contain; padding: 2px; background: #fff; }
+.produccion-dispatch-floating-suggest { z-index: 3600; }
+.dispatch-products-table td { vertical-align: middle; }
+.dispatch-products-table th:nth-child(1) { width: 28%; }
+.dispatch-products-table th:nth-child(3) { width: 22%; }
+.dispatch-actions-row { justify-content: space-between; }
+.dispatch-actions-row .recipe-table-action-btn { width: fit-content; max-width: none; }
+.produccion-managers-grid { max-height: 240px; }
+.produccion-user-check { width: 100%; grid-template-columns: 26px 52px minmax(0,1fr); }
+.produccion-user-check .user-avatar-thumb { width: 52px; height: 52px; }
