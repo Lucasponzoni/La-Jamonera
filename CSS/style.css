@@ -914,10 +914,6 @@ html.login-protected.auth-ok body {
   padding-top: 0;
 }
 
-.step-block + .step-block {
-  margin-top: 12px;
-}
-
 .step-title {
   margin: 0 0 8px;
   color: #3f4f78;
@@ -5488,12 +5484,9 @@ html.login-protected.auth-ok body {
 .produccion-dispatch-btn {
   width: fit-content;
   max-width: none;
-  background: #eef3ff;
+  background: #eaf1ff;
   color: #2a4ea3;
-  border: 1px solid #d3dbf0;
-  border-radius: 14px;
-  min-height: 48px;
-  font-weight: 700;
+  border: 1px solid #cdd9f6;
   white-space: nowrap;
 }
 
@@ -5503,9 +5496,9 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-dispatch-btn:hover {
-  background: #e4ecff;
+  background: #dfe9ff;
   color: #24448f;
-  border-color: #c5d3f3;
+  border-color: #bcccf3;
 }
 
 .produccion-history-btn:hover {
@@ -5867,9 +5860,9 @@ html.login-protected.auth-ok body {
 }
 
 .dispatch-client-preview-avatar {
-  width: 78px;
-  height: 78px;
-  font-size: 1.35rem;
+  width: 52px;
+  height: 52px;
+  font-size: 1rem;
 }
 
 .dispatch-client-alert :is(.swal2-input, .swal2-select, .swal2-file),
@@ -5891,21 +5884,11 @@ html.login-protected.auth-ok body {
 
 .produccion-dispatch-create .dispatch-products-table,
 .produccion-dispatch-create .recipe-table-wrap {
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-
-.produccion-dispatch-create .recipe-table {
-  min-width: 920px;
+  overflow: visible;
 }
 
 .dispatch-product-input-wrap {
   grid-template-columns: 30px minmax(180px, 1fr);
-}
-
-.dispatch-products-table th:nth-child(2),
-.dispatch-products-table td:nth-child(2) {
-  width: 130px;
 }
 
 .dispatch-product-input-wrap .recipe-inline-avatar {
@@ -5919,45 +5902,8 @@ html.login-protected.auth-ok body {
 }
 
 .dispatch-actions-row {
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.dispatch-comment-row td {
-  background: #fff8ef !important;
-}
-
-.dispatch-comment-row input {
-  border-color: #f3d6ae;
-  background: #fff;
-}
-
-.dispatch-comment-textarea {
-  min-height: 84px;
-  resize: vertical;
-}
-
-.dispatch-client-head {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 6px;
-}
-
-.dispatch-client-helper {
-  color: #6f7fa2;
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-
-.dispatch-quick-client-btn {
-  min-height: 34px;
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 0.78rem;
-  max-width: none;
-  width: auto;
 }
 
 .dispatch-actions-row #dispatchAddProductBtn {
@@ -7555,24 +7501,6 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   .inventario-toolbar-actions::-webkit-scrollbar-thumb {
     background: #cfd8f4;
     border-radius: 999px;
-  }
-
-  .dispatch-actions-row {
-    display: grid;
-    grid-template-columns: 1fr;
-    width: 100%;
-  }
-
-  .dispatch-actions-row .recipe-table-action-btn,
-  .dispatch-actions-row .ios-btn {
-    width: 100%;
-    max-width: none;
-    justify-content: center;
-  }
-
-  .dispatch-client-head {
-    flex-direction: column;
-    align-items: flex-start;
   }
 
   .swal2-popup.produccion-umbral-alert {
