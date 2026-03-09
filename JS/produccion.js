@@ -2560,7 +2560,7 @@
       title: `Historial rápido · ${escapeHtml(capitalize(recipe.title || 'Producto'))}`,
       width: 'min(720px,96vw)',
       customClass: { popup: 'produccion-recipe-history-alert' },
-      html: `<div class="text-start produccion-recipe-history-modal"><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input type="search" class="form-control ios-input" data-recipe-history-search placeholder="Buscar por código"></div><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-regular fa-calendar"></i></span><input type="text" class="form-control ios-input" data-recipe-history-range placeholder="Filtrar rango (desde - hasta)" autocomplete="off"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn data-recipe-history-range-clear" data-recipe-history-range-clear><i class="fa-solid fa-xmark"></i></button></div><div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn" data-recipe-history-expand><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button><button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" data-recipe-history-excel><i class="fa-solid fa-file-excel"></i><span>Excel</span></button><span class="inventario-period-divider" aria-hidden="true"></span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-print><i class="fa-solid fa-print"></i><span>Período</span></button></div><div data-recipe-history-body class="dispatch-clients-manager-list" style="max-height:52vh;overflow:auto"></div><div class="d-flex align-items-center justify-content-between mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-prev><i class="fa-solid fa-chevron-left"></i></button><span data-recipe-history-pager>Página 1 de 1</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-next><i class="fa-solid fa-chevron-right"></i></button></div></div>`,
+      html: `<div class="text-start produccion-recipe-history-modal"><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input type="search" class="form-control ios-input" data-recipe-history-search placeholder="Buscar por código"></div><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-regular fa-calendar"></i></span><input type="text" class="form-control ios-input" data-recipe-history-range placeholder="Filtrar rango (desde - hasta)" autocomplete="off"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-range-clear><i class="fa-solid fa-xmark"></i></button></div><div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn" data-recipe-history-expand><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button><button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" data-recipe-history-excel><i class="fa-solid fa-file-excel"></i><span>Excel</span></button><span class="inventario-period-divider" aria-hidden="true"></span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-print><i class="fa-solid fa-print"></i><span>Período</span></button></div><div data-recipe-history-body class="dispatch-clients-manager-list" style="max-height:52vh;overflow:auto"></div><div class="d-flex align-items-center justify-content-between mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-prev><i class="fa-solid fa-chevron-left"></i></button><span data-recipe-history-pager>Página 1 de 1</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-next><i class="fa-solid fa-chevron-right"></i></button></div></div>`,
       confirmButtonText: 'Cerrar',
       didOpen: (popup) => {
         const rangeInput = popup.querySelector('[data-recipe-history-range]');
@@ -2698,8 +2698,7 @@
     win.focus();
     win.print();
   };
-  const openDispatchPlanilla = async (dispatchRow) => {
-    if (!dispatchRow?.id) return;
+  const buildDispatchPlanillaHtml = (dispatchRow) => {
     const client = { ...getDispatchClient(dispatchRow.clientId), ...safeObject(dispatchRow.clientSnapshot) };
     const vehicle = getDispatchVehicle(dispatchRow.vehicleId);
     const managerTokens = Array.isArray(dispatchRow.managers) ? dispatchRow.managers : [];
@@ -2727,6 +2726,37 @@
     const headerTable = `<table style="width:100%;border-collapse:collapse;table-layout:fixed"><tbody><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">FRIGO LA JAMONERA • REGISTRO DE SALIDA DE PRODUCTOS PRODUCIDOS</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">${escapeHtml(dispatchRow.code || dispatchRow.id)}</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px"><strong>FECHA Y HORA:</strong></td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(formatDateTime(dispatchRow.createdAt || dispatchRow.dispatchDate))}</strong></td><td style="border:1px solid #2f2f2f;padding:4px"><strong>CLIENTE:</strong></td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(normalizeValue(client.name) || '-')}</strong></td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px" colspan="4"><strong>DIRECCION:</strong> ${escapeHtml(location)}${location && clientDoc ? ' • ' : ''}${escapeHtml(clientDoc)}</td></tr></tbody></table>`;
     const planillaStyle = '<style>.dispatch-planilla-print{font-family:Inter,Arial,sans-serif;color:#111827;background:#fff}.dispatch-planilla-print table{width:100%;border-collapse:collapse;table-layout:fixed}.dispatch-planilla-print th,.dispatch-planilla-print td{border:1px solid #2f2f2f;padding:6px;word-break:break-word;background:#fff;color:#111827}</style>';
     const html = `${planillaStyle}<div class="dispatch-planilla-print" id="dispatchPlanillaPrintable">${headerTable}<div class="table-responsive" style="margin-top:8px;"><table><thead><tr><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de lote</th></tr></thead><tbody>${detailRows}<tr><td colspan="4"><strong>VEHÍCULO (UTA-URA):</strong> ${escapeHtml(`${vehicle.number || '-'} - ${vehicle.patent || '-'} - ${vehicle.brand || vehicle.type || '-'}`)}</td></tr>${commentsRows}<tr><td colspan="4"><strong>CONTROLO:</strong> ${escapeHtml(managerLabel)}</td></tr><tr><td colspan="2"><strong>TEMPERATURA UNIDAD DE TRANSPORTE:</strong> 3 °C</td><td colspan="2"><strong>UNIDAD DE TRANSPORTE ESTADO:</strong> A (ACEPTABLE)</td></tr></tbody></table></div><div style="margin-top:10px;display:flex;gap:12px;align-items:center;"><div data-dispatch-planilla-qr></div><div><p style="margin:0 0 6px;font-weight:700;">QR de trazabilidad de los lotes</p><p style="margin:0;color:#556487;">Escaneá el QR con tu celular para acceder a la trazabilidad completa del producto.</p></div></div></div>`;
+    return { html };
+  };
+  const printDispatchPlanillasBatch = async (rows = [], onProgress) => {
+    const list = Array.isArray(rows) ? rows : [];
+    if (!list.length) return;
+    const win = window.open('', '_blank', 'width=1400,height=900');
+    if (!win) return;
+    win.document.write('<html><head><title>Planillas masivas reparto</title><style>@page{size:landscape;margin:10mm}body{font-family:Inter,Arial,sans-serif;color:#111827;background:#ffffff;margin:0;padding:8px}.dispatch-planilla-print{background:#fff}.dispatch-planilla-print table{width:100%;border-collapse:collapse;table-layout:fixed}.dispatch-planilla-print th,.dispatch-planilla-print td{border:1px solid #2f2f2f;padding:6px;word-break:break-word;background:#fff;color:#111827}.page-break{page-break-before:always;break-before:page}</style></head><body></body></html>');
+    win.document.close();
+    for (let index = 0; index < list.length; index += 1) {
+      const row = list[index];
+      const section = win.document.createElement('section');
+      section.className = index > 0 ? 'page-break' : '';
+      section.innerHTML = buildDispatchPlanillaHtml(row).html;
+      win.document.body.appendChild(section);
+      const printable = section.querySelector('#dispatchPlanillaPrintable');
+      if (printable) {
+        await renderDispatchPlanillaQr(printable.querySelector('[data-dispatch-planilla-qr]'), row);
+        await waitNodeImages(printable);
+      }
+      if (typeof onProgress === 'function') {
+        onProgress(Math.round(((index + 1) / list.length) * 100));
+      }
+    }
+    await waitPrintAssets(win);
+    win.focus();
+    win.print();
+  };
+  const openDispatchPlanilla = async (dispatchRow) => {
+    if (!dispatchRow?.id) return;
+    const html = buildDispatchPlanillaHtml(dispatchRow).html;
     Swal.fire({
       title: 'Generando planilla...',
       html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando planilla" class="meta-spinner-login"></div>',
@@ -4895,6 +4925,94 @@
       }
     });
   };
+  const openMassDispatchPlanillasByPeriod = async () => {
+    const rows = getDispatchRows();
+    if (!rows.length) {
+      await openIosSwal({ title: 'Sin datos', html: '<p>No hay repartos para el período seleccionado.</p>', icon: 'info' });
+      return;
+    }
+
+    const uniqueRecipes = Object.values(rows.reduce((acc, row) => {
+      const products = Array.isArray(row.products) ? row.products : [];
+      products.forEach((product) => {
+        const id = normalizeValue(product.recipeId || product.recipeTitle);
+        if (!id) return;
+        if (!acc[id]) {
+          acc[id] = {
+            id,
+            title: normalizeValue(product.recipeTitle) || normalizeValue(state.recetas?.[product.recipeId]?.title) || 'Sin nombre',
+            imageUrl: normalizeValue(product.recipeImageUrl || state.recetas?.[product.recipeId]?.imageUrl)
+          };
+        }
+      });
+      return acc;
+    }, {}));
+
+    const selector = await openIosSwal({
+      title: 'Selector de productos',
+      html: `<div class="swal-stack-fields text-start">
+        <label class="inventario-check-row"><input type="radio" name="dispatchMassPlanillaScope" value="all" checked><span>Incluir todos los productos</span></label>
+        <label class="inventario-check-row"><input type="radio" name="dispatchMassPlanillaScope" value="exclude"><span>Excluir algunos productos</span></label>
+        <div id="dispatchMassPlanillasScope" class="notify-specific-users-list d-none">
+          <div class="step-block"><strong>Productos</strong>${uniqueRecipes.map((item) => `<label class="inventario-check-row inventario-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-dispatch-mass-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}"></span>` : ''}<input type="checkbox" data-dispatch-mass-planilla-recipe value="${escapeHtml(item.id)}"><span>${escapeHtml(item.title)}</span></label>`).join('')}</div>
+        </div>
+      </div>`,
+      showCancelButton: true,
+      confirmButtonText: 'Continuar',
+      cancelButtonText: 'Cancelar',
+      didOpen: () => {
+        const all = document.querySelector('input[name="dispatchMassPlanillaScope"][value="all"]');
+        const exclude = document.querySelector('input[name="dispatchMassPlanillaScope"][value="exclude"]');
+        const list = document.getElementById('dispatchMassPlanillasScope');
+        const toggle = () => list?.classList.toggle('d-none', !exclude?.checked);
+        all?.addEventListener('change', toggle);
+        exclude?.addEventListener('change', toggle);
+        prepareThumbLoaders('.js-dispatch-mass-thumb');
+      },
+      preConfirm: () => {
+        const mode = document.querySelector('input[name="dispatchMassPlanillaScope"]:checked')?.value || 'all';
+        const selected = [...document.querySelectorAll('[data-dispatch-mass-planilla-recipe]:checked')].map((node) => node.value);
+        if (mode === 'exclude' && !selected.length) {
+          Swal.showValidationMessage('Seleccioná al menos un producto para excluir.');
+          return false;
+        }
+        return { mode, selected };
+      }
+    });
+    if (!selector.isConfirmed) return;
+
+    const excluded = new Set(selector.value.mode === 'exclude' ? selector.value.selected : []);
+    const filtered = rows.filter((row) => {
+      if (!excluded.size) return true;
+      const products = Array.isArray(row.products) ? row.products : [];
+      return products.some((product) => !excluded.has(normalizeValue(product.recipeId || product.recipeTitle)));
+    });
+    if (!filtered.length) {
+      await openIosSwal({ title: 'Sin resultados', html: '<p>El filtro dejó 0 planillas para imprimir.</p>', icon: 'warning' });
+      return;
+    }
+
+    await Swal.fire({
+      title: 'Planillas masivas',
+      html: '<div class="planilla-progress-wrap"><div class="planilla-progress-bar"><span id="dispatchMassPlanillasProgressBar" style="width:0%"></span></div><p id="dispatchMassPlanillasProgressText" class="planilla-progress-text">0% Preparando...</p></div>',
+      allowOutsideClick: false,
+      showConfirmButton: false,
+      customClass: { popup: 'ios-alert produccion-loading-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' },
+      didOpen: async () => {
+        try {
+          await printDispatchPlanillasBatch(filtered, (progress) => {
+            const value = Math.max(0, Math.min(100, Number(progress) || 0));
+            const bar = document.getElementById('dispatchMassPlanillasProgressBar');
+            const text = document.getElementById('dispatchMassPlanillasProgressText');
+            if (bar) bar.style.width = `${value}%`;
+            if (text) text.textContent = `${value}% Procesando planillas...`;
+          });
+        } finally {
+          Swal.close();
+        }
+      }
+    });
+  };
 
   nodes.historyPrintBtn?.addEventListener('click', async () => {
     const ask = await openIosSwal({
@@ -5350,7 +5468,7 @@
       return;
     }
     if (event.target.closest('#produccionDispatchMassBtn')) {
-      await openIosSwal({ title: 'Próximamente', html: '<p>Planillas masivas para repartos quedará en la próxima etapa.</p>', icon: 'info' });
+      await openMassDispatchPlanillasByPeriod();
       return;
     }
     if (event.target.closest('#produccionDispatchExpandBtn')) {
