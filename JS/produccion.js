@@ -781,6 +781,31 @@
     await ref.put(file);
     return ref.getDownloadURL();
   };
+
+  const runWithBackSpinner = async (task, title = 'Actualizando vista...') => {
+    Swal.fire({
+      title,
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Actualizando" class="meta-spinner-login"></div>',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      backdrop: 'rgba(20, 28, 48, 0.35)',
+      customClass: {
+        popup: 'ios-alert produccion-loading-alert',
+        title: 'ios-alert-title',
+        htmlContainer: 'ios-alert-text'
+      },
+      didOpen: () => {
+        const container = Swal.getContainer();
+        if (container) container.style.backdropFilter = 'blur(4px)';
+      }
+    });
+    try {
+      await task();
+    } finally {
+      Swal.close();
+    }
+  };
   const setStateView = (view) => {
     state.view = view;
     if (view !== 'list' && state.draftsTick) {
@@ -4840,16 +4865,17 @@
     }
   });
   nodes.historyBackBtn?.addEventListener('click', async () => {
-    await refreshData({ silent: true });
-    setHistoryMode(false);
-    renderList();
+    await runWithBackSpinner(async () => {
+      await refreshData({ silent: true });
+      setHistoryMode(false);
+      renderList();
+    }, 'Volviendo...');
   });
   nodes.historyApplyBtn?.addEventListener('click', () => {
     state.historySearch = normalizeValue(nodes.historySearch?.value);
     state.historyRange = normalizeValue(nodes.historyRange?.value);
     nodes.historyClearBtn?.classList.toggle('d-none', !(state.historyRange || state.historySearch));
     state.historyPage = 1;
-    nodes.historyClearBtn?.classList.toggle('d-none', !(state.historyRange || state.historySearch));
     renderHistoryTable();
   });
   nodes.historySearch?.addEventListener('input', () => {
@@ -5274,9 +5300,11 @@
         const canLeave = await confirmLeaveDispatchCreate();
         if (!canLeave) return;
       }
-      await refreshData({ silent: true });
-      setDispatchMode(false);
-      renderList();
+      await runWithBackSpinner(async () => {
+        await refreshData({ silent: true });
+        setDispatchMode(false);
+        renderList();
+      }, 'Volviendo...');
       return;
     }
     if (event.target.closest('#produccionDispatchNewBtn')) {
@@ -5287,8 +5315,10 @@
     if (event.target.closest('#produccionDispatchBackToListBtn')) {
       const canLeave = await confirmLeaveDispatchCreate();
       if (!canLeave) return;
-      await refreshData({ silent: true });
-      renderDispatchMain();
+      await runWithBackSpinner(async () => {
+        await refreshData({ silent: true });
+        renderDispatchMain();
+      }, 'Volviendo...');
       return;
     }
     if (event.target.closest('#dispatchAddProductBtn')) {
