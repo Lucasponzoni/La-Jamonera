@@ -31,7 +31,8 @@
   const DRAFTS_PATH = '/produccion/drafts';
   const REGISTROS_PATH = '/produccion/registros';
   const SEQUENCE_PATH = '/produccion/sequence';
-  const REPARTO_PATH = '/REPARTO';
+  const REPARTO_PATH = '/Reparto';
+  const LEGACY_REPARTO_PATH = '/REPARTO';
   const AUDIT_PATH = '/produccion/auditoria';
   const RESERVE_TTL_MS = 10 * 60 * 1000;
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -95,8 +96,85 @@
     registros: safeObject(source?.registros),
     sequenceByDate: safeObject(source?.sequenceByDate),
     clients: safeObject(source?.clients),
-    vehicles: safeObject(source?.vehicles)
+    vehicles: safeObject(source?.vehicles),
+    productIndex: safeObject(source?.productIndex)
   });
+  const getWeekStartIso = (dateLike = nowTs()) => {
+    const date = new Date(dateLike);
+    if (Number.isNaN(date.getTime())) return toIsoDate();
+    const day = date.getDay();
+    const diff = (day + 6) % 7;
+    date.setDate(date.getDate() - diff);
+    return toIsoDate(date.getTime());
+  };
+  const toFiniteKg = (value) => {
+    const n = Number(value || 0);
+    return Number.isFinite(n) ? Number(n.toFixed(3)) : 0;
+  };
+  const getRecipeProductIndex = (recipeId) => {
+    const id = normalizeValue(recipeId);
+    if (!id) return null;
+    if (!state.reparto.productIndex || typeof state.reparto.productIndex !== 'object') state.reparto.productIndex = {};
+    if (!state.reparto.productIndex[id]) {
+      state.reparto.productIndex[id] = {
+        availableKg: 0,
+        updatedAt: 0,
+        weeklyOutByWeek: {},
+        movements: {}
+      };
+    }
+    const current = safeObject(state.reparto.productIndex[id]);
+    current.weeklyOutByWeek = safeObject(current.weeklyOutByWeek);
+    current.movements = safeObject(current.movements);
+    state.reparto.productIndex[id] = current;
+    return current;
+  };
+  const compactRecipeMovements = (entry) => {
+    const movements = Object.values(safeObject(entry?.movements));
+    if (movements.length <= 2000) return;
+    const next = movements.sort((a, b) => Number(b.at || 0) - Number(a.at || 0)).slice(0, 2000)
+      .reduce((acc, move) => {
+        const key = normalizeValue(move.id) || makeId('prod_move');
+        acc[key] = move;
+        return acc;
+      }, {});
+    entry.movements = next;
+  };
+  const appendRecipeMovement = (recipeId, movement = {}) => {
+    const entry = getRecipeProductIndex(recipeId);
+    if (!entry) return;
+    const moveId = normalizeValue(movement.id) || makeId('prod_move');
+    const type = normalizeValue(movement.type) === 'egreso' ? 'egreso' : 'ingreso';
+    const qtyKg = toFiniteKg(movement.qtyKg);
+    const at = Number(movement.at || nowTs());
+    entry.movements[moveId] = {
+      id: moveId,
+      type,
+      qtyKg,
+      at,
+      label: normalizeValue(movement.label),
+      sourceId: normalizeValue(movement.sourceId),
+      sourceCode: normalizeValue(movement.sourceCode),
+      date: normalizeValue(movement.date)
+    };
+    entry.availableKg = toFiniteKg(type === 'egreso' ? Math.max(0, Number(entry.availableKg || 0) - qtyKg) : Number(entry.availableKg || 0) + qtyKg);
+    if (type === 'egreso') {
+      const week = getWeekStartIso(at);
+      entry.weeklyOutByWeek[week] = toFiniteKg(Number(entry.weeklyOutByWeek[week] || 0) + qtyKg);
+    }
+    entry.updatedAt = nowTs();
+    compactRecipeMovements(entry);
+  };
+  const getLastWeekOutFromIndex = (recipeId) => {
+    const entry = safeObject(state.reparto?.productIndex?.[recipeId]);
+    const now = Date.now();
+    const weekAgo = now - (7 * 24 * 60 * 60 * 1000);
+    return Number(Object.entries(safeObject(entry.weeklyOutByWeek)).reduce((acc, [weekIso, qty]) => {
+      const weekTs = Number(new Date(`${weekIso}T00:00:00`).getTime());
+      if (!Number.isFinite(weekTs) || weekTs < weekAgo) return acc;
+      return acc + Number(qty || 0);
+    }, 0).toFixed(3));
+  };
   const getProvidersCatalog = () => (Array.isArray(state.inventario?.config?.providers) ? state.inventario.config.providers : []);
   const normalizeRneRecord = (source = {}) => ({
     number: normalizeValue(source?.number),
@@ -895,6 +973,15 @@
   });
   const getDispatchRecordsList = () => Object.values(safeObject(state.reparto?.registros));
   const getProducedStockMeta = (recipeId) => {
+    const indexed = safeObject(state.reparto?.productIndex?.[recipeId]);
+    if (Object.keys(indexed).length) {
+      return {
+        produced: 0,
+        dispatched: 0,
+        available: toFiniteKg(indexed.availableKg),
+        lastWeekOut: getLastWeekOutFromIndex(recipeId)
+      };
+    }
     const produced = getRegistrosList()
       .filter((item) => normalizeValue(item.recipeId) === normalizeValue(recipeId) && normalizeValue(item.status) !== 'anulada')
       .reduce((acc, item) => acc + Number(item.quantityKg || 0), 0);
@@ -917,6 +1004,44 @@
         .reduce((sum, row) => sum + Number(row.qtyKg || 0), 0);
     }, 0);
     return { produced, dispatched, available, lastWeekOut: Number(lastWeekOut.toFixed(3)) };
+  };
+  const getRecipeHistoryRows = (recipeId) => {
+    const indexed = safeObject(state.reparto?.productIndex?.[recipeId]);
+    const rows = Object.values(safeObject(indexed.movements))
+      .sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
+    return rows;
+  };
+  const rebuildProductIndexFromHistory = () => {
+    state.reparto.productIndex = {};
+    getRegistrosList()
+      .filter((item) => normalizeValue(item.status) !== 'anulada')
+      .forEach((registro) => {
+        appendRecipeMovement(registro.recipeId, {
+          id: `ing_${registro.id}`,
+          type: 'ingreso',
+          qtyKg: Number(registro.quantityKg || 0),
+          at: Number(registro.createdAt || 0) || nowTs(),
+          sourceId: registro.id,
+          sourceCode: registro.id,
+          label: 'Producción confirmada',
+          date: registro.productionDate
+        });
+      });
+    getDispatchRecordsList().forEach((reparto) => {
+      const products = Array.isArray(reparto.products) ? reparto.products : [];
+      products.forEach((product) => {
+        appendRecipeMovement(product.recipeId, {
+          id: `egr_${reparto.id}_${product.recipeId}`,
+          type: 'egreso',
+          qtyKg: Number(product.qtyKg || 0),
+          at: Number(reparto.createdAt || 0) || nowTs(),
+          sourceId: reparto.id,
+          sourceCode: reparto.code,
+          label: 'Reparto guardado',
+          date: reparto.dispatchDate
+        });
+      });
+    });
   };
   const buildPlanForRecipe = (recipe, qtyKg, productionDateIso = toIsoDate()) => {
     const analysis = analyzeRecipe(recipe, productionDateIso);
@@ -2311,6 +2436,51 @@
     setHistoryMode(true);
     renderHistoryTable();
   };
+  const openRecipeQuickHistory = async (recipeId) => {
+    const recipe = safeObject(state.recetas?.[recipeId]);
+    const rows = getRecipeHistoryRows(recipeId);
+    let page = 1;
+    const PAGE_SIZE = 12;
+    let query = '';
+    const renderRows = (popup) => {
+      if (!popup) return;
+      const filtered = rows.filter((item) => {
+        const text = normalizeLower(`${item.label || ''} ${item.sourceCode || ''} ${item.sourceId || ''}`);
+        return !query || text.includes(normalizeLower(query));
+      });
+      const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+      page = Math.min(Math.max(1, page), pages);
+      const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+      const body = popup.querySelector('[data-recipe-history-body]');
+      const pager = popup.querySelector('[data-recipe-history-pager]');
+      if (body) {
+        body.innerHTML = pageRows.map((item) => `<div class="dispatch-client-manager-card ${item.type === 'egreso' ? 'tone-danger' : 'tone-success'}"><p><strong>${item.type === 'egreso' ? '↓ Egreso' : '↑ Ingreso'}</strong> · ${Number(item.qtyKg || 0).toFixed(2)} kg</p><small>${escapeHtml(formatDateTime(item.at || 0))} · ${escapeHtml(item.sourceCode || item.sourceId || '-')}</small></div>`).join('') || '<p class="text-muted mb-0">Sin movimientos para el filtro.</p>';
+      }
+      if (pager) pager.textContent = `Página ${page} de ${pages}`;
+    };
+    await openIosSwal({
+      title: `Historial rápido · ${escapeHtml(capitalize(recipe.title || 'Producto'))}`,
+      width: 'min(720px,96vw)',
+      html: `<div class="text-start"><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input type="search" class="form-control ios-input" data-recipe-history-search placeholder="Buscar por código"></div><div data-recipe-history-body class="dispatch-clients-manager-list" style="max-height:52vh;overflow:auto"></div><div class="d-flex align-items-center justify-content-between mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-prev><i class="fa-solid fa-chevron-left"></i></button><span data-recipe-history-pager>Página 1 de 1</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-next><i class="fa-solid fa-chevron-right"></i></button></div></div>`,
+      confirmButtonText: 'Cerrar',
+      didOpen: (popup) => {
+        popup.querySelector('[data-recipe-history-search]')?.addEventListener('input', (event) => {
+          query = event.target.value;
+          page = 1;
+          renderRows(popup);
+        });
+        popup.querySelector('[data-recipe-history-prev]')?.addEventListener('click', () => {
+          page -= 1;
+          renderRows(popup);
+        });
+        popup.querySelector('[data-recipe-history-next]')?.addEventListener('click', () => {
+          page += 1;
+          renderRows(popup);
+        });
+        renderRows(popup);
+      }
+    });
+  };
   const getDispatchClient = (clientId) => safeObject(state.reparto.clients?.[clientId]);
   const getDispatchVehicle = (vehicleId) => safeObject(state.reparto.vehicles?.[vehicleId]);
   const getDispatchRecordById = (dispatchId) => safeObject(state.reparto?.registros?.[dispatchId]);
@@ -3150,6 +3320,10 @@
               <div class="produccion-stat-block is-stock-down">
                 <small>Últimos egresados <i class="fa-solid fa-arrow-down"></i></small>
                 <strong>${dispatchMeta.lastWeekOut.toFixed(2)} kg</strong>
+              </div>
+              <div class="produccion-stat-sep" aria-hidden="true"></div>
+              <div class="produccion-stat-block">
+                <small><button type="button" class="btn btn-link p-0 produccion-history-btn" data-open-recipe-history="${recipe.id}">Historial</button></small>
               </div>
             </div>
             ${Number(analysis.expiredKg || 0) > 0.0001 ? `<p class="produccion-last-line produccion-last-line-expired"><i class="fa-solid fa-triangle-exclamation"></i> <strong>Kilos expirados:</strong> <strong>${Number(analysis.expiredKg || 0).toFixed(2)} kg</strong></p>` : ''}
@@ -4081,6 +4255,17 @@
         await window.dbLaJamoneraRest.write('/inventario', inventarioNext);
         await window.dbLaJamoneraRest.write(SEQUENCE_PATH, nextSequence);
         await window.dbLaJamoneraRest.write(REGISTROS_PATH, { ...registros, [productionId]: registro });
+        appendRecipeMovement(recipe.id, {
+          id: `ing_${productionId}`,
+          type: 'ingreso',
+          qtyKg: qty,
+          at: nowTs(),
+          sourceId: productionId,
+          sourceCode: productionId,
+          label: 'Producción confirmada',
+          date
+        });
+        await persistRepartoStore();
         await appendAudit({ action: 'produccion_confirmada', productionId, before: null, after: registro, reason: 'confirmacion final' });
         state.config.lastProductionByRecipe[recipe.id] = nowTs();
         await persistConfig();
@@ -4148,7 +4333,7 @@
         return fallback;
       }
     };
-    const [recetas, ingredientes, inventario, config, reservas, drafts, registros, users, repartoStore] = await Promise.all([
+    const [recetas, ingredientes, inventario, config, reservas, drafts, registros, users, repartoStore, legacyRepartoStore] = await Promise.all([
       safeRead('/recetas', {}),
       safeRead('/ingredientes/items', {}),
       safeRead('/inventario', {}),
@@ -4157,7 +4342,8 @@
       safeRead(DRAFTS_PATH, {}),
       safeRead(REGISTROS_PATH, {}),
       safeRead('/informes/users', {}),
-      safeRead(REPARTO_PATH, {})
+      safeRead(REPARTO_PATH, {}),
+      safeRead(LEGACY_REPARTO_PATH, {})
     ]);
     state.recetas = safeObject(recetas);
     state.ingredientes = safeObject(ingredientes);
@@ -4166,7 +4352,17 @@
     state.drafts = safeObject(drafts);
     state.registros = safeObject(registros);
     state.users = safeObject(users);
-    state.reparto = normalizeDispatchStore(repartoStore);
+    const nextRepartoStore = Object.keys(safeObject(repartoStore)).length
+      ? repartoStore
+      : legacyRepartoStore;
+    state.reparto = normalizeDispatchStore(nextRepartoStore);
+    if (!Object.keys(safeObject(state.reparto.productIndex)).length) {
+      rebuildProductIndexFromHistory();
+      await window.dbLaJamoneraRest.write(REPARTO_PATH, state.reparto);
+    }
+    if (!Object.keys(safeObject(repartoStore)).length && Object.keys(safeObject(legacyRepartoStore)).length) {
+      await window.dbLaJamoneraRest.write(REPARTO_PATH, state.reparto);
+    }
     state.config = {
       globalMinKg: parsePositive(config?.globalMinKg, 1),
       recipeMinKg: safeObject(config?.recipeMinKg),
@@ -4282,6 +4478,11 @@
     }
     if (event.target.closest('[data-open-inventario]')) {
       openInventarioFromProduccion();
+      return;
+    }
+    const historyBtn = event.target.closest('[data-open-recipe-history]');
+    if (historyBtn) {
+      await openRecipeQuickHistory(historyBtn.dataset.openRecipeHistory);
       return;
     }
     const minBtn = event.target.closest('[data-set-recipe-min]');
@@ -4794,6 +4995,18 @@
         createdAt: nowTs(),
         createdBy: getCurrentUserLabel()
       };
+      normalizedProducts.forEach((product) => {
+        appendRecipeMovement(product.recipeId, {
+          id: `egr_${repartoId}_${product.recipeId}`,
+          type: 'egreso',
+          qtyKg: Number(product.qtyKg || 0),
+          at: nowTs(),
+          sourceId: repartoId,
+          sourceCode: code,
+          label: 'Reparto guardado',
+          date: draft.dispatchDate
+        });
+      });
       await persistRepartoStore();
       await refreshData();
       state.dispatchDraft = null;
