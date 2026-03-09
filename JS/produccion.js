@@ -536,6 +536,17 @@
     next.movementHistory.unshift(movement);
     return next;
   };
+  const usageToBaseQty = (usage = {}, fallbackUnit = 'kilos') => {
+    const usedQty = Number(usage?.usedQty);
+    const usedUnit = normalizeValue(usage?.usedUnit) || fallbackUnit;
+    if (Number.isFinite(usedQty) && usedQty > 0) {
+      const baseQty = toBase(usedQty, usedUnit);
+      if (Number.isFinite(baseQty) && baseQty > 0) return baseQty;
+    }
+    const kilosUsed = Number(usage?.kilosUsed);
+    if (Number.isFinite(kilosUsed) && kilosUsed > 0) return kilosUsed * 1000;
+    return 0;
+  };
   const applyPlanOnInventory = (inventorySource, plan, productionId, productionDate, mode = 'consume') => {
     const inventoryNext = safeObject(inventorySource);
     plan.ingredientPlans.forEach((item) => {
@@ -545,19 +556,36 @@
         const index = nextEntries.findIndex((entry) => entry.id === lot.entryId);
         if (index === -1) return;
         const entry = { ...nextEntries[index] };
+        const entryUnit = normalizeValue(entry.unit || lot.unit || item.ingredientUnit || 'kilos') || 'kilos';
+        const fullQty = parseNumber(entry?.qty);
+        const maxQty = Number.isFinite(fullQty) && fullQty > 0 ? fullQty : Number.POSITIVE_INFINITY;
         const currentAvailableQty = getEntryAvailableQty(entry);
-        const amountInEntryUnit = fromBase(lot.takeBaseQty, entry.unit || lot.unit);
-        const safeAmount = Number.isFinite(amountInEntryUnit) ? amountInEntryUnit : 0;
-        const sign = mode === 'consume' ? -1 : 1;
-        const nextAvailableQty = Math.max(0, Number((currentAvailableQty + (sign * safeAmount)).toFixed(4)));
-        const nextAvailableKg = Number((toBase(nextAvailableQty, entry.unit || lot.unit) / 1000).toFixed(4));
-        entry.availableQty = Number(nextAvailableQty.toFixed(4));
-        entry.availableKg = nextAvailableKg;
-        entry.lotStatus = nextAvailableQty <= 0 ? 'consumido_en_produccion' : 'disponible';
         entry.productionUsage = Array.isArray(entry.productionUsage) ? [...entry.productionUsage] : [];
+        let safeAmount = 0;
         if (mode === 'restore') {
-          entry.productionUsage = entry.productionUsage.filter((usage) => normalizeValue(usage?.productionId) !== normalizeValue(productionId));
+          const keepUsages = [];
+          let restoreBaseQty = 0;
+          entry.productionUsage.forEach((usage) => {
+            if (normalizeValue(usage?.productionId) === normalizeValue(productionId)) {
+              restoreBaseQty += usageToBaseQty(usage, entryUnit);
+            } else {
+              keepUsages.push(usage);
+            }
+          });
+          entry.productionUsage = keepUsages;
+          safeAmount = Number.isFinite(restoreBaseQty) && restoreBaseQty > 0
+            ? Number(fromBase(restoreBaseQty, entryUnit).toFixed(4))
+            : 0;
+          if (safeAmount <= 0) {
+            nextEntries[index] = entry;
+            return;
+          }
+          entry.availableQty = Number(Math.min(maxQty, currentAvailableQty + safeAmount).toFixed(4));
         } else {
+          const amountInEntryUnit = fromBase(lot.takeBaseQty, entryUnit);
+          safeAmount = Number.isFinite(amountInEntryUnit) ? Number(amountInEntryUnit.toFixed(4)) : 0;
+          if (safeAmount <= 0) return;
+          entry.availableQty = Number(Math.max(0, currentAvailableQty - safeAmount).toFixed(4));
           entry.productionUsage.unshift({
             id: makeId('usage'),
             productionId,
@@ -567,18 +595,22 @@
             kilosUsed: Number((Number(lot.takeBaseQty || 0) / 1000).toFixed(4)),
             usedQty: Number(lot.takeQty || 0),
             usedUnit: normalizeValue(lot.unit || item.ingredientUnit || ''),
+            usedBaseQty: Number(lot.takeBaseQty || 0),
             lotNumber: normalizeValue(entry.lotNumber) || normalizeValue(entry.invoiceNumber) || entry.id,
             ingredientLot: normalizeValue(entry.lotNumber) || normalizeValue(entry.invoiceNumber) || entry.id,
             ingredientEntryId: entry.id,
             ingredientId: item.ingredientId
           });
         }
+        const nextAvailableKg = Number((toBase(entry.availableQty, entryUnit) / 1000).toFixed(4));
+        entry.availableKg = nextAvailableKg;
+        entry.lotStatus = entry.availableQty <= 0 ? 'consumido_en_produccion' : 'disponible';
         const moveType = mode === 'consume' ? 'consumo_produccion' : 'reversion_produccion';
         nextEntries[index] = updateEntryMovement(entry, {
           type: moveType,
           productionId,
           qty: Number(safeAmount.toFixed(4)),
-          qtyUnit: entry.unit || lot.unit,
+          qtyUnit: entryUnit,
           createdAt: nowTs(),
           productionDate,
           user: getCurrentUserLabel(),
@@ -2994,6 +3026,7 @@
     compactRecipeMovements(entry);
   };
 
+
   const renderDispatchHistoryTable = () => {
     if (!nodes.dispatchView || state.dispatchCreateMode) return;
     const rows = getDispatchRows();
@@ -4702,6 +4735,12 @@
           icon: 'warning',
           confirmButtonText: 'Entendido'
         });
+        const managersSection = nodes.editor.querySelector('[data-manager-check]')?.closest('.recipe-step-card');
+        if (managersSection) {
+          managersSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const firstManager = managersSection.querySelector('[data-manager-check]');
+          firstManager?.focus({ preventScroll: true });
+        }
         return;
       }
       const managerSummary = managers.map((token) => {
