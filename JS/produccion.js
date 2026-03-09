@@ -3414,10 +3414,10 @@
     const repartoNext = normalizeDispatchStore(deepClone(state.reparto));
     const previous = deepClone(repartoNext.registros[dispatchId]);
     delete repartoNext.registros[dispatchId];
+    state.reparto = repartoNext;
     (Array.isArray(dispatchRow?.products) ? dispatchRow.products : []).forEach((product) => {
       removeRecipeMovementsBySource({ recipeId: product.recipeId, sourceId: dispatchId, sourceCode: dispatchRow.code });
     });
-    state.reparto = repartoNext;
     await persistRepartoStore();
     await appendAudit({ action: 'reparto_eliminado', dispatchId, before: previous, after: null, reason: auth.value.reason });
     renderDispatchHistoryTable();
