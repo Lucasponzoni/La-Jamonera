@@ -507,6 +507,15 @@
     .slice(0, 2)
     .map((item) => item.charAt(0).toUpperCase())
     .join('');
+  const initialsFromPersonName = (value) => {
+    const words = normalizeValue(value)
+      .split(/\s+/)
+      .map((item) => item.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ]/g, ''))
+      .filter(Boolean);
+    if (words.length < 2) return '';
+    return words.slice(0, 2).map((item) => item.charAt(0).toUpperCase()).join('');
+  };
+  const getDispatchUserRole = (user) => normalizeValue(user?.cargo || user?.role || user?.puesto || user?.position || user?.jobTitle || 'Sin cargo');
   const renderUserAvatar = (user) => {
     const photoUrl = sanitizeImageUrl(user?.photoUrl);
     if (photoUrl) {
@@ -2405,6 +2414,10 @@
     dispatchDate: toIsoDate(),
     clientId: '',
     clientName: '',
+    clientAddress: '',
+    clientCity: '',
+    clientProvince: 'Santa Fe',
+    clientCountry: 'Argentina',
     lines: [{ id: makeId('dispatch_row'), recipeId: '', recipeSearch: '', qtyKg: '', allocations: [] }],
     comments: [],
     managers: [],
@@ -2421,21 +2434,29 @@
     const lineRows = draft.lines.map((line, idx) => {
       const alloc = allocateDispatchLots(line.recipeId, Number(line.qtyKg || 0));
       line.allocations = alloc.allocations;
+      const requestedKg = Number(line.qtyKg || 0);
+      const availableKg = Number(getProducedStockMeta(line.recipeId).available || 0);
       const stockStatus = normalizeValue(line.recipeId)
-        ? (alloc.hasStock
-          ? `<span class="produccion-dispatch-ok"><i class="fa-solid fa-circle-check"></i> Stock disponible (${alloc.fulfilledKg.toFixed(2)} kg)</span>`
-          : `<span class="produccion-dispatch-missing"><i class="fa-solid fa-circle-xmark"></i> Sin stock / faltan ${alloc.missingKg.toFixed(2)} kg</span>`)
+        ? (requestedKg <= 0
+          ? `<span class="produccion-dispatch-ok"><i class="fa-solid fa-circle-check"></i> <strong>Disponible:</strong> ${availableKg.toFixed(2)} kg</span>`
+          : (alloc.hasStock
+            ? `<span class="produccion-dispatch-ok"><i class="fa-solid fa-circle-check"></i> <strong>Disponible:</strong> ${availableKg.toFixed(2)} kg · <strong>Usás:</strong> ${requestedKg.toFixed(2)} kg</span>`
+            : (availableKg > 0.0001
+              ? `<span class="produccion-dispatch-missing"><i class="fa-solid fa-circle-exclamation"></i> <strong>Disponible:</strong> ${availableKg.toFixed(2)} kg · <strong>Faltan:</strong> ${alloc.missingKg.toFixed(2)} kg</span>`
+              : '<span class="produccion-dispatch-missing"><i class="fa-solid fa-circle-xmark"></i> <strong>Sin stock disponible.</strong></span>')))
         : '<span class="text-muted">Seleccionar producto.</span>';
       const lotsText = alloc.allocations.map((lot) => `${escapeHtml(lot.lotNumber)} · ${Number(lot.qtyKg || 0).toFixed(2)} kg`).join('<br>') || '-';
       const expiries = [...new Set(alloc.allocations.map((lot) => normalizeValue(lot.expiryDate)).filter(Boolean))];
       const expiryText = expiries.length === 1 ? escapeHtml(formatIsoEs(expiries[0])) : (expiries.length ? expiries.map((item) => escapeHtml(formatIsoEs(item))).join('<br>') : '-');
-      const recipeTitle = normalizeValue(line.recipeSearch || safeObject(state.recetas[line.recipeId]).title);
-      return `<tr><td><div class="recipe-ing-autocomplete" data-dispatch-product-wrap="${idx}"><div class="recipe-ing-input-wrap"><input type="search" class="form-control ios-input" data-dispatch-product-search="${idx}" placeholder="Seleccionar Producto" value="${escapeHtml(recipeTitle)}"></div><input type="hidden" data-dispatch-product-id="${idx}" value="${escapeHtml(line.recipeId)}"></div></td><td><input class="form-control ios-input" type="number" step="0.01" min="0" data-dispatch-qty="${idx}" value="${escapeHtml(line.qtyKg || '')}"></td><td>${stockStatus}</td><td>${lotsText}</td><td>${expiryText}</td><td><button type="button" class="btn family-manage-btn" data-dispatch-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+      const recipe = safeObject(state.recetas[line.recipeId]);
+      const recipeTitle = normalizeValue(line.recipeSearch || recipe.title);
+      const recipeImage = sanitizeImageUrl(recipe.imageUrl);
+      return `<tr><td><div class="recipe-ing-autocomplete" data-dispatch-product-wrap="${idx}"><div class="recipe-ing-input-wrap dispatch-product-input-wrap"><span class="recipe-inline-avatar-wrap">${recipeImage ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-dispatch-inline-thumb" src="${escapeHtml(recipeImage)}" alt="${escapeHtml(recipeTitle || 'Producto')}">` : '<span class="image-placeholder-circle-2"><i class="fa-solid fa-drumstick-bite"></i></span>'}</span><input type="search" class="form-control ios-input dispatch-product-search-input" data-dispatch-product-search="${idx}" placeholder="Seleccionar producto" value="${escapeHtml(recipeTitle)}"></div><input type="hidden" data-dispatch-product-id="${idx}" value="${escapeHtml(line.recipeId)}"></div></td><td><input class="form-control ios-input" type="number" step="0.01" min="0" data-dispatch-qty="${idx}" value="${escapeHtml(line.qtyKg || '')}"></td><td>${stockStatus}</td><td>${lotsText}</td><td>${expiryText}</td><td><button type="button" class="btn family-manage-btn" data-dispatch-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`;
     }).join('');
     nodes.dispatchView.innerHTML = `<div class="inventario-period-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Nuevo reparto</h6></div>
-    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">1</span> Datos generales</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Día de reparto</label><input id="dispatchDateInput" class="form-control ios-input" value="${escapeHtml(draft.dispatchDate)}"></div><div class="recipe-field recipe-field-half"><label class="form-label">Cliente</label><div class="inventario-provider-search-wrap"><input id="dispatchClientInput" class="form-control ios-input" placeholder="Buscar por nombre, DNI o CUIL" value="${escapeHtml(draft.clientName)}"><input type="hidden" id="dispatchClientId" value="${escapeHtml(draft.clientId)}"></div><small class="text-muted">Si no existe, seleccioná Nuevo Cliente.</small></div></div></section>
-    <section class="recipe-step-card step-block produccion-dispatch-create"><div class="d-flex align-items-center justify-content-between mb-2"><h6 class="step-title mb-0"><span class="recipe-step-number">2</span> Productos a repartir</h6><button type="button" class="btn ios-btn ios-btn-success recipe-table-action-btn" id="dispatchAddProductBtn"><i class="fa-solid fa-plus"></i><span>Producto</span></button></div><div class="table-responsive recipe-table-wrap dispatch-products-table"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Producto</th><th>Kilos</th><th>Stock</th><th>Lote</th><th>Vencimiento</th><th></th></tr></thead><tbody>${lineRows}</tbody></table></div></section>
-    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">3</span> Vehículo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">UTA / URA</label><small class="d-block text-muted mb-1">UTA / URA (Unidad de Transporte Alimentario)</small><select id="dispatchVehicleSelect" class="form-select ios-input"><option value="">Seleccionar UTA/URA</option>${Object.values(safeObject(state.reparto.vehicles)).map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === draft.vehicleId ? 'selected' : ''}>${escapeHtml(item.number || item.patent || item.id)}</option>`).join('')}<option value="add_vehicle">+ URA/UTA</option></select></div><div class="recipe-field recipe-field-half"><label class="form-label">Responsables</label><div class="produccion-managers-grid">${Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-check"><input type="checkbox" data-dispatch-manager="${escapeHtml(user.id)}" ${draft.managers.includes(user.id) ? 'checked' : ''}>${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(user.role || user.cargo || 'Sin cargo')}</small></span></label>`).join('')}</div></div></div><div class="mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchAddCommentBtn"><i class="fa-regular fa-comment-dots"></i><span>Comentarios</span></button><div id="dispatchCommentsWrap" class="mt-2">${draft.comments.map((comment, idx) => `<input class="form-control ios-input mt-2" data-dispatch-comment="${idx}" placeholder="Comentario visual" value="${escapeHtml(comment)}">`).join('')}</div></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-success" id="dispatchSaveBtn"><i class="fa-solid fa-floppy-disk"></i><span>Guardar reparto</span></button></div>`;
+    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">1</span> Datos generales</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Día de reparto</label><input id="dispatchDateInput" class="form-control ios-input" value="${escapeHtml(draft.dispatchDate)}"></div><div class="recipe-field recipe-field-half"><label class="form-label">Cliente</label><div class="inventario-provider-search-wrap"><input id="dispatchClientInput" class="form-control ios-input" placeholder="Buscar por nombre, DNI o CUIL" value="${escapeHtml(draft.clientName)}"><input type="hidden" id="dispatchClientId" value="${escapeHtml(draft.clientId)}"></div><small class="text-muted">Si no existe, seleccioná Nuevo Cliente.</small></div><div class="recipe-field recipe-field-half"><label class="form-label">Dirección de reparto</label><input id="dispatchClientAddressInput" class="form-control ios-input" placeholder="Dirección" value="${escapeHtml(draft.clientAddress || '')}" ${draft.clientId ? '' : 'disabled'}></div><div class="recipe-field recipe-field-half"><label class="form-label">Localidad</label><input id="dispatchClientCityInput" class="form-control ios-input" placeholder="Localidad" value="${escapeHtml(draft.clientCity || '')}" ${draft.clientId ? '' : 'disabled'}></div><div class="recipe-field recipe-field-half"><label class="form-label">Provincia</label><select id="dispatchClientProvinceInput" class="form-select ios-input" ${draft.clientId ? '' : 'disabled'}>${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${normalizeValue(draft.clientProvince || 'Santa Fe') === item ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select></div><div class="recipe-field recipe-field-half"><label class="form-label">País</label><input id="dispatchClientCountryInput" class="form-control ios-input" value="${escapeHtml(draft.clientCountry || 'Argentina')}" ${draft.clientId ? '' : 'disabled'}></div></div></section>
+    <section class="recipe-step-card step-block produccion-dispatch-create"><div class="d-flex align-items-center justify-content-between mb-2"><h6 class="step-title mb-0"><span class="recipe-step-number">2</span> Productos a repartir</h6></div><div class="table-responsive recipe-table-wrap dispatch-products-table"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Producto</th><th>Kilos</th><th>Stock</th><th>Lote</th><th>Vencimiento</th><th></th></tr></thead><tbody>${lineRows}</tbody></table></div><div class="toolbar-scroll-x dispatch-actions-row mt-2"><button type="button" class="btn ios-btn ios-btn-success recipe-table-action-btn" id="dispatchAddProductBtn"><i class="fa-solid fa-plus"></i><span>Producto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchAddCommentBtn"><i class="fa-regular fa-comment-dots"></i><span>Comentario</span></button></div><div id="dispatchCommentsWrap" class="mt-2">${draft.comments.map((comment, idx) => `<input class="form-control ios-input mt-2" data-dispatch-comment="${idx}" placeholder="Comentario visual" value="${escapeHtml(comment)}">`).join('')}</div></section>
+    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">3</span> Vehículo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">UTA / URA</label><small class="d-block text-muted mb-1">UTA / URA (Unidad de Transporte Alimentario)</small><select id="dispatchVehicleSelect" class="form-select ios-input"><option value="">Seleccionar UTA/URA</option>${Object.values(safeObject(state.reparto.vehicles)).map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === draft.vehicleId ? 'selected' : ''}>${escapeHtml(item.number || item.patent || item.id)}</option>`).join('')}<option value="add_vehicle">+ URA/UTA</option></select></div><div class="recipe-field recipe-field-half"><label class="form-label">Responsables</label><div class="produccion-managers-grid">${Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-check"><input type="checkbox" data-dispatch-manager="${escapeHtml(user.id)}" ${draft.managers.includes(user.id) ? 'checked' : ''}>${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(getDispatchUserRole(user))}</small></span></label>`).join('')}</div></div></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchSaveBtn"><i class="fa-solid fa-floppy-disk"></i><span>Guardar reparto</span></button></div>`;
     const dateInput = nodes.dispatchView.querySelector('#dispatchDateInput');
     if (window.flatpickr && dateInput) {
       window.flatpickr(dateInput, {
@@ -2447,7 +2468,7 @@
         disableMobile: true
       });
     }
-    prepareThumbLoaders('.js-produccion-user-photo');
+    prepareThumbLoaders('.js-produccion-user-photo, .js-dispatch-inline-thumb');
   };
   const persistRepartoStore = async () => {
     await window.dbLaJamoneraRest.write(REPARTO_PATH, state.reparto);
@@ -2456,7 +2477,7 @@
     const result = await openIosSwal({
       title: 'Nuevo cliente',
       customClass: { popup: 'dispatch-client-alert' },
-      html: `<div class="swal-stack-fields text-start"><div class="d-flex align-items-center gap-2 mb-2"><span id="dispatchClientInitialsPreview" class="user-avatar-thumb">${initialsFromName(seedName) || '<i class="bi bi-person-fill"></i>'}</span><small class="text-muted">Vista previa del cliente</small></div><input id="dispatchClientName" class="swal2-input ios-input" placeholder="Nombre y apellido / Razón social" value="${escapeHtml(seedName)}"><input id="dispatchClientDoc" class="swal2-input ios-input" placeholder="DNI o CUIL"><input id="dispatchClientAddress" class="swal2-input ios-input" placeholder="Dirección"><input id="dispatchClientCity" class="swal2-input ios-input" placeholder="Localidad"><select id="dispatchClientProvince" class="swal2-select ios-input">${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${item === 'Santa Fe' ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select><input id="dispatchClientCountry" class="swal2-input ios-input" value="Argentina" placeholder="País"></div>`,
+      html: `<div class="swal-stack-fields text-start"><div class="dispatch-client-preview"><span id="dispatchClientInitialsPreview" class="user-avatar-thumb dispatch-client-preview-avatar">${initialsFromPersonName(seedName) || '<i class=\"bi bi-person-fill\"></i>'}</span></div><input id="dispatchClientName" class="swal2-input ios-input" placeholder="Nombre y apellido / Razón social" value="${escapeHtml(seedName)}"><input id="dispatchClientDoc" class="swal2-input ios-input" placeholder="DNI o CUIL"><input id="dispatchClientAddress" class="swal2-input ios-input" placeholder="Dirección"><input id="dispatchClientCity" class="swal2-input ios-input" placeholder="Localidad"><select id="dispatchClientProvince" class="swal2-select ios-input">${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${item === 'Santa Fe' ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select><input id="dispatchClientCountry" class="swal2-input ios-input" value="Argentina" placeholder="País"></div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
@@ -2465,7 +2486,7 @@
         const preview = document.getElementById('dispatchClientInitialsPreview');
         const sync = () => {
           if (!preview) return;
-          const initials = initialsFromName(nameInput?.value || '');
+          const initials = initialsFromPersonName(nameInput?.value || '');
           preview.innerHTML = initials ? escapeHtml(initials) : '<i class="bi bi-person-fill"></i>';
         };
         nameInput?.addEventListener('input', sync);
@@ -2496,7 +2517,7 @@
     });
     if (!result.isConfirmed) return null;
     const id = makeId('dispatch_client');
-    const initials = result.value.name.split(' ').filter(Boolean).slice(0, 2).map((word) => word[0]).join('').toUpperCase() || 'U';
+    const initials = initialsFromPersonName(result.value.name) || 'U';
     state.reparto.clients[id] = { id, ...result.value, initials, createdAt: nowTs() };
     await persistRepartoStore();
     return state.reparto.clients[id];
@@ -2505,7 +2526,7 @@
     const result = await openIosSwal({
       title: 'Nueva UTA / URA',
       customClass: { popup: 'dispatch-vehicle-alert' },
-      html: '<div class="swal-stack-fields text-start"><input id="dispatchVehicleNumber" class="swal2-input ios-input" placeholder="Número de URA / UTA"><input id="dispatchVehiclePatent" class="swal2-input ios-input" placeholder="Patente"><input id="dispatchVehicleBrand" class="swal2-input ios-input" placeholder="Marca"><input id="dispatchVehicleType" class="swal2-input ios-input" value="Camión" placeholder="Tipo"><input id="dispatchVehicleExpiry" class="swal2-input ios-input" placeholder="Vencimiento"><label for="dispatchVehicleFile" class="inventario-upload-dropzone"><i class="fa-regular fa-file"></i><span>Adjunto: click o arrastrá</span></label><input id="dispatchVehicleFile" class="form-control image-file-input inventario-hidden-file-input" type="file" accept="image/*,application/pdf"></div>',
+      html: '<div class="swal-stack-fields text-start"><input id="dispatchVehicleNumber" class="swal2-input ios-input" placeholder="Número de URA / UTA"><input id="dispatchVehiclePatent" class="swal2-input ios-input" placeholder="Patente"><input id="dispatchVehicleBrand" class="swal2-input ios-input" placeholder="Marca"><input id="dispatchVehicleType" class="swal2-input ios-input" value="Camión" placeholder="Tipo"><input id="dispatchVehicleExpiry" class="swal2-input ios-input" placeholder="Vencimiento"><label for="dispatchVehicleFile" class="inventario-upload-dropzone"><i class="fa-regular fa-file"></i><span id="dispatchVehicleFileLabel">Adjunto: click o arrastrá</span></label><input id="dispatchVehicleFile" class="form-control image-file-input inventario-hidden-file-input" type="file" accept="image/*,application/pdf"></div>',
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
@@ -2513,9 +2534,14 @@
         const expiryInput = document.getElementById('dispatchVehicleExpiry');
         const fileInput = document.getElementById('dispatchVehicleFile');
         const dropzone = document.querySelector('label[for="dispatchVehicleFile"]');
+        const fileLabel = document.getElementById('dispatchVehicleFileLabel');
         if (window.flatpickr && expiryInput) {
           window.flatpickr(expiryInput, { locale: window.flatpickr.l10ns?.es || undefined, dateFormat: 'Y-m-d', altInput: true, altFormat: 'd/m/Y', allowInput: true, disableMobile: true });
         }
+        fileInput?.addEventListener('change', () => {
+          const file = fileInput.files?.[0];
+          if (fileLabel) fileLabel.textContent = file ? `Adjunto: ${file.name}` : 'Adjunto: click o arrastrá';
+        });
         dropzone?.addEventListener('dragover', (event) => {
           event.preventDefault();
           dropzone.classList.add('is-dragging');
@@ -4293,6 +4319,10 @@
       draft.clientId = normalizeValue(nodes.dispatchView.querySelector('#dispatchClientId')?.value);
       draft.clientName = normalizeValue(nodes.dispatchView.querySelector('#dispatchClientInput')?.value);
       draft.vehicleId = normalizeValue(nodes.dispatchView.querySelector('#dispatchVehicleSelect')?.value);
+      draft.clientAddress = normalizeValue(nodes.dispatchView.querySelector('#dispatchClientAddressInput')?.value);
+      draft.clientCity = normalizeValue(nodes.dispatchView.querySelector('#dispatchClientCityInput')?.value);
+      draft.clientProvince = normalizeValue(nodes.dispatchView.querySelector('#dispatchClientProvinceInput')?.value) || 'Santa Fe';
+      draft.clientCountry = normalizeValue(nodes.dispatchView.querySelector('#dispatchClientCountryInput')?.value) || 'Argentina';
       draft.managers = [...nodes.dispatchView.querySelectorAll('[data-dispatch-manager]:checked')].map((n) => n.value).filter(Boolean);
       draft.comments = [...nodes.dispatchView.querySelectorAll('[data-dispatch-comment]')].map((n) => normalizeValue(n.value)).filter(Boolean);
       if (!draft.clientId) {
@@ -4350,6 +4380,14 @@
         vehicleId: draft.vehicleId,
         managers: draft.managers,
         comments: draft.comments,
+        clientSnapshot: {
+          id: draft.clientId,
+          name: draft.clientName,
+          address: draft.clientAddress,
+          city: draft.clientCity,
+          province: draft.clientProvince,
+          country: draft.clientCountry
+        },
         products: normalizedProducts,
         createdAt: nowTs(),
         createdBy: getCurrentUserLabel()
@@ -4468,6 +4506,10 @@
       renderDispatchCreate(state.dispatchDraft);
       return;
     }
+    if (event.target.matches('#dispatchClientProvinceInput')) {
+      state.dispatchDraft.clientProvince = normalizeValue(event.target.value) || 'Santa Fe';
+      return;
+    }
     if (event.target.matches('#dispatchVehicleSelect') && event.target.value === 'add_vehicle') {
       const vehicle = await openCreateDispatchVehicle();
       if (vehicle) state.dispatchDraft.vehicleId = vehicle.id;
@@ -4512,6 +4554,10 @@
       const query = normalizeLower(clientInput.value);
       state.dispatchDraft.clientName = normalizeValue(clientInput.value);
       state.dispatchDraft.clientId = '';
+      state.dispatchDraft.clientAddress = '';
+      state.dispatchDraft.clientCity = '';
+      state.dispatchDraft.clientProvince = 'Santa Fe';
+      state.dispatchDraft.clientCountry = 'Argentina';
       nodes.dispatchView.querySelector('#dispatchClientId').value = '';
       const list = Object.values(safeObject(state.reparto.clients))
         .filter((item) => normalizeLower(item.name).includes(query) || normalizeLower(item.doc).includes(query))
@@ -4526,6 +4572,10 @@
           if (!client.id) return;
           state.dispatchDraft.clientId = client.id;
           state.dispatchDraft.clientName = client.name;
+          state.dispatchDraft.clientAddress = normalizeValue(client.address);
+          state.dispatchDraft.clientCity = normalizeValue(client.city);
+          state.dispatchDraft.clientProvince = normalizeValue(client.province) || 'Santa Fe';
+          state.dispatchDraft.clientCountry = normalizeValue(client.country) || 'Argentina';
           nodes.dispatchView.querySelector('#dispatchClientInput').value = client.name;
           nodes.dispatchView.querySelector('#dispatchClientId').value = client.id;
           closeDispatchSuggests();
@@ -4537,12 +4587,23 @@
           if (created) {
             state.dispatchDraft.clientId = created.id;
             state.dispatchDraft.clientName = created.name;
+            state.dispatchDraft.clientAddress = normalizeValue(created.address);
+            state.dispatchDraft.clientCity = normalizeValue(created.city);
+            state.dispatchDraft.clientProvince = normalizeValue(created.province) || 'Santa Fe';
+            state.dispatchDraft.clientCountry = normalizeValue(created.country) || 'Argentina';
             renderDispatchCreate(state.dispatchDraft);
           }
         }
       };
       return;
     }
+    const addressInput = event.target.closest('#dispatchClientAddressInput');
+    if (addressInput) { state.dispatchDraft.clientAddress = normalizeValue(addressInput.value); return; }
+    const cityInput = event.target.closest('#dispatchClientCityInput');
+    if (cityInput) { state.dispatchDraft.clientCity = normalizeValue(cityInput.value); return; }
+    const countryInput = event.target.closest('#dispatchClientCountryInput');
+    if (countryInput) { state.dispatchDraft.clientCountry = normalizeValue(countryInput.value); return; }
+
     const productInput = event.target.closest('[data-dispatch-product-search]');
     if (!productInput) return;
     const idx = Number(productInput.dataset.dispatchProductSearch);
@@ -4557,7 +4618,8 @@
       .filter((item) => normalizeLower(item.title).includes(query))
       .slice(0, 8)
       .map((item) => ({ ...item, meta: getProducedStockMeta(item.id) }));
-    suggest.innerHTML = `${recipes.map((item) => `<button type="button" class="recipe-suggest-item" data-dispatch-product-pick="${escapeHtml(item.id)}" data-dispatch-row="${idx}"><span class="recipe-suggest-avatar-wrap">${sanitizeImageUrl(item.imageUrl) ? `<img class="recipe-suggest-avatar" src="${escapeHtml(sanitizeImageUrl(item.imageUrl))}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2"><i class="fa-solid fa-drumstick-bite"></i></span>'}</span><span>${escapeHtml(capitalize(item.title || 'Receta'))}<br><small class="${item.meta.available > 0.0001 ? '' : 'text-danger'}">${item.meta.available > 0.0001 ? `Disponible: ${item.meta.available.toFixed(2)} kg` : 'Sin stock'}</small></span></button>`).join('')}`;
+    suggest.innerHTML = `${recipes.map((item) => `<button type="button" class="recipe-suggest-item" data-dispatch-product-pick="${escapeHtml(item.id)}" data-dispatch-row="${idx}"><span class="recipe-suggest-avatar-wrap">${sanitizeImageUrl(item.imageUrl) ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-suggest-avatar js-dispatch-suggest-thumb" src="${escapeHtml(sanitizeImageUrl(item.imageUrl))}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2"><i class="fa-solid fa-drumstick-bite"></i></span>'}</span><span><strong>${escapeHtml(capitalize(item.title || 'Receta'))}</strong><br><small class="${item.meta.available > 0.0001 ? 'produccion-dispatch-ok' : 'text-danger'}">${item.meta.available > 0.0001 ? `Disponible: ${item.meta.available.toFixed(2)} kg` : 'Sin stock disponible'}</small></span></button>`).join('')}`;
+    prepareThumbLoaders('.js-dispatch-suggest-thumb');
     suggest.onclick = (ev) => {
       const pick = ev.target.closest('[data-dispatch-product-pick]');
       if (!pick) return;

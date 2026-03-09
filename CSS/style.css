@@ -3949,6 +3949,8 @@ html.login-protected.auth-ok body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
 }
 
 .inventario-status-filters {
@@ -5466,6 +5468,8 @@ html.login-protected.auth-ok body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
 }
 
 .produccion-history-btn {
@@ -5481,6 +5485,12 @@ html.login-protected.auth-ok body {
   background: #eaf1ff;
   color: #2a4ea3;
   border: 1px solid #cdd9f6;
+  white-space: nowrap;
+}
+
+.produccion-dispatch-btn span,
+.produccion-history-btn span {
+  white-space: nowrap;
 }
 
 .produccion-dispatch-btn:hover {
@@ -5840,6 +5850,18 @@ html.login-protected.auth-ok body {
   text-align: left !important;
 }
 
+.dispatch-client-preview {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 12px;
+}
+
+.dispatch-client-preview-avatar {
+  width: 52px;
+  height: 52px;
+  font-size: 1rem;
+}
+
 .dispatch-client-alert :is(.swal2-input, .swal2-select, .swal2-file),
 .dispatch-vehicle-alert :is(.swal2-input, .swal2-select, .swal2-file) {
   margin: 0 0 10px !important;
@@ -5860,6 +5882,19 @@ html.login-protected.auth-ok body {
 .produccion-dispatch-create .dispatch-products-table,
 .produccion-dispatch-create .recipe-table-wrap {
   overflow: visible;
+}
+
+.dispatch-product-input-wrap {
+  grid-template-columns: 30px minmax(180px, 1fr);
+}
+
+.dispatch-product-search-input {
+  min-width: 180px;
+}
+
+.dispatch-actions-row {
+  justify-content: flex-start;
+  gap: 8px;
 }
 
 .produccion-dispatch-floating-suggest {
