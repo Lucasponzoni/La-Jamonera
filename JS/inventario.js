@@ -1813,7 +1813,7 @@
     const result = await openIosSwal({
       title: 'Planilla semanal · Productos',
       html: `<div class="inventario-weekly-bulk-wrap">
-        <p class="inventario-weekly-bulk-intro">Editá en masa la configuración de todos los productos. Las filas perecederas se marcan en verde y las no perecederas en azul.</p>
+        <p class="inventario-weekly-bulk-intro">Editá en masa la configuración de todos los productos.</p>
         <div class="input-group ios-input-group ingredientes-search-group inventario-weekly-search"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="inventarioWeeklySearchInput" type="search" class="form-control ios-input ingredientes-search-input" placeholder="Buscar producto"></div>
         <div class="inventario-weekly-bulk-list" id="inventarioWeeklyBulkList">${buildWeeklyConfigBulkRows()}</div>
         <div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" id="inventarioWeeklyPrevBtn"><i class="fa-solid fa-chevron-left"></i></button><span id="inventarioWeeklyPageText">Página 1</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" id="inventarioWeeklyNextBtn"><i class="fa-solid fa-chevron-right"></i></button></div>
@@ -4528,7 +4528,7 @@
     if (!record.hasEntries && !state.editorDraft.tokens.length) {
       await openIosSwal({
         title: 'Configuración requerida',
-        html: '<p>Antes del primer ingreso debés configurar el lote (paso 1).</p>',
+        html: '<p>Antes del primer ingreso debés configurar el LOTE.</p>',
         icon: 'warning',
         confirmButtonText: 'Entendido'
       });

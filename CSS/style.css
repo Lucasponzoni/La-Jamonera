@@ -120,9 +120,31 @@ html.login-protected.auth-ok body {
 .barra-vertical {
   display: inline-block;
   width: 1px;
-  background: #c2c5ce;
-  margin: 0 3px;
+  height: 40px;
+  margin: 0 10px;
   vertical-align: middle;
+  background: linear-gradient(
+    to bottom,
+    rgba(255,255,255,0.6),
+    rgba(150, 150, 150, 0.9),
+    rgba(255,255,255,0.6)
+  );
+  border-radius: 999px;
+}
+
+.barra-separadora {
+  display: inline-block;
+  width: 1px;
+  height: 40px;
+  margin: 0 10px;
+  vertical-align: middle;
+  background: linear-gradient(
+    to bottom,
+    rgba(255,255,255,0.6),
+    rgba(134, 134, 134, 0.9),
+    rgba(255,255,255,0.6)
+  );
+  border-radius: 999px;
 }
 
 .inventario-filter-helper {
@@ -4147,7 +4169,6 @@ html.login-protected.auth-ok body {
   display: flex;
   gap: 8px;
   align-items: center;
-  justify-content: flex-end;
   overflow: visible;
   white-space: nowrap;
   padding-bottom: 4px;
