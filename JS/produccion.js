@@ -4964,8 +4964,10 @@
       ? repartoStore
       : legacyRepartoStore;
     state.reparto = normalizeDispatchStore(nextRepartoStore);
-    if (!Object.keys(safeObject(state.reparto.productIndex)).length) {
-      rebuildProductIndexFromHistory();
+    const previousIndexSerialized = JSON.stringify(safeObject(state.reparto.productIndex));
+    normalizeProductIndexFromHistory();
+    const nextIndexSerialized = JSON.stringify(safeObject(state.reparto.productIndex));
+    if (previousIndexSerialized !== nextIndexSerialized) {
       await window.dbLaJamoneraRest.write(REPARTO_PATH, state.reparto);
     }
     if (!Object.keys(safeObject(repartoStore)).length && Object.keys(safeObject(legacyRepartoStore)).length) {
