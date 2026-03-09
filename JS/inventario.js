@@ -3213,6 +3213,7 @@
       invoiceNumber: '',
       provider: '',
       invoiceImageFile: null,
+      invoiceImageFiles: [],
       invoiceImageCountLabel: 'Sin archivos seleccionados',
       tokens: [...record.lotConfig.tokens],
       customAcronym: normalizeValue(record.lotConfig.customAcronym),
@@ -3435,7 +3436,9 @@
       state.editorDraft.customAcronym = nodes.editorForm.querySelector('#lotCustomAcronym')?.value || '';
       state.editorDraft.includeSeparator = Boolean(nodes.editorForm.querySelector('#lotIncludeSeparator')?.checked);
       state.editorDraft.separator = nodes.editorForm.querySelector('#lotSeparator')?.value || '-';
-      const files = [...(nodes.editorForm.querySelector('#inventoryInvoiceImage')?.files || [])];
+      const inputFiles = [...(nodes.editorForm.querySelector('#inventoryInvoiceImage')?.files || [])];
+      const files = inputFiles.length ? inputFiles : (Array.isArray(state.editorDraft.invoiceImageFiles) ? state.editorDraft.invoiceImageFiles : []);
+      state.editorDraft.invoiceImageFiles = files;
       state.editorDraft.invoiceImageCountLabel = files.length
         ? `${files.length} archivo${files.length === 1 ? '' : 's'} adjunto${files.length === 1 ? '' : 's'} para subir`
         : 'Sin archivos seleccionados';
@@ -4510,7 +4513,10 @@
     const invoiceNumber = normalizeValue(nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value);
     const providerValue = normalizeValue(nodes.editorForm.querySelector('#inventoryProvider')?.value);
     const provider = providerLabel(providerValue);
-    const files = [...(nodes.editorForm.querySelector('#inventoryInvoiceImage')?.files || [])];
+    const currentInputFiles = [...(nodes.editorForm.querySelector('#inventoryInvoiceImage')?.files || [])];
+    const files = currentInputFiles.length
+      ? currentInputFiles
+      : (Array.isArray(state.editorDraft.invoiceImageFiles) ? state.editorDraft.invoiceImageFiles : []);
     const record = getRecord(ingredientId);
     const bulkEntries = Array.isArray(state.editorDraft.bulkEntries) ? state.editorDraft.bulkEntries : [];
 
@@ -4746,6 +4752,7 @@
         invoiceNumber: '',
         provider: '',
         invoiceImageCountLabel: 'Sin archivos seleccionados',
+        invoiceImageFiles: [],
         noPerecedero: false,
         usoInternoEmpresa: false,
         expiryDate: addDaysToIso(getArgentinaIsoDate(), 5),
