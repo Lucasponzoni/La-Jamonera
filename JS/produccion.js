@@ -390,6 +390,7 @@
   };
   const deepClone = (value) => JSON.parse(JSON.stringify(value || {}));
   const getRegistrosList = () => Object.values(safeObject(state.registros));
+  const getRegistroById = (key) => safeObject(state.registros?.[key]);
   const getGeneralPassword = async () => {
     await window.laJamoneraReady;
     const value = await window.dbLaJamoneraRest.read('/passGeneral/pass');
@@ -2438,7 +2439,7 @@
         const traceBtn = normalizeValue(allocation.productionId)
           ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button>`
           : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
-        return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${Number(allocation.qtyKg || 0).toFixed(2)} kg</span></div></td><td>${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${Number(getRegistro(allocation.productionId)?.quantityKg || allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
+        return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${Number(allocation.qtyKg || 0).toFixed(2)} kg</span></div></td><td>${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${Number(getRegistroById(allocation.productionId)?.quantityKg || allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
       }).join('') : '';
       const locationParts = [client.address, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean);
       const customerDoc = normalizeValue(client.doc || client.dni || client.cuit || client.cuil || client.document || client.taxId);
@@ -4768,7 +4769,7 @@
                   const traceBtn = normalizeValue(allocation.productionId)
                     ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button>`
                     : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
-                  return `<tr class="inventario-trace-row"><td>${escapeHtml(item.recipeTitle || '-')} ${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${Number(getRegistro(allocation.productionId)?.quantityKg || allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
+                  return `<tr class="inventario-trace-row"><td>${escapeHtml(item.recipeTitle || '-')} ${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${Number(getRegistroById(allocation.productionId)?.quantityKg || allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
                 });
               }).join('') : '';
               const locationParts = [client.address, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean);
@@ -4812,7 +4813,7 @@
             }
             const traceBtn = expandedEvent.target.closest('[data-prod-trace]');
             if (traceBtn) {
-              const reg = getRegistro(traceBtn.dataset.prodTrace);
+              const reg = getRegistroById(traceBtn.dataset.prodTrace);
               if (reg) await openTraceability(reg);
             }
           });
@@ -4846,7 +4847,7 @@
     }
     const traceBtn = event.target.closest('[data-prod-trace]');
     if (traceBtn) {
-      const reg = getRegistro(traceBtn.dataset.prodTrace);
+      const reg = getRegistroById(traceBtn.dataset.prodTrace);
       if (reg) await openTraceability(reg);
       return;
     }
@@ -5113,7 +5114,7 @@
     }
     const traceBtn = event.target.closest('[data-prod-trace]');
     if (traceBtn) {
-      const reg = getRegistro(traceBtn.dataset.prodTrace);
+      const reg = getRegistroById(traceBtn.dataset.prodTrace);
       if (reg) await openTraceability(reg);
       return;
     }
