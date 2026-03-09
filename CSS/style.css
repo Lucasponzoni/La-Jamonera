@@ -5494,10 +5494,17 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-history-btn {
-  width: fit-content;
+  width: auto;
   max-width: none;
-  background: #ff8a2a;
-  color: #fff;
+  border: 0;
+  background: transparent;
+  color: #6f7ea6;
+  font-weight: 600;
+  font-size: 0.86rem;
+  padding: 0;
+  line-height: 1.1;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .produccion-dispatch-btn {
@@ -5521,8 +5528,32 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-history-btn:hover {
-  background: #ef7c1e;
-  color: #fff;
+  background: transparent;
+  color: #2d4578;
+}
+
+.swal2-popup.produccion-recipe-history-alert .swal2-html-container {
+  padding: 0 !important;
+  margin: 0 !important;
+  text-align: left !important;
+}
+
+.swal2-popup.produccion-recipe-history-alert .swal2-actions {
+  margin-top: 10px;
+}
+
+.produccion-recipe-history-modal {
+  padding: 10px 12px 0;
+}
+
+@media (max-width: 768px) {
+  .produccion-recipe-history-modal {
+    padding: 8px 8px 0;
+  }
+
+  .swal2-popup.produccion-recipe-history-alert {
+    width: 96vw !important;
+  }
 }
 
 .produccion-umbral-global-btn,

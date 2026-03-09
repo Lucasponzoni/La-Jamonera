@@ -2455,11 +2455,17 @@
     let page = 1;
     const PAGE_SIZE = 12;
     let query = '';
+    let range = '';
     const renderRows = (popup) => {
       if (!popup) return;
+      const { from, to } = parseDispatchRange(range);
       const filtered = rows.filter((item) => {
         const text = normalizeLower(`${item.label || ''} ${item.sourceCode || ''} ${item.sourceId || ''}`);
-        return !query || text.includes(normalizeLower(query));
+        if (query && !text.includes(normalizeLower(query))) return false;
+        const day = normalizeValue(item.date) || toIsoDate(item.at || 0);
+        if (from && day < from) return false;
+        if (to && day > to) return false;
+        return true;
       });
       const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
       page = Math.min(Math.max(1, page), pages);
@@ -2478,11 +2484,19 @@
     await openIosSwal({
       title: `Historial rápido · ${escapeHtml(capitalize(recipe.title || 'Producto'))}`,
       width: 'min(720px,96vw)',
-      html: `<div class="text-start"><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input type="search" class="form-control ios-input" data-recipe-history-search placeholder="Buscar por código"></div><div data-recipe-history-body class="dispatch-clients-manager-list" style="max-height:52vh;overflow:auto"></div><div class="d-flex align-items-center justify-content-between mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-prev><i class="fa-solid fa-chevron-left"></i></button><span data-recipe-history-pager>Página 1 de 1</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-next><i class="fa-solid fa-chevron-right"></i></button></div></div>`,
+      customClass: { popup: 'produccion-recipe-history-alert' },
+      html: `<div class="text-start produccion-recipe-history-modal"><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input type="search" class="form-control ios-input" data-recipe-history-search placeholder="Buscar por código"></div><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-regular fa-calendar"></i></span><input type="text" class="form-control ios-input" data-recipe-history-range placeholder="Filtrar rango (desde - hasta)" autocomplete="off"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-range-clear><i class="fa-solid fa-xmark"></i></button></div><div data-recipe-history-body class="dispatch-clients-manager-list" style="max-height:52vh;overflow:auto"></div><div class="d-flex align-items-center justify-content-between mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-prev><i class="fa-solid fa-chevron-left"></i></button><span data-recipe-history-pager>Página 1 de 1</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-next><i class="fa-solid fa-chevron-right"></i></button></div></div>`,
       confirmButtonText: 'Cerrar',
       didOpen: (popup) => {
+        const rangeInput = popup.querySelector('[data-recipe-history-range]');
         popup.querySelector('[data-recipe-history-search]')?.addEventListener('input', (event) => {
           query = event.target.value;
+          page = 1;
+          renderRows(popup);
+        });
+        popup.querySelector('[data-recipe-history-range-clear]')?.addEventListener('click', () => {
+          range = '';
+          if (rangeInput) rangeInput.value = '';
           page = 1;
           renderRows(popup);
         });
@@ -2494,6 +2508,24 @@
           page += 1;
           renderRows(popup);
         });
+        if (window.flatpickr && rangeInput) {
+          const locale = window.flatpickr.l10ns?.es || undefined;
+          disableCalendarSuggestions(rangeInput);
+          window.flatpickr(rangeInput, {
+            locale,
+            mode: 'range',
+            dateFormat: 'Y-m-d',
+            allowInput: false,
+            onClose: (_selectedDates, _dateStr, instance) => {
+              const from = instance.selectedDates[0] ? getArgentinaIsoDate(instance.selectedDates[0]) : '';
+              const to = instance.selectedDates[1] ? getArgentinaIsoDate(instance.selectedDates[1]) : from;
+              range = from && to ? `${from} a ${to}` : from;
+              rangeInput.value = range;
+              page = 1;
+              renderRows(popup);
+            }
+          });
+        }
         renderRows(popup);
       }
     });
