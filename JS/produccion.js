@@ -4839,8 +4839,10 @@
       openDispatch();
     }
   });
-  nodes.historyBackBtn?.addEventListener('click', () => {
+  nodes.historyBackBtn?.addEventListener('click', async () => {
+    await refreshData({ silent: true });
     setHistoryMode(false);
+    renderList();
   });
   nodes.historyApplyBtn?.addEventListener('click', () => {
     state.historySearch = normalizeValue(nodes.historySearch?.value);
@@ -5272,7 +5274,9 @@
         const canLeave = await confirmLeaveDispatchCreate();
         if (!canLeave) return;
       }
+      await refreshData({ silent: true });
       setDispatchMode(false);
+      renderList();
       return;
     }
     if (event.target.closest('#produccionDispatchNewBtn')) {
@@ -5283,6 +5287,7 @@
     if (event.target.closest('#produccionDispatchBackToListBtn')) {
       const canLeave = await confirmLeaveDispatchCreate();
       if (!canLeave) return;
+      await refreshData({ silent: true });
       renderDispatchMain();
       return;
     }

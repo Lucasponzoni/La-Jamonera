@@ -5459,7 +5459,18 @@
   nodes.weeklyConfigBtn?.addEventListener('click', openWeeklyConfigManager);
   nodes.createIngredientBtn?.addEventListener('click', openCreateIngredient);
   nodes.toolbarCreateBtn?.addEventListener('click', openCreateIngredient);
-  nodes.backBtn?.addEventListener('click', backToList);
+  nodes.backBtn?.addEventListener('click', async () => {
+    const prevSelected = state.selectedIngredientId;
+    await backToList();
+    if (state.view !== 'list') return;
+    await loadData();
+    renderFamilies();
+    renderStatusFilters();
+    if (prevSelected && state.ingredientes[prevSelected]) {
+      state.selectedIngredientId = prevSelected;
+    }
+    renderList();
+  });
   nodes.editorForm?.addEventListener('submit', saveEntry);
 
   nodes.openPeriodFilterBtn?.addEventListener('click', () => {
@@ -5467,8 +5478,12 @@
     renderGlobalPeriodTable();
     setPeriodMode(true);
   });
-  nodes.periodBackBtn?.addEventListener('click', () => {
+  nodes.periodBackBtn?.addEventListener('click', async () => {
+    await loadData();
     setPeriodMode(false);
+    renderFamilies();
+    renderStatusFilters();
+    renderList();
   });
   nodes.globalApplyBtn?.addEventListener('click', async () => {
     state.dashboardDateRange = normalizeValue(nodes.globalRange?.value);
