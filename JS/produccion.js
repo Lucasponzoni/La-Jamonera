@@ -2923,20 +2923,21 @@
   const rebuildProductIndexEntryMetrics = (entry) => {
     const target = safeObject(entry);
     const movements = Object.values(safeObject(target.movements));
-    let available = 0;
     const weekly = {};
+    let totalIn = 0;
+    let totalOut = 0;
     movements.forEach((move) => {
       const qtyKg = toFiniteKg(move.qtyKg);
       const type = normalizeValue(move.type) === 'egreso' ? 'egreso' : 'ingreso';
       if (type === 'egreso') {
-        available = toFiniteKg(Math.max(0, available - qtyKg));
+        totalOut += qtyKg;
         const week = getWeekStartIso(move.at || nowTs());
         weekly[week] = toFiniteKg(Number(weekly[week] || 0) + qtyKg);
-      } else {
-        available = toFiniteKg(available + qtyKg);
+        return;
       }
+      totalIn += qtyKg;
     });
-    target.availableKg = available;
+    target.availableKg = toFiniteKg(Math.max(0, totalIn - totalOut));
     target.weeklyOutByWeek = weekly;
     target.updatedAt = nowTs();
     return target;
@@ -3390,11 +3391,26 @@
     await appendAudit({ action: 'produccion_eliminada', productionId, before: previous, after: null, reason: auth.value.reason });
     state.inventario = restored;
     state.registros = registros;
-    renderHistoryTable();
+    await refreshAfterMutation();
+    await openIosSwal({ title: 'Producción eliminada', html: `<p>Se eliminó ${productionId} y se restauró el stock.</p>`, icon: 'success', confirmButtonText: 'Entendido' });
+  };
+
+
+  const refreshAfterMutation = async () => {
+    await refreshData({ silent: true });
+    if (state.historyMode) renderHistoryTable();
+    if (state.dispatchMode) {
+      if (state.dispatchCreateMode) {
+        renderDispatchCreate();
+      } else {
+        renderDispatchMain();
+      }
+    }
     if (state.view === 'editor' && state.activeRecipeId) {
       await renderEditor(state.activeRecipeId);
+    } else if (state.view === 'list') {
+      renderList();
     }
-    await openIosSwal({ title: 'Producción eliminada', html: `<p>Se eliminó ${productionId} y se restauró el stock.</p>`, icon: 'success', confirmButtonText: 'Entendido' });
   };
 
   const deleteDispatchRecord = async (dispatchRow) => {
@@ -3420,7 +3436,7 @@
     });
     await persistRepartoStore();
     await appendAudit({ action: 'reparto_eliminado', dispatchId, before: previous, after: null, reason: auth.value.reason });
-    renderDispatchHistoryTable();
+    await refreshAfterMutation();
     await openIosSwal({ title: 'Salida eliminada', html: `<p>Se eliminó ${escapeHtml(dispatchRow.code || dispatchId)} y se restauró el stock disponible.</p>`, icon: 'success' });
   };
 
@@ -4831,6 +4847,7 @@
     state.historyRange = normalizeValue(nodes.historyRange?.value);
     nodes.historyClearBtn?.classList.toggle('d-none', !(state.historyRange || state.historySearch));
     state.historyPage = 1;
+    nodes.historyClearBtn?.classList.toggle('d-none', !(state.historyRange || state.historySearch));
     renderHistoryTable();
   });
   nodes.historySearch?.addEventListener('input', () => {
