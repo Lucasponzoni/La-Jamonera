@@ -6979,6 +6979,17 @@ html.login-protected.auth-ok body {
   font-size: 0.82rem;
 }
 
+
+.produccion-dispatch-table-center th,
+.produccion-dispatch-table-center td {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.produccion-dispatch-table-center .inventario-trace-main {
+  justify-content: center;
+}
+
 .inventario-internal-meta {
   display: inline-flex;
   flex-direction: column;
