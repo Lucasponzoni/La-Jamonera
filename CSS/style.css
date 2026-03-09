@@ -3949,6 +3949,18 @@ html.login-protected.auth-ok body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+.inventario-toolbar-actions .ios-btn {
+  width: fit-content;
+  max-width: none;
+}
+
+.inventario-toolbar-actions .ios-btn {
+  width: fit-content;
+  max-width: none;
 }
 
 .inventario-toolbar-actions .ios-btn {
@@ -4487,6 +4499,7 @@ html.login-protected.auth-ok body {
 .inventario-weekly-bulk-intro {
   margin: 0 0 12px;
   color: #566684;
+  text-align: center;
 }
 
 .inventario-weekly-bulk-list {
@@ -5479,6 +5492,8 @@ html.login-protected.auth-ok body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
 }
 
 .produccion-history-btn {
