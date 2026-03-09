@@ -569,20 +569,26 @@
       if (Swal.isVisible()) Swal.close();
     }
   };
-  const openIosSwal = (options) => Swal.fire({
-    ...options,
-    returnFocus: false,
-    customClass: {
-      popup: `ios-alert ${options?.customClass?.popup || ''}`.trim(),
-      title: 'ios-alert-title',
-      htmlContainer: 'ios-alert-text',
-      confirmButton: 'ios-btn ios-btn-primary',
-      cancelButton: 'ios-btn ios-btn-secondary',
-      denyButton: 'ios-btn ios-btn-warning',
-      ...options.customClass
-    },
-    buttonsStyling: false
-  });
+  const openIosSwal = (options) => {
+    const incoming = safeObject(options?.customClass);
+    const joinClass = (base, extra) => [base, extra].filter(Boolean).join(' ').trim();
+    const reserved = new Set(['popup', 'title', 'htmlContainer', 'confirmButton', 'cancelButton', 'denyButton']);
+    const passthrough = Object.fromEntries(Object.entries(incoming).filter(([key]) => !reserved.has(key)));
+    return Swal.fire({
+      ...options,
+      returnFocus: false,
+      customClass: {
+        ...passthrough,
+        popup: joinClass('ios-alert', incoming.popup),
+        title: joinClass('ios-alert-title', incoming.title),
+        htmlContainer: joinClass('ios-alert-text', incoming.htmlContainer),
+        confirmButton: joinClass('ios-btn ios-btn-primary', incoming.confirmButton),
+        cancelButton: joinClass('ios-btn ios-btn-secondary', incoming.cancelButton),
+        denyButton: joinClass('ios-btn ios-btn-warning', incoming.denyButton)
+      },
+      buttonsStyling: false
+    });
+  };
   const exportStyledExcel = async ({ fileName, sheetName, headers, rows }) => {
     if (!window.ExcelJS) return;
     const wb = new window.ExcelJS.Workbook();
@@ -2398,7 +2404,7 @@
     dispatchDate: toIsoDate(),
     clientId: '',
     clientName: '',
-    lines: [{ id: makeId('dispatch_row'), recipeId: '', qtyKg: '', allocations: [] }],
+    lines: [{ id: makeId('dispatch_row'), recipeId: '', recipeSearch: '', qtyKg: '', allocations: [] }],
     comments: [],
     managers: [],
     vehicleId: ''
@@ -2411,15 +2417,26 @@
   const renderDispatchCreate = (draft) => {
     if (!nodes.dispatchView) return;
     state.dispatchCreateMode = true;
+    const client = getDispatchClient(draft.clientId);
+    const clientInitials = initialsFromName(draft.clientName || client.name || '');
     const lineRows = draft.lines.map((line, idx) => {
-      const recipe = safeObject(state.recetas[line.recipeId]);
       const alloc = allocateDispatchLots(line.recipeId, Number(line.qtyKg || 0));
       line.allocations = alloc.allocations;
-      const lotsText = alloc.allocations.map((lot) => `${escapeHtml(lot.lotNumber)} · ${Number(lot.qtyKg || 0).toFixed(2)} kg · VTO ${escapeHtml(formatIsoEs(lot.expiryDate || ''))}`).join('<br>');
-      const stockStatus = normalizeValue(line.recipeId) ? (alloc.hasStock ? `<span class="produccion-dispatch-ok"><i class="fa-solid fa-circle-check"></i> Stock disponible</span>` : `<span class="produccion-dispatch-missing"><i class="fa-solid fa-circle-xmark"></i> Faltan ${alloc.missingKg.toFixed(2)} kg</span>`) : '<span class="text-muted">Seleccioná receta.</span>';
-      return `<tr><td><div class="recipe-ing-autocomplete"><select class="form-select ios-input" data-dispatch-recipe="${idx}"><option value="">Seleccionar receta</option>${Object.values(state.recetas).map((item) => `<option value="${escapeHtml(item.id)}" ${normalizeValue(item.id) === normalizeValue(line.recipeId) ? 'selected' : ''}>${escapeHtml(capitalize(item.title || 'Receta'))}</option>`).join('')}</select></div></td><td><input class="form-control ios-input" type="number" step="0.01" min="0" data-dispatch-qty="${idx}" value="${escapeHtml(line.qtyKg || '')}"></td><td>${stockStatus}</td><td>${lotsText || '-'}</td><td>${recipe.productExpiryDate ? escapeHtml(formatIsoEs(recipe.productExpiryDate)) : '-'}</td><td><button type="button" class="btn family-manage-btn" data-dispatch-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+      const stockStatus = normalizeValue(line.recipeId)
+        ? (alloc.hasStock
+          ? `<span class="produccion-dispatch-ok"><i class="fa-solid fa-circle-check"></i> Stock disponible (${alloc.fulfilledKg.toFixed(2)} kg)</span>`
+          : `<span class="produccion-dispatch-missing"><i class="fa-solid fa-circle-xmark"></i> Sin stock / faltan ${alloc.missingKg.toFixed(2)} kg</span>`)
+        : '<span class="text-muted">Seleccionar producto.</span>';
+      const lotsText = alloc.allocations.map((lot) => `${escapeHtml(lot.lotNumber)} · ${Number(lot.qtyKg || 0).toFixed(2)} kg`).join('<br>') || '-';
+      const expiries = [...new Set(alloc.allocations.map((lot) => normalizeValue(lot.expiryDate)).filter(Boolean))];
+      const expiryText = expiries.length === 1 ? escapeHtml(formatIsoEs(expiries[0])) : (expiries.length ? expiries.map((item) => escapeHtml(formatIsoEs(item))).join('<br>') : '-');
+      const recipeTitle = normalizeValue(line.recipeSearch || safeObject(state.recetas[line.recipeId]).title);
+      return `<tr><td><div class="recipe-ing-autocomplete" data-dispatch-product-wrap="${idx}"><div class="recipe-ing-input-wrap"><input type="search" class="form-control ios-input" data-dispatch-product-search="${idx}" placeholder="Seleccionar Producto" value="${escapeHtml(recipeTitle)}"></div><input type="hidden" data-dispatch-product-id="${idx}" value="${escapeHtml(line.recipeId)}"></div></td><td><input class="form-control ios-input" type="number" step="0.01" min="0" data-dispatch-qty="${idx}" value="${escapeHtml(line.qtyKg || '')}"></td><td>${stockStatus}</td><td>${lotsText}</td><td>${expiryText}</td><td><button type="button" class="btn family-manage-btn" data-dispatch-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`;
     }).join('');
-    nodes.dispatchView.innerHTML = `<div class="inventario-period-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Nuevo reparto</h6></div><section class="recipe-step-card step-block"><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Día de reparto</label><input id="dispatchDateInput" class="form-control ios-input" value="${escapeHtml(draft.dispatchDate)}"></div><div class="recipe-field recipe-field-half"><label class="form-label">Cliente</label><div class="inventario-provider-search-wrap"><input id="dispatchClientInput" class="form-control ios-input" placeholder="Buscar cliente..." value="${escapeHtml(draft.clientName)}"><input type="hidden" id="dispatchClientId" value="${escapeHtml(draft.clientId)}"></div><small class="text-muted">Si no existe, seleccioná (+ nuevo cliente).</small></div></div></section><section class="recipe-step-card step-block"><div class="d-flex align-items-center justify-content-between mb-2"><h6 class="step-title mb-0"><span class="recipe-step-number">1</span> Tabla de productos a repartir</h6><button type="button" class="btn ios-btn ios-btn-success recipe-table-action-btn" id="dispatchAddProductBtn"><i class="fa-solid fa-plus"></i><span>Producto</span></button></div><div class="table-responsive recipe-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Producto</th><th>Kilos a repartir</th><th>Estado</th><th>Lotes automáticos</th><th>Vencimiento</th><th></th></tr></thead><tbody>${lineRows}</tbody></table></div></section><section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">2</span> Vehículo</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">UTA / URA</label><small class="d-block text-muted mb-1">UTA / URA (Unidad de Transporte Alimentario)</small><select id="dispatchVehicleSelect" class="form-select ios-input"><option value="">Seleccionar UTA/URA</option>${Object.values(safeObject(state.reparto.vehicles)).map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === draft.vehicleId ? 'selected' : ''}>${escapeHtml(item.number || item.patent || item.id)}</option>`).join('')}<option value="add_vehicle">(+ URA/UTA)</option></select></div><div class="recipe-field recipe-field-half"><label class="form-label">Responsables</label><div class="produccion-users-selection">${Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-item"><input type="checkbox" data-dispatch-manager="${escapeHtml(user.id)}" ${draft.managers.includes(user.id) ? 'checked' : ''}><span class="produccion-user-avatar">${sanitizeImageUrl(user.photoUrl) ? `<img src="${escapeHtml(sanitizeImageUrl(user.photoUrl))}" alt="${escapeHtml(user.fullName || user.email || user.id)}">` : '<i class="fa-solid fa-user"></i>'}</span><span class="produccion-user-copy"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(user.role || user.cargo || 'Sin cargo')}</small></span></label>`).join('')}</div></div></div><div class="mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchAddCommentBtn"><i class="fa-regular fa-comment-dots"></i><span>Comentarios</span></button><div id="dispatchCommentsWrap" class="mt-2">${draft.comments.map((comment, idx) => `<textarea class="form-control ios-input mt-2" data-dispatch-comment="${idx}" placeholder="Comentario">${escapeHtml(comment)}</textarea>`).join('')}</div></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-success" id="dispatchSaveBtn"><i class="fa-solid fa-floppy-disk"></i><span>Guardar reparto</span></button></div>`;
+    nodes.dispatchView.innerHTML = `<div class="inventario-period-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Nuevo reparto</h6></div>
+    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">1</span> Datos generales</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Día de reparto</label><input id="dispatchDateInput" class="form-control ios-input" value="${escapeHtml(draft.dispatchDate)}"></div><div class="recipe-field recipe-field-half"><label class="form-label">Cliente</label><div class="inventario-provider-search-wrap"><input id="dispatchClientInput" class="form-control ios-input" placeholder="Buscar por nombre, DNI o CUIL" value="${escapeHtml(draft.clientName)}"><input type="hidden" id="dispatchClientId" value="${escapeHtml(draft.clientId)}"></div><small class="text-muted">Si no existe, seleccioná Nuevo Cliente.</small></div></div><div class="d-flex align-items-center gap-2 mt-2"><span class="user-avatar-thumb">${clientInitials ? escapeHtml(clientInitials) : '<i class="bi bi-person-fill"></i>'}</span><small class="text-muted">Cliente seleccionado</small></div></section>
+    <section class="recipe-step-card step-block"><div class="d-flex align-items-center justify-content-between mb-2"><h6 class="step-title mb-0"><span class="recipe-step-number">2</span> Productos a repartir</h6><button type="button" class="btn ios-btn ios-btn-success recipe-table-action-btn" id="dispatchAddProductBtn"><i class="fa-solid fa-plus"></i><span>Producto</span></button></div><div class="table-responsive recipe-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Producto</th><th>Kilos</th><th>Stock</th><th>Lote</th><th>Vencimiento</th><th></th></tr></thead><tbody>${lineRows}</tbody></table></div></section>
+    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">3</span> Vehículo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">UTA / URA</label><small class="d-block text-muted mb-1">UTA / URA (Unidad de Transporte Alimentario)</small><select id="dispatchVehicleSelect" class="form-select ios-input"><option value="">Seleccionar UTA/URA</option>${Object.values(safeObject(state.reparto.vehicles)).map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === draft.vehicleId ? 'selected' : ''}>${escapeHtml(item.number || item.patent || item.id)}</option>`).join('')}<option value="add_vehicle">+ URA/UTA</option></select></div><div class="recipe-field recipe-field-half"><label class="form-label">Responsables</label><div class="produccion-managers-grid">${Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-check"><input type="checkbox" data-dispatch-manager="${escapeHtml(user.id)}" ${draft.managers.includes(user.id) ? 'checked' : ''}>${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(user.role || user.cargo || 'Sin cargo')}</small></span></label>`).join('')}</div></div></div><div class="mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchAddCommentBtn"><i class="fa-regular fa-comment-dots"></i><span>Comentarios</span></button><div id="dispatchCommentsWrap" class="mt-2">${draft.comments.map((comment, idx) => `<input class="form-control ios-input mt-2" data-dispatch-comment="${idx}" placeholder="Comentario visual" value="${escapeHtml(comment)}">`).join('')}</div></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-success" id="dispatchSaveBtn"><i class="fa-solid fa-floppy-disk"></i><span>Guardar reparto</span></button></div>`;
     const dateInput = nodes.dispatchView.querySelector('#dispatchDateInput');
     if (window.flatpickr && dateInput) {
       window.flatpickr(dateInput, {
@@ -2438,20 +2455,31 @@
   const openCreateDispatchClient = async (seedName = '') => {
     const result = await openIosSwal({
       title: 'Nuevo cliente',
+      customClass: { popup: 'dispatch-client-alert' },
       html: `<div class="swal-stack-fields text-start"><input id="dispatchClientName" class="swal2-input ios-input" placeholder="Nombre y apellido / Razón social" value="${escapeHtml(seedName)}"><input id="dispatchClientDoc" class="swal2-input ios-input" placeholder="DNI o CUIL"><input id="dispatchClientAddress" class="swal2-input ios-input" placeholder="Dirección"><input id="dispatchClientCity" class="swal2-input ios-input" placeholder="Localidad"><select id="dispatchClientProvince" class="swal2-select ios-input">${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${item === 'Santa Fe' ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select><input id="dispatchClientCountry" class="swal2-input ios-input" value="Argentina" placeholder="País"></div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
       preConfirm: () => {
         const name = normalizeValue(document.getElementById('dispatchClientName')?.value);
-        if (!name) return Swal.showValidationMessage('Completá el nombre o razón social.');
+        const doc = normalizeValue(document.getElementById('dispatchClientDoc')?.value);
+        const address = normalizeValue(document.getElementById('dispatchClientAddress')?.value);
+        const city = normalizeValue(document.getElementById('dispatchClientCity')?.value);
+        const province = normalizeValue(document.getElementById('dispatchClientProvince')?.value) || 'Santa Fe';
+        const country = normalizeValue(document.getElementById('dispatchClientCountry')?.value) || 'Argentina';
+        if (!name) return Swal.showValidationMessage('Completá nombre o razón social.');
+        if (!doc) return Swal.showValidationMessage('Completá DNI o CUIL.');
+        if (!address) return Swal.showValidationMessage('Completá dirección.');
+        if (!city) return Swal.showValidationMessage('Completá localidad.');
+        if (!province) return Swal.showValidationMessage('Completá provincia.');
+        if (!country) return Swal.showValidationMessage('Completá país.');
         return {
           name,
-          doc: normalizeValue(document.getElementById('dispatchClientDoc')?.value),
-          address: normalizeValue(document.getElementById('dispatchClientAddress')?.value),
-          city: normalizeValue(document.getElementById('dispatchClientCity')?.value),
-          province: normalizeValue(document.getElementById('dispatchClientProvince')?.value) || 'Santa Fe',
-          country: normalizeValue(document.getElementById('dispatchClientCountry')?.value) || 'Argentina'
+          doc,
+          address,
+          city,
+          province,
+          country
         };
       }
     });
@@ -2465,6 +2493,7 @@
   const openCreateDispatchVehicle = async () => {
     const result = await openIosSwal({
       title: 'Nueva UTA / URA',
+      customClass: { popup: 'dispatch-vehicle-alert' },
       html: '<div class="swal-stack-fields text-start"><input id="dispatchVehicleNumber" class="swal2-input ios-input" placeholder="Número de URA / UTA"><input id="dispatchVehiclePatent" class="swal2-input ios-input" placeholder="Patente"><input id="dispatchVehicleBrand" class="swal2-input ios-input" placeholder="Marca"><input id="dispatchVehicleType" class="swal2-input ios-input" value="Camión" placeholder="Tipo"><input id="dispatchVehicleExpiry" class="swal2-input ios-input" placeholder="Vencimiento"><label for="dispatchVehicleFile" class="inventario-upload-dropzone"><i class="fa-regular fa-file"></i><span>Adjunto: click o arrastrá</span></label><input id="dispatchVehicleFile" class="form-control image-file-input inventario-hidden-file-input" type="file" accept="image/*,application/pdf"></div>',
       showCancelButton: true,
       confirmButtonText: 'Guardar',
@@ -2477,8 +2506,17 @@
       },
       preConfirm: async () => {
         const number = normalizeValue(document.getElementById('dispatchVehicleNumber')?.value);
+        const patent = normalizeValue(document.getElementById('dispatchVehiclePatent')?.value);
+        const brand = normalizeValue(document.getElementById('dispatchVehicleBrand')?.value);
+        const type = normalizeValue(document.getElementById('dispatchVehicleType')?.value) || 'Camión';
+        const expiryDate = normalizeValue(document.getElementById('dispatchVehicleExpiry')?.value);
         if (!number) return Swal.showValidationMessage('Completá el número de URA/UTA.');
+        if (!patent) return Swal.showValidationMessage('Completá patente.');
+        if (!brand) return Swal.showValidationMessage('Completá marca.');
+        if (!type) return Swal.showValidationMessage('Completá tipo.');
+        if (!expiryDate) return Swal.showValidationMessage('Completá vencimiento.');
         const file = document.getElementById('dispatchVehicleFile')?.files?.[0] || null;
+        if (!file) return Swal.showValidationMessage('Adjuntá respaldo del vehículo.');
         let attachmentUrl = '';
         if (file) {
           const validType = [...ALLOWED_UPLOAD_TYPES, 'application/pdf'].includes(file.type);
@@ -2488,10 +2526,10 @@
         }
         return {
           number,
-          patent: normalizeValue(document.getElementById('dispatchVehiclePatent')?.value),
-          brand: normalizeValue(document.getElementById('dispatchVehicleBrand')?.value),
-          type: normalizeValue(document.getElementById('dispatchVehicleType')?.value) || 'Camión',
-          expiryDate: normalizeValue(document.getElementById('dispatchVehicleExpiry')?.value),
+          patent,
+          brand,
+          type,
+          expiryDate,
           attachmentUrl
         };
       }
@@ -4205,7 +4243,7 @@
       return;
     }
     if (event.target.closest('#dispatchAddProductBtn')) {
-      state.dispatchDraft.lines.push({ id: makeId('dispatch_row'), recipeId: '', qtyKg: '', allocations: [] });
+      state.dispatchDraft.lines.push({ id: makeId('dispatch_row'), recipeId: '', recipeSearch: '', qtyKg: '', allocations: [] });
       renderDispatchCreate(state.dispatchDraft);
       return;
     }
@@ -4213,7 +4251,7 @@
     if (removeLineBtn) {
       const idx = Number(removeLineBtn.dataset.dispatchRemove);
       state.dispatchDraft.lines = state.dispatchDraft.lines.filter((_, i) => i !== idx);
-      if (!state.dispatchDraft.lines.length) state.dispatchDraft.lines.push({ id: makeId('dispatch_row'), recipeId: '', qtyKg: '', allocations: [] });
+      if (!state.dispatchDraft.lines.length) state.dispatchDraft.lines.push({ id: makeId('dispatch_row'), recipeId: '', recipeSearch: '', qtyKg: '', allocations: [] });
       renderDispatchCreate(state.dispatchDraft);
       return;
     }
@@ -4234,6 +4272,14 @@
         await openIosSwal({ title: 'Cliente requerido', html: '<p>Seleccioná o creá un cliente.</p>', icon: 'warning' });
         return;
       }
+      if (!draft.vehicleId) {
+        await openIosSwal({ title: 'Vehículo requerido', html: '<p>Seleccioná o creá una UTA/URA.</p>', icon: 'warning' });
+        return;
+      }
+      if (!draft.managers.length) {
+        await openIosSwal({ title: 'Responsable requerido', html: '<p>Seleccioná al menos un responsable.</p>', icon: 'warning' });
+        return;
+      }
       if (!draft.lines.some((line) => normalizeValue(line.recipeId) && Number(line.qtyKg || 0) > 0)) {
         await openIosSwal({ title: 'Sin productos', html: '<p>Agregá al menos un producto para repartir.</p>', icon: 'warning' });
         return;
@@ -4242,7 +4288,14 @@
       for (const line of draft.lines) {
         const recipeId = normalizeValue(line.recipeId);
         const qtyKg = Number(line.qtyKg || 0);
-        if (!recipeId || qtyKg <= 0) continue;
+        if (!recipeId) {
+          await openIosSwal({ title: 'Producto incompleto', html: '<p>Seleccioná un producto válido en todas las filas cargadas.</p>', icon: 'warning' });
+          return;
+        }
+        if (qtyKg <= 0) {
+          await openIosSwal({ title: 'Cantidad inválida', html: '<p>Completá kilos mayores a 0 para cada fila.</p>', icon: 'warning' });
+          return;
+        }
         const recipe = safeObject(state.recetas[recipeId]);
         const allocated = allocateDispatchLots(recipeId, qtyKg);
         if (!allocated.hasStock) {
@@ -4297,11 +4350,42 @@
       return;
     }
     if (event.target.closest('#produccionDispatchPrintBtn')) {
-      window.print();
+      const rows = getDispatchRows();
+      if (!rows.length) {
+        await openIosSwal({ title: 'Sin datos', html: '<p>No hay repartos para imprimir.</p>', icon: 'info' });
+        return;
+      }
+      const win = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=900');
+      if (!win) return;
+      const body = rows.map((row) => {
+        const client = getDispatchClient(row.clientId);
+        const products = Array.isArray(row.products) ? row.products : [];
+        const kg = products.reduce((acc, p) => acc + Number(p.qtyKg || 0), 0);
+        return `<tr><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${products.length}</td><td>${kg.toFixed(2)} kg</td><td>${escapeHtml(row.code || '-')}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
+      }).join('');
+      win.document.write(`<html><head><title>Repartos</title><style>body{font-family:Inter,Arial,sans-serif;padding:12px;color:#223457}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d5def2;padding:8px}th{background:#eef3ff}</style></head><body><h2>Salida de Productos</h2><table><thead><tr><th>Fecha</th><th>Productos</th><th>Cantidad</th><th>Código</th><th>Cliente</th></tr></thead><tbody>${body}</tbody></table></body></html>`);
+      win.document.close();
+      win.focus();
+      win.print();
       return;
     }
     if (event.target.closest('#produccionDispatchExcelBtn')) {
-      await openIosSwal({ title: 'Próximamente', html: '<p>La exportación Excel de repartos se habilitará en la siguiente iteración.</p>', icon: 'info' });
+      const rows = getDispatchRows().map((row) => {
+        const client = getDispatchClient(row.clientId);
+        const products = Array.isArray(row.products) ? row.products : [];
+        return {
+          Fecha: formatDateTime(row.createdAt),
+          Cliente: client.name || '-',
+          Código: row.code || '-',
+          Productos: products.length,
+          'Cantidad (kg)': products.reduce((acc, p) => acc + Number(p.qtyKg || 0), 0).toFixed(2)
+        };
+      });
+      if (!rows.length) {
+        await openIosSwal({ title: 'Sin datos', html: '<p>No hay repartos para exportar.</p>', icon: 'info' });
+        return;
+      }
+      await exportStyledExcel({ fileName: `repartos_periodo_${Date.now()}.xlsx`, sheetName: 'Repartos', headers: ['Fecha', 'Cliente', 'Código', 'Productos', 'Cantidad (kg)'], rows });
       return;
     }
     if (event.target.closest('#produccionDispatchMassBtn')) {
@@ -4309,7 +4393,18 @@
       return;
     }
     if (event.target.closest('#produccionDispatchExpandBtn')) {
-      await openIosSwal({ title: 'Vista ampliada', html: '<p>Podés usar la impresión para ampliar la visualización del período.</p>', icon: 'info' });
+      const rows = getDispatchRows();
+      await openIosSwal({
+        title: 'Salida de Productos · Vista ampliada',
+        width: '92vw',
+        html: `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha</th><th>Productos</th><th>Cantidad</th><th>Código</th><th>Cliente</th></tr></thead><tbody>${rows.map((row) => {
+          const client = getDispatchClient(row.clientId);
+          const products = Array.isArray(row.products) ? row.products : [];
+          const kg = products.reduce((acc, p) => acc + Number(p.qtyKg || 0), 0);
+          return `<tr><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${products.length}</td><td>${kg.toFixed(2)} kg</td><td>${escapeHtml(row.code || '-')}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
+        }).join('') || '<tr><td colspan="5">Sin datos.</td></tr>'}</tbody></table></div>`,
+        confirmButtonText: 'Cerrar'
+      });
       return;
     }
     const collapseBtn = event.target.closest('[data-dispatch-collapse]');
@@ -4339,13 +4434,6 @@
 
   nodes.dispatchView?.addEventListener('change', async (event) => {
     if (!state.dispatchCreateMode || !state.dispatchDraft) return;
-    const recipeInput = event.target.closest('[data-dispatch-recipe]');
-    if (recipeInput) {
-      const idx = Number(recipeInput.dataset.dispatchRecipe);
-      state.dispatchDraft.lines[idx].recipeId = normalizeValue(recipeInput.value);
-      renderDispatchCreate(state.dispatchDraft);
-      return;
-    }
     const qtyInput = event.target.closest('[data-dispatch-qty]');
     if (qtyInput) {
       const idx = Number(qtyInput.dataset.dispatchQty);
@@ -4364,41 +4452,75 @@
   nodes.dispatchView?.addEventListener('input', async (event) => {
     if (!state.dispatchCreateMode || !state.dispatchDraft) return;
     const clientInput = event.target.closest('#dispatchClientInput');
-    if (!clientInput) return;
-    const query = normalizeLower(clientInput.value);
-    state.dispatchDraft.clientName = normalizeValue(clientInput.value);
-    state.dispatchDraft.clientId = '';
-    nodes.dispatchView.querySelector('#dispatchClientId').value = '';
-    const list = Object.values(safeObject(state.reparto.clients)).filter((item) => normalizeLower(item.name).includes(query)).slice(0, 8);
-    let suggest = nodes.dispatchView.querySelector('#dispatchClientSuggest');
-    if (!suggest) {
-      suggest = document.createElement('div');
-      suggest.id = 'dispatchClientSuggest';
-      suggest.className = 'recipe-suggest-floating';
-      clientInput.closest('.inventario-provider-search-wrap')?.appendChild(suggest);
-    }
-    suggest.innerHTML = `${list.map((item) => `<button type="button" class="recipe-suggest-item" data-dispatch-client-pick="${escapeHtml(item.id)}"><span class="image-placeholder-circle-2">${escapeHtml(item.initials || 'U')}</span><span>${escapeHtml(item.name)}</span></button>`).join('')}${query ? `<button type="button" class="recipe-suggest-item recipe-suggest-create" data-dispatch-client-create="1"><i class="fa-solid fa-plus"></i><span>(+ nuevo cliente)</span></button>` : ''}`;
-    suggest.onclick = async (ev) => {
-      const pick = ev.target.closest('[data-dispatch-client-pick]');
-      if (pick) {
-        const client = getDispatchClient(pick.dataset.dispatchClientPick);
-        if (!client.id) return;
-        state.dispatchDraft.clientId = client.id;
-        state.dispatchDraft.clientName = client.name;
-        nodes.dispatchView.querySelector('#dispatchClientInput').value = client.name;
-        nodes.dispatchView.querySelector('#dispatchClientId').value = client.id;
-        suggest.remove();
-        return;
+    if (clientInput) {
+      const query = normalizeLower(clientInput.value);
+      state.dispatchDraft.clientName = normalizeValue(clientInput.value);
+      state.dispatchDraft.clientId = '';
+      nodes.dispatchView.querySelector('#dispatchClientId').value = '';
+      const list = Object.values(safeObject(state.reparto.clients))
+        .filter((item) => normalizeLower(item.name).includes(query) || normalizeLower(item.doc).includes(query))
+        .slice(0, 8);
+      let suggest = nodes.dispatchView.querySelector('#dispatchClientSuggest');
+      if (!suggest) {
+        suggest = document.createElement('div');
+        suggest.id = 'dispatchClientSuggest';
+        suggest.className = 'recipe-suggest-floating';
+        clientInput.closest('.inventario-provider-search-wrap')?.appendChild(suggest);
       }
-      if (ev.target.closest('[data-dispatch-client-create]')) {
-        const created = await openCreateDispatchClient(normalizeValue(clientInput.value));
-        if (created) {
-          state.dispatchDraft.clientId = created.id;
-          state.dispatchDraft.clientName = created.name;
+      suggest.innerHTML = `${list.map((item) => `<button type="button" class="recipe-suggest-item" data-dispatch-client-pick="${escapeHtml(item.id)}"><span class="user-avatar-thumb" style="width:28px;height:28px;font-size:.75rem">${escapeHtml(item.initials || 'U')}</span><span>${escapeHtml(item.name)}<br><small>${escapeHtml(item.doc || '-')}</small></span></button>`).join('')}${query ? `<button type="button" class="recipe-suggest-item recipe-suggest-create" data-dispatch-client-create="1"><i class="fa-solid fa-plus"></i><span>Nuevo Cliente</span></button>` : ''}`;
+      suggest.onclick = async (ev) => {
+        const pick = ev.target.closest('[data-dispatch-client-pick]');
+        if (pick) {
+          const client = getDispatchClient(pick.dataset.dispatchClientPick);
+          if (!client.id) return;
+          state.dispatchDraft.clientId = client.id;
+          state.dispatchDraft.clientName = client.name;
+          nodes.dispatchView.querySelector('#dispatchClientInput').value = client.name;
+          nodes.dispatchView.querySelector('#dispatchClientId').value = client.id;
+          suggest.remove();
           renderDispatchCreate(state.dispatchDraft);
+          return;
         }
-      }
-    };
+        if (ev.target.closest('[data-dispatch-client-create]')) {
+          const created = await openCreateDispatchClient(normalizeValue(clientInput.value));
+          if (created) {
+            state.dispatchDraft.clientId = created.id;
+            state.dispatchDraft.clientName = created.name;
+            renderDispatchCreate(state.dispatchDraft);
+          }
+        }
+      };
+      return;
+    }
+    const productInput = event.target.closest('[data-dispatch-product-search]');
+    if (!productInput) return;
+    const idx = Number(productInput.dataset.dispatchProductSearch);
+    const query = normalizeLower(productInput.value);
+    state.dispatchDraft.lines[idx].recipeSearch = normalizeValue(productInput.value);
+    state.dispatchDraft.lines[idx].recipeId = '';
+    const wrap = nodes.dispatchView.querySelector(`[data-dispatch-product-wrap="${idx}"]`);
+    let suggest = wrap?.querySelector('.recipe-suggest-floating');
+    if (!suggest && wrap) {
+      suggest = document.createElement('div');
+      suggest.className = 'recipe-suggest-floating';
+      wrap.appendChild(suggest);
+    }
+    const recipes = Object.values(state.recetas)
+      .filter((item) => normalizeLower(item.title).includes(query))
+      .slice(0, 8)
+      .map((item) => ({ ...item, meta: getProducedStockMeta(item.id) }));
+    if (suggest) {
+      suggest.innerHTML = `${recipes.map((item) => `<button type="button" class="recipe-suggest-item" data-dispatch-product-pick="${escapeHtml(item.id)}" data-dispatch-row="${idx}"><span class="recipe-suggest-avatar-wrap">${sanitizeImageUrl(item.imageUrl) ? `<img class="recipe-suggest-avatar" src="${escapeHtml(sanitizeImageUrl(item.imageUrl))}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2"><i class="fa-solid fa-drumstick-bite"></i></span>'}</span><span>${escapeHtml(capitalize(item.title || 'Receta'))}<br><small class="${item.meta.available > 0.0001 ? '' : 'text-danger'}">${item.meta.available > 0.0001 ? `Disponible: ${item.meta.available.toFixed(2)} kg` : 'Sin stock'}</small></span></button>`).join('')}`;
+      suggest.onclick = (ev) => {
+        const pick = ev.target.closest('[data-dispatch-product-pick]');
+        if (!pick) return;
+        const rowIdx = Number(pick.dataset.dispatchRow);
+        const rec = safeObject(state.recetas[pick.dataset.dispatchProductPick]);
+        state.dispatchDraft.lines[rowIdx].recipeId = normalizeValue(rec.id);
+        state.dispatchDraft.lines[rowIdx].recipeSearch = normalizeValue(capitalize(rec.title || ''));
+        renderDispatchCreate(state.dispatchDraft);
+      };
+    }
   });
 
   nodes.historyTableWrap?.addEventListener('click', async (event) => {
