@@ -682,8 +682,11 @@
     const joinClass = (base, extra) => [base, extra].filter(Boolean).join(' ').trim();
     const reserved = new Set(['popup', 'title', 'htmlContainer', 'confirmButton', 'cancelButton', 'denyButton']);
     const passthrough = Object.fromEntries(Object.entries(incoming).filter(([key]) => !reserved.has(key)));
+    const activeBootstrapModal = document.querySelector('.modal.show .modal-content');
+    const target = options?.target || activeBootstrapModal || document.body;
     return Swal.fire({
       ...options,
+      target,
       returnFocus: false,
       customClass: {
         ...passthrough,
@@ -3184,6 +3187,7 @@
   const askForNewDispatchLocality = async (seed = '') => {
     const result = await openIosSwal({
       title: 'Nueva localidad',
+      customClass: { popup: 'dispatch-locality-alert' },
       input: 'text',
       inputValue: normalizeValue(seed),
       inputPlaceholder: 'Ej: Granadero Baigorria',

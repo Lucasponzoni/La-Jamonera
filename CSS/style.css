@@ -6016,6 +6016,19 @@ html.login-protected.auth-ok body {
   text-align: left !important;
 }
 
+
+.dispatch-locality-alert .swal2-html-container {
+  padding: 0 !important;
+}
+
+.dispatch-locality-alert :is(.swal2-input, .swal2-select) {
+  margin: 8px 0 10px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+
+
 .dispatch-client-alert .swal-stack-fields {
   display: grid;
   gap: 10px;
