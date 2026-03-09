@@ -640,7 +640,7 @@
         return acc;
       }, {});
       const row = ws.addRow(rowData);
-      const tone = data.__tone === 'trace' ? 'FFFFECEF' : data.__tone === 'resolution_yellow' ? 'FFFFF6D9' : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
+      const tone = data.__tone === 'trace' ? 'FFFFECEF' : data.__tone === 'internal_use' ? 'FFFFF2E3' : data.__tone === 'resolution_yellow' ? 'FFFFF6D9' : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
       row.eachCell((cell) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tone } };
         cell.border = {
@@ -652,6 +652,8 @@
         cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
         if (data.__tone === 'trace') {
           cell.font = { color: { argb: 'FFB42338' }, bold: true };
+        } else if (data.__tone === 'internal_use') {
+          cell.font = { color: { argb: 'FF9A4F0A' }, bold: true };
         }
       });
     });
@@ -4717,22 +4719,56 @@
       return;
     }
     if (event.target.closest('#produccionDispatchExcelBtn')) {
-      const rows = getDispatchRows().map((row) => {
-        const client = getDispatchClient(row.clientId);
+      const headers = ['Fecha', 'Productos', 'Cantidad (kg)', 'Vencimiento', 'Número de reparto', 'Cliente'];
+      const rows = getDispatchRows().flatMap((row) => {
         const products = Array.isArray(row.products) ? row.products : [];
-        return {
+        const kgTotal = products.reduce((acc, item) => acc + Number(item.qtyKg || 0), 0);
+        const expiries = [...new Set(products.flatMap((item) => (Array.isArray(item.allocations) ? item.allocations : []).map((l) => normalizeValue(l.expiryDate)).filter(Boolean)))];
+        const expiryLabel = expiries.length === 1 ? formatIsoEs(expiries[0]) : (expiries.length ? 'Ver detalle' : '-');
+        const client = { ...getDispatchClient(row.clientId), ...safeObject(row.clientSnapshot) };
+        const summary = {
           Fecha: formatDateTime(row.createdAt),
-          Cliente: client.name || '-',
-          Código: row.code || '-',
-          Productos: products.length,
-          'Cantidad (kg)': products.reduce((acc, p) => acc + Number(p.qtyKg || 0), 0).toFixed(2)
+          Productos: `${products.length} ${products.length === 1 ? 'producto' : 'productos'}`,
+          'Cantidad (kg)': `${kgTotal.toFixed(2)} kg`,
+          Vencimiento: expiryLabel,
+          'Número de reparto': row.code || row.id || '-',
+          Cliente: client.name || '-'
         };
+        const detailRows = products.flatMap((item) => {
+          const allocations = Array.isArray(item.allocations) && item.allocations.length
+            ? item.allocations
+            : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
+          return allocations.map((allocation) => ({
+            Fecha: `↳ ${item.recipeTitle || '-'}`,
+            Productos: `${Number(allocation.qtyKg || 0).toFixed(2)} kg`,
+            'Cantidad (kg)': `${escapeHtml(allocation.lotNumber || '-')} · ${Number(getRegistroById(allocation.productionId)?.quantityKg || allocation.qtyKg || 0).toFixed(2)} kg`,
+            Vencimiento: formatIsoEs(allocation.expiryDate || '') || '-',
+            'Número de reparto': normalizeValue(allocation.productionId) ? 'Trazabilidad' : 'Sin trazabilidad',
+            Cliente: client.name || '-',
+            __tone: 'trace'
+          }));
+        });
+        const locationParts = [client.address, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean);
+        const customerDoc = normalizeValue(client.doc || client.dni || client.cuit || client.cuil || client.document || client.taxId);
+        const locationMeta = [normalizeValue(client.name), customerDoc].filter(Boolean).join(' · ');
+        const locationRow = (locationParts.length || locationMeta)
+          ? [{
+            Fecha: `↳ 🏠 ${locationParts.join(' • ')}`,
+            Productos: '',
+            'Cantidad (kg)': '',
+            Vencimiento: '',
+            'Número de reparto': locationMeta,
+            Cliente: '',
+            __tone: 'internal_use'
+          }]
+          : [];
+        return [summary, ...detailRows, ...locationRow];
       });
       if (!rows.length) {
         await openIosSwal({ title: 'Sin datos', html: '<p>No hay repartos para exportar.</p>', icon: 'info' });
         return;
       }
-      await exportStyledExcel({ fileName: `repartos_periodo_${Date.now()}.xlsx`, sheetName: 'Repartos', headers: ['Fecha', 'Cliente', 'Código', 'Productos', 'Cantidad (kg)'], rows });
+      await exportStyledExcel({ fileName: `repartos_periodo_${Date.now()}.xlsx`, sheetName: 'Repartos', headers, rows });
       return;
     }
     if (event.target.closest('#produccionDispatchMassBtn')) {
@@ -4769,7 +4805,8 @@
                   const traceBtn = normalizeValue(allocation.productionId)
                     ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button>`
                     : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
-                  return `<tr class="inventario-trace-row"><td>${escapeHtml(item.recipeTitle || '-')} ${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${Number(getRegistroById(allocation.productionId)?.quantityKg || allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
+                  const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
+                  return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${Number(allocation.qtyKg || 0).toFixed(2)} kg</span></div></td><td>${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${Number(getRegistroById(allocation.productionId)?.quantityKg || allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
                 });
               }).join('') : '';
               const locationParts = [client.address, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean);
@@ -4781,6 +4818,7 @@
               return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${products.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-collapse="${escapeHtml(row.id)}"><i class="fa-solid ${collapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(formatDateTime(row.createdAt))}</span></div></td><td>${products.length === 1 ? '1 producto' : `${products.length} productos`}</td><td>${kg.toFixed(2)} kg</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || '-')}</td><td>${escapeHtml(client.name || '-')}</td></tr>${detail}${locationRow}`;
             }).join('') || '<tr><td colspan="6">Sin datos.</td></tr>';
             popup.querySelector('#dispatchExpandedWrap').innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-collapse-all ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-expand-all ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0 produccion-dispatch-table-center"><thead><tr><th>Fecha de reparto</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th></tr></thead><tbody>${body}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+            prepareThumbLoaders('.js-produccion-thumb');
           };
           renderExpanded();
           popup.addEventListener('click', async (expandedEvent) => {
