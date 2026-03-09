@@ -5603,6 +5603,20 @@ html.login-protected.auth-ok body {
   font-weight: 700;
 }
 
+.produccion-recipe-history-modal .movement-qty-in {
+  color: #17803d;
+  font-weight: 700;
+}
+
+.produccion-recipe-history-modal .movement-qty-out {
+  color: #b4232a;
+  font-weight: 700;
+}
+
+.produccion-recipe-history-modal .inventario-table-compact-wrap.is-expanded {
+  max-height: 70vh;
+}
+
 @media (max-width: 768px) {
   .produccion-recipe-history-modal {
     padding: 8px 8px 0;

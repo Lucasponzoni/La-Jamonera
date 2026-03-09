@@ -732,13 +732,13 @@
         if (data.__tone === 'trace' || data.__tone === 'internal_use') {
           cell.font = { color: { argb: 'FF1F2A44' }, bold: false };
         } else if (data.__tone === 'movement_in') {
-          if (colHeader === 'Tipo' || colHeader === 'Código') {
+          if (colHeader === 'Tipo' || colHeader === 'Código' || colHeader === 'Cantidad (kg)') {
             cell.font = { color: { argb: 'FF17803D' }, bold: true };
           } else {
             cell.font = { color: { argb: 'FF111827' }, bold: false };
           }
         } else if (data.__tone === 'movement_out') {
-          if (colHeader === 'Tipo' || colHeader === 'Código') {
+          if (colHeader === 'Tipo' || colHeader === 'Código' || colHeader === 'Cantidad (kg)') {
             cell.font = { color: { argb: 'FFB4232A' }, bold: true };
           } else {
             cell.font = { color: { argb: 'FF111827' }, bold: false };
@@ -2469,6 +2469,7 @@
     const PAGE_SIZE = 12;
     let query = '';
     let range = '';
+    let expanded = false;
     const getFilteredRows = () => {
       const { from, to } = parseDispatchRange(range);
       return rows.filter((item) => {
@@ -2484,7 +2485,10 @@
       const isOut = item.type === 'egreso';
       const toneClass = isOut ? 'movement-type-out' : 'movement-type-in';
       const codeClass = isOut ? 'movement-code-out' : 'movement-code-in';
-      return `<tr class="${isOut ? 'is-movement-out' : 'is-movement-in'}"><td><span class="${toneClass}"><i class="fa-solid ${isOut ? 'fa-arrow-down' : 'fa-arrow-up'}"></i> ${isOut ? 'Egreso' : 'Ingreso'}</span></td><td>${escapeHtml(formatDateTime(item.at || 0))}</td><td><span class="${codeClass}">${escapeHtml(item.sourceCode || item.sourceId || '-')}</span></td><td>${Number(item.qtyKg || 0).toFixed(2)} kg</td></tr>`;
+      const qty = Number(item.qtyKg || 0);
+      const qtyClass = isOut ? 'movement-qty-out' : 'movement-qty-in';
+      const qtyLabel = `${isOut ? '-' : '+'}${Math.abs(qty).toFixed(2)} kg`;
+      return `<tr class="${isOut ? 'is-movement-out' : 'is-movement-in'}"><td><span class="${toneClass}"><i class="fa-solid ${isOut ? 'fa-arrow-down' : 'fa-arrow-up'}"></i> ${isOut ? 'Egreso' : 'Ingreso'}</span></td><td>${escapeHtml(formatDateTime(item.at || 0))}</td><td><span class="${codeClass}">${escapeHtml(item.sourceCode || item.sourceId || '-')}</span></td><td><span class="${qtyClass}">${qtyLabel}</span></td></tr>`;
     }).join('');
     const exportRecipeHistoryExcel = async () => {
       const filtered = getFilteredRows();
@@ -2497,7 +2501,7 @@
         Tipo: `${item.type === 'egreso' ? '↓' : '↑'} ${item.type === 'egreso' ? 'Egreso' : 'Ingreso'}`,
         'Fecha y hora': formatDateTime(item.at || 0),
         Código: item.sourceCode || item.sourceId || '-',
-        'Cantidad (kg)': Number(item.qtyKg || 0).toFixed(2),
+        'Cantidad (kg)': `${item.type === 'egreso' ? '-' : '+'}${Math.abs(Number(item.qtyKg || 0)).toFixed(2)}`,
         __tone: item.type === 'egreso' ? 'movement_out' : 'movement_in'
       }));
       await exportStyledExcel({
@@ -2531,16 +2535,6 @@
       win.focus();
       win.print();
     };
-    const expandRecipeHistoryTable = async () => {
-      const filtered = getFilteredRows();
-      await openIosSwal({
-        title: `Historial ampliado · ${escapeHtml(capitalize(recipe.title || 'Producto'))}`,
-        width: '96vw',
-        html: `<div class="table-responsive inventario-global-table inventario-table-compact-wrap" style="max-height:70vh;overflow:auto"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Tipo</th><th>Fecha y hora</th><th>Código</th><th>Cantidad</th></tr></thead><tbody>${buildRowsHtml(filtered) || '<tr><td colspan="4" class="text-center">Sin movimientos para el filtro.</td></tr>'}</tbody></table></div>`,
-        confirmButtonText: 'Cerrar',
-        customClass: { popup: 'produccion-recipe-history-alert' }
-      });
-    };
     const renderRows = (popup) => {
       if (!popup) return;
       const filtered = getFilteredRows();
@@ -2551,7 +2545,9 @@
       const pager = popup.querySelector('[data-recipe-history-pager]');
       const prevBtn = popup.querySelector('[data-recipe-history-prev]');
       const nextBtn = popup.querySelector('[data-recipe-history-next]');
-      if (body) body.innerHTML = `<div class="table-responsive inventario-global-table inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Tipo</th><th>Fecha y hora</th><th>Código</th><th>Cantidad</th></tr></thead><tbody>${buildRowsHtml(pageRows) || '<tr><td colspan="4" class="text-center">Sin movimientos para el filtro.</td></tr>'}</tbody></table></div>`;
+      const expandBtn = popup.querySelector('[data-recipe-history-expand]');
+      if (expandBtn) expandBtn.querySelector('span').textContent = expanded ? 'Contraer tabla' : 'Ampliar tabla';
+      if (body) body.innerHTML = `<div class="table-responsive inventario-global-table inventario-table-compact-wrap ${expanded ? 'is-expanded' : ''}"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Tipo</th><th>Fecha y hora</th><th>Código</th><th>Cantidad</th></tr></thead><tbody>${buildRowsHtml(pageRows) || '<tr><td colspan="4" class="text-center">Sin movimientos para el filtro.</td></tr>'}</tbody></table></div>`;
       if (pager) pager.textContent = `Página ${page} de ${pages}`;
       if (prevBtn) prevBtn.disabled = page <= 1;
       if (nextBtn) nextBtn.disabled = page >= pages;
@@ -2583,7 +2579,10 @@
           page += 1;
           renderRows(popup);
         });
-        popup.querySelector('[data-recipe-history-expand]')?.addEventListener('click', async () => expandRecipeHistoryTable());
+        popup.querySelector('[data-recipe-history-expand]')?.addEventListener('click', () => {
+          expanded = !expanded;
+          renderRows(popup);
+        });
         popup.querySelector('[data-recipe-history-excel]')?.addEventListener('click', async () => exportRecipeHistoryExcel());
         popup.querySelector('[data-recipe-history-print]')?.addEventListener('click', async () => printRecipeHistory());
         if (window.flatpickr && rangeInput) {
