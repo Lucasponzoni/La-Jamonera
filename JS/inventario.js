@@ -507,6 +507,31 @@
     });
   };
 
+  const runWithBackSpinner = async (task, title = 'Actualizando vista...') => {
+    Swal.fire({
+      title,
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Actualizando" class="meta-spinner-login"></div>',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      backdrop: 'rgba(20, 28, 48, 0.35)',
+      customClass: {
+        popup: 'ios-alert produccion-loading-alert',
+        title: 'ios-alert-title',
+        htmlContainer: 'ios-alert-text'
+      },
+      didOpen: () => {
+        const container = Swal.getContainer();
+        if (container) container.style.backdropFilter = 'blur(4px)';
+      }
+    });
+    try {
+      await task();
+    } finally {
+      Swal.close();
+    }
+  };
+
   const setStateView = (view) => {
     state.view = view;
     nodes.loading.classList.toggle('d-none', view !== 'loading');
@@ -5459,7 +5484,20 @@
   nodes.weeklyConfigBtn?.addEventListener('click', openWeeklyConfigManager);
   nodes.createIngredientBtn?.addEventListener('click', openCreateIngredient);
   nodes.toolbarCreateBtn?.addEventListener('click', openCreateIngredient);
-  nodes.backBtn?.addEventListener('click', backToList);
+  nodes.backBtn?.addEventListener('click', async () => {
+    const prevSelected = state.selectedIngredientId;
+    await runWithBackSpinner(async () => {
+      await backToList();
+      if (state.view !== 'list') return;
+      await loadData();
+      renderFamilies();
+      renderStatusFilters();
+      if (prevSelected && state.ingredientes[prevSelected]) {
+        state.selectedIngredientId = prevSelected;
+      }
+      renderList();
+    }, 'Volviendo...');
+  });
   nodes.editorForm?.addEventListener('submit', saveEntry);
 
   nodes.openPeriodFilterBtn?.addEventListener('click', () => {
@@ -5467,8 +5505,14 @@
     renderGlobalPeriodTable();
     setPeriodMode(true);
   });
-  nodes.periodBackBtn?.addEventListener('click', () => {
-    setPeriodMode(false);
+  nodes.periodBackBtn?.addEventListener('click', async () => {
+    await runWithBackSpinner(async () => {
+      await loadData();
+      setPeriodMode(false);
+      renderFamilies();
+      renderStatusFilters();
+      renderList();
+    }, 'Volviendo...');
   });
   nodes.globalApplyBtn?.addEventListener('click', async () => {
     state.dashboardDateRange = normalizeValue(nodes.globalRange?.value);
