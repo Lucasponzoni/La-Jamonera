@@ -3949,6 +3949,8 @@ html.login-protected.auth-ok body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
 }
 
 .inventario-status-filters {
@@ -5474,6 +5476,8 @@ html.login-protected.auth-ok body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
 }
 
 .produccion-history-btn {
