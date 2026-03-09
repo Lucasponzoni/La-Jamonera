@@ -9019,14 +9019,28 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   gap: 16px;
 }
 
+.weekly-sheet-block {
+  border: 1px solid #d9e0f3;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+
 .weekly-sheet-block h3,
 .weekly-sheet-block h4 {
   text-align: center;
   margin: 0;
   font-weight: 800;
+  padding: 8px 10px;
 }
 
-.weekly-sheet-block h4 { margin-bottom: 8px; }
+.weekly-sheet-block h3 {
+  border-bottom: 1px solid #d9e0f3;
+}
+
+.weekly-sheet-block h4 {
+  border-bottom: 1px solid #d9e0f3;
+}
 
 .weekly-sheet-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 
@@ -9038,9 +9052,11 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   vertical-align: middle;
 }
 
-.weekly-sheet-table th { background: #0b4f92; color: #fff; }
-.weekly-sheet-table td.is-missing { background: #ffe8ea; }
-.weekly-sheet-table td.is-ok { background: #eef2f7; }
+.weekly-sheet-table th.th-cat { background: #1d7a2f; color: #fff; }
+.weekly-sheet-table th.th-day { background: #136fb6; color: #fff; }
+.weekly-sheet-table th.th-total { background: #08266e; color: #fff; }
+.weekly-sheet-table td.is-missing { background: #f4dfe2; }
+.weekly-sheet-table td.is-ok { background: #e9edf2; }
 .weekly-sheet-table .weekly-total { font-weight: 800; }
 
 .weekly-product-cell {
