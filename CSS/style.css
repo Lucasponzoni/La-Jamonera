@@ -5499,6 +5499,14 @@ html.login-protected.auth-ok body {
   background: #ff8a2a;
   border: 1px solid #f2c08a;
   color: #fff;
+  transition: all 0.25s ease;
+}
+
+.produccion-history-btn:hover {
+  background: #ef8025;
+  border-color: #ffc78f;
+  color: white;
+  cursor: pointer;
 }
 
 .produccion-dispatch-btn {
@@ -5519,10 +5527,6 @@ html.login-protected.auth-ok body {
   background: #166ad0;
   color: #fff;
   border: 1px solid #1f7ae8;
-}
-
-.produccion-history-btn:hover {
-  color: inherit;
 }
 
 .produccion-product-history-btn {
