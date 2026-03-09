@@ -2293,6 +2293,7 @@
   };
   let openDispatch = () => {};
   let setDispatchMode = () => {};
+  let refreshData = async () => { throw new Error('No se pudo inicializar módulo de repartos.'); };
   {
     const repartoController = window.initProduccionRepartos?.({
       state, nodes,
@@ -2306,6 +2307,7 @@
     }) || {};
     openDispatch = repartoController.openDispatch || openDispatch;
     setDispatchMode = repartoController.setDispatchMode || setDispatchMode;
+    refreshData = repartoController.refreshData || refreshData;
   }
 
   nodes.historyTableWrap?.addEventListener('click', async (event) => {

@@ -2367,6 +2367,6 @@
     closeDispatchSuggests();
   });
 
-    return { openDispatch, setDispatchMode };
+    return { openDispatch, setDispatchMode, refreshData };
   };
 })();
