@@ -5916,6 +5916,14 @@ html.login-protected.auth-ok body {
   background: #fff;
 }
 
+.dispatch-product-table-icon {
+  font-size: 1rem;
+}
+
+.dispatch-product-placeholder {
+  color: #6f46eb;
+}
+
 .dispatch-product-search-input {
   min-width: 180px;
 }
@@ -5975,6 +5983,29 @@ html.login-protected.auth-ok body {
 
 .dispatch-stock-block {
   display: block;
+}
+
+.dispatch-uses-label {
+  color: #2f5fb0;
+}
+
+.dispatch-uses-value {
+  color: #7a5ce6;
+  font-weight: 800;
+}
+
+.dispatch-lot-cell {
+  font-weight: 700;
+  font-size: 0.84rem;
+  color: #34486f;
+}
+
+.dispatch-managers-search-group {
+  margin-bottom: 10px;
+}
+
+.dispatch-managers-search-group .ingredientes-search-icon {
+  border-right: 1px solid #d2d8e8;
 }
 
 .dispatch-vehicle-actions {
@@ -6037,6 +6068,7 @@ html.login-protected.auth-ok body {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 6px;
+  min-height: 30px;
 }
 
 .dispatch-client-helper {
@@ -6052,19 +6084,6 @@ html.login-protected.auth-ok body {
   font-size: 0.78rem;
   max-width: none;
   width: auto;
-}
-
-.dispatch-actions-row #dispatchAddProductBtn {
-  margin-left: auto;
-}
-
-.dispatch-comment-row td {
-  background: #fff8ef !important;
-}
-
-.dispatch-comment-row input {
-  border-color: #f3d6ae;
-  background: #fff;
 }
 
 .produccion-dispatch-floating-suggest {
