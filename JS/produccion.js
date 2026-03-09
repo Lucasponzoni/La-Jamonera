@@ -2546,12 +2546,12 @@
       const prevBtn = popup.querySelector('[data-recipe-history-prev]');
       const nextBtn = popup.querySelector('[data-recipe-history-next]');
       const expandBtn = popup.querySelector('[data-recipe-history-expand]');
-      popup.classList.toggle('is-expanded', expanded);
-      if (window.Swal?.update) {
-        window.Swal.update({ width: expanded ? '96vw' : 'min(720px,96vw)' });
-      }
-      if (expandBtn) expandBtn.querySelector('span').textContent = expanded ? 'Contraer tabla' : 'Ampliar tabla';
       if (body) body.innerHTML = `<div class="table-responsive inventario-global-table inventario-table-compact-wrap ${expanded ? 'is-expanded' : ''}"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Tipo</th><th>Fecha y hora</th><th>Código</th><th>Cantidad</th></tr></thead><tbody>${buildRowsHtml(pageRows) || '<tr><td colspan="4" class="text-center">Sin movimientos para el filtro.</td></tr>'}</tbody></table></div>`;
+      popup.classList.toggle('is-expanded', expanded);
+      if (expandBtn) {
+        const label = expandBtn.querySelector('span');
+        if (label) label.textContent = expanded ? 'Contraer tabla' : 'Ampliar tabla';
+      }
       if (pager) pager.textContent = `Página ${page} de ${pages}`;
       if (prevBtn) prevBtn.disabled = page <= 1;
       if (nextBtn) nextBtn.disabled = page >= pages;
