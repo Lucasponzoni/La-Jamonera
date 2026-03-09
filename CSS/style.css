@@ -5494,7 +5494,7 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-history-btn {
-  width: fit-content;
+  width: auto;
   max-width: none;
 }
 
