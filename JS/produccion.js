@@ -4983,6 +4983,7 @@
     state.historyRange = normalizeValue(nodes.historyRange?.value);
     nodes.historyClearBtn?.classList.toggle('d-none', !(state.historyRange || state.historySearch));
     state.historyPage = 1;
+    nodes.historyClearBtn?.classList.toggle('d-none', !(state.historyRange || state.historySearch));
     renderHistoryTable();
   });
   nodes.historySearch?.addEventListener('input', () => {
