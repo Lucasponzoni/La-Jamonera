@@ -59,7 +59,7 @@
 
   const MONOGRAPHY_ROW_TYPE = 'monography';
   const FOOD_CATEGORIES_AR = {
-    'carnes-y-derivados': ['Carnes frescas', 'Chacinados embutidos', 'Fiambres y cocidos', 'Menudencias y vísceras'],
+    'carnes-y-derivados': ['Carnes frescas', 'Chacinados embutidos', 'Fiambres y cocidos', 'Menudencias y vísceras', 'Elaboraciones propias'],
     lacteos: ['Leche fluida', 'Leche en polvo', 'Quesos', 'Yogures y fermentados'],
     panificados: ['Panificados', 'Pastas frescas', 'Galletitas y crackers'],
     conservas: ['Conservas vegetales', 'Conservas cárnicas', 'Semiconservas'],
@@ -137,6 +137,26 @@
     },
     buttonsStyling: false
   });
+  };
+
+  const runWithModalSpinner = async (task) => {
+    const modalContent = recetasModal?.querySelector('.modal-content');
+    if (!modalContent) {
+      await task();
+      return;
+    }
+    if (window.getComputedStyle(modalContent).position === 'static') {
+      modalContent.style.position = 'relative';
+    }
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-local-overlay';
+    overlay.innerHTML = '<div class="modal-local-overlay-card"><img src="./IMG/Meta-ai-logo.webp" alt="Actualizando" class="meta-spinner-login"></div>';
+    modalContent.appendChild(overlay);
+    try {
+      await task();
+    } finally {
+      overlay.remove();
+    }
   };
 
   const showState = (key) => {
@@ -2752,7 +2772,7 @@
     if (state.editorDirty) {
       const leave = await openIosSwal({
         title: '¿Abandonar cambios?',
-        html: '<p>Tenés cambios sin guardar en la receta.</p><p class="mb-0">Si volvés atrás, se perderán.</p>',
+        html: '<p>Tenés cambios sin guardar en la receta.</p><p class=\"mb-0\">Si volvés atrás, se perderán.</p>',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Abandonar',
@@ -2760,11 +2780,14 @@
       });
       if (!leave.isConfirmed) return;
     }
-    state.activeRecipeId = '';
-    state.editor = null;
-    state.resumeEditor = null;
-    state.editorDirty = false;
-    setView(getRecetasArray().length ? 'list' : 'empty');
+    await runWithModalSpinner(async () => {
+      await loadRecetas();
+      state.activeRecipeId = '';
+      state.editor = null;
+      state.resumeEditor = null;
+      state.editorDirty = false;
+      setView(getRecetasArray().length ? 'list' : 'empty');
+    });
   });
 
   recetasModal.addEventListener('hide.bs.modal', () => {
