@@ -718,7 +718,7 @@
         return acc;
       }, {});
       const row = ws.addRow(rowData);
-      const tone = data.__tone === 'trace' ? 'FFFFECEF' : data.__tone === 'internal_use' ? 'FFFFF2E3' : data.__tone === 'resolution_yellow' ? 'FFFFF6D9' : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
+      const tone = data.__tone === 'trace' ? 'FFFFECEF' : data.__tone === 'movement_in' ? 'FF111111' : data.__tone === 'internal_use' ? 'FFFFF2E3' : data.__tone === 'resolution_yellow' ? 'FFFFF6D9' : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
       row.eachCell((cell) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tone } };
         cell.border = {
@@ -730,6 +730,8 @@
         cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
         if (data.__tone === 'trace' || data.__tone === 'internal_use') {
           cell.font = { color: { argb: 'FF1F2A44' }, bold: false };
+        } else if (data.__tone === 'movement_in') {
+          cell.font = { color: { argb: 'FFF8FAFC' }, bold: false };
         }
       });
       if (data.__mergeAcross) {
@@ -2456,10 +2458,9 @@
     const PAGE_SIZE = 12;
     let query = '';
     let range = '';
-    const renderRows = (popup) => {
-      if (!popup) return;
+    const getFilteredRows = () => {
       const { from, to } = parseDispatchRange(range);
-      const filtered = rows.filter((item) => {
+      return rows.filter((item) => {
         const text = normalizeLower(`${item.label || ''} ${item.sourceCode || ''} ${item.sourceId || ''}`);
         if (query && !text.includes(normalizeLower(query))) return false;
         const day = normalizeValue(item.date) || toIsoDate(item.at || 0);
@@ -2467,6 +2468,57 @@
         if (to && day > to) return false;
         return true;
       });
+    };
+    const buildRowsHtml = (items) => items.map((item) => {
+      const isOut = item.type === 'egreso';
+      return `<tr class="${isOut ? 'is-movement-out' : 'is-movement-in'}"><td><span class="${isOut ? 'text-danger' : 'text-body'}"><i class="fa-solid ${isOut ? 'fa-arrow-down' : 'fa-arrow-up'}"></i> ${isOut ? 'Egreso' : 'Ingreso'}</span></td><td>${escapeHtml(formatDateTime(item.at || 0))}</td><td>${escapeHtml(item.sourceCode || item.sourceId || '-')}</td><td>${Number(item.qtyKg || 0).toFixed(2)} kg</td></tr>`;
+    }).join('');
+    const exportRecipeHistoryExcel = async () => {
+      const filtered = getFilteredRows();
+      if (!filtered.length) {
+        await openIosSwal({ title: 'Sin datos', html: '<p>No hay movimientos para exportar.</p>', icon: 'info' });
+        return;
+      }
+      const headers = ['Tipo', 'Fecha y hora', 'Código', 'Cantidad (kg)'];
+      const rowsExcel = filtered.map((item) => ({
+        Tipo: `${item.type === 'egreso' ? '↓' : '↑'} ${item.type === 'egreso' ? 'Egreso' : 'Ingreso'}`,
+        'Fecha y hora': formatDateTime(item.at || 0),
+        Código: item.sourceCode || item.sourceId || '-',
+        'Cantidad (kg)': Number(item.qtyKg || 0).toFixed(2),
+        __tone: item.type === 'egreso' ? 'trace' : 'movement_in'
+      }));
+      await exportStyledExcel({
+        fileName: `historial_producto_${normalizeValue(recipe.title || 'producto').replace(/\s+/g, '_').toLowerCase()}_${Date.now()}.xlsx`,
+        sheetName: 'Historial Producto',
+        headers,
+        rows: rowsExcel
+      });
+    };
+    const printRecipeHistory = async () => {
+      const filtered = getFilteredRows();
+      const title = `Historial producto ${capitalize(recipe.title || 'Producto')}`;
+      const bodyRows = buildRowsHtml(filtered) || '<tr><td colspan="4" class="text-center">Sin movimientos para el filtro.</td></tr>';
+      const win = window.open('', '_blank', 'noopener,noreferrer');
+      if (!win) return;
+      win.document.write(`<html><head><title>${escapeHtml(title)}</title><style>body{font-family:Inter,Arial,sans-serif;padding:12px;color:#223457}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d5def2;padding:8px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.03em}.is-movement-in td{background:#0f172a;color:#f8fafc;font-weight:400}.is-movement-out td{background:#ffecef;color:#b4232a;font-weight:400}</style></head><body><h2>${escapeHtml(title)}</h2><table><thead><tr><th>Tipo</th><th>Fecha y hora</th><th>Código</th><th>Cantidad</th></tr></thead><tbody>${bodyRows}</tbody></table></body></html>`);
+      win.document.close();
+      await waitPrintAssets(win);
+      win.focus();
+      win.print();
+    };
+    const expandRecipeHistoryTable = async () => {
+      const filtered = getFilteredRows();
+      await openIosSwal({
+        title: `Historial ampliado · ${escapeHtml(capitalize(recipe.title || 'Producto'))}`,
+        width: '96vw',
+        html: `<div class="table-responsive inventario-global-table inventario-table-compact-wrap" style="max-height:70vh;overflow:auto"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Tipo</th><th>Fecha y hora</th><th>Código</th><th>Cantidad</th></tr></thead><tbody>${buildRowsHtml(filtered) || '<tr><td colspan="4" class="text-center">Sin movimientos para el filtro.</td></tr>'}</tbody></table></div>`,
+        confirmButtonText: 'Cerrar',
+        customClass: { popup: 'produccion-recipe-history-alert' }
+      });
+    };
+    const renderRows = (popup) => {
+      if (!popup) return;
+      const filtered = getFilteredRows();
       const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
       page = Math.min(Math.max(1, page), pages);
       const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -2474,9 +2526,7 @@
       const pager = popup.querySelector('[data-recipe-history-pager]');
       const prevBtn = popup.querySelector('[data-recipe-history-prev]');
       const nextBtn = popup.querySelector('[data-recipe-history-next]');
-      if (body) {
-        body.innerHTML = `<div class="table-responsive inventario-global-table inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Tipo</th><th>Fecha y hora</th><th>Código</th><th>Cantidad</th></tr></thead><tbody>${pageRows.map((item) => `<tr><td><span class="${item.type === 'egreso' ? 'text-danger' : 'text-success'}"><i class="fa-solid ${item.type === 'egreso' ? 'fa-arrow-down' : 'fa-arrow-up'}"></i> ${item.type === 'egreso' ? 'Egreso' : 'Ingreso'}</span></td><td>${escapeHtml(formatDateTime(item.at || 0))}</td><td>${escapeHtml(item.sourceCode || item.sourceId || '-')}</td><td><strong>${Number(item.qtyKg || 0).toFixed(2)} kg</strong></td></tr>`).join('') || '<tr><td colspan="4" class="text-center">Sin movimientos para el filtro.</td></tr>'}</tbody></table></div>`;
-      }
+      if (body) body.innerHTML = `<div class="table-responsive inventario-global-table inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Tipo</th><th>Fecha y hora</th><th>Código</th><th>Cantidad</th></tr></thead><tbody>${buildRowsHtml(pageRows) || '<tr><td colspan="4" class="text-center">Sin movimientos para el filtro.</td></tr>'}</tbody></table></div>`;
       if (pager) pager.textContent = `Página ${page} de ${pages}`;
       if (prevBtn) prevBtn.disabled = page <= 1;
       if (nextBtn) nextBtn.disabled = page >= pages;
@@ -2485,7 +2535,7 @@
       title: `Historial rápido · ${escapeHtml(capitalize(recipe.title || 'Producto'))}`,
       width: 'min(720px,96vw)',
       customClass: { popup: 'produccion-recipe-history-alert' },
-      html: `<div class="text-start produccion-recipe-history-modal"><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input type="search" class="form-control ios-input" data-recipe-history-search placeholder="Buscar por código"></div><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-regular fa-calendar"></i></span><input type="text" class="form-control ios-input" data-recipe-history-range placeholder="Filtrar rango (desde - hasta)" autocomplete="off"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-range-clear><i class="fa-solid fa-xmark"></i></button></div><div data-recipe-history-body class="dispatch-clients-manager-list" style="max-height:52vh;overflow:auto"></div><div class="d-flex align-items-center justify-content-between mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-prev><i class="fa-solid fa-chevron-left"></i></button><span data-recipe-history-pager>Página 1 de 1</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-next><i class="fa-solid fa-chevron-right"></i></button></div></div>`,
+      html: `<div class="text-start produccion-recipe-history-modal"><div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-expand><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button><button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" data-recipe-history-excel><i class="fa-solid fa-file-excel"></i><span>Excel</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-print><i class="fa-solid fa-print"></i><span>Período</span></button></div><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input type="search" class="form-control ios-input" data-recipe-history-search placeholder="Buscar por código"></div><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-regular fa-calendar"></i></span><input type="text" class="form-control ios-input" data-recipe-history-range placeholder="Filtrar rango (desde - hasta)" autocomplete="off"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-range-clear><i class="fa-solid fa-xmark"></i></button></div><div data-recipe-history-body class="dispatch-clients-manager-list" style="max-height:52vh;overflow:auto"></div><div class="d-flex align-items-center justify-content-between mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-prev><i class="fa-solid fa-chevron-left"></i></button><span data-recipe-history-pager>Página 1 de 1</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-next><i class="fa-solid fa-chevron-right"></i></button></div></div>`,
       confirmButtonText: 'Cerrar',
       didOpen: (popup) => {
         const rangeInput = popup.querySelector('[data-recipe-history-range]');
@@ -2508,6 +2558,9 @@
           page += 1;
           renderRows(popup);
         });
+        popup.querySelector('[data-recipe-history-expand]')?.addEventListener('click', async () => expandRecipeHistoryTable());
+        popup.querySelector('[data-recipe-history-excel]')?.addEventListener('click', async () => exportRecipeHistoryExcel());
+        popup.querySelector('[data-recipe-history-print]')?.addEventListener('click', async () => printRecipeHistory());
         if (window.flatpickr && rangeInput) {
           const locale = window.flatpickr.l10ns?.es || undefined;
           disableCalendarSuggestions(rangeInput);
@@ -5084,9 +5137,23 @@
           date: draft.dispatchDate
         });
       });
-      await persistRepartoStore();
-      await refreshData();
+      const persistResult = await Promise.race([
+        persistRepartoStore().then(() => 'ok').catch(() => 'error'),
+        new Promise((resolve) => setTimeout(() => resolve('timeout'), 10000))
+      ]);
+      if (persistResult !== 'ok') {
+        throw new Error(`persist_reparto_${persistResult}`);
+      }
       state.dispatchDraft = null;
+      renderDispatchMain();
+      const refreshTask = refreshData();
+      const refreshResult = await Promise.race([
+        refreshTask.then(() => 'ok').catch(() => 'error'),
+        new Promise((resolve) => setTimeout(() => resolve('timeout'), 6500))
+      ]);
+      if (refreshResult !== 'ok') {
+        console.warn('[produccion] refreshData post-dispatch delayed', refreshResult);
+      }
       renderDispatchMain();
       Swal.close();
       await openIosSwal({ title: 'Reparto guardado', html: `<p>Código generado: <strong>${code}</strong></p>`, icon: 'success' });
