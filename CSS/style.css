@@ -168,6 +168,10 @@ html.login-protected.auth-ok body {
   color: #7b86a4;
 }
 
+.data-recipe-history-range-clear{
+  border-radius: 0 14px 14px 0 !important;
+}
+
 .topbar-user-btn {
   border: 1px solid #d3dbf0;
   border-radius: 12px;
