@@ -2299,7 +2299,7 @@
       safeObject, normalizeValue, normalizeLower, nowTs, makeId, toIsoDate, formatIsoToDmyCompact,
       getDispatchRecordsList, getRegistrosList, getProducedStockMeta, getCurrentUserLabel,
       sanitizeImageUrl, capitalize, escapeHtml, formatDateTime, formatIsoEs,
-      openIosSwal,
+      openIosSwal, updateProduccionListScrollHint,
       renderUserAvatar, initialsFromPersonName, getDispatchUserRole, prepareThumbLoaders,
       uploadImageToStorage, ALLOWED_UPLOAD_TYPES, MAX_UPLOAD_SIZE_BYTES, ARG_PROVINCIAS,
       REPARTO_PATH

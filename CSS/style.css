@@ -3953,6 +3953,11 @@ html.login-protected.auth-ok body {
   overflow-x: auto;
 }
 
+.inventario-toolbar-actions .ios-btn {
+  width: fit-content;
+  max-width: none;
+}
+
 .inventario-status-filters {
   display: flex;
   gap: 8px;
