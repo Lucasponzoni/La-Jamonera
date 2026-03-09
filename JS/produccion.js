@@ -2994,6 +2994,11 @@
     compactRecipeMovements(entry);
   };
 
+  const normalizeProductIndexFromHistory = () => {
+    rebuildProductIndexFromHistory();
+    return state.reparto;
+  };
+
   const renderDispatchHistoryTable = () => {
     if (!nodes.dispatchView || state.dispatchCreateMode) return;
     const rows = getDispatchRows();
@@ -4702,6 +4707,12 @@
           icon: 'warning',
           confirmButtonText: 'Entendido'
         });
+        const managersSection = nodes.editor.querySelector('[data-manager-check]')?.closest('.recipe-step-card');
+        if (managersSection) {
+          managersSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const firstManager = managersSection.querySelector('[data-manager-check]');
+          firstManager?.focus({ preventScroll: true });
+        }
         return;
       }
       const managerSummary = managers.map((token) => {
@@ -4914,8 +4925,10 @@
       ? repartoStore
       : legacyRepartoStore;
     state.reparto = normalizeDispatchStore(nextRepartoStore);
-    if (!Object.keys(safeObject(state.reparto.productIndex)).length) {
-      rebuildProductIndexFromHistory();
+    const previousIndexSerialized = JSON.stringify(safeObject(state.reparto.productIndex));
+    normalizeProductIndexFromHistory();
+    const nextIndexSerialized = JSON.stringify(safeObject(state.reparto.productIndex));
+    if (previousIndexSerialized !== nextIndexSerialized) {
       await window.dbLaJamoneraRest.write(REPARTO_PATH, state.reparto);
     }
     if (!Object.keys(safeObject(repartoStore)).length && Object.keys(safeObject(legacyRepartoStore)).length) {
