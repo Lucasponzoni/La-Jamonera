@@ -5484,10 +5484,10 @@ html.login-protected.auth-ok body {
 .produccion-dispatch-btn {
   width: fit-content;
   max-width: none;
-  background: #eaf1ff;
-  color: #2a4ea3;
-  border: 1px solid #cdd9f6;
   white-space: nowrap;
+  background: #1f7ae8;
+  border: 1px solid #1f7ae8;
+  color: #fff;
 }
 
 .produccion-dispatch-btn span,
@@ -5496,9 +5496,9 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-dispatch-btn:hover {
-  background: #dfe9ff;
-  color: #24448f;
-  border-color: #bcccf3;
+  background: #166ad0;
+  color: #fff;
+  border: 1px solid #1f7ae8;
 }
 
 .produccion-history-btn:hover {
