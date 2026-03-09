@@ -507,28 +507,23 @@
     });
   };
 
-  const runWithBackSpinner = async (task, title = 'Actualizando vista...') => {
-    Swal.fire({
-      title,
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Actualizando" class="meta-spinner-login"></div>',
-      allowOutsideClick: false,
-      allowEscapeKey: false,
-      showConfirmButton: false,
-      backdrop: 'rgba(20, 28, 48, 0.35)',
-      customClass: {
-        popup: 'ios-alert produccion-loading-alert',
-        title: 'ios-alert-title',
-        htmlContainer: 'ios-alert-text'
-      },
-      didOpen: () => {
-        const container = Swal.getContainer();
-        if (container) container.style.backdropFilter = 'blur(4px)';
-      }
-    });
+  const runWithBackSpinner = async (task) => {
+    const modalContent = inventarioModal?.querySelector('.modal-content');
+    if (!modalContent) {
+      await task();
+      return;
+    }
+    if (window.getComputedStyle(modalContent).position === 'static') {
+      modalContent.style.position = 'relative';
+    }
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-local-overlay';
+    overlay.innerHTML = '<div class="modal-local-overlay-card"><img src="./IMG/Meta-ai-logo.webp" alt="Actualizando" class="meta-spinner-login"></div>';
+    modalContent.appendChild(overlay);
     try {
       await task();
     } finally {
-      Swal.close();
+      overlay.remove();
     }
   };
 
@@ -5496,7 +5491,7 @@
         state.selectedIngredientId = prevSelected;
       }
       renderList();
-    }, 'Volviendo...');
+    });
   });
   nodes.editorForm?.addEventListener('submit', saveEntry);
 
@@ -5512,7 +5507,7 @@
       renderFamilies();
       renderStatusFilters();
       renderList();
-    }, 'Volviendo...');
+    });
   });
   nodes.globalApplyBtn?.addEventListener('click', async () => {
     state.dashboardDateRange = normalizeValue(nodes.globalRange?.value);
