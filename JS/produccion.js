@@ -2279,7 +2279,7 @@
     state.historyMode = enabled;
     if (enabled) state.dispatchMode = false;
     nodes.search?.closest('.produccion-toolbar')?.classList.toggle('d-none', enabled);
-    nodes.rneAlert?.classList.toggle('d-none', enabled || !getRneExpiryMeta().visible);
+    nodes.rneAlert?.classList.toggle('d-none', enabled);
     nodes.list?.classList.toggle('d-none', enabled);
     nodes.historyView?.classList.toggle('d-none', !enabled);
     nodes.dispatchView?.classList.toggle('d-none', true);
@@ -2396,7 +2396,6 @@
       state.historyTraceCollapse = {};
       setHistoryMode(false);
       renderList();
-      renderModalRneBadge();
       if (window.flatpickr && nodes.historyRange) {
         const locale = window.flatpickr.l10ns?.es || undefined;
         const dayMap = getProductionDayMap();
