@@ -651,7 +651,7 @@
         };
         cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
         if (data.__tone === 'trace' || data.__tone === 'internal_use') {
-          cell.font = { color: { argb: 'FF1F2A44' }, bold: true };
+          cell.font = { color: { argb: 'FF1F2A44' }, bold: false };
         }
       });
       if (data.__mergeAcross) {
@@ -4723,13 +4723,15 @@
       });
       if (!askDetail.isConfirmed && !askDetail.isDenied) return;
       const includeDetail = askDetail.isConfirmed;
+      const win = window.open('', '_blank', 'width=1280,height=920');
+      if (!win) return;
+      win.document.write('<html><head><title>Cargando impresión...</title></head><body style="font-family:Inter,Arial,sans-serif;padding:16px;color:#223457;">Preparando impresión de repartos...</body></html>');
+      win.document.close();
       const imageUrls = rows.flatMap((row) => {
         const products = Array.isArray(row.products) ? row.products : [];
         return products.map((item) => sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl)).filter(Boolean);
       });
       await preloadPrintImages(imageUrls);
-      const win = window.open('', '_blank', 'noopener,noreferrer,width=1280,height=920');
-      if (!win) return;
       const body = rows.flatMap((row, index) => {
         const client = { ...getDispatchClient(row.clientId), ...safeObject(row.clientSnapshot) };
         const products = Array.isArray(row.products) ? row.products : [];

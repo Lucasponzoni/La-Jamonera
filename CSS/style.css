@@ -6996,7 +6996,7 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-dispatch-table-center .inventario-internal-use-row td {
-  text-align: left;
+  text-align: center;
 }
 
 .inventario-internal-meta {
