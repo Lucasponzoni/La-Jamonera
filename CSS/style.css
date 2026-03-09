@@ -5496,6 +5496,9 @@ html.login-protected.auth-ok body {
 .produccion-history-btn {
   width: auto;
   max-width: none;
+  background: #ff8a2a;
+  border: 1px solid #f2c08a;
+  color: #fff;
 }
 
 .produccion-dispatch-btn {
@@ -5540,6 +5543,24 @@ html.login-protected.auth-ok body {
   color: #fff;
 }
 
+.produccion-product-history-btn {
+  width: auto;
+  border: 0;
+  background: transparent;
+  color: #6f7ea6;
+  font-weight: 600;
+  font-size: 0.86rem;
+  padding: 0;
+  line-height: 1.1;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.produccion-product-history-btn:hover {
+  background: transparent;
+  color: #2d4578;
+}
+
 .swal2-popup.produccion-recipe-history-alert .swal2-html-container {
   padding: 0 !important;
   margin: 0 !important;
@@ -5555,15 +5576,27 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-recipe-history-modal .is-movement-in td {
-  background: #111827;
-  color: #f3f4f6;
+  background: #ecfdf3;
+  color: #111827;
   font-weight: 400;
 }
 
 .produccion-recipe-history-modal .is-movement-out td {
-  background: #ffecef;
-  color: #b4232a;
+  background: #fff1f2;
+  color: #111827;
   font-weight: 400;
+}
+
+.produccion-recipe-history-modal .movement-type-in,
+.produccion-recipe-history-modal .movement-code-in {
+  color: #17803d;
+  font-weight: 700;
+}
+
+.produccion-recipe-history-modal .movement-type-out,
+.produccion-recipe-history-modal .movement-code-out {
+  color: #b4232a;
+  font-weight: 700;
 }
 
 @media (max-width: 768px) {

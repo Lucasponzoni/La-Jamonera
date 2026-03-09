@@ -718,7 +718,7 @@
         return acc;
       }, {});
       const row = ws.addRow(rowData);
-      const tone = data.__tone === 'trace' ? 'FFFFECEF' : data.__tone === 'movement_in' ? 'FF111111' : data.__tone === 'internal_use' ? 'FFFFF2E3' : data.__tone === 'resolution_yellow' ? 'FFFFF6D9' : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
+      const tone = data.__tone === 'trace' ? 'FFFFECEF' : data.__tone === 'movement_in' ? 'FFECFDF3' : data.__tone === 'movement_out' ? 'FFFFF1F2' : data.__tone === 'internal_use' ? 'FFFFF2E3' : data.__tone === 'resolution_yellow' ? 'FFFFF6D9' : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
       row.eachCell((cell) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tone } };
         cell.border = {
@@ -728,10 +728,21 @@
           right: { style: 'thin', color: { argb: 'FFD8E2F5' } }
         };
         cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        const colHeader = headers[cell.col - 1];
         if (data.__tone === 'trace' || data.__tone === 'internal_use') {
           cell.font = { color: { argb: 'FF1F2A44' }, bold: false };
         } else if (data.__tone === 'movement_in') {
-          cell.font = { color: { argb: 'FFF8FAFC' }, bold: false };
+          if (colHeader === 'Tipo' || colHeader === 'Código') {
+            cell.font = { color: { argb: 'FF17803D' }, bold: true };
+          } else {
+            cell.font = { color: { argb: 'FF111827' }, bold: false };
+          }
+        } else if (data.__tone === 'movement_out') {
+          if (colHeader === 'Tipo' || colHeader === 'Código') {
+            cell.font = { color: { argb: 'FFB4232A' }, bold: true };
+          } else {
+            cell.font = { color: { argb: 'FF111827' }, bold: false };
+          }
         }
       });
       if (data.__mergeAcross) {
@@ -2471,7 +2482,9 @@
     };
     const buildRowsHtml = (items) => items.map((item) => {
       const isOut = item.type === 'egreso';
-      return `<tr class="${isOut ? 'is-movement-out' : 'is-movement-in'}"><td><span class="${isOut ? 'text-danger' : 'text-body'}"><i class="fa-solid ${isOut ? 'fa-arrow-down' : 'fa-arrow-up'}"></i> ${isOut ? 'Egreso' : 'Ingreso'}</span></td><td>${escapeHtml(formatDateTime(item.at || 0))}</td><td>${escapeHtml(item.sourceCode || item.sourceId || '-')}</td><td>${Number(item.qtyKg || 0).toFixed(2)} kg</td></tr>`;
+      const toneClass = isOut ? 'movement-type-out' : 'movement-type-in';
+      const codeClass = isOut ? 'movement-code-out' : 'movement-code-in';
+      return `<tr class="${isOut ? 'is-movement-out' : 'is-movement-in'}"><td><span class="${toneClass}"><i class="fa-solid ${isOut ? 'fa-arrow-down' : 'fa-arrow-up'}"></i> ${isOut ? 'Egreso' : 'Ingreso'}</span></td><td>${escapeHtml(formatDateTime(item.at || 0))}</td><td><span class="${codeClass}">${escapeHtml(item.sourceCode || item.sourceId || '-')}</span></td><td>${Number(item.qtyKg || 0).toFixed(2)} kg</td></tr>`;
     }).join('');
     const exportRecipeHistoryExcel = async () => {
       const filtered = getFilteredRows();
@@ -2485,7 +2498,7 @@
         'Fecha y hora': formatDateTime(item.at || 0),
         Código: item.sourceCode || item.sourceId || '-',
         'Cantidad (kg)': Number(item.qtyKg || 0).toFixed(2),
-        __tone: item.type === 'egreso' ? 'trace' : 'movement_in'
+        __tone: item.type === 'egreso' ? 'movement_out' : 'movement_in'
       }));
       await exportStyledExcel({
         fileName: `historial_producto_${normalizeValue(recipe.title || 'producto').replace(/\s+/g, '_').toLowerCase()}_${Date.now()}.xlsx`,
@@ -2495,12 +2508,24 @@
       });
     };
     const printRecipeHistory = async () => {
+      const ask = await openIosSwal({
+        title: 'Imprimir período',
+        html: '<p>Se imprimirá el período filtrado del historial rápido.</p>',
+        showCancelButton: true,
+        confirmButtonText: 'Imprimir',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+          confirmButton: 'ios-btn ios-btn-success',
+          cancelButton: 'ios-btn ios-btn-secondary'
+        }
+      });
+      if (!ask.isConfirmed) return;
       const filtered = getFilteredRows();
       const title = `Historial producto ${capitalize(recipe.title || 'Producto')}`;
       const bodyRows = buildRowsHtml(filtered) || '<tr><td colspan="4" class="text-center">Sin movimientos para el filtro.</td></tr>';
-      const win = window.open('', '_blank', 'noopener,noreferrer');
+      const win = window.open('', '_blank', 'width=1300,height=900');
       if (!win) return;
-      win.document.write(`<html><head><title>${escapeHtml(title)}</title><style>body{font-family:Inter,Arial,sans-serif;padding:12px;color:#223457}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d5def2;padding:8px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.03em}.is-movement-in td{background:#0f172a;color:#f8fafc;font-weight:400}.is-movement-out td{background:#ffecef;color:#b4232a;font-weight:400}</style></head><body><h2>${escapeHtml(title)}</h2><table><thead><tr><th>Tipo</th><th>Fecha y hora</th><th>Código</th><th>Cantidad</th></tr></thead><tbody>${bodyRows}</tbody></table></body></html>`);
+      win.document.write(`<html><head><title>${escapeHtml(title)}</title><style>body{font-family:Inter,Arial,sans-serif;padding:12px;color:#223457}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d5def2;padding:8px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.03em}.is-movement-in td{background:#ecfdf3;color:#111827;font-weight:400}.is-movement-out td{background:#fff1f2;color:#111827;font-weight:400}.movement-type-in,.movement-code-in{color:#17803d;font-weight:700}.movement-type-out,.movement-code-out{color:#b4232a;font-weight:700}</style></head><body><h2>${escapeHtml(title)}</h2><table><thead><tr><th>Tipo</th><th>Fecha y hora</th><th>Código</th><th>Cantidad</th></tr></thead><tbody>${bodyRows}</tbody></table></body></html>`);
       win.document.close();
       await waitPrintAssets(win);
       win.focus();
@@ -2535,7 +2560,7 @@
       title: `Historial rápido · ${escapeHtml(capitalize(recipe.title || 'Producto'))}`,
       width: 'min(720px,96vw)',
       customClass: { popup: 'produccion-recipe-history-alert' },
-      html: `<div class="text-start produccion-recipe-history-modal"><div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-expand><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button><button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" data-recipe-history-excel><i class="fa-solid fa-file-excel"></i><span>Excel</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-print><i class="fa-solid fa-print"></i><span>Período</span></button></div><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input type="search" class="form-control ios-input" data-recipe-history-search placeholder="Buscar por código"></div><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-regular fa-calendar"></i></span><input type="text" class="form-control ios-input" data-recipe-history-range placeholder="Filtrar rango (desde - hasta)" autocomplete="off"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-range-clear><i class="fa-solid fa-xmark"></i></button></div><div data-recipe-history-body class="dispatch-clients-manager-list" style="max-height:52vh;overflow:auto"></div><div class="d-flex align-items-center justify-content-between mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-prev><i class="fa-solid fa-chevron-left"></i></button><span data-recipe-history-pager>Página 1 de 1</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-next><i class="fa-solid fa-chevron-right"></i></button></div></div>`,
+      html: `<div class="text-start produccion-recipe-history-modal"><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input type="search" class="form-control ios-input" data-recipe-history-search placeholder="Buscar por código"></div><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-regular fa-calendar"></i></span><input type="text" class="form-control ios-input" data-recipe-history-range placeholder="Filtrar rango (desde - hasta)" autocomplete="off"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-range-clear><i class="fa-solid fa-xmark"></i></button></div><div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn" data-recipe-history-expand><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button><button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" data-recipe-history-excel><i class="fa-solid fa-file-excel"></i><span>Excel</span></button><span class="inventario-period-divider" aria-hidden="true"></span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-print><i class="fa-solid fa-print"></i><span>Período</span></button></div><div data-recipe-history-body class="dispatch-clients-manager-list" style="max-height:52vh;overflow:auto"></div><div class="d-flex align-items-center justify-content-between mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-prev><i class="fa-solid fa-chevron-left"></i></button><span data-recipe-history-pager>Página 1 de 1</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-next><i class="fa-solid fa-chevron-right"></i></button></div></div>`,
       confirmButtonText: 'Cerrar',
       didOpen: (popup) => {
         const rangeInput = popup.querySelector('[data-recipe-history-range]');
