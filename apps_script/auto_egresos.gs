@@ -21,7 +21,9 @@ const CFG = {
   // Si querés forzar que sólo se ejecute dentro de horario comercial, poner true.
   STRICT_RUN_WINDOW: false,
   // Cantidad máxima de movimientos por día para un lote.
-  MAX_DAILY_SPLITS: 3
+  MAX_DAILY_SPLITS: 3,
+  MIN_WEIGHT_VOL_MOVE_QTY: 0.25,
+  MIN_UNIT_MOVE_QTY: 1
 };
 
 function runAutoEgresos() {
@@ -190,8 +192,11 @@ function processEntryAutoEgreso(ctx) {
     entry.availableQty = 0;
     entry.availableBase = 0;
     entry.availableKg = 0;
+    entry.lotStatus = 'consumido_en_produccion';
     entry.expiryResolutionStatus = 'sold_counter';
     entry.status = 'sold_counter';
+  } else {
+    entry.lotStatus = 'disponible';
   }
 
   entry.autoEgresoState.lastProcessedDate = toIso;
@@ -204,18 +209,43 @@ function processEntryAutoEgreso(ctx) {
 function pushAutoEgresoMovement(entry, meta) {
   const { atTs, qtyUnit, qtyBase, unitMeta, unitLabel, runId } = meta;
 
+  const roundedQty = roundQtyForUnit(qtyUnit, unitMeta);
+  const roundedBase = Number(qtyBase.toFixed(6));
+  const roundedKg = baseToKg(qtyBase, unitMeta);
+
   entry.expiryResolutions = Array.isArray(entry.expiryResolutions) ? entry.expiryResolutions : [];
   entry.expiryResolutions.unshift({
     id: `auto_res_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     createdAt: atTs,
     type: 'sold_counter',
-    qtyKg: baseToKg(qtyBase, unitMeta),
-    qty: roundQtyForUnit(qtyUnit, unitMeta),
+    qtyKg: roundedKg,
+    qty: roundedQty,
     unit: unitLabel,
     reason: 'Venta en mostrador',
     generatedAutomatically: true,
     source: 'apps_script_auto_egreso',
     runId
+  });
+
+  // Filas de trazabilidad en front (usa productionUsage para múltiples filas)
+  entry.productionUsage = Array.isArray(entry.productionUsage) ? entry.productionUsage : [];
+  entry.productionUsage.unshift({
+    id: `usage_auto_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    createdAt: atTs,
+    producedAt: atTs,
+    productionDate: dateToIso(new Date(atTs), CFG.TIMEZONE),
+    expiryDateAtProduction: 'Venta en mostrador',
+    kilosUsed: roundedKg,
+    usedQty: roundedQty,
+    usedUnit: unitLabel,
+    usedBaseQty: roundedBase,
+    lotNumber: String(entry.lotNumber || entry.invoiceNumber || entry.id || '-'),
+    ingredientLot: String(entry.lotNumber || entry.invoiceNumber || entry.id || '-'),
+    productionId: `AUTO-EGRESO-${runId}`,
+    internalUse: true,
+    generatedAutomatically: true,
+    source: 'apps_script_auto_egreso',
+    note: 'Auto egreso · Venta en mostrador'
   });
 
   // Historial técnico (útil para auditoría y debugging)
@@ -224,9 +254,9 @@ function pushAutoEgresoMovement(entry, meta) {
     createdAt: atTs,
     type: 'egreso_automatico',
     reason: 'Venta en mostrador',
-    qty: roundQtyForUnit(qtyUnit, unitMeta),
-    qtyBase: Number(qtyBase.toFixed(6)),
-    qtyKg: baseToKg(qtyBase, unitMeta),
+    qty: roundedQty,
+    qtyBase: roundedBase,
+    qtyKg: roundedKg,
     qtyUnit: unitLabel,
     generatedAutomatically: true,
     source: 'apps_script_auto_egreso',
@@ -438,7 +468,7 @@ function splitBaseQuantity(dayBase, unitMeta) {
       left -= p;
     }
     if (left > 0) out.push(toBase(left, unitMeta));
-    return out.filter((v) => v > 0);
+    return out.filter((v) => v > 0 && (unitMeta.category === 'peso' || unitMeta.category === 'volumen' ? fromBase(v, unitMeta) >= CFG.MIN_WEIGHT_VOL_MOVE_QTY - CFG.EPS : fromBase(v, unitMeta) >= CFG.MIN_UNIT_MOVE_QTY));
   }
 
   const maxParts = Math.max(1, Math.min(CFG.MAX_DAILY_SPLITS, 3));
@@ -448,7 +478,7 @@ function splitBaseQuantity(dayBase, unitMeta) {
   let remain = dayBase;
   const out = [];
   for (let i = 0; i < parts - 1; i++) {
-    const minB = roundBaseReasonable(toBase(0.05, unitMeta), unitMeta);
+    const minB = roundBaseReasonable(toBase(CFG.MIN_WEIGHT_VOL_MOVE_QTY, unitMeta), unitMeta);
     const maxB = Math.max(minB, remain * 0.7);
     let p = randBetween(minB, maxB);
     p = roundBaseReasonable(p, unitMeta);
@@ -463,7 +493,7 @@ function splitBaseQuantity(dayBase, unitMeta) {
   const sum = out.reduce((a, b) => a + b, 0);
   const diff = roundBaseReasonable(dayBase - sum, unitMeta);
   if (Math.abs(diff) > CFG.EPS && out.length) out[out.length - 1] = roundBaseReasonable(out[out.length - 1] + diff, unitMeta);
-  return out.filter((v) => v > 0);
+  return out.filter((v) => v > 0 && fromBase(v, unitMeta) >= CFG.MIN_WEIGHT_VOL_MOVE_QTY - CFG.EPS);
 }
 
 function applyDiscountBaseToEntry(entry, baseOutRaw, unitMeta) {
