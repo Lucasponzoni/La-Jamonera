@@ -3372,7 +3372,7 @@
               </div>
               <div class="produccion-stat-sep" aria-hidden="true"></div>
               <div class="produccion-stat-block">
-                <small><button type="button" class="btn btn-link p-0 produccion-history-btn" data-open-recipe-history="${recipe.id}">Historial</button></small>
+                <small><button type="button" class="btn btn-link p-0 produccion-product-history-btn" data-open-recipe-history="${recipe.id}">Historial</button></small>
               </div>
             </div>
             ${Number(analysis.expiredKg || 0) > 0.0001 ? `<p class="produccion-last-line produccion-last-line-expired"><i class="fa-solid fa-triangle-exclamation"></i> <strong>Kilos expirados:</strong> <strong>${Number(analysis.expiredKg || 0).toFixed(2)} kg</strong></p>` : ''}

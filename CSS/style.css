@@ -5496,15 +5496,6 @@ html.login-protected.auth-ok body {
 .produccion-history-btn {
   width: auto;
   max-width: none;
-  border: 0;
-  background: transparent;
-  color: #6f7ea6;
-  font-weight: 600;
-  font-size: 0.86rem;
-  padding: 0;
-  line-height: 1.1;
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
 
 .produccion-dispatch-btn {
@@ -5528,6 +5519,23 @@ html.login-protected.auth-ok body {
 }
 
 .produccion-history-btn:hover {
+  color: inherit;
+}
+
+.produccion-product-history-btn {
+  width: auto;
+  border: 0;
+  background: transparent;
+  color: #6f7ea6;
+  font-weight: 600;
+  font-size: 0.86rem;
+  padding: 0;
+  line-height: 1.1;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.produccion-product-history-btn:hover {
   background: transparent;
   color: #2d4578;
 }
