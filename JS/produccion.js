@@ -2328,10 +2328,8 @@
     })
   )));
   const getDispatchTraceUrl = (productionId) => {
-    const reg = getRegistroById(productionId);
-    if (window.laJamoneraPlanillaProduccion?.getTraceUrl && reg?.id) return window.laJamoneraPlanillaProduccion.getTraceUrl(reg);
-    const base = normalizeValue(window.TRACE_BASE_URL) || 'https://lucasponzoni.github.io/La-Jamonera/';
-    return `${base}${encodeURIComponent(normalizeValue(productionId))}`;
+    const id = encodeURIComponent(normalizeValue(productionId));
+    return `https://lucasponzoni.github.io/La-Jamonera/produccion_publica.html?id=${id}`;
   };
   const renderDispatchPlanillaQr = async (host, dispatchRow) => {
     if (!host || !dispatchRow?.id) return;
@@ -2340,10 +2338,30 @@
     const products = Array.isArray(dispatchRow.products) ? dispatchRow.products : [];
     const lotIds = [...new Set(products.flatMap((item) => (Array.isArray(item.allocations) ? item.allocations : []).map((lot) => normalizeValue(lot.productionId)).filter(Boolean)))];
     if (!lotIds.length) return;
-    const qrText = lotIds.map((id) => `${id}: ${getDispatchTraceUrl(id)}`).join('\n');
     host.innerHTML = '';
-    // eslint-disable-next-line no-new
-    new window.QRCode(host, { text: qrText, width: 130, height: 130, colorDark: '#111827', colorLight: '#ffffff' });
+    host.style.display = 'grid';
+    host.style.gridTemplateColumns = 'repeat(auto-fit,minmax(130px,1fr))';
+    host.style.gap = '10px';
+    lotIds.forEach((id) => {
+      const wrap = document.createElement('div');
+      wrap.style.display = 'flex';
+      wrap.style.flexDirection = 'column';
+      wrap.style.alignItems = 'center';
+      wrap.style.gap = '4px';
+      const qrBox = document.createElement('div');
+      qrBox.style.width = '130px';
+      qrBox.style.height = '130px';
+      const caption = document.createElement('small');
+      caption.style.fontWeight = '700';
+      caption.style.color = '#1f2a44';
+      caption.style.textAlign = 'center';
+      caption.textContent = id;
+      wrap.appendChild(qrBox);
+      wrap.appendChild(caption);
+      host.appendChild(wrap);
+      // eslint-disable-next-line no-new
+      new window.QRCode(qrBox, { text: getDispatchTraceUrl(id), width: 130, height: 130, colorDark: '#111827', colorLight: '#ffffff' });
+    });
   };
   const printDispatchPlanilla = async (node, dispatchRow) => {
     const win = window.open('', '_blank', 'width=1400,height=900');
@@ -2383,7 +2401,7 @@
     const commentsRows = comments.length
       ? comments.map((item, idx) => `<tr><td colspan="4"><strong>OBSERVACIÓN ${idx + 1}:</strong> ${escapeHtml(item)}</td></tr>`).join('')
       : '<tr><td colspan="4"><strong>OBSERVACIÓN 1:</strong> Sin observaciones</td></tr>';
-    const headerTable = `<table style="width:100%;border-collapse:collapse;table-layout:fixed"><tbody><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800" colspan="4">FRIGO LA JAMONERA • REGISTRO DE SALIDA DE PRODUCTOS PRODUCIDOS</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800" colspan="4">${escapeHtml(dispatchRow.code || dispatchRow.id)}</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px"><strong>FECHA Y HORA:</strong></td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(formatDateTime(dispatchRow.createdAt || dispatchRow.dispatchDate))}</strong></td><td style="border:1px solid #2f2f2f;padding:4px"><strong>CLIENTE:</strong></td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(normalizeValue(client.name) || '-')}</strong></td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px" colspan="4"><strong>DIRECCION:</strong> ${escapeHtml(location)}${location && clientDoc ? ' • ' : ''}${escapeHtml(clientDoc)}</td></tr></tbody></table>`;
+    const headerTable = `<table style="width:100%;border-collapse:collapse;table-layout:fixed"><tbody><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">FRIGO LA JAMONERA • REGISTRO DE SALIDA DE PRODUCTOS PRODUCIDOS</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">${escapeHtml(dispatchRow.code || dispatchRow.id)}</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px"><strong>FECHA Y HORA:</strong></td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(formatDateTime(dispatchRow.createdAt || dispatchRow.dispatchDate))}</strong></td><td style="border:1px solid #2f2f2f;padding:4px"><strong>CLIENTE:</strong></td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(normalizeValue(client.name) || '-')}</strong></td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px" colspan="4"><strong>DIRECCION:</strong> ${escapeHtml(location)}${location && clientDoc ? ' • ' : ''}${escapeHtml(clientDoc)}</td></tr></tbody></table>`;
     const planillaStyle = '<style>.dispatch-planilla-print{font-family:Inter,Arial,sans-serif;color:#111827;background:#fff}.dispatch-planilla-print table{width:100%;border-collapse:collapse;table-layout:fixed}.dispatch-planilla-print th,.dispatch-planilla-print td{border:1px solid #2f2f2f;padding:6px;word-break:break-word;background:#fff;color:#111827}</style>';
     const html = `${planillaStyle}<div class="dispatch-planilla-print" id="dispatchPlanillaPrintable">${headerTable}<div class="table-responsive" style="margin-top:8px;"><table><thead><tr><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de lote</th></tr></thead><tbody>${detailRows}<tr><td colspan="4"><strong>VEHÍCULO (UTA-URA):</strong> ${escapeHtml(`${vehicle.number || '-'} - ${vehicle.patent || '-'} - ${vehicle.brand || vehicle.type || '-'}`)}</td></tr>${commentsRows}<tr><td colspan="4"><strong>CONTROLO:</strong> ${escapeHtml(managerLabel)}</td></tr><tr><td colspan="2"><strong>TEMPERATURA UNIDAD DE TRANSPORTE:</strong> 3 °C</td><td colspan="2"><strong>UNIDAD DE TRANSPORTE ESTADO:</strong> A (ACEPTABLE)</td></tr></tbody></table></div><div style="margin-top:10px;display:flex;gap:12px;align-items:center;"><div data-dispatch-planilla-qr></div><div><p style="margin:0 0 6px;font-weight:700;">QR de trazabilidad de los lotes</p><p style="margin:0;color:#556487;">Escaneá el QR con tu celular para acceder a la trazabilidad completa del producto.</p></div></div></div>`;
     Swal.fire({
