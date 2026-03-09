@@ -5439,7 +5439,7 @@
         const input = document.getElementById('sheetRangeInput');
         if (window.flatpickr && input) {
           const locale = { ...(window.flatpickr.l10ns?.es || {}), rangeSeparator: ' a ' };
-          window.flatpickr(input, { locale, mode: 'range', dateFormat: 'Y-m-d', altInput: true, altFormat: 'd/m/Y', allowInput: false, disableMobile: true });
+          window.flatpickr(input, { locale, mode: 'range', dateFormat: 'Y-m-d', allowInput: false, disableMobile: true });
         }
       },
       preConfirm: () => {
