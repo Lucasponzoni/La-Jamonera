@@ -798,6 +798,7 @@
     if (window.getComputedStyle(modalContent).position === 'static') {
       modalContent.style.position = 'relative';
     }
+    document.querySelectorAll('.produccion-dispatch-floating-suggest').forEach((node) => node.remove());
     const overlay = document.createElement('div');
     overlay.className = 'modal-local-overlay';
     overlay.innerHTML = '<div class="modal-local-overlay-card"><img src="./IMG/Meta-ai-logo.webp" alt="Actualizando" class="meta-spinner-login"></div>';
@@ -2759,6 +2760,7 @@
     const qrHost = win.document.querySelector('[data-dispatch-planilla-qr]');
     if (qrHost) await renderDispatchPlanillaQr(qrHost, dispatchRow);
     await waitPrintAssets(win);
+    onProgress?.(100);
     win.focus();
     win.print();
   };
@@ -2811,10 +2813,11 @@
         await waitNodeImages(printable);
       }
       if (typeof onProgress === 'function') {
-        onProgress(Math.round(((index + 1) / list.length) * 100));
+        onProgress(Math.min(95, Math.round(((index + 1) / list.length) * 95)));
       }
     }
     await waitPrintAssets(win);
+    onProgress?.(100);
     win.focus();
     win.print();
   };
@@ -5427,6 +5430,7 @@
   const askRequiredRangeForWeeklyProductionSheet = async () => {
     const picker = await openIosSwal({
       title: 'Rango obligatorio para planilla',
+      customClass: { popup: 'weekly-range-alert' },
       html: '<p>Para evitar procesar datos infinitos, seleccioná un rango de fechas antes de continuar.</p><input id="sheetRangeInput" class="swal2-input ios-input w-100" placeholder="Seleccionar rango">',
       showCancelButton: true,
       confirmButtonText: 'Continuar',
@@ -5456,6 +5460,7 @@
     win.document.close();
     win.focus();
     await waitPrintAssets(win);
+    onProgress?.(100);
     win.print();
   };
 
@@ -5624,6 +5629,7 @@
     win.document.close();
     win.focus();
     await waitPrintAssets(win);
+    onProgress?.(100);
     win.print();
   });
   nodes.historyMassPlanillasBtn?.addEventListener('click', openMassPlanillasByPeriod);
