@@ -95,6 +95,7 @@
   const normalizeLower = (value) => normalizeValue(value).toLowerCase();
   const normalizeUpper = (value) => normalizeValue(value).toUpperCase();
   const ARG_PROVINCIAS = ['Buenos Aires', 'CABA', 'Catamarca', 'Chaco', 'Chubut', 'Córdoba', 'Corrientes', 'Entre Ríos', 'Formosa', 'Jujuy', 'La Pampa', 'La Rioja', 'Mendoza', 'Misiones', 'Neuquén', 'Río Negro', 'Salta', 'San Juan', 'San Luis', 'Santa Cruz', 'Santa Fe', 'Santiago del Estero', 'Tierra del Fuego', 'Tucumán'];
+  const ROSARIO_DEPT_LOCALITIES = ['Rosario', 'Villa Gobernador Gálvez', 'Pérez', 'Funes', 'Roldán', 'Ibarlucea', 'Alvear', 'Pueblo Esther', 'General Lagos', 'Arroyo Seco', 'Piñero'];
   const COMPANY_LEGAL_NAME = 'FRIGORIFICO LA JAMONERA SA';
   const normalizeDispatchStore = (source = {}) => ({
     registros: safeObject(source?.registros),
