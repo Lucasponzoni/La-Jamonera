@@ -390,6 +390,7 @@
   };
   const deepClone = (value) => JSON.parse(JSON.stringify(value || {}));
   const getRegistrosList = () => Object.values(safeObject(state.registros));
+  const getRegistroById = (key) => safeObject(state.registros?.[key]);
   const getGeneralPassword = async () => {
     await window.laJamoneraReady;
     const value = await window.dbLaJamoneraRest.read('/passGeneral/pass');
@@ -639,7 +640,7 @@
         return acc;
       }, {});
       const row = ws.addRow(rowData);
-      const tone = data.__tone === 'trace' ? 'FFFFECEF' : data.__tone === 'resolution_yellow' ? 'FFFFF6D9' : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
+      const tone = data.__tone === 'trace' ? 'FFFFECEF' : data.__tone === 'internal_use' ? 'FFFFF2E3' : data.__tone === 'resolution_yellow' ? 'FFFFF6D9' : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
       row.eachCell((cell) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tone } };
         cell.border = {
@@ -649,10 +650,15 @@
           right: { style: 'thin', color: { argb: 'FFD8E2F5' } }
         };
         cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-        if (data.__tone === 'trace') {
-          cell.font = { color: { argb: 'FFB42338' }, bold: true };
+        if (data.__tone === 'trace' || data.__tone === 'internal_use') {
+          cell.font = { color: { argb: 'FF1F2A44' }, bold: false };
         }
       });
+      if (data.__mergeAcross) {
+        ws.mergeCells(row.number, 1, row.number, headers.length);
+        const mergedCell = row.getCell(1);
+        mergedCell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+      }
     });
     const buf = await wb.xlsx.writeBuffer();
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -2307,6 +2313,103 @@
   };
   const getDispatchClient = (clientId) => safeObject(state.reparto.clients?.[clientId]);
   const getDispatchVehicle = (vehicleId) => safeObject(state.reparto.vehicles?.[vehicleId]);
+  const getDispatchRecordById = (dispatchId) => safeObject(state.reparto?.registros?.[dispatchId]);
+  const ensureQrCodeLib = async () => {
+    if (window.QRCode) return true;
+    return loadScriptFromSources([
+      'https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js',
+      'https://unpkg.com/qrcodejs2@0.0.2/qrcode.min.js'
+    ], 'la-jamonera-qrcode-dispatch');
+  };
+  const waitNodeImages = async (root) => Promise.all([...(root?.querySelectorAll('img') || [])].map((img) => (
+    img.complete ? Promise.resolve() : new Promise((resolve) => {
+      img.addEventListener('load', resolve, { once: true });
+      img.addEventListener('error', resolve, { once: true });
+    })
+  )));
+  const getDispatchTraceUrl = (productionId) => {
+    const reg = getRegistroById(productionId);
+    if (window.laJamoneraPlanillaProduccion?.getTraceUrl && reg?.id) return window.laJamoneraPlanillaProduccion.getTraceUrl(reg);
+    const base = normalizeValue(window.TRACE_BASE_URL) || 'https://lucasponzoni.github.io/La-Jamonera/';
+    return `${base}${encodeURIComponent(normalizeValue(productionId))}`;
+  };
+  const renderDispatchPlanillaQr = async (host, dispatchRow) => {
+    if (!host || !dispatchRow?.id) return;
+    const ready = await ensureQrCodeLib();
+    if (!ready || !window.QRCode) return;
+    const products = Array.isArray(dispatchRow.products) ? dispatchRow.products : [];
+    const lotIds = [...new Set(products.flatMap((item) => (Array.isArray(item.allocations) ? item.allocations : []).map((lot) => normalizeValue(lot.productionId)).filter(Boolean)))];
+    if (!lotIds.length) return;
+    const qrText = lotIds.map((id) => `${id}: ${getDispatchTraceUrl(id)}`).join('\n');
+    host.innerHTML = '';
+    // eslint-disable-next-line no-new
+    new window.QRCode(host, { text: qrText, width: 130, height: 130, colorDark: '#111827', colorLight: '#ffffff' });
+  };
+  const printDispatchPlanilla = async (node, dispatchRow) => {
+    const win = window.open('', '_blank', 'width=1400,height=900');
+    if (!win) return;
+    win.document.write(`<html><head><title>Planilla reparto ${escapeHtml(dispatchRow?.code || '')}</title><style>@page{size:landscape;margin:10mm}body{font-family:Inter,Arial,sans-serif;color:#111827;background:#ffffff;margin:0;padding:8px}.dispatch-planilla-print{background:#fff}.dispatch-planilla-print table{width:100%;border-collapse:collapse;table-layout:fixed}.dispatch-planilla-print th,.dispatch-planilla-print td{border:1px solid #2f2f2f;padding:6px;word-break:break-word;background:#fff;color:#111827}.dispatch-planilla-print .head-title{font-size:20px;font-weight:800;margin:0}.dispatch-planilla-print .head-sub{font-size:14px;color:#374151;margin:0}.dispatch-planilla-top-title{font-weight:800;text-align:center;padding:8px;border:1px solid #2f2f2f;border-bottom:none}</style></head><body>${node.outerHTML}</body></html>`);
+    win.document.close();
+    await new Promise((resolve) => setTimeout(resolve, 180));
+    const qrHost = win.document.querySelector('[data-dispatch-planilla-qr]');
+    if (qrHost) await renderDispatchPlanillaQr(qrHost, dispatchRow);
+    await waitPrintAssets(win);
+    win.focus();
+    win.print();
+  };
+  const openDispatchPlanilla = async (dispatchRow) => {
+    if (!dispatchRow?.id) return;
+    const client = { ...getDispatchClient(dispatchRow.clientId), ...safeObject(dispatchRow.clientSnapshot) };
+    const vehicle = getDispatchVehicle(dispatchRow.vehicleId);
+    const managerTokens = Array.isArray(dispatchRow.managers) ? dispatchRow.managers : [];
+    const managerProfiles = Array.isArray(dispatchRow.managerProfiles) ? dispatchRow.managerProfiles : [];
+    const managerLabel = managerTokens.length
+      ? managerTokens.map((token) => {
+        const manager = getManagerDisplay(token);
+        return `${manager.name} (${manager.role})`;
+      }).join(', ')
+      : (managerProfiles.length
+        ? managerProfiles.map((m) => `${normalizeValue(m.name) || 'Sin responsable'} (${normalizeValue(m.role) || 'Encargado'})`).join(', ')
+        : 'Sin responsable (Encargado)');
+    const location = [client.address, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean).join(' • ');
+    const clientDoc = normalizeValue(client.doc || client.dni || client.cuit || client.cuil || client.document || client.taxId);
+    const products = Array.isArray(dispatchRow.products) ? dispatchRow.products : [];
+    const detailRows = products.flatMap((item) => {
+      const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
+      const allocations = Array.isArray(item.allocations) && item.allocations.length ? item.allocations : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '' }];
+      return allocations.map((allocation) => `<tr><td><span style="display:inline-flex;align-items:center;gap:8px;">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(item.recipeTitle || '-')}</span></span></td><td><strong>${Number(allocation.qtyKg || 0).toFixed(2)} kg</strong></td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td><strong>${escapeHtml(allocation.lotNumber || '-')} · ${Number(getRegistroById(allocation.productionId)?.quantityKg || allocation.qtyKg || 0).toFixed(2)} kg</strong></td></tr>`);
+    }).join('') || '<tr><td colspan="4">Sin productos.</td></tr>';
+    const comments = (Array.isArray(dispatchRow.comments) ? dispatchRow.comments : []).map((c) => normalizeValue(c)).filter(Boolean);
+    const commentsRows = comments.length
+      ? comments.map((item, idx) => `<tr><td colspan="4"><strong>OBSERVACIÓN ${idx + 1}:</strong> ${escapeHtml(item)}</td></tr>`).join('')
+      : '<tr><td colspan="4"><strong>OBSERVACIÓN 1:</strong> Sin observaciones</td></tr>';
+    const headerTable = `<table style="width:100%;border-collapse:collapse;table-layout:fixed"><tbody><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800" colspan="4">FRIGO LA JAMONERA • REGISTRO DE SALIDA DE PRODUCTOS PRODUCIDOS</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800" colspan="4">${escapeHtml(dispatchRow.code || dispatchRow.id)}</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px"><strong>FECHA Y HORA:</strong></td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(formatDateTime(dispatchRow.createdAt || dispatchRow.dispatchDate))}</strong></td><td style="border:1px solid #2f2f2f;padding:4px"><strong>CLIENTE:</strong></td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(normalizeValue(client.name) || '-')}</strong></td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px" colspan="4"><strong>DIRECCION:</strong> ${escapeHtml(location)}${location && clientDoc ? ' • ' : ''}${escapeHtml(clientDoc)}</td></tr></tbody></table>`;
+    const planillaStyle = '<style>.dispatch-planilla-print{font-family:Inter,Arial,sans-serif;color:#111827;background:#fff}.dispatch-planilla-print table{width:100%;border-collapse:collapse;table-layout:fixed}.dispatch-planilla-print th,.dispatch-planilla-print td{border:1px solid #2f2f2f;padding:6px;word-break:break-word;background:#fff;color:#111827}</style>';
+    const html = `${planillaStyle}<div class="dispatch-planilla-print" id="dispatchPlanillaPrintable">${headerTable}<div class="table-responsive" style="margin-top:8px;"><table><thead><tr><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de lote</th></tr></thead><tbody>${detailRows}<tr><td colspan="4"><strong>VEHÍCULO (UTA-URA):</strong> ${escapeHtml(`${vehicle.number || '-'} - ${vehicle.patent || '-'} - ${vehicle.brand || vehicle.type || '-'}`)}</td></tr>${commentsRows}<tr><td colspan="4"><strong>CONTROLO:</strong> ${escapeHtml(managerLabel)}</td></tr><tr><td colspan="2"><strong>TEMPERATURA UNIDAD DE TRANSPORTE:</strong> 3 °C</td><td colspan="2"><strong>UNIDAD DE TRANSPORTE ESTADO:</strong> A (ACEPTABLE)</td></tr></tbody></table></div><div style="margin-top:10px;display:flex;gap:12px;align-items:center;"><div data-dispatch-planilla-qr></div><div><p style="margin:0 0 6px;font-weight:700;">QR de trazabilidad de los lotes</p><p style="margin:0;color:#556487;">Escaneá el QR con tu celular para acceder a la trazabilidad completa del producto.</p></div></div></div>`;
+    Swal.fire({
+      title: 'Generando planilla...',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando planilla" class="meta-spinner-login"></div>',
+      allowOutsideClick: false,
+      showConfirmButton: false,
+      customClass: { popup: 'ios-alert produccion-loading-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' }
+    });
+    await new Promise((resolve) => setTimeout(resolve, 140));
+    Swal.close();
+    await openIosSwal({
+      title: `Planilla ${escapeHtml(dispatchRow.code || dispatchRow.id)}`,
+      html: `<div class="planilla-toolbar"><button type="button" class="btn ios-btn ios-btn-secondary" id="dispatchPlanillaPrintBtn"><i class="fa-solid fa-print"></i><span>Imprimir</span></button></div><div class="planilla-card">${html}</div>`,
+      width: '98vw',
+      confirmButtonText: 'Cerrar',
+      customClass: { popup: 'produccion-trace-alert planilla-modal', confirmButton: 'ios-btn ios-btn-secondary' },
+      didOpen: async (popup) => {
+        const printable = popup.querySelector('#dispatchPlanillaPrintable');
+        if (!printable) return;
+        await renderDispatchPlanillaQr(printable.querySelector('[data-dispatch-planilla-qr]'), dispatchRow);
+        await waitNodeImages(printable);
+        popup.querySelector('#dispatchPlanillaPrintBtn')?.addEventListener('click', async () => printDispatchPlanilla(printable, dispatchRow));
+      }
+    });
+  };
   const getDispatchVehicleExpiryMeta = (vehicle = {}) => {
     const expiry = normalizeValue(vehicle.expiryDate);
     if (!expiry) return { tone: 'neutral', text: 'Sin vencimiento', days: null };
@@ -2374,10 +2477,31 @@
     nodes.historyView?.classList.toggle('d-none', true);
     nodes.dispatchView?.classList.toggle('d-none', !enabled);
   };
+  const normalizeDispatchDateToken = (value) => {
+    const raw = normalizeValue(value);
+    if (!raw) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+    const slash = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (slash) return `${slash[3]}-${slash[2]}-${slash[1]}`;
+    const compact = raw.match(/^(\d{4})-(\d{2})-(\d{2}).*$/);
+    return compact ? `${compact[1]}-${compact[2]}-${compact[3]}` : '';
+  };
+  const parseDispatchRange = (value) => {
+    const raw = normalizeValue(value);
+    if (!raw) return { from: '', to: '' };
+    const chunks = raw.split(/\s+a\s+|\s+to\s+/i).map((item) => normalizeDispatchDateToken(item)).filter(Boolean);
+    if (!chunks.length) {
+      const single = normalizeDispatchDateToken(raw);
+      return { from: single, to: single };
+    }
+    const from = chunks[0];
+    const to = chunks[1] || from;
+    return { from, to };
+  };
   const getDispatchRows = () => {
     const all = getDispatchRecordsList().sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
     const query = normalizeLower(state.dispatchSearch);
-    const [from, to] = String(state.dispatchRange || '').split(' a ').map((item) => normalizeValue(item));
+    const { from, to } = parseDispatchRange(state.dispatchRange);
     return all.filter((row) => {
       const client = getDispatchClient(row.clientId);
       const text = `${row.code || ''} ${client.name || ''} ${(Array.isArray(row.products) ? row.products.map((p) => p.recipeTitle).join(' ') : '')}`.toLowerCase();
@@ -2403,19 +2527,39 @@
       const kgTotal = products.reduce((acc, item) => acc + Number(item.qtyKg || 0), 0);
       const expiries = [...new Set(products.flatMap((item) => (Array.isArray(item.allocations) ? item.allocations : []).map((l) => normalizeValue(l.expiryDate)).filter(Boolean)))];
       const expiryLabel = expiries.length === 1 ? formatIsoEs(expiries[0]) : (expiries.length ? 'Ver detalle' : '-');
-      const client = getDispatchClient(row.clientId);
+      const client = { ...getDispatchClient(row.clientId), ...safeObject(row.clientSnapshot) };
       const collapsed = state.dispatchCollapse[row.id] !== false;
-      const detail = !collapsed ? products.map((item) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${item.recipeImageUrl ? `<img class="thumb-image" src="${escapeHtml(item.recipeImageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')}</span></div></td><td>${Number(item.qtyKg || 0).toFixed(2)} kg</td><td>${(Array.isArray(item.allocations) ? item.allocations : []).map((a) => `${escapeHtml(a.lotNumber)} · ${Number(a.qtyKg || 0).toFixed(2)} kg`).join('<br>') || '-'}</td><td>${(Array.isArray(item.allocations) ? item.allocations : []).map((a) => escapeHtml(formatIsoEs(a.expiryDate || ''))).join('<br>') || '-'}</td><td colspan="3">${(Array.isArray(item.allocations) ? item.allocations : []).map((a) => `<small>${escapeHtml(a.productionId)}</small>`).join('<br>')}</td></tr>`).join('') : '';
-      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${products.length} productos</td><td>${kgTotal.toFixed(2)} kg</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || row.id || '-')}</td><td>${escapeHtml(client.name || '-')}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-collapse="${escapeHtml(row.id)}" title="${collapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${collapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${collapsed ? 'fa-expand' : 'fa-compress'}"></i></button></td></tr>${detail}`;
+      const productLabel = `${products.length} ${products.length === 1 ? 'producto' : 'productos'}`;
+      const detailItems = products.flatMap((item) => {
+        const allocations = Array.isArray(item.allocations) && item.allocations.length
+          ? item.allocations
+          : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
+        return allocations.map((allocation) => ({ item, allocation }));
+      });
+      const detailRows = !collapsed ? detailItems.map(({ item, allocation }) => {
+        const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
+        const traceBtn = normalizeValue(allocation.productionId)
+          ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button>`
+          : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
+        return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${Number(allocation.qtyKg || 0).toFixed(2)} kg</span></div></td><td>${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${Number(getRegistroById(allocation.productionId)?.quantityKg || allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td></tr>`;
+      }).join('') : '';
+      const locationParts = [client.address, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean);
+      const customerDoc = normalizeValue(client.doc || client.dni || client.cuit || client.cuil || client.document || client.taxId);
+      const locationMeta = [normalizeValue(client.name), customerDoc].filter(Boolean).join(' · ');
+      const locationRow = !collapsed && (locationParts.length || locationMeta)
+        ? `<tr class="inventario-internal-use-row"><td colspan="7"><i class="fa-solid fa-house"></i> ${escapeHtml(locationParts.join(' • '))}${locationMeta ? ` • ${escapeHtml(locationMeta)}` : ''}</td></tr>`
+        : '';
+      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${products.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-collapse="${escapeHtml(row.id)}" title="${collapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${collapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${collapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(formatDateTime(row.createdAt))}</span></div></td><td>${productLabel}</td><td>${kgTotal.toFixed(2)} kg</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || row.id || '-')}</td><td>${escapeHtml(client.name || '-')}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-planilla="${escapeHtml(row.id)}"><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button></td></tr>${detailRows}${locationRow}`;
     }).join('') : '<tr><td colspan="7" class="text-center">Sin repartos para el filtro seleccionado.</td></tr>';
     const tableWrap = nodes.dispatchView.querySelector('#produccionDispatchTableWrap');
     if (!tableWrap) return;
-    tableWrap.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioGlobalCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar todo</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioGlobalExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar todo</span></button></div><div class="table-responsive inventario-global-table inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha de reparto</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th><th>Acción</th></tr></thead><tbody>${htmlRows}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-page="prev" ${state.dispatchPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${state.dispatchPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-page="next" ${state.dispatchPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+    tableWrap.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioGlobalCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar todo</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioGlobalExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar todo</span></button></div><div class="table-responsive inventario-global-table inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0 produccion-dispatch-table-center"><thead><tr><th>Fecha de reparto</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th><th>Planilla</th></tr></thead><tbody>${htmlRows}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-page="prev" ${state.dispatchPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${state.dispatchPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-page="next" ${state.dispatchPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+    prepareThumbLoaders('.js-produccion-thumb');
   };
   const renderDispatchMain = () => {
     if (!nodes.dispatchView) return;
     state.dispatchCreateMode = false;
-    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Salida de Productos</h6><button id="produccionDispatchNewBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="bi bi-plus-lg"></i><span>Nuevo reparto</span></button></div><div class="inventario-period-filters"><input id="produccionDispatchSearch" type="search" class="form-control ios-input produccion-dispatch-filter" placeholder="Buscar reparto, cliente o producto" value="${escapeHtml(state.dispatchSearch)}"><input id="produccionDispatchRange" class="form-control ios-input produccion-dispatch-filter" placeholder="Seleccionar rango de fechas" value="${escapeHtml(state.dispatchRange)}"><div class="toolbar-scroll-x inventario-period-actions-scroll"><button id="produccionDispatchClearBtn" type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn ${state.dispatchRange ? '' : 'd-none'}"><i class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></button><button id="produccionDispatchApplyBtn" type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn"><i class="fa-solid fa-filter"></i><span>Aplicar</span></button><button id="produccionDispatchExpandBtn" type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button><button id="produccionDispatchExcelBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="fa-solid fa-file-excel"></i><span>Excel</span></button><span class="inventario-period-divider" aria-hidden="true"></span><button id="produccionDispatchPrintBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-print"></i><span>Imprimir período</span></button><button id="produccionDispatchMassBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-regular fa-file-lines"></i><span>Planillas masivas</span></button></div></div><div id="produccionDispatchTableWrap"></div>`;
+    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Salida de Productos</h6><button id="produccionDispatchNewBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="bi bi-plus-lg"></i><span>Nuevo reparto</span></button></div><div class="inventario-period-filters"><input id="produccionDispatchSearch" type="search" class="form-control ios-input produccion-dispatch-filter" placeholder="Buscar reparto, cliente o producto" value="${escapeHtml(state.dispatchSearch)}"><input id="produccionDispatchRange" class="form-control ios-input produccion-dispatch-filter" placeholder="Seleccionar rango de fechas" value="${escapeHtml(state.dispatchRange)}"><div class="toolbar-scroll-x inventario-period-actions-scroll"><button id="produccionDispatchClearBtn" type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn ${(state.dispatchRange || state.dispatchSearch) ? '' : 'd-none'}"><i class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></button><button id="produccionDispatchApplyBtn" type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn"><i class="fa-solid fa-filter"></i><span>Aplicar</span></button><button id="produccionDispatchExpandBtn" type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button><button id="produccionDispatchExcelBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="fa-solid fa-file-excel"></i><span>Excel</span></button><span class="inventario-period-divider" aria-hidden="true"></span><button id="produccionDispatchPrintBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-print"></i><span>Imprimir período</span></button><button id="produccionDispatchMassBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-regular fa-file-lines"></i><span>Planillas masivas</span></button></div></div><div id="produccionDispatchTableWrap"></div>`;
     const rangeInput = nodes.dispatchView.querySelector('#produccionDispatchRange');
     if (window.flatpickr && rangeInput) {
       const locale = window.flatpickr.l10ns?.es || undefined;
@@ -2436,6 +2580,21 @@
         }
       });
     }
+    const searchInput = nodes.dispatchView.querySelector('#produccionDispatchSearch');
+    const clearBtn = nodes.dispatchView.querySelector('#produccionDispatchClearBtn');
+    const refreshDispatchFilters = () => {
+      state.dispatchSearch = normalizeValue(searchInput?.value);
+      state.dispatchPage = 1;
+      renderDispatchHistoryTable();
+      clearBtn?.classList.toggle('d-none', !(state.dispatchRange || state.dispatchSearch));
+    };
+    searchInput?.addEventListener('input', refreshDispatchFilters);
+    searchInput?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        refreshDispatchFilters();
+      }
+    });
     renderDispatchHistoryTable();
     alignScrollActionsToRight(nodes.dispatchView);
   };
@@ -2522,7 +2681,7 @@
     nodes.dispatchView.innerHTML = `<div class="inventario-period-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Nuevo reparto</h6></div>
     <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">1</span> Datos generales</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Día de reparto</label><input id="dispatchDateInput" class="form-control ios-input" value="${escapeHtml(draft.dispatchDate)}"></div><div class="recipe-field recipe-field-half"><div class="dispatch-client-head"><label class="form-label mb-0">Cliente <small class="dispatch-client-helper">(si no existe, crealo)</small></label><button type="button" class="btn ios-btn ios-btn-secondary dispatch-quick-client-btn" id="dispatchQuickCreateClientBtn"><i class="fa-solid fa-plus"></i><span>Nuevo cliente</span></button></div><div class="inventario-provider-search-wrap"><input id="dispatchClientInput" class="form-control ios-input" placeholder="Buscar por nombre, DNI o CUIL" value="${escapeHtml(draft.clientName)}"><input type="hidden" id="dispatchClientId" value="${escapeHtml(draft.clientId)}"></div></div><div class="recipe-field recipe-field-half"><label class="form-label">Dirección de reparto</label><input id="dispatchClientAddressInput" class="form-control ios-input" placeholder="Dirección" value="${escapeHtml(draft.clientAddress || '')}" ${draft.clientId ? '' : 'disabled'}></div><div class="recipe-field recipe-field-half"><label class="form-label">Localidad</label><input id="dispatchClientCityInput" class="form-control ios-input" placeholder="Localidad" value="${escapeHtml(draft.clientCity || '')}" ${draft.clientId ? '' : 'disabled'}></div><div class="recipe-field recipe-field-half"><label class="form-label">Provincia</label><select id="dispatchClientProvinceInput" class="form-select ios-input" ${draft.clientId ? '' : 'disabled'}>${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${normalizeValue(draft.clientProvince || 'Santa Fe') === item ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select></div><div class="recipe-field recipe-field-half"><label class="form-label">País</label><input id="dispatchClientCountryInput" class="form-control ios-input" value="${escapeHtml(draft.clientCountry || 'Argentina')}" ${draft.clientId ? '' : 'disabled'}></div></div></section>
     <section class="recipe-step-card step-block produccion-dispatch-create"><div class="d-flex align-items-center justify-content-between mb-2"><h6 class="step-title mb-0"><span class="recipe-step-number">2</span> Productos a repartir</h6></div><div class="table-responsive recipe-table-wrap dispatch-products-table"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Producto</th><th>Kilos</th><th>Stock</th><th>Lote</th><th>Vencimiento</th><th></th></tr></thead><tbody>${lineRows}${commentRows}${proofRows}</tbody></table></div><div class="toolbar-scroll-x dispatch-actions-row mt-2"><button type="button" class="btn ios-btn ios-btn-success recipe-table-action-btn" id="dispatchAddProductBtn"><i class="fa-solid fa-plus"></i><span>Producto</span></button><button type="button" class="btn recipe-table-action-btn recipe-table-action-btn-neutral" id="dispatchAddCommentBtn"><i class="fa-regular fa-message"></i><span>Comentario</span></button><button type="button" class="btn recipe-table-action-btn recipe-table-action-btn-monography" id="dispatchAddProofBtn"><i class="fa-solid fa-paperclip"></i><span>Adjuntar comprobantes</span></button></div></section>
-    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">3</span> Vehículo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Transporte habilitado (UTA/URA)</label><small class="d-block text-muted mb-1">Unidad de Transporte Alimentario / Unidad de Reparto Alimentario.</small><div class="inventario-provider-search-wrap"><input id="dispatchVehicleInput" class="form-control ios-input" placeholder="Seleccionar unidad habilitada" value="${escapeHtml(draft.vehicleSearch || (draft.vehicleId ? formatDispatchVehicleLabel(getDispatchVehicle(draft.vehicleId)) : ''))}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"><input type="hidden" id="dispatchVehicleSelect" value="${escapeHtml(draft.vehicleId)}"></div><div class="dispatch-vehicle-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchAddVehicleBtn"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchManageVehiclesBtn"><i class="fa-solid fa-pen-to-square"></i><span>Gestionar UTA/URA</span></button></div></div><div class="recipe-field recipe-field-half"><label class="form-label">Responsables</label><div class="input-group ios-input-group ingredientes-search-group dispatch-managers-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchManagersSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar responsable" value="${escapeHtml(draft.managerSearch || '')}"></div><div class="produccion-managers-grid">${Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-check" data-user-search="${escapeHtml(normalizeLower(`${user.fullName || ''} ${user.email || ''} ${getDispatchUserRole(user) || ''}`))}"><input type="checkbox" data-dispatch-manager="${escapeHtml(user.id)}" ${draft.managers.includes(user.id) ? 'checked' : ''}>${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(getDispatchUserRole(user))}</small></span></label>`).join('')}</div></div></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchSaveBtn"><i class="fa-solid fa-floppy-disk"></i><span>Guardar reparto</span></button></div>`;
+    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">3</span> Vehículo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Transporte habilitado (UTA/URA)</label><small class="d-block text-muted mb-1">Unidad de Transporte Alimentario / Unidad de Reparto Alimentario.</small><div class="inventario-provider-search-wrap"><input id="dispatchVehicleInput" class="form-control ios-input" placeholder="Seleccionar unidad habilitada" value="${escapeHtml(draft.vehicleSearch || (draft.vehicleId ? formatDispatchVehicleLabel(getDispatchVehicle(draft.vehicleId)) : ''))}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"><input type="hidden" id="dispatchVehicleSelect" value="${escapeHtml(draft.vehicleId)}"></div><div class="dispatch-vehicle-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchAddVehicleBtn"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchManageVehiclesBtn"><i class="fa-solid fa-pen-to-square"></i><span>Gestionar UTA/URA</span></button></div></div><div class="recipe-field recipe-field-half"><label class="form-label">Responsables</label><div class="input-group ios-input-group ingredientes-search-group dispatch-managers-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchManagersSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar responsable" value="${escapeHtml(draft.managerSearch || '')}"></div><div class="produccion-managers-grid">${Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-check" data-user-search="${escapeHtml(normalizeLower(`${user.fullName || ''} ${user.email || ''} ${getDispatchUserRole(user) || ''}`))}"><input type="checkbox" data-dispatch-manager="${escapeHtml(user.id)}" value="${escapeHtml(user.id)}" ${draft.managers.includes(user.id) ? 'checked' : ''}>${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(getDispatchUserRole(user))}</small></span></label>`).join('')}</div></div></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchSaveBtn"><i class="fa-solid fa-floppy-disk"></i><span>Guardar reparto</span></button></div>`;
     const dateInput = nodes.dispatchView.querySelector('#dispatchDateInput');
     if (window.flatpickr && dateInput) {
       window.flatpickr(dateInput, {
@@ -4541,7 +4700,7 @@
       draft.clientCity = normalizeValue(nodes.dispatchView.querySelector('#dispatchClientCityInput')?.value);
       draft.clientProvince = normalizeValue(nodes.dispatchView.querySelector('#dispatchClientProvinceInput')?.value) || 'Santa Fe';
       draft.clientCountry = normalizeValue(nodes.dispatchView.querySelector('#dispatchClientCountryInput')?.value) || 'Argentina';
-      draft.managers = [...nodes.dispatchView.querySelectorAll('[data-dispatch-manager]:checked')].map((n) => n.value).filter(Boolean);
+      draft.managers = [...nodes.dispatchView.querySelectorAll('[data-dispatch-manager]:checked')].map((n) => normalizeValue(n.dataset.dispatchManager || n.value)).filter(Boolean);
       draft.comments = [...nodes.dispatchView.querySelectorAll('[data-dispatch-comment]')].map((n) => normalizeValue(n.value)).filter(Boolean);
       draft.proofs = Array.isArray(draft.proofs) ? draft.proofs.filter((item) => normalizeValue(item?.url)) : [];
       if (!draft.clientId) {
@@ -4598,11 +4757,16 @@
         clientId: draft.clientId,
         vehicleId: draft.vehicleId,
         managers: draft.managers,
+        managerProfiles: draft.managers.map((token) => {
+          const manager = getManagerDisplay(token);
+          return { id: token, name: manager.name, role: manager.role };
+        }),
         comments: draft.comments,
         proofs: draft.proofs,
         clientSnapshot: {
           id: draft.clientId,
           name: draft.clientName,
+          doc: normalizeValue(getDispatchClient(draft.clientId)?.doc),
           address: draft.clientAddress,
           city: draft.clientCity,
           province: draft.clientProvince,
@@ -4621,15 +4785,19 @@
     }
     if (event.target.closest('#produccionDispatchApplyBtn')) {
       state.dispatchSearch = normalizeValue(nodes.dispatchView.querySelector('#produccionDispatchSearch')?.value);
-      state.dispatchRange = normalizeValue(nodes.dispatchView.querySelector('#produccionDispatchRange')?.value);
+      state.dispatchRange = normalizeValue(state.dispatchRange || nodes.dispatchView.querySelector('#produccionDispatchRange')?.value);
       state.dispatchPage = 1;
       renderDispatchHistoryTable();
+      nodes.dispatchView.querySelector('#produccionDispatchClearBtn')?.classList.toggle('d-none', !(state.dispatchRange || state.dispatchSearch));
       return;
     }
     if (event.target.closest('#produccionDispatchClearBtn')) {
+      state.dispatchSearch = '';
       state.dispatchRange = '';
       const rangeInput = nodes.dispatchView.querySelector('#produccionDispatchRange');
       if (rangeInput) rangeInput.value = '';
+      const searchInput = nodes.dispatchView.querySelector('#produccionDispatchSearch');
+      if (searchInput) searchInput.value = '';
       state.dispatchPage = 1;
       renderDispatchMain();
       return;
@@ -4640,37 +4808,114 @@
         await openIosSwal({ title: 'Sin datos', html: '<p>No hay repartos para imprimir.</p>', icon: 'info' });
         return;
       }
-      const win = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=900');
+      const askDetail = await openIosSwal({
+        title: 'Incluir Desglose',
+        html: '<p>¿Querés incluir los datos colapsados de Repartos donde ves el detalle de productos?</p>',
+        showCancelButton: true,
+        showDenyButton: true,
+        confirmButtonText: 'Incluir',
+        denyButtonText: 'No incluir',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+          confirmButton: 'ios-btn ios-btn-success',
+          denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical',
+          cancelButton: 'ios-btn ios-btn-secondary'
+        }
+      });
+      if (!askDetail.isConfirmed && !askDetail.isDenied) return;
+      const includeDetail = askDetail.isConfirmed;
+      const win = window.open('', '_blank', 'width=1280,height=920');
       if (!win) return;
-      const body = rows.map((row) => {
-        const client = getDispatchClient(row.clientId);
+      win.document.write('<html><head><title>Cargando impresión...</title></head><body style="font-family:Inter,Arial,sans-serif;padding:16px;color:#223457;">Preparando impresión de repartos...</body></html>');
+      win.document.close();
+      const imageUrls = rows.flatMap((row) => {
+        const products = Array.isArray(row.products) ? row.products : [];
+        return products.map((item) => sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl)).filter(Boolean);
+      });
+      await preloadPrintImages(imageUrls);
+      const body = rows.flatMap((row, index) => {
+        const client = { ...getDispatchClient(row.clientId), ...safeObject(row.clientSnapshot) };
         const products = Array.isArray(row.products) ? row.products : [];
         const kg = products.reduce((acc, p) => acc + Number(p.qtyKg || 0), 0);
-        return `<tr><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${products.length}</td><td>${kg.toFixed(2)} kg</td><td>${escapeHtml(row.code || '-')}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
+        const expiries = [...new Set(products.flatMap((item) => (Array.isArray(item.allocations) ? item.allocations : []).map((l) => normalizeValue(l.expiryDate)).filter(Boolean)))];
+        const expiryLabel = expiries.length === 1 ? formatIsoEs(expiries[0]) : (expiries.length ? 'Ver detalle' : '-');
+        const customerDoc = normalizeValue(client.doc || client.dni || client.cuit || client.cuil || client.document || client.taxId);
+        const locationParts = [client.address, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean);
+        const locationText = `${locationParts.join(' • ')}${customerDoc ? ` • ${customerDoc}` : ''}`;
+        const repartoHead = `<tr class="is-dispatch-head-row"><td colspan="6"><div class="dispatch-print-head"><span class="dispatch-print-truck">🚚</span><div><h3>${escapeHtml(row.code || '-')}</h3><p>${escapeHtml(locationText)}</p></div></div></td></tr>`;
+        const summary = `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${products.length === 1 ? '1 producto' : `${products.length} productos`}</td><td>${kg.toFixed(2)} kg</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || '-')}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
+        if (!includeDetail) return [repartoHead, summary];
+        const detailRows = products.flatMap((item) => {
+          const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
+          const allocations = Array.isArray(item.allocations) && item.allocations.length
+            ? item.allocations
+            : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
+          return allocations.map((allocation) => `<tr class="is-dispatch-trace-row"><td>↳ <span style="display:inline-flex;align-items:center;gap:8px;">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(item.recipeTitle || '-')}</span></span></td><td>${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${Number(getRegistroById(allocation.productionId)?.quantityKg || allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${normalizeValue(allocation.productionId) ? 'Trazabilidad' : 'Sin trazabilidad'}</td><td>${escapeHtml(client.name || '-')}</td></tr>`);
+        });
+        const locationRow = locationText
+          ? `<tr class="is-dispatch-internal-row"><td colspan="6">🏠 ${escapeHtml(locationText)}</td></tr>`
+          : '';
+        return [repartoHead, summary, ...detailRows, locationRow].filter(Boolean);
       }).join('');
-      win.document.write(`<html><head><title>Repartos</title><style>body{font-family:Inter,Arial,sans-serif;padding:12px;color:#223457}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d5def2;padding:8px}th{background:#eef3ff}</style></head><body><h2>Salida de Productos</h2><table><thead><tr><th>Fecha</th><th>Productos</th><th>Cantidad</th><th>Código</th><th>Cliente</th></tr></thead><tbody>${body}</tbody></table></body></html>`);
+      win.document.write(`<html><head><title>Repartos</title><style>body{font-family:Inter,Arial,sans-serif;padding:12px;color:#223457}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #d5def2;padding:8px;font-size:11px;vertical-align:top;word-break:break-word}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.03em}.is-dispatch-head-row td{background:#fff}.dispatch-print-head{display:flex;align-items:center;gap:10px}.dispatch-print-head h3{margin:0;font-size:26px;line-height:1.1;color:#1f2a44}.dispatch-print-head p{margin:2px 0 0;color:#6d7ca3;font-size:18px}.dispatch-print-truck{width:48px;height:48px;border-radius:999px;border:1px solid #d7def2;display:inline-flex;align-items:center;justify-content:center;background:#fff;font-size:24px}.is-dispatch-trace-row td{background:#ffecef;color:#1f2a44}.is-dispatch-internal-row td{background:#fff2e3;color:#1f2a44;font-weight:400;text-align:center}</style></head><body><h2>Salida de Productos</h2><table><thead><tr><th>Fecha</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th></tr></thead><tbody>${body || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table></body></html>`);
       win.document.close();
       win.focus();
+      await waitPrintAssets(win);
       win.print();
       return;
     }
     if (event.target.closest('#produccionDispatchExcelBtn')) {
-      const rows = getDispatchRows().map((row) => {
-        const client = getDispatchClient(row.clientId);
+      const headers = ['Fecha', 'Productos', 'Cantidad (kg)', 'Vencimiento', 'Número de reparto', 'Cliente'];
+      const rows = getDispatchRows().flatMap((row) => {
         const products = Array.isArray(row.products) ? row.products : [];
-        return {
+        const kgTotal = products.reduce((acc, item) => acc + Number(item.qtyKg || 0), 0);
+        const expiries = [...new Set(products.flatMap((item) => (Array.isArray(item.allocations) ? item.allocations : []).map((l) => normalizeValue(l.expiryDate)).filter(Boolean)))];
+        const expiryLabel = expiries.length === 1 ? formatIsoEs(expiries[0]) : (expiries.length ? 'Ver detalle' : '-');
+        const client = { ...getDispatchClient(row.clientId), ...safeObject(row.clientSnapshot) };
+        const summary = {
           Fecha: formatDateTime(row.createdAt),
-          Cliente: client.name || '-',
-          Código: row.code || '-',
-          Productos: products.length,
-          'Cantidad (kg)': products.reduce((acc, p) => acc + Number(p.qtyKg || 0), 0).toFixed(2)
+          Productos: `${products.length} ${products.length === 1 ? 'producto' : 'productos'}`,
+          'Cantidad (kg)': `${kgTotal.toFixed(2)} kg`,
+          Vencimiento: expiryLabel,
+          'Número de reparto': row.code || row.id || '-',
+          Cliente: client.name || '-'
         };
+        const detailRows = products.flatMap((item) => {
+          const allocations = Array.isArray(item.allocations) && item.allocations.length
+            ? item.allocations
+            : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
+          return allocations.map((allocation) => ({
+            Fecha: `↳ ${item.recipeTitle || '-'}`,
+            Productos: `${Number(allocation.qtyKg || 0).toFixed(2)} kg`,
+            'Cantidad (kg)': `${allocation.lotNumber || '-'} · ${Number(getRegistroById(allocation.productionId)?.quantityKg || allocation.qtyKg || 0).toFixed(2)} kg`,
+            Vencimiento: formatIsoEs(allocation.expiryDate || '') || '-',
+            'Número de reparto': normalizeValue(allocation.productionId) ? 'Trazabilidad' : 'Sin trazabilidad',
+            Cliente: client.name || '-',
+            __tone: 'trace'
+          }));
+        });
+        const locationParts = [client.address, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean);
+        const customerDoc = normalizeValue(client.doc || client.dni || client.cuit || client.cuil || client.document || client.taxId);
+        const locationMeta = [normalizeValue(client.name), customerDoc].filter(Boolean).join(' · ');
+        const locationRow = (locationParts.length || locationMeta)
+          ? [{
+            Fecha: `↳ 🏠 ${locationParts.join(' • ')}${locationMeta ? ` • ${locationMeta}` : ''}`,
+            Productos: '',
+            'Cantidad (kg)': '',
+            Vencimiento: '',
+            'Número de reparto': '',
+            Cliente: '',
+            __tone: 'internal_use',
+            __mergeAcross: true
+          }]
+          : [];
+        return [summary, ...detailRows, ...locationRow];
       });
       if (!rows.length) {
         await openIosSwal({ title: 'Sin datos', html: '<p>No hay repartos para exportar.</p>', icon: 'info' });
         return;
       }
-      await exportStyledExcel({ fileName: `repartos_periodo_${Date.now()}.xlsx`, sheetName: 'Repartos', headers: ['Fecha', 'Cliente', 'Código', 'Productos', 'Cantidad (kg)'], rows });
+      await exportStyledExcel({ fileName: `repartos_periodo_${Date.now()}.xlsx`, sheetName: 'Repartos', headers, rows });
       return;
     }
     if (event.target.closest('#produccionDispatchMassBtn')) {
@@ -4682,20 +4927,96 @@
       await openIosSwal({
         title: 'Salida de Productos · Vista ampliada',
         width: '92vw',
-        html: `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha</th><th>Productos</th><th>Cantidad</th><th>Código</th><th>Cliente</th></tr></thead><tbody>${rows.map((row) => {
-          const client = getDispatchClient(row.clientId);
-          const products = Array.isArray(row.products) ? row.products : [];
-          const kg = products.reduce((acc, p) => acc + Number(p.qtyKg || 0), 0);
-          return `<tr><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${products.length}</td><td>${kg.toFixed(2)} kg</td><td>${escapeHtml(row.code || '-')}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
-        }).join('') || '<tr><td colspan="5">Sin datos.</td></tr>'}</tbody></table></div>`,
-        confirmButtonText: 'Cerrar'
+        html: '<div id="dispatchExpandedWrap"></div>',
+        confirmButtonText: 'Cerrar',
+        didOpen: (popup) => {
+          const pageSize = 8;
+          let expandedPage = 1;
+          const renderExpanded = () => {
+            const pages = Math.max(1, Math.ceil(rows.length / pageSize));
+            expandedPage = Math.min(Math.max(1, expandedPage), pages);
+            const start = (expandedPage - 1) * pageSize;
+            const slice = rows.slice(start, start + pageSize);
+            const canCollapseRows = slice.some((row) => state.dispatchCollapse[row.id] === false);
+            const canExpandRows = slice.some((row) => state.dispatchCollapse[row.id] !== false);
+            const body = slice.map((row, index) => {
+              const products = Array.isArray(row.products) ? row.products : [];
+              const kg = products.reduce((acc, p) => acc + Number(p.qtyKg || 0), 0);
+              const expiries = [...new Set(products.flatMap((item) => (Array.isArray(item.allocations) ? item.allocations : []).map((l) => normalizeValue(l.expiryDate)).filter(Boolean)))];
+              const expiryLabel = expiries.length === 1 ? formatIsoEs(expiries[0]) : (expiries.length ? 'Ver detalle' : '-');
+              const client = { ...getDispatchClient(row.clientId), ...safeObject(row.clientSnapshot) };
+              const collapsed = state.dispatchCollapse[row.id] !== false;
+              const detail = !collapsed ? products.flatMap((item) => {
+                const allocations = Array.isArray(item.allocations) && item.allocations.length ? item.allocations : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
+                return allocations.map((allocation) => {
+                  const traceBtn = normalizeValue(allocation.productionId)
+                    ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button>`
+                    : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
+                  const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
+                  return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${Number(allocation.qtyKg || 0).toFixed(2)} kg</span></div></td><td>${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${Number(getRegistroById(allocation.productionId)?.quantityKg || allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td></tr>`;
+                });
+              }).join('') : '';
+              const locationParts = [client.address, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean);
+              const customerDoc = normalizeValue(client.doc || client.dni || client.cuit || client.cuil || client.document || client.taxId);
+              const locationMeta = [normalizeValue(client.name), customerDoc].filter(Boolean).join(' · ');
+              const locationRow = !collapsed && (locationParts.length || locationMeta)
+                ? `<tr class="inventario-internal-use-row"><td colspan="7"><i class="fa-solid fa-house"></i> ${escapeHtml(locationParts.join(' • '))}${locationMeta ? ` • ${escapeHtml(locationMeta)}` : ''}</td></tr>`
+                : '';
+              return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${products.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-collapse="${escapeHtml(row.id)}"><i class="fa-solid ${collapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(formatDateTime(row.createdAt))}</span></div></td><td>${products.length === 1 ? '1 producto' : `${products.length} productos`}</td><td>${kg.toFixed(2)} kg</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || '-')}</td><td>${escapeHtml(client.name || '-')}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-planilla="${escapeHtml(row.id)}"><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button></td></tr>${detail}${locationRow}`;
+            }).join('') || '<tr><td colspan="7">Sin datos.</td></tr>';
+            popup.querySelector('#dispatchExpandedWrap').innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-collapse-all ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-expand-all ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0 produccion-dispatch-table-center"><thead><tr><th>Fecha de reparto</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th><th>Planilla</th></tr></thead><tbody>${body}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+            prepareThumbLoaders('.js-produccion-thumb');
+          };
+          renderExpanded();
+          popup.addEventListener('click', async (expandedEvent) => {
+            const toggleBtn = expandedEvent.target.closest('[data-dispatch-expanded-collapse]');
+            if (toggleBtn) {
+              const id = toggleBtn.dataset.dispatchExpandedCollapse;
+              const collapsed = state.dispatchCollapse[id] !== false;
+              state.dispatchCollapse[id] = collapsed ? false : true;
+              renderExpanded();
+              renderDispatchHistoryTable();
+              return;
+            }
+            if (expandedEvent.target.closest('[data-dispatch-expanded-collapse-all]')) {
+              rows.forEach((row) => { state.dispatchCollapse[row.id] = true; });
+              renderExpanded();
+              renderDispatchHistoryTable();
+              return;
+            }
+            if (expandedEvent.target.closest('[data-dispatch-expanded-expand-all]')) {
+              rows.forEach((row) => { state.dispatchCollapse[row.id] = false; });
+              renderExpanded();
+              renderDispatchHistoryTable();
+              return;
+            }
+            const pageBtn = expandedEvent.target.closest('[data-dispatch-expanded-page]');
+            if (pageBtn) {
+              expandedPage += pageBtn.dataset.dispatchExpandedPage === 'next' ? 1 : -1;
+              renderExpanded();
+              return;
+            }
+            const traceBtn = expandedEvent.target.closest('[data-prod-trace]');
+            if (traceBtn) {
+              const reg = getRegistroById(traceBtn.dataset.prodTrace);
+              if (reg) await openTraceability(reg);
+              return;
+            }
+            const dispatchPlanillaBtn = expandedEvent.target.closest('[data-dispatch-planilla]');
+            if (dispatchPlanillaBtn) {
+              const dispatchRow = getDispatchRecordById(dispatchPlanillaBtn.dataset.dispatchPlanilla);
+              if (dispatchRow.id) await openDispatchPlanilla(dispatchRow);
+            }
+          });
+        }
       });
       return;
     }
     const collapseBtn = event.target.closest('[data-dispatch-collapse]');
     if (collapseBtn) {
       const id = collapseBtn.dataset.dispatchCollapse;
-      state.dispatchCollapse[id] = !state.dispatchCollapse[id];
+      const collapsed = state.dispatchCollapse[id] !== false;
+      state.dispatchCollapse[id] = collapsed ? false : true;
       renderDispatchHistoryTable();
       return;
     }
@@ -4713,6 +5034,18 @@
     if (event.target.closest('#inventarioGlobalExpandAllRowsBtn')) {
       getDispatchRows().forEach((row) => { state.dispatchCollapse[row.id] = false; });
       renderDispatchHistoryTable();
+      return;
+    }
+    const traceBtn = event.target.closest('[data-prod-trace]');
+    if (traceBtn) {
+      const reg = getRegistroById(traceBtn.dataset.prodTrace);
+      if (reg) await openTraceability(reg);
+      return;
+    }
+    const dispatchPlanillaBtn = event.target.closest('[data-dispatch-planilla]');
+    if (dispatchPlanillaBtn) {
+      const dispatchRow = getDispatchRecordById(dispatchPlanillaBtn.dataset.dispatchPlanilla);
+      if (dispatchRow.id) await openDispatchPlanilla(dispatchRow);
       return;
     }
   });
@@ -4978,8 +5311,14 @@
     }
     const traceBtn = event.target.closest('[data-prod-trace]');
     if (traceBtn) {
-      const reg = getRegistro(traceBtn.dataset.prodTrace);
+      const reg = getRegistroById(traceBtn.dataset.prodTrace);
       if (reg) await openTraceability(reg);
+      return;
+    }
+    const dispatchPlanillaBtn = event.target.closest('[data-dispatch-planilla]');
+    if (dispatchPlanillaBtn) {
+      const dispatchRow = getDispatchRecordById(dispatchPlanillaBtn.dataset.dispatchPlanilla);
+      if (dispatchRow.id) await openDispatchPlanilla(dispatchRow);
       return;
     }
     const traceImageBtn = event.target.closest('[data-prod-trace-images]');
