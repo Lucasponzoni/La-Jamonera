@@ -1588,7 +1588,7 @@
 
       const availableClass = Number(row.availableQty || 0) <= 0 ? 'is-zero' : '';
       const resolutionHtml = (!isCollapsed && resolutionRows.length)
-        ? resolutionRows.map((resolutionRow) => `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(resolutionRow.at))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td></tr>`).join('')
+        ? resolutionRows.map((resolutionRow) => `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(resolutionRow.at))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${resolutionRow.resolvedLabel}<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableLabel}</span></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td></tr>`).join('')
         : '';
       return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
         <td>${escapeHtml(row.entryDateTime)}${getExpiryBadgeHtml(row) ? `<br><small>${getExpiryBadgeHtml(row)}</small>` : ''}</td>
@@ -2106,16 +2106,38 @@
     const resolutions = Array.isArray(entry?.expiryResolutions) ? entry.expiryResolutions : [];
     const latest = resolutions[0] || {};
     const totalKg = Number(entry?.qtyKg || 0);
+    const totalQty = Number(entry?.qty || 0);
+    const unit = normalizeValue(entry?.unit || 'kilos');
+    const availableQty = getAvailableInUnit(entry, unit);
     const availableKg = getAvailableKg(entry);
     const resolvedKgRaw = Number(latest?.qtyKg || 0);
     const resolvedKg = resolvedKgRaw > 0 ? resolvedKgRaw : Math.max(0, totalKg - availableKg);
+    const resolvedQty = totalKg > 0.0001 && totalQty > 0.0001
+      ? Math.max(0, (resolvedKg / totalKg) * totalQty)
+      : Math.max(0, totalQty - availableQty);
     return {
       badge: meta.badge,
       status: meta.status,
       at: Number(latest?.createdAt || entry?.createdAt || 0),
       resolvedKg: Number(resolvedKg.toFixed(2)),
-      availableKg: Number(availableKg.toFixed(3))
+      availableKg: Number(availableKg.toFixed(3)),
+      resolvedQty: Number(resolvedQty.toFixed(4)),
+      availableQty: Number(availableQty.toFixed(4)),
+      unit,
+      resolvedLabel: formatResolutionQtyLabel(resolvedQty, unit),
+      availableLabel: formatResolutionQtyLabel(availableQty, unit)
     };
+  };
+
+  const formatResolutionQtyLabel = (qty, unit) => {
+    const amount = Number(qty || 0);
+    if (!Number.isFinite(amount)) return `0 ${getMeasureAbbr(unit)}`;
+    const safe = Math.abs(amount) < 0.0001 ? 0 : amount;
+    const meta = getUnitMeta(unit);
+    if (meta.category === 'unidad') {
+      return `${safe.toFixed(0)} ${getMeasureAbbr(unit)}`;
+    }
+    return `${safe.toFixed(2)} ${getMeasureAbbr(unit)}`;
   };
 
   const getEntryResolutionRowsData = (entry) => {
@@ -2125,16 +2147,32 @@
       return single ? [single] : [];
     }
     const totalKg = Number(entry?.qtyKg || 0);
+    const totalQty = Number(entry?.qty || 0);
+    const unit = normalizeValue(entry?.unit || 'kilos');
     const currentAvailableKg = getAvailableKg(entry);
+    const currentAvailableQty = getAvailableInUnit(entry, unit);
     let consumedByNewerResolutionsKg = 0;
+    let consumedByNewerResolutionsQty = 0;
     return resolutions
       .map((resolution) => {
         const status = normalizeValue(resolution?.type || entry?.expiryResolutionStatus || entry?.status);
         const baseLabel = getResolutionBaseLabel(status);
         if (!baseLabel) return null;
         const resolvedKg = Number(resolution?.qtyKg || 0);
+        const resolvedQtyFromResolution = Number(resolution?.qty);
+        let resolvedQty = Number.isFinite(resolvedQtyFromResolution) && resolvedQtyFromResolution > 0
+          ? resolvedQtyFromResolution
+          : 0;
+        if (resolvedQty <= 0 && resolvedKg > 0.0001 && totalKg > 0.0001 && totalQty > 0.0001) {
+          resolvedQty = (resolvedKg / totalKg) * totalQty;
+        }
+        if (resolvedQty <= 0 && resolutions.length === 1 && getAvailableQty(entry) <= 0.0001 && totalQty > 0.0001) {
+          resolvedQty = totalQty;
+        }
         const availableKgAtResolution = Math.max(0, currentAvailableKg + consumedByNewerResolutionsKg);
+        const availableQtyAtResolution = Math.max(0, currentAvailableQty + consumedByNewerResolutionsQty);
         consumedByNewerResolutionsKg += resolvedKg > 0 ? resolvedKg : 0;
+        consumedByNewerResolutionsQty += resolvedQty > 0 ? resolvedQty : 0;
         const isFull = availableKgAtResolution <= 0.0001;
         const badge = isFull
           ? `${baseLabel} (lote completo)`
@@ -2144,7 +2182,12 @@
           status,
           at: Number(resolution?.createdAt || entry?.createdAt || 0),
           resolvedKg: Number(Math.max(0, resolvedKg).toFixed(2)),
-          availableKg: Number(availableKgAtResolution.toFixed(3))
+          availableKg: Number(availableKgAtResolution.toFixed(3)),
+          resolvedQty: Number(Math.max(0, resolvedQty).toFixed(4)),
+          availableQty: Number(availableQtyAtResolution.toFixed(4)),
+          unit,
+          resolvedLabel: formatResolutionQtyLabel(resolvedQty, unit),
+          availableLabel: `${formatResolutionQtyLabel(availableQtyAtResolution, unit)}`
         };
       })
       .filter(Boolean);
@@ -2212,7 +2255,7 @@
           __tone: isBlueResolutionStatus(resolutionRow.status) ? 'resolution' : 'normal',
           fechaHora: formatDateTime(resolutionRow.at),
           fechaCaducidad: resolutionRow.badge,
-          cantidad: `-${resolutionRow.resolvedKg.toFixed(2)} kilos · disp. ${resolutionRow.availableKg.toFixed(3)} kg`,
+          cantidad: `-${resolutionRow.resolvedLabel} · disp. ${resolutionRow.availableLabel}`,
           factura: entry.invoiceNumber || '-',
           proveedor: providerLabel(entry.provider),
           imagenes: 'Resolución'
@@ -2242,7 +2285,7 @@
         rows.push({
           Fecha: `↳ ${formatDateTime(resolutionRow.at)}`,
           'Fecha caducidad': resolutionRow.badge,
-          Cantidad: `-${resolutionRow.resolvedKg.toFixed(2)} kilos · disp. ${resolutionRow.availableKg.toFixed(3)} kg`,
+          Cantidad: `-${resolutionRow.resolvedLabel} · disp. ${resolutionRow.availableLabel}`,
           'N° factura': entry.invoiceNumber || '-',
           Proveedor: providerLabel(entry.provider),
           Imágenes: 'Resolución',
@@ -2510,7 +2553,7 @@
       const strikeClass = expiryMeta.isExpired ? ' style="text-decoration:line-through;font-weight:700;color:#b42338"' : '';
       const mainRow = `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}${expiryMeta.isExpired ? ' is-expired-row-print' : ''}"><td>${escapeHtml(formatDateTime(entry.createdAt))}</td><td>${escapeHtml(entry.expiryDate || '-')}${expiryBadge ? `<br><small style="color:#b42338;font-weight:700">${escapeHtml(expiryBadge)}</small>` : ''}</td><td><span${strikeClass}>${escapeHtml(detail.qtyLabel)}</span><br><small${strikeClass}>${escapeHtml(detail.availableLabel)}</small></td><td><span${strikeClass}>${escapeHtml(detail.qtyLabel)}</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td>${includeImages ? (entryImageUrls(entry).length ? `Ver adjunto (${entryImageUrls(entry).length})` : 'Sin adjunto') : (entryImageUrls(entry).length ? `Posee ${entryImageUrls(entry).length} adjunto/s` : 'Sin adjunto')}</td></tr>`;
       const resolutionRows = getEntryResolutionRowsData(entry)
-        .map((resolution) => `<tr class="is-resolution-row-print"><td>${escapeHtml(`↳ ${formatDateTime(resolution.at)}`)}</td><td>${escapeHtml(entry.expiryDate || '-')}</td><td>${escapeHtml(`-${resolution.resolvedKg.toFixed(2)} kilos`)}</td><td>${escapeHtml(resolution.badge)}</td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td>Resolución</td></tr>`);
+        .map((resolution) => `<tr class="is-resolution-row-print"><td>${escapeHtml(`↳ ${formatDateTime(resolution.at)}`)}</td><td>${escapeHtml(entry.expiryDate || '-')}</td><td>${escapeHtml(`-${resolution.resolvedLabel}`)}</td><td>${escapeHtml(resolution.badge)}</td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td>Resolución</td></tr>`);
       if (!includeTrace) return [mainRow, ...resolutionRows].filter(Boolean);
       const traceRows = buildTraceRowsForEntry(entry).map((trace) => `<tr class="is-trace-row"><td>${escapeHtml(`↳ ${trace.fechaHora}`)}</td><td>${escapeHtml(trace.fechaCaducidad || '-')}</td><td>${escapeHtml(trace.cantidad)}</td><td>${escapeHtml(trace.factura)}</td><td>${escapeHtml(trace.proveedor)}</td><td class="inventario-provider-cell">Trazabilidad</td><td></td></tr>`);
       return [mainRow, ...resolutionRows, ...traceRows].filter(Boolean);
@@ -2611,7 +2654,7 @@
       const tableRows = productRows.flatMap((row) => {
         const expiryMeta = getEntryExpiryMeta(row); const expiryBadge = getExpiryBadgeText(row); const detail = formatEntryDetailLabel(row); const strikeClass = expiryMeta.isExpired ? ' style="text-decoration:line-through;font-weight:700;color:#b42338"' : ''; const mainRow = `<tr${expiryMeta.isExpired ? ' style="background:#ffecef"' : ''}><td>${escapeHtml(row.entryDateTime)}</td><td>${escapeHtml(row.noPerecedero ? 'No perecedero' : (row.expiryDate || 'No perecedero'))}${expiryBadge ? `<br><small style="color:#b42338;font-weight:700">${escapeHtml(expiryBadge)}</small>` : ''}</td><td><span${strikeClass}>${escapeHtml(detail.qtyLabel)}</span><br><small${strikeClass}>${escapeHtml(detail.availableLabel)}</small></td><td><span${strikeClass}>${escapeHtml(detail.qtyLabel)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td>${includeImages ? (row.invoiceImageUrls?.length ? `Ver adjunto (${row.invoiceImageUrls.length})` : 'Sin adjunto') : (row.invoiceImageUrls?.length ? `Posee ${row.invoiceImageUrls.length} adjunto/s` : 'Sin adjunto')}</td></tr>`;
         const resolutionRows = getEntryResolutionRowsData(row)
-          .map((resolution) => `<tr style="background:#fff6d9;"><td>${escapeHtml(`↳ ${formatDateTime(resolution.at)}`)}</td><td>${escapeHtml(row.noPerecedero ? 'No perecedero' : (row.expiryDate || 'No perecedero'))}</td><td>${escapeHtml(`-${resolution.resolvedKg.toFixed(2)} kilos`)}</td><td>${escapeHtml(resolution.badge)}</td><td>${escapeHtml(row.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(row.provider || '-')}</td><td>Resolución</td></tr>`);
+          .map((resolution) => `<tr style="background:#fff6d9;"><td>${escapeHtml(`↳ ${formatDateTime(resolution.at)}`)}</td><td>${escapeHtml(row.noPerecedero ? 'No perecedero' : (row.expiryDate || 'No perecedero'))}</td><td>${escapeHtml(`-${resolution.resolvedLabel}`)}</td><td>${escapeHtml(resolution.badge)}</td><td>${escapeHtml(row.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(row.provider || '-')}</td><td>Resolución</td></tr>`);
         if (!includeTrace) return [mainRow, ...resolutionRows].filter(Boolean);
         const traceRows = buildTraceRowsForEntry(row).map((trace) => `<tr style="background:#ffecef;"><td>${escapeHtml(`↳ ${trace.fechaHora}`)}</td><td>${escapeHtml(trace.fechaCaducidad || '-')}</td><td>${escapeHtml(trace.cantidad)}</td><td>${escapeHtml(trace.factura)}</td><td>${escapeHtml(trace.proveedor)}</td><td class="inventario-provider-cell">Trazabilidad</td><td></td></tr>`);
         return [mainRow, ...resolutionRows, ...traceRows].filter(Boolean);
@@ -3043,7 +3086,7 @@
       const availableClass = availableQtyInUnit <= 0.0001 ? 'is-zero' : '';
       const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
       const resolutionHtml = (!isCollapsed && resolutionRows.length)
-        ? resolutionRows.map((resolutionRow) => `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(resolutionRow.at)}</div></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td><td></td></tr>`).join('')
+        ? resolutionRows.map((resolutionRow) => `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(resolutionRow.at)}</div></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td class="inventario-trace-kilos">-${resolutionRow.resolvedLabel}<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableLabel}</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td><td></td></tr>`).join('')
         : '';
       const canEditEntry = availableQtyInUnit > 0.0001;
       return `
@@ -4295,7 +4338,7 @@
         const availableClass = availableQtyInUnit <= 0.0001 ? 'is-zero' : '';
         const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
         const resolutionHtml = (!isCollapsed && resolutionRows.length)
-          ? resolutionRows.map((resolutionRow) => `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(resolutionRow.at)}</div></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td></tr>`).join('')
+          ? resolutionRows.map((resolutionRow) => `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(resolutionRow.at)}</div></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td class="inventario-trace-kilos">-${resolutionRow.resolvedLabel}<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableLabel}</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td></tr>`).join('')
           : '';
         return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${formatEntryDateTime(entry.entryDate, entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}</td><td>${escapeHtml(formatExpiryForUi(entry))} </td><td><strong class="${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</strong><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRows.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expanded-entry-collapse="${entry.id}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(entryImageUrls(entry))}</div></td></tr>${resolutionHtml}${traceHtml}`;
       }).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos para mostrar.</td></tr>';
@@ -5591,7 +5634,7 @@
       const traceHtml = (!isCollapsed && traceRows.length)
         ? traceRows.map((trace) => `<tr class="${trace.internalUse ? 'inventario-internal-use-row' : 'inventario-trace-row'}"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(trace.createdAt))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td>${trace.internalUse ? '<span class="inventario-resolution-badge">Uso interno en empresa</span>' : escapeHtml(trace.expiryDateAtProduction || 'No perecedero')}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml(trace.internalUse ? row.provider : trace.productionId)}</td><td>${trace.internalUse ? '<span class="inventario-internal-no-trace">Sin trazabilidad</span>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td></tr>`).join('') : '';
       const resolutionHtml = (!isCollapsed && resolutionRows.length)
-        ? resolutionRows.map((resolutionRow) => `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(resolutionRow.at))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td></tr>`).join('')
+        ? resolutionRows.map((resolutionRow) => `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(resolutionRow.at))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${resolutionRow.resolvedLabel}<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableLabel}</span></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td></tr>`).join('')
         : '';
       return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(row.entryDateTime)}${getExpiryBadgeHtml(row) ? `<br><small>${getExpiryBadgeHtml(row)}</small>` : ''}</td><td>${escapeHtml(row.ingredientName)}</td><td><span class="${expiredQtyClass}">${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</span></td><td><span class="${expiredQtyClass}">${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</span><br><span class="inventario-available-line ${Number(row.availableQty || 0) <= 0 ? 'is-zero' : ''} ${expiredQtyClass}">disp. ${Number(row.availableQty || 0).toFixed(2)} ${escapeHtml(getMeasureAbbr(row.unit || ''))}${row.packageQty ? ` x${row.packageQty}` : ''}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRows.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expand-toggle-collapse="${row.entryId}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(row.invoiceImageUrls)}</div></td></tr>${resolutionHtml}${traceHtml}`;
     }).join('') : '<tr><td colspan="7" class="text-center">Sin ingresos en ese rango.</td></tr>';
@@ -5690,7 +5733,7 @@
       const resolutions = resolutionRows.map((resolutionRow) => ({
         'Fecha y hora': `↳ ${formatDateTime(resolutionRow.at)}`,
         Producto: row.ingredientName,
-        Kilos: `-${resolutionRow.resolvedKg.toFixed(2)} kg`,
+        Kilos: `-${resolutionRow.resolvedLabel}`,
         Cantidad: resolutionRow.badge,
         'N° factura': row.invoiceNumber,
         Proveedor: providerLabel(row.provider),
