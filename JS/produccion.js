@@ -5070,6 +5070,7 @@
     state.historyRange = normalizeValue(nodes.historyRange?.value);
     nodes.historyClearBtn?.classList.toggle('d-none', !(state.historyRange || state.historySearch));
     state.historyPage = 1;
+    nodes.historyClearBtn?.classList.toggle('d-none', !(state.historyRange || state.historySearch));
     renderHistoryTable();
   });
   nodes.historySearch?.addEventListener('input', () => {
@@ -5410,9 +5411,12 @@
 
   const parseWeeklyRangeValue = (value = '') => {
     const raw = normalizeValue(value);
-    if (!raw.includes(' a ')) return { from: '', to: '' };
-    const [from, to] = raw.split(' a ').map((item) => normalizeValue(item));
-    return { from, to };
+    if (!raw) return { from: '', to: '' };
+    const parts = raw.split(/\s+to\s+|\s+a\s+/i).map((item) => normalizeValue(item));
+    return {
+      from: parts[0] || '',
+      to: parts[1] || parts[0] || ''
+    };
   };
   const addIsoDays = (isoDate, days = 0) => {
     const date = new Date(`${normalizeValue(isoDate)}T00:00:00`);
@@ -5423,18 +5427,18 @@
   const askRequiredRangeForWeeklyProductionSheet = async () => {
     const picker = await openIosSwal({
       title: 'Rango obligatorio para planilla',
-      html: '<p>Para evitar procesar datos infinitos, seleccioná un rango de fechas antes de continuar.</p><input id="weeklySheetRangeInput" class="swal2-input ios-input" placeholder="Seleccionar rango">',
+      html: '<p>Para evitar procesar datos infinitos, seleccioná un rango de fechas antes de continuar.</p><input id="sheetRangeInput" class="swal2-input ios-input" placeholder="Seleccionar rango">',
       showCancelButton: true,
       confirmButtonText: 'Continuar',
       cancelButtonText: 'Cancelar',
       didOpen: () => {
-        const input = document.getElementById('weeklySheetRangeInput');
+        const input = document.getElementById('sheetRangeInput');
         if (window.flatpickr && input) {
           window.flatpickr(input, { locale: window.flatpickr.l10ns?.es || undefined, mode: 'range', dateFormat: 'Y-m-d', allowInput: false, disableMobile: true });
         }
       },
       preConfirm: () => {
-        const parsed = parseWeeklyRangeValue(normalizeValue(document.getElementById('weeklySheetRangeInput')?.value));
+        const parsed = parseWeeklyRangeValue(normalizeValue(document.getElementById('sheetRangeInput')?.value));
         if (!parsed.from || !parsed.to) {
           Swal.showValidationMessage('Debés seleccionar un rango completo (desde y hasta).');
           return false;
@@ -5512,8 +5516,23 @@
       }).join('');
       return `<section class="weekly-sheet-block ${idx ? 'page-break' : ''}"><h3>FRIGORIFICO LA JAMONERA • PLANILLA DE PRODUCCION SEMANAL</h3><h4>SEMANA DE ${formatIsoEs(week)} A ${formatIsoEs(addIsoDays(week, 6))}</h4><div class="table-responsive"><table class="weekly-sheet-table"><thead><tr><th>CATEGORIA</th><th>SUBCATEGORIA</th><th>PRODUCTO</th>${days.map((d) => `<th>${d.toUpperCase()}</th>`).join('')}<th>TOTAL</th></tr></thead><tbody>${rowsHtml || '<tr><td colspan="9">Sin datos.</td></tr>'}</tbody></table></div></section>`;
     }).join('')}</div>`;
-    await Swal.fire({ title: 'Generando planilla...', html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando planilla" class="meta-spinner-login"></div>', allowOutsideClick: false, showConfirmButton: false, customClass: { popup: 'ios-alert produccion-loading-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' } });
-    Swal.close();
+    await openIosSwal({
+      title: 'Generando planilla...',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando planilla" class="meta-spinner-login"></div>',
+      allowOutsideClick: false,
+      showConfirmButton: false,
+      customClass: { popup: 'produccion-loading-alert' },
+      didOpen: async () => {
+        const closeLoader = () => {
+          if (Swal.isVisible()) Swal.close();
+        };
+        try {
+          await Promise.resolve();
+        } finally {
+          closeLoader();
+        }
+      }
+    });
     await openIosSwal({
       title: 'Planilla de Producción Semanal',
       width: 'min(1400px,98vw)',
