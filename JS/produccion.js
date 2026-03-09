@@ -657,7 +657,7 @@
       if (data.__mergeAcross) {
         ws.mergeCells(row.number, 1, row.number, headers.length);
         const mergedCell = row.getCell(1);
-        mergedCell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+        mergedCell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
       }
     });
     const buf = await wb.xlsx.writeBuffer();
@@ -4741,9 +4741,9 @@
         const customerDoc = normalizeValue(client.doc || client.dni || client.cuit || client.cuil || client.document || client.taxId);
         const locationParts = [client.address, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean);
         const locationText = `${locationParts.join(' • ')}${customerDoc ? ` • ${customerDoc}` : ''}`;
-        const truckCode = `<span style="display:inline-flex;align-items:center;gap:8px;"><span style="width:26px;height:26px;border-radius:999px;border:1px solid #d7def2;display:inline-flex;align-items:center;justify-content:center;background:#fff;">🚚</span><strong>${escapeHtml(row.code || '-')}</strong></span>`;
-        const summary = `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${products.length === 1 ? '1 producto' : `${products.length} productos`}</td><td>${kg.toFixed(2)} kg</td><td>${escapeHtml(expiryLabel)}</td><td>${truckCode}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
-        if (!includeDetail) return [summary];
+        const repartoHead = `<tr class="is-dispatch-head-row"><td colspan="6"><div class="dispatch-print-head"><span class="dispatch-print-truck">🚚</span><div><h3>${escapeHtml(row.code || '-')}</h3><p>${escapeHtml(locationText)}</p></div></div></td></tr>`;
+        const summary = `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${products.length === 1 ? '1 producto' : `${products.length} productos`}</td><td>${kg.toFixed(2)} kg</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || '-')}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
+        if (!includeDetail) return [repartoHead, summary];
         const detailRows = products.flatMap((item) => {
           const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
           const allocations = Array.isArray(item.allocations) && item.allocations.length
@@ -4754,9 +4754,9 @@
         const locationRow = locationText
           ? `<tr class="is-dispatch-internal-row"><td colspan="6">🏠 ${escapeHtml(locationText)}</td></tr>`
           : '';
-        return [summary, ...detailRows, locationRow].filter(Boolean);
+        return [repartoHead, summary, ...detailRows, locationRow].filter(Boolean);
       }).join('');
-      win.document.write(`<html><head><title>Repartos</title><style>body{font-family:Inter,Arial,sans-serif;padding:12px;color:#223457}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d5def2;padding:8px}th{background:#eef3ff;font-size:11px;text-transform:uppercase;letter-spacing:.03em}.is-dispatch-trace-row td{background:#ffecef;color:#1f2a44}.is-dispatch-internal-row td{background:#fff2e3;color:#1f2a44;font-weight:700}</style></head><body><h2>Salida de Productos</h2><table><thead><tr><th>Fecha</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th></tr></thead><tbody>${body || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table></body></html>`);
+      win.document.write(`<html><head><title>Repartos</title><style>body{font-family:Inter,Arial,sans-serif;padding:12px;color:#223457}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #d5def2;padding:8px;font-size:11px;vertical-align:top;word-break:break-word}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.03em}.is-dispatch-head-row td{background:#fff}.dispatch-print-head{display:flex;align-items:center;gap:10px}.dispatch-print-head h3{margin:0;font-size:26px;line-height:1.1;color:#1f2a44}.dispatch-print-head p{margin:2px 0 0;color:#6d7ca3;font-size:18px}.dispatch-print-truck{width:48px;height:48px;border-radius:999px;border:1px solid #d7def2;display:inline-flex;align-items:center;justify-content:center;background:#fff;font-size:24px}.is-dispatch-trace-row td{background:#ffecef;color:#1f2a44}.is-dispatch-internal-row td{background:#fff2e3;color:#1f2a44;font-weight:400;text-align:center}</style></head><body><h2>Salida de Productos</h2><table><thead><tr><th>Fecha</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th></tr></thead><tbody>${body || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table></body></html>`);
       win.document.close();
       win.focus();
       await waitPrintAssets(win);
