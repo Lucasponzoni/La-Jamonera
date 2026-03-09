@@ -650,12 +650,15 @@
           right: { style: 'thin', color: { argb: 'FFD8E2F5' } }
         };
         cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-        if (data.__tone === 'trace') {
-          cell.font = { color: { argb: 'FFB42338' }, bold: true };
-        } else if (data.__tone === 'internal_use') {
-          cell.font = { color: { argb: 'FF9A4F0A' }, bold: true };
+        if (data.__tone === 'trace' || data.__tone === 'internal_use') {
+          cell.font = { color: { argb: 'FF1F2A44' }, bold: true };
         }
       });
+      if (data.__mergeAcross) {
+        ws.mergeCells(row.number, 1, row.number, headers.length);
+        const mergedCell = row.getCell(1);
+        mergedCell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+      }
     });
     const buf = await wb.xlsx.writeBuffer();
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -4704,17 +4707,57 @@
         await openIosSwal({ title: 'Sin datos', html: '<p>No hay repartos para imprimir.</p>', icon: 'info' });
         return;
       }
-      const win = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=900');
+      const askDetail = await openIosSwal({
+        title: 'Incluir Desglose',
+        html: '<p>¿Querés incluir los datos colapsados de Repartos donde ves el detalle de productos?</p>',
+        showCancelButton: true,
+        showDenyButton: true,
+        confirmButtonText: 'Incluir',
+        denyButtonText: 'No incluir',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+          confirmButton: 'ios-btn ios-btn-success',
+          denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical',
+          cancelButton: 'ios-btn ios-btn-secondary'
+        }
+      });
+      if (!askDetail.isConfirmed && !askDetail.isDenied) return;
+      const includeDetail = askDetail.isConfirmed;
+      const imageUrls = rows.flatMap((row) => {
+        const products = Array.isArray(row.products) ? row.products : [];
+        return products.map((item) => sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl)).filter(Boolean);
+      });
+      await preloadPrintImages(imageUrls);
+      const win = window.open('', '_blank', 'noopener,noreferrer,width=1280,height=920');
       if (!win) return;
-      const body = rows.map((row) => {
-        const client = getDispatchClient(row.clientId);
+      const body = rows.flatMap((row, index) => {
+        const client = { ...getDispatchClient(row.clientId), ...safeObject(row.clientSnapshot) };
         const products = Array.isArray(row.products) ? row.products : [];
         const kg = products.reduce((acc, p) => acc + Number(p.qtyKg || 0), 0);
-        return `<tr><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${products.length}</td><td>${kg.toFixed(2)} kg</td><td>${escapeHtml(row.code || '-')}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
+        const expiries = [...new Set(products.flatMap((item) => (Array.isArray(item.allocations) ? item.allocations : []).map((l) => normalizeValue(l.expiryDate)).filter(Boolean)))];
+        const expiryLabel = expiries.length === 1 ? formatIsoEs(expiries[0]) : (expiries.length ? 'Ver detalle' : '-');
+        const customerDoc = normalizeValue(client.doc || client.dni || client.cuit || client.cuil || client.document || client.taxId);
+        const locationParts = [client.address, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean);
+        const locationText = `${locationParts.join(' • ')}${customerDoc ? ` • ${customerDoc}` : ''}`;
+        const truckCode = `<span style="display:inline-flex;align-items:center;gap:8px;"><span style="width:26px;height:26px;border-radius:999px;border:1px solid #d7def2;display:inline-flex;align-items:center;justify-content:center;background:#fff;">🚚</span><strong>${escapeHtml(row.code || '-')}</strong></span>`;
+        const summary = `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${products.length === 1 ? '1 producto' : `${products.length} productos`}</td><td>${kg.toFixed(2)} kg</td><td>${escapeHtml(expiryLabel)}</td><td>${truckCode}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
+        if (!includeDetail) return [summary];
+        const detailRows = products.flatMap((item) => {
+          const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
+          const allocations = Array.isArray(item.allocations) && item.allocations.length
+            ? item.allocations
+            : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
+          return allocations.map((allocation) => `<tr class="is-dispatch-trace-row"><td>↳ <span style="display:inline-flex;align-items:center;gap:8px;">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(item.recipeTitle || '-')}</span></span></td><td>${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${Number(getRegistroById(allocation.productionId)?.quantityKg || allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${normalizeValue(allocation.productionId) ? 'Trazabilidad' : 'Sin trazabilidad'}</td><td>${escapeHtml(client.name || '-')}</td></tr>`);
+        });
+        const locationRow = locationText
+          ? `<tr class="is-dispatch-internal-row"><td colspan="6">🏠 ${escapeHtml(locationText)}</td></tr>`
+          : '';
+        return [summary, ...detailRows, locationRow].filter(Boolean);
       }).join('');
-      win.document.write(`<html><head><title>Repartos</title><style>body{font-family:Inter,Arial,sans-serif;padding:12px;color:#223457}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d5def2;padding:8px}th{background:#eef3ff}</style></head><body><h2>Salida de Productos</h2><table><thead><tr><th>Fecha</th><th>Productos</th><th>Cantidad</th><th>Código</th><th>Cliente</th></tr></thead><tbody>${body}</tbody></table></body></html>`);
+      win.document.write(`<html><head><title>Repartos</title><style>body{font-family:Inter,Arial,sans-serif;padding:12px;color:#223457}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d5def2;padding:8px}th{background:#eef3ff;font-size:11px;text-transform:uppercase;letter-spacing:.03em}.is-dispatch-trace-row td{background:#ffecef;color:#1f2a44}.is-dispatch-internal-row td{background:#fff2e3;color:#1f2a44;font-weight:700}</style></head><body><h2>Salida de Productos</h2><table><thead><tr><th>Fecha</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th></tr></thead><tbody>${body || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table></body></html>`);
       win.document.close();
       win.focus();
+      await waitPrintAssets(win);
       win.print();
       return;
     }
@@ -4741,7 +4784,7 @@
           return allocations.map((allocation) => ({
             Fecha: `↳ ${item.recipeTitle || '-'}`,
             Productos: `${Number(allocation.qtyKg || 0).toFixed(2)} kg`,
-            'Cantidad (kg)': `${escapeHtml(allocation.lotNumber || '-')} · ${Number(getRegistroById(allocation.productionId)?.quantityKg || allocation.qtyKg || 0).toFixed(2)} kg`,
+            'Cantidad (kg)': `${allocation.lotNumber || '-'} · ${Number(getRegistroById(allocation.productionId)?.quantityKg || allocation.qtyKg || 0).toFixed(2)} kg`,
             Vencimiento: formatIsoEs(allocation.expiryDate || '') || '-',
             'Número de reparto': normalizeValue(allocation.productionId) ? 'Trazabilidad' : 'Sin trazabilidad',
             Cliente: client.name || '-',
@@ -4753,13 +4796,14 @@
         const locationMeta = [normalizeValue(client.name), customerDoc].filter(Boolean).join(' · ');
         const locationRow = (locationParts.length || locationMeta)
           ? [{
-            Fecha: `↳ 🏠 ${locationParts.join(' • ')}`,
+            Fecha: `↳ 🏠 ${locationParts.join(' • ')}${locationMeta ? ` • ${locationMeta}` : ''}`,
             Productos: '',
             'Cantidad (kg)': '',
             Vencimiento: '',
-            'Número de reparto': locationMeta,
+            'Número de reparto': '',
             Cliente: '',
-            __tone: 'internal_use'
+            __tone: 'internal_use',
+            __mergeAcross: true
           }]
           : [];
         return [summary, ...detailRows, ...locationRow];

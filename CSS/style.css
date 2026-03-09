@@ -6990,6 +6990,15 @@ html.login-protected.auth-ok body {
   justify-content: center;
 }
 
+.produccion-dispatch-table-center .inventario-trace-row td,
+.produccion-dispatch-table-center .inventario-internal-use-row td {
+  color: #1f2a44;
+}
+
+.produccion-dispatch-table-center .inventario-internal-use-row td {
+  text-align: left;
+}
+
 .inventario-internal-meta {
   display: inline-flex;
   flex-direction: column;
