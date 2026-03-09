@@ -5960,6 +5960,19 @@ html.login-protected.auth-ok body {
   width: auto;
 }
 
+.dispatch-actions-row #dispatchAddProductBtn {
+  margin-left: auto;
+}
+
+.dispatch-comment-row td {
+  background: #fff8ef !important;
+}
+
+.dispatch-comment-row input {
+  border-color: #f3d6ae;
+  background: #fff;
+}
+
 .produccion-dispatch-floating-suggest {
   max-height: 260px;
   overflow-y: auto;
@@ -6683,6 +6696,7 @@ html.login-protected.auth-ok body {
   margin-top: 10px;
   display: flex;
   flex-wrap: wrap;
+  justify-content: end;
   gap: 8px;
 }
 
