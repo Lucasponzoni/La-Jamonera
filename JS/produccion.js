@@ -508,8 +508,9 @@
     .map((item) => item.charAt(0).toUpperCase())
     .join('');
   const renderUserAvatar = (user) => {
-    if (normalizeValue(user?.photoUrl)) {
-      return `<span class="user-avatar-thumb"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-user-photo" src="${user.photoUrl}" alt="${normalizeValue(user.fullName || user.email || 'Usuario')}"></span>`;
+    const photoUrl = sanitizeImageUrl(user?.photoUrl);
+    if (photoUrl) {
+      return `<span class="user-avatar-thumb"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-user-photo" src="${photoUrl}" alt="${normalizeValue(user.fullName || user.email || 'Usuario')}"></span>`;
     }
     const initials = initialsFromName(user?.fullName || user?.email || '');
     return `<span class="user-avatar-thumb user-avatar-initials">${initials || '<i class="bi bi-person-fill"></i>'}</span>`;
@@ -2417,8 +2418,6 @@
   const renderDispatchCreate = (draft) => {
     if (!nodes.dispatchView) return;
     state.dispatchCreateMode = true;
-    const client = getDispatchClient(draft.clientId);
-    const clientInitials = initialsFromName(draft.clientName || client.name || '');
     const lineRows = draft.lines.map((line, idx) => {
       const alloc = allocateDispatchLots(line.recipeId, Number(line.qtyKg || 0));
       line.allocations = alloc.allocations;
@@ -2434,8 +2433,8 @@
       return `<tr><td><div class="recipe-ing-autocomplete" data-dispatch-product-wrap="${idx}"><div class="recipe-ing-input-wrap"><input type="search" class="form-control ios-input" data-dispatch-product-search="${idx}" placeholder="Seleccionar Producto" value="${escapeHtml(recipeTitle)}"></div><input type="hidden" data-dispatch-product-id="${idx}" value="${escapeHtml(line.recipeId)}"></div></td><td><input class="form-control ios-input" type="number" step="0.01" min="0" data-dispatch-qty="${idx}" value="${escapeHtml(line.qtyKg || '')}"></td><td>${stockStatus}</td><td>${lotsText}</td><td>${expiryText}</td><td><button type="button" class="btn family-manage-btn" data-dispatch-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`;
     }).join('');
     nodes.dispatchView.innerHTML = `<div class="inventario-period-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Nuevo reparto</h6></div>
-    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">1</span> Datos generales</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Día de reparto</label><input id="dispatchDateInput" class="form-control ios-input" value="${escapeHtml(draft.dispatchDate)}"></div><div class="recipe-field recipe-field-half"><label class="form-label">Cliente</label><div class="inventario-provider-search-wrap"><input id="dispatchClientInput" class="form-control ios-input" placeholder="Buscar por nombre, DNI o CUIL" value="${escapeHtml(draft.clientName)}"><input type="hidden" id="dispatchClientId" value="${escapeHtml(draft.clientId)}"></div><small class="text-muted">Si no existe, seleccioná Nuevo Cliente.</small></div></div><div class="d-flex align-items-center gap-2 mt-2"><span class="user-avatar-thumb">${clientInitials ? escapeHtml(clientInitials) : '<i class="bi bi-person-fill"></i>'}</span><small class="text-muted">Cliente seleccionado</small></div></section>
-    <section class="recipe-step-card step-block"><div class="d-flex align-items-center justify-content-between mb-2"><h6 class="step-title mb-0"><span class="recipe-step-number">2</span> Productos a repartir</h6><button type="button" class="btn ios-btn ios-btn-success recipe-table-action-btn" id="dispatchAddProductBtn"><i class="fa-solid fa-plus"></i><span>Producto</span></button></div><div class="table-responsive recipe-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Producto</th><th>Kilos</th><th>Stock</th><th>Lote</th><th>Vencimiento</th><th></th></tr></thead><tbody>${lineRows}</tbody></table></div></section>
+    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">1</span> Datos generales</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Día de reparto</label><input id="dispatchDateInput" class="form-control ios-input" value="${escapeHtml(draft.dispatchDate)}"></div><div class="recipe-field recipe-field-half"><label class="form-label">Cliente</label><div class="inventario-provider-search-wrap"><input id="dispatchClientInput" class="form-control ios-input" placeholder="Buscar por nombre, DNI o CUIL" value="${escapeHtml(draft.clientName)}"><input type="hidden" id="dispatchClientId" value="${escapeHtml(draft.clientId)}"></div><small class="text-muted">Si no existe, seleccioná Nuevo Cliente.</small></div></div></section>
+    <section class="recipe-step-card step-block produccion-dispatch-create"><div class="d-flex align-items-center justify-content-between mb-2"><h6 class="step-title mb-0"><span class="recipe-step-number">2</span> Productos a repartir</h6><button type="button" class="btn ios-btn ios-btn-success recipe-table-action-btn" id="dispatchAddProductBtn"><i class="fa-solid fa-plus"></i><span>Producto</span></button></div><div class="table-responsive recipe-table-wrap dispatch-products-table"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Producto</th><th>Kilos</th><th>Stock</th><th>Lote</th><th>Vencimiento</th><th></th></tr></thead><tbody>${lineRows}</tbody></table></div></section>
     <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">3</span> Vehículo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">UTA / URA</label><small class="d-block text-muted mb-1">UTA / URA (Unidad de Transporte Alimentario)</small><select id="dispatchVehicleSelect" class="form-select ios-input"><option value="">Seleccionar UTA/URA</option>${Object.values(safeObject(state.reparto.vehicles)).map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === draft.vehicleId ? 'selected' : ''}>${escapeHtml(item.number || item.patent || item.id)}</option>`).join('')}<option value="add_vehicle">+ URA/UTA</option></select></div><div class="recipe-field recipe-field-half"><label class="form-label">Responsables</label><div class="produccion-managers-grid">${Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-check"><input type="checkbox" data-dispatch-manager="${escapeHtml(user.id)}" ${draft.managers.includes(user.id) ? 'checked' : ''}>${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(user.role || user.cargo || 'Sin cargo')}</small></span></label>`).join('')}</div></div></div><div class="mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchAddCommentBtn"><i class="fa-regular fa-comment-dots"></i><span>Comentarios</span></button><div id="dispatchCommentsWrap" class="mt-2">${draft.comments.map((comment, idx) => `<input class="form-control ios-input mt-2" data-dispatch-comment="${idx}" placeholder="Comentario visual" value="${escapeHtml(comment)}">`).join('')}</div></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-success" id="dispatchSaveBtn"><i class="fa-solid fa-floppy-disk"></i><span>Guardar reparto</span></button></div>`;
     const dateInput = nodes.dispatchView.querySelector('#dispatchDateInput');
     if (window.flatpickr && dateInput) {
@@ -2448,6 +2447,7 @@
         disableMobile: true
       });
     }
+    prepareThumbLoaders('.js-produccion-user-photo');
   };
   const persistRepartoStore = async () => {
     await window.dbLaJamoneraRest.write(REPARTO_PATH, state.reparto);
@@ -2456,10 +2456,21 @@
     const result = await openIosSwal({
       title: 'Nuevo cliente',
       customClass: { popup: 'dispatch-client-alert' },
-      html: `<div class="swal-stack-fields text-start"><input id="dispatchClientName" class="swal2-input ios-input" placeholder="Nombre y apellido / Razón social" value="${escapeHtml(seedName)}"><input id="dispatchClientDoc" class="swal2-input ios-input" placeholder="DNI o CUIL"><input id="dispatchClientAddress" class="swal2-input ios-input" placeholder="Dirección"><input id="dispatchClientCity" class="swal2-input ios-input" placeholder="Localidad"><select id="dispatchClientProvince" class="swal2-select ios-input">${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${item === 'Santa Fe' ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select><input id="dispatchClientCountry" class="swal2-input ios-input" value="Argentina" placeholder="País"></div>`,
+      html: `<div class="swal-stack-fields text-start"><div class="d-flex align-items-center gap-2 mb-2"><span id="dispatchClientInitialsPreview" class="user-avatar-thumb">${initialsFromName(seedName) || '<i class="bi bi-person-fill"></i>'}</span><small class="text-muted">Vista previa del cliente</small></div><input id="dispatchClientName" class="swal2-input ios-input" placeholder="Nombre y apellido / Razón social" value="${escapeHtml(seedName)}"><input id="dispatchClientDoc" class="swal2-input ios-input" placeholder="DNI o CUIL"><input id="dispatchClientAddress" class="swal2-input ios-input" placeholder="Dirección"><input id="dispatchClientCity" class="swal2-input ios-input" placeholder="Localidad"><select id="dispatchClientProvince" class="swal2-select ios-input">${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${item === 'Santa Fe' ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select><input id="dispatchClientCountry" class="swal2-input ios-input" value="Argentina" placeholder="País"></div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
+      didOpen: () => {
+        const nameInput = document.getElementById('dispatchClientName');
+        const preview = document.getElementById('dispatchClientInitialsPreview');
+        const sync = () => {
+          if (!preview) return;
+          const initials = initialsFromName(nameInput?.value || '');
+          preview.innerHTML = initials ? escapeHtml(initials) : '<i class="bi bi-person-fill"></i>';
+        };
+        nameInput?.addEventListener('input', sync);
+        sync();
+      },
       preConfirm: () => {
         const name = normalizeValue(document.getElementById('dispatchClientName')?.value);
         const doc = normalizeValue(document.getElementById('dispatchClientDoc')?.value);
@@ -2500,9 +2511,25 @@
       cancelButtonText: 'Cancelar',
       didOpen: () => {
         const expiryInput = document.getElementById('dispatchVehicleExpiry');
+        const fileInput = document.getElementById('dispatchVehicleFile');
+        const dropzone = document.querySelector('label[for="dispatchVehicleFile"]');
         if (window.flatpickr && expiryInput) {
           window.flatpickr(expiryInput, { locale: window.flatpickr.l10ns?.es || undefined, dateFormat: 'Y-m-d', altInput: true, altFormat: 'd/m/Y', allowInput: true, disableMobile: true });
         }
+        dropzone?.addEventListener('dragover', (event) => {
+          event.preventDefault();
+          dropzone.classList.add('is-dragging');
+        });
+        dropzone?.addEventListener('dragleave', () => dropzone.classList.remove('is-dragging'));
+        dropzone?.addEventListener('drop', (event) => {
+          event.preventDefault();
+          dropzone.classList.remove('is-dragging');
+          const file = event.dataTransfer?.files?.[0];
+          if (!file || !fileInput) return;
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          fileInput.files = dt.files;
+        });
       },
       preConfirm: async () => {
         const number = normalizeValue(document.getElementById('dispatchVehicleNumber')?.value);
@@ -4449,6 +4476,35 @@
     }
   });
 
+  let dispatchClientSuggestEl = null;
+  let dispatchProductSuggestEl = null;
+  const closeDispatchSuggests = () => {
+    dispatchClientSuggestEl?.remove();
+    dispatchProductSuggestEl?.remove();
+    dispatchClientSuggestEl = null;
+    dispatchProductSuggestEl = null;
+  };
+  const ensureFloatingSuggest = (type) => {
+    const current = type === 'client' ? dispatchClientSuggestEl : dispatchProductSuggestEl;
+    if (current) return current;
+    const node = document.createElement('div');
+    node.className = 'recipe-suggest-floating produccion-dispatch-floating-suggest';
+    node.dataset.dispatchSuggest = type;
+    document.body.appendChild(node);
+    if (type === 'client') dispatchClientSuggestEl = node;
+    else dispatchProductSuggestEl = node;
+    return node;
+  };
+  const positionFloatingSuggest = (node, anchor) => {
+    if (!node || !anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    node.style.position = 'absolute';
+    node.style.left = `${rect.left + window.scrollX}px`;
+    node.style.top = `${rect.bottom + window.scrollY + 4}px`;
+    node.style.width = `${Math.max(rect.width, 420)}px`;
+    node.style.zIndex = '3300';
+  };
+
   nodes.dispatchView?.addEventListener('input', async (event) => {
     if (!state.dispatchCreateMode || !state.dispatchDraft) return;
     const clientInput = event.target.closest('#dispatchClientInput');
@@ -4460,13 +4516,8 @@
       const list = Object.values(safeObject(state.reparto.clients))
         .filter((item) => normalizeLower(item.name).includes(query) || normalizeLower(item.doc).includes(query))
         .slice(0, 8);
-      let suggest = nodes.dispatchView.querySelector('#dispatchClientSuggest');
-      if (!suggest) {
-        suggest = document.createElement('div');
-        suggest.id = 'dispatchClientSuggest';
-        suggest.className = 'recipe-suggest-floating';
-        clientInput.closest('.inventario-provider-search-wrap')?.appendChild(suggest);
-      }
+      const suggest = ensureFloatingSuggest('client');
+      positionFloatingSuggest(suggest, clientInput);
       suggest.innerHTML = `${list.map((item) => `<button type="button" class="recipe-suggest-item" data-dispatch-client-pick="${escapeHtml(item.id)}"><span class="user-avatar-thumb" style="width:28px;height:28px;font-size:.75rem">${escapeHtml(item.initials || 'U')}</span><span>${escapeHtml(item.name)}<br><small>${escapeHtml(item.doc || '-')}</small></span></button>`).join('')}${query ? `<button type="button" class="recipe-suggest-item recipe-suggest-create" data-dispatch-client-create="1"><i class="fa-solid fa-plus"></i><span>Nuevo Cliente</span></button>` : ''}`;
       suggest.onclick = async (ev) => {
         const pick = ev.target.closest('[data-dispatch-client-pick]');
@@ -4477,7 +4528,7 @@
           state.dispatchDraft.clientName = client.name;
           nodes.dispatchView.querySelector('#dispatchClientInput').value = client.name;
           nodes.dispatchView.querySelector('#dispatchClientId').value = client.id;
-          suggest.remove();
+          closeDispatchSuggests();
           renderDispatchCreate(state.dispatchDraft);
           return;
         }
@@ -4499,28 +4550,32 @@
     state.dispatchDraft.lines[idx].recipeSearch = normalizeValue(productInput.value);
     state.dispatchDraft.lines[idx].recipeId = '';
     const wrap = nodes.dispatchView.querySelector(`[data-dispatch-product-wrap="${idx}"]`);
-    let suggest = wrap?.querySelector('.recipe-suggest-floating');
-    if (!suggest && wrap) {
-      suggest = document.createElement('div');
-      suggest.className = 'recipe-suggest-floating';
-      wrap.appendChild(suggest);
-    }
+    if (!wrap) return;
+    const suggest = ensureFloatingSuggest('product');
+    positionFloatingSuggest(suggest, productInput);
     const recipes = Object.values(state.recetas)
       .filter((item) => normalizeLower(item.title).includes(query))
       .slice(0, 8)
       .map((item) => ({ ...item, meta: getProducedStockMeta(item.id) }));
-    if (suggest) {
-      suggest.innerHTML = `${recipes.map((item) => `<button type="button" class="recipe-suggest-item" data-dispatch-product-pick="${escapeHtml(item.id)}" data-dispatch-row="${idx}"><span class="recipe-suggest-avatar-wrap">${sanitizeImageUrl(item.imageUrl) ? `<img class="recipe-suggest-avatar" src="${escapeHtml(sanitizeImageUrl(item.imageUrl))}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2"><i class="fa-solid fa-drumstick-bite"></i></span>'}</span><span>${escapeHtml(capitalize(item.title || 'Receta'))}<br><small class="${item.meta.available > 0.0001 ? '' : 'text-danger'}">${item.meta.available > 0.0001 ? `Disponible: ${item.meta.available.toFixed(2)} kg` : 'Sin stock'}</small></span></button>`).join('')}`;
-      suggest.onclick = (ev) => {
-        const pick = ev.target.closest('[data-dispatch-product-pick]');
-        if (!pick) return;
-        const rowIdx = Number(pick.dataset.dispatchRow);
-        const rec = safeObject(state.recetas[pick.dataset.dispatchProductPick]);
-        state.dispatchDraft.lines[rowIdx].recipeId = normalizeValue(rec.id);
-        state.dispatchDraft.lines[rowIdx].recipeSearch = normalizeValue(capitalize(rec.title || ''));
-        renderDispatchCreate(state.dispatchDraft);
-      };
-    }
+    suggest.innerHTML = `${recipes.map((item) => `<button type="button" class="recipe-suggest-item" data-dispatch-product-pick="${escapeHtml(item.id)}" data-dispatch-row="${idx}"><span class="recipe-suggest-avatar-wrap">${sanitizeImageUrl(item.imageUrl) ? `<img class="recipe-suggest-avatar" src="${escapeHtml(sanitizeImageUrl(item.imageUrl))}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2"><i class="fa-solid fa-drumstick-bite"></i></span>'}</span><span>${escapeHtml(capitalize(item.title || 'Receta'))}<br><small class="${item.meta.available > 0.0001 ? '' : 'text-danger'}">${item.meta.available > 0.0001 ? `Disponible: ${item.meta.available.toFixed(2)} kg` : 'Sin stock'}</small></span></button>`).join('')}`;
+    suggest.onclick = (ev) => {
+      const pick = ev.target.closest('[data-dispatch-product-pick]');
+      if (!pick) return;
+      const rowIdx = Number(pick.dataset.dispatchRow);
+      const rec = safeObject(state.recetas[pick.dataset.dispatchProductPick]);
+      state.dispatchDraft.lines[rowIdx].recipeId = normalizeValue(rec.id);
+      state.dispatchDraft.lines[rowIdx].recipeSearch = normalizeValue(capitalize(rec.title || ''));
+      closeDispatchSuggests();
+      renderDispatchCreate(state.dispatchDraft);
+    };
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!state.dispatchCreateMode) return;
+    if (event.target.closest('.produccion-dispatch-floating-suggest')) return;
+    if (event.target.closest('#dispatchClientInput')) return;
+    if (event.target.closest('[data-dispatch-product-search]')) return;
+    closeDispatchSuggests();
   });
 
   nodes.historyTableWrap?.addEventListener('click', async (event) => {
