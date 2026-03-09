@@ -123,12 +123,7 @@ html.login-protected.auth-ok body {
   height: 40px;
   margin: 0 10px;
   vertical-align: middle;
-  background: linear-gradient(
-    to bottom,
-    rgba(255,255,255,0.6),
-    rgba(150, 150, 150, 0.9),
-    rgba(255,255,255,0.6)
-  );
+  background: linear-gradient(to bottom, rgb(216 216 216), rgba(150, 150, 150, 0.9), rgba(216 216 216));
   border-radius: 999px;
 }
 
@@ -138,12 +133,7 @@ html.login-protected.auth-ok body {
   height: 40px;
   margin: 0 10px;
   vertical-align: middle;
-  background: linear-gradient(
-    to bottom,
-    rgba(255,255,255,0.6),
-    rgba(134, 134, 134, 0.9),
-    rgba(255,255,255,0.6)
-  );
+  background: linear-gradient(to bottom, rgb(216 216 216), rgba(150, 150, 150, 0.9), rgba(216 216 216));
   border-radius: 999px;
 }
 
