@@ -3968,6 +3968,11 @@ html.login-protected.auth-ok body {
   max-width: none;
 }
 
+.inventario-toolbar-actions .ios-btn {
+  width: fit-content;
+  max-width: none;
+}
+
 .inventario-status-filters {
   display: flex;
   gap: 8px;

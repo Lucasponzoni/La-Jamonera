@@ -2303,7 +2303,9 @@
       openIosSwal, updateProduccionListScrollHint,
       renderUserAvatar, initialsFromPersonName, getDispatchUserRole, prepareThumbLoaders,
       uploadImageToStorage, ALLOWED_UPLOAD_TYPES, MAX_UPLOAD_SIZE_BYTES, ARG_PROVINCIAS,
-      REPARTO_PATH
+      REPARTO_PATH,
+      disableCalendarSuggestions, parsePositive, setStateView, analyzeRecipe, getRecipes,
+      cleanupExpiredReservations, cleanupExpiredDrafts, persistConfig, normalizeDispatchStore
     }) || {};
     openDispatch = repartoController.openDispatch || openDispatch;
     setDispatchMode = repartoController.setDispatchMode || setDispatchMode;
