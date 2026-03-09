@@ -507,6 +507,26 @@
     });
   };
 
+  const runWithBackSpinner = async (task) => {
+    const modalContent = inventarioModal?.querySelector('.modal-content');
+    if (!modalContent) {
+      await task();
+      return;
+    }
+    if (window.getComputedStyle(modalContent).position === 'static') {
+      modalContent.style.position = 'relative';
+    }
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-local-overlay';
+    overlay.innerHTML = '<div class="modal-local-overlay-card"><img src="./IMG/Meta-ai-logo.webp" alt="Actualizando" class="meta-spinner-login"></div>';
+    modalContent.appendChild(overlay);
+    try {
+      await task();
+    } finally {
+      overlay.remove();
+    }
+  };
+
   const setStateView = (view) => {
     state.view = view;
     nodes.loading.classList.toggle('d-none', view !== 'loading');
@@ -5459,7 +5479,20 @@
   nodes.weeklyConfigBtn?.addEventListener('click', openWeeklyConfigManager);
   nodes.createIngredientBtn?.addEventListener('click', openCreateIngredient);
   nodes.toolbarCreateBtn?.addEventListener('click', openCreateIngredient);
-  nodes.backBtn?.addEventListener('click', backToList);
+  nodes.backBtn?.addEventListener('click', async () => {
+    const prevSelected = state.selectedIngredientId;
+    await runWithBackSpinner(async () => {
+      await backToList();
+      if (state.view !== 'list') return;
+      await loadData();
+      renderFamilies();
+      renderStatusFilters();
+      if (prevSelected && state.ingredientes[prevSelected]) {
+        state.selectedIngredientId = prevSelected;
+      }
+      renderList();
+    });
+  });
   nodes.editorForm?.addEventListener('submit', saveEntry);
 
   nodes.openPeriodFilterBtn?.addEventListener('click', () => {
@@ -5467,8 +5500,14 @@
     renderGlobalPeriodTable();
     setPeriodMode(true);
   });
-  nodes.periodBackBtn?.addEventListener('click', () => {
-    setPeriodMode(false);
+  nodes.periodBackBtn?.addEventListener('click', async () => {
+    await runWithBackSpinner(async () => {
+      await loadData();
+      setPeriodMode(false);
+      renderFamilies();
+      renderStatusFilters();
+      renderList();
+    });
   });
   nodes.globalApplyBtn?.addEventListener('click', async () => {
     state.dashboardDateRange = normalizeValue(nodes.globalRange?.value);

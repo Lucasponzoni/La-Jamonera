@@ -199,6 +199,7 @@
       renderQr(qrHost, registro);
     }
     await waitImages(win.document.body);
+    onProgress?.(100);
     win.focus();
     win.print();
   };
@@ -226,13 +227,15 @@
     for (let index = 0; index < rows.length; index += 1) {
       const node = await createPrintableNode(rows[index], context);
       if (node) printNodes.push(node.outerHTML);
-      onProgress?.(Math.round(((index + 1) / rows.length) * 100));
+      const value = Math.min(95, Math.round(((index + 1) / rows.length) * 95));
+      onProgress?.(value);
     }
     const win = window.open('', '_blank', 'width=1240,height=900');
     if (!win) return;
     win.document.write(`<html><head><title>Planillas masivas</title><link rel="stylesheet" href="./CSS/style.css"></head><body style="padding:8px;background:#ffffff;display:grid;gap:12px;">${printNodes.map((html, index) => `<section style="${index ? 'page-break-before:always;' : ''}">${html}</section>`).join('')}</body></html>`);
     win.document.close();
     await waitImages(win.document.body);
+    onProgress?.(100);
     win.focus();
     win.print();
   };
