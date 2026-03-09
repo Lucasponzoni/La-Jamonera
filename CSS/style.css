@@ -4491,6 +4491,7 @@ html.login-protected.auth-ok body {
 .inventario-weekly-bulk-intro {
   margin: 0 0 12px;
   color: #566684;
+  text-align: center;
 }
 
 .inventario-weekly-bulk-list {
@@ -6069,6 +6070,8 @@ html.login-protected.auth-ok body {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
 }
 
 .dispatch-vehicle-manager-card.tone-success { border-color: #bbe6c8; background: #ecfaf2; }
