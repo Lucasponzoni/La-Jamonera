@@ -914,6 +914,10 @@ html.login-protected.auth-ok body {
   padding-top: 0;
 }
 
+.step-block + .step-block {
+  margin-top: 12px;
+}
+
 .step-title {
   margin: 0 0 8px;
   color: #3f4f78;
@@ -5853,6 +5857,11 @@ html.login-protected.auth-ok body {
   text-align: left !important;
 }
 
+.dispatch-client-alert .swal-stack-fields {
+  display: grid;
+  gap: 10px;
+}
+
 .dispatch-client-preview {
   display: flex;
   justify-content: center;
@@ -5860,9 +5869,9 @@ html.login-protected.auth-ok body {
 }
 
 .dispatch-client-preview-avatar {
-  width: 52px;
-  height: 52px;
-  font-size: 1rem;
+  width: 78px;
+  height: 78px;
+  font-size: 1.35rem;
 }
 
 .dispatch-client-alert :is(.swal2-input, .swal2-select, .swal2-file),
@@ -5884,11 +5893,21 @@ html.login-protected.auth-ok body {
 
 .produccion-dispatch-create .dispatch-products-table,
 .produccion-dispatch-create .recipe-table-wrap {
-  overflow: visible;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.produccion-dispatch-create .recipe-table {
+  min-width: 920px;
 }
 
 .dispatch-product-input-wrap {
   grid-template-columns: 30px minmax(180px, 1fr);
+}
+
+.dispatch-products-table th:nth-child(2),
+.dispatch-products-table td:nth-child(2) {
+  width: 130px;
 }
 
 .dispatch-product-input-wrap .recipe-inline-avatar {
@@ -5902,8 +5921,137 @@ html.login-protected.auth-ok body {
 }
 
 .dispatch-actions-row {
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dispatch-comment-row td {
+  background: #fff8ef !important;
+}
+
+.dispatch-proof-row td {
+  background: #fff1f4 !important;
+  border-top: 1px solid #f3ccd6 !important;
+}
+
+.dispatch-proof-name {
+  margin: 6px 0 0;
+  color: #8f3b4f;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.dispatch-proof-drop {
+  min-height: 52px;
+  border-color: #f0b4c3;
+  background: #fff6f8;
+  color: #a13e58;
+}
+
+.dispatch-proof-expiry-cell {
+  color: #a13e58;
+  font-weight: 700;
+}
+
+.dispatch-comment-row input {
+  border-color: #f3d6ae;
+  background: #fff;
+}
+
+.dispatch-comment-textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.dispatch-stock-cell,
+.dispatch-lot-cell,
+.dispatch-expiry-cell {
+  font-size: 0.9rem;
+  line-height: 1.35;
+  vertical-align: top;
+  word-break: break-word;
+}
+
+.dispatch-stock-block {
+  display: block;
+}
+
+.dispatch-vehicle-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dispatch-vehicle-tone {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  margin-top: 4px;
+}
+
+.dispatch-vehicle-tone.tone-success { background: #1f9d50; }
+.dispatch-vehicle-tone.tone-warning { background: #b86a08; }
+.dispatch-vehicle-tone.tone-danger { background: #c4314f; }
+.dispatch-vehicle-tone.tone-neutral { background: #7d87a4; }
+
+.dispatch-vehicles-manager-list {
+  display: grid;
+  gap: 10px;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.dispatch-vehicle-manager-card {
+  border: 1px solid #d9e3f8;
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px;
+}
+
+.dispatch-vehicle-manager-card p,
+.dispatch-vehicle-manager-card small {
+  margin: 0;
+}
+
+.dispatch-vehicle-manager-card small {
+  color: #627497;
+}
+
+.dispatch-vehicle-manager-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dispatch-vehicle-manager-card.tone-success { border-color: #bbe6c8; background: #ecfaf2; }
+.dispatch-vehicle-manager-card.tone-warning { border-color: #f3d4ad; background: #fff4e7; }
+.dispatch-vehicle-manager-card.tone-danger { border-color: #f2b4c0; background: #ffecef; }
+
+.dispatch-client-head {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
+  margin-bottom: 6px;
+}
+
+.dispatch-client-helper {
+  color: #6f7fa2;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.dispatch-quick-client-btn {
+  min-height: 34px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  max-width: none;
+  width: auto;
 }
 
 .dispatch-actions-row #dispatchAddProductBtn {
@@ -7501,6 +7649,36 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   .inventario-toolbar-actions::-webkit-scrollbar-thumb {
     background: #cfd8f4;
     border-radius: 999px;
+  }
+
+  .dispatch-actions-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .dispatch-actions-row .recipe-table-action-btn,
+  .dispatch-actions-row .ios-btn {
+    width: 100%;
+    max-width: none;
+    justify-content: center;
+  }
+
+  .dispatch-vehicle-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .dispatch-vehicle-actions .ios-btn {
+    width: 100%;
+    max-width: none;
+    justify-content: center;
+  }
+
+  .dispatch-client-head {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .swal2-popup.produccion-umbral-alert {
