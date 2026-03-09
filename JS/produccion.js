@@ -4964,14 +4964,20 @@
       ? repartoStore
       : legacyRepartoStore;
     state.reparto = normalizeDispatchStore(nextRepartoStore);
-    const previousIndexSerialized = JSON.stringify(safeObject(state.reparto.productIndex));
-    normalizeProductIndexFromHistory();
-    const nextIndexSerialized = JSON.stringify(safeObject(state.reparto.productIndex));
-    if (previousIndexSerialized !== nextIndexSerialized) {
-      await window.dbLaJamoneraRest.write(REPARTO_PATH, state.reparto);
+    if (!Object.keys(safeObject(state.reparto.productIndex)).length) {
+      rebuildProductIndexFromHistory();
+      try {
+        await window.dbLaJamoneraRest.write(REPARTO_PATH, state.reparto);
+      } catch (error) {
+        console.warn('[Producción] No se pudo persistir /Reparto al reconstruir índice.', error);
+      }
     }
     if (!Object.keys(safeObject(repartoStore)).length && Object.keys(safeObject(legacyRepartoStore)).length) {
-      await window.dbLaJamoneraRest.write(REPARTO_PATH, state.reparto);
+      try {
+        await window.dbLaJamoneraRest.write(REPARTO_PATH, state.reparto);
+      } catch (error) {
+        console.warn('[Producción] No se pudo migrar /REPARTO a /Reparto.', error);
+      }
     }
     state.config = {
       globalMinKg: parsePositive(config?.globalMinKg, 1),
