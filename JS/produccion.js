@@ -2374,10 +2374,31 @@
     nodes.historyView?.classList.toggle('d-none', true);
     nodes.dispatchView?.classList.toggle('d-none', !enabled);
   };
+  const normalizeDispatchDateToken = (value) => {
+    const raw = normalizeValue(value);
+    if (!raw) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+    const slash = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (slash) return `${slash[3]}-${slash[2]}-${slash[1]}`;
+    const compact = raw.match(/^(\d{4})-(\d{2})-(\d{2}).*$/);
+    return compact ? `${compact[1]}-${compact[2]}-${compact[3]}` : '';
+  };
+  const parseDispatchRange = (value) => {
+    const raw = normalizeValue(value);
+    if (!raw) return { from: '', to: '' };
+    const chunks = raw.split(/\s+a\s+|\s+to\s+/i).map((item) => normalizeDispatchDateToken(item)).filter(Boolean);
+    if (!chunks.length) {
+      const single = normalizeDispatchDateToken(raw);
+      return { from: single, to: single };
+    }
+    const from = chunks[0];
+    const to = chunks[1] || from;
+    return { from, to };
+  };
   const getDispatchRows = () => {
     const all = getDispatchRecordsList().sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
     const query = normalizeLower(state.dispatchSearch);
-    const [from, to] = String(state.dispatchRange || '').split(' a ').map((item) => normalizeValue(item));
+    const { from, to } = parseDispatchRange(state.dispatchRange);
     return all.filter((row) => {
       const client = getDispatchClient(row.clientId);
       const text = `${row.code || ''} ${client.name || ''} ${(Array.isArray(row.products) ? row.products.map((p) => p.recipeTitle).join(' ') : '')}`.toLowerCase();
@@ -2403,19 +2424,39 @@
       const kgTotal = products.reduce((acc, item) => acc + Number(item.qtyKg || 0), 0);
       const expiries = [...new Set(products.flatMap((item) => (Array.isArray(item.allocations) ? item.allocations : []).map((l) => normalizeValue(l.expiryDate)).filter(Boolean)))];
       const expiryLabel = expiries.length === 1 ? formatIsoEs(expiries[0]) : (expiries.length ? 'Ver detalle' : '-');
-      const client = getDispatchClient(row.clientId);
+      const client = { ...getDispatchClient(row.clientId), ...safeObject(row.clientSnapshot) };
       const collapsed = state.dispatchCollapse[row.id] !== false;
-      const detail = !collapsed ? products.map((item) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${item.recipeImageUrl ? `<img class="thumb-image" src="${escapeHtml(item.recipeImageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')}</span></div></td><td>${Number(item.qtyKg || 0).toFixed(2)} kg</td><td>${(Array.isArray(item.allocations) ? item.allocations : []).map((a) => `${escapeHtml(a.lotNumber)} · ${Number(a.qtyKg || 0).toFixed(2)} kg`).join('<br>') || '-'}</td><td>${(Array.isArray(item.allocations) ? item.allocations : []).map((a) => escapeHtml(formatIsoEs(a.expiryDate || ''))).join('<br>') || '-'}</td><td colspan="3">${(Array.isArray(item.allocations) ? item.allocations : []).map((a) => `<small>${escapeHtml(a.productionId)}</small>`).join('<br>')}</td></tr>`).join('') : '';
-      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${products.length} productos</td><td>${kgTotal.toFixed(2)} kg</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || row.id || '-')}</td><td>${escapeHtml(client.name || '-')}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-collapse="${escapeHtml(row.id)}" title="${collapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${collapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${collapsed ? 'fa-expand' : 'fa-compress'}"></i></button></td></tr>${detail}`;
-    }).join('') : '<tr><td colspan="7" class="text-center">Sin repartos para el filtro seleccionado.</td></tr>';
+      const productLabel = `${products.length} ${products.length === 1 ? 'producto' : 'productos'}`;
+      const detailItems = products.flatMap((item) => {
+        const allocations = Array.isArray(item.allocations) && item.allocations.length
+          ? item.allocations
+          : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
+        return allocations.map((allocation) => ({ item, allocation }));
+      });
+      const detailRows = !collapsed ? detailItems.map(({ item, allocation }) => {
+        const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
+        const traceBtn = normalizeValue(allocation.productionId)
+          ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button>`
+          : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
+        return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${Number(allocation.qtyKg || 0).toFixed(2)} kg</span></div></td><td>${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
+      }).join('') : '';
+      const locationParts = [client.address, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean);
+      const customerDoc = normalizeValue(client.dni || client.cuit || client.document || client.taxId);
+      const locationMeta = [normalizeValue(client.name), customerDoc].filter(Boolean).join(' · ');
+      const locationRow = !collapsed && (locationParts.length || locationMeta)
+        ? `<tr class="inventario-internal-use-row"><td colspan="6"><i class="fa-solid fa-house"></i> ${escapeHtml(locationParts.join(' • '))}${locationMeta ? ` • ${escapeHtml(locationMeta)}` : ''}</td></tr>`
+        : '';
+      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${products.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-collapse="${escapeHtml(row.id)}" title="${collapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${collapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${collapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(formatDateTime(row.createdAt))}</span></div></td><td>${productLabel}</td><td>${kgTotal.toFixed(2)} kg</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || row.id || '-')}</td><td>${escapeHtml(client.name || '-')}</td></tr>${detailRows}${locationRow}`;
+    }).join('') : '<tr><td colspan="6" class="text-center">Sin repartos para el filtro seleccionado.</td></tr>';
     const tableWrap = nodes.dispatchView.querySelector('#produccionDispatchTableWrap');
     if (!tableWrap) return;
-    tableWrap.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioGlobalCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar todo</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioGlobalExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar todo</span></button></div><div class="table-responsive inventario-global-table inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha de reparto</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th><th>Acción</th></tr></thead><tbody>${htmlRows}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-page="prev" ${state.dispatchPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${state.dispatchPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-page="next" ${state.dispatchPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+    tableWrap.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioGlobalCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar todo</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioGlobalExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar todo</span></button></div><div class="table-responsive inventario-global-table inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha de reparto</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th></tr></thead><tbody>${htmlRows}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-page="prev" ${state.dispatchPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${state.dispatchPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-page="next" ${state.dispatchPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+    prepareThumbLoaders('.js-produccion-thumb');
   };
   const renderDispatchMain = () => {
     if (!nodes.dispatchView) return;
     state.dispatchCreateMode = false;
-    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Salida de Productos</h6><button id="produccionDispatchNewBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="bi bi-plus-lg"></i><span>Nuevo reparto</span></button></div><div class="inventario-period-filters"><input id="produccionDispatchSearch" type="search" class="form-control ios-input produccion-dispatch-filter" placeholder="Buscar reparto, cliente o producto" value="${escapeHtml(state.dispatchSearch)}"><input id="produccionDispatchRange" class="form-control ios-input produccion-dispatch-filter" placeholder="Seleccionar rango de fechas" value="${escapeHtml(state.dispatchRange)}"><div class="toolbar-scroll-x inventario-period-actions-scroll"><button id="produccionDispatchClearBtn" type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn ${state.dispatchRange ? '' : 'd-none'}"><i class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></button><button id="produccionDispatchApplyBtn" type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn"><i class="fa-solid fa-filter"></i><span>Aplicar</span></button><button id="produccionDispatchExpandBtn" type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button><button id="produccionDispatchExcelBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="fa-solid fa-file-excel"></i><span>Excel</span></button><span class="inventario-period-divider" aria-hidden="true"></span><button id="produccionDispatchPrintBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-print"></i><span>Imprimir período</span></button><button id="produccionDispatchMassBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-regular fa-file-lines"></i><span>Planillas masivas</span></button></div></div><div id="produccionDispatchTableWrap"></div>`;
+    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Salida de Productos</h6><button id="produccionDispatchNewBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="bi bi-plus-lg"></i><span>Nuevo reparto</span></button></div><div class="inventario-period-filters"><input id="produccionDispatchSearch" type="search" class="form-control ios-input produccion-dispatch-filter" placeholder="Buscar reparto, cliente o producto" value="${escapeHtml(state.dispatchSearch)}"><input id="produccionDispatchRange" class="form-control ios-input produccion-dispatch-filter" placeholder="Seleccionar rango de fechas" value="${escapeHtml(state.dispatchRange)}"><div class="toolbar-scroll-x inventario-period-actions-scroll"><button id="produccionDispatchClearBtn" type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn ${(state.dispatchRange || state.dispatchSearch) ? '' : 'd-none'}"><i class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></button><button id="produccionDispatchApplyBtn" type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn"><i class="fa-solid fa-filter"></i><span>Aplicar</span></button><button id="produccionDispatchExpandBtn" type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button><button id="produccionDispatchExcelBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="fa-solid fa-file-excel"></i><span>Excel</span></button><span class="inventario-period-divider" aria-hidden="true"></span><button id="produccionDispatchPrintBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-print"></i><span>Imprimir período</span></button><button id="produccionDispatchMassBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-regular fa-file-lines"></i><span>Planillas masivas</span></button></div></div><div id="produccionDispatchTableWrap"></div>`;
     const rangeInput = nodes.dispatchView.querySelector('#produccionDispatchRange');
     if (window.flatpickr && rangeInput) {
       const locale = window.flatpickr.l10ns?.es || undefined;
@@ -2436,6 +2477,21 @@
         }
       });
     }
+    const searchInput = nodes.dispatchView.querySelector('#produccionDispatchSearch');
+    const clearBtn = nodes.dispatchView.querySelector('#produccionDispatchClearBtn');
+    const refreshDispatchFilters = () => {
+      state.dispatchSearch = normalizeValue(searchInput?.value);
+      state.dispatchPage = 1;
+      renderDispatchHistoryTable();
+      clearBtn?.classList.toggle('d-none', !(state.dispatchRange || state.dispatchSearch));
+    };
+    searchInput?.addEventListener('input', refreshDispatchFilters);
+    searchInput?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        refreshDispatchFilters();
+      }
+    });
     renderDispatchHistoryTable();
     alignScrollActionsToRight(nodes.dispatchView);
   };
@@ -4621,15 +4677,19 @@
     }
     if (event.target.closest('#produccionDispatchApplyBtn')) {
       state.dispatchSearch = normalizeValue(nodes.dispatchView.querySelector('#produccionDispatchSearch')?.value);
-      state.dispatchRange = normalizeValue(nodes.dispatchView.querySelector('#produccionDispatchRange')?.value);
+      state.dispatchRange = normalizeValue(state.dispatchRange || nodes.dispatchView.querySelector('#produccionDispatchRange')?.value);
       state.dispatchPage = 1;
       renderDispatchHistoryTable();
+      nodes.dispatchView.querySelector('#produccionDispatchClearBtn')?.classList.toggle('d-none', !(state.dispatchRange || state.dispatchSearch));
       return;
     }
     if (event.target.closest('#produccionDispatchClearBtn')) {
+      state.dispatchSearch = '';
       state.dispatchRange = '';
       const rangeInput = nodes.dispatchView.querySelector('#produccionDispatchRange');
       if (rangeInput) rangeInput.value = '';
+      const searchInput = nodes.dispatchView.querySelector('#produccionDispatchSearch');
+      if (searchInput) searchInput.value = '';
       state.dispatchPage = 1;
       renderDispatchMain();
       return;
@@ -4682,20 +4742,81 @@
       await openIosSwal({
         title: 'Salida de Productos · Vista ampliada',
         width: '92vw',
-        html: `<div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha</th><th>Productos</th><th>Cantidad</th><th>Código</th><th>Cliente</th></tr></thead><tbody>${rows.map((row) => {
-          const client = getDispatchClient(row.clientId);
-          const products = Array.isArray(row.products) ? row.products : [];
-          const kg = products.reduce((acc, p) => acc + Number(p.qtyKg || 0), 0);
-          return `<tr><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${products.length}</td><td>${kg.toFixed(2)} kg</td><td>${escapeHtml(row.code || '-')}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
-        }).join('') || '<tr><td colspan="5">Sin datos.</td></tr>'}</tbody></table></div>`,
-        confirmButtonText: 'Cerrar'
+        html: '<div id="dispatchExpandedWrap"></div>',
+        confirmButtonText: 'Cerrar',
+        didOpen: (popup) => {
+          const pageSize = 8;
+          let expandedPage = 1;
+          const renderExpanded = () => {
+            const pages = Math.max(1, Math.ceil(rows.length / pageSize));
+            expandedPage = Math.min(Math.max(1, expandedPage), pages);
+            const start = (expandedPage - 1) * pageSize;
+            const slice = rows.slice(start, start + pageSize);
+            const canCollapseRows = slice.some((row) => state.dispatchCollapse[row.id] === false);
+            const canExpandRows = slice.some((row) => state.dispatchCollapse[row.id] !== false);
+            const body = slice.map((row, index) => {
+              const products = Array.isArray(row.products) ? row.products : [];
+              const kg = products.reduce((acc, p) => acc + Number(p.qtyKg || 0), 0);
+              const expiries = [...new Set(products.flatMap((item) => (Array.isArray(item.allocations) ? item.allocations : []).map((l) => normalizeValue(l.expiryDate)).filter(Boolean)))];
+              const expiryLabel = expiries.length === 1 ? formatIsoEs(expiries[0]) : (expiries.length ? 'Ver detalle' : '-');
+              const client = { ...getDispatchClient(row.clientId), ...safeObject(row.clientSnapshot) };
+              const collapsed = state.dispatchCollapse[row.id] !== false;
+              const detail = !collapsed ? products.flatMap((item) => {
+                const allocations = Array.isArray(item.allocations) && item.allocations.length ? item.allocations : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
+                return allocations.map((allocation) => {
+                  const traceBtn = normalizeValue(allocation.productionId)
+                    ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button>`
+                    : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
+                  return `<tr class="inventario-trace-row"><td>${escapeHtml(item.recipeTitle || '-')} ${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
+                });
+              }).join('') : '';
+              return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${products.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-collapse="${escapeHtml(row.id)}"><i class="fa-solid ${collapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(formatDateTime(row.createdAt))}</span></div></td><td>${products.length === 1 ? '1 producto' : `${products.length} productos`}</td><td>${kg.toFixed(2)} kg</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || '-')}</td><td>${escapeHtml(client.name || '-')}</td></tr>${detail}`;
+            }).join('') || '<tr><td colspan="6">Sin datos.</td></tr>';
+            popup.querySelector('#dispatchExpandedWrap').innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-collapse-all ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-expand-all ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha de reparto</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th></tr></thead><tbody>${body}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+          };
+          renderExpanded();
+          popup.addEventListener('click', async (expandedEvent) => {
+            const toggleBtn = expandedEvent.target.closest('[data-dispatch-expanded-collapse]');
+            if (toggleBtn) {
+              const id = toggleBtn.dataset.dispatchExpandedCollapse;
+              const collapsed = state.dispatchCollapse[id] !== false;
+              state.dispatchCollapse[id] = collapsed ? false : true;
+              renderExpanded();
+              renderDispatchHistoryTable();
+              return;
+            }
+            if (expandedEvent.target.closest('[data-dispatch-expanded-collapse-all]')) {
+              rows.forEach((row) => { state.dispatchCollapse[row.id] = true; });
+              renderExpanded();
+              renderDispatchHistoryTable();
+              return;
+            }
+            if (expandedEvent.target.closest('[data-dispatch-expanded-expand-all]')) {
+              rows.forEach((row) => { state.dispatchCollapse[row.id] = false; });
+              renderExpanded();
+              renderDispatchHistoryTable();
+              return;
+            }
+            const pageBtn = expandedEvent.target.closest('[data-dispatch-expanded-page]');
+            if (pageBtn) {
+              expandedPage += pageBtn.dataset.dispatchExpandedPage === 'next' ? 1 : -1;
+              renderExpanded();
+              return;
+            }
+            const traceBtn = expandedEvent.target.closest('[data-prod-trace]');
+            if (traceBtn) {
+              await openProductionTraceModal(traceBtn.dataset.prodTrace);
+            }
+          });
+        }
       });
       return;
     }
     const collapseBtn = event.target.closest('[data-dispatch-collapse]');
     if (collapseBtn) {
       const id = collapseBtn.dataset.dispatchCollapse;
-      state.dispatchCollapse[id] = !state.dispatchCollapse[id];
+      const collapsed = state.dispatchCollapse[id] !== false;
+      state.dispatchCollapse[id] = collapsed ? false : true;
       renderDispatchHistoryTable();
       return;
     }
@@ -4713,6 +4834,11 @@
     if (event.target.closest('#inventarioGlobalExpandAllRowsBtn')) {
       getDispatchRows().forEach((row) => { state.dispatchCollapse[row.id] = false; });
       renderDispatchHistoryTable();
+      return;
+    }
+    const traceBtn = event.target.closest('[data-prod-trace]');
+    if (traceBtn) {
+      await openProductionTraceModal(traceBtn.dataset.prodTrace);
       return;
     }
   });
