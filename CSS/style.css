@@ -3952,6 +3952,7 @@ html.login-protected.auth-ok body {
 .inventario-toolbar-actions {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
   overflow: visible;
@@ -4146,6 +4147,7 @@ html.login-protected.auth-ok body {
   display: flex;
   gap: 8px;
   align-items: center;
+  justify-content: flex-end;
   overflow: visible;
   white-space: nowrap;
   padding-bottom: 4px;
@@ -5469,6 +5471,7 @@ html.login-protected.auth-ok body {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
 }
@@ -8130,6 +8133,17 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   margin-top: 6px;
 }
 
+.dispatch-vehicles-search-group {
+  margin-bottom: 8px;
+}
+
+.dispatch-vehicles-manager-list {
+  max-height: min(58vh, 420px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+
 .swal2-popup.inventario-provider-rne-alert :is(.swal2-input, .swal2-file, .swal2-textarea, .swal2-select),
 .swal2-popup.inventario-provider-form-alert :is(.swal2-input, .swal2-file, .swal2-textarea, .swal2-select),
 .swal2-popup.produccion-umbral-alert :is(.swal2-input, .swal2-file, .swal2-textarea, .swal2-select) {
@@ -8697,6 +8711,15 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 .inventario-weekly-search {
   max-width: none;
   margin-bottom: 10px;
+}
+
+.inventario-provider-suggest-placeholder {
+  background: #edf2ff;
+}
+
+.inventario-provider-suggest-icon {
+  font-size: 1rem !important;
+  line-height: 1;
 }
 
 .inventario-bulk-list {

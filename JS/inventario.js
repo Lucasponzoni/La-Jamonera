@@ -3196,6 +3196,15 @@
     }
   };
 
+  const alignScrollActionsToRight = (scope = document) => {
+    const nodesToAlign = scope.querySelectorAll('.toolbar-scroll-x, .inventario-toolbar-actions, .produccion-toolbar-actions');
+    requestAnimationFrame(() => {
+      nodesToAlign.forEach((node) => {
+        node.scrollLeft = node.scrollWidth;
+      });
+    });
+  };
+
   const renderEditor = (ingredientId, draft = null) => {
     const ingredient = state.ingredientes[ingredientId];
     if (!ingredient) return;
@@ -3680,7 +3689,7 @@
       dropdown.innerHTML = `${source.map((provider) => {
         const avatar = sanitizeImageUrl(provider?.photoUrl)
           ? `<span class="recipe-suggest-avatar-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-suggest-avatar js-inventario-thumb" src="${escapeHtml(sanitizeImageUrl(provider.photoUrl))}" alt="${escapeHtml(provider.name)}" loading="lazy"></span>`
-          : '<span class="recipe-suggest-avatar-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-truck-field"></i></span></span>';
+          : '<span class="recipe-suggest-avatar-wrap"><span class="image-placeholder-circle-2 inventario-provider-suggest-placeholder"><i class="fa-solid fa-truck-field inventario-provider-suggest-icon"></i></span></span>';
         return `<button type="button" class="recipe-suggest-item" data-provider-pick="${escapeHtml(provider.id)}">${avatar}<span>${escapeHtml(provider.name)}</span></button>`;
       }).join('')}<button type="button" class="recipe-suggest-item recipe-suggest-create" data-provider-create="1"><i class="fa-solid fa-plus"></i><span>nuevo proveedor</span></button>`;
       document.body.appendChild(dropdown);
@@ -4506,8 +4515,9 @@
     const noPerecedero = Boolean(nodes.editorForm.querySelector('#inventoryNoPerecedero')?.checked);
     const usoInternoEmpresa = Boolean(nodes.editorForm.querySelector('#inventoryUsoInternoEmpresa')?.checked);
     const invoiceNumber = normalizeValue(nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value);
-    const providerValue = normalizeValue(nodes.editorForm.querySelector('#inventoryProvider')?.value);
-    const provider = providerLabel(providerValue);
+    const providerId = normalizeValue(nodes.editorForm.querySelector('#inventoryProvider')?.value);
+    const providerData = findProviderById(providerId);
+    const provider = providerLabel(providerId);
     const currentInputFiles = [...(nodes.editorForm.querySelector('#inventoryInvoiceImage')?.files || [])];
     const files = currentInputFiles.length
       ? currentInputFiles
@@ -4560,8 +4570,8 @@
       return;
     }
 
-    if (!provider) {
-      await openIosSwal({ title: 'Proveedor requerido', html: '<p>Seleccioná un proveedor para guardar el ingreso.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+    if (!providerId || !providerData?.id) {
+      await openIosSwal({ title: 'Proveedor requerido', html: '<p>Seleccioná un proveedor de la lista antes de guardar el ingreso.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
       return;
     }
 
@@ -5392,6 +5402,7 @@
         renderFamilies();
         renderStatusFilters();
         renderList();
+        alignScrollActionsToRight(document);
       }
       if (window.flatpickr && nodes.globalRange) {
         const locale = window.flatpickr.l10ns?.es || undefined;

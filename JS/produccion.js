@@ -2437,7 +2437,31 @@
       });
     }
     renderDispatchHistoryTable();
+    alignScrollActionsToRight(nodes.dispatchView);
   };
+  const hasDispatchDraftChanges = (draft = {}) => {
+    if (!draft || typeof draft !== 'object') return false;
+    if (normalizeValue(draft.clientId || draft.clientName || draft.vehicleId || draft.vehicleSearch || draft.clientAddress || draft.clientCity)) return true;
+    if (Array.isArray(draft.managers) && draft.managers.length) return true;
+    if (Array.isArray(draft.comments) && draft.comments.some((item) => normalizeValue(item))) return true;
+    if (Array.isArray(draft.proofs) && draft.proofs.some((item) => normalizeValue(item?.url || item?.name))) return true;
+    const lines = Array.isArray(draft.lines) ? draft.lines : [];
+    return lines.some((line) => normalizeValue(line?.recipeId || line?.recipeSearch || line?.qtyKg));
+  };
+
+  const confirmLeaveDispatchCreate = async () => {
+    if (!hasDispatchDraftChanges(state.dispatchDraft)) return true;
+    const result = await openIosSwal({
+      title: 'Abandonar nuevo reparto',
+      html: '<p>Hay cambios sin guardar en este reparto.</p>',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, salir',
+      cancelButtonText: 'Seguir editando'
+    });
+    return Boolean(result.isConfirmed);
+  };
+
   const buildDispatchDraft = () => ({
     dispatchDate: toIsoDate(),
     clientId: '',
@@ -2454,6 +2478,15 @@
     vehicleSearch: '',
     managerSearch: ''
   });
+  const alignScrollActionsToRight = (scope = document) => {
+    const nodesToAlign = scope.querySelectorAll('.toolbar-scroll-x, .inventario-toolbar-actions, .produccion-toolbar-actions');
+    requestAnimationFrame(() => {
+      nodesToAlign.forEach((node) => {
+        node.scrollLeft = node.scrollWidth;
+      });
+    });
+  };
+
   const openDispatch = () => {
     state.dispatchPage = 1;
     setDispatchMode(true);
@@ -2630,9 +2663,9 @@
   const openDispatchVehiclesManager = async () => {
     const rows = Object.values(safeObject(state.reparto.vehicles || {}));
     const html = rows.length
-      ? `<div id="dispatchVehiclesManagerList" class="dispatch-vehicles-manager-list">${rows.map((item) => {
+      ? `<div class="input-group ios-input-group ingredientes-search-group dispatch-vehicles-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchVehiclesSearchInput" type="search" class="form-control ios-input ingredientes-search-input" placeholder="Buscar por número, patente o marca" autocomplete="off"></div><div id="dispatchVehiclesManagerList" class="dispatch-vehicles-manager-list">${rows.map((item) => {
         const meta = getDispatchVehicleExpiryMeta(item);
-        return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i class="fa-regular fa-eye"></i><span>Adjunto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i class="fa-solid fa-upload"></i><span>Reemplazar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i class="fa-solid fa-paperclip"></i><span>Quitar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></div></div>`;
+        return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}" data-vehicle-search="${escapeHtml(normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`))}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i class="fa-regular fa-eye"></i><span>Adjunto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i class="fa-solid fa-upload"></i><span>Reemplazar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i class="fa-solid fa-paperclip"></i><span>Quitar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></div></div>`;
       }).join('')}</div>`
       : '<p>No hay unidades cargadas.</p>';
     const result = await openIosSwal({
@@ -2648,9 +2681,18 @@
           const rowsLive = Object.values(safeObject(state.reparto.vehicles || {}));
           list.innerHTML = rowsLive.map((item) => {
             const meta = getDispatchVehicleExpiryMeta(item);
-            return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i class="fa-regular fa-eye"></i><span>Adjunto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i class="fa-solid fa-upload"></i><span>Reemplazar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i class="fa-solid fa-paperclip"></i><span>Quitar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></div></div>`;
+            return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}" data-vehicle-search="${escapeHtml(normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`))}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i class="fa-regular fa-eye"></i><span>Adjunto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i class="fa-solid fa-upload"></i><span>Reemplazar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i class="fa-solid fa-paperclip"></i><span>Quitar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></div></div>`;
           }).join('') || '<p>No hay unidades cargadas.</p>';
         };
+        const searchInput = box?.querySelector('#dispatchVehiclesSearchInput');
+        searchInput?.addEventListener('input', () => {
+          const query = normalizeLower(searchInput.value);
+          box.querySelectorAll('.dispatch-vehicle-manager-card[data-vehicle-search]').forEach((card) => {
+            const hay = normalizeLower(card.getAttribute('data-vehicle-search') || '');
+            card.classList.toggle('d-none', Boolean(query) && !hay.includes(query));
+          });
+        });
+        
         box?.addEventListener('click', async (ev) => {
           const id = ev.target.closest('[data-vehicle-view],[data-vehicle-upload],[data-vehicle-clear],[data-vehicle-toggle],[data-vehicle-delete]')?.dataset.vehicleView
             || ev.target.closest('[data-vehicle-upload]')?.dataset.vehicleUpload
@@ -3294,8 +3336,9 @@
         const traces = getTraceRowsFromRegistro(item).map((trace) => `<tr class="is-trace-row"><td>↳ ${trace.index}</td><td><span class="print-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td><span style="display:inline-flex;align-items:center;gap:8px;">${trace.ingredientImageUrl ? `<img src="${escapeHtml(trace.ingredientImageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(trace.ingredientName)}</span></span></td><td>-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="print-trace-vto">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td></tr>`);
         return [main, ...resolutions, ...traces];
       }).join('');
-      const imagesHtml = ask.isConfirmed
-        ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));">${rows.flatMap((item) => getTraceRowsFromRegistro(item).map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><figcaption style="font-size:12px;color:#4b5f8e;font-weight:700;">${escapeHtml(trace.ingredientName)}</figcaption></div>${(trace.invoiceImageUrls || []).map((url) => `<img src="${url}" style="width:100%;max-height:220px;object-fit:contain;border-radius:10px;margin-top:8px;">`).join('')}</figure>`)).join('')}</div></section>`
+      const tracesWithAttachments = rows.flatMap((item) => getTraceRowsFromRegistro(item).filter((trace) => Array.isArray(trace.invoiceImageUrls) && trace.invoiceImageUrls.length));
+      const imagesHtml = ask.isConfirmed && tracesWithAttachments.length
+        ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));">${tracesWithAttachments.map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><figcaption style="font-size:12px;color:#4b5f8e;font-weight:700;">${escapeHtml(trace.ingredientName)}</figcaption></div>${(trace.invoiceImageUrls || []).map((url) => `<img src="${url}" style="width:100%;max-height:220px;object-fit:contain;border-radius:10px;margin-top:8px;">`).join('')}</figure>`).join('')}</div></section>`
         : '';
       win.document.write(`<html><head><title>Historial producción ${escapeHtml(capitalize(recipe.title || ''))}</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.is-trace-row td{background:#ffecef}.is-resolution-row td{background:#fff6d9}.print-trace-date{color:#1f6fd6;font-weight:700}.print-trace-vto{color:#b04a09;font-weight:700}</style></head><body><h1>Historial producción ${escapeHtml(capitalize(recipe.title || ''))}</h1><table><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>VTO producto</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
       win.document.close();
@@ -4378,8 +4421,9 @@
       const traces = getTraceRowsFromRegistro(item).map((trace) => `<tr class="is-trace-row"><td>↳ ${trace.index}</td><td><span class="print-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td><span style="display:inline-flex;align-items:center;gap:8px;">${trace.ingredientImageUrl ? `<img src="${escapeHtml(trace.ingredientImageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(trace.ingredientName)}</span></span></td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="print-trace-vto">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td></tr>`);
       return [main, ...resolutions, ...traces];
     }).join('');
-    const imagesHtml = includeImages
-      ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas del período</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${rows.flatMap((item) => getTraceRowsFromRegistro(item).map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><figcaption style="font-size:12px;color:#4b5f8e;font-weight:700;">${escapeHtml(trace.ingredientName)}</figcaption></div>${(trace.invoiceImageUrls || []).map((url, idx) => `<img src="${url}" style="width:100%;max-height:240px;object-fit:contain;border-radius:10px;margin-top:${idx ? '8px' : '0'};">`).join('')}</figure>`)).join('')}</div></section>`
+    const tracesWithAttachments = rows.flatMap((item) => getTraceRowsFromRegistro(item).filter((trace) => Array.isArray(trace.invoiceImageUrls) && trace.invoiceImageUrls.length));
+    const imagesHtml = includeImages && tracesWithAttachments.length
+      ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas del período</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${tracesWithAttachments.map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><figcaption style="font-size:12px;color:#4b5f8e;font-weight:700;">${escapeHtml(trace.ingredientName)}</figcaption></div>${(trace.invoiceImageUrls || []).map((url, idx) => `<img src="${url}" style="width:100%;max-height:240px;object-fit:contain;border-radius:10px;margin-top:${idx ? '8px' : '0'};">`).join('')}</figure>`).join('')}</div></section>`
       : '';
     win.document.write(`<html><head><title>Producción por período</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.is-trace-row td{background:#ffecef}.is-resolution-row td{background:#fff6d9}.print-trace-date{color:#1f6fd6;font-weight:700}.print-trace-vto{color:#b04a09;font-weight:700}</style></head><body><h1>Producción por período • La Jamonera</h1><table><thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
     win.document.close();
@@ -4404,6 +4448,10 @@
 
   nodes.dispatchView?.addEventListener('click', async (event) => {
     if (event.target.closest('#produccionDispatchBackBtn')) {
+      if (state.dispatchCreateMode) {
+        const canLeave = await confirmLeaveDispatchCreate();
+        if (!canLeave) return;
+      }
       setDispatchMode(false);
       return;
     }
@@ -4413,6 +4461,8 @@
       return;
     }
     if (event.target.closest('#produccionDispatchBackToListBtn')) {
+      const canLeave = await confirmLeaveDispatchCreate();
+      if (!canLeave) return;
       renderDispatchMain();
       return;
     }
@@ -4987,6 +5037,7 @@
       setHistoryMode(false);
       renderList();
       renderModalRneBadge();
+      alignScrollActionsToRight(document);
       if (window.flatpickr && nodes.historyRange) {
         const locale = window.flatpickr.l10ns?.es || undefined;
         const dayMap = getProductionDayMap();
