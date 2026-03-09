@@ -2318,8 +2318,8 @@
   };
   const formatDispatchVehicleLabel = (vehicle = {}) => {
     const meta = getDispatchVehicleExpiryMeta(vehicle);
-    const model = normalizeValue(vehicle.type || 'Vehículo');
-    return `${vehicle.number || '-'} - ${vehicle.patent || '-'} - ${model} (${meta.text})`;
+    const brand = normalizeValue(vehicle.brand || vehicle.type || 'Vehículo');
+    return `${vehicle.number || '-'} - ${vehicle.patent || '-'} - ${brand} (${meta.text})`;
   };
   const getDispatchAvailableByProductionId = (productionId) => {
     const prod = safeObject(state.registros?.[productionId]);
@@ -2437,7 +2437,31 @@
       });
     }
     renderDispatchHistoryTable();
+    alignScrollActionsToRight(nodes.dispatchView);
   };
+  const hasDispatchDraftChanges = (draft = {}) => {
+    if (!draft || typeof draft !== 'object') return false;
+    if (normalizeValue(draft.clientId || draft.clientName || draft.vehicleId || draft.vehicleSearch || draft.clientAddress || draft.clientCity)) return true;
+    if (Array.isArray(draft.managers) && draft.managers.length) return true;
+    if (Array.isArray(draft.comments) && draft.comments.some((item) => normalizeValue(item))) return true;
+    if (Array.isArray(draft.proofs) && draft.proofs.some((item) => normalizeValue(item?.url || item?.name))) return true;
+    const lines = Array.isArray(draft.lines) ? draft.lines : [];
+    return lines.some((line) => normalizeValue(line?.recipeId || line?.recipeSearch || line?.qtyKg));
+  };
+
+  const confirmLeaveDispatchCreate = async () => {
+    if (!hasDispatchDraftChanges(state.dispatchDraft)) return true;
+    const result = await openIosSwal({
+      title: 'Abandonar nuevo reparto',
+      html: '<p>Hay cambios sin guardar en este reparto.</p>',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, salir',
+      cancelButtonText: 'Seguir editando'
+    });
+    return Boolean(result.isConfirmed);
+  };
+
   const buildDispatchDraft = () => ({
     dispatchDate: toIsoDate(),
     clientId: '',
@@ -2454,6 +2478,15 @@
     vehicleSearch: '',
     managerSearch: ''
   });
+  const alignScrollActionsToRight = (scope = document) => {
+    const nodesToAlign = scope.querySelectorAll('.toolbar-scroll-x, .inventario-toolbar-actions, .produccion-toolbar-actions');
+    requestAnimationFrame(() => {
+      nodesToAlign.forEach((node) => {
+        node.scrollLeft = node.scrollWidth;
+      });
+    });
+  };
+
   const openDispatch = () => {
     state.dispatchPage = 1;
     setDispatchMode(true);
@@ -2482,14 +2515,14 @@
       const recipe = safeObject(state.recetas[line.recipeId]);
       const recipeTitle = normalizeValue(line.recipeSearch || recipe.title);
       const recipeImage = sanitizeImageUrl(recipe.imageUrl);
-      return `<tr><td><div class="recipe-ing-autocomplete" data-dispatch-product-wrap="${idx}"><div class="recipe-ing-input-wrap dispatch-product-input-wrap"><span class="recipe-inline-avatar-wrap">${recipeImage ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-dispatch-inline-thumb" src="${escapeHtml(recipeImage)}" alt="${escapeHtml(recipeTitle || 'Producto')}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon"></i></span>'}</span><input type="search" class="form-control ios-input dispatch-product-search-input" data-dispatch-product-search="${idx}" placeholder="Seleccionar producto" value="${escapeHtml(recipeTitle)}"></div><input type="hidden" data-dispatch-product-id="${idx}" value="${escapeHtml(line.recipeId)}"></div></td><td><input class="form-control ios-input" type="number" step="0.01" min="0" data-dispatch-qty="${idx}" value="${escapeHtml(line.qtyKg || '')}"></td><td class="dispatch-stock-cell">${stockStatus}</td><td class="dispatch-lot-cell">${lotsText}</td><td class="dispatch-expiry-cell">${expiryText}</td><td><button type="button" class="btn family-manage-btn" data-dispatch-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+      return `<tr><td><div class="recipe-ing-autocomplete" data-dispatch-product-wrap="${idx}"><div class="recipe-ing-input-wrap dispatch-product-input-wrap"><span class="recipe-inline-avatar-wrap">${recipeImage ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-dispatch-inline-thumb" src="${escapeHtml(recipeImage)}" alt="${escapeHtml(recipeTitle || 'Producto')}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><input type="search" class="form-control ios-input dispatch-product-search-input" data-dispatch-product-search="${idx}" placeholder="Seleccionar producto" value="${escapeHtml(recipeTitle)}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"></div><input type="hidden" data-dispatch-product-id="${idx}" value="${escapeHtml(line.recipeId)}"></div></td><td><input class="form-control ios-input" type="number" step="0.01" min="0" data-dispatch-qty="${idx}" value="${escapeHtml(line.qtyKg || '')}"></td><td class="dispatch-stock-cell">${stockStatus}</td><td class="dispatch-lot-cell">${lotsText}</td><td class="dispatch-expiry-cell">${expiryText}</td><td><button type="button" class="btn family-manage-btn" data-dispatch-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`;
     }).join('');
     const commentRows = draft.comments.map((comment, idx) => `<tr class="dispatch-comment-row"><td colspan="5"><textarea class="form-control ios-input dispatch-comment-textarea" data-dispatch-comment="${idx}" placeholder="Agregá comentarios y observaciones">${escapeHtml(comment)}</textarea></td><td><button type="button" class="btn family-manage-btn" data-dispatch-comment-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
     const proofRows = (Array.isArray(draft.proofs) ? draft.proofs : []).map((proof, idx) => `<tr class="dispatch-proof-row"><td colspan="4"><label class="inventario-upload-dropzone dispatch-proof-drop" for="dispatchProofFile_${idx}"><i class="fa-solid fa-paperclip"></i><span>${escapeHtml(proof?.name || 'Adjuntar comprobante (imagen/PDF)')}</span></label><input id="dispatchProofFile_${idx}" class="inventario-hidden-file-input" type="file" accept="image/*,application/pdf" data-dispatch-proof-file="${idx}">${proof?.url ? `<p class="dispatch-proof-name">Cargado: ${escapeHtml(proof.name || 'comprobante')}</p>` : ''}</td><td class="dispatch-proof-expiry-cell">Comprobante</td><td><button type="button" class="btn family-manage-btn" data-dispatch-proof-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
     nodes.dispatchView.innerHTML = `<div class="inventario-period-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Nuevo reparto</h6></div>
     <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">1</span> Datos generales</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Día de reparto</label><input id="dispatchDateInput" class="form-control ios-input" value="${escapeHtml(draft.dispatchDate)}"></div><div class="recipe-field recipe-field-half"><div class="dispatch-client-head"><label class="form-label mb-0">Cliente <small class="dispatch-client-helper">(si no existe, crealo)</small></label><button type="button" class="btn ios-btn ios-btn-secondary dispatch-quick-client-btn" id="dispatchQuickCreateClientBtn"><i class="fa-solid fa-plus"></i><span>Nuevo cliente</span></button></div><div class="inventario-provider-search-wrap"><input id="dispatchClientInput" class="form-control ios-input" placeholder="Buscar por nombre, DNI o CUIL" value="${escapeHtml(draft.clientName)}"><input type="hidden" id="dispatchClientId" value="${escapeHtml(draft.clientId)}"></div></div><div class="recipe-field recipe-field-half"><label class="form-label">Dirección de reparto</label><input id="dispatchClientAddressInput" class="form-control ios-input" placeholder="Dirección" value="${escapeHtml(draft.clientAddress || '')}" ${draft.clientId ? '' : 'disabled'}></div><div class="recipe-field recipe-field-half"><label class="form-label">Localidad</label><input id="dispatchClientCityInput" class="form-control ios-input" placeholder="Localidad" value="${escapeHtml(draft.clientCity || '')}" ${draft.clientId ? '' : 'disabled'}></div><div class="recipe-field recipe-field-half"><label class="form-label">Provincia</label><select id="dispatchClientProvinceInput" class="form-select ios-input" ${draft.clientId ? '' : 'disabled'}>${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${normalizeValue(draft.clientProvince || 'Santa Fe') === item ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select></div><div class="recipe-field recipe-field-half"><label class="form-label">País</label><input id="dispatchClientCountryInput" class="form-control ios-input" value="${escapeHtml(draft.clientCountry || 'Argentina')}" ${draft.clientId ? '' : 'disabled'}></div></div></section>
     <section class="recipe-step-card step-block produccion-dispatch-create"><div class="d-flex align-items-center justify-content-between mb-2"><h6 class="step-title mb-0"><span class="recipe-step-number">2</span> Productos a repartir</h6></div><div class="table-responsive recipe-table-wrap dispatch-products-table"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Producto</th><th>Kilos</th><th>Stock</th><th>Lote</th><th>Vencimiento</th><th></th></tr></thead><tbody>${lineRows}${commentRows}${proofRows}</tbody></table></div><div class="toolbar-scroll-x dispatch-actions-row mt-2"><button type="button" class="btn ios-btn ios-btn-success recipe-table-action-btn" id="dispatchAddProductBtn"><i class="fa-solid fa-plus"></i><span>Producto</span></button><button type="button" class="btn recipe-table-action-btn recipe-table-action-btn-neutral" id="dispatchAddCommentBtn"><i class="fa-regular fa-message"></i><span>Comentario</span></button><button type="button" class="btn recipe-table-action-btn recipe-table-action-btn-monography" id="dispatchAddProofBtn"><i class="fa-solid fa-paperclip"></i><span>Adjuntar comprobantes</span></button></div></section>
-    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">3</span> Vehículo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Transporte habilitado (UTA/URA)</label><small class="d-block text-muted mb-1">Unidad de Transporte Alimentario / Unidad de Reparto Alimentario.</small><div class="inventario-provider-search-wrap"><input id="dispatchVehicleInput" class="form-control ios-input" placeholder="Seleccionar unidad habilitada" value="${escapeHtml(draft.vehicleSearch || (draft.vehicleId ? formatDispatchVehicleLabel(getDispatchVehicle(draft.vehicleId)) : ''))}"><input type="hidden" id="dispatchVehicleSelect" value="${escapeHtml(draft.vehicleId)}"></div><div class="dispatch-vehicle-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchAddVehicleBtn"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchManageVehiclesBtn"><i class="fa-solid fa-pen-to-square"></i><span>Gestionar UTA/URA</span></button></div></div><div class="recipe-field recipe-field-half"><label class="form-label">Responsables</label><div class="input-group ios-input-group ingredientes-search-group dispatch-managers-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchManagersSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar responsable" value="${escapeHtml(draft.managerSearch || '')}"></div><div class="produccion-managers-grid">${Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-check" data-user-search="${escapeHtml(normalizeLower(`${user.fullName || ''} ${user.email || ''} ${getDispatchUserRole(user) || ''}`))}"><input type="checkbox" data-dispatch-manager="${escapeHtml(user.id)}" ${draft.managers.includes(user.id) ? 'checked' : ''}>${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(getDispatchUserRole(user))}</small></span></label>`).join('')}</div></div></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchSaveBtn"><i class="fa-solid fa-floppy-disk"></i><span>Guardar reparto</span></button></div>`;
+    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">3</span> Vehículo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Transporte habilitado (UTA/URA)</label><small class="d-block text-muted mb-1">Unidad de Transporte Alimentario / Unidad de Reparto Alimentario.</small><div class="inventario-provider-search-wrap"><input id="dispatchVehicleInput" class="form-control ios-input" placeholder="Seleccionar unidad habilitada" value="${escapeHtml(draft.vehicleSearch || (draft.vehicleId ? formatDispatchVehicleLabel(getDispatchVehicle(draft.vehicleId)) : ''))}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"><input type="hidden" id="dispatchVehicleSelect" value="${escapeHtml(draft.vehicleId)}"></div><div class="dispatch-vehicle-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchAddVehicleBtn"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchManageVehiclesBtn"><i class="fa-solid fa-pen-to-square"></i><span>Gestionar UTA/URA</span></button></div></div><div class="recipe-field recipe-field-half"><label class="form-label">Responsables</label><div class="input-group ios-input-group ingredientes-search-group dispatch-managers-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchManagersSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar responsable" value="${escapeHtml(draft.managerSearch || '')}"></div><div class="produccion-managers-grid">${Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-check" data-user-search="${escapeHtml(normalizeLower(`${user.fullName || ''} ${user.email || ''} ${getDispatchUserRole(user) || ''}`))}"><input type="checkbox" data-dispatch-manager="${escapeHtml(user.id)}" ${draft.managers.includes(user.id) ? 'checked' : ''}>${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(getDispatchUserRole(user))}</small></span></label>`).join('')}</div></div></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchSaveBtn"><i class="fa-solid fa-floppy-disk"></i><span>Guardar reparto</span></button></div>`;
     const dateInput = nodes.dispatchView.querySelector('#dispatchDateInput');
     if (window.flatpickr && dateInput) {
       window.flatpickr(dateInput, {
@@ -2630,9 +2663,9 @@
   const openDispatchVehiclesManager = async () => {
     const rows = Object.values(safeObject(state.reparto.vehicles || {}));
     const html = rows.length
-      ? `<div class="dispatch-vehicles-manager-list">${rows.map((item) => {
+      ? `<div class="input-group ios-input-group ingredientes-search-group dispatch-vehicles-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchVehiclesSearchInput" type="search" class="form-control ios-input ingredientes-search-input" placeholder="Buscar por número, patente o marca" autocomplete="off"></div><div id="dispatchVehiclesManagerList" class="dispatch-vehicles-manager-list">${rows.map((item) => {
         const meta = getDispatchVehicleExpiryMeta(item);
-        return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i class="fa-regular fa-eye"></i><span>Adjunto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i class="fa-solid fa-upload"></i><span>Reemplazar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i class="fa-solid fa-paperclip"></i><span>Quitar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></div></div>`;
+        return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}" data-vehicle-search="${escapeHtml(normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`))}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i class="fa-regular fa-eye"></i><span>Adjunto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i class="fa-solid fa-upload"></i><span>Reemplazar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i class="fa-solid fa-paperclip"></i><span>Quitar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></div></div>`;
       }).join('')}</div>`
       : '<p>No hay unidades cargadas.</p>';
     const result = await openIosSwal({
@@ -2642,6 +2675,24 @@
       confirmButtonText: 'Cerrar',
       didOpen: () => {
         const box = Swal.getHtmlContainer();
+        const refreshVehiclesManagerList = () => {
+          const list = box?.querySelector('#dispatchVehiclesManagerList');
+          if (!list) return;
+          const rowsLive = Object.values(safeObject(state.reparto.vehicles || {}));
+          list.innerHTML = rowsLive.map((item) => {
+            const meta = getDispatchVehicleExpiryMeta(item);
+            return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}" data-vehicle-search="${escapeHtml(normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`))}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i class="fa-regular fa-eye"></i><span>Adjunto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i class="fa-solid fa-upload"></i><span>Reemplazar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i class="fa-solid fa-paperclip"></i><span>Quitar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></div></div>`;
+          }).join('') || '<p>No hay unidades cargadas.</p>';
+        };
+        const searchInput = box?.querySelector('#dispatchVehiclesSearchInput');
+        searchInput?.addEventListener('input', () => {
+          const query = normalizeLower(searchInput.value);
+          box.querySelectorAll('.dispatch-vehicle-manager-card[data-vehicle-search]').forEach((card) => {
+            const hay = normalizeLower(card.getAttribute('data-vehicle-search') || '');
+            card.classList.toggle('d-none', Boolean(query) && !hay.includes(query));
+          });
+        });
+        
         box?.addEventListener('click', async (ev) => {
           const id = ev.target.closest('[data-vehicle-view],[data-vehicle-upload],[data-vehicle-clear],[data-vehicle-toggle],[data-vehicle-delete]')?.dataset.vehicleView
             || ev.target.closest('[data-vehicle-upload]')?.dataset.vehicleUpload
@@ -2662,7 +2713,7 @@
             return;
           }
           if (ev.target.closest('[data-vehicle-upload]')) {
-            const pick = await openIosSwal({ title: 'Reemplazar adjunto', html: '<input id="vehicleReplaceFile" type="file" class="swal2-file" accept="image/*,application/pdf">', showCancelButton: true, confirmButtonText: 'Subir', preConfirm: async () => {
+            const pick = await openIosSwal({ title: 'Reemplazar adjunto', customClass: { popup: 'dispatch-vehicle-replace-alert' }, html: '<div class="dispatch-vehicle-replace-wrap"><label for="vehicleReplaceFile" class="inventario-upload-dropzone"><i class="fa-solid fa-upload"></i><span id="vehicleReplaceLabel">Seleccioná un archivo PDF o imagen</span></label><input id="vehicleReplaceFile" type="file" class="inventario-hidden-file-input" accept="image/*,application/pdf"></div>', showCancelButton: true, confirmButtonText: 'Subir', didOpen: () => { const fileInput = document.getElementById('vehicleReplaceFile'); const label = document.getElementById('vehicleReplaceLabel'); fileInput?.addEventListener('change', () => { const file = fileInput.files?.[0]; if (label) label.textContent = file ? file.name : 'Seleccioná un archivo PDF o imagen'; }); }, preConfirm: async () => {
               const file = document.getElementById('vehicleReplaceFile')?.files?.[0];
               if (!file) return Swal.showValidationMessage('Seleccioná un archivo.');
               if (![...ALLOWED_UPLOAD_TYPES, 'application/pdf'].includes(file.type)) return Swal.showValidationMessage('Sólo imagen o PDF.');
@@ -2672,30 +2723,26 @@
             if (pick.isConfirmed && pick.value) {
               state.reparto.vehicles[id].attachmentUrl = pick.value;
               await persistRepartoStore();
-              Swal.close();
-              await openDispatchVehiclesManager();
+              refreshVehiclesManagerList();
             }
             return;
           }
           if (ev.target.closest('[data-vehicle-clear]')) {
             state.reparto.vehicles[id].attachmentUrl = '';
             await persistRepartoStore();
-            Swal.close();
-            await openDispatchVehiclesManager();
+            refreshVehiclesManagerList();
             return;
           }
           if (ev.target.closest('[data-vehicle-toggle]')) {
             state.reparto.vehicles[id].enabled = state.reparto.vehicles[id].enabled === false;
             await persistRepartoStore();
-            Swal.close();
-            await openDispatchVehiclesManager();
+            refreshVehiclesManagerList();
             return;
           }
           if (ev.target.closest('[data-vehicle-delete]')) {
             delete state.reparto.vehicles[id];
             await persistRepartoStore();
-            Swal.close();
-            await openDispatchVehiclesManager();
+            refreshVehiclesManagerList();
           }
         });
       }
@@ -3267,14 +3314,11 @@
       });
       if (!askTrace.isConfirmed && !askTrace.isDenied) return;
       const includeTrace = askTrace.isConfirmed;
-      const ingredientImages = ask.isConfirmed
-        ? rows.flatMap((item) => getTraceRowsFromRegistro(item).map((trace) => trace.ingredientImageUrl).filter(Boolean))
-        : [];
       const attachedImages = ask.isConfirmed
         ? rows.flatMap((item) => getTraceRowsFromRegistro(item).flatMap((trace) => trace.invoiceImageUrls || []))
         : [];
       if (ask.isConfirmed) {
-        await preloadPrintImages([...ingredientImages, ...attachedImages]);
+        await preloadPrintImages(attachedImages);
       }
       const win = window.open('', '_blank', 'width=1300,height=900');
       if (!win) return;
@@ -3292,8 +3336,9 @@
         const traces = getTraceRowsFromRegistro(item).map((trace) => `<tr class="is-trace-row"><td>↳ ${trace.index}</td><td><span class="print-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td><span style="display:inline-flex;align-items:center;gap:8px;">${trace.ingredientImageUrl ? `<img src="${escapeHtml(trace.ingredientImageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(trace.ingredientName)}</span></span></td><td>-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="print-trace-vto">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td></tr>`);
         return [main, ...resolutions, ...traces];
       }).join('');
-      const imagesHtml = ask.isConfirmed
-        ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));">${rows.flatMap((item) => getTraceRowsFromRegistro(item).map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">${trace.ingredientImageUrl ? `<img src="${trace.ingredientImageUrl}" style="width:36px;height:36px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<figcaption style="font-size:12px;color:#4b5f8e;">${escapeHtml(trace.ingredientName)}</figcaption></div>${(trace.invoiceImageUrls || []).map((url) => `<img src="${url}" style="width:100%;max-height:220px;object-fit:contain;border-radius:10px;margin-top:8px;">`).join('')}</figure>`)).join('')}</div></section>`
+      const tracesWithAttachments = rows.flatMap((item) => getTraceRowsFromRegistro(item).filter((trace) => Array.isArray(trace.invoiceImageUrls) && trace.invoiceImageUrls.length));
+      const imagesHtml = ask.isConfirmed && tracesWithAttachments.length
+        ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));">${tracesWithAttachments.map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><figcaption style="font-size:12px;color:#4b5f8e;font-weight:700;">${escapeHtml(trace.ingredientName)}</figcaption></div>${(trace.invoiceImageUrls || []).map((url) => `<img src="${url}" style="width:100%;max-height:220px;object-fit:contain;border-radius:10px;margin-top:8px;">`).join('')}</figure>`).join('')}</div></section>`
         : '';
       win.document.write(`<html><head><title>Historial producción ${escapeHtml(capitalize(recipe.title || ''))}</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.is-trace-row td{background:#ffecef}.is-resolution-row td{background:#fff6d9}.print-trace-date{color:#1f6fd6;font-weight:700}.print-trace-vto{color:#b04a09;font-weight:700}</style></head><body><h1>Historial producción ${escapeHtml(capitalize(recipe.title || ''))}</h1><table><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>VTO producto</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
       win.document.close();
@@ -4354,14 +4399,11 @@
     if (!askTrace.isConfirmed && !askTrace.isDenied) return;
     const includeTrace = askTrace.isConfirmed;
     const rows = getHistoryRows();
-    const ingredientImages = includeImages
-      ? rows.flatMap((item) => getTraceRowsFromRegistro(item).map((trace) => trace.ingredientImageUrl).filter(Boolean))
-      : [];
     const attachedImages = includeImages
       ? rows.flatMap((item) => getTraceRowsFromRegistro(item).flatMap((trace) => trace.invoiceImageUrls || []))
       : [];
     if (includeImages) {
-      await preloadPrintImages([...ingredientImages, ...attachedImages]);
+      await preloadPrintImages(attachedImages);
     }
     const win = window.open('', '_blank', 'width=1300,height=900');
     if (!win) return;
@@ -4379,8 +4421,9 @@
       const traces = getTraceRowsFromRegistro(item).map((trace) => `<tr class="is-trace-row"><td>↳ ${trace.index}</td><td><span class="print-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td><span style="display:inline-flex;align-items:center;gap:8px;">${trace.ingredientImageUrl ? `<img src="${escapeHtml(trace.ingredientImageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(trace.ingredientName)}</span></span></td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="print-trace-vto">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td></tr>`);
       return [main, ...resolutions, ...traces];
     }).join('');
-    const imagesHtml = includeImages
-      ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas del período</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${rows.flatMap((item) => getTraceRowsFromRegistro(item).map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">${trace.ingredientImageUrl ? `<img src="${trace.ingredientImageUrl}" style="width:36px;height:36px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<figcaption style="font-size:12px;color:#4b5f8e;">${escapeHtml(trace.ingredientName)}</figcaption></div>${(trace.invoiceImageUrls || []).map((url, idx) => `<img src="${url}" style="width:100%;max-height:240px;object-fit:contain;border-radius:10px;margin-top:${idx ? '8px' : '0'};">`).join('')}</figure>`)).join('')}</div></section>`
+    const tracesWithAttachments = rows.flatMap((item) => getTraceRowsFromRegistro(item).filter((trace) => Array.isArray(trace.invoiceImageUrls) && trace.invoiceImageUrls.length));
+    const imagesHtml = includeImages && tracesWithAttachments.length
+      ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas del período</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${tracesWithAttachments.map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><figcaption style="font-size:12px;color:#4b5f8e;font-weight:700;">${escapeHtml(trace.ingredientName)}</figcaption></div>${(trace.invoiceImageUrls || []).map((url, idx) => `<img src="${url}" style="width:100%;max-height:240px;object-fit:contain;border-radius:10px;margin-top:${idx ? '8px' : '0'};">`).join('')}</figure>`).join('')}</div></section>`
       : '';
     win.document.write(`<html><head><title>Producción por período</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.is-trace-row td{background:#ffecef}.is-resolution-row td{background:#fff6d9}.print-trace-date{color:#1f6fd6;font-weight:700}.print-trace-vto{color:#b04a09;font-weight:700}</style></head><body><h1>Producción por período • La Jamonera</h1><table><thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
     win.document.close();
@@ -4390,8 +4433,25 @@
   });
   nodes.historyMassPlanillasBtn?.addEventListener('click', openMassPlanillasByPeriod);
 
+  nodes.dispatchView?.addEventListener('click', (event) => {
+    if (!state.dispatchCreateMode || !state.dispatchDraft) return;
+    const vehicleInput = event.target.closest('#dispatchVehicleInput');
+    if (vehicleInput) {
+      showDispatchVehicleSuggestions(vehicleInput);
+      return;
+    }
+    const productInput = event.target.closest('[data-dispatch-product-search]');
+    if (productInput) {
+      showDispatchProductSuggestions(productInput);
+    }
+  });
+
   nodes.dispatchView?.addEventListener('click', async (event) => {
     if (event.target.closest('#produccionDispatchBackBtn')) {
+      if (state.dispatchCreateMode) {
+        const canLeave = await confirmLeaveDispatchCreate();
+        if (!canLeave) return;
+      }
       setDispatchMode(false);
       return;
     }
@@ -4401,6 +4461,8 @@
       return;
     }
     if (event.target.closest('#produccionDispatchBackToListBtn')) {
+      const canLeave = await confirmLeaveDispatchCreate();
+      if (!canLeave) return;
       renderDispatchMain();
       return;
     }
@@ -4726,6 +4788,77 @@
     node.style.zIndex = '3300';
   };
 
+  const showDispatchVehicleSuggestions = (vehicleInput) => {
+    if (!state.dispatchDraft || !vehicleInput) return;
+    const query = normalizeLower(vehicleInput.value);
+    state.dispatchDraft.vehicleSearch = normalizeValue(vehicleInput.value);
+    state.dispatchDraft.vehicleId = '';
+    const hidden = nodes.dispatchView?.querySelector('#dispatchVehicleSelect');
+    if (hidden) hidden.value = '';
+    const list = Object.values(safeObject(state.reparto.vehicles || {}))
+      .filter((item) => item.enabled !== false)
+      .filter((item) => {
+        const hay = normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`);
+        return hay.includes(query);
+      })
+      .slice(0, 8);
+    const suggest = ensureFloatingSuggest('vehicle');
+    positionFloatingSuggest(suggest, vehicleInput);
+    suggest.innerHTML = `${list.map((item) => {
+      const meta = getDispatchVehicleExpiryMeta(item);
+      return `<button type="button" class="recipe-suggest-item" data-dispatch-vehicle-pick="${escapeHtml(item.id)}"><span class="dispatch-vehicle-tone tone-${meta.tone}"></span><span><strong>${escapeHtml(item.number || item.id)}</strong><br><small>${escapeHtml(formatDispatchVehicleLabel(item))}</small></span></button>`;
+    }).join('')}${query ? `<button type="button" class="recipe-suggest-item recipe-suggest-create" data-dispatch-vehicle-create="1"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button>` : ''}`;
+    suggest.onclick = async (ev) => {
+      const pick = ev.target.closest('[data-dispatch-vehicle-pick]');
+      if (pick) {
+        const vehicle = getDispatchVehicle(pick.dataset.dispatchVehiclePick);
+        if (!vehicle.id) return;
+        state.dispatchDraft.vehicleId = vehicle.id;
+        state.dispatchDraft.vehicleSearch = formatDispatchVehicleLabel(vehicle);
+        vehicleInput.value = state.dispatchDraft.vehicleSearch;
+        if (hidden) hidden.value = vehicle.id;
+        closeDispatchSuggests();
+        return;
+      }
+      if (ev.target.closest('[data-dispatch-vehicle-create]')) {
+        closeDispatchSuggests();
+        const created = await openCreateDispatchVehicle();
+        if (created) {
+          state.dispatchDraft.vehicleId = created.id;
+          state.dispatchDraft.vehicleSearch = formatDispatchVehicleLabel(created);
+          renderDispatchCreate(state.dispatchDraft);
+        }
+      }
+    };
+  };
+
+  const showDispatchProductSuggestions = (productInput) => {
+    if (!state.dispatchDraft || !productInput) return;
+    const idx = Number(productInput.dataset.dispatchProductSearch);
+    if (!Number.isFinite(idx) || !state.dispatchDraft.lines?.[idx]) return;
+    const query = normalizeLower(productInput.value);
+    state.dispatchDraft.lines[idx].recipeSearch = normalizeValue(productInput.value);
+    state.dispatchDraft.lines[idx].recipeId = '';
+    const suggest = ensureFloatingSuggest('product');
+    positionFloatingSuggest(suggest, productInput);
+    const recipes = Object.values(state.recetas)
+      .filter((item) => !query || normalizeLower(item.title).includes(query))
+      .slice(0, 8)
+      .map((item) => ({ ...item, meta: getProducedStockMeta(item.id) }));
+    suggest.innerHTML = `${recipes.map((item) => `<button type="button" class="recipe-suggest-item" data-dispatch-product-pick="${escapeHtml(item.id)}" data-dispatch-row="${idx}"><span class="recipe-suggest-avatar-wrap">${sanitizeImageUrl(item.imageUrl) ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-suggest-avatar js-dispatch-suggest-thumb" src="${escapeHtml(sanitizeImageUrl(item.imageUrl))}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><span><strong>${escapeHtml(capitalize(item.title || 'Receta'))}</strong><br><small class="${item.meta.available > 0.0001 ? 'produccion-dispatch-ok' : 'text-danger'}">${item.meta.available > 0.0001 ? `Disponible: ${item.meta.available.toFixed(2)} kg` : 'Sin stock disponible'}</small></span></button>`).join('')}`;
+    prepareThumbLoaders('.js-dispatch-suggest-thumb');
+    suggest.onclick = (ev) => {
+      const pick = ev.target.closest('[data-dispatch-product-pick]');
+      if (!pick) return;
+      const rowIdx = Number(pick.dataset.dispatchRow);
+      const rec = safeObject(state.recetas[pick.dataset.dispatchProductPick]);
+      state.dispatchDraft.lines[rowIdx].recipeId = normalizeValue(rec.id);
+      state.dispatchDraft.lines[rowIdx].recipeSearch = normalizeValue(capitalize(rec.title || ''));
+      closeDispatchSuggests();
+      renderDispatchCreate(state.dispatchDraft);
+    };
+  };
+
   nodes.dispatchView?.addEventListener('input', async (event) => {
     if (!state.dispatchCreateMode || !state.dispatchDraft) return;
     const clientInput = event.target.closest('#dispatchClientInput');
@@ -4743,7 +4876,7 @@
         .slice(0, 8);
       const suggest = ensureFloatingSuggest('client');
       positionFloatingSuggest(suggest, clientInput);
-      suggest.innerHTML = `${list.map((item) => `<button type="button" class="recipe-suggest-item" data-dispatch-client-pick="${escapeHtml(item.id)}"><span class="user-avatar-thumb" style="width:28px;height:28px;font-size:.75rem">${escapeHtml(item.initials || 'U')}</span><span>${escapeHtml(item.name)}<br><small>${escapeHtml(item.doc || '-')}</small></span></button>`).join('')}${query ? `<button type="button" class="recipe-suggest-item recipe-suggest-create" data-dispatch-client-create="1"><i class="fa-solid fa-plus"></i><span>Nuevo Cliente</span></button>` : ''}`;
+      suggest.innerHTML = `${list.map((item) => `<button type="button" class="recipe-suggest-item" data-dispatch-client-pick="${escapeHtml(item.id)}"><span class="user-avatar-thumb dispatch-client-suggest-avatar">${escapeHtml(item.initials || 'U')}</span><span>${escapeHtml(item.name)}<br><small>${escapeHtml(item.doc || '-')}</small></span></button>`).join('')}${query ? `<button type="button" class="recipe-suggest-item recipe-suggest-create" data-dispatch-client-create="1"><i class="fa-solid fa-plus"></i><span>Nuevo Cliente</span></button>` : ''}`;
       suggest.onclick = async (ev) => {
         const pick = ev.target.closest('[data-dispatch-client-pick]');
         if (pick) {
@@ -4797,75 +4930,13 @@
 
     const vehicleInput = event.target.closest('#dispatchVehicleInput');
     if (vehicleInput) {
-      const query = normalizeLower(vehicleInput.value);
-      state.dispatchDraft.vehicleSearch = normalizeValue(vehicleInput.value);
-      state.dispatchDraft.vehicleId = '';
-      const hidden = nodes.dispatchView.querySelector('#dispatchVehicleSelect');
-      if (hidden) hidden.value = '';
-      const list = Object.values(safeObject(state.reparto.vehicles || {}))
-        .filter((item) => item.enabled !== false)
-        .filter((item) => {
-          const hay = normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`);
-          return hay.includes(query);
-        })
-        .slice(0, 8);
-      const suggest = ensureFloatingSuggest('vehicle');
-      positionFloatingSuggest(suggest, vehicleInput);
-      suggest.innerHTML = `${list.map((item) => {
-        const meta = getDispatchVehicleExpiryMeta(item);
-        return `<button type="button" class="recipe-suggest-item" data-dispatch-vehicle-pick="${escapeHtml(item.id)}"><span class="dispatch-vehicle-tone tone-${meta.tone}"></span><span><strong>${escapeHtml(item.number || item.id)}</strong><br><small>${escapeHtml(formatDispatchVehicleLabel(item))}</small></span></button>`;
-      }).join('')}${query ? `<button type="button" class="recipe-suggest-item recipe-suggest-create" data-dispatch-vehicle-create="1"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button>` : ''}`;
-      suggest.onclick = async (ev) => {
-        const pick = ev.target.closest('[data-dispatch-vehicle-pick]');
-        if (pick) {
-          const vehicle = getDispatchVehicle(pick.dataset.dispatchVehiclePick);
-          if (!vehicle.id) return;
-          state.dispatchDraft.vehicleId = vehicle.id;
-          state.dispatchDraft.vehicleSearch = formatDispatchVehicleLabel(vehicle);
-          vehicleInput.value = state.dispatchDraft.vehicleSearch;
-          if (hidden) hidden.value = vehicle.id;
-          closeDispatchSuggests();
-          return;
-        }
-        if (ev.target.closest('[data-dispatch-vehicle-create]')) {
-          closeDispatchSuggests();
-          const created = await openCreateDispatchVehicle();
-          if (created) {
-            state.dispatchDraft.vehicleId = created.id;
-            state.dispatchDraft.vehicleSearch = formatDispatchVehicleLabel(created);
-            renderDispatchCreate(state.dispatchDraft);
-          }
-        }
-      };
+      showDispatchVehicleSuggestions(vehicleInput);
       return;
     }
 
     const productInput = event.target.closest('[data-dispatch-product-search]');
     if (!productInput) return;
-    const idx = Number(productInput.dataset.dispatchProductSearch);
-    const query = normalizeLower(productInput.value);
-    state.dispatchDraft.lines[idx].recipeSearch = normalizeValue(productInput.value);
-    state.dispatchDraft.lines[idx].recipeId = '';
-    const wrap = nodes.dispatchView.querySelector(`[data-dispatch-product-wrap="${idx}"]`);
-    if (!wrap) return;
-    const suggest = ensureFloatingSuggest('product');
-    positionFloatingSuggest(suggest, productInput);
-    const recipes = Object.values(state.recetas)
-      .filter((item) => normalizeLower(item.title).includes(query))
-      .slice(0, 8)
-      .map((item) => ({ ...item, meta: getProducedStockMeta(item.id) }));
-    suggest.innerHTML = `${recipes.map((item) => `<button type="button" class="recipe-suggest-item" data-dispatch-product-pick="${escapeHtml(item.id)}" data-dispatch-row="${idx}"><span class="recipe-suggest-avatar-wrap">${sanitizeImageUrl(item.imageUrl) ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-suggest-avatar js-dispatch-suggest-thumb" src="${escapeHtml(sanitizeImageUrl(item.imageUrl))}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon"></i></span>'}</span><span><strong>${escapeHtml(capitalize(item.title || 'Receta'))}</strong><br><small class="${item.meta.available > 0.0001 ? 'produccion-dispatch-ok' : 'text-danger'}">${item.meta.available > 0.0001 ? `Disponible: ${item.meta.available.toFixed(2)} kg` : 'Sin stock disponible'}</small></span></button>`).join('')}`;
-    prepareThumbLoaders('.js-dispatch-suggest-thumb');
-    suggest.onclick = (ev) => {
-      const pick = ev.target.closest('[data-dispatch-product-pick]');
-      if (!pick) return;
-      const rowIdx = Number(pick.dataset.dispatchRow);
-      const rec = safeObject(state.recetas[pick.dataset.dispatchProductPick]);
-      state.dispatchDraft.lines[rowIdx].recipeId = normalizeValue(rec.id);
-      state.dispatchDraft.lines[rowIdx].recipeSearch = normalizeValue(capitalize(rec.title || ''));
-      closeDispatchSuggests();
-      renderDispatchCreate(state.dispatchDraft);
-    };
+    showDispatchProductSuggestions(productInput);
   });
 
   document.addEventListener('click', (event) => {
@@ -4966,6 +5037,7 @@
       setHistoryMode(false);
       renderList();
       renderModalRneBadge();
+      alignScrollActionsToRight(document);
       if (window.flatpickr && nodes.historyRange) {
         const locale = window.flatpickr.l10ns?.es || undefined;
         const dayMap = getProductionDayMap();

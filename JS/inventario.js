@@ -3196,6 +3196,15 @@
     }
   };
 
+  const alignScrollActionsToRight = (scope = document) => {
+    const nodesToAlign = scope.querySelectorAll('.toolbar-scroll-x, .inventario-toolbar-actions, .produccion-toolbar-actions');
+    requestAnimationFrame(() => {
+      nodesToAlign.forEach((node) => {
+        node.scrollLeft = node.scrollWidth;
+      });
+    });
+  };
+
   const renderEditor = (ingredientId, draft = null) => {
     const ingredient = state.ingredientes[ingredientId];
     if (!ingredient) return;
@@ -3213,6 +3222,7 @@
       invoiceNumber: '',
       provider: '',
       invoiceImageFile: null,
+      invoiceImageFiles: [],
       invoiceImageCountLabel: 'Sin archivos seleccionados',
       tokens: [...record.lotConfig.tokens],
       customAcronym: normalizeValue(record.lotConfig.customAcronym),
@@ -3350,7 +3360,7 @@
             <div class="recipe-ing-autocomplete">
               <div class="recipe-ing-input-wrap">
                 <span class="recipe-inline-avatar-wrap recipe-inline-avatar-fallback"><span class="recipe-small-placeholder"><i class="fa-solid fa-truck-field"></i></span></span>
-                <input id="inventoryProviderSearch" type="search" class="form-control ios-input" placeholder="Buscar proveedor..." value="${escapeHtml(providerSearchValue)}" autocomplete="off">
+                <input id="inventoryProviderSearch" type="search" class="form-control ios-input" placeholder="Buscar proveedor..." value="${escapeHtml(providerSearchValue)}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false">
               </div>
             </div>
             <select id="inventoryProvider" class="form-select ios-input d-none" autocomplete="off">
@@ -3435,7 +3445,9 @@
       state.editorDraft.customAcronym = nodes.editorForm.querySelector('#lotCustomAcronym')?.value || '';
       state.editorDraft.includeSeparator = Boolean(nodes.editorForm.querySelector('#lotIncludeSeparator')?.checked);
       state.editorDraft.separator = nodes.editorForm.querySelector('#lotSeparator')?.value || '-';
-      const files = [...(nodes.editorForm.querySelector('#inventoryInvoiceImage')?.files || [])];
+      const inputFiles = [...(nodes.editorForm.querySelector('#inventoryInvoiceImage')?.files || [])];
+      const files = inputFiles.length ? inputFiles : (Array.isArray(state.editorDraft.invoiceImageFiles) ? state.editorDraft.invoiceImageFiles : []);
+      state.editorDraft.invoiceImageFiles = files;
       state.editorDraft.invoiceImageCountLabel = files.length
         ? `${files.length} archivo${files.length === 1 ? '' : 's'} adjunto${files.length === 1 ? '' : 's'} para subir`
         : 'Sin archivos seleccionados';
@@ -3651,24 +3663,21 @@
     };
 
     const providerSearchInput = nodes.editorForm.querySelector('#inventoryProviderSearch');
-    providerSearchInput?.addEventListener('input', () => {
+    const showProviderSuggestions = () => {
+      if (!providerSearchInput) return;
       const query = normalizeValue(providerSearchInput.value);
       const providerSelect = nodes.editorForm.querySelector('#inventoryProvider');
-      if (!query) {
-        closeProviderSuggestions();
-        if (providerSelect) {
-          providerSelect.value = '';
-          syncDraft();
-        }
-        return;
+      if (!query && providerSelect && providerSelect.value) {
+        providerSelect.value = '';
+        syncDraft();
       }
 
       const source = sortedProviders()
-        .filter((provider) => normalizeLower(provider.name).includes(normalizeLower(query)))
+        .filter((provider) => !query || normalizeLower(provider.name).includes(normalizeLower(query)))
         .slice(0, 10);
 
       const exact = sortedProviders().find((provider) => normalizeLower(provider.name) === normalizeLower(query));
-      if (exact) {
+      if (query && exact) {
         applyProviderSelection(exact.id);
         closeProviderSuggestions();
         return;
@@ -3680,7 +3689,7 @@
       dropdown.innerHTML = `${source.map((provider) => {
         const avatar = sanitizeImageUrl(provider?.photoUrl)
           ? `<span class="recipe-suggest-avatar-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-suggest-avatar js-inventario-thumb" src="${escapeHtml(sanitizeImageUrl(provider.photoUrl))}" alt="${escapeHtml(provider.name)}" loading="lazy"></span>`
-          : '<span class="recipe-suggest-avatar-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-truck-field"></i></span></span>';
+          : '<span class="recipe-suggest-avatar-wrap"><span class="image-placeholder-circle-2 inventario-provider-suggest-placeholder"><i class="fa-solid fa-truck-field inventario-provider-suggest-icon"></i></span></span>';
         return `<button type="button" class="recipe-suggest-item" data-provider-pick="${escapeHtml(provider.id)}">${avatar}<span>${escapeHtml(provider.name)}</span></button>`;
       }).join('')}<button type="button" class="recipe-suggest-item recipe-suggest-create" data-provider-create="1"><i class="fa-solid fa-plus"></i><span>nuevo proveedor</span></button>`;
       document.body.appendChild(dropdown);
@@ -3699,12 +3708,10 @@
         }
       });
       providerSuggestDropdown = dropdown;
-    });
-    providerSearchInput?.addEventListener('focus', () => {
-      if (normalizeValue(providerSearchInput.value).length) {
-        providerSearchInput.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-    });
+    };
+    providerSearchInput?.addEventListener('input', showProviderSuggestions);
+    providerSearchInput?.addEventListener('focus', showProviderSuggestions);
+    providerSearchInput?.addEventListener('click', showProviderSuggestions);
     providerSearchInput?.addEventListener('blur', () => {
       setTimeout(() => closeProviderSuggestions(), 140);
     });
@@ -4508,9 +4515,13 @@
     const noPerecedero = Boolean(nodes.editorForm.querySelector('#inventoryNoPerecedero')?.checked);
     const usoInternoEmpresa = Boolean(nodes.editorForm.querySelector('#inventoryUsoInternoEmpresa')?.checked);
     const invoiceNumber = normalizeValue(nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value);
-    const providerValue = normalizeValue(nodes.editorForm.querySelector('#inventoryProvider')?.value);
-    const provider = providerLabel(providerValue);
-    const files = [...(nodes.editorForm.querySelector('#inventoryInvoiceImage')?.files || [])];
+    const providerId = normalizeValue(nodes.editorForm.querySelector('#inventoryProvider')?.value);
+    const providerData = findProviderById(providerId);
+    const provider = providerLabel(providerId);
+    const currentInputFiles = [...(nodes.editorForm.querySelector('#inventoryInvoiceImage')?.files || [])];
+    const files = currentInputFiles.length
+      ? currentInputFiles
+      : (Array.isArray(state.editorDraft.invoiceImageFiles) ? state.editorDraft.invoiceImageFiles : []);
     const record = getRecord(ingredientId);
     const bulkEntries = Array.isArray(state.editorDraft.bulkEntries) ? state.editorDraft.bulkEntries : [];
 
@@ -4559,8 +4570,8 @@
       return;
     }
 
-    if (!provider) {
-      await openIosSwal({ title: 'Proveedor requerido', html: '<p>Seleccioná un proveedor para guardar el ingreso.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+    if (!providerId || !providerData?.id) {
+      await openIosSwal({ title: 'Proveedor requerido', html: '<p>Seleccioná un proveedor de la lista antes de guardar el ingreso.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
       return;
     }
 
@@ -4746,6 +4757,7 @@
         invoiceNumber: '',
         provider: '',
         invoiceImageCountLabel: 'Sin archivos seleccionados',
+        invoiceImageFiles: [],
         noPerecedero: false,
         usoInternoEmpresa: false,
         expiryDate: addDaysToIso(getArgentinaIsoDate(), 5),
@@ -5390,6 +5402,7 @@
         renderFamilies();
         renderStatusFilters();
         renderList();
+        alignScrollActionsToRight(document);
       }
       if (window.flatpickr && nodes.globalRange) {
         const locale = window.flatpickr.l10ns?.es || undefined;
