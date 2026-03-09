@@ -6268,6 +6268,33 @@ html.login-protected.auth-ok body {
 }
 
 
+
+.dispatch-clients-manager-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dispatch-clients-manager-search {
+  flex: 1 1 320px;
+  margin-bottom: 0;
+}
+
+.dispatch-clients-edit-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dispatch-clients-edit-head .inventario-period-head {
+  margin-bottom: 0;
+}
+
+
 .dispatch-client-row {
   display: flex;
   align-items: center;
