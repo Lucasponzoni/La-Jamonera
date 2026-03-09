@@ -2564,50 +2564,73 @@
       confirmButtonText: 'Cerrar',
       didOpen: (popup) => {
         const rangeInput = popup.querySelector('[data-recipe-history-range]');
+        const safeRenderRows = () => {
+          try {
+            renderRows(popup);
+          } catch (error) {
+            const body = popup.querySelector('[data-recipe-history-body]');
+            if (body) body.innerHTML = '<p class="text-danger mb-0">No se pudo renderizar el historial. Intentá nuevamente.</p>';
+          }
+        };
         popup.querySelector('[data-recipe-history-search]')?.addEventListener('input', (event) => {
           query = event.target.value;
           page = 1;
-          renderRows(popup);
+          safeRenderRows();
         });
-        popup.querySelector('[data-recipe-history-range-clear]')?.addEventListener('click', () => {
-          range = '';
-          if (rangeInput) rangeInput.value = '';
-          page = 1;
-          renderRows(popup);
+        popup.addEventListener('click', async (event) => {
+          if (event.target.closest('[data-recipe-history-range-clear]')) {
+            range = '';
+            if (rangeInput) rangeInput.value = '';
+            page = 1;
+            safeRenderRows();
+            return;
+          }
+          if (event.target.closest('[data-recipe-history-prev]')) {
+            page -= 1;
+            safeRenderRows();
+            return;
+          }
+          if (event.target.closest('[data-recipe-history-next]')) {
+            page += 1;
+            safeRenderRows();
+            return;
+          }
+          if (event.target.closest('[data-recipe-history-expand]')) {
+            expanded = !expanded;
+            safeRenderRows();
+            return;
+          }
+          if (event.target.closest('[data-recipe-history-excel]')) {
+            await exportRecipeHistoryExcel();
+            return;
+          }
+          if (event.target.closest('[data-recipe-history-print]')) {
+            await printRecipeHistory();
+          }
         });
-        popup.querySelector('[data-recipe-history-prev]')?.addEventListener('click', () => {
-          page -= 1;
-          renderRows(popup);
-        });
-        popup.querySelector('[data-recipe-history-next]')?.addEventListener('click', () => {
-          page += 1;
-          renderRows(popup);
-        });
-        popup.querySelector('[data-recipe-history-expand]')?.addEventListener('click', () => {
-          expanded = !expanded;
-          renderRows(popup);
-        });
-        popup.querySelector('[data-recipe-history-excel]')?.addEventListener('click', async () => exportRecipeHistoryExcel());
-        popup.querySelector('[data-recipe-history-print]')?.addEventListener('click', async () => printRecipeHistory());
         if (window.flatpickr && rangeInput) {
-          const locale = window.flatpickr.l10ns?.es || undefined;
-          disableCalendarSuggestions(rangeInput);
-          window.flatpickr(rangeInput, {
-            locale,
-            mode: 'range',
-            dateFormat: 'Y-m-d',
-            allowInput: false,
-            onClose: (_selectedDates, _dateStr, instance) => {
-              const from = instance.selectedDates[0] ? getArgentinaIsoDate(instance.selectedDates[0]) : '';
-              const to = instance.selectedDates[1] ? getArgentinaIsoDate(instance.selectedDates[1]) : from;
-              range = from && to ? `${from} a ${to}` : from;
-              rangeInput.value = range;
-              page = 1;
-              renderRows(popup);
-            }
-          });
+          try {
+            const locale = window.flatpickr.l10ns?.es || undefined;
+            disableCalendarSuggestions(rangeInput);
+            window.flatpickr(rangeInput, {
+              locale,
+              mode: 'range',
+              dateFormat: 'Y-m-d',
+              allowInput: false,
+              onClose: (_selectedDates, _dateStr, instance) => {
+                const from = instance.selectedDates[0] ? getArgentinaIsoDate(instance.selectedDates[0]) : '';
+                const to = instance.selectedDates[1] ? getArgentinaIsoDate(instance.selectedDates[1]) : from;
+                range = from && to ? `${from} a ${to}` : from;
+                rangeInput.value = range;
+                page = 1;
+                safeRenderRows();
+              }
+            });
+          } catch (error) {
+            // noop
+          }
         }
-        renderRows(popup);
+        safeRenderRows();
       }
     });
   };
