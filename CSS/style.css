@@ -5497,6 +5497,7 @@ html.login-protected.auth-ok body {
   width: fit-content;
   max-width: none;
   background: #ff8a2a;
+  border: 1px solid #f2c08a;
   color: #fff;
 }
 
@@ -5523,6 +5524,72 @@ html.login-protected.auth-ok body {
 .produccion-history-btn:hover {
   background: #ef7c1e;
   color: #fff;
+}
+
+.produccion-product-history-btn {
+  width: auto;
+  border: 0;
+  background: transparent;
+  color: #6f7ea6;
+  font-weight: 600;
+  font-size: 0.86rem;
+  padding: 0;
+  line-height: 1.1;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.produccion-product-history-btn:hover {
+  background: transparent;
+  color: #2d4578;
+}
+
+.swal2-popup.produccion-recipe-history-alert .swal2-html-container {
+  padding: 0 !important;
+  margin: 0 !important;
+  text-align: left !important;
+}
+
+.swal2-popup.produccion-recipe-history-alert .swal2-actions {
+  margin-top: 10px;
+}
+
+.produccion-recipe-history-modal {
+  padding: 10px 12px 0;
+}
+
+.produccion-recipe-history-modal .is-movement-in td {
+  background: #ecfdf3;
+  color: #111827;
+  font-weight: 400;
+}
+
+.produccion-recipe-history-modal .is-movement-out td {
+  background: #fff1f2;
+  color: #111827;
+  font-weight: 400;
+}
+
+.produccion-recipe-history-modal .movement-type-in,
+.produccion-recipe-history-modal .movement-code-in {
+  color: #17803d;
+  font-weight: 700;
+}
+
+.produccion-recipe-history-modal .movement-type-out,
+.produccion-recipe-history-modal .movement-code-out {
+  color: #b4232a;
+  font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .produccion-recipe-history-modal {
+    padding: 8px 8px 0;
+  }
+
+  .swal2-popup.produccion-recipe-history-alert {
+    width: 96vw !important;
+  }
 }
 
 .produccion-umbral-global-btn,
@@ -6977,6 +7044,26 @@ html.login-protected.auth-ok body {
   border-top: 1px dashed #ef8f27 !important;
   color: #9a4f0a;
   font-size: 0.82rem;
+}
+
+
+.produccion-dispatch-table-center th,
+.produccion-dispatch-table-center td {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.produccion-dispatch-table-center .inventario-trace-main {
+  justify-content: center;
+}
+
+.produccion-dispatch-table-center .inventario-trace-row td,
+.produccion-dispatch-table-center .inventario-internal-use-row td {
+  color: #1f2a44;
+}
+
+.produccion-dispatch-table-center .inventario-internal-use-row td {
+  text-align: center;
 }
 
 .inventario-internal-meta {
