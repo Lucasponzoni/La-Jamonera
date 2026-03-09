@@ -4484,6 +4484,7 @@ html.login-protected.auth-ok body {
 .inventario-weekly-bulk-intro {
   margin: 0 0 12px;
   color: #566684;
+  text-align: center;
 }
 
 .inventario-weekly-bulk-list {
