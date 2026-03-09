@@ -5427,14 +5427,15 @@
   const askRequiredRangeForWeeklyProductionSheet = async () => {
     const picker = await openIosSwal({
       title: 'Rango obligatorio para planilla',
-      html: '<p>Para evitar procesar datos infinitos, seleccioná un rango de fechas antes de continuar.</p><input id="sheetRangeInput" class="swal2-input ios-input" placeholder="Seleccionar rango">',
+      html: '<p>Para evitar procesar datos infinitos, seleccioná un rango de fechas antes de continuar.</p><input id="sheetRangeInput" class="swal2-input ios-input w-100" placeholder="Seleccionar rango">',
       showCancelButton: true,
       confirmButtonText: 'Continuar',
       cancelButtonText: 'Cancelar',
       didOpen: () => {
         const input = document.getElementById('sheetRangeInput');
         if (window.flatpickr && input) {
-          window.flatpickr(input, { locale: window.flatpickr.l10ns?.es || undefined, mode: 'range', dateFormat: 'Y-m-d', allowInput: false, disableMobile: true });
+          const locale = { ...(window.flatpickr.l10ns?.es || {}), rangeSeparator: ' a ' };
+          window.flatpickr(input, { locale, mode: 'range', dateFormat: 'Y-m-d', altInput: true, altFormat: 'd/m/Y', allowInput: false, disableMobile: true });
         }
       },
       preConfirm: () => {
@@ -5451,7 +5452,7 @@
   const printWeeklyProductionPlanilla = async (html) => {
     const win = window.open('', '_blank', 'width=1400,height=900');
     if (!win) return;
-    win.document.write(`<html><head><title>Planilla de producción semanal</title><style>@page{size:landscape;margin:10mm}body{font-family:Inter,Arial,sans-serif;color:#111827;background:#ffffff;margin:0;padding:8px}.weekly-production-sheet{display:grid;gap:14px}.weekly-sheet-block{border:1px solid #2f2f2f}.weekly-sheet-block h3,.weekly-sheet-block h4{margin:0;text-align:center;font-weight:800;padding:8px 6px}.weekly-sheet-block h4{border-top:1px solid #2f2f2f}.weekly-sheet-table{width:100%;border-collapse:collapse;table-layout:fixed}.weekly-sheet-table th,.weekly-sheet-table td{border:1px solid #2f2f2f;padding:6px;word-break:break-word;text-align:center}.weekly-sheet-table th.th-cat{background:#1d7a2f;color:#fff}.weekly-sheet-table th.th-day{background:#136fb6;color:#fff}.weekly-sheet-table th.th-total{background:#08266e;color:#fff}.weekly-sheet-table td.is-missing{background:#f4dfe2}.weekly-sheet-table td.is-ok{background:#e9edf2}.weekly-sheet-table td.weekly-total{font-weight:800}.weekly-product-cell{display:inline-flex;align-items:center;gap:8px;justify-content:flex-start;text-align:left}.weekly-product-cell img{width:34px;height:34px;border-radius:8px;object-fit:cover;border:1px solid #c7d3ea}.page-break{page-break-before:always;break-before:page}</style></head><body>${html}</body></html>`);
+    win.document.write(`<html><head><title>Planilla de producción semanal</title><style>@page{size:landscape;margin:10mm}body{font-family:Inter,Arial,sans-serif;color:#111827;background:#ffffff;margin:0;padding:8px}.weekly-production-sheet{display:grid;gap:14px}.weekly-sheet-block{border:1px solid #2f2f2f}.weekly-sheet-block h3,.weekly-sheet-block h4{margin:0;text-align:center;font-weight:800;padding:6px 6px}.weekly-sheet-block h4{border-top:1px solid #2f2f2f;font-size:16px}.weekly-sheet-table{width:100%;border-collapse:collapse;table-layout:fixed}.weekly-sheet-table th,.weekly-sheet-table td{border:1px solid #2f2f2f;padding:4px;word-break:break-word;text-align:center;font-size:11px;line-height:1.15}.weekly-sheet-table th.th-cat{background:#1d7a2f;color:#fff}.weekly-sheet-table th.th-day{background:#136fb6;color:#fff}.weekly-sheet-table th.th-total{background:#08266e;color:#fff}.weekly-sheet-table td.is-missing{background:#f4dfe2}.weekly-sheet-table td.is-ok{background:#e9edf2}.weekly-sheet-table td.weekly-total{font-weight:800}.weekly-product-cell{display:inline-flex;align-items:center;gap:8px;justify-content:flex-start;text-align:left}.weekly-product-cell img{width:24px;height:24px;border-radius:999px;object-fit:cover;border:1px solid #c7d3ea}.page-break{page-break-before:always;break-before:page}</style></head><body>${html}</body></html>`);
     win.document.close();
     win.focus();
     await waitPrintAssets(win);
@@ -5540,7 +5541,7 @@
       const rowsHtml = products.slice().sort((a,b)=> `${a.subcategory}|${a.title}`.localeCompare(`${b.subcategory}|${b.title}`,'es')).map((product) => {
         const daily = displayIsos.map((iso) => rowsInRange.filter((row) => normalizeValue(row.recipeId || row.recipeTitle || row.id) === product.id && normalizeValue(row.productionDate) === iso).reduce((acc, row) => acc + Number(row.quantityKg || 0), 0));
         const total = daily.reduce((acc, value) => acc + value, 0);
-        return `<tr><td>${escapeHtml(capitalize(product.category.replaceAll('-', ' ')))}</td><td>${escapeHtml(capitalize(product.subcategory))}</td><td><div class="weekly-product-cell">${product.imageUrl ? `<img src="${escapeHtml(product.imageUrl)}" alt="${escapeHtml(product.title)}">` : ''}<span>${escapeHtml(product.title)}</span></div></td>${daily.map((kg) => `<td class="${kg > 0 ? 'is-ok' : 'is-missing'}">${kg > 0 ? `${kg.toFixed(2)}KG` : ''}</td>`).join('')}<td class="weekly-total">${total.toFixed(2)}KG</td></tr>`;
+        return `<tr><td>${escapeHtml(capitalize(product.category.replaceAll('-', ' ')))}</td><td>${escapeHtml(capitalize(product.subcategory))}</td><td><div class="weekly-product-cell">${product.imageUrl ? `<img class="weekly-product-thumb" src="${escapeHtml(product.imageUrl)}" alt="${escapeHtml(product.title)}">` : ''}<span>${escapeHtml(product.title)}</span></div></td>${daily.map((kg) => `<td class="${kg > 0 ? 'is-ok' : 'is-missing'}">${kg > 0 ? `${kg.toFixed(2)}KG` : ''}</td>`).join('')}<td class="weekly-total">${total.toFixed(2)}KG</td></tr>`;
       }).join('');
       return `<section class="weekly-sheet-block ${idx ? 'page-break' : ''}"><h3>FRIGORIFICO LA JAMONERA • PLANILLA DE PRODUCCION SEMANAL</h3><h4>SEMANA DE ${formatIsoEs(segment.start)} A ${formatIsoEs(segment.end)}</h4><div class="table-responsive"><table class="weekly-sheet-table"><thead><tr><th class="th-cat">CATEGORIA</th><th class="th-cat">SUBCATEGORIA</th><th class="th-cat">PRODUCTO</th>${headers.map((d) => `<th class="th-day">${d.toUpperCase()}</th>`).join('')}<th class="th-total">TOTAL</th></tr></thead><tbody>${rowsHtml || `<tr><td colspan="${4 + headers.length}">Sin datos.</td></tr>`}</tbody></table></div></section>`;
     }).join('')}</div>`;
