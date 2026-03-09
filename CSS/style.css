@@ -6241,6 +6241,15 @@ html.login-protected.auth-ok body {
   gap: 8px;
   margin-bottom: 6px;
   min-height: 30px;
+  flex-wrap: wrap;
+}
+
+.dispatch-client-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
 }
 
 .dispatch-client-helper {
@@ -8956,4 +8965,11 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+
+@media (max-width: 768px) {
+  .dispatch-client-head-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
