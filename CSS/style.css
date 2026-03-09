@@ -5902,7 +5902,7 @@ html.login-protected.auth-ok body {
 }
 
 .dispatch-product-input-wrap {
-  grid-template-columns: 30px minmax(180px, 1fr);
+  grid-template-columns: 34px minmax(180px, 1fr);
 }
 
 .dispatch-products-table th:nth-child(2),
@@ -5916,12 +5916,18 @@ html.login-protected.auth-ok body {
   background: #fff;
 }
 
+.dispatch-product-input-wrap .recipe-inline-avatar-wrap {
+  width: 34px;
+  height: 34px;
+}
+
 .dispatch-product-table-icon {
   font-size: 1rem;
 }
 
 .dispatch-product-row-icon {
-  font-size: 1rem;
+  font-size: 1rem !important;
+  line-height: 1;
 }
 
 .dispatch-product-placeholder {

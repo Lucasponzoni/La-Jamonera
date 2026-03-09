@@ -3351,7 +3351,7 @@
             <div class="recipe-ing-autocomplete">
               <div class="recipe-ing-input-wrap">
                 <span class="recipe-inline-avatar-wrap recipe-inline-avatar-fallback"><span class="recipe-small-placeholder"><i class="fa-solid fa-truck-field"></i></span></span>
-                <input id="inventoryProviderSearch" type="search" class="form-control ios-input" placeholder="Buscar proveedor..." value="${escapeHtml(providerSearchValue)}" autocomplete="off">
+                <input id="inventoryProviderSearch" type="search" class="form-control ios-input" placeholder="Buscar proveedor..." value="${escapeHtml(providerSearchValue)}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false">
               </div>
             </div>
             <select id="inventoryProvider" class="form-select ios-input d-none" autocomplete="off">
@@ -3654,24 +3654,21 @@
     };
 
     const providerSearchInput = nodes.editorForm.querySelector('#inventoryProviderSearch');
-    providerSearchInput?.addEventListener('input', () => {
+    const showProviderSuggestions = () => {
+      if (!providerSearchInput) return;
       const query = normalizeValue(providerSearchInput.value);
       const providerSelect = nodes.editorForm.querySelector('#inventoryProvider');
-      if (!query) {
-        closeProviderSuggestions();
-        if (providerSelect) {
-          providerSelect.value = '';
-          syncDraft();
-        }
-        return;
+      if (!query && providerSelect && providerSelect.value) {
+        providerSelect.value = '';
+        syncDraft();
       }
 
       const source = sortedProviders()
-        .filter((provider) => normalizeLower(provider.name).includes(normalizeLower(query)))
+        .filter((provider) => !query || normalizeLower(provider.name).includes(normalizeLower(query)))
         .slice(0, 10);
 
       const exact = sortedProviders().find((provider) => normalizeLower(provider.name) === normalizeLower(query));
-      if (exact) {
+      if (query && exact) {
         applyProviderSelection(exact.id);
         closeProviderSuggestions();
         return;
@@ -3702,12 +3699,10 @@
         }
       });
       providerSuggestDropdown = dropdown;
-    });
-    providerSearchInput?.addEventListener('focus', () => {
-      if (normalizeValue(providerSearchInput.value).length) {
-        providerSearchInput.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-    });
+    };
+    providerSearchInput?.addEventListener('input', showProviderSuggestions);
+    providerSearchInput?.addEventListener('focus', showProviderSuggestions);
+    providerSearchInput?.addEventListener('click', showProviderSuggestions);
     providerSearchInput?.addEventListener('blur', () => {
       setTimeout(() => closeProviderSuggestions(), 140);
     });
