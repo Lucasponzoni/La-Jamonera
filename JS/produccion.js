@@ -39,6 +39,7 @@
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const ALLOWED_RNE_UPLOAD_TYPES = [...ALLOWED_UPLOAD_TYPES, 'application/pdf'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
+  const ROSARIO_DEPT_LOCALITIES = ['Rosario', 'Villa Gobernador Gálvez', 'Pérez', 'Funes', 'Roldán', 'Ibarlucea', 'Alvear', 'Pueblo Esther', 'General Lagos', 'Arroyo Seco', 'Piñero'];
   const state = {
     recetas: {},
     ingredientes: {},
