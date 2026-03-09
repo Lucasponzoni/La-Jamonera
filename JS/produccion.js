@@ -3174,17 +3174,48 @@
   const persistRepartoStore = async () => {
     await window.dbLaJamoneraRest.write(REPARTO_PATH, state.reparto);
   };
+  const DISPATCH_NEW_LOCALITY_VALUE = '__new_locality__';
+  const getDispatchLocalities = () => (Array.isArray(state.reparto.localities) ? state.reparto.localities : []).map((item) => normalizeValue(item)).filter(Boolean);
+  const renderDispatchLocalityOptions = (selected = '') => {
+    const normalized = normalizeValue(selected);
+    const options = getDispatchLocalities().map((loc) => `<option value="${escapeHtml(loc)}" ${normalizeValue(loc) === normalized ? 'selected' : ''}>${escapeHtml(loc)}</option>`).join('');
+    const newOption = `<option value="${DISPATCH_NEW_LOCALITY_VALUE}">+ Nueva localidad</option>`;
+    return `<option value="" ${!normalized ? 'selected' : ''}>Seleccionar localidad</option>${options}${newOption}`;
+  };
+  const askForNewDispatchLocality = async (seed = '') => {
+    const result = await openIosSwal({
+      title: 'Nueva localidad',
+      input: 'text',
+      inputValue: normalizeValue(seed),
+      inputPlaceholder: 'Ej: Granadero Baigorria',
+      showCancelButton: true,
+      confirmButtonText: 'Guardar localidad',
+      cancelButtonText: 'Cancelar',
+      preConfirm: (value) => {
+        const city = normalizeValue(value);
+        if (!city) {
+          Swal.showValidationMessage('Ingresá una localidad válida.');
+          return false;
+        }
+        return city;
+      }
+    });
+    if (!result.isConfirmed) return '';
+    await ensureDispatchLocalitySaved(result.value);
+    return normalizeValue(result.value);
+  };
   const openCreateDispatchClient = async (seedName = '') => {
     const result = await openIosSwal({
       title: 'Nuevo cliente',
       customClass: { popup: 'dispatch-client-alert' },
-      html: `<div class="swal-stack-fields text-start"><div class="dispatch-client-preview"><span id="dispatchClientInitialsPreview" class="user-avatar-thumb dispatch-client-preview-avatar">${initialsFromPersonName(seedName) || '<i class=\"bi bi-person-fill\"></i>'}</span></div><input id="dispatchClientName" class="swal2-input ios-input" placeholder="Nombre y apellido / Razón social" value=""><input id="dispatchClientDoc" class="swal2-input ios-input" placeholder="DNI o CUIL"><input id="dispatchClientAddress" class="swal2-input ios-input" placeholder="Dirección"><input id="dispatchClientCity" class="swal2-input ios-input" list="dispatchClientCityList" placeholder="Localidad"><datalist id="dispatchClientCityList">${(Array.isArray(state.reparto.localities) ? state.reparto.localities : []).map((loc) => `<option value=\"${escapeHtml(loc)}\"></option>`).join('')}</datalist><select id="dispatchClientProvince" class="swal2-select ios-input">${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${item === 'Santa Fe' ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select><input id="dispatchClientCountry" class="swal2-input ios-input" value="Argentina" placeholder="País"></div>`,
+      html: `<div class="swal-stack-fields text-start"><div class="dispatch-client-preview"><span id="dispatchClientInitialsPreview" class="user-avatar-thumb dispatch-client-preview-avatar">${initialsFromPersonName(seedName) || '<i class=\"bi bi-person-fill\"></i>'}</span></div><input id="dispatchClientName" class="swal2-input ios-input" placeholder="Nombre y apellido / Razón social" value=""><input id="dispatchClientDoc" class="swal2-input ios-input" placeholder="DNI o CUIL"><input id="dispatchClientAddress" class="swal2-input ios-input" placeholder="Dirección"><select id="dispatchClientCity" class="swal2-select ios-input">${renderDispatchLocalityOptions('')}</select><select id="dispatchClientProvince" class="swal2-select ios-input">${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${item === 'Santa Fe' ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select><input id="dispatchClientCountry" class="swal2-input ios-input" value="Argentina" placeholder="País"></div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
       didOpen: () => {
         const nameInput = document.getElementById('dispatchClientName');
         const preview = document.getElementById('dispatchClientInitialsPreview');
+        const citySelect = document.getElementById('dispatchClientCity');
         nameInput?.focus();
         const sync = () => {
           if (!preview) return;
@@ -3192,6 +3223,12 @@
           preview.innerHTML = initials ? escapeHtml(initials) : '<i class="bi bi-person-fill"></i>';
         };
         nameInput?.addEventListener('input', sync);
+        citySelect?.addEventListener('change', async () => {
+          if (citySelect.value !== DISPATCH_NEW_LOCALITY_VALUE) return;
+          const created = await askForNewDispatchLocality('');
+          citySelect.innerHTML = renderDispatchLocalityOptions(created);
+          citySelect.value = created || '';
+        });
         sync();
       },
       preConfirm: () => {
@@ -3269,7 +3306,7 @@
       const pages = Math.max(1, Math.ceil(rows.length / PAGE));
       page = Math.min(Math.max(1, page), pages);
       const slice = rows.slice((page - 1) * PAGE, page * PAGE);
-      host.innerHTML = `<div class="inventario-print-row mb-2 toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" data-client-create-inline><i class="fa-solid fa-plus"></i><span>Crear cliente</span></button></div><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchClientsManagerSearch" type="search" class="form-control ios-input" placeholder="Buscar cliente" value="${escapeHtml(query)}"></div><div class="dispatch-clients-manager-list">${slice.map((item) => `<article class="dispatch-client-row"><div class="dispatch-client-row-main"><span class="user-avatar-thumb dispatch-client-suggest-avatar" style="${getDispatchClientAvatarStyle(item)}">${escapeHtml(item.initials || initialsFromPersonName(item.name) || 'U')}</span><div><strong>${escapeHtml(item.name || '-')}</strong><small>${escapeHtml(item.doc || '-')}</small></div></div><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-client-edit="${escapeHtml(item.id)}"><i class="fa-solid fa-pen"></i><span>Editar</span></button></article>`).join('') || '<p class="m-0">Sin clientes para ese filtro.</p>'}</div><div class="inventario-pagination enhanced mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-client-page="prev" ${page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${page} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-client-page="next" ${page >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+      host.innerHTML = `<div class="dispatch-clients-manager-toolbar mb-2"><div class="input-group ios-input-group ingredientes-search-group dispatch-clients-manager-search"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchClientsManagerSearch" type="search" class="form-control ios-input" placeholder="Buscar cliente" value="${escapeHtml(query)}"></div><button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" data-client-create-inline><i class="fa-solid fa-plus"></i><span>Crear cliente</span></button></div><div class="dispatch-clients-manager-list">${slice.map((item) => `<article class="dispatch-client-row"><div class="dispatch-client-row-main"><span class="user-avatar-thumb dispatch-client-suggest-avatar" style="${getDispatchClientAvatarStyle(item)}">${escapeHtml(item.initials || initialsFromPersonName(item.name) || 'U')}</span><div><strong>${escapeHtml(item.name || '-')}</strong><small>${escapeHtml(item.doc || '-')}</small></div></div><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-client-edit="${escapeHtml(item.id)}"><i class="fa-solid fa-pen"></i><span>Editar</span></button></article>`).join('') || '<p class="m-0">Sin clientes para ese filtro.</p>'}</div><div class="inventario-pagination enhanced mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-client-page="prev" ${page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${page} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-client-page="next" ${page >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
       const searchInput = host.querySelector('#dispatchClientsManagerSearch');
       if (searchInput) {
         searchInput.focus();
@@ -3281,14 +3318,21 @@
       const host = popup.querySelector('[data-dispatch-clients-host]');
       const client = safeObject(state.reparto.clients?.[clientId]);
       if (!host || !client.id) return;
-      host.innerHTML = `<div class="inventario-period-head mb-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-client-edit-back><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Editar cliente</h6></div><div class="inventario-print-row mb-2 toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" data-client-create-inline><i class="fa-solid fa-plus"></i><span>Crear cliente</span></button></div><div class="swal-stack-fields text-start"><div class="dispatch-client-preview"><span id="dispatchClientEditInitialsPreview" class="user-avatar-thumb dispatch-client-preview-avatar" style="${getDispatchClientAvatarStyle(client)}">${escapeHtml(client.initials || initialsFromPersonName(client.name) || 'U')}</span></div><input id="dispatchClientEditName" class="swal2-input ios-input" placeholder="Nombre" value="${escapeHtml(client.name || '')}"><input id="dispatchClientEditDoc" class="swal2-input ios-input" placeholder="DNI/CUIL" value="${escapeHtml(client.doc || '')}"><input id="dispatchClientEditAddress" class="swal2-input ios-input" placeholder="Dirección" value="${escapeHtml(client.address || '')}"><input id="dispatchClientEditCity" class="swal2-input ios-input" list="dispatchClientEditCityList" placeholder="Localidad" value="${escapeHtml(client.city || '')}"><datalist id="dispatchClientEditCityList">${(Array.isArray(state.reparto.localities) ? state.reparto.localities : []).map((loc) => `<option value=\"${escapeHtml(loc)}\"></option>`).join('')}</datalist><select id="dispatchClientEditProvince" class="swal2-select ios-input">${ARG_PROVINCIAS.map((prov) => `<option value="${escapeHtml(prov)}" ${normalizeValue(client.province || 'Santa Fe') === prov ? 'selected' : ''}>${escapeHtml(prov)}</option>`).join('')}</select><input id="dispatchClientEditCountry" class="swal2-input ios-input" placeholder="País" value="${escapeHtml(client.country || 'Argentina')}"></div><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" data-client-edit-save="${escapeHtml(client.id)}"><i class="fa-solid fa-floppy-disk"></i><span>Guardar</span></button></div>`;
+      host.innerHTML = `<div class=\"dispatch-clients-edit-head mb-2\"><div class=\"inventario-period-head mb-0\"><button type=\"button\" class=\"btn ios-btn ios-btn-secondary inventario-threshold-btn\" data-client-edit-back><i class=\"fa-solid fa-arrow-left\"></i><span>Volver</span></button><h6 class=\"step-title mb-0\">Editar cliente</h6></div><button type=\"button\" class=\"btn ios-btn ios-btn-success inventario-threshold-btn\" data-client-create-inline><i class=\"fa-solid fa-plus\"></i><span>Crear cliente</span></button></div><div class=\"swal-stack-fields text-start\"><div class=\"dispatch-client-preview\"><span id=\"dispatchClientEditInitialsPreview\" class=\"user-avatar-thumb dispatch-client-preview-avatar\" style=\"${getDispatchClientAvatarStyle(client)}\">${escapeHtml(client.initials || initialsFromPersonName(client.name) || 'U')}</span></div><input id=\"dispatchClientEditName\" class=\"swal2-input ios-input\" placeholder=\"Nombre\" value=\"${escapeHtml(client.name || '')}\"><input id=\"dispatchClientEditDoc\" class=\"swal2-input ios-input\" placeholder=\"DNI/CUIL\" value=\"${escapeHtml(client.doc || '')}\"><input id=\"dispatchClientEditAddress\" class=\"swal2-input ios-input\" placeholder=\"Dirección\" value=\"${escapeHtml(client.address || '')}\"><select id=\"dispatchClientEditCity\" class=\"swal2-select ios-input\">${renderDispatchLocalityOptions(client.city || '')}</select><select id=\"dispatchClientEditProvince\" class=\"swal2-select ios-input\">${ARG_PROVINCIAS.map((prov) => `<option value=\"${escapeHtml(prov)}\" ${normalizeValue(client.province || 'Santa Fe') === prov ? 'selected' : ''}>${escapeHtml(prov)}</option>`).join('')}</select><input id=\"dispatchClientEditCountry\" class=\"swal2-input ios-input\" placeholder=\"País\" value=\"${escapeHtml(client.country || 'Argentina')}\"></div><div class=\"produccion-config-actions\"><button type=\"button\" class=\"btn ios-btn ios-btn-success\" data-client-edit-save=\"${escapeHtml(client.id)}\"><i class=\"fa-solid fa-floppy-disk\"></i><span>Guardar</span></button></div>`;
       const nameInput = host.querySelector('#dispatchClientEditName');
+      const citySelect = host.querySelector('#dispatchClientEditCity');
       const preview = host.querySelector('#dispatchClientEditInitialsPreview');
       const syncPreview = () => {
         if (!preview) return;
         const initials = initialsFromPersonName(nameInput?.value || client.name || '');
         preview.textContent = initials || 'U';
       };
+      citySelect?.addEventListener('change', async () => {
+        if (citySelect.value !== DISPATCH_NEW_LOCALITY_VALUE) return;
+        const created = await askForNewDispatchLocality('');
+        citySelect.innerHTML = renderDispatchLocalityOptions(created || client.city || '');
+        citySelect.value = created || normalizeValue(client.city || '');
+      });
       nameInput?.addEventListener('input', syncPreview);
       syncPreview();
     };
