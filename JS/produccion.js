@@ -2348,7 +2348,7 @@
   const printDispatchPlanilla = async (node, dispatchRow) => {
     const win = window.open('', '_blank', 'width=1400,height=900');
     if (!win) return;
-    win.document.write(`<html><head><title>Planilla reparto ${escapeHtml(dispatchRow?.code || '')}</title><link rel="stylesheet" href="./CSS/style.css"><style>@page{size:landscape;margin:10mm}.dispatch-planilla-print{font-family:Inter,Arial,sans-serif;color:#1f2a44}.dispatch-planilla-print table{width:100%;border-collapse:collapse;table-layout:fixed}.dispatch-planilla-print th,.dispatch-planilla-print td{border:1px solid #d7def2;padding:6px;word-break:break-word}.dispatch-planilla-print .head-title{font-size:26px;font-weight:800;margin:0}.dispatch-planilla-print .head-sub{font-size:18px;color:#6d7ca3;margin:0}</style></head><body>${node.outerHTML}</body></html>`);
+    win.document.write(`<html><head><title>Planilla reparto ${escapeHtml(dispatchRow?.code || '')}</title><style>@page{size:landscape;margin:10mm}body{font-family:Inter,Arial,sans-serif;color:#111827;background:#ffffff;margin:0;padding:8px}.dispatch-planilla-print{background:#fff}.dispatch-planilla-print table{width:100%;border-collapse:collapse;table-layout:fixed}.dispatch-planilla-print th,.dispatch-planilla-print td{border:1px solid #2f2f2f;padding:6px;word-break:break-word;background:#fff;color:#111827}.dispatch-planilla-print .head-title{font-size:20px;font-weight:800;margin:0}.dispatch-planilla-print .head-sub{font-size:14px;color:#374151;margin:0}.dispatch-planilla-top-title{font-weight:800;text-align:center;padding:8px;border:1px solid #2f2f2f;border-bottom:none}</style></head><body>${node.outerHTML}</body></html>`);
     win.document.close();
     await new Promise((resolve) => setTimeout(resolve, 180));
     const qrHost = win.document.querySelector('[data-dispatch-planilla-qr]');
@@ -2361,12 +2361,15 @@
     if (!dispatchRow?.id) return;
     const client = { ...getDispatchClient(dispatchRow.clientId), ...safeObject(dispatchRow.clientSnapshot) };
     const vehicle = getDispatchVehicle(dispatchRow.vehicleId);
-    const managers = (Array.isArray(dispatchRow.managers) ? dispatchRow.managers : []).map((token) => {
-      const user = safeObject(state.users?.[token]);
-      return { name: normalizeValue(user.fullName || user.email || token), role: getDispatchUserRole(user) };
-    });
-    const managerLabel = managers.length ? managers.map((m) => `${m.name} (${m.role})`).join(', ') : 'Sin responsable';
+    const managerTokens = Array.isArray(dispatchRow.managers) ? dispatchRow.managers : [];
+    const managerLabel = managerTokens.length
+      ? managerTokens.map((token) => {
+        const manager = getManagerDisplay(token);
+        return `${manager.name} (${manager.role})`;
+      }).join(', ')
+      : 'Sin responsable (Encargado)';
     const location = [client.address, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean).join(' • ');
+    const clientDoc = normalizeValue(client.doc || client.dni || client.cuit || client.cuil || client.document || client.taxId);
     const products = Array.isArray(dispatchRow.products) ? dispatchRow.products : [];
     const detailRows = products.flatMap((item) => {
       const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
@@ -2377,7 +2380,9 @@
     const commentsRows = comments.length
       ? comments.map((item, idx) => `<tr><td colspan="4"><strong>OBSERVACIÓN ${idx + 1}:</strong> ${escapeHtml(item)}</td></tr>`).join('')
       : '<tr><td colspan="4"><strong>OBSERVACIÓN 1:</strong> Sin observaciones</td></tr>';
-    const html = `<div class="dispatch-planilla-print" id="dispatchPlanillaPrintable"><div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;"><span style="width:58px;height:58px;border:1px solid #d7def2;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;background:#fff;font-size:28px;">🚚</span><div><p class="head-title">${escapeHtml(dispatchRow.code || dispatchRow.id)}</p><p class="head-sub">${escapeHtml(location)}${location ? ' • ' : ''}${escapeHtml(normalizeValue(client.name))}${normalizeValue(client.doc || client.dni || client.cuit || client.cuil) ? ` • ${escapeHtml(normalizeValue(client.doc || client.dni || client.cuit || client.cuil))}` : ''}</p></div></div><div class="table-responsive"><table><thead><tr><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de lote</th></tr></thead><tbody>${detailRows}<tr><td colspan="4"><strong>VEHÍCULO (UTA-URA):</strong> ${escapeHtml(`${vehicle.number || '-'} - ${vehicle.patent || '-'} - ${vehicle.brand || vehicle.type || '-'}`)}</td></tr>${commentsRows}<tr><td colspan="4"><strong>CONTROLO:</strong> ${escapeHtml(managerLabel)}</td></tr><tr><td colspan="2"><strong>TEMPERATURA UNIDAD DE TRANSPORTE:</strong> 3 °C</td><td colspan="2"><strong>UNIDAD DE TRANSPORTE ESTADO:</strong> A (ACEPTABLE)</td></tr></tbody></table></div><div style="margin-top:10px;display:flex;gap:12px;align-items:center;"><div data-dispatch-planilla-qr></div><div><p style="margin:0 0 6px;font-weight:700;">QR de trazabilidad de los lotes</p><p style="margin:0;color:#556487;">Escaneá el QR con tu celular para acceder a la trazabilidad completa del producto.</p></div></div></div>`;
+    const headerTable = `<table style="width:100%;border-collapse:collapse;table-layout:fixed"><tbody><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800" colspan="4">FRIGO LA JAMONERA • REGISTRO DE SALIDA DE PRODUCTOS PRODUCIDOS</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800" colspan="4">${escapeHtml(dispatchRow.code || dispatchRow.id)}</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px"><strong>FECHA Y HORA:</strong></td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(formatDateTime(dispatchRow.createdAt || dispatchRow.dispatchDate))}</strong></td><td style="border:1px solid #2f2f2f;padding:4px"><strong>CLIENTE:</strong></td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(normalizeValue(client.name) || '-')}</strong></td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px" colspan="4"><strong>DIRECCION:</strong> ${escapeHtml(location)}${location && clientDoc ? ' • ' : ''}${escapeHtml(clientDoc)}</td></tr></tbody></table>`;
+    const planillaStyle = '<style>.dispatch-planilla-print{font-family:Inter,Arial,sans-serif;color:#111827;background:#fff}.dispatch-planilla-print table{width:100%;border-collapse:collapse;table-layout:fixed}.dispatch-planilla-print th,.dispatch-planilla-print td{border:1px solid #2f2f2f;padding:6px;word-break:break-word;background:#fff;color:#111827}</style>';
+    const html = `${planillaStyle}<div class="dispatch-planilla-print" id="dispatchPlanillaPrintable">${headerTable}<div class="table-responsive" style="margin-top:8px;"><table><thead><tr><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de lote</th></tr></thead><tbody>${detailRows}<tr><td colspan="4"><strong>VEHÍCULO (UTA-URA):</strong> ${escapeHtml(`${vehicle.number || '-'} - ${vehicle.patent || '-'} - ${vehicle.brand || vehicle.type || '-'}`)}</td></tr>${commentsRows}<tr><td colspan="4"><strong>CONTROLO:</strong> ${escapeHtml(managerLabel)}</td></tr><tr><td colspan="2"><strong>TEMPERATURA UNIDAD DE TRANSPORTE:</strong> 3 °C</td><td colspan="2"><strong>UNIDAD DE TRANSPORTE ESTADO:</strong> A (ACEPTABLE)</td></tr></tbody></table></div><div style="margin-top:10px;display:flex;gap:12px;align-items:center;"><div data-dispatch-planilla-qr></div><div><p style="margin:0 0 6px;font-weight:700;">QR de trazabilidad de los lotes</p><p style="margin:0;color:#556487;">Escaneá el QR con tu celular para acceder a la trazabilidad completa del producto.</p></div></div></div>`;
     await openIosSwal({
       title: `Planilla ${escapeHtml(dispatchRow.code || dispatchRow.id)}`,
       html: `<div class="planilla-toolbar"><button type="button" class="btn ios-btn ios-btn-secondary" id="dispatchPlanillaPrintBtn"><i class="fa-solid fa-print"></i><span>Imprimir</span></button></div>${html}`,
