@@ -5453,15 +5453,26 @@
     });
     return picker.isConfirmed ? picker.value : null;
   };
-  const printWeeklyProductionPlanilla = async (html) => {
+  const printWeeklyProductionPlanilla = (html) => {
     const win = window.open('', '_blank', 'width=1400,height=900');
     if (!win) return;
     win.document.write(`<html><head><title>Planilla de producción semanal</title><style>@page{size:landscape;margin:10mm}body{font-family:Inter,Arial,sans-serif;color:#111827;background:#ffffff;margin:0;padding:8px}.weekly-production-sheet{display:grid;gap:14px}.weekly-sheet-block{border:1px solid #2f2f2f}.weekly-sheet-block h3,.weekly-sheet-block h4{margin:0;text-align:center;font-weight:800;padding:6px 6px}.weekly-sheet-block h4{border-top:1px solid #2f2f2f;font-size:16px}.weekly-sheet-table{width:100%;border-collapse:collapse;table-layout:fixed}.weekly-sheet-table th,.weekly-sheet-table td{border:1px solid #2f2f2f;padding:4px;word-break:break-word;text-align:center;font-size:11px;line-height:1.15}.weekly-sheet-table th.th-cat{background:#1d7a2f;color:#fff}.weekly-sheet-table th.th-day{background:#136fb6;color:#fff}.weekly-sheet-table th.th-total{background:#08266e;color:#fff}.weekly-sheet-table td.is-missing{background:#f4dfe2}.weekly-sheet-table td.is-ok{background:#e9edf2}.weekly-sheet-table td.weekly-total{font-weight:800}.weekly-product-cell{display:inline-flex;align-items:center;gap:8px;justify-content:flex-start;text-align:left}.weekly-product-cell img{width:24px;height:24px;border-radius:999px;object-fit:cover;border:1px solid #c7d3ea}.page-break{page-break-before:always;break-before:page}</style></head><body>${html}</body></html>`);
     win.document.close();
-    win.focus();
-    await waitPrintAssets(win);
-    onProgress?.(100);
-    win.print();
+    const safePrint = () => {
+      try {
+        if (win.__printed) return;
+        win.__printed = true;
+        win.focus();
+        win.print();
+      } catch (_) {
+      }
+    };
+    waitPrintAssets(win).then(() => {
+      setTimeout(safePrint, 120);
+    }).catch(() => {
+      safePrint();
+    });
+    setTimeout(safePrint, 1200);
   };
 
   const openWeeklyProductionPlanillaByPeriod = async () => {
@@ -5559,7 +5570,7 @@
       customClass: { popup: 'produccion-trace-alert planilla-modal', confirmButton: 'ios-btn ios-btn-secondary' },
       didOpen: (popup) => {
         popup.querySelector('#weeklyProductionPrintBtn')?.addEventListener('click', async () => {
-          await printWeeklyProductionPlanilla(html);
+          printWeeklyProductionPlanilla(html);
         });
       }
     });
