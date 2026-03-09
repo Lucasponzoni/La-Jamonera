@@ -5575,6 +5575,11 @@ html.login-protected.auth-ok body {
   margin-top: 10px;
 }
 
+.swal2-popup.produccion-recipe-history-alert.is-expanded {
+  width: 96vw !important;
+  max-width: 96vw !important;
+}
+
 .produccion-recipe-history-modal {
   padding: 10px 12px 0;
 }
