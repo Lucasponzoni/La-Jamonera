@@ -527,7 +527,7 @@
   const prepareThumbLoaders = (selector) => {
     const list = Array.from(document.querySelectorAll(selector));
     list.forEach((img) => {
-      const parent = img.closest('.user-avatar-thumb, .receta-thumb-wrap, .produccion-hero-avatar, .inventario-trace-avatar, .inventario-print-photo-wrap');
+      const parent = img.closest('.user-avatar-thumb, .receta-thumb-wrap, .produccion-hero-avatar, .inventario-trace-avatar, .inventario-print-photo-wrap, .recipe-inline-avatar-wrap, .recipe-suggest-avatar-wrap');
       const spinner = parent ? parent.querySelector('.thumb-loading') : null;
       const done = () => {
         img.classList.add('is-loaded');
@@ -538,6 +538,11 @@
       } else {
         img.addEventListener('load', done, { once: true });
         img.addEventListener('error', () => { spinner?.remove(); }, { once: true });
+        setTimeout(() => {
+          if (!img.classList.contains('is-loaded')) {
+            spinner?.remove();
+          }
+        }, 7000);
       }
     });
   };
@@ -2445,18 +2450,19 @@
               ? `<span class="produccion-dispatch-missing"><i class="fa-solid fa-circle-exclamation"></i> <strong>Disponible:</strong> ${availableKg.toFixed(2)} kg · <strong>Faltan:</strong> ${alloc.missingKg.toFixed(2)} kg</span>`
               : '<span class="produccion-dispatch-missing"><i class="fa-solid fa-circle-xmark"></i> <strong>Sin stock disponible.</strong></span>')))
         : '<span class="text-muted">Seleccionar producto.</span>';
-      const lotsText = alloc.allocations.map((lot) => `${escapeHtml(lot.lotNumber)} · ${Number(lot.qtyKg || 0).toFixed(2)} kg`).join('<br>') || '-';
+      const lotsText = alloc.allocations.map((lot) => `${escapeHtml(lot.lotNumber)} · ${Number(lot.qtyKg || 0).toFixed(2)} kg`).join('<br>') || 'Sin asignar';
       const expiries = [...new Set(alloc.allocations.map((lot) => normalizeValue(lot.expiryDate)).filter(Boolean))];
-      const expiryText = expiries.length === 1 ? escapeHtml(formatIsoEs(expiries[0])) : (expiries.length ? expiries.map((item) => escapeHtml(formatIsoEs(item))).join('<br>') : '-');
+      const expiryText = expiries.length === 1 ? escapeHtml(formatIsoEs(expiries[0])) : (expiries.length ? expiries.map((item) => escapeHtml(formatIsoEs(item))).join('<br>') : 'Sin fecha');
       const recipe = safeObject(state.recetas[line.recipeId]);
       const recipeTitle = normalizeValue(line.recipeSearch || recipe.title);
       const recipeImage = sanitizeImageUrl(recipe.imageUrl);
       return `<tr><td><div class="recipe-ing-autocomplete" data-dispatch-product-wrap="${idx}"><div class="recipe-ing-input-wrap dispatch-product-input-wrap"><span class="recipe-inline-avatar-wrap">${recipeImage ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-dispatch-inline-thumb" src="${escapeHtml(recipeImage)}" alt="${escapeHtml(recipeTitle || 'Producto')}">` : '<span class="image-placeholder-circle-2"><i class="fa-solid fa-drumstick-bite"></i></span>'}</span><input type="search" class="form-control ios-input dispatch-product-search-input" data-dispatch-product-search="${idx}" placeholder="Seleccionar producto" value="${escapeHtml(recipeTitle)}"></div><input type="hidden" data-dispatch-product-id="${idx}" value="${escapeHtml(line.recipeId)}"></div></td><td><input class="form-control ios-input" type="number" step="0.01" min="0" data-dispatch-qty="${idx}" value="${escapeHtml(line.qtyKg || '')}"></td><td>${stockStatus}</td><td>${lotsText}</td><td>${expiryText}</td><td><button type="button" class="btn family-manage-btn" data-dispatch-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`;
     }).join('');
+    const commentRows = draft.comments.map((comment, idx) => `<tr class="dispatch-comment-row"><td colspan="5"><textarea class="form-control ios-input dispatch-comment-textarea" data-dispatch-comment="${idx}" placeholder="Agregá comentarios y observaciones">${escapeHtml(comment)}</textarea></td><td><button type="button" class="btn family-manage-btn" data-dispatch-comment-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
     nodes.dispatchView.innerHTML = `<div class="inventario-period-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Nuevo reparto</h6></div>
-    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">1</span> Datos generales</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Día de reparto</label><input id="dispatchDateInput" class="form-control ios-input" value="${escapeHtml(draft.dispatchDate)}"></div><div class="recipe-field recipe-field-half"><label class="form-label">Cliente</label><div class="inventario-provider-search-wrap"><input id="dispatchClientInput" class="form-control ios-input" placeholder="Buscar por nombre, DNI o CUIL" value="${escapeHtml(draft.clientName)}"><input type="hidden" id="dispatchClientId" value="${escapeHtml(draft.clientId)}"></div><small class="text-muted">Si no existe, seleccioná Nuevo Cliente.</small></div><div class="recipe-field recipe-field-half"><label class="form-label">Dirección de reparto</label><input id="dispatchClientAddressInput" class="form-control ios-input" placeholder="Dirección" value="${escapeHtml(draft.clientAddress || '')}" ${draft.clientId ? '' : 'disabled'}></div><div class="recipe-field recipe-field-half"><label class="form-label">Localidad</label><input id="dispatchClientCityInput" class="form-control ios-input" placeholder="Localidad" value="${escapeHtml(draft.clientCity || '')}" ${draft.clientId ? '' : 'disabled'}></div><div class="recipe-field recipe-field-half"><label class="form-label">Provincia</label><select id="dispatchClientProvinceInput" class="form-select ios-input" ${draft.clientId ? '' : 'disabled'}>${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${normalizeValue(draft.clientProvince || 'Santa Fe') === item ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select></div><div class="recipe-field recipe-field-half"><label class="form-label">País</label><input id="dispatchClientCountryInput" class="form-control ios-input" value="${escapeHtml(draft.clientCountry || 'Argentina')}" ${draft.clientId ? '' : 'disabled'}></div></div></section>
-    <section class="recipe-step-card step-block produccion-dispatch-create"><div class="d-flex align-items-center justify-content-between mb-2"><h6 class="step-title mb-0"><span class="recipe-step-number">2</span> Productos a repartir</h6></div><div class="table-responsive recipe-table-wrap dispatch-products-table"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Producto</th><th>Kilos</th><th>Stock</th><th>Lote</th><th>Vencimiento</th><th></th></tr></thead><tbody>${lineRows}</tbody></table></div><div class="toolbar-scroll-x dispatch-actions-row mt-2"><button type="button" class="btn ios-btn ios-btn-success recipe-table-action-btn" id="dispatchAddProductBtn"><i class="fa-solid fa-plus"></i><span>Producto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchAddCommentBtn"><i class="fa-regular fa-comment-dots"></i><span>Comentario</span></button></div><div id="dispatchCommentsWrap" class="mt-2">${draft.comments.map((comment, idx) => `<input class="form-control ios-input mt-2" data-dispatch-comment="${idx}" placeholder="Comentario visual" value="${escapeHtml(comment)}">`).join('')}</div></section>
-    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">3</span> Vehículo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">UTA / URA</label><small class="d-block text-muted mb-1">UTA / URA (Unidad de Transporte Alimentario)</small><select id="dispatchVehicleSelect" class="form-select ios-input"><option value="">Seleccionar UTA/URA</option>${Object.values(safeObject(state.reparto.vehicles)).map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === draft.vehicleId ? 'selected' : ''}>${escapeHtml(item.number || item.patent || item.id)}</option>`).join('')}<option value="add_vehicle">+ URA/UTA</option></select></div><div class="recipe-field recipe-field-half"><label class="form-label">Responsables</label><div class="produccion-managers-grid">${Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-check"><input type="checkbox" data-dispatch-manager="${escapeHtml(user.id)}" ${draft.managers.includes(user.id) ? 'checked' : ''}>${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(getDispatchUserRole(user))}</small></span></label>`).join('')}</div></div></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchSaveBtn"><i class="fa-solid fa-floppy-disk"></i><span>Guardar reparto</span></button></div>`;
+    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">1</span> Datos generales</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Día de reparto</label><input id="dispatchDateInput" class="form-control ios-input" value="${escapeHtml(draft.dispatchDate)}"></div><div class="recipe-field recipe-field-half"><div class="dispatch-client-head"><label class="form-label mb-0">Cliente <small class="dispatch-client-helper">(si no existe, crealo)</small></label><button type="button" class="btn ios-btn ios-btn-secondary dispatch-quick-client-btn" id="dispatchQuickCreateClientBtn"><i class="fa-solid fa-plus"></i><span>Nuevo cliente</span></button></div><div class="inventario-provider-search-wrap"><input id="dispatchClientInput" class="form-control ios-input" placeholder="Buscar por nombre, DNI o CUIL" value="${escapeHtml(draft.clientName)}"><input type="hidden" id="dispatchClientId" value="${escapeHtml(draft.clientId)}"></div></div><div class="recipe-field recipe-field-half"><label class="form-label">Dirección de reparto</label><input id="dispatchClientAddressInput" class="form-control ios-input" placeholder="Dirección" value="${escapeHtml(draft.clientAddress || '')}" ${draft.clientId ? '' : 'disabled'}></div><div class="recipe-field recipe-field-half"><label class="form-label">Localidad</label><input id="dispatchClientCityInput" class="form-control ios-input" placeholder="Localidad" value="${escapeHtml(draft.clientCity || '')}" ${draft.clientId ? '' : 'disabled'}></div><div class="recipe-field recipe-field-half"><label class="form-label">Provincia</label><select id="dispatchClientProvinceInput" class="form-select ios-input" ${draft.clientId ? '' : 'disabled'}>${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${normalizeValue(draft.clientProvince || 'Santa Fe') === item ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select></div><div class="recipe-field recipe-field-half"><label class="form-label">País</label><input id="dispatchClientCountryInput" class="form-control ios-input" value="${escapeHtml(draft.clientCountry || 'Argentina')}" ${draft.clientId ? '' : 'disabled'}></div></div></section>
+    <section class="recipe-step-card step-block produccion-dispatch-create"><div class="d-flex align-items-center justify-content-between mb-2"><h6 class="step-title mb-0"><span class="recipe-step-number">2</span> Productos a repartir</h6></div><div class="table-responsive recipe-table-wrap dispatch-products-table"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Producto</th><th>Kilos</th><th>Stock</th><th>Lote</th><th>Vencimiento</th><th></th></tr></thead><tbody>${lineRows}${commentRows}</tbody></table></div><div class="toolbar-scroll-x dispatch-actions-row mt-2"><button type="button" class="btn ios-btn ios-btn-success recipe-table-action-btn" id="dispatchAddProductBtn"><i class="fa-solid fa-plus"></i><span>Producto</span></button><button type="button" class="btn recipe-table-action-btn recipe-table-action-btn-neutral" id="dispatchAddCommentBtn"><i class="fa-regular fa-message"></i><span>Comentario</span></button></div></section>
+    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">3</span> Vehículo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Transporte habilitado (UTA/URA)</label><small class="d-block text-muted mb-1">Unidad de Transporte Alimentario / Unidad de Reparto Alimentario.</small><select id="dispatchVehicleSelect" class="form-select ios-input"><option value="">Seleccionar unidad habilitada</option>${Object.values(safeObject(state.reparto.vehicles)).map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === draft.vehicleId ? 'selected' : ''}>${escapeHtml(item.number || item.patent || item.id)}</option>`).join('')}<option value="add_vehicle">+ Cargar nueva unidad</option></select></div><div class="recipe-field recipe-field-half"><label class="form-label">Responsables</label><div class="produccion-managers-grid">${Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-check"><input type="checkbox" data-dispatch-manager="${escapeHtml(user.id)}" ${draft.managers.includes(user.id) ? 'checked' : ''}>${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(getDispatchUserRole(user))}</small></span></label>`).join('')}</div></div></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchSaveBtn"><i class="fa-solid fa-floppy-disk"></i><span>Guardar reparto</span></button></div>`;
     const dateInput = nodes.dispatchView.querySelector('#dispatchDateInput');
     if (window.flatpickr && dateInput) {
       window.flatpickr(dateInput, {
@@ -2477,13 +2483,14 @@
     const result = await openIosSwal({
       title: 'Nuevo cliente',
       customClass: { popup: 'dispatch-client-alert' },
-      html: `<div class="swal-stack-fields text-start"><div class="dispatch-client-preview"><span id="dispatchClientInitialsPreview" class="user-avatar-thumb dispatch-client-preview-avatar">${initialsFromPersonName(seedName) || '<i class=\"bi bi-person-fill\"></i>'}</span></div><input id="dispatchClientName" class="swal2-input ios-input" placeholder="Nombre y apellido / Razón social" value="${escapeHtml(seedName)}"><input id="dispatchClientDoc" class="swal2-input ios-input" placeholder="DNI o CUIL"><input id="dispatchClientAddress" class="swal2-input ios-input" placeholder="Dirección"><input id="dispatchClientCity" class="swal2-input ios-input" placeholder="Localidad"><select id="dispatchClientProvince" class="swal2-select ios-input">${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${item === 'Santa Fe' ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select><input id="dispatchClientCountry" class="swal2-input ios-input" value="Argentina" placeholder="País"></div>`,
+      html: `<div class="swal-stack-fields text-start"><div class="dispatch-client-preview"><span id="dispatchClientInitialsPreview" class="user-avatar-thumb dispatch-client-preview-avatar">${initialsFromPersonName(seedName) || '<i class=\"bi bi-person-fill\"></i>'}</span></div><input id="dispatchClientName" class="swal2-input ios-input" placeholder="Nombre y apellido / Razón social" value=""><input id="dispatchClientDoc" class="swal2-input ios-input" placeholder="DNI o CUIL"><input id="dispatchClientAddress" class="swal2-input ios-input" placeholder="Dirección"><input id="dispatchClientCity" class="swal2-input ios-input" placeholder="Localidad"><select id="dispatchClientProvince" class="swal2-select ios-input">${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${item === 'Santa Fe' ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select><input id="dispatchClientCountry" class="swal2-input ios-input" value="Argentina" placeholder="País"></div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
       didOpen: () => {
         const nameInput = document.getElementById('dispatchClientName');
         const preview = document.getElementById('dispatchClientInitialsPreview');
+        nameInput?.focus();
         const sync = () => {
           if (!preview) return;
           const initials = initialsFromPersonName(nameInput?.value || '');
@@ -4308,8 +4315,28 @@
       renderDispatchCreate(state.dispatchDraft);
       return;
     }
+    if (event.target.closest('#dispatchQuickCreateClientBtn')) {
+      const created = await openCreateDispatchClient('');
+      if (created) {
+        state.dispatchDraft.clientId = created.id;
+        state.dispatchDraft.clientName = created.name;
+        state.dispatchDraft.clientAddress = normalizeValue(created.address);
+        state.dispatchDraft.clientCity = normalizeValue(created.city);
+        state.dispatchDraft.clientProvince = normalizeValue(created.province) || 'Santa Fe';
+        state.dispatchDraft.clientCountry = normalizeValue(created.country) || 'Argentina';
+        renderDispatchCreate(state.dispatchDraft);
+      }
+      return;
+    }
     if (event.target.closest('#dispatchAddCommentBtn')) {
       state.dispatchDraft.comments.push('');
+      renderDispatchCreate(state.dispatchDraft);
+      return;
+    }
+    const removeCommentBtn = event.target.closest('[data-dispatch-comment-remove]');
+    if (removeCommentBtn) {
+      const idx = Number(removeCommentBtn.dataset.dispatchCommentRemove);
+      state.dispatchDraft.comments = state.dispatchDraft.comments.filter((_, i) => i !== idx);
       renderDispatchCreate(state.dispatchDraft);
       return;
     }
@@ -4543,7 +4570,8 @@
     node.style.position = 'absolute';
     node.style.left = `${rect.left + window.scrollX}px`;
     node.style.top = `${rect.bottom + window.scrollY + 4}px`;
-    node.style.width = `${Math.max(rect.width, 420)}px`;
+    const maxWidth = Math.min(window.innerWidth - 24, 560);
+    node.style.width = `${Math.min(Math.max(rect.width, 300), maxWidth)}px`;
     node.style.zIndex = '3300';
   };
 
@@ -4583,7 +4611,8 @@
           return;
         }
         if (ev.target.closest('[data-dispatch-client-create]')) {
-          const created = await openCreateDispatchClient(normalizeValue(clientInput.value));
+          closeDispatchSuggests();
+          const created = await openCreateDispatchClient('');
           if (created) {
             state.dispatchDraft.clientId = created.id;
             state.dispatchDraft.clientName = created.name;
