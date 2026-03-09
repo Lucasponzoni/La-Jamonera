@@ -329,6 +329,15 @@
     utc.setUTCDate(utc.getUTCDate() + Number(days || 0));
     return utc.toISOString().slice(0, 10);
   };
+  const diffDays = (fromIso, toIso) => {
+    const from = normalizeValue(fromIso);
+    const to = normalizeValue(toIso);
+    if (!from || !to) return Number.NaN;
+    const fromDate = new Date(`${from}T00:00:00Z`);
+    const toDate = new Date(`${to}T00:00:00Z`);
+    if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) return Number.NaN;
+    return Math.round((fromDate.getTime() - toDate.getTime()) / 86400000);
+  };
   const moveIsoFromSunday = (isoDate) => {
     const text = normalizeValue(isoDate);
     if (!text) return '';
@@ -527,7 +536,7 @@
   const prepareThumbLoaders = (selector) => {
     const list = Array.from(document.querySelectorAll(selector));
     list.forEach((img) => {
-      const parent = img.closest('.user-avatar-thumb, .receta-thumb-wrap, .produccion-hero-avatar, .inventario-trace-avatar, .inventario-print-photo-wrap');
+      const parent = img.closest('.user-avatar-thumb, .receta-thumb-wrap, .produccion-hero-avatar, .inventario-trace-avatar, .inventario-print-photo-wrap, .recipe-inline-avatar-wrap, .recipe-suggest-avatar-wrap');
       const spinner = parent ? parent.querySelector('.thumb-loading') : null;
       const done = () => {
         img.classList.add('is-loaded');
@@ -538,6 +547,11 @@
       } else {
         img.addEventListener('load', done, { once: true });
         img.addEventListener('error', () => { spinner?.remove(); }, { once: true });
+        setTimeout(() => {
+          if (!img.classList.contains('is-loaded')) {
+            spinner?.remove();
+          }
+        }, 7000);
       }
     });
   };
@@ -2293,6 +2307,20 @@
   };
   const getDispatchClient = (clientId) => safeObject(state.reparto.clients?.[clientId]);
   const getDispatchVehicle = (vehicleId) => safeObject(state.reparto.vehicles?.[vehicleId]);
+  const getDispatchVehicleExpiryMeta = (vehicle = {}) => {
+    const expiry = normalizeValue(vehicle.expiryDate);
+    if (!expiry) return { tone: 'neutral', text: 'Sin vencimiento', days: null };
+    const days = diffDays(expiry, toIsoDate());
+    if (days < 0) return { tone: 'danger', text: 'Vencido', days };
+    if (days <= 30) return { tone: 'danger', text: `Vence en ${days} día${days === 1 ? '' : 's'}`, days };
+    if (days <= 90) return { tone: 'warning', text: `Vence en ${days} días`, days };
+    return { tone: 'success', text: `Vigente (${days} días)`, days };
+  };
+  const formatDispatchVehicleLabel = (vehicle = {}) => {
+    const meta = getDispatchVehicleExpiryMeta(vehicle);
+    const model = normalizeValue(vehicle.type || 'Vehículo');
+    return `${vehicle.number || '-'} - ${vehicle.patent || '-'} - ${model} (${meta.text})`;
+  };
   const getDispatchAvailableByProductionId = (productionId) => {
     const prod = safeObject(state.registros?.[productionId]);
     if (!prod.id || normalizeValue(prod.status) === 'anulada') return 0;
@@ -2420,8 +2448,11 @@
     clientCountry: 'Argentina',
     lines: [{ id: makeId('dispatch_row'), recipeId: '', recipeSearch: '', qtyKg: '', allocations: [] }],
     comments: [],
+    proofs: [],
     managers: [],
-    vehicleId: ''
+    vehicleId: '',
+    vehicleSearch: '',
+    managerSearch: ''
   });
   const openDispatch = () => {
     state.dispatchPage = 1;
@@ -2440,23 +2471,25 @@
         ? (requestedKg <= 0
           ? `<span class="produccion-dispatch-ok"><i class="fa-solid fa-circle-check"></i> <strong>Disponible:</strong> ${availableKg.toFixed(2)} kg</span>`
           : (alloc.hasStock
-            ? `<span class="produccion-dispatch-ok"><i class="fa-solid fa-circle-check"></i> <strong>Disponible:</strong> ${availableKg.toFixed(2)} kg · <strong>Usás:</strong> ${requestedKg.toFixed(2)} kg</span>`
+            ? `<span class="produccion-dispatch-ok dispatch-stock-block"><i class="fa-solid fa-circle-check"></i> <strong>Disponible:</strong> ${availableKg.toFixed(2)} kg</span><span class="produccion-dispatch-ok dispatch-stock-block"><strong class="dispatch-uses-label">Usás:</strong> <span class="dispatch-uses-value">${requestedKg.toFixed(2)} kg</span></span>`
             : (availableKg > 0.0001
-              ? `<span class="produccion-dispatch-missing"><i class="fa-solid fa-circle-exclamation"></i> <strong>Disponible:</strong> ${availableKg.toFixed(2)} kg · <strong>Faltan:</strong> ${alloc.missingKg.toFixed(2)} kg</span>`
+              ? `<span class="produccion-dispatch-missing dispatch-stock-block"><i class="fa-solid fa-circle-exclamation"></i> <strong>Disponible:</strong> ${availableKg.toFixed(2)} kg</span><span class="produccion-dispatch-missing dispatch-stock-block"><strong>Faltan:</strong> ${alloc.missingKg.toFixed(2)} kg</span>`
               : '<span class="produccion-dispatch-missing"><i class="fa-solid fa-circle-xmark"></i> <strong>Sin stock disponible.</strong></span>')))
         : '<span class="text-muted">Seleccionar producto.</span>';
-      const lotsText = alloc.allocations.map((lot) => `${escapeHtml(lot.lotNumber)} · ${Number(lot.qtyKg || 0).toFixed(2)} kg`).join('<br>') || '-';
+      const lotsText = alloc.allocations.map((lot) => `${escapeHtml(lot.lotNumber)} · ${Number(lot.qtyKg || 0).toFixed(2)} kg`).join('<br>') || 'Sin asignar';
       const expiries = [...new Set(alloc.allocations.map((lot) => normalizeValue(lot.expiryDate)).filter(Boolean))];
-      const expiryText = expiries.length === 1 ? escapeHtml(formatIsoEs(expiries[0])) : (expiries.length ? expiries.map((item) => escapeHtml(formatIsoEs(item))).join('<br>') : '-');
+      const expiryText = expiries.length === 1 ? escapeHtml(formatIsoEs(expiries[0])) : (expiries.length ? expiries.map((item) => escapeHtml(formatIsoEs(item))).join('<br>') : 'Sin fecha');
       const recipe = safeObject(state.recetas[line.recipeId]);
       const recipeTitle = normalizeValue(line.recipeSearch || recipe.title);
       const recipeImage = sanitizeImageUrl(recipe.imageUrl);
-      return `<tr><td><div class="recipe-ing-autocomplete" data-dispatch-product-wrap="${idx}"><div class="recipe-ing-input-wrap dispatch-product-input-wrap"><span class="recipe-inline-avatar-wrap">${recipeImage ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-dispatch-inline-thumb" src="${escapeHtml(recipeImage)}" alt="${escapeHtml(recipeTitle || 'Producto')}">` : '<span class="image-placeholder-circle-2"><i class="fa-solid fa-drumstick-bite"></i></span>'}</span><input type="search" class="form-control ios-input dispatch-product-search-input" data-dispatch-product-search="${idx}" placeholder="Seleccionar producto" value="${escapeHtml(recipeTitle)}"></div><input type="hidden" data-dispatch-product-id="${idx}" value="${escapeHtml(line.recipeId)}"></div></td><td><input class="form-control ios-input" type="number" step="0.01" min="0" data-dispatch-qty="${idx}" value="${escapeHtml(line.qtyKg || '')}"></td><td>${stockStatus}</td><td>${lotsText}</td><td>${expiryText}</td><td><button type="button" class="btn family-manage-btn" data-dispatch-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+      return `<tr><td><div class="recipe-ing-autocomplete" data-dispatch-product-wrap="${idx}"><div class="recipe-ing-input-wrap dispatch-product-input-wrap"><span class="recipe-inline-avatar-wrap">${recipeImage ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-dispatch-inline-thumb" src="${escapeHtml(recipeImage)}" alt="${escapeHtml(recipeTitle || 'Producto')}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon"></i></span>'}</span><input type="search" class="form-control ios-input dispatch-product-search-input" data-dispatch-product-search="${idx}" placeholder="Seleccionar producto" value="${escapeHtml(recipeTitle)}"></div><input type="hidden" data-dispatch-product-id="${idx}" value="${escapeHtml(line.recipeId)}"></div></td><td><input class="form-control ios-input" type="number" step="0.01" min="0" data-dispatch-qty="${idx}" value="${escapeHtml(line.qtyKg || '')}"></td><td class="dispatch-stock-cell">${stockStatus}</td><td class="dispatch-lot-cell">${lotsText}</td><td class="dispatch-expiry-cell">${expiryText}</td><td><button type="button" class="btn family-manage-btn" data-dispatch-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`;
     }).join('');
+    const commentRows = draft.comments.map((comment, idx) => `<tr class="dispatch-comment-row"><td colspan="5"><textarea class="form-control ios-input dispatch-comment-textarea" data-dispatch-comment="${idx}" placeholder="Agregá comentarios y observaciones">${escapeHtml(comment)}</textarea></td><td><button type="button" class="btn family-manage-btn" data-dispatch-comment-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
+    const proofRows = (Array.isArray(draft.proofs) ? draft.proofs : []).map((proof, idx) => `<tr class="dispatch-proof-row"><td colspan="4"><label class="inventario-upload-dropzone dispatch-proof-drop" for="dispatchProofFile_${idx}"><i class="fa-solid fa-paperclip"></i><span>${escapeHtml(proof?.name || 'Adjuntar comprobante (imagen/PDF)')}</span></label><input id="dispatchProofFile_${idx}" class="inventario-hidden-file-input" type="file" accept="image/*,application/pdf" data-dispatch-proof-file="${idx}">${proof?.url ? `<p class="dispatch-proof-name">Cargado: ${escapeHtml(proof.name || 'comprobante')}</p>` : ''}</td><td class="dispatch-proof-expiry-cell">Comprobante</td><td><button type="button" class="btn family-manage-btn" data-dispatch-proof-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
     nodes.dispatchView.innerHTML = `<div class="inventario-period-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Nuevo reparto</h6></div>
-    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">1</span> Datos generales</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Día de reparto</label><input id="dispatchDateInput" class="form-control ios-input" value="${escapeHtml(draft.dispatchDate)}"></div><div class="recipe-field recipe-field-half"><label class="form-label">Cliente</label><div class="inventario-provider-search-wrap"><input id="dispatchClientInput" class="form-control ios-input" placeholder="Buscar por nombre, DNI o CUIL" value="${escapeHtml(draft.clientName)}"><input type="hidden" id="dispatchClientId" value="${escapeHtml(draft.clientId)}"></div><small class="text-muted">Si no existe, seleccioná Nuevo Cliente.</small></div><div class="recipe-field recipe-field-half"><label class="form-label">Dirección de reparto</label><input id="dispatchClientAddressInput" class="form-control ios-input" placeholder="Dirección" value="${escapeHtml(draft.clientAddress || '')}" ${draft.clientId ? '' : 'disabled'}></div><div class="recipe-field recipe-field-half"><label class="form-label">Localidad</label><input id="dispatchClientCityInput" class="form-control ios-input" placeholder="Localidad" value="${escapeHtml(draft.clientCity || '')}" ${draft.clientId ? '' : 'disabled'}></div><div class="recipe-field recipe-field-half"><label class="form-label">Provincia</label><select id="dispatchClientProvinceInput" class="form-select ios-input" ${draft.clientId ? '' : 'disabled'}>${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${normalizeValue(draft.clientProvince || 'Santa Fe') === item ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select></div><div class="recipe-field recipe-field-half"><label class="form-label">País</label><input id="dispatchClientCountryInput" class="form-control ios-input" value="${escapeHtml(draft.clientCountry || 'Argentina')}" ${draft.clientId ? '' : 'disabled'}></div></div></section>
-    <section class="recipe-step-card step-block produccion-dispatch-create"><div class="d-flex align-items-center justify-content-between mb-2"><h6 class="step-title mb-0"><span class="recipe-step-number">2</span> Productos a repartir</h6></div><div class="table-responsive recipe-table-wrap dispatch-products-table"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Producto</th><th>Kilos</th><th>Stock</th><th>Lote</th><th>Vencimiento</th><th></th></tr></thead><tbody>${lineRows}</tbody></table></div><div class="toolbar-scroll-x dispatch-actions-row mt-2"><button type="button" class="btn ios-btn ios-btn-success recipe-table-action-btn" id="dispatchAddProductBtn"><i class="fa-solid fa-plus"></i><span>Producto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchAddCommentBtn"><i class="fa-regular fa-comment-dots"></i><span>Comentario</span></button></div><div id="dispatchCommentsWrap" class="mt-2">${draft.comments.map((comment, idx) => `<input class="form-control ios-input mt-2" data-dispatch-comment="${idx}" placeholder="Comentario visual" value="${escapeHtml(comment)}">`).join('')}</div></section>
-    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">3</span> Vehículo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">UTA / URA</label><small class="d-block text-muted mb-1">UTA / URA (Unidad de Transporte Alimentario)</small><select id="dispatchVehicleSelect" class="form-select ios-input"><option value="">Seleccionar UTA/URA</option>${Object.values(safeObject(state.reparto.vehicles)).map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === draft.vehicleId ? 'selected' : ''}>${escapeHtml(item.number || item.patent || item.id)}</option>`).join('')}<option value="add_vehicle">+ URA/UTA</option></select></div><div class="recipe-field recipe-field-half"><label class="form-label">Responsables</label><div class="produccion-managers-grid">${Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-check"><input type="checkbox" data-dispatch-manager="${escapeHtml(user.id)}" ${draft.managers.includes(user.id) ? 'checked' : ''}>${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(getDispatchUserRole(user))}</small></span></label>`).join('')}</div></div></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchSaveBtn"><i class="fa-solid fa-floppy-disk"></i><span>Guardar reparto</span></button></div>`;
+    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">1</span> Datos generales</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Día de reparto</label><input id="dispatchDateInput" class="form-control ios-input" value="${escapeHtml(draft.dispatchDate)}"></div><div class="recipe-field recipe-field-half"><div class="dispatch-client-head"><label class="form-label mb-0">Cliente <small class="dispatch-client-helper">(si no existe, crealo)</small></label><button type="button" class="btn ios-btn ios-btn-secondary dispatch-quick-client-btn" id="dispatchQuickCreateClientBtn"><i class="fa-solid fa-plus"></i><span>Nuevo cliente</span></button></div><div class="inventario-provider-search-wrap"><input id="dispatchClientInput" class="form-control ios-input" placeholder="Buscar por nombre, DNI o CUIL" value="${escapeHtml(draft.clientName)}"><input type="hidden" id="dispatchClientId" value="${escapeHtml(draft.clientId)}"></div></div><div class="recipe-field recipe-field-half"><label class="form-label">Dirección de reparto</label><input id="dispatchClientAddressInput" class="form-control ios-input" placeholder="Dirección" value="${escapeHtml(draft.clientAddress || '')}" ${draft.clientId ? '' : 'disabled'}></div><div class="recipe-field recipe-field-half"><label class="form-label">Localidad</label><input id="dispatchClientCityInput" class="form-control ios-input" placeholder="Localidad" value="${escapeHtml(draft.clientCity || '')}" ${draft.clientId ? '' : 'disabled'}></div><div class="recipe-field recipe-field-half"><label class="form-label">Provincia</label><select id="dispatchClientProvinceInput" class="form-select ios-input" ${draft.clientId ? '' : 'disabled'}>${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${normalizeValue(draft.clientProvince || 'Santa Fe') === item ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select></div><div class="recipe-field recipe-field-half"><label class="form-label">País</label><input id="dispatchClientCountryInput" class="form-control ios-input" value="${escapeHtml(draft.clientCountry || 'Argentina')}" ${draft.clientId ? '' : 'disabled'}></div></div></section>
+    <section class="recipe-step-card step-block produccion-dispatch-create"><div class="d-flex align-items-center justify-content-between mb-2"><h6 class="step-title mb-0"><span class="recipe-step-number">2</span> Productos a repartir</h6></div><div class="table-responsive recipe-table-wrap dispatch-products-table"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Producto</th><th>Kilos</th><th>Stock</th><th>Lote</th><th>Vencimiento</th><th></th></tr></thead><tbody>${lineRows}${commentRows}${proofRows}</tbody></table></div><div class="toolbar-scroll-x dispatch-actions-row mt-2"><button type="button" class="btn ios-btn ios-btn-success recipe-table-action-btn" id="dispatchAddProductBtn"><i class="fa-solid fa-plus"></i><span>Producto</span></button><button type="button" class="btn recipe-table-action-btn recipe-table-action-btn-neutral" id="dispatchAddCommentBtn"><i class="fa-regular fa-message"></i><span>Comentario</span></button><button type="button" class="btn recipe-table-action-btn recipe-table-action-btn-monography" id="dispatchAddProofBtn"><i class="fa-solid fa-paperclip"></i><span>Adjuntar comprobantes</span></button></div></section>
+    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">3</span> Vehículo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Transporte habilitado (UTA/URA)</label><small class="d-block text-muted mb-1">Unidad de Transporte Alimentario / Unidad de Reparto Alimentario.</small><div class="inventario-provider-search-wrap"><input id="dispatchVehicleInput" class="form-control ios-input" placeholder="Seleccionar unidad habilitada" value="${escapeHtml(draft.vehicleSearch || (draft.vehicleId ? formatDispatchVehicleLabel(getDispatchVehicle(draft.vehicleId)) : ''))}"><input type="hidden" id="dispatchVehicleSelect" value="${escapeHtml(draft.vehicleId)}"></div><div class="dispatch-vehicle-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchAddVehicleBtn"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchManageVehiclesBtn"><i class="fa-solid fa-pen-to-square"></i><span>Gestionar UTA/URA</span></button></div></div><div class="recipe-field recipe-field-half"><label class="form-label">Responsables</label><div class="input-group ios-input-group ingredientes-search-group dispatch-managers-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchManagersSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar responsable" value="${escapeHtml(draft.managerSearch || '')}"></div><div class="produccion-managers-grid">${Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-check" data-user-search="${escapeHtml(normalizeLower(`${user.fullName || ''} ${user.email || ''} ${getDispatchUserRole(user) || ''}`))}"><input type="checkbox" data-dispatch-manager="${escapeHtml(user.id)}" ${draft.managers.includes(user.id) ? 'checked' : ''}>${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(getDispatchUserRole(user))}</small></span></label>`).join('')}</div></div></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchSaveBtn"><i class="fa-solid fa-floppy-disk"></i><span>Guardar reparto</span></button></div>`;
     const dateInput = nodes.dispatchView.querySelector('#dispatchDateInput');
     if (window.flatpickr && dateInput) {
       window.flatpickr(dateInput, {
@@ -2477,13 +2510,14 @@
     const result = await openIosSwal({
       title: 'Nuevo cliente',
       customClass: { popup: 'dispatch-client-alert' },
-      html: `<div class="swal-stack-fields text-start"><div class="dispatch-client-preview"><span id="dispatchClientInitialsPreview" class="user-avatar-thumb dispatch-client-preview-avatar">${initialsFromPersonName(seedName) || '<i class=\"bi bi-person-fill\"></i>'}</span></div><input id="dispatchClientName" class="swal2-input ios-input" placeholder="Nombre y apellido / Razón social" value="${escapeHtml(seedName)}"><input id="dispatchClientDoc" class="swal2-input ios-input" placeholder="DNI o CUIL"><input id="dispatchClientAddress" class="swal2-input ios-input" placeholder="Dirección"><input id="dispatchClientCity" class="swal2-input ios-input" placeholder="Localidad"><select id="dispatchClientProvince" class="swal2-select ios-input">${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${item === 'Santa Fe' ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select><input id="dispatchClientCountry" class="swal2-input ios-input" value="Argentina" placeholder="País"></div>`,
+      html: `<div class="swal-stack-fields text-start"><div class="dispatch-client-preview"><span id="dispatchClientInitialsPreview" class="user-avatar-thumb dispatch-client-preview-avatar">${initialsFromPersonName(seedName) || '<i class=\"bi bi-person-fill\"></i>'}</span></div><input id="dispatchClientName" class="swal2-input ios-input" placeholder="Nombre y apellido / Razón social" value=""><input id="dispatchClientDoc" class="swal2-input ios-input" placeholder="DNI o CUIL"><input id="dispatchClientAddress" class="swal2-input ios-input" placeholder="Dirección"><input id="dispatchClientCity" class="swal2-input ios-input" placeholder="Localidad"><select id="dispatchClientProvince" class="swal2-select ios-input">${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${item === 'Santa Fe' ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select><input id="dispatchClientCountry" class="swal2-input ios-input" value="Argentina" placeholder="País"></div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
       didOpen: () => {
         const nameInput = document.getElementById('dispatchClientName');
         const preview = document.getElementById('dispatchClientInitialsPreview');
+        nameInput?.focus();
         const sync = () => {
           if (!preview) return;
           const initials = initialsFromPersonName(nameInput?.value || '');
@@ -2592,6 +2626,81 @@
     state.reparto.vehicles[id] = { id, ...result.value, createdAt: nowTs() };
     await persistRepartoStore();
     return state.reparto.vehicles[id];
+  };
+  const openDispatchVehiclesManager = async () => {
+    const rows = Object.values(safeObject(state.reparto.vehicles || {}));
+    const html = rows.length
+      ? `<div class="dispatch-vehicles-manager-list">${rows.map((item) => {
+        const meta = getDispatchVehicleExpiryMeta(item);
+        return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i class="fa-regular fa-eye"></i><span>Adjunto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i class="fa-solid fa-upload"></i><span>Reemplazar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i class="fa-solid fa-paperclip"></i><span>Quitar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></div></div>`;
+      }).join('')}</div>`
+      : '<p>No hay unidades cargadas.</p>';
+    const result = await openIosSwal({
+      title: 'Gestionar UTA/URA',
+      html,
+      width: 'min(980px,96vw)',
+      confirmButtonText: 'Cerrar',
+      didOpen: () => {
+        const box = Swal.getHtmlContainer();
+        box?.addEventListener('click', async (ev) => {
+          const id = ev.target.closest('[data-vehicle-view],[data-vehicle-upload],[data-vehicle-clear],[data-vehicle-toggle],[data-vehicle-delete]')?.dataset.vehicleView
+            || ev.target.closest('[data-vehicle-upload]')?.dataset.vehicleUpload
+            || ev.target.closest('[data-vehicle-clear]')?.dataset.vehicleClear
+            || ev.target.closest('[data-vehicle-toggle]')?.dataset.vehicleToggle
+            || ev.target.closest('[data-vehicle-delete]')?.dataset.vehicleDelete;
+          if (!id) return;
+          const vehicle = safeObject(state.reparto.vehicles[id]);
+          if (!vehicle.id) return;
+          if (ev.target.closest('[data-vehicle-view]')) {
+            if (!vehicle.attachmentUrl) {
+              await openIosSwal({ title: 'Sin adjunto', html: '<p>No hay adjunto cargado.</p>', icon: 'info' });
+            } else if (typeof window.laJamoneraOpenImageViewer === 'function') {
+              await window.laJamoneraOpenImageViewer([{ invoiceImageUrls: [vehicle.attachmentUrl] }], 0, 'Adjunto UTA/URA');
+            } else {
+              window.open(vehicle.attachmentUrl, '_blank', 'noopener,noreferrer');
+            }
+            return;
+          }
+          if (ev.target.closest('[data-vehicle-upload]')) {
+            const pick = await openIosSwal({ title: 'Reemplazar adjunto', html: '<input id="vehicleReplaceFile" type="file" class="swal2-file" accept="image/*,application/pdf">', showCancelButton: true, confirmButtonText: 'Subir', preConfirm: async () => {
+              const file = document.getElementById('vehicleReplaceFile')?.files?.[0];
+              if (!file) return Swal.showValidationMessage('Seleccioná un archivo.');
+              if (![...ALLOWED_UPLOAD_TYPES, 'application/pdf'].includes(file.type)) return Swal.showValidationMessage('Sólo imagen o PDF.');
+              if (file.size > MAX_UPLOAD_SIZE_BYTES) return Swal.showValidationMessage('Máximo 5MB.');
+              return uploadImageToStorage(file, 'reparto/vehiculos');
+            } });
+            if (pick.isConfirmed && pick.value) {
+              state.reparto.vehicles[id].attachmentUrl = pick.value;
+              await persistRepartoStore();
+              Swal.close();
+              await openDispatchVehiclesManager();
+            }
+            return;
+          }
+          if (ev.target.closest('[data-vehicle-clear]')) {
+            state.reparto.vehicles[id].attachmentUrl = '';
+            await persistRepartoStore();
+            Swal.close();
+            await openDispatchVehiclesManager();
+            return;
+          }
+          if (ev.target.closest('[data-vehicle-toggle]')) {
+            state.reparto.vehicles[id].enabled = state.reparto.vehicles[id].enabled === false;
+            await persistRepartoStore();
+            Swal.close();
+            await openDispatchVehiclesManager();
+            return;
+          }
+          if (ev.target.closest('[data-vehicle-delete]')) {
+            delete state.reparto.vehicles[id];
+            await persistRepartoStore();
+            Swal.close();
+            await openDispatchVehiclesManager();
+          }
+        });
+      }
+    });
+    return result.isConfirmed;
   };
   const cancelProduction = async (registro) => {
     if (registro.status === 'anulada') {
@@ -4300,6 +4409,20 @@
       renderDispatchCreate(state.dispatchDraft);
       return;
     }
+    if (event.target.closest('#dispatchAddVehicleBtn')) {
+      const vehicle = await openCreateDispatchVehicle();
+      if (vehicle) {
+        state.dispatchDraft.vehicleId = vehicle.id;
+        state.dispatchDraft.vehicleSearch = formatDispatchVehicleLabel(vehicle);
+      }
+      renderDispatchCreate(state.dispatchDraft);
+      return;
+    }
+    if (event.target.closest('#dispatchManageVehiclesBtn')) {
+      await openDispatchVehiclesManager();
+      renderDispatchCreate(state.dispatchDraft);
+      return;
+    }
     const removeLineBtn = event.target.closest('[data-dispatch-remove]');
     if (removeLineBtn) {
       const idx = Number(removeLineBtn.dataset.dispatchRemove);
@@ -4308,8 +4431,41 @@
       renderDispatchCreate(state.dispatchDraft);
       return;
     }
+    if (event.target.closest('#dispatchQuickCreateClientBtn')) {
+      const created = await openCreateDispatchClient('');
+      if (created) {
+        state.dispatchDraft.clientId = created.id;
+        state.dispatchDraft.clientName = created.name;
+        state.dispatchDraft.clientAddress = normalizeValue(created.address);
+        state.dispatchDraft.clientCity = normalizeValue(created.city);
+        state.dispatchDraft.clientProvince = normalizeValue(created.province) || 'Santa Fe';
+        state.dispatchDraft.clientCountry = normalizeValue(created.country) || 'Argentina';
+        renderDispatchCreate(state.dispatchDraft);
+      }
+      return;
+    }
     if (event.target.closest('#dispatchAddCommentBtn')) {
       state.dispatchDraft.comments.push('');
+      renderDispatchCreate(state.dispatchDraft);
+      return;
+    }
+    if (event.target.closest('#dispatchAddProofBtn')) {
+      if (!Array.isArray(state.dispatchDraft.proofs)) state.dispatchDraft.proofs = [];
+      state.dispatchDraft.proofs.push({ name: '', url: '' });
+      renderDispatchCreate(state.dispatchDraft);
+      return;
+    }
+    const removeCommentBtn = event.target.closest('[data-dispatch-comment-remove]');
+    if (removeCommentBtn) {
+      const idx = Number(removeCommentBtn.dataset.dispatchCommentRemove);
+      state.dispatchDraft.comments = state.dispatchDraft.comments.filter((_, i) => i !== idx);
+      renderDispatchCreate(state.dispatchDraft);
+      return;
+    }
+    const removeProofBtn = event.target.closest('[data-dispatch-proof-remove]');
+    if (removeProofBtn) {
+      const idx = Number(removeProofBtn.dataset.dispatchProofRemove);
+      state.dispatchDraft.proofs = (Array.isArray(state.dispatchDraft.proofs) ? state.dispatchDraft.proofs : []).filter((_, i) => i !== idx);
       renderDispatchCreate(state.dispatchDraft);
       return;
     }
@@ -4325,6 +4481,7 @@
       draft.clientCountry = normalizeValue(nodes.dispatchView.querySelector('#dispatchClientCountryInput')?.value) || 'Argentina';
       draft.managers = [...nodes.dispatchView.querySelectorAll('[data-dispatch-manager]:checked')].map((n) => n.value).filter(Boolean);
       draft.comments = [...nodes.dispatchView.querySelectorAll('[data-dispatch-comment]')].map((n) => normalizeValue(n.value)).filter(Boolean);
+      draft.proofs = Array.isArray(draft.proofs) ? draft.proofs.filter((item) => normalizeValue(item?.url)) : [];
       if (!draft.clientId) {
         await openIosSwal({ title: 'Cliente requerido', html: '<p>Seleccioná o creá un cliente.</p>', icon: 'warning' });
         return;
@@ -4380,6 +4537,7 @@
         vehicleId: draft.vehicleId,
         managers: draft.managers,
         comments: draft.comments,
+        proofs: draft.proofs,
         clientSnapshot: {
           id: draft.clientId,
           name: draft.clientName,
@@ -4499,6 +4657,26 @@
 
   nodes.dispatchView?.addEventListener('change', async (event) => {
     if (!state.dispatchCreateMode || !state.dispatchDraft) return;
+    const proofInput = event.target.closest('[data-dispatch-proof-file]');
+    if (proofInput) {
+      const idx = Number(proofInput.dataset.dispatchProofFile);
+      const file = proofInput.files?.[0];
+      if (!file) return;
+      const validType = [...ALLOWED_UPLOAD_TYPES, 'application/pdf'].includes(file.type);
+      if (!validType) {
+        await openIosSwal({ title: 'Adjunto inválido', html: '<p>Adjuntá imagen o PDF.</p>', icon: 'warning' });
+        return;
+      }
+      if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+        await openIosSwal({ title: 'Archivo muy grande', html: '<p>Máximo permitido: 5MB.</p>', icon: 'warning' });
+        return;
+      }
+      const uploaded = await uploadImageToStorage(file, 'reparto/comprobantes');
+      if (!Array.isArray(state.dispatchDraft.proofs)) state.dispatchDraft.proofs = [];
+      state.dispatchDraft.proofs[idx] = { name: file.name, url: uploaded };
+      renderDispatchCreate(state.dispatchDraft);
+      return;
+    }
     const qtyInput = event.target.closest('[data-dispatch-qty]');
     if (qtyInput) {
       const idx = Number(qtyInput.dataset.dispatchQty);
@@ -4510,31 +4688,31 @@
       state.dispatchDraft.clientProvince = normalizeValue(event.target.value) || 'Santa Fe';
       return;
     }
-    if (event.target.matches('#dispatchVehicleSelect') && event.target.value === 'add_vehicle') {
-      const vehicle = await openCreateDispatchVehicle();
-      if (vehicle) state.dispatchDraft.vehicleId = vehicle.id;
-      renderDispatchCreate(state.dispatchDraft);
-      return;
-    }
   });
 
   let dispatchClientSuggestEl = null;
   let dispatchProductSuggestEl = null;
+  let dispatchVehicleSuggestEl = null;
   const closeDispatchSuggests = () => {
     dispatchClientSuggestEl?.remove();
     dispatchProductSuggestEl?.remove();
+    dispatchVehicleSuggestEl?.remove();
     dispatchClientSuggestEl = null;
     dispatchProductSuggestEl = null;
+    dispatchVehicleSuggestEl = null;
   };
   const ensureFloatingSuggest = (type) => {
-    const current = type === 'client' ? dispatchClientSuggestEl : dispatchProductSuggestEl;
+    const current = type === 'client'
+      ? dispatchClientSuggestEl
+      : (type === 'product' ? dispatchProductSuggestEl : dispatchVehicleSuggestEl);
     if (current) return current;
     const node = document.createElement('div');
     node.className = 'recipe-suggest-floating produccion-dispatch-floating-suggest';
     node.dataset.dispatchSuggest = type;
     document.body.appendChild(node);
     if (type === 'client') dispatchClientSuggestEl = node;
-    else dispatchProductSuggestEl = node;
+    else if (type === 'product') dispatchProductSuggestEl = node;
+    else dispatchVehicleSuggestEl = node;
     return node;
   };
   const positionFloatingSuggest = (node, anchor) => {
@@ -4543,7 +4721,8 @@
     node.style.position = 'absolute';
     node.style.left = `${rect.left + window.scrollX}px`;
     node.style.top = `${rect.bottom + window.scrollY + 4}px`;
-    node.style.width = `${Math.max(rect.width, 420)}px`;
+    const maxWidth = Math.min(window.innerWidth - 24, 560);
+    node.style.width = `${Math.min(Math.max(rect.width, 300), maxWidth)}px`;
     node.style.zIndex = '3300';
   };
 
@@ -4583,7 +4762,8 @@
           return;
         }
         if (ev.target.closest('[data-dispatch-client-create]')) {
-          const created = await openCreateDispatchClient(normalizeValue(clientInput.value));
+          closeDispatchSuggests();
+          const created = await openCreateDispatchClient('');
           if (created) {
             state.dispatchDraft.clientId = created.id;
             state.dispatchDraft.clientName = created.name;
@@ -4604,6 +4784,62 @@
     const countryInput = event.target.closest('#dispatchClientCountryInput');
     if (countryInput) { state.dispatchDraft.clientCountry = normalizeValue(countryInput.value); return; }
 
+    const managersSearchInput = event.target.closest('#dispatchManagersSearch');
+    if (managersSearchInput) {
+      state.dispatchDraft.managerSearch = normalizeValue(managersSearchInput.value);
+      const query = normalizeLower(managersSearchInput.value);
+      nodes.dispatchView.querySelectorAll('.produccion-user-check[data-user-search]').forEach((row) => {
+        const hay = normalizeLower(row.dataset.userSearch || '');
+        row.classList.toggle('d-none', !!query && !hay.includes(query));
+      });
+      return;
+    }
+
+    const vehicleInput = event.target.closest('#dispatchVehicleInput');
+    if (vehicleInput) {
+      const query = normalizeLower(vehicleInput.value);
+      state.dispatchDraft.vehicleSearch = normalizeValue(vehicleInput.value);
+      state.dispatchDraft.vehicleId = '';
+      const hidden = nodes.dispatchView.querySelector('#dispatchVehicleSelect');
+      if (hidden) hidden.value = '';
+      const list = Object.values(safeObject(state.reparto.vehicles || {}))
+        .filter((item) => item.enabled !== false)
+        .filter((item) => {
+          const hay = normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`);
+          return hay.includes(query);
+        })
+        .slice(0, 8);
+      const suggest = ensureFloatingSuggest('vehicle');
+      positionFloatingSuggest(suggest, vehicleInput);
+      suggest.innerHTML = `${list.map((item) => {
+        const meta = getDispatchVehicleExpiryMeta(item);
+        return `<button type="button" class="recipe-suggest-item" data-dispatch-vehicle-pick="${escapeHtml(item.id)}"><span class="dispatch-vehicle-tone tone-${meta.tone}"></span><span><strong>${escapeHtml(item.number || item.id)}</strong><br><small>${escapeHtml(formatDispatchVehicleLabel(item))}</small></span></button>`;
+      }).join('')}${query ? `<button type="button" class="recipe-suggest-item recipe-suggest-create" data-dispatch-vehicle-create="1"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button>` : ''}`;
+      suggest.onclick = async (ev) => {
+        const pick = ev.target.closest('[data-dispatch-vehicle-pick]');
+        if (pick) {
+          const vehicle = getDispatchVehicle(pick.dataset.dispatchVehiclePick);
+          if (!vehicle.id) return;
+          state.dispatchDraft.vehicleId = vehicle.id;
+          state.dispatchDraft.vehicleSearch = formatDispatchVehicleLabel(vehicle);
+          vehicleInput.value = state.dispatchDraft.vehicleSearch;
+          if (hidden) hidden.value = vehicle.id;
+          closeDispatchSuggests();
+          return;
+        }
+        if (ev.target.closest('[data-dispatch-vehicle-create]')) {
+          closeDispatchSuggests();
+          const created = await openCreateDispatchVehicle();
+          if (created) {
+            state.dispatchDraft.vehicleId = created.id;
+            state.dispatchDraft.vehicleSearch = formatDispatchVehicleLabel(created);
+            renderDispatchCreate(state.dispatchDraft);
+          }
+        }
+      };
+      return;
+    }
+
     const productInput = event.target.closest('[data-dispatch-product-search]');
     if (!productInput) return;
     const idx = Number(productInput.dataset.dispatchProductSearch);
@@ -4618,7 +4854,7 @@
       .filter((item) => normalizeLower(item.title).includes(query))
       .slice(0, 8)
       .map((item) => ({ ...item, meta: getProducedStockMeta(item.id) }));
-    suggest.innerHTML = `${recipes.map((item) => `<button type="button" class="recipe-suggest-item" data-dispatch-product-pick="${escapeHtml(item.id)}" data-dispatch-row="${idx}"><span class="recipe-suggest-avatar-wrap">${sanitizeImageUrl(item.imageUrl) ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-suggest-avatar js-dispatch-suggest-thumb" src="${escapeHtml(sanitizeImageUrl(item.imageUrl))}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2"><i class="fa-solid fa-drumstick-bite"></i></span>'}</span><span><strong>${escapeHtml(capitalize(item.title || 'Receta'))}</strong><br><small class="${item.meta.available > 0.0001 ? 'produccion-dispatch-ok' : 'text-danger'}">${item.meta.available > 0.0001 ? `Disponible: ${item.meta.available.toFixed(2)} kg` : 'Sin stock disponible'}</small></span></button>`).join('')}`;
+    suggest.innerHTML = `${recipes.map((item) => `<button type="button" class="recipe-suggest-item" data-dispatch-product-pick="${escapeHtml(item.id)}" data-dispatch-row="${idx}"><span class="recipe-suggest-avatar-wrap">${sanitizeImageUrl(item.imageUrl) ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-suggest-avatar js-dispatch-suggest-thumb" src="${escapeHtml(sanitizeImageUrl(item.imageUrl))}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon"></i></span>'}</span><span><strong>${escapeHtml(capitalize(item.title || 'Receta'))}</strong><br><small class="${item.meta.available > 0.0001 ? 'produccion-dispatch-ok' : 'text-danger'}">${item.meta.available > 0.0001 ? `Disponible: ${item.meta.available.toFixed(2)} kg` : 'Sin stock disponible'}</small></span></button>`).join('')}`;
     prepareThumbLoaders('.js-dispatch-suggest-thumb');
     suggest.onclick = (ev) => {
       const pick = ev.target.closest('[data-dispatch-product-pick]');
@@ -4636,6 +4872,7 @@
     if (!state.dispatchCreateMode) return;
     if (event.target.closest('.produccion-dispatch-floating-suggest')) return;
     if (event.target.closest('#dispatchClientInput')) return;
+    if (event.target.closest('#dispatchVehicleInput')) return;
     if (event.target.closest('[data-dispatch-product-search]')) return;
     closeDispatchSuggests();
   });
