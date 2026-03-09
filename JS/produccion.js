@@ -2482,7 +2482,7 @@
       const recipe = safeObject(state.recetas[line.recipeId]);
       const recipeTitle = normalizeValue(line.recipeSearch || recipe.title);
       const recipeImage = sanitizeImageUrl(recipe.imageUrl);
-      return `<tr><td><div class="recipe-ing-autocomplete" data-dispatch-product-wrap="${idx}"><div class="recipe-ing-input-wrap dispatch-product-input-wrap"><span class="recipe-inline-avatar-wrap">${recipeImage ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-dispatch-inline-thumb" src="${escapeHtml(recipeImage)}" alt="${escapeHtml(recipeTitle || 'Producto')}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon"></i></span>'}</span><input type="search" class="form-control ios-input dispatch-product-search-input" data-dispatch-product-search="${idx}" placeholder="Seleccionar producto" value="${escapeHtml(recipeTitle)}"></div><input type="hidden" data-dispatch-product-id="${idx}" value="${escapeHtml(line.recipeId)}"></div></td><td><input class="form-control ios-input" type="number" step="0.01" min="0" data-dispatch-qty="${idx}" value="${escapeHtml(line.qtyKg || '')}"></td><td class="dispatch-stock-cell">${stockStatus}</td><td class="dispatch-lot-cell">${lotsText}</td><td class="dispatch-expiry-cell">${expiryText}</td><td><button type="button" class="btn family-manage-btn" data-dispatch-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+      return `<tr><td><div class="recipe-ing-autocomplete" data-dispatch-product-wrap="${idx}"><div class="recipe-ing-input-wrap dispatch-product-input-wrap"><span class="recipe-inline-avatar-wrap">${recipeImage ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-dispatch-inline-thumb" src="${escapeHtml(recipeImage)}" alt="${escapeHtml(recipeTitle || 'Producto')}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><input type="search" class="form-control ios-input dispatch-product-search-input" data-dispatch-product-search="${idx}" placeholder="Seleccionar producto" value="${escapeHtml(recipeTitle)}"></div><input type="hidden" data-dispatch-product-id="${idx}" value="${escapeHtml(line.recipeId)}"></div></td><td><input class="form-control ios-input" type="number" step="0.01" min="0" data-dispatch-qty="${idx}" value="${escapeHtml(line.qtyKg || '')}"></td><td class="dispatch-stock-cell">${stockStatus}</td><td class="dispatch-lot-cell">${lotsText}</td><td class="dispatch-expiry-cell">${expiryText}</td><td><button type="button" class="btn family-manage-btn" data-dispatch-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`;
     }).join('');
     const commentRows = draft.comments.map((comment, idx) => `<tr class="dispatch-comment-row"><td colspan="5"><textarea class="form-control ios-input dispatch-comment-textarea" data-dispatch-comment="${idx}" placeholder="Agregá comentarios y observaciones">${escapeHtml(comment)}</textarea></td><td><button type="button" class="btn family-manage-btn" data-dispatch-comment-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
     const proofRows = (Array.isArray(draft.proofs) ? draft.proofs : []).map((proof, idx) => `<tr class="dispatch-proof-row"><td colspan="4"><label class="inventario-upload-dropzone dispatch-proof-drop" for="dispatchProofFile_${idx}"><i class="fa-solid fa-paperclip"></i><span>${escapeHtml(proof?.name || 'Adjuntar comprobante (imagen/PDF)')}</span></label><input id="dispatchProofFile_${idx}" class="inventario-hidden-file-input" type="file" accept="image/*,application/pdf" data-dispatch-proof-file="${idx}">${proof?.url ? `<p class="dispatch-proof-name">Cargado: ${escapeHtml(proof.name || 'comprobante')}</p>` : ''}</td><td class="dispatch-proof-expiry-cell">Comprobante</td><td><button type="button" class="btn family-manage-btn" data-dispatch-proof-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
@@ -2630,7 +2630,7 @@
   const openDispatchVehiclesManager = async () => {
     const rows = Object.values(safeObject(state.reparto.vehicles || {}));
     const html = rows.length
-      ? `<div class="dispatch-vehicles-manager-list">${rows.map((item) => {
+      ? `<div id="dispatchVehiclesManagerList" class="dispatch-vehicles-manager-list">${rows.map((item) => {
         const meta = getDispatchVehicleExpiryMeta(item);
         return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i class="fa-regular fa-eye"></i><span>Adjunto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i class="fa-solid fa-upload"></i><span>Reemplazar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i class="fa-solid fa-paperclip"></i><span>Quitar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></div></div>`;
       }).join('')}</div>`
@@ -2642,6 +2642,15 @@
       confirmButtonText: 'Cerrar',
       didOpen: () => {
         const box = Swal.getHtmlContainer();
+        const refreshVehiclesManagerList = () => {
+          const list = box?.querySelector('#dispatchVehiclesManagerList');
+          if (!list) return;
+          const rowsLive = Object.values(safeObject(state.reparto.vehicles || {}));
+          list.innerHTML = rowsLive.map((item) => {
+            const meta = getDispatchVehicleExpiryMeta(item);
+            return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i class="fa-regular fa-eye"></i><span>Adjunto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i class="fa-solid fa-upload"></i><span>Reemplazar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i class="fa-solid fa-paperclip"></i><span>Quitar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></div></div>`;
+          }).join('') || '<p>No hay unidades cargadas.</p>';
+        };
         box?.addEventListener('click', async (ev) => {
           const id = ev.target.closest('[data-vehicle-view],[data-vehicle-upload],[data-vehicle-clear],[data-vehicle-toggle],[data-vehicle-delete]')?.dataset.vehicleView
             || ev.target.closest('[data-vehicle-upload]')?.dataset.vehicleUpload
@@ -2662,7 +2671,7 @@
             return;
           }
           if (ev.target.closest('[data-vehicle-upload]')) {
-            const pick = await openIosSwal({ title: 'Reemplazar adjunto', html: '<input id="vehicleReplaceFile" type="file" class="swal2-file" accept="image/*,application/pdf">', showCancelButton: true, confirmButtonText: 'Subir', preConfirm: async () => {
+            const pick = await openIosSwal({ title: 'Reemplazar adjunto', customClass: { popup: 'dispatch-vehicle-replace-alert' }, html: '<div class="dispatch-vehicle-replace-wrap"><label for="vehicleReplaceFile" class="inventario-upload-dropzone"><i class="fa-solid fa-upload"></i><span id="vehicleReplaceLabel">Seleccioná un archivo PDF o imagen</span></label><input id="vehicleReplaceFile" type="file" class="inventario-hidden-file-input" accept="image/*,application/pdf"></div>', showCancelButton: true, confirmButtonText: 'Subir', didOpen: () => { const fileInput = document.getElementById('vehicleReplaceFile'); const label = document.getElementById('vehicleReplaceLabel'); fileInput?.addEventListener('change', () => { const file = fileInput.files?.[0]; if (label) label.textContent = file ? file.name : 'Seleccioná un archivo PDF o imagen'; }); }, preConfirm: async () => {
               const file = document.getElementById('vehicleReplaceFile')?.files?.[0];
               if (!file) return Swal.showValidationMessage('Seleccioná un archivo.');
               if (![...ALLOWED_UPLOAD_TYPES, 'application/pdf'].includes(file.type)) return Swal.showValidationMessage('Sólo imagen o PDF.');
@@ -2672,30 +2681,26 @@
             if (pick.isConfirmed && pick.value) {
               state.reparto.vehicles[id].attachmentUrl = pick.value;
               await persistRepartoStore();
-              Swal.close();
-              await openDispatchVehiclesManager();
+              refreshVehiclesManagerList();
             }
             return;
           }
           if (ev.target.closest('[data-vehicle-clear]')) {
             state.reparto.vehicles[id].attachmentUrl = '';
             await persistRepartoStore();
-            Swal.close();
-            await openDispatchVehiclesManager();
+            refreshVehiclesManagerList();
             return;
           }
           if (ev.target.closest('[data-vehicle-toggle]')) {
             state.reparto.vehicles[id].enabled = state.reparto.vehicles[id].enabled === false;
             await persistRepartoStore();
-            Swal.close();
-            await openDispatchVehiclesManager();
+            refreshVehiclesManagerList();
             return;
           }
           if (ev.target.closest('[data-vehicle-delete]')) {
             delete state.reparto.vehicles[id];
             await persistRepartoStore();
-            Swal.close();
-            await openDispatchVehiclesManager();
+            refreshVehiclesManagerList();
           }
         });
       }
@@ -3267,14 +3272,11 @@
       });
       if (!askTrace.isConfirmed && !askTrace.isDenied) return;
       const includeTrace = askTrace.isConfirmed;
-      const ingredientImages = ask.isConfirmed
-        ? rows.flatMap((item) => getTraceRowsFromRegistro(item).map((trace) => trace.ingredientImageUrl).filter(Boolean))
-        : [];
       const attachedImages = ask.isConfirmed
         ? rows.flatMap((item) => getTraceRowsFromRegistro(item).flatMap((trace) => trace.invoiceImageUrls || []))
         : [];
       if (ask.isConfirmed) {
-        await preloadPrintImages([...ingredientImages, ...attachedImages]);
+        await preloadPrintImages(attachedImages);
       }
       const win = window.open('', '_blank', 'width=1300,height=900');
       if (!win) return;
@@ -3293,7 +3295,7 @@
         return [main, ...resolutions, ...traces];
       }).join('');
       const imagesHtml = ask.isConfirmed
-        ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));">${rows.flatMap((item) => getTraceRowsFromRegistro(item).map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">${trace.ingredientImageUrl ? `<img src="${trace.ingredientImageUrl}" style="width:36px;height:36px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<figcaption style="font-size:12px;color:#4b5f8e;">${escapeHtml(trace.ingredientName)}</figcaption></div>${(trace.invoiceImageUrls || []).map((url) => `<img src="${url}" style="width:100%;max-height:220px;object-fit:contain;border-radius:10px;margin-top:8px;">`).join('')}</figure>`)).join('')}</div></section>`
+        ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));">${rows.flatMap((item) => getTraceRowsFromRegistro(item).map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><figcaption style="font-size:12px;color:#4b5f8e;font-weight:700;">${escapeHtml(trace.ingredientName)}</figcaption></div>${(trace.invoiceImageUrls || []).map((url) => `<img src="${url}" style="width:100%;max-height:220px;object-fit:contain;border-radius:10px;margin-top:8px;">`).join('')}</figure>`)).join('')}</div></section>`
         : '';
       win.document.write(`<html><head><title>Historial producción ${escapeHtml(capitalize(recipe.title || ''))}</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.is-trace-row td{background:#ffecef}.is-resolution-row td{background:#fff6d9}.print-trace-date{color:#1f6fd6;font-weight:700}.print-trace-vto{color:#b04a09;font-weight:700}</style></head><body><h1>Historial producción ${escapeHtml(capitalize(recipe.title || ''))}</h1><table><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>VTO producto</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
       win.document.close();
@@ -4354,14 +4356,11 @@
     if (!askTrace.isConfirmed && !askTrace.isDenied) return;
     const includeTrace = askTrace.isConfirmed;
     const rows = getHistoryRows();
-    const ingredientImages = includeImages
-      ? rows.flatMap((item) => getTraceRowsFromRegistro(item).map((trace) => trace.ingredientImageUrl).filter(Boolean))
-      : [];
     const attachedImages = includeImages
       ? rows.flatMap((item) => getTraceRowsFromRegistro(item).flatMap((trace) => trace.invoiceImageUrls || []))
       : [];
     if (includeImages) {
-      await preloadPrintImages([...ingredientImages, ...attachedImages]);
+      await preloadPrintImages(attachedImages);
     }
     const win = window.open('', '_blank', 'width=1300,height=900');
     if (!win) return;
@@ -4380,7 +4379,7 @@
       return [main, ...resolutions, ...traces];
     }).join('');
     const imagesHtml = includeImages
-      ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas del período</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${rows.flatMap((item) => getTraceRowsFromRegistro(item).map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">${trace.ingredientImageUrl ? `<img src="${trace.ingredientImageUrl}" style="width:36px;height:36px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<figcaption style="font-size:12px;color:#4b5f8e;">${escapeHtml(trace.ingredientName)}</figcaption></div>${(trace.invoiceImageUrls || []).map((url, idx) => `<img src="${url}" style="width:100%;max-height:240px;object-fit:contain;border-radius:10px;margin-top:${idx ? '8px' : '0'};">`).join('')}</figure>`)).join('')}</div></section>`
+      ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas del período</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${rows.flatMap((item) => getTraceRowsFromRegistro(item).map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><figcaption style="font-size:12px;color:#4b5f8e;font-weight:700;">${escapeHtml(trace.ingredientName)}</figcaption></div>${(trace.invoiceImageUrls || []).map((url, idx) => `<img src="${url}" style="width:100%;max-height:240px;object-fit:contain;border-radius:10px;margin-top:${idx ? '8px' : '0'};">`).join('')}</figure>`)).join('')}</div></section>`
       : '';
     win.document.write(`<html><head><title>Producción por período</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.is-trace-row td{background:#ffecef}.is-resolution-row td{background:#fff6d9}.print-trace-date{color:#1f6fd6;font-weight:700}.print-trace-vto{color:#b04a09;font-weight:700}</style></head><body><h1>Producción por período • La Jamonera</h1><table><thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
     win.document.close();
@@ -4389,6 +4388,13 @@
     win.print();
   });
   nodes.historyMassPlanillasBtn?.addEventListener('click', openMassPlanillasByPeriod);
+
+  nodes.dispatchView?.addEventListener('click', (event) => {
+    if (!state.dispatchCreateMode || !state.dispatchDraft) return;
+    const vehicleInput = event.target.closest('#dispatchVehicleInput');
+    if (!vehicleInput) return;
+    showDispatchVehicleSuggestions(vehicleInput);
+  });
 
   nodes.dispatchView?.addEventListener('click', async (event) => {
     if (event.target.closest('#produccionDispatchBackBtn')) {
@@ -4726,6 +4732,50 @@
     node.style.zIndex = '3300';
   };
 
+  const showDispatchVehicleSuggestions = (vehicleInput) => {
+    if (!state.dispatchDraft || !vehicleInput) return;
+    const query = normalizeLower(vehicleInput.value);
+    state.dispatchDraft.vehicleSearch = normalizeValue(vehicleInput.value);
+    state.dispatchDraft.vehicleId = '';
+    const hidden = nodes.dispatchView?.querySelector('#dispatchVehicleSelect');
+    if (hidden) hidden.value = '';
+    const list = Object.values(safeObject(state.reparto.vehicles || {}))
+      .filter((item) => item.enabled !== false)
+      .filter((item) => {
+        const hay = normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`);
+        return hay.includes(query);
+      })
+      .slice(0, 8);
+    const suggest = ensureFloatingSuggest('vehicle');
+    positionFloatingSuggest(suggest, vehicleInput);
+    suggest.innerHTML = `${list.map((item) => {
+      const meta = getDispatchVehicleExpiryMeta(item);
+      return `<button type="button" class="recipe-suggest-item" data-dispatch-vehicle-pick="${escapeHtml(item.id)}"><span class="dispatch-vehicle-tone tone-${meta.tone}"></span><span><strong>${escapeHtml(item.number || item.id)}</strong><br><small>${escapeHtml(formatDispatchVehicleLabel(item))}</small></span></button>`;
+    }).join('')}${query ? `<button type="button" class="recipe-suggest-item recipe-suggest-create" data-dispatch-vehicle-create="1"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button>` : ''}`;
+    suggest.onclick = async (ev) => {
+      const pick = ev.target.closest('[data-dispatch-vehicle-pick]');
+      if (pick) {
+        const vehicle = getDispatchVehicle(pick.dataset.dispatchVehiclePick);
+        if (!vehicle.id) return;
+        state.dispatchDraft.vehicleId = vehicle.id;
+        state.dispatchDraft.vehicleSearch = formatDispatchVehicleLabel(vehicle);
+        vehicleInput.value = state.dispatchDraft.vehicleSearch;
+        if (hidden) hidden.value = vehicle.id;
+        closeDispatchSuggests();
+        return;
+      }
+      if (ev.target.closest('[data-dispatch-vehicle-create]')) {
+        closeDispatchSuggests();
+        const created = await openCreateDispatchVehicle();
+        if (created) {
+          state.dispatchDraft.vehicleId = created.id;
+          state.dispatchDraft.vehicleSearch = formatDispatchVehicleLabel(created);
+          renderDispatchCreate(state.dispatchDraft);
+        }
+      }
+    };
+  };
+
   nodes.dispatchView?.addEventListener('input', async (event) => {
     if (!state.dispatchCreateMode || !state.dispatchDraft) return;
     const clientInput = event.target.closest('#dispatchClientInput');
@@ -4743,7 +4793,7 @@
         .slice(0, 8);
       const suggest = ensureFloatingSuggest('client');
       positionFloatingSuggest(suggest, clientInput);
-      suggest.innerHTML = `${list.map((item) => `<button type="button" class="recipe-suggest-item" data-dispatch-client-pick="${escapeHtml(item.id)}"><span class="user-avatar-thumb" style="width:28px;height:28px;font-size:.75rem">${escapeHtml(item.initials || 'U')}</span><span>${escapeHtml(item.name)}<br><small>${escapeHtml(item.doc || '-')}</small></span></button>`).join('')}${query ? `<button type="button" class="recipe-suggest-item recipe-suggest-create" data-dispatch-client-create="1"><i class="fa-solid fa-plus"></i><span>Nuevo Cliente</span></button>` : ''}`;
+      suggest.innerHTML = `${list.map((item) => `<button type="button" class="recipe-suggest-item" data-dispatch-client-pick="${escapeHtml(item.id)}"><span class="user-avatar-thumb dispatch-client-suggest-avatar">${escapeHtml(item.initials || 'U')}</span><span>${escapeHtml(item.name)}<br><small>${escapeHtml(item.doc || '-')}</small></span></button>`).join('')}${query ? `<button type="button" class="recipe-suggest-item recipe-suggest-create" data-dispatch-client-create="1"><i class="fa-solid fa-plus"></i><span>Nuevo Cliente</span></button>` : ''}`;
       suggest.onclick = async (ev) => {
         const pick = ev.target.closest('[data-dispatch-client-pick]');
         if (pick) {
@@ -4797,46 +4847,7 @@
 
     const vehicleInput = event.target.closest('#dispatchVehicleInput');
     if (vehicleInput) {
-      const query = normalizeLower(vehicleInput.value);
-      state.dispatchDraft.vehicleSearch = normalizeValue(vehicleInput.value);
-      state.dispatchDraft.vehicleId = '';
-      const hidden = nodes.dispatchView.querySelector('#dispatchVehicleSelect');
-      if (hidden) hidden.value = '';
-      const list = Object.values(safeObject(state.reparto.vehicles || {}))
-        .filter((item) => item.enabled !== false)
-        .filter((item) => {
-          const hay = normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`);
-          return hay.includes(query);
-        })
-        .slice(0, 8);
-      const suggest = ensureFloatingSuggest('vehicle');
-      positionFloatingSuggest(suggest, vehicleInput);
-      suggest.innerHTML = `${list.map((item) => {
-        const meta = getDispatchVehicleExpiryMeta(item);
-        return `<button type="button" class="recipe-suggest-item" data-dispatch-vehicle-pick="${escapeHtml(item.id)}"><span class="dispatch-vehicle-tone tone-${meta.tone}"></span><span><strong>${escapeHtml(item.number || item.id)}</strong><br><small>${escapeHtml(formatDispatchVehicleLabel(item))}</small></span></button>`;
-      }).join('')}${query ? `<button type="button" class="recipe-suggest-item recipe-suggest-create" data-dispatch-vehicle-create="1"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button>` : ''}`;
-      suggest.onclick = async (ev) => {
-        const pick = ev.target.closest('[data-dispatch-vehicle-pick]');
-        if (pick) {
-          const vehicle = getDispatchVehicle(pick.dataset.dispatchVehiclePick);
-          if (!vehicle.id) return;
-          state.dispatchDraft.vehicleId = vehicle.id;
-          state.dispatchDraft.vehicleSearch = formatDispatchVehicleLabel(vehicle);
-          vehicleInput.value = state.dispatchDraft.vehicleSearch;
-          if (hidden) hidden.value = vehicle.id;
-          closeDispatchSuggests();
-          return;
-        }
-        if (ev.target.closest('[data-dispatch-vehicle-create]')) {
-          closeDispatchSuggests();
-          const created = await openCreateDispatchVehicle();
-          if (created) {
-            state.dispatchDraft.vehicleId = created.id;
-            state.dispatchDraft.vehicleSearch = formatDispatchVehicleLabel(created);
-            renderDispatchCreate(state.dispatchDraft);
-          }
-        }
-      };
+      showDispatchVehicleSuggestions(vehicleInput);
       return;
     }
 
