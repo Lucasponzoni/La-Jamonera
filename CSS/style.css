@@ -1199,6 +1199,11 @@ html.login-protected.auth-ok body {
   color: #5a6482;
   font-size: 0.98rem;
   margin-top: 0;
+  padding: 0 !important;
+}
+
+.swal2-popup.produccion-confirm-alert .swal2-html-container {
+  padding: 0 !important;
 }
 
 .swal2-popup.ios-alert.informes-alert .swal2-html-container {
