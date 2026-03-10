@@ -3945,7 +3945,7 @@
               <div class="produccion-stat-block">
                 <small>Máximo producible</small>
                 ${draftLock?.blockedKg > 0
-      ? `<strong style="text-decoration:line-through">${analysis.maxKg.toFixed(2)} kg</strong><br><strong style="color:#ff8a2a">${Math.max(0, analysis.maxKg - draftLock.blockedKg).toFixed(2)} kg</strong>`
+      ? `<div class="produccion-max-values"><strong class="produccion-max-base">${analysis.maxKg.toFixed(2)} kg</strong><strong class="produccion-max-adjusted">${Math.max(0, analysis.maxKg - draftLock.blockedKg).toFixed(2)} kg</strong></div>`
       : `<strong>${analysis.maxKg.toFixed(2)} kg</strong>`}
               </div>
               <div class="produccion-stat-sep" aria-hidden="true"></div>

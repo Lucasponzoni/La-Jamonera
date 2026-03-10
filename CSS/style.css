@@ -9123,3 +9123,20 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   font-weight: 700;
   font-size: 0.85rem;
 }
+
+.produccion-max-values {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+}
+
+.produccion-max-base {
+  text-decoration: line-through;
+}
+
+.produccion-max-adjusted {
+  color: #ff8a2a !important;
+  margin-top: 0 !important;
+  line-height: 1.05;
+}
