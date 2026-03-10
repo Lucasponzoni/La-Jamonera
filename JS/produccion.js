@@ -536,6 +536,17 @@
     next.movementHistory.unshift(movement);
     return next;
   };
+  const usageToBaseQty = (usage = {}, fallbackUnit = 'kilos') => {
+    const usedQty = Number(usage?.usedQty);
+    const usedUnit = normalizeValue(usage?.usedUnit) || fallbackUnit;
+    if (Number.isFinite(usedQty) && usedQty > 0) {
+      const baseQty = toBase(usedQty, usedUnit);
+      if (Number.isFinite(baseQty) && baseQty > 0) return baseQty;
+    }
+    const kilosUsed = Number(usage?.kilosUsed);
+    if (Number.isFinite(kilosUsed) && kilosUsed > 0) return kilosUsed * 1000;
+    return 0;
+  };
   const applyPlanOnInventory = (inventorySource, plan, productionId, productionDate, mode = 'consume') => {
     const inventoryNext = safeObject(inventorySource);
     plan.ingredientPlans.forEach((item) => {
@@ -545,19 +556,38 @@
         const index = nextEntries.findIndex((entry) => entry.id === lot.entryId);
         if (index === -1) return;
         const entry = { ...nextEntries[index] };
+        const entryUnit = normalizeValue(entry.unit || lot.unit || item.ingredientUnit || 'kilos') || 'kilos';
+        const fullQty = parseNumber(entry?.qty);
+        const maxQty = Number.isFinite(fullQty) && fullQty > 0 ? fullQty : Number.POSITIVE_INFINITY;
         const currentAvailableQty = getEntryAvailableQty(entry);
-        const amountInEntryUnit = fromBase(lot.takeBaseQty, entry.unit || lot.unit);
-        const safeAmount = Number.isFinite(amountInEntryUnit) ? amountInEntryUnit : 0;
-        const sign = mode === 'consume' ? -1 : 1;
-        const nextAvailableQty = Math.max(0, Number((currentAvailableQty + (sign * safeAmount)).toFixed(4)));
-        const nextAvailableKg = Number((toBase(nextAvailableQty, entry.unit || lot.unit) / 1000).toFixed(4));
-        entry.availableQty = Number(nextAvailableQty.toFixed(4));
-        entry.availableKg = nextAvailableKg;
-        entry.lotStatus = nextAvailableQty <= 0 ? 'consumido_en_produccion' : 'disponible';
         entry.productionUsage = Array.isArray(entry.productionUsage) ? [...entry.productionUsage] : [];
+        let safeAmount = 0;
         if (mode === 'restore') {
-          entry.productionUsage = entry.productionUsage.filter((usage) => normalizeValue(usage?.productionId) !== normalizeValue(productionId));
+          const keepUsages = [];
+          let restoreBaseQty = 0;
+          entry.productionUsage.forEach((usage) => {
+            if (normalizeValue(usage?.productionId) === normalizeValue(productionId)) {
+              restoreBaseQty += usageToBaseQty(usage, entryUnit);
+            } else {
+              keepUsages.push(usage);
+            }
+          });
+          entry.productionUsage = keepUsages;
+          safeAmount = Number.isFinite(restoreBaseQty) && restoreBaseQty > 0
+            ? Number(fromBase(restoreBaseQty, entryUnit).toFixed(4))
+            : 0;
+          if (safeAmount <= 0) {
+            nextEntries[index] = entry;
+            return;
+          }
+          entry.availableQty = Number(Math.min(maxQty, currentAvailableQty + safeAmount).toFixed(4));
+          entry.availableBase = Number(Math.max(0, toBase(entry.availableQty, entryUnit)).toFixed(6));
         } else {
+          const amountInEntryUnit = fromBase(lot.takeBaseQty, entryUnit);
+          safeAmount = Number.isFinite(amountInEntryUnit) ? Number(amountInEntryUnit.toFixed(4)) : 0;
+          if (safeAmount <= 0) return;
+          entry.availableQty = Number(Math.max(0, currentAvailableQty - safeAmount).toFixed(4));
+          entry.availableBase = Number(Math.max(0, toBase(entry.availableQty, entryUnit)).toFixed(6));
           entry.productionUsage.unshift({
             id: makeId('usage'),
             productionId,
@@ -567,18 +597,25 @@
             kilosUsed: Number((Number(lot.takeBaseQty || 0) / 1000).toFixed(4)),
             usedQty: Number(lot.takeQty || 0),
             usedUnit: normalizeValue(lot.unit || item.ingredientUnit || ''),
+            usedBaseQty: Number(lot.takeBaseQty || 0),
             lotNumber: normalizeValue(entry.lotNumber) || normalizeValue(entry.invoiceNumber) || entry.id,
             ingredientLot: normalizeValue(entry.lotNumber) || normalizeValue(entry.invoiceNumber) || entry.id,
             ingredientEntryId: entry.id,
             ingredientId: item.ingredientId
           });
         }
+        if (!Number.isFinite(Number(entry.availableBase))) {
+          entry.availableBase = Number(Math.max(0, toBase(entry.availableQty, entryUnit)).toFixed(6));
+        }
+        const nextAvailableKg = Number((toBase(entry.availableQty, entryUnit) / 1000).toFixed(4));
+        entry.availableKg = nextAvailableKg;
+        entry.lotStatus = entry.availableQty <= 0 ? 'consumido_en_produccion' : 'disponible';
         const moveType = mode === 'consume' ? 'consumo_produccion' : 'reversion_produccion';
         nextEntries[index] = updateEntryMovement(entry, {
           type: moveType,
           productionId,
           qty: Number(safeAmount.toFixed(4)),
-          qtyUnit: entry.unit || lot.unit,
+          qtyUnit: entryUnit,
           createdAt: nowTs(),
           productionDate,
           user: getCurrentUserLabel(),
@@ -586,10 +623,16 @@
           observation: mode === 'consume' ? 'Consumo FEFO en producción' : 'Restitución por anulación/edición'
         });
       });
+      const stockBase = nextEntries.reduce((acc, entry) => {
+        const availableBase = Number(entry?.availableBase);
+        if (Number.isFinite(availableBase) && availableBase >= 0) return acc + availableBase;
+        return acc + Math.max(0, Number(toBase(getEntryAvailableQty(entry), entry?.unit || record.stockUnit || item.ingredientUnit || 'kilos') || 0));
+      }, 0);
       const stockKg = nextEntries.reduce((acc, entry) => acc + getEntryAvailableKg(entry), 0);
       inventoryNext.items[item.ingredientId] = {
         ...record,
         entries: nextEntries,
+        stockBase: Number(stockBase.toFixed(6)),
         stockKg: Number(stockKg.toFixed(4))
       };
     });
@@ -941,6 +984,26 @@
       return acc + availableKg;
     }, 0);
   };
+  const formatDateRangeForRecipe = (recipe) => {
+    const ingredientRows = (Array.isArray(recipe?.rows) ? recipe.rows : []).filter((row) => row.type === 'ingredient' && row.ingredientId);
+    let minEntry = '';
+    let maxExpiry = '';
+    ingredientRows.forEach((row) => {
+      const record = safeObject(state.inventario.items?.[row.ingredientId]);
+      const entries = Array.isArray(record.entries) ? record.entries : [];
+      entries.forEach((entry) => {
+        const availableQty = getEntryAvailableQty(entry);
+        if (!Number.isFinite(availableQty) || availableQty <= 0.0001) return;
+        const entryDate = normalizeValue(entry.entryDate);
+        const expiryDate = isEntryNoPerecedero(entry) ? '' : normalizeValue(entry.expiryDate);
+        if (entryDate && (!minEntry || entryDate < minEntry)) minEntry = entryDate;
+        if (expiryDate && (!maxExpiry || expiryDate > maxExpiry)) maxExpiry = expiryDate;
+      });
+    });
+    if (!minEntry && !maxExpiry) return 'sin rango disponible';
+    return `${minEntry || '-'} a ${maxExpiry || '-'}`;
+  };
+
   const getRecipeExpiredKg = (recipe, productionDateIso = toIsoDate()) => {
     const ingredientRows = (Array.isArray(recipe?.rows) ? recipe.rows : []).filter((row) => row.type === 'ingredient' && row.ingredientId);
     const uniqueIds = [...new Set(ingredientRows.map((row) => row.ingredientId))];
@@ -968,6 +1031,7 @@
       const neededPerKg = reqQty / yieldKg;
       const availability = getInventoryAvailability(row.ingredientId, unit, productionDateIso);
       const coverage = neededPerKg > 0 ? Math.max(0, availability.available) / neededPerKg : 0;
+      const totalCoverage = neededPerKg > 0 ? Math.max(0, availability.total) / neededPerKg : 0;
       if (availability.incompatibleUnits.length) {
         errors.push(`Esta receta contiene unidades incompatibles para cálculo automático. Revisá ${capitalize(row.ingredientName)}.`);
       }
@@ -977,8 +1041,11 @@
         unit,
         neededPerKg,
         available: availability.available,
+        totalAvailable: availability.total,
         coverage,
+        totalCoverage,
         missingForMin: Math.max(0, (neededPerKg * minKg) - availability.available),
+        missingForMinIncludingExpired: Math.max(0, (neededPerKg * minKg) - availability.total),
         hasExpired: availability.hasExpired
       });
     });
@@ -990,23 +1057,48 @@
       };
     }
     const minCoverage = Math.min(...requirements.map((item) => item.coverage));
+    const minTotalCoverage = Math.min(...requirements.map((item) => item.totalCoverage));
     const maxKg = Math.max(0, minCoverage);
+    const maxKgIncludingExpired = Math.max(0, minTotalCoverage);
     const readyCount = requirements.filter((item) => item.missingForMin <= 0.0001).length;
+    const readyCountIncludingExpired = requirements.filter((item) => item.missingForMinIncludingExpired <= 0.0001).length;
     const progress = Math.max(0, Math.min(100, (readyCount / Math.max(requirements.length, 1)) * 100));
+    const progressIncludingExpired = Math.max(0, Math.min(100, (readyCountIncludingExpired / Math.max(requirements.length, 1)) * 100));
     const canProduce = maxKg >= minKg;
+    const canProduceConsideringExpired = maxKgIncludingExpired >= minKg;
     const missingForMin = requirements.filter((item) => item.missingForMin > 0.0001);
+    const missingForMinIncludingExpired = requirements.filter((item) => item.missingForMinIncludingExpired > 0.0001);
     const hasExpired = requirements.some((item) => item.hasExpired);
     let status = 'danger';
     let statusText = 'Faltan insumos';
     if (canProduce) {
       status = 'success';
       statusText = 'Disponible';
+    } else if (!canProduce && canProduceConsideringExpired) {
+      status = 'warning';
+      statusText = 'Stock vencido';
     } else if (progress >= 50) {
       status = 'warning';
       statusText = 'Stock parcial';
     }
     const expiredKg = getRecipeExpiredKg(recipe, productionDateIso);
-    return { status, statusText, maxKg, progress, canProduce, errors, requirements, missingForMin, hasExpired, minKg, expiredKg };
+    return {
+      status,
+      statusText,
+      maxKg,
+      maxKgIncludingExpired,
+      progress,
+      progressIncludingExpired,
+      canProduce,
+      canProduceConsideringExpired,
+      errors,
+      requirements,
+      missingForMin,
+      missingForMinIncludingExpired,
+      hasExpired,
+      minKg,
+      expiredKg
+    };
   };
   const sortEntriesFEFO = (entries = []) => [...entries].sort((a, b) => {
     const expiryA = isEntryNoPerecedero(a) ? '9999-12-31' : (normalizeValue(a.expiryDate) || '9999-12-31');
@@ -1217,26 +1309,52 @@
     const pending = safeObject(state.pendingExpiryActions);
     if (!Object.keys(pending).length) return inventory;
     const next = deepClone(safeObject(inventory));
+    const rawEntryAvailableQty = (entry) => {
+      const available = parseNumber(entry?.availableQty);
+      if (Number.isFinite(available) && available >= 0) return available;
+      const qty = parseNumber(entry?.qty);
+      return Number.isFinite(qty) && qty > 0 ? qty : 0;
+    };
+    const rawEntryAvailableKg = (entry) => {
+      const availableKg = Number(entry?.availableKg);
+      if (Number.isFinite(availableKg) && availableKg >= 0) return availableKg;
+      const base = toBase(rawEntryAvailableQty(entry), entry?.unit || 'kilos');
+      return Number.isFinite(base) ? Number((base / 1000).toFixed(4)) : 0;
+    };
+
     Object.values(safeObject(next.items)).forEach((record) => {
       const entries = Array.isArray(record.entries) ? record.entries : [];
       entries.forEach((entry) => {
         const action = pending[normalizeValue(entry.id)];
         if (!action) return;
-        const availableKg = Number(entry.availableKg);
-        const availableQty = Number(entry.availableQty);
+        const availableKg = rawEntryAvailableKg(entry);
+        const availableQty = rawEntryAvailableQty(entry);
         const qtyKg = Math.max(0, Math.min(Number(action.qtyKg || 0), Number.isFinite(availableKg) ? availableKg : 0));
         if (qtyKg <= 0) return;
         const ratio = Number.isFinite(availableKg) && availableKg > 0 ? (qtyKg / availableKg) : 1;
         const qtyDiscount = Number.isFinite(availableQty) ? (availableQty * ratio) : 0;
         entry.availableKg = Number(Math.max(0, (Number.isFinite(availableKg) ? availableKg : 0) - qtyKg).toFixed(4));
         entry.availableQty = Number(Math.max(0, (Number.isFinite(availableQty) ? availableQty : 0) - qtyDiscount).toFixed(4));
+        entry.availableBase = Number(Math.max(0, toBase(entry.availableQty, entry?.unit || record.stockUnit || 'kilos')).toFixed(6));
         entry.expiryResolutions = Array.isArray(entry.expiryResolutions) ? entry.expiryResolutions : [];
         entry.expiryResolutions.unshift({ id: makeId('expiry_resolution'), createdAt: nowTs(), type: action.type, qtyKg: Number(qtyKg.toFixed(4)) });
+        entry.movementHistory = Array.isArray(entry.movementHistory) ? entry.movementHistory : [];
+        entry.movementHistory.unshift({
+          type: 'resolucion_vencido',
+          createdAt: nowTs(),
+          qty: Number(qtyDiscount.toFixed(4)),
+          qtyUnit: normalizeValue(entry?.unit || record.stockUnit || 'kilos'),
+          qtyKg: Number(qtyKg.toFixed(4)),
+          reference: normalizeValue(action.type),
+          observation: action.type === 'decommissioned' ? 'Lote vencido decomisado' : 'Lote vencido vendido en mostrador'
+        });
         if (entry.availableKg <= 0.0001) {
           entry.expiryResolutionStatus = action.type;
           entry.status = action.type;
+          entry.lotStatus = action.type === 'decommissioned' ? 'decomisado' : 'sin_trazabilidad';
         }
       });
+      record.stockBase = Number(entries.reduce((acc, item) => acc + Number(item?.availableBase || 0), 0).toFixed(6));
       record.stockKg = Number(entries.reduce((acc, item) => acc + Number(item?.availableKg || 0), 0).toFixed(4));
     });
     return next;
@@ -2994,6 +3112,7 @@
     compactRecipeMovements(entry);
   };
 
+
   const renderDispatchHistoryTable = () => {
     if (!nodes.dispatchView || state.dispatchCreateMode) return;
     const rows = getDispatchRows();
@@ -3582,6 +3701,23 @@
     });
     return result.isConfirmed;
   };
+  const showRestoringStockOverlay = (title = 'Restaurando stock...') => {
+    Swal.fire({
+      title,
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Restaurando stock" class="meta-spinner-login"><p style="margin-top:8px;color:#5f6f95;font-weight:600">Restaurando stock...</p></div>',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      customClass: {
+        popup: 'ios-alert ingredientes-alert ingredientes-saving-alert',
+        title: 'ios-alert-title',
+        htmlContainer: 'ios-alert-text ingredientes-saving-html'
+      },
+      buttonsStyling: false,
+      returnFocus: false
+    });
+  };
+
   const cancelProduction = async (registro) => {
     const productionId = normalizeValue(registro?.id);
     if (!productionId) return;
@@ -3601,20 +3737,27 @@
     if (!confirmDelete.isConfirmed) return;
     const auth = await askSensitivePassword('Clave general requerida', '<p>Confirmá para eliminar la producción y revertir su impacto.</p>', true);
     if (!auth.isConfirmed) return;
-    const latestInventory = safeObject(await window.dbLaJamoneraRest.read('/inventario'));
-    const restored = applyPlanOnInventory(latestInventory, { ingredientPlans: registro.lots || [] }, productionId, registro.productionDate, 'restore');
-    const registros = deepClone(state.registros);
-    const previous = deepClone(registros[productionId]);
-    delete registros[productionId];
-    removeRecipeMovementsBySource({ recipeId: registro.recipeId, sourceId: productionId, sourceCode: productionId });
-    await window.dbLaJamoneraRest.write('/inventario', restored);
-    await window.dbLaJamoneraRest.write(REGISTROS_PATH, registros);
-    await persistRepartoStore();
-    await appendAudit({ action: 'produccion_eliminada', productionId, before: previous, after: null, reason: auth.value.reason });
-    state.inventario = restored;
-    state.registros = registros;
-    await refreshAfterMutation();
-    await openIosSwal({ title: 'Producción eliminada', html: `<p>Se eliminó ${productionId} y se restauró el stock.</p>`, icon: 'success', confirmButtonText: 'Entendido' });
+    showRestoringStockOverlay();
+    try {
+      const latestInventory = safeObject(await window.dbLaJamoneraRest.read('/inventario'));
+      const restored = applyPlanOnInventory(latestInventory, { ingredientPlans: registro.lots || [] }, productionId, registro.productionDate, 'restore');
+      const registros = deepClone(state.registros);
+      const previous = deepClone(registros[productionId]);
+      delete registros[productionId];
+      removeRecipeMovementsBySource({ recipeId: registro.recipeId, sourceId: productionId, sourceCode: productionId });
+      await window.dbLaJamoneraRest.write('/inventario', restored);
+      await window.dbLaJamoneraRest.write(REGISTROS_PATH, registros);
+      await persistRepartoStore();
+      await appendAudit({ action: 'produccion_eliminada', productionId, before: previous, after: null, reason: auth.value.reason });
+      state.inventario = restored;
+      state.registros = registros;
+      await refreshAfterMutation();
+      if (Swal.isVisible()) Swal.close();
+      await openIosSwal({ title: 'Producción eliminada', html: `<p>Se eliminó ${productionId} y se restauró el stock.</p>`, icon: 'success', confirmButtonText: 'Entendido' });
+    } catch (error) {
+      if (Swal.isVisible()) Swal.close();
+      await openIosSwal({ title: 'No se pudo eliminar', html: '<p>Ocurrió un error restaurando stock. Intentá nuevamente.</p>', icon: 'error' });
+    }
   };
 
 
@@ -3649,17 +3792,24 @@
     if (!confirmDelete.isConfirmed) return;
     const auth = await askSensitivePassword('Clave general requerida', '<p>Confirmá para eliminar la salida de productos.</p>', true);
     if (!auth.isConfirmed) return;
-    const repartoNext = normalizeDispatchStore(deepClone(state.reparto));
-    const previous = deepClone(repartoNext.registros[dispatchId]);
-    delete repartoNext.registros[dispatchId];
-    state.reparto = repartoNext;
-    (Array.isArray(dispatchRow?.products) ? dispatchRow.products : []).forEach((product) => {
-      removeRecipeMovementsBySource({ recipeId: product.recipeId, sourceId: dispatchId, sourceCode: dispatchRow.code });
-    });
-    await persistRepartoStore();
-    await appendAudit({ action: 'reparto_eliminado', dispatchId, before: previous, after: null, reason: auth.value.reason });
-    await refreshAfterMutation();
-    await openIosSwal({ title: 'Salida eliminada', html: `<p>Se eliminó ${escapeHtml(dispatchRow.code || dispatchId)} y se restauró el stock disponible.</p>`, icon: 'success' });
+    showRestoringStockOverlay();
+    try {
+      const repartoNext = normalizeDispatchStore(deepClone(state.reparto));
+      const previous = deepClone(repartoNext.registros[dispatchId]);
+      delete repartoNext.registros[dispatchId];
+      state.reparto = repartoNext;
+      (Array.isArray(dispatchRow?.products) ? dispatchRow.products : []).forEach((product) => {
+        removeRecipeMovementsBySource({ recipeId: product.recipeId, sourceId: dispatchId, sourceCode: dispatchRow.code });
+      });
+      await persistRepartoStore();
+      await appendAudit({ action: 'reparto_eliminado', dispatchId, before: previous, after: null, reason: auth.value.reason });
+      await refreshAfterMutation();
+      if (Swal.isVisible()) Swal.close();
+      await openIosSwal({ title: 'Salida eliminada', html: `<p>Se eliminó ${escapeHtml(dispatchRow.code || dispatchId)} y se restauró el stock disponible.</p>`, icon: 'success' });
+    } catch (error) {
+      if (Swal.isVisible()) Swal.close();
+      await openIosSwal({ title: 'No se pudo eliminar', html: '<p>Ocurrió un error restaurando stock. Intentá nuevamente.</p>', icon: 'error' });
+    }
   };
 
   const editProduction = async (registro) => {
@@ -3818,8 +3968,15 @@
       const analysis = state.analysis[recipe.id] || analyzeRecipe(recipe);
       const dispatchMeta = getProducedStockMeta(recipe.id);
       const draftLock = getRecipeDraftLockInfo(recipe.id);
-      const statusClass = analysis.status === 'success' ? 'tone-success' : analysis.status === 'warning' ? 'tone-warning' : 'tone-danger';
-      const action = `<button type="button" class="btn ios-btn ios-btn-success produccion-main-btn ${analysis.canProduce ? '' : 'is-disabled'}" data-open-produccion="${recipe.id}" ${analysis.canProduce ? '' : 'disabled'}><i class="bi bi-plus-lg"></i><span>Producir</span></button>`;
+      const isExpiredOnlyAvailable = Boolean(!analysis.canProduce && analysis.canProduceConsideringExpired);
+      const statusClass = isExpiredOnlyAvailable
+        ? 'tone-expired'
+        : (analysis.status === 'success' ? 'tone-success' : analysis.status === 'warning' ? 'tone-warning' : 'tone-danger');
+      const canOpenProduction = Boolean(analysis.canProduce || analysis.canProduceConsideringExpired);
+      const actionToneClass = canOpenProduction
+        ? (analysis.canProduce ? 'ios-btn-success' : 'ios-btn-danger')
+        : 'ios-btn-success';
+      const action = `<button type="button" class="btn ios-btn ${actionToneClass} produccion-main-btn ${canOpenProduction ? '' : 'is-disabled'}" data-open-produccion="${recipe.id}" ${canOpenProduction ? '' : 'disabled'}><i class="bi bi-plus-lg"></i><span>Producir</span></button>`;
       const inventoryAction = analysis.canProduce
         ? ''
         : `<button type="button" class="btn ios-btn inventory-production-action-btn is-inventory" data-open-inventario="1"><i class="fa-solid fa-boxes-stacked"></i><span>Inventario</span></button>`;
@@ -3845,12 +4002,16 @@
           <div class="ingrediente-main receta-main">
             <div class="produccion-row-head">
               <h6 class="ingrediente-name receta-name">${capitalize(recipe.title || 'Sin título')}</h6>
-              <span class="produccion-chip ${statusClass}"><span class="produccion-semaforo"></span>${analysis.statusText}</span>
+              <span class="produccion-chip ${statusClass}"><span class="produccion-semaforo"></span>${isExpiredOnlyAvailable ? 'Disponible con expirados' : analysis.statusText}</span>
             </div>
             <div class="produccion-stats-line">
               <div class="produccion-stat-block">
                 <small>Máximo producible</small>
-                <strong>${analysis.maxKg.toFixed(2)} kg</strong>
+                ${isExpiredOnlyAvailable
+      ? `<strong class="produccion-max-expired-only">${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg*</strong>`
+      : (draftLock?.blockedKg > 0
+        ? `<div class="produccion-max-values"><strong class="produccion-max-base">${analysis.maxKg.toFixed(2)} kg</strong><strong class="produccion-max-adjusted">${Math.max(0, analysis.maxKg - draftLock.blockedKg).toFixed(2)} kg</strong></div>`
+        : `<strong>${analysis.maxKg.toFixed(2)} kg</strong>`)}
               </div>
               <div class="produccion-stat-sep" aria-hidden="true"></div>
               <div class="produccion-stat-block">
@@ -3873,11 +4034,12 @@
               </div>
             </div>
             ${Number(analysis.expiredKg || 0) > 0.0001 ? `<p class="produccion-last-line produccion-last-line-expired"><i class="fa-solid fa-triangle-exclamation"></i> <strong>Kilos expirados:</strong> <strong>${Number(analysis.expiredKg || 0).toFixed(2)} kg</strong></p>` : ''}
+            ${(!analysis.canProduce && analysis.canProduceConsideringExpired) ? `<p class="produccion-last-line produccion-last-line-expired"><i class="fa-solid fa-calendar-days"></i> Podes producir con lote vencido ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg, pero en el rango de fecha ${formatDateRangeForRecipe(recipe)}.</p>` : ''}
             ${draftLock?.blockedKg > 0 ? `<p class="produccion-last-line" data-draft-lock-line="${recipe.id}"><i class="fa-solid fa-lock"></i> Bloqueado por borrador: <strong>${draftLock.blockedKg.toFixed(2)} kg</strong> · disponible en <strong data-draft-lock-time="${recipe.id}">${formatCountdown(draftLock.remainingMs)}</strong></p>` : ''}
             <p class="produccion-last-line"><i class="fa-regular fa-clock"></i> Última producción: <strong>${formatDate(lastProductionAt)}</strong></p>
-            <div class="produccion-progress-wrap">
-              <div class="produccion-progress-bar"><span class="${analysis.status === 'danger' ? 'is-danger' : analysis.progress >= 100 ? 'is-success' : 'is-warning'}" style="width:${analysis.progress.toFixed(1)}%"></span></div>
-              <small>Cobertura del mínimo: ${analysis.progress.toFixed(0)}%</small>
+            <div class="produccion-progress-wrap ${isExpiredOnlyAvailable ? 'is-expired-only' : ''}">
+              <div class="produccion-progress-bar"><span class="${isExpiredOnlyAvailable ? 'is-expired' : (analysis.status === 'danger' ? 'is-danger' : analysis.progress >= 100 ? 'is-success' : 'is-warning')}" style="width:${(isExpiredOnlyAvailable ? Number(analysis.progressIncludingExpired || 0) : analysis.progress).toFixed(1)}%"></span></div>
+              <small>Cobertura del mínimo: ${(isExpiredOnlyAvailable ? Number(analysis.progressIncludingExpired || 0) : analysis.progress).toFixed(0)}%${isExpiredOnlyAvailable ? ' (con expirados)' : ''}</small>
             </div>
             ${buildCoverageChecksHtml(analysis)}
             <div class="produccion-badges">${badges}</div>
@@ -4082,7 +4244,9 @@
     const preferredManagers = Array.isArray(state.config.preferredManagersByRecipe?.[recipe.id])
       ? state.config.preferredManagersByRecipe[recipe.id]
       : (Array.isArray(state.config.preferredManagers) ? state.config.preferredManagers : []);
-    const initialQty = ownDraft ? parsePositive(ownDraft.quantityKg, analysis.minKg) : Math.max(analysis.minKg, 0.1);
+    const editorMaxKg = Math.max(0.1, Number(analysis.maxKg || 0), Number(analysis.maxKgIncludingExpired || 0));
+    const requestedInitialQty = ownDraft ? parsePositive(ownDraft.quantityKg, analysis.minKg) : Math.max(analysis.minKg, 0.1);
+    const initialQty = Math.min(editorMaxKg, Math.max(0.1, requestedInitialQty));
     const initialDate = ownDraft?.productionDate || toIsoDate();
     const initialObs = ownDraft?.observations || '';
     const initialManagers = Array.isArray(ownDraft?.managers) ? ownDraft.managers : preferredManagers;
@@ -4110,14 +4274,14 @@
           <p class="inventario-editor-kicker"><img src="./IMG/Octicons-git-branch.svg" class="produccion-head-icon" alt="Flujo"> Flujo de producción</p>
           <h3 class="inventario-editor-name">${capitalize(recipe.title || 'Sin título')}</h3>
           <p class="inventario-editor-meta">${capitalize(recipe.description || 'Sin descripción.')}</p>
-          <p class="produccion-max-line">Máximo según inventario: <strong>${analysis.maxKg.toFixed(2)} kg</strong></p>
+          <p class="produccion-max-line">Máximo según inventario: <strong>${analysis.maxKg.toFixed(2)} kg</strong>${Number(analysis.maxKgIncludingExpired || 0) > Number(analysis.maxKg || 0) ? ` <span class="produccion-expired-max-help">(con vencidos: ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg)</span>` : ''}</p>
           <p id="produccionReservaTimer" class="produccion-reserva-timer"></p>
         </div>
       </section>
       <section class="recipe-step-card step-block">
         <h6 class="step-title"><span class="recipe-step-number">1</span> ¿Qué cantidad deseás producir?</h6>
         <div class="produccion-qty-grid">
-          <input id="produccionQtyInput" type="number" min="0.1" step="0.01" max="${analysis.maxKg.toFixed(2)}" value="${initialQty.toFixed(2)}" class="form-control ios-input">
+          <input id="produccionQtyInput" type="number" min="0.1" step="0.01" max="${editorMaxKg.toFixed(2)}" value="${initialQty.toFixed(2)}" class="form-control ios-input">
           <button id="produccionQtyMaxBtn" type="button" class="btn ios-btn ios-btn-secondary">Usar máximo</button>
         </div>
         <p id="produccionQtyHelp" class="produccion-qty-help"></p>
@@ -4325,8 +4489,9 @@
       }
     };
     const updateEditorPlan = async () => {
+      const editorMaxKg = Math.max(analysis.maxKg, analysis.maxKgIncludingExpired || 0);
       let qty = parsePositive(qtyInput.value, 0.1);
-      if (qty > analysis.maxKg) qty = analysis.maxKg;
+      if (qty > editorMaxKg) qty = editorMaxKg;
       qtyInput.value = qty.toFixed(2);
       const productionDate = normalizeValue(dateInput.value) || toIsoDate();
       state.editorPlan = buildPlanForRecipe(recipe, qty, productionDate);
@@ -4339,7 +4504,7 @@
         ? `Escala aplicada: ${qty.toFixed(2)} kg. Reserva temporal activa por 10 min.`
         : (qty <= 0 ? 'Modo visualización: ajustá kilos para confirmar producción.' : `Hay conflictos de stock/lotes para ${productionDate}.`);
       if (expiredLotsCount > 0) {
-        qtyHelp.textContent += ` Detectamos ${expiredLotsCount} lote(s) vencido(s): resolvé su estado o cambiá fecha para continuar.`;
+        qtyHelp.textContent += ` Detectamos ${expiredLotsCount} lote(s) vencido(s): resolvé su estado o cambiá fecha para continuar. También podés ajustar la fecha para recalcular FEFO.`;
       }
       await ensureReservationForPlan(state.editorPlan);
     };
@@ -4645,7 +4810,7 @@
     qtyInput.addEventListener('change', async () => { await updateEditorPlan(); });
     qtyInput.addEventListener('blur', async () => { await updateEditorPlan(); });
     nodes.editor.querySelector('#produccionQtyMaxBtn').addEventListener('click', async () => {
-      qtyInput.value = analysis.maxKg.toFixed(2);
+      qtyInput.value = Math.max(analysis.maxKg, analysis.maxKgIncludingExpired || 0).toFixed(2);
       await updateEditorPlan();
     });
     nodes.editor.querySelector('#produccionSaveManagersPrefBtn')?.addEventListener('click', async () => {
@@ -4702,6 +4867,12 @@
           icon: 'warning',
           confirmButtonText: 'Entendido'
         });
+        const managersSection = nodes.editor.querySelector('[data-manager-check]')?.closest('.recipe-step-card');
+        if (managersSection) {
+          managersSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const firstManager = managersSection.querySelector('[data-manager-check]');
+          firstManager?.focus({ preventScroll: true });
+        }
         return;
       }
       const managerSummary = managers.map((token) => {
@@ -4916,10 +5087,18 @@
     state.reparto = normalizeDispatchStore(nextRepartoStore);
     if (!Object.keys(safeObject(state.reparto.productIndex)).length) {
       rebuildProductIndexFromHistory();
-      await window.dbLaJamoneraRest.write(REPARTO_PATH, state.reparto);
+      try {
+        await window.dbLaJamoneraRest.write(REPARTO_PATH, state.reparto);
+      } catch (error) {
+        console.warn('[Producción] No se pudo persistir /Reparto al reconstruir índice.', error);
+      }
     }
     if (!Object.keys(safeObject(repartoStore)).length && Object.keys(safeObject(legacyRepartoStore)).length) {
-      await window.dbLaJamoneraRest.write(REPARTO_PATH, state.reparto);
+      try {
+        await window.dbLaJamoneraRest.write(REPARTO_PATH, state.reparto);
+      } catch (error) {
+        console.warn('[Producción] No se pudo migrar /REPARTO a /Reparto.', error);
+      }
     }
     state.config = {
       globalMinKg: parsePositive(config?.globalMinKg, 1),

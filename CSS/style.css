@@ -9082,3 +9082,82 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   border-radius: 999px;
   object-fit: cover;
 }
+
+/* =========================================
+   INVENTARIO · AUTO EGRESOS
+========================================= */
+.inventario-auto-egreso-row td {
+  background: #fff6ea !important;
+  border-bottom: 1px dashed #f0be7a !important;
+}
+
+.inventario-auto-egreso-badge {
+  background: #ffe9cf;
+  border-color: #f0be7a;
+  color: #92551c;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+
+.swal2-popup.inventario-expand-alert {
+  width: 96vw !important;
+  max-width: 96vw !important;
+}
+
+.swal2-popup.inventario-expand-alert .swal2-html-container {
+  max-height: 78vh;
+  overflow: auto;
+}
+
+.swal2-popup.inventario-expand-alert .inventario-table-compact-wrap {
+  max-height: 70vh;
+}
+
+.produccion-expired-max-help {
+  color: #b45309;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.produccion-max-values {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+}
+
+.produccion-max-base {
+  text-decoration: line-through;
+}
+
+.produccion-max-adjusted {
+  color: #ff8a2a !important;
+  margin-top: 0 !important;
+  line-height: 1.05;
+}
+
+
+.produccion-card.tone-expired {
+  border-color: #c9b4f8;
+  background: #f3edff;
+}
+
+.produccion-chip.tone-expired {
+  color: #6d35b3;
+  background: #efe6ff;
+  border-color: #ccb4f4;
+}
+
+.produccion-progress-wrap.is-expired-only small {
+  color: #6d35b3;
+}
+
+.produccion-progress-bar span.is-expired {
+  background: linear-gradient(90deg, #8b5cf6 0%, #a855f7 100%);
+}
+
+.produccion-max-expired-only {
+  color: #c4314f !important;
+}
