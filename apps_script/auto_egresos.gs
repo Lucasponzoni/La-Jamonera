@@ -21,15 +21,33 @@ const CFG = {
   // Si querés forzar que sólo se ejecute dentro de horario comercial, poner true.
   STRICT_RUN_WINDOW: false,
   // Cantidad máxima de movimientos por día para un lote.
-  MAX_DAILY_SPLITS: 3,
+  MAX_DAILY_SPLITS: Number(PropertiesService.getScriptProperties().getProperty('AUTO_EGRESOS_MAX_DAILY_SPLITS') || 8),
   MIN_WEIGHT_VOL_MOVE_QTY: 0.25,
   MIN_UNIT_MOVE_QTY: 1,
+  MAX_WEIGHT_VOL_MOVE_QTY: Number(PropertiesService.getScriptProperties().getProperty('AUTO_EGRESOS_MAX_WEIGHT_VOL_MOVE_QTY') || 3),
+  MAX_UNIT_MOVE_QTY: Number(PropertiesService.getScriptProperties().getProperty('AUTO_EGRESOS_MAX_UNIT_MOVE_QTY') || 4),
+  MAX_PACKAGE_MOVE_QTY: Number(PropertiesService.getScriptProperties().getProperty('AUTO_EGRESOS_MAX_PACKAGE_MOVE_QTY') || 3),
+  MAX_UNIT_DAY_QTY: Number(PropertiesService.getScriptProperties().getProperty('AUTO_EGRESOS_MAX_UNIT_DAY_QTY') || 12),
+  MAX_PACKAGE_DAY_QTY: Number(PropertiesService.getScriptProperties().getProperty('AUTO_EGRESOS_MAX_PACKAGE_DAY_QTY') || 8),
+  MAX_WEIGHT_VOL_DAY_QTY: Number(PropertiesService.getScriptProperties().getProperty('AUTO_EGRESOS_MAX_WEIGHT_VOL_DAY_QTY') || 10),
   DEEPSEEK_MODEL_FALLBACK: PropertiesService.getScriptProperties().getProperty('DEEPSEEK_MODEL') || 'deepseek-chat',
   DEEPSEEK_ENABLED: String(PropertiesService.getScriptProperties().getProperty('DEEPSEEK_ENABLED') || 'true').toLowerCase() !== 'false',
   DEEPSEEK_MAX_BATCH_ITEMS: Number(PropertiesService.getScriptProperties().getProperty('DEEPSEEK_MAX_BATCH_ITEMS') || 20),
   MAX_RUN_MILLIS: Number(PropertiesService.getScriptProperties().getProperty('AUTO_EGRESOS_MAX_RUN_MILLIS') || 330000),
   MAX_PRODUCTS_PER_RUN: Number(PropertiesService.getScriptProperties().getProperty('AUTO_EGRESOS_MAX_PRODUCTS_PER_RUN') || 60),
-  RUN_CURSOR_KEY: 'AUTO_EGRESOS_CURSOR'
+  RUN_CURSOR_KEY: 'AUTO_EGRESOS_CURSOR',
+  AUTO_EGRESOS_DEFAULTS: {
+    AUTO_EGRESOS_MAX_DAILY_SPLITS: '8',
+    AUTO_EGRESOS_MAX_UNIT_MOVE_QTY: '4',
+    AUTO_EGRESOS_MAX_PACKAGE_MOVE_QTY: '3',
+    AUTO_EGRESOS_MAX_WEIGHT_VOL_MOVE_QTY: '3',
+    AUTO_EGRESOS_MAX_UNIT_DAY_QTY: '12',
+    AUTO_EGRESOS_MAX_PACKAGE_DAY_QTY: '8',
+    AUTO_EGRESOS_MAX_WEIGHT_VOL_DAY_QTY: '10',
+    AUTO_EGRESOS_MAX_RUN_MILLIS: '330000',
+    AUTO_EGRESOS_MAX_PRODUCTS_PER_RUN: '60',
+    DEEPSEEK_MAX_BATCH_ITEMS: '20'
+  }
 };
 
 const RUNTIME = {
@@ -216,8 +234,19 @@ function processEntryAutoEgreso(ctx) {
     const aiSplits = Array.isArray(aiPlanByDay?.[dayIso]) ? aiPlanByDay[dayIso] : [];
     let splits = [];
     if (aiSplits.length) {
-      splits = aiSplits.map((item) => Number(item || 0)).filter((item) => item > CFG.EPS).map((item) => roundBaseReasonable(item, unitMeta));
-      logInfo(`🤖 ${String(ingredient?.name || ingredientId)} ${dayIso} movimientos=${splits.length}`);
+      const aiDayBase = aiSplits
+        .map((item) => Number(item || 0))
+        .filter((item) => item > CFG.EPS)
+        .reduce((acc, item) => acc + roundBaseReasonable(item, unitMeta), 0);
+      const isLastLimitDay = dayIso === limitIso;
+      const fairDayBase = roundBaseReasonable(availableBase / businessDaysLeft, unitMeta);
+      const hardDayLimitBase = getHardDailyLimitBase_(unitMeta);
+      const aiDayLimitBase = Math.max(hardDayLimitBase, roundBaseReasonable(fairDayBase * 1.35, unitMeta));
+      const cappedAiDayBase = isLastLimitDay
+        ? availableBase
+        : Math.min(availableBase, Math.max(0, Math.min(aiDayBase, aiDayLimitBase)));
+      splits = splitBaseQuantity(cappedAiDayBase, unitMeta);
+      logInfo(`🤖 ${String(ingredient?.name || ingredientId)} ${dayIso} baseAI=${Number(cappedAiDayBase.toFixed(3))}${isLastLimitDay ? ' (bypass tope diario por vencimiento/limite)' : ''} movimientos=${splits.length}`);
     }
 
     if (!splits.length) {
@@ -382,6 +411,25 @@ function setRunCursor_(ingredientId) {
 
 function clearRunCursor_() {
   PropertiesService.getScriptProperties().deleteProperty(CFG.RUN_CURSOR_KEY);
+}
+
+function installAutoEgresoPropertiesDefaults(forceOverwrite) {
+  const props = PropertiesService.getScriptProperties();
+  const defaults = safeObj(CFG.AUTO_EGRESOS_DEFAULTS);
+  const overwrite = Boolean(forceOverwrite);
+  Object.keys(defaults).forEach((key) => {
+    const value = String(defaults[key]);
+    const current = props.getProperty(key);
+    if (overwrite || current === null || String(current).trim() === '') {
+      props.setProperty(key, value);
+    }
+  });
+  Logger.log(`Propiedades auto-egreso ${overwrite ? 'actualizadas' : 'verificadas'}: ${Object.keys(defaults).join(', ')}`);
+}
+
+function installAutoEgresoRuntimeSetup() {
+  installAutoEgresoPropertiesDefaults(false);
+  installAutoEgresoTriggerHourly();
 }
 
 function installAutoEgresoTriggerHourly() {
@@ -565,54 +613,71 @@ function roundBaseReasonable(baseQty, unitMeta) {
   return Number(toBase(roundedQty, unitMeta).toFixed(6));
 }
 
+function getHardDailyLimitBase_(unitMeta) {
+  if (unitMeta.category === 'unidad') {
+    return roundBaseReasonable(toBase(Math.max(CFG.MIN_UNIT_MOVE_QTY, num(CFG.MAX_UNIT_DAY_QTY || 12)), unitMeta), unitMeta);
+  }
+  if (unitMeta.category === 'paquete') {
+    return roundBaseReasonable(toBase(Math.max(CFG.MIN_UNIT_MOVE_QTY, num(CFG.MAX_PACKAGE_DAY_QTY || 8)), unitMeta), unitMeta);
+  }
+  return roundBaseReasonable(toBase(Math.max(CFG.MIN_WEIGHT_VOL_MOVE_QTY, num(CFG.MAX_WEIGHT_VOL_DAY_QTY || 10)), unitMeta), unitMeta);
+}
+
 function splitBaseQuantity(dayBase, unitMeta) {
   if (dayBase <= 0) return [];
 
-  // unidades/paquetes: splits enteros reales
-  if (unitMeta.category === 'unidad' || unitMeta.category === 'paquete') {
-    let units = Math.round(fromBase(dayBase, unitMeta));
-    units = Math.max(0, units);
-    if (units === 0) return [];
+  const maxDailySplits = Math.max(1, Math.floor(num(CFG.MAX_DAILY_SPLITS || 8)));
 
-    const maxParts = Math.min(2, units);
-    const parts = Math.max(1, Math.floor(randBetween(1, maxParts + 1)));
-    if (parts === 1) return [toBase(units, unitMeta)];
+  // unidades/paquetes: movimientos chicos y realistas
+  if (unitMeta.category === 'unidad' || unitMeta.category === 'paquete') {
+    const maxMoveQty = unitMeta.category === 'paquete'
+      ? Math.max(1, Math.floor(num(CFG.MAX_PACKAGE_MOVE_QTY || 3)))
+      : Math.max(1, Math.floor(num(CFG.MAX_UNIT_MOVE_QTY || 4)));
+
+    let qtyLeft = Math.max(0, Math.round(fromBase(dayBase, unitMeta)));
+    if (qtyLeft <= 0) return [];
 
     const out = [];
-    let left = units;
-    for (let i = 0; i < parts - 1; i++) {
-      const min = 1;
-      const max = Math.max(1, left - (parts - i - 1));
-      const p = Math.floor(randBetween(min, max + 1));
-      out.push(toBase(p, unitMeta));
-      left -= p;
+    let guard = 0;
+    while (qtyLeft > 0 && guard < 2000) {
+      guard += 1;
+      const remainingSlots = Math.max(1, maxDailySplits - out.length);
+      const minNeededForRest = Math.max(0, qtyLeft - (remainingSlots * maxMoveQty));
+      const minThis = Math.max(1, minNeededForRest);
+      const maxThis = Math.max(minThis, Math.min(maxMoveQty, qtyLeft));
+      const thisQty = out.length >= maxDailySplits - 1
+        ? Math.min(maxMoveQty, qtyLeft)
+        : Math.floor(randBetween(minThis, maxThis + 1));
+      out.push(toBase(thisQty, unitMeta));
+      qtyLeft -= thisQty;
     }
-    if (left > 0) out.push(toBase(left, unitMeta));
-    return out.filter((v) => v > 0 && (unitMeta.category === 'peso' || unitMeta.category === 'volumen' ? fromBase(v, unitMeta) >= CFG.MIN_WEIGHT_VOL_MOVE_QTY - CFG.EPS : fromBase(v, unitMeta) >= CFG.MIN_UNIT_MOVE_QTY));
+    return out.filter((v) => v > 0);
   }
 
-  const maxParts = Math.max(1, Math.min(CFG.MAX_DAILY_SPLITS, 3));
-  const parts = Math.max(1, Math.floor(randBetween(1, maxParts + 1)));
-  if (parts === 1) return [roundBaseReasonable(dayBase, unitMeta)];
+  // peso/volumen: evita tickets enormes por movimiento
+  const maxMoveQty = Math.max(CFG.MIN_WEIGHT_VOL_MOVE_QTY, num(CFG.MAX_WEIGHT_VOL_MOVE_QTY || 3));
+  let qtyLeft = Math.max(0, fromBase(dayBase, unitMeta));
+  if (qtyLeft <= CFG.EPS) return [];
 
-  let remain = dayBase;
   const out = [];
-  for (let i = 0; i < parts - 1; i++) {
-    const minB = roundBaseReasonable(toBase(CFG.MIN_WEIGHT_VOL_MOVE_QTY, unitMeta), unitMeta);
-    const maxB = Math.max(minB, remain * 0.7);
-    let p = randBetween(minB, maxB);
-    p = roundBaseReasonable(p, unitMeta);
-    if (p <= 0) continue;
-    if (p >= remain) p = roundBaseReasonable(remain / 2, unitMeta);
-    out.push(p);
-    remain = roundBaseReasonable(remain - p, unitMeta);
-    if (remain <= 0) break;
+  let guard = 0;
+  while (qtyLeft > CFG.EPS && guard < 2000) {
+    guard += 1;
+    const qtyChunk = Math.min(maxMoveQty, qtyLeft);
+    const minChunk = Math.min(qtyChunk, CFG.MIN_WEIGHT_VOL_MOVE_QTY);
+    const picked = out.length >= maxDailySplits - 1 ? qtyChunk : randBetween(minChunk, qtyChunk);
+    const rounded = roundBaseReasonable(toBase(picked, unitMeta), unitMeta);
+    if (rounded <= CFG.EPS) break;
+    out.push(rounded);
+    qtyLeft = Math.max(0, qtyLeft - fromBase(rounded, unitMeta));
   }
-  if (remain > 0) out.push(roundBaseReasonable(remain, unitMeta));
 
   const sum = out.reduce((a, b) => a + b, 0);
   const diff = roundBaseReasonable(dayBase - sum, unitMeta);
-  if (Math.abs(diff) > CFG.EPS && out.length) out[out.length - 1] = roundBaseReasonable(out[out.length - 1] + diff, unitMeta);
+  if (Math.abs(diff) > CFG.EPS && out.length) {
+    out[out.length - 1] = roundBaseReasonable(out[out.length - 1] + diff, unitMeta);
+  }
+
   return out.filter((v) => v > 0 && fromBase(v, unitMeta) >= CFG.MIN_WEIGHT_VOL_MOVE_QTY - CFG.EPS);
 }
 
