@@ -2,8 +2,6 @@
   const root = document.getElementById('panelDashboard');
   if (!root) return;
 
-  const REFRESH_MS = 60000;
-  const nowChip = document.getElementById('panelNowChip');
   const rangeInput = document.getElementById('panelChartRange');
 
   const nodes = {
@@ -19,12 +17,25 @@
     wrapTransporte: document.getElementById('panelTransporte')
   };
 
-  const state = { report: null, reports: [], range: [] };
+  const state = {
+    report: null,
+    reports: [],
+    recipesById: {},
+    providers: [],
+    recipes: [],
+    vehicles: [],
+    registros: [],
+    range: [],
+    initialized: false
+  };
+
   const safeObject = (v) => (v && typeof v === 'object' ? v : {});
   const normalize = (v) => String(v || '').trim();
   const escapeHtml = (v) => normalize(v).replace(/[&<>'"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
-  const formatEs = (ts) => new Date(Number(ts || Date.now())).toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
+  const formatEs = (ts) => new Date(Number(ts || Date.now())).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const formatDayEs = (ts) => new Date(Number(ts || Date.now())).toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
   const initials = (name) => normalize(name).split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]).join('').toUpperCase() || 'PR';
+
   const dayDiff = (iso) => {
     const date = new Date(`${normalize(iso)}T00:00:00`);
     if (Number.isNaN(date.getTime())) return null;
@@ -32,16 +43,16 @@
     now.setHours(0, 0, 0, 0);
     return Math.round((date.getTime() - now.getTime()) / 86400000);
   };
+
   const relative = (ts) => {
     const diff = Date.now() - Number(ts || Date.now());
     const days = Math.floor(diff / 86400000);
-    if (days <= 0) return 'hoy';
-    if (days === 1) return 'hace 1 día';
-    return `hace ${days} días`;
+    if (days <= 0) return 'HOY';
+    if (days === 1) return 'HACE 1 DÍA';
+    return `HACE ${days} DÍAS`;
   };
 
   const spinner = (alt) => `<div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="${escapeHtml(alt)}" class="panel-spinner"></div>`;
-  const setNowChip = () => { if (nowChip) nowChip.textContent = `Actualizado ${new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`; };
 
   const flattenReports = (tree) => {
     const out = [];
@@ -58,6 +69,22 @@
     return out.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
   };
 
+  const commentsList = (report) => {
+    const raw = report?.comments;
+    if (Array.isArray(raw)) return raw;
+    if (raw && typeof raw === 'object') return Object.values(raw);
+    return [];
+  };
+
+  const toneImportance = (value) => {
+    const n = Math.max(0, Math.min(100, Number(value || 0)));
+    if (n >= 90) return { tone: 'critical', label: 'Muy importante' };
+    if (n >= 75) return { tone: 'high', label: 'Alta' };
+    if (n >= 55) return { tone: 'warn', label: 'Atención' };
+    if (n >= 30) return { tone: 'normal', label: 'Normal' };
+    return { tone: 'ok', label: 'Baja' };
+  };
+
   const renderLastReport = () => {
     const report = state.report;
     if (!report) {
@@ -65,11 +92,57 @@
       nodes.informeAgo.classList.add('d-none');
       return;
     }
+
+    const userName = normalize(report.userName) || 'Usuario';
+    const userPos = normalize(report.userPosition) || 'Asesor Bromatológico';
+    const commentsCount = commentsList(report).length;
+    const attachments = Array.isArray(report.attachments) ? report.attachments : [];
+    const importance = toneImportance(report.importance);
+
     nodes.informeAgo.classList.remove('d-none');
     nodes.informeAgo.textContent = relative(report.createdAt);
-    nodes.informe.innerHTML = `<div class="panel-report-preview"><small><strong>Fecha:</strong> ${escapeHtml(formatEs(report.createdAt))}</small><div class="panel-report-html">${report.html || '<p>Sin contenido.</p>'}</div><div class="panel-report-actions"><a class="btn ios-btn ios-btn-secondary" href="./informes.html"><i class="fa-solid fa-expand"></i><span>Ampliar</span></a><button id="panelReportComment" class="btn ios-btn ios-btn-primary" type="button"><i class="fa-solid fa-comment-dots"></i><span>Comentar</span></button></div></div>`;
-    const btn = document.getElementById('panelReportComment');
-    btn?.addEventListener('click', async () => {
+
+    nodes.informe.innerHTML = `
+      <article class="informe-card panel-last-report-card" data-report-id="${escapeHtml(report.id)}">
+        <div class="informe-card-head">
+          <span class="informe-card-date"><i class="fa-regular fa-calendar"></i> ${escapeHtml(formatEs(report.createdAt))}</span>
+          <span class="informe-card-comments ${commentsCount ? 'has-comments' : 'no-comments'}"><i class="fa-solid ${commentsCount ? 'fa-comment-dots' : 'fa-comment-slash'}"></i> ${commentsCount ? `${commentsCount} comentario(s)` : 'Sin comentarios'}</span>
+        </div>
+
+        <div class="informe-card-preview">${report.html || '<p>Sin contenido.</p>'}</div>
+
+        <div class="informe-card-meta">
+          <span class="informe-attach-chip"><i class="fa-regular fa-image"></i> ${attachments.filter((x) => x?.type === 'image').length}</span>
+          <span class="informe-attach-chip"><i class="fa-regular fa-file-lines"></i> ${Math.max(0, attachments.length - attachments.filter((x) => x?.type === 'image').length)}</span>
+          <span class="importance-chip importance-${importance.tone}">${Math.max(0, Math.min(100, Number(report.importance || 0)))}% · ${importance.label} 📌</span>
+          <button id="panelPrintReport" class="btn informe-print-chip" type="button" title="Imprimir informe"><i class="fa-solid fa-print"></i></button>
+        </div>
+
+        <div class="informe-card-user">
+          <span class="user-avatar-thumb">${escapeHtml(initials(userName))}</span>
+          <div class="informe-card-user-text">
+            <strong>${escapeHtml(userName)}</strong>
+            <small>${escapeHtml(userPos)}</small>
+          </div>
+        </div>
+
+        <div class="informe-card-actions">
+          <a class="btn ios-btn ios-btn-primary" href="./informes.html">Ver informe completo</a>
+          <button id="panelReportComment" class="btn ios-btn ios-btn-secondary" type="button" title="Comentar"><i class="fa-regular fa-message"></i></button>
+          <button id="panelReportEdit" class="btn ios-btn ios-btn-secondary" type="button" title="Editar en informes"><i class="fa-solid fa-pen"></i></button>
+        </div>
+      </article>
+    `;
+
+    document.getElementById('panelPrintReport')?.addEventListener('click', () => {
+      window.open('./informes.html', '_blank', 'noopener,noreferrer');
+    });
+
+    document.getElementById('panelReportEdit')?.addEventListener('click', () => {
+      window.location.href = './informes.html';
+    });
+
+    document.getElementById('panelReportComment')?.addEventListener('click', async () => {
       const res = await Swal.fire({
         title: 'Nuevo comentario',
         input: 'textarea',
@@ -84,19 +157,21 @@
       if (!res.isConfirmed || !text) return;
       const path = `/informes/${report.year}/${report.month}/${report.day}/${report.id}`;
       const latest = safeObject(await window.dbLaJamoneraRest.read(path));
-      const comments = Array.isArray(latest.comments) ? latest.comments : Object.values(safeObject(latest.comments));
+      const comments = commentsList(latest);
       comments.push({ id: `comment_${Date.now()}`, createdAt: Date.now(), userName: 'Panel', text });
       await window.dbLaJamoneraRest.update(path, { comments });
-      Swal.fire({ title: 'Comentario guardado', icon: 'success', timer: 1200, showConfirmButton: false, customClass: { popup: 'ios-alert' } });
+      await loadOnce();
     });
   };
 
-  const makeMarquee = (rows) => {
-    const clone = rows.length > 2 ? rows.concat(rows) : rows;
-    return `<div class="panel-marquee"><div class="panel-marquee-track">${clone.join('')}</div></div>`;
+  const makeMarquee = (rows, minToAnimate = 3) => {
+    const animate = rows.length >= minToAnimate;
+    const clone = animate ? rows.concat(rows) : rows;
+    return `<div class="panel-marquee"><div class="panel-marquee-track ${animate ? 'is-animated' : ''}">${clone.join('')}</div></div>`;
   };
 
-  const renderProviders = (providers = []) => {
+  const renderProviders = () => {
+    const providers = state.providers;
     if (!providers.length) {
       nodes.wrapRne.classList.add('d-none');
       return;
@@ -109,10 +184,11 @@
         : `<div class="panel-avatar">${escapeHtml(initials(provider.name))}</div>`;
       return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(provider.name || 'Proveedor')}</strong><small>${escapeHtml(provider.rne?.number || 'Sin número RNE')}</small><p class="panel-status is-danger">RNE pendiente</p></div></article>`;
     });
-    nodes.rne.innerHTML = makeMarquee(rows);
+    nodes.rne.innerHTML = makeMarquee(rows, 3);
   };
 
-  const renderRnpa = (recipes = []) => {
+  const renderRnpa = () => {
+    const recipes = state.recipes;
     if (!recipes.length) {
       nodes.wrapRnpa.classList.add('d-none');
       return;
@@ -127,10 +203,11 @@
         : `<div class="panel-avatar">${escapeHtml(initials(recipe.title))}</div>`;
       return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(recipe.title || 'Receta')}</strong><small>Vence: ${escapeHtml(recipe.rnpa?.expiryDate || '-')}</small><p class="panel-status ${isExpired ? 'is-danger' : 'is-warning'}">${escapeHtml(msg)}</p></div></article>`;
     });
-    nodes.rnpa.innerHTML = makeMarquee(rows);
+    nodes.rnpa.innerHTML = makeMarquee(rows, 3);
   };
 
-  const renderTransport = (vehicles = []) => {
+  const renderTransport = () => {
+    const vehicles = state.vehicles;
     if (!vehicles.length) {
       nodes.wrapTransporte.classList.add('d-none');
       return;
@@ -139,18 +216,41 @@
     const rows = vehicles.map((vehicle) => {
       const days = dayDiff(vehicle.expiryDate);
       const status = Number.isFinite(days) ? (days < 0 ? `Vencido hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`) : 'Sin vencimiento';
-      return `<article class="panel-list-card"><div class="panel-avatar"><i class="fa-solid fa-truck"></i></div><div class="panel-item-text"><strong>${escapeHtml(vehicle.number || '-')} · ${escapeHtml(vehicle.patent || '-')}</strong><small>${escapeHtml(vehicle.brand || vehicle.type || 'Unidad')}</small><p class="panel-status ${days < 0 ? 'is-danger' : 'is-warning'}">${escapeHtml(status)}</p></div></article>`;
+      return `<article class="panel-list-card"><div class="panel-avatar"><i class="fa-solid fa-truck"></i></div><div class="panel-item-text"><strong>${escapeHtml(vehicle.number || '-')} · ${escapeHtml(vehicle.patent || '-')}</strong><small>${escapeHtml(vehicle.brand || vehicle.type || 'Unidad')} · Vence: ${escapeHtml(vehicle.expiryDate || '-')}</small><p class="panel-status ${days < 0 ? 'is-danger' : 'is-warning'}">${escapeHtml(status)}</p></div></article>`;
     });
-    nodes.transporte.innerHTML = makeMarquee(rows);
+    nodes.transporte.innerHTML = makeMarquee(rows, 3);
   };
 
-  const renderSummary = (data) => {
-    nodes.resumen.innerHTML = `<div class="panel-mini-grid"><div class="panel-metric"><strong>${data.pendingProviders}</strong><span>RNE pendientes</span></div><div class="panel-metric"><strong>${data.rnpaAlerts}</strong><span>RNPA críticos (60 días)</span></div><div class="panel-metric"><strong>${data.transportAlerts}</strong><span>UTA/URA con alerta</span></div><div class="panel-metric"><strong>${data.reports}</strong><span>Informes cargados</span></div></div>`;
+  const renderSummary = () => {
+    const alerts = [];
+
+    state.providers.slice(0, 6).forEach((item) => {
+      alerts.push(`<article class="panel-list-card"><div class="panel-item-text"><strong>${escapeHtml(item.name || 'Proveedor')}</strong><p class="panel-status is-danger">RNE pendiente</p></div></article>`);
+    });
+
+    state.recipes.slice(0, 6).forEach((item) => {
+      const days = dayDiff(item.rnpa?.expiryDate);
+      alerts.push(`<article class="panel-list-card"><div class="panel-item-text"><strong>${escapeHtml(item.title || 'Receta')}</strong><p class="panel-status ${days < 0 ? 'is-danger' : 'is-warning'}">RNPA ${days < 0 ? `vencido hace ${Math.abs(days)} día(s)` : `vence en ${days} día(s)`}</p></div></article>`);
+    });
+
+    state.vehicles.slice(0, 6).forEach((item) => {
+      const days = dayDiff(item.expiryDate);
+      alerts.push(`<article class="panel-list-card"><div class="panel-item-text"><strong>${escapeHtml(item.number || 'UTA/URA')}</strong><p class="panel-status ${days < 0 ? 'is-danger' : 'is-warning'}">${days < 0 ? `Venció hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`}</p></div></article>`);
+    });
+
+    const metrics = `<div class="panel-mini-grid"><div class="panel-metric"><strong>${state.providers.length}</strong><span>RNE pendientes</span></div><div class="panel-metric"><strong>${state.recipes.length}</strong><span>RNPA críticos (60 días)</span></div><div class="panel-metric"><strong>${state.vehicles.length}</strong><span>UTA/URA con alerta</span></div><div class="panel-metric"><strong>${state.reports.length}</strong><span>Informes cargados</span></div></div>`;
+
+    if (!alerts.length) {
+      nodes.resumen.innerHTML = `${metrics}<div class="panel-empty">Sin alertas activas por el momento.</div>`;
+      return;
+    }
+
+    nodes.resumen.innerHTML = `${metrics}${makeMarquee(alerts, 3)}`;
   };
 
-  const renderChart = (registros = []) => {
+  const renderChart = () => {
     const [start, end] = state.range;
-    const inRange = registros.filter((item) => {
+    const inRange = state.registros.filter((item) => {
       const ts = Number(item.createdAt || 0);
       if (!ts) return false;
       if (!start || !end) return true;
@@ -159,17 +259,118 @@
 
     const map = {};
     inRange.forEach((item) => {
-      const key = normalize(item.recipeTitle || item.recipeName || item.recipeId || 'Sin nombre');
-      map[key] = Number((Number(map[key] || 0) + Number(item.quantityKg || 0)).toFixed(2));
+      const key = normalize(item.recipeId || item.recipeTitle || item.recipeName || 'sin_nombre');
+      if (!map[key]) {
+        map[key] = {
+          id: normalize(item.recipeId),
+          name: normalize(item.recipeTitle || item.recipeName || item.recipeId || 'Sin nombre'),
+          kg: 0,
+          imageUrl: normalize(item.recipeImageUrl)
+        };
+      }
+      map[key].kg = Number((Number(map[key].kg || 0) + Number(item.quantityKg || 0)).toFixed(2));
     });
 
-    const top = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const top = Object.values(map)
+      .map((item) => {
+        const recipe = safeObject(state.recipesById[item.id]);
+        if (!item.imageUrl && normalize(recipe.imageUrl)) item.imageUrl = normalize(recipe.imageUrl);
+        return item;
+      })
+      .sort((a, b) => b.kg - a.kg)
+      .slice(0, 10);
+
     if (!top.length) {
       nodes.produccion.innerHTML = '<div class="panel-empty">No hay producción en el rango seleccionado.</div>';
       return;
     }
-    const max = Math.max(...top.map((x) => x[1]));
-    nodes.produccion.innerHTML = `<div class="panel-chart-wrap">${top.map(([name, kg]) => `<div class="panel-chart-row"><div class="panel-chart-label"><i class="fa-solid fa-drumstick-bite"></i><span>${escapeHtml(name)}</span></div><div class="panel-chart-bar"><div class="panel-chart-fill" style="width:${Math.max(8, (kg / max) * 100)}%"></div></div><div class="panel-chart-value">${kg.toFixed(2)} kg</div></div>`).join('')}</div>`;
+
+    const max = Math.max(...top.map((x) => x.kg));
+    nodes.produccion.innerHTML = `<div class="panel-chart-wrap">${top.map((item) => {
+      const avatar = item.imageUrl
+        ? `<span class="panel-chart-avatar"><img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name)}" onload="this.classList.add('is-loaded')"><img src="./IMG/Meta-ai-logo.webp" class="panel-spinner" alt="cargando"></span>`
+        : `<span class="panel-chart-avatar">${escapeHtml(initials(item.name))}</span>`;
+      return `<div class="panel-chart-row"><div class="panel-chart-label">${avatar}<span>${escapeHtml(item.name)}</span></div><div class="panel-chart-bar"><div class="panel-chart-fill" style="width:${Math.max(8, (item.kg / max) * 100)}%"></div></div><div class="panel-chart-value">${item.kg.toFixed(2)} kg</div></div>`;
+    }).join('')}</div>`;
+  };
+
+  const renderAll = () => {
+    renderLastReport();
+    renderSummary();
+    renderProviders();
+    renderRnpa();
+    renderTransport();
+    renderChart();
+  };
+
+  const applyData = (raw) => {
+    const reports = flattenReports(raw.reportsTree);
+    state.reports = reports;
+    state.report = reports[0] || null;
+
+    const recipesById = safeObject(raw.recetas);
+    state.recipesById = recipesById;
+
+    const providers = (Array.isArray(raw.inventario?.config?.providers) ? raw.inventario.config.providers : []).filter((p) => !normalize(p?.rne?.number));
+    state.providers = providers;
+
+    const recetasRows = Object.values(recipesById).filter((r) => {
+      const days = dayDiff(r?.rnpa?.expiryDate);
+      return Number.isFinite(days) && days <= 60;
+    });
+    state.recipes = recetasRows;
+
+    const vehicleRows = Object.values(safeObject(raw.reparto?.vehicles))
+      .filter((v) => v?.enabled !== false)
+      .filter((v) => {
+        const days = dayDiff(v.expiryDate);
+        return Number.isFinite(days) && days <= 60;
+      });
+    state.vehicles = vehicleRows;
+
+    state.registros = Object.values(safeObject(raw.registros));
+  };
+
+  const loadOnce = async () => {
+    if (!state.initialized) {
+      nodes.informe.innerHTML = spinner('Cargando informe');
+      nodes.resumen.innerHTML = spinner('Cargando métricas');
+      nodes.rne.innerHTML = spinner('Cargando proveedores');
+      nodes.rnpa.innerHTML = spinner('Cargando RNPA');
+      nodes.transporte.innerHTML = spinner('Cargando transporte');
+      nodes.produccion.innerHTML = spinner('Cargando producción');
+    }
+
+    try {
+      await window.laJamoneraReady;
+      const [reportsTree, inventario, recetas, reparto, registros] = await Promise.all([
+        window.dbLaJamoneraRest.read('/informes'),
+        window.dbLaJamoneraRest.read('/inventario'),
+        window.dbLaJamoneraRest.read('/recetas'),
+        window.dbLaJamoneraRest.read('/Reparto'),
+        window.dbLaJamoneraRest.read('/produccion/registros')
+      ]);
+
+      applyData({ reportsTree, inventario, recetas, reparto, registros });
+      renderAll();
+      state.initialized = true;
+    } catch (error) {
+      const fallback = '<div class="panel-empty">No se pudieron cargar los datos del panel.</div>';
+      [nodes.informe, nodes.resumen, nodes.rne, nodes.rnpa, nodes.transporte, nodes.produccion].forEach((node) => {
+        if (node) node.innerHTML = fallback;
+      });
+    }
+  };
+
+  const attachRealtimeListeners = () => {
+    const db = window.dbLaJamonera;
+    if (!db?.ref) return;
+    const watched = ['/informes', '/inventario', '/recetas', '/Reparto', '/produccion/registros'];
+    watched.forEach((path) => {
+      db.ref(path).on('value', () => {
+        loadOnce();
+      });
+    });
   };
 
   const initRange = () => {
@@ -186,68 +387,12 @@
       onChange: (dates) => {
         if (dates.length === 2) {
           state.range = dates;
-          loadPanel();
+          renderChart();
         }
       }
     });
   };
 
-  const loadPanel = async () => {
-    nodes.informe.innerHTML = spinner('Cargando informe');
-    nodes.resumen.innerHTML = spinner('Cargando métricas');
-    nodes.rne.innerHTML = spinner('Cargando proveedores');
-    nodes.rnpa.innerHTML = spinner('Cargando RNPA');
-    nodes.transporte.innerHTML = spinner('Cargando transporte');
-    nodes.produccion.innerHTML = spinner('Cargando producción');
-
-    try {
-      await window.laJamoneraReady;
-      const [reportsTree, inventario, recetas, reparto, registros] = await Promise.all([
-        window.dbLaJamoneraRest.read('/informes'),
-        window.dbLaJamoneraRest.read('/inventario'),
-        window.dbLaJamoneraRest.read('/recetas'),
-        window.dbLaJamoneraRest.read('/Reparto'),
-        window.dbLaJamoneraRest.read('/produccion/registros')
-      ]);
-
-      const reports = flattenReports(reportsTree);
-      state.reports = reports;
-      state.report = reports[0] || null;
-      renderLastReport();
-
-      const providers = (Array.isArray(inventario?.config?.providers) ? inventario.config.providers : []).filter((p) => !normalize(p?.rne?.number));
-      renderProviders(providers);
-
-      const recetasRows = Object.values(safeObject(recetas)).filter((r) => {
-        const days = dayDiff(r?.rnpa?.expiryDate);
-        return Number.isFinite(days) && days <= 60;
-      });
-      renderRnpa(recetasRows);
-
-      const vehicleRows = Object.values(safeObject(reparto?.vehicles)).filter((v) => v?.enabled !== false).filter((v) => {
-        const days = dayDiff(v.expiryDate);
-        return Number.isFinite(days) && days <= 60;
-      });
-      renderTransport(vehicleRows);
-
-      renderSummary({
-        pendingProviders: providers.length,
-        rnpaAlerts: recetasRows.length,
-        transportAlerts: vehicleRows.length,
-        reports: reports.length
-      });
-
-      renderChart(Object.values(safeObject(registros)));
-      setNowChip();
-    } catch (error) {
-      const fallback = '<div class="panel-empty">No se pudieron cargar los datos del panel.</div>';
-      Object.values(nodes).forEach((node) => {
-        if (node?.classList?.contains('panel-card-body')) node.innerHTML = fallback;
-      });
-    }
-  };
-
   initRange();
-  loadPanel();
-  setInterval(loadPanel, REFRESH_MS);
+  loadOnce().then(() => attachRealtimeListeners());
 })();
