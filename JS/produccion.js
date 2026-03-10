@@ -1306,26 +1306,52 @@
     const pending = safeObject(state.pendingExpiryActions);
     if (!Object.keys(pending).length) return inventory;
     const next = deepClone(safeObject(inventory));
+    const rawEntryAvailableQty = (entry) => {
+      const available = parseNumber(entry?.availableQty);
+      if (Number.isFinite(available) && available >= 0) return available;
+      const qty = parseNumber(entry?.qty);
+      return Number.isFinite(qty) && qty > 0 ? qty : 0;
+    };
+    const rawEntryAvailableKg = (entry) => {
+      const availableKg = Number(entry?.availableKg);
+      if (Number.isFinite(availableKg) && availableKg >= 0) return availableKg;
+      const base = toBase(rawEntryAvailableQty(entry), entry?.unit || 'kilos');
+      return Number.isFinite(base) ? Number((base / 1000).toFixed(4)) : 0;
+    };
+
     Object.values(safeObject(next.items)).forEach((record) => {
       const entries = Array.isArray(record.entries) ? record.entries : [];
       entries.forEach((entry) => {
         const action = pending[normalizeValue(entry.id)];
         if (!action) return;
-        const availableKg = getEntryAvailableKg(entry);
-        const availableQty = getEntryAvailableQty(entry);
+        const availableKg = rawEntryAvailableKg(entry);
+        const availableQty = rawEntryAvailableQty(entry);
         const qtyKg = Math.max(0, Math.min(Number(action.qtyKg || 0), Number.isFinite(availableKg) ? availableKg : 0));
         if (qtyKg <= 0) return;
         const ratio = Number.isFinite(availableKg) && availableKg > 0 ? (qtyKg / availableKg) : 1;
         const qtyDiscount = Number.isFinite(availableQty) ? (availableQty * ratio) : 0;
         entry.availableKg = Number(Math.max(0, (Number.isFinite(availableKg) ? availableKg : 0) - qtyKg).toFixed(4));
         entry.availableQty = Number(Math.max(0, (Number.isFinite(availableQty) ? availableQty : 0) - qtyDiscount).toFixed(4));
+        entry.availableBase = Number(Math.max(0, toBase(entry.availableQty, entry?.unit || record.stockUnit || 'kilos')).toFixed(6));
         entry.expiryResolutions = Array.isArray(entry.expiryResolutions) ? entry.expiryResolutions : [];
         entry.expiryResolutions.unshift({ id: makeId('expiry_resolution'), createdAt: nowTs(), type: action.type, qtyKg: Number(qtyKg.toFixed(4)) });
+        entry.movementHistory = Array.isArray(entry.movementHistory) ? entry.movementHistory : [];
+        entry.movementHistory.unshift({
+          type: 'resolucion_vencido',
+          createdAt: nowTs(),
+          qty: Number(qtyDiscount.toFixed(4)),
+          qtyUnit: normalizeValue(entry?.unit || record.stockUnit || 'kilos'),
+          qtyKg: Number(qtyKg.toFixed(4)),
+          reference: normalizeValue(action.type),
+          observation: action.type === 'decommissioned' ? 'Lote vencido decomisado' : 'Lote vencido vendido en mostrador'
+        });
         if (entry.availableKg <= 0.0001) {
           entry.expiryResolutionStatus = action.type;
           entry.status = action.type;
+          entry.lotStatus = action.type === 'decommissioned' ? 'decomisado' : 'sin_trazabilidad';
         }
       });
+      record.stockBase = Number(entries.reduce((acc, item) => acc + Number(item?.availableBase || 0), 0).toFixed(6));
       record.stockKg = Number(entries.reduce((acc, item) => acc + Number(item?.availableKg || 0), 0).toFixed(4));
     });
     return next;
