@@ -5724,7 +5724,6 @@ html.login-protected.auth-ok body {
 .produccion-trace-ingredients {
   display: grid;
   gap: 10px;
-  max-height: 60vh;
   overflow: auto;
 }
 
