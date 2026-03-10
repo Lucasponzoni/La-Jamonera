@@ -4006,8 +4006,8 @@
       return `
         <div class="produccion-checks-head">${available}/${analysis.requirements.length} ingredientes listos</div>
         <div class="produccion-checks-list">${analysis.requirements.map((item) => `
-          <span class="produccion-check-item ${item.missingForMin <= 0.0001 ? 'is-ok' : 'is-missing'}">
-            <i class="fa-solid ${item.missingForMin <= 0.0001 ? 'fa-circle-check' : 'fa-circle-xmark'}"></i>
+          <span class="produccion-check-item ${item.missingForMin <= 0.0001 ? 'is-ok' : (item.missingForMinIncludingExpired <= 0.0001 ? 'is-expired' : 'is-missing')}">
+            <i class="fa-solid ${item.missingForMin <= 0.0001 ? 'fa-circle-check' : (item.missingForMinIncludingExpired <= 0.0001 ? 'fa-triangle-exclamation' : 'fa-circle-xmark')}"></i>
             <span>${item.name}</span>
           </span>`).join('')}
         </div>`;
@@ -4034,12 +4034,14 @@
         analysis.missingForMin.length
           ? `<span class="produccion-badge">${isExpiredOnlyAvailable ? 'Faltan insumos frescos' : 'Faltan insumos'}</span>`
           : '',
-        analysis.status === 'warning' ? '<span class="produccion-badge is-warning">Stock parcial</span>' : '',
+        (!isExpiredOnlyAvailable && analysis.status === 'warning') ? '<span class="produccion-badge is-warning">Stock parcial</span>' : '',
         analysis.hasExpired ? '<span class="produccion-badge is-danger">Posee lotes expirados</span>' : '',
         foreignDraft ? '<span class="produccion-badge is-warning">Borrador en uso</span>' : ''
       ].filter(Boolean).join('');
+      const missingFresh = analysis.missingForMin.filter((item) => Number(item.missingForMinIncludingExpired || 0) > 0.0001);
+      const expiredOnlyIngredients = analysis.requirements.filter((item) => item.missingForMin > 0.0001 && item.missingForMinIncludingExpired <= 0.0001);
       const missingHtml = analysis.missingForMin.length
-        ? `<div class="produccion-missing-list">${analysis.missingForMin.map((item) => `<p><strong>${item.name}:</strong> disponible ${formatQty(item.available, item.unit)} / faltan ${formatQty(item.missingForMin, item.unit)}</p>`).join('')}</div>`
+        ? `<div class="produccion-missing-list">${missingFresh.map((item) => `<p><strong>${item.name}:</strong> disponible ${formatQty(item.available, item.unit)} / faltan ${formatQty(item.missingForMin, item.unit)}</p>`).join('')}${expiredOnlyIngredients.map((item) => `<p><strong>${item.name}:</strong> sin stock fresco · disponible en expirado ${formatQty(item.totalAvailable, item.unit)}</p>`).join('')}</div>`
         : '<p class="produccion-ok-line">Cobertura suficiente para iniciar producción.</p>';
       const lastProductionAt = state.config.lastProductionByRecipe?.[recipe.id] || recipe.lastProductionAt || recipe.production?.lastAt || 0;
       return `
@@ -6479,6 +6481,11 @@
 
   nodes.dispatchView?.addEventListener('change', async (event) => {
     if (!state.dispatchCreateMode || !state.dispatchDraft) return;
+    if (event.target.matches('#dispatchDateInput')) {
+      state.dispatchDraft.dispatchDate = normalizeValue(event.target.value) || toIsoDate();
+      renderDispatchCreate(state.dispatchDraft);
+      return;
+    }
     const proofInput = event.target.closest('[data-dispatch-proof-file]');
     if (proofInput) {
       const idx = Number(proofInput.dataset.dispatchProofFile);

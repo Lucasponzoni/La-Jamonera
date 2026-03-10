@@ -6426,6 +6426,12 @@ html.login-protected.auth-ok body {
   color: #b53c53;
 }
 
+.produccion-check-item.is-expired {
+  border-color: #ffd6a4;
+  background: #fff4e4;
+  color: #b26b08;
+}
+
 .produccion-badges {
   display: flex;
   flex-wrap: wrap;
