@@ -161,7 +161,11 @@
       label: normalizeValue(movement.label),
       sourceId: normalizeValue(movement.sourceId),
       sourceCode: normalizeValue(movement.sourceCode),
-      date: normalizeValue(movement.date)
+      date: normalizeValue(movement.date),
+      reason: normalizeValue(movement.reason),
+      nonTraceable: Boolean(movement.nonTraceable),
+      lotNumber: normalizeValue(movement.lotNumber),
+      expiryDate: normalizeValue(movement.expiryDate)
     };
     entry.availableKg = toFiniteKg(type === 'egreso' ? Math.max(0, Number(entry.availableKg || 0) - qtyKg) : Number(entry.availableKg || 0) + qtyKg);
     if (type === 'egreso') {
@@ -2659,12 +2663,17 @@
     };
     const buildRowsHtml = (items) => items.map((item) => {
       const isOut = item.type === 'egreso';
+      const isNonTraceable = Boolean(item.nonTraceable) || normalizeUpper(item.sourceCode) === 'SIN TRAZABILIDAD';
+      const movementTypeLabel = isOut ? (normalizeValue(item.label) || 'Egreso') : 'Ingreso';
       const toneClass = isOut ? 'movement-type-out' : 'movement-type-in';
       const codeClass = isOut ? 'movement-code-out' : 'movement-code-in';
       const qty = Number(item.qtyKg || 0);
       const qtyClass = isOut ? 'movement-qty-out' : 'movement-qty-in';
       const qtyLabel = `${isOut ? '-' : '+'}${Math.abs(qty).toFixed(2)} kg`;
-      return `<tr class="${isOut ? 'is-movement-out' : 'is-movement-in'}"><td><span class="${toneClass}"><i class="fa-solid ${isOut ? 'fa-arrow-down' : 'fa-arrow-up'}"></i> ${isOut ? 'Egreso' : 'Ingreso'}</span></td><td>${escapeHtml(formatDateTime(item.at || 0))}</td><td><button type="button" class="btn btn-link p-0 ${codeClass}" data-history-shortcut-code="${escapeHtml(item.sourceCode || item.sourceId || '')}">${escapeHtml(item.sourceCode || item.sourceId || '-')}</button></td><td><span class="${qtyClass}">${qtyLabel}</span></td></tr>`;
+      const codeHtml = isNonTraceable
+        ? '<span class="inventario-internal-no-trace">SIN TRAZABILIDAD</span>'
+        : `<button type="button" class="btn btn-link p-0 ${codeClass}" data-history-shortcut-code="${escapeHtml(item.sourceCode || item.sourceId || '')}">${escapeHtml(item.sourceCode || item.sourceId || '-')}</button>`;
+      return `<tr class="${isOut ? 'is-movement-out' : 'is-movement-in'}"><td><span class="${toneClass}"><i class="fa-solid ${isOut ? 'fa-arrow-down' : 'fa-arrow-up'}"></i> ${escapeHtml(movementTypeLabel)}</span></td><td>${escapeHtml(formatDateTime(item.at || 0))}</td><td>${codeHtml}</td><td><span class="${qtyClass}">${qtyLabel}</span></td></tr>`;
     }).join('');
     const exportRecipeHistoryExcel = async () => {
       const filtered = getFilteredRows();
@@ -2674,9 +2683,9 @@
       }
       const headers = ['Tipo', 'Fecha y hora', 'Código', 'Cantidad (kg)'];
       const rowsExcel = filtered.map((item) => ({
-        Tipo: `${item.type === 'egreso' ? '↓' : '↑'} ${item.type === 'egreso' ? 'Egreso' : 'Ingreso'}`,
+        Tipo: `${item.type === 'egreso' ? '↓' : '↑'} ${item.type === 'egreso' ? (normalizeValue(item.label) || 'Egreso') : 'Ingreso'}`,
         'Fecha y hora': formatDateTime(item.at || 0),
-        Código: item.sourceCode || item.sourceId || '-',
+        Código: (Boolean(item.nonTraceable) || normalizeUpper(item.sourceCode) === 'SIN TRAZABILIDAD') ? 'SIN TRAZABILIDAD' : (item.sourceCode || item.sourceId || '-'),
         'Cantidad (kg)': `${item.type === 'egreso' ? '-' : '+'}${Math.abs(Number(item.qtyKg || 0)).toFixed(2)}`,
         __tone: item.type === 'egreso' ? 'movement_out' : 'movement_in'
       }));
@@ -3005,6 +3014,12 @@
       availableKg: getDispatchAvailableByProductionId(reg.id)
     }))
     .filter((row) => row.availableKg > 0.0001);
+  const isDispatchLotExpiredForDate = (lot = {}, dispatchDateIso = toIsoDate()) => {
+    const expiryIso = normalizeValue(lot.expiryDate);
+    return Boolean(expiryIso && dispatchDateIso && expiryIso < dispatchDateIso);
+  };
+  const getDispatchExpiredLots = (allocations = [], dispatchDateIso = toIsoDate()) =>
+    (Array.isArray(allocations) ? allocations : []).filter((lot) => isDispatchLotExpiredForDate(lot, dispatchDateIso));
   const allocateDispatchLots = (recipeId, qtyKg) => {
     const needed = Number(qtyKg || 0);
     if (!Number.isFinite(needed) || needed <= 0) return { allocations: [], fulfilledKg: 0, missingKg: needed, hasStock: false };
@@ -3023,6 +3038,29 @@
       missingKg: Number(remaining.toFixed(3)),
       hasStock: remaining <= 0.0001
     };
+  };
+  const registerDispatchExpiredResolution = async ({ recipeId = '', lotNumber = '', qtyKg = 0, expiryDate = '', resolutionType = 'retail_sale', dispatchDate = toIsoDate() } = {}) => {
+    const safeRecipeId = normalizeValue(recipeId);
+    const safeLot = normalizeValue(lotNumber) || '-';
+    const safeExpiry = normalizeValue(expiryDate);
+    const safeQty = Number(qtyKg || 0);
+    if (!safeRecipeId || safeQty <= 0) return false;
+    const movementLabel = resolutionType === 'decommissioned' ? 'Decomisado' : 'Venta en Sucursal';
+    appendRecipeMovement(safeRecipeId, {
+      id: makeId('egr_sin_trazabilidad'),
+      type: 'egreso',
+      qtyKg: Number(safeQty.toFixed(3)),
+      at: nowTs(),
+      sourceId: '',
+      sourceCode: 'SIN TRAZABILIDAD',
+      label: movementLabel,
+      date: dispatchDate,
+      reason: resolutionType,
+      nonTraceable: true,
+      lotNumber: safeLot,
+      expiryDate: safeExpiry
+    });
+    return true;
   };
   const setDispatchMode = (enabled) => {
     state.dispatchMode = enabled;
@@ -3258,6 +3296,8 @@
     const lineRows = draft.lines.map((line, idx) => {
       const alloc = allocateDispatchLots(line.recipeId, Number(line.qtyKg || 0));
       line.allocations = alloc.allocations;
+      const dispatchDateIso = normalizeValue(draft.dispatchDate) || toIsoDate();
+      const expiredLots = getDispatchExpiredLots(alloc.allocations, dispatchDateIso);
       const requestedKg = Number(line.qtyKg || 0);
       const availableKg = Number(getProducedStockMeta(line.recipeId).available || 0);
       const stockStatus = normalizeValue(line.recipeId)
@@ -3271,11 +3311,19 @@
         : '<span class="text-muted">Seleccionar producto.</span>';
       const lotsText = alloc.allocations.map((lot) => `${escapeHtml(lot.lotNumber)} · ${Number(lot.qtyKg || 0).toFixed(2)} kg`).join('<br>') || 'Sin asignar';
       const expiries = [...new Set(alloc.allocations.map((lot) => normalizeValue(lot.expiryDate)).filter(Boolean))];
-      const expiryText = expiries.length === 1 ? escapeHtml(formatIsoEs(expiries[0])) : (expiries.length ? expiries.map((item) => escapeHtml(formatIsoEs(item))).join('<br>') : 'Sin fecha');
+      const expiryText = expiries.length === 1
+        ? `<span class="${expiredLots.length ? 'dispatch-expiry-text-danger' : ''}">${escapeHtml(formatIsoEs(expiries[0]))}</span>`
+        : (expiries.length
+          ? expiries.map((item) => `<span class="${item && item < dispatchDateIso ? 'dispatch-expiry-text-danger' : ''}">${escapeHtml(formatIsoEs(item))}</span>`).join('<br>')
+          : 'Sin fecha');
       const recipe = safeObject(state.recetas[line.recipeId]);
       const recipeTitle = normalizeValue(line.recipeSearch || recipe.title);
       const recipeImage = sanitizeImageUrl(recipe.imageUrl);
-      return `<tr><td><div class="recipe-ing-autocomplete" data-dispatch-product-wrap="${idx}"><div class="recipe-ing-input-wrap dispatch-product-input-wrap"><span class="recipe-inline-avatar-wrap">${recipeImage ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-dispatch-inline-thumb" src="${escapeHtml(recipeImage)}" alt="${escapeHtml(recipeTitle || 'Producto')}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><input type="search" class="form-control ios-input dispatch-product-search-input" data-dispatch-product-search="${idx}" placeholder="Seleccionar producto" value="${escapeHtml(recipeTitle)}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"></div><input type="hidden" data-dispatch-product-id="${idx}" value="${escapeHtml(line.recipeId)}"></div></td><td><input class="form-control ios-input" type="number" step="0.01" min="0" data-dispatch-qty="${idx}" value="${escapeHtml(line.qtyKg || '')}"></td><td class="dispatch-stock-cell">${stockStatus}</td><td class="dispatch-lot-cell">${lotsText}</td><td class="dispatch-expiry-cell">${expiryText}</td><td><button type="button" class="btn family-manage-btn" data-dispatch-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+      const expiredLot = expiredLots[0];
+      const expiredHelpRow = expiredLot
+        ? `<tr class="dispatch-expired-row"><td colspan="6"><p class="dispatch-expired-copy">PODÉS SACAR A REPARTO LA UNIDAD CAMBIANDO LA FECHA HASTA EL DÍA ${escapeHtml(formatIsoEs(expiredLot.expiryDate || ''))}. También podés marcar los kilos disponibles del lote como vendidos en mostrador o decomisados.</p><div class="dispatch-expired-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expired-action="retail_sale" data-dispatch-row="${idx}"><i class="fa-solid fa-store"></i><span>Marcar venta en mostrador</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-dispatch-expired-action="decommissioned" data-dispatch-row="${idx}"><i class="fa-solid fa-trash"></i><span>Marcar decomisado</span></button></div></td></tr>`
+        : '';
+      return `<tr><td><div class="recipe-ing-autocomplete" data-dispatch-product-wrap="${idx}"><div class="recipe-ing-input-wrap dispatch-product-input-wrap"><span class="recipe-inline-avatar-wrap">${recipeImage ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-dispatch-inline-thumb" src="${escapeHtml(recipeImage)}" alt="${escapeHtml(recipeTitle || 'Producto')}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><input type="search" class="form-control ios-input dispatch-product-search-input" data-dispatch-product-search="${idx}" placeholder="Seleccionar producto" value="${escapeHtml(recipeTitle)}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"></div><input type="hidden" data-dispatch-product-id="${idx}" value="${escapeHtml(line.recipeId)}"></div></td><td><input class="form-control ios-input" type="number" step="0.01" min="0" data-dispatch-qty="${idx}" value="${escapeHtml(line.qtyKg || '')}"></td><td class="dispatch-stock-cell">${stockStatus}</td><td class="dispatch-lot-cell">${lotsText}</td><td class="dispatch-expiry-cell ${expiredLots.length ? 'is-danger' : ''}">${expiryText}</td><td><button type="button" class="btn family-manage-btn" data-dispatch-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>${expiredHelpRow}`;
     }).join('');
     const commentRows = draft.comments.map((comment, idx) => `<tr class="dispatch-comment-row"><td colspan="5"><textarea class="form-control ios-input dispatch-comment-textarea" data-dispatch-comment="${idx}" placeholder="Agregá comentarios y observaciones">${escapeHtml(comment)}</textarea></td><td><button type="button" class="btn family-manage-btn" data-dispatch-comment-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
     const proofRows = (Array.isArray(draft.proofs) ? draft.proofs : []).map((proof, idx) => `<tr class="dispatch-proof-row"><td colspan="4"><label class="inventario-upload-dropzone dispatch-proof-drop" for="dispatchProofFile_${idx}"><i class="fa-solid fa-paperclip"></i><span>${escapeHtml(proof?.name || 'Adjuntar comprobante (imagen/PDF)')}</span></label><input id="dispatchProofFile_${idx}" class="inventario-hidden-file-input" type="file" accept="image/*,application/pdf" data-dispatch-proof-file="${idx}">${proof?.url ? `<p class="dispatch-proof-name">Cargado: ${escapeHtml(proof.name || 'comprobante')}</p>` : ''}</td><td class="dispatch-proof-expiry-cell">Comprobante</td><td><button type="button" class="btn family-manage-btn" data-dispatch-proof-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
@@ -3704,7 +3752,7 @@
   const showRestoringStockOverlay = (title = 'Restaurando stock...') => {
     Swal.fire({
       title,
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Restaurando stock" class="meta-spinner-login"><p style="margin-top:8px;color:#5f6f95;font-weight:600">Restaurando stock...</p></div>',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Restaurando stock" class="meta-spinner-login"></div>',
       allowOutsideClick: false,
       allowEscapeKey: false,
       showConfirmButton: false,
@@ -3958,8 +4006,8 @@
       return `
         <div class="produccion-checks-head">${available}/${analysis.requirements.length} ingredientes listos</div>
         <div class="produccion-checks-list">${analysis.requirements.map((item) => `
-          <span class="produccion-check-item ${item.missingForMin <= 0.0001 ? 'is-ok' : 'is-missing'}">
-            <i class="fa-solid ${item.missingForMin <= 0.0001 ? 'fa-circle-check' : 'fa-circle-xmark'}"></i>
+          <span class="produccion-check-item ${item.missingForMin <= 0.0001 ? 'is-ok' : (item.missingForMinIncludingExpired <= 0.0001 ? 'is-expired' : 'is-missing')}">
+            <i class="fa-solid ${item.missingForMin <= 0.0001 ? 'fa-circle-check' : (item.missingForMinIncludingExpired <= 0.0001 ? 'fa-triangle-exclamation' : 'fa-circle-xmark')}"></i>
             <span>${item.name}</span>
           </span>`).join('')}
         </div>`;
@@ -3983,13 +4031,17 @@
       const viewAction = `<button type="button" class="btn ios-btn ios-btn-secondary produccion-visualizar-btn" data-open-produccion="${recipe.id}"><i class="fa-regular fa-eye"></i><span>Visualizar</span></button>`;
       const foreignDraft = getForeignDraftConflict(recipe.id);
       const badges = [
-        analysis.missingForMin.length ? '<span class="produccion-badge">Faltan insumos</span>' : '',
-        analysis.status === 'warning' ? '<span class="produccion-badge is-warning">Stock parcial</span>' : '',
+        analysis.missingForMin.length
+          ? `<span class="produccion-badge">${isExpiredOnlyAvailable ? 'Faltan insumos frescos' : 'Faltan insumos'}</span>`
+          : '',
+        (!isExpiredOnlyAvailable && analysis.status === 'warning') ? '<span class="produccion-badge is-warning">Stock parcial</span>' : '',
         analysis.hasExpired ? '<span class="produccion-badge is-danger">Posee lotes expirados</span>' : '',
         foreignDraft ? '<span class="produccion-badge is-warning">Borrador en uso</span>' : ''
       ].filter(Boolean).join('');
+      const missingFresh = analysis.missingForMin.filter((item) => Number(item.missingForMinIncludingExpired || 0) > 0.0001);
+      const expiredOnlyIngredients = analysis.requirements.filter((item) => item.missingForMin > 0.0001 && item.missingForMinIncludingExpired <= 0.0001);
       const missingHtml = analysis.missingForMin.length
-        ? `<div class="produccion-missing-list">${analysis.missingForMin.map((item) => `<p><strong>${item.name}:</strong> disponible ${formatQty(item.available, item.unit)} / faltan ${formatQty(item.missingForMin, item.unit)}</p>`).join('')}</div>`
+        ? `<div class="produccion-missing-list">${missingFresh.map((item) => `<p><strong>${item.name}:</strong> disponible ${formatQty(item.available, item.unit)} / faltan ${formatQty(item.missingForMin, item.unit)}</p>`).join('')}${expiredOnlyIngredients.map((item) => `<p><strong>${item.name}:</strong> sin stock fresco · disponible en expirado ${formatQty(item.totalAvailable, item.unit)}</p>`).join('')}</div>`
         : '<p class="produccion-ok-line">Cobertura suficiente para iniciar producción.</p>';
       const lastProductionAt = state.config.lastProductionByRecipe?.[recipe.id] || recipe.lastProductionAt || recipe.production?.lastAt || 0;
       return `
@@ -5935,6 +5987,62 @@
       renderDispatchCreate(state.dispatchDraft);
       return;
     }
+    const expiredActionBtn = event.target.closest('[data-dispatch-expired-action]');
+    if (expiredActionBtn) {
+      const idx = Number(expiredActionBtn.dataset.dispatchRow);
+      const actionType = normalizeValue(expiredActionBtn.dataset.dispatchExpiredAction);
+      const line = state.dispatchDraft.lines?.[idx];
+      const recipeId = normalizeValue(line?.recipeId);
+      const dispatchDate = normalizeValue(state.dispatchDraft.dispatchDate) || toIsoDate();
+      if (!recipeId) {
+        await openIosSwal({ title: 'Producto requerido', html: '<p>Seleccioná un producto válido antes de resolver lotes vencidos.</p>', icon: 'warning' });
+        return;
+      }
+      const expiredLot = buildRecipeLotsForDispatch(recipeId).find((lot) => isDispatchLotExpiredForDate(lot, dispatchDate));
+      if (!expiredLot || Number(expiredLot.availableKg || 0) <= 0.0001) {
+        await openIosSwal({ title: 'Sin lotes vencidos', html: '<p>El lote vencido ya no está disponible para resolver.</p>', icon: 'info' });
+        renderDispatchCreate(state.dispatchDraft);
+        return;
+      }
+      const upcomingLot = buildRecipeLotsForDispatch(recipeId).find((lot) => !isDispatchLotExpiredForDate(lot, dispatchDate) && Number(lot.availableKg || 0) > 0.0001);
+      const confirmTitle = actionType === 'decommissioned' ? '¿Marcar lote como decomisado?' : '¿Marcar lote como venta en sucursal?';
+      const confirmText = actionType === 'decommissioned'
+        ? 'Se descontará todo el disponible del lote vencido y se registrará un egreso sin trazabilidad como Decomisado.'
+        : 'Se descontará todo el disponible del lote vencido y se registrará un egreso sin trazabilidad como Venta en Sucursal.';
+      const extraLotText = upcomingLot
+        ? `<small>Al confirmar cargaremos otro lote disponible: <strong>${escapeHtml(upcomingLot.lotNumber || '-')}</strong> con <strong>${Number(upcomingLot.availableKg || 0).toFixed(2)} kg</strong>.</small>`
+        : '<small>Si no hay otro lote vigente, la fila del producto se quitará para que puedas seguir cargando el reparto.</small>';
+      const confirm = await openIosSwal({
+        title: confirmTitle,
+        html: `<p>${confirmText}</p><p><strong>Lote:</strong> ${escapeHtml(expiredLot.lotNumber || '-')} · <strong>Vence:</strong> ${escapeHtml(formatIsoEs(expiredLot.expiryDate || ''))} · <strong>Disponible:</strong> ${Number(expiredLot.availableKg || 0).toFixed(2)} kg</p>${extraLotText}`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Confirmar',
+        cancelButtonText: 'Cancelar'
+      });
+      if (!confirm.isConfirmed) return;
+      const applied = await registerDispatchExpiredResolution({
+        recipeId,
+        lotNumber: normalizeValue(expiredLot.lotNumber),
+        qtyKg: Number(expiredLot.availableKg || 0),
+        expiryDate: normalizeValue(expiredLot.expiryDate),
+        resolutionType: actionType === 'decommissioned' ? 'decommissioned' : 'retail_sale',
+        dispatchDate
+      });
+      if (!applied) return;
+      const qtyRequested = Number(line.qtyKg || 0);
+      const nextAlloc = allocateDispatchLots(recipeId, qtyRequested);
+      const stillExpired = getDispatchExpiredLots(nextAlloc.allocations, dispatchDate).length > 0;
+      if (!nextAlloc.hasStock || stillExpired) {
+        state.dispatchDraft.lines = state.dispatchDraft.lines.filter((_, rowIdx) => rowIdx !== idx);
+      }
+      if (!state.dispatchDraft.lines.length) {
+        state.dispatchDraft.lines.push({ id: makeId('dispatch_row'), recipeId: '', recipeSearch: '', qtyKg: '', allocations: [] });
+      }
+      await persistRepartoStore();
+      renderDispatchCreate(state.dispatchDraft);
+      return;
+    }
     if (event.target.closest('#dispatchSaveBtn')) {
       const draft = state.dispatchDraft;
       draft.dispatchDate = normalizeValue(nodes.dispatchView.querySelector('#dispatchDateInput')?.value) || toIsoDate();
@@ -5978,6 +6086,15 @@
         }
         const recipe = safeObject(state.recetas[recipeId]);
         const allocated = allocateDispatchLots(recipeId, qtyKg);
+        const expiredForDate = getDispatchExpiredLots(allocated.allocations, draft.dispatchDate);
+        if (expiredForDate.length) {
+          await openIosSwal({
+            title: 'Lote vencido detectado',
+            html: `<p>${escapeHtml(capitalize(recipe.title || 'Receta'))} tiene lote vencido para la fecha ${escapeHtml(formatIsoEs(draft.dispatchDate || ''))}.</p><small>Resolvé la fila en rojo (Venta en Sucursal/Decomisado) o cambiá la fecha de reparto.</small>`,
+            icon: 'warning'
+          });
+          return;
+        }
         if (!allocated.hasStock) {
           await openIosSwal({ title: 'Stock insuficiente', html: `<p>${escapeHtml(capitalize(recipe.title || 'Receta'))}: faltan ${allocated.missingKg.toFixed(2)} kg.</p>`, icon: 'warning' });
           return;
@@ -6364,6 +6481,11 @@
 
   nodes.dispatchView?.addEventListener('change', async (event) => {
     if (!state.dispatchCreateMode || !state.dispatchDraft) return;
+    if (event.target.matches('#dispatchDateInput')) {
+      state.dispatchDraft.dispatchDate = normalizeValue(event.target.value) || toIsoDate();
+      renderDispatchCreate(state.dispatchDraft);
+      return;
+    }
     const proofInput = event.target.closest('[data-dispatch-proof-file]');
     if (proofInput) {
       const idx = Number(proofInput.dataset.dispatchProofFile);
