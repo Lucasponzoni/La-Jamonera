@@ -9099,3 +9099,23 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   align-items: center;
   gap: 6px;
 }
+
+.swal2-popup.inventario-expand-alert {
+  width: 96vw !important;
+  max-width: 96vw !important;
+}
+
+.swal2-popup.inventario-expand-alert .swal2-html-container {
+  max-height: 78vh;
+  overflow: auto;
+}
+
+.swal2-popup.inventario-expand-alert .inventario-table-compact-wrap {
+  max-height: 70vh;
+}
+
+.produccion-expired-max-help {
+  color: #b45309;
+  font-weight: 700;
+  font-size: 0.85rem;
+}

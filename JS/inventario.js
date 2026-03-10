@@ -1670,7 +1670,12 @@
       title: 'Umbral por producto',
       html: `
         <div class="text-start">
-          <label class="form-label" for="itemLowThresholdInput">Umbral de stock (${escapeHtml(unitAbbr)})</label>
+          <label class="form-label">Id unico de ingrediente</label>
+          <div class="input-group ios-input-group">
+            <input id="itemIngredientIdInput" class="form-control ios-input" value="${escapeHtml(ingredientId)}" readonly>
+            <button id="copyIngredientIdBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-regular fa-copy"></i><span>Copiar</span></button>
+          </div>
+          <label class="form-label mt-2" for="itemLowThresholdInput">Umbral de stock (${escapeHtml(unitAbbr)})</label>
           <input id="itemLowThresholdInput" class="swal2-input ios-input" type="number" min="0" step="0.01" value="${currentLocal ?? ''}" placeholder="Vacío = usar global">
           <label class="form-label mt-2" for="itemExpiringSoonInput">Próximo a caducar (días)</label>
           <input id="itemExpiringSoonInput" class="swal2-input ios-input" type="number" min="0" step="1" value="${record.expiringSoonDays ?? ''}" placeholder="Vacío = usar global">
@@ -1678,6 +1683,18 @@
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
+      didOpen: () => {
+        document.getElementById('copyIngredientIdBtn')?.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(String(ingredientId || ''));
+          } catch (_error) {
+            const input = document.getElementById('itemIngredientIdInput');
+            input?.focus();
+            input?.select?.();
+            document.execCommand('copy');
+          }
+        });
+      },
       preConfirm: () => {
         const lowRaw = normalizeValue(document.getElementById('itemLowThresholdInput')?.value);
         const daysRaw = normalizeValue(document.getElementById('itemExpiringSoonInput')?.value);
@@ -3351,6 +3368,9 @@
           </select>
           <div class="inventario-lot-order" id="lotTokenOrder">${tokensHtml || '<div class="inventario-token-placeholder">Tildá opciones para generar badges.</div>'}</div>
           <code id="lotPatternPreview" class="inventario-lot-preview"></code>
+          <div class="recipe-table-actions inventario-save-inline mt-2">
+            <button type="button" id="saveLotConfigBtn" class="btn ios-btn ios-btn-secondary recipe-table-action-btn"><i class="fa-solid fa-floppy-disk"></i><span>Guardar configuración de lote</span></button>
+          </div>
         </div>
       </section>
 
@@ -3586,6 +3606,10 @@
 
     nodes.editorForm.querySelector('#inventarioProductThresholdBtn')?.addEventListener('click', async () => {
       await openProductThresholdConfig(ingredientId);
+    });
+    nodes.editorForm.querySelector('#saveLotConfigBtn')?.addEventListener('click', async () => {
+      syncDraft();
+      await saveLotConfigOnly(ingredientId);
     });
     nodes.editorForm.querySelector('#inventarioWeeklySheetBtn')?.addEventListener('click', async () => {
       await openWeeklySheetConfig(ingredientId, { force: true });
@@ -4530,6 +4554,25 @@
     setStateView('list');
     renderFamilies();
     renderList();
+  };
+
+  const saveLotConfigOnly = async (ingredientId) => {
+    const record = getRecord(ingredientId);
+    const draft = safeObject(state.editorDraft);
+    record.lotConfig = {
+      configured: Array.isArray(draft.tokens) && draft.tokens.length > 0,
+      collapsed: Array.isArray(draft.tokens) && draft.tokens.length > 0,
+      tokens: [...(Array.isArray(draft.tokens) ? draft.tokens : [])],
+      customAcronym: normalizeValue(draft.customAcronym),
+      includeSeparator: Boolean(draft.includeSeparator),
+      separator: normalizeValue(draft.separator) || '-'
+    };
+    state.inventario.items[ingredientId] = record;
+    rebuildInventarioIndexes();
+    await persistInventario();
+    state.editorDirty = false;
+    await openIosSwal({ title: 'Configuración guardada', html: '<p>Se guardó la configuración de lote sin cargar stock.</p>', icon: 'success', confirmButtonText: 'Continuar' });
+    renderEditor(ingredientId, state.editorDraft);
   };
 
   const saveEntry = async (event) => {
