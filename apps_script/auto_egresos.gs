@@ -25,7 +25,8 @@ const CFG = {
   MIN_WEIGHT_VOL_MOVE_QTY: 0.25,
   MIN_UNIT_MOVE_QTY: 1,
   DEEPSEEK_MODEL_FALLBACK: PropertiesService.getScriptProperties().getProperty('DEEPSEEK_MODEL') || 'deepseek-chat',
-  DEEPSEEK_ENABLED: String(PropertiesService.getScriptProperties().getProperty('DEEPSEEK_ENABLED') || 'true').toLowerCase() !== 'false'
+  DEEPSEEK_ENABLED: String(PropertiesService.getScriptProperties().getProperty('DEEPSEEK_ENABLED') || 'true').toLowerCase() !== 'false',
+  DEEPSEEK_MAX_BATCH_ITEMS: Number(PropertiesService.getScriptProperties().getProperty('DEEPSEEK_MAX_BATCH_ITEMS') || 20)
 };
 
 const RUNTIME = {
@@ -53,6 +54,7 @@ function runAutoEgresos() {
 
   const yearsNeeded = collectYearsToFetch(items, todayIso);
   const holidaySet = fetchHolidaySet(yearsNeeded);
+  const aiPlansByEntryId = buildAiBatchPlans({ items, ingredientes, todayIso, holidaySet, runId });
 
   Object.keys(items).forEach((ingredientId) => {
     const record = items[ingredientId];
@@ -69,16 +71,23 @@ function runAutoEgresos() {
         changedRecord = true;
         logInfo(`🧹 Normalizado legado auto-egreso en lote ${entry.id || '-'} (${ingredientId})`);
       }
+      const ingredientInfo = safeObj(ingredientes[ingredientId]);
+      const ingredientName = String(ingredientInfo.name || ingredientId);
+      const ingredientDesc = String(ingredientInfo.description || 'Sin descripción');
       const result = processEntryAutoEgreso({
         ingredientId,
-        ingredient: safeObj(ingredientes[ingredientId]),
+        ingredient: ingredientInfo,
         record,
         entry: normalized.entry,
         weeklyCfg,
         todayIso,
         holidaySet,
-        runId
+        runId,
+        aiPlanByDay: safeObj(aiPlansByEntryId[normalizeText(normalized.entry.id)])
       });
+      if (result.changed) {
+        logInfo(`🧾 ${ingredientName} | ${ingredientDesc} | lote ${normalized.entry.id || '-'} | +${result.movementsCreated} mov.`);
+      }
       if (!result.changed) return normalized.entry;
       changedRecord = true;
       generatedMovements += result.movementsCreated;
@@ -128,52 +137,16 @@ function normalizeLegacyAutoEgresoEntry(entry) {
 }
 
 function processEntryAutoEgreso(ctx) {
-  const { ingredientId, ingredient, record, entry, weeklyCfg, todayIso, holidaySet, runId } = ctx;
+  const { ingredientId, ingredient, record, entry, weeklyCfg, todayIso, holidaySet, runId, aiPlanByDay = null } = ctx;
   const out = { changed: false, movementsCreated: 0, entry };
 
   const unitMeta = getUnitMeta(entry.unit);
   let availableBase = getAvailableBase(entry, unitMeta);
   if (availableBase <= CFG.EPS) return out;
 
-  const entryDateIso = normalizeIso(entry.entryDate);
-  if (!entryDateIso) return out;
-
-  const expiryIso = isNoPerecedero(entry) ? '' : normalizeIso(entry.expiryDate);
-  const rotationDays = Math.max(0, Math.round(num(weeklyCfg.rotationDays)));
-
-  // Fecha límite real: min(vencimiento, ingreso + rotación hábil inclusiva)
-  const rotationLimitIso = addBusinessDaysInclusive(entryDateIso, rotationDays, holidaySet);
-  let limitIso = rotationLimitIso;
-  if (expiryIso) limitIso = minIso(expiryIso, rotationLimitIso);
-
-  if (todayIso < entryDateIso) return out;
-
-  entry.autoEgresoState = safeObj(entry.autoEgresoState);
-  const lastProcessedDate = normalizeIso(entry.autoEgresoState.lastProcessedDate);
-
-  let fromIso = entryDateIso;
-  if (lastProcessedDate) {
-    fromIso = nextBusinessDay(addDays(lastProcessedDate, 1), holidaySet);
-  }
-
-  const toIso = minIso(todayIso, limitIso);
-  if (!toIso || fromIso > toIso) return out;
-
-  const processDays = listBusinessDays(fromIso, toIso, holidaySet);
-  if (!processDays.length) return out;
-
-  const aiPlanByDay = buildAiPlanForEntry({
-    ingredientId,
-    ingredient,
-    record,
-    entry,
-    weeklyCfg,
-    processDays,
-    limitIso,
-    availableBase,
-    unitMeta,
-    runId
-  });
+  const window = getEntryProcessingWindow(entry, weeklyCfg, todayIso, holidaySet);
+  if (!window) return out;
+  const { fromIso, toIso, processDays, limitIso } = window;
 
   let businessDaysLeft = listBusinessDays(fromIso, limitIso, holidaySet).length;
   if (businessDaysLeft <= 0) businessDaysLeft = 1;
@@ -186,7 +159,7 @@ function processEntryAutoEgreso(ctx) {
     let splits = [];
     if (aiSplits.length) {
       splits = aiSplits.map((item) => Number(item || 0)).filter((item) => item > CFG.EPS).map((item) => roundBaseReasonable(item, unitMeta));
-      Logger.log(`[AutoEgreso][AI] ${ingredientId} ${dayIso} movimientos=${splits.length}`);
+      logInfo(`🤖 ${String(ingredient?.name || ingredientId)} ${dayIso} movimientos=${splits.length}`);
     }
 
     if (!splits.length) {
@@ -607,6 +580,134 @@ function recalcRecordStock(record) {
   record.hasEntries = entries.length > 0;
 }
 
+
+
+function buildAiBatchPlans({ items, ingredientes, todayIso, holidaySet, runId }) {
+  const plans = {};
+  if (!CFG.DEEPSEEK_ENABLED) {
+    logWarn('🤖 DeepSeek deshabilitado para batch.');
+    return plans;
+  }
+  const deepseekConfig = getDeepseekConfig();
+  if (!deepseekConfig.apiKey) {
+    logWarn('🤖 Sin clave DeepSeek para batch. Se usará fallback local por producto.');
+    return plans;
+  }
+
+  const candidates = [];
+  Object.keys(items || {}).forEach((ingredientId) => {
+    const record = items[ingredientId];
+    if (!record || !Array.isArray(record.entries) || !record.entries.length) return;
+    const weeklyCfg = withDefaultWeeklyConfig(record.weeklySheetConfig);
+    if (!weeklyCfg.egresoEnabled) return;
+    const ingredient = safeObj(ingredientes[ingredientId]);
+    record.entries.forEach((entry) => {
+      const window = getEntryProcessingWindow(entry, weeklyCfg, todayIso, holidaySet);
+      if (!window) return;
+      const unitMeta = getUnitMeta(entry.unit);
+      const availableBase = getAvailableBase(entry, unitMeta);
+      if (availableBase <= CFG.EPS) return;
+      const ingredientName = String(ingredient.name || ingredientId);
+      const ingredientDesc = String(ingredient.description || 'Sin descripción');
+      candidates.push({
+        ingredientId,
+        entryId: normalizeText(entry.id),
+        ingredientName,
+        ingredientDesc,
+        provider: String(entry.provider || ''),
+        unit: String(entry.unit || ''),
+        packageQty: Number(entry.packageQty || record.packageQty || 0) || 0,
+        entryDate: String(entry.entryDate || ''),
+        expiryDate: String(entry.expiryDate || ''),
+        rotationDays: Number(weeklyCfg.rotationDays || 0),
+        processDays: window.processDays,
+        limitIso: window.limitIso,
+        availableQty: Number(entry.availableQty || 0),
+        availableBase
+      });
+      logInfo(`🧠 Contexto AI: ${ingredientName} | ${ingredientDesc} | unidad=${entry.unit || '-'} | dispQty=${entry.availableQty || 0} | pack=${entry.packageQty || record.packageQty || '-'} | días=${window.processDays.join(',')}`);
+    });
+  });
+
+  if (!candidates.length) {
+    logInfo('🤖 Sin candidatos para planificación AI.');
+    return plans;
+  }
+
+  const batchSize = Math.max(1, Math.min(100, Number(CFG.DEEPSEEK_MAX_BATCH_ITEMS || 20)));
+  for (let i = 0; i < candidates.length; i += batchSize) {
+    const chunk = candidates.slice(i, i + batchSize);
+    try {
+      const payload = {
+        model: deepseekConfig.model,
+        temperature: 0.2,
+        messages: [
+          { role: 'system', content: 'Sos planificador de ventas realistas de mostrador para frigorífico/panificados. Responde SOLO JSON válido.' },
+          { role: 'user', content: `Generá plan para cada item. Output estricto: {"plans":[{"entryId":"id","movements":[{"dayIso":"YYYY-MM-DD","qty":number}]}]}. Respetar processDays de cada item y suma <= availableQty. Contexto: ${JSON.stringify(chunk)}` }
+        ]
+      };
+      logInfo(`🤖 Batch DeepSeek ${Math.floor(i / batchSize) + 1}: items=${chunk.length}`);
+      const response = callDeepseek(payload, deepseekConfig);
+      const content = String(response?.choices?.[0]?.message?.content || '');
+      logInfo(`🤖 Respuesta cruda batch: ${content.slice(0, 280)}${content.length > 280 ? '…' : ''}`);
+      const parsed = parseAiJsonFromText(content);
+      const aiPlans = Array.isArray(parsed?.plans) ? parsed.plans : [];
+      aiPlans.forEach((planItem) => {
+        const entryId = normalizeText(planItem?.entryId);
+        if (!entryId) return;
+        const source = chunk.find((c) => c.entryId === entryId);
+        if (!source) return;
+        const allowed = new Set(source.processDays);
+        const unitMeta = getUnitMeta(source.unit);
+        const next = {};
+        (Array.isArray(planItem?.movements) ? planItem.movements : []).forEach((mv) => {
+          const dayIso = normalizeIso(mv?.dayIso);
+          if (!dayIso || !allowed.has(dayIso)) return;
+          const qty = Number(mv?.qty || 0);
+          if (!Number.isFinite(qty) || qty <= 0) return;
+          const base = roundBaseReasonable(toBase(qty, unitMeta), unitMeta);
+          if (base <= CFG.EPS) return;
+          next[dayIso] = Array.isArray(next[dayIso]) ? next[dayIso] : [];
+          next[dayIso].push(base);
+        });
+        const totalBase = Object.values(next).flat().reduce((acc, n) => acc + Number(n || 0), 0);
+        if (totalBase > source.availableBase && totalBase > 0) {
+          const ratio = source.availableBase / totalBase;
+          Object.keys(next).forEach((d) => {
+            next[d] = next[d].map((b) => roundBaseReasonable(Number(b || 0) * ratio, unitMeta)).filter((b) => b > CFG.EPS);
+          });
+        }
+        if (Object.keys(next).length) {
+          plans[entryId] = next;
+          logInfo(`🤖 Plan AI OK: ${source.ingredientName} (${entryId}) días=${Object.keys(next).length}`);
+        }
+      });
+    } catch (error) {
+      logWarn(`🤖 Batch DeepSeek falló (${Math.floor(i / batchSize) + 1}): ${error.message}.`);
+    }
+  }
+
+  logInfo(`🤖 Planes AI totales aplicables: ${Object.keys(plans).length}/${candidates.length}`);
+  return plans;
+}
+
+function getEntryProcessingWindow(entry, weeklyCfg, todayIso, holidaySet) {
+  const entryDateIso = normalizeIso(entry.entryDate);
+  if (!entryDateIso) return null;
+  const expiryIso = isNoPerecedero(entry) ? '' : normalizeIso(entry.expiryDate);
+  const rotationDays = Math.max(0, Math.round(num(weeklyCfg.rotationDays)));
+  const rotationLimitIso = addBusinessDaysInclusive(entryDateIso, rotationDays, holidaySet);
+  const limitIso = expiryIso ? minIso(expiryIso, rotationLimitIso) : rotationLimitIso;
+  if (todayIso < entryDateIso) return null;
+  const lastProcessedDate = normalizeIso(safeObj(entry.autoEgresoState).lastProcessedDate);
+  let fromIso = entryDateIso;
+  if (lastProcessedDate) fromIso = nextBusinessDay(addDays(lastProcessedDate, 1), holidaySet);
+  const toIso = minIso(todayIso, limitIso);
+  if (!toIso || fromIso > toIso) return null;
+  const processDays = listBusinessDays(fromIso, toIso, holidaySet);
+  if (!processDays.length) return null;
+  return { fromIso, toIso, processDays, limitIso };
+}
 
 function buildAiPlanForEntry(ctx) {
   if (!CFG.DEEPSEEK_ENABLED) {
