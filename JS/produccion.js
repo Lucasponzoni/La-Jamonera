@@ -3704,7 +3704,7 @@
   const showRestoringStockOverlay = (title = 'Restaurando stock...') => {
     Swal.fire({
       title,
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Restaurando stock" class="meta-spinner-login"><p style="margin-top:8px;color:#5f6f95;font-weight:600">Restaurando stock...</p></div>',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Restaurando stock" class="meta-spinner-login"></div>',
       allowOutsideClick: false,
       allowEscapeKey: false,
       showConfirmButton: false,
@@ -3983,7 +3983,9 @@
       const viewAction = `<button type="button" class="btn ios-btn ios-btn-secondary produccion-visualizar-btn" data-open-produccion="${recipe.id}"><i class="fa-regular fa-eye"></i><span>Visualizar</span></button>`;
       const foreignDraft = getForeignDraftConflict(recipe.id);
       const badges = [
-        analysis.missingForMin.length ? '<span class="produccion-badge">Faltan insumos</span>' : '',
+        analysis.missingForMin.length
+          ? `<span class="produccion-badge">${isExpiredOnlyAvailable ? 'Faltan insumos frescos' : 'Faltan insumos'}</span>`
+          : '',
         analysis.status === 'warning' ? '<span class="produccion-badge is-warning">Stock parcial</span>' : '',
         analysis.hasExpired ? '<span class="produccion-badge is-danger">Posee lotes expirados</span>' : '',
         foreignDraft ? '<span class="produccion-badge is-warning">Borrador en uso</span>' : ''

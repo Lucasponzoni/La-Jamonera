@@ -9142,22 +9142,22 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 
 
 .produccion-card.tone-expired {
-  border-color: #c9b4f8;
-  background: #f3edff;
+  border-color: #f1cf9a;
+  background: #fff8ee;
 }
 
 .produccion-chip.tone-expired {
-  color: #6d35b3;
-  background: #efe6ff;
-  border-color: #ccb4f4;
+  color: #a86409;
+  background: #fff1df;
+  border-color: #f3d2a5;
 }
 
 .produccion-progress-wrap.is-expired-only small {
-  color: #6d35b3;
+  color: #9f5b00;
 }
 
 .produccion-progress-bar span.is-expired {
-  background: linear-gradient(90deg, #8b5cf6 0%, #a855f7 100%);
+  background: linear-gradient(90deg, #ffb85c 0%, #ff8a00 100%);
 }
 
 .produccion-max-expired-only {
