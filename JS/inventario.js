@@ -4559,20 +4559,40 @@
   const saveLotConfigOnly = async (ingredientId) => {
     const record = getRecord(ingredientId);
     const draft = safeObject(state.editorDraft);
-    record.lotConfig = {
-      configured: Array.isArray(draft.tokens) && draft.tokens.length > 0,
-      collapsed: Array.isArray(draft.tokens) && draft.tokens.length > 0,
-      tokens: [...(Array.isArray(draft.tokens) ? draft.tokens : [])],
-      customAcronym: normalizeValue(draft.customAcronym),
-      includeSeparator: Boolean(draft.includeSeparator),
-      separator: normalizeValue(draft.separator) || '-'
-    };
-    state.inventario.items[ingredientId] = record;
-    rebuildInventarioIndexes();
-    await persistInventario();
-    state.editorDirty = false;
-    await openIosSwal({ title: 'Configuración guardada', html: '<p>Se guardó la configuración de lote sin cargar stock.</p>', icon: 'success', confirmButtonText: 'Continuar' });
-    renderEditor(ingredientId, state.editorDraft);
+    Swal.fire({
+      title: 'Actualizando lote...',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Actualizando lote" class="meta-spinner-login"><p style="margin-top:8px;color:#5f6f95;font-weight:600">Actualizando lote...</p></div>',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      customClass: {
+        popup: 'ios-alert ingredientes-alert ingredientes-saving-alert',
+        title: 'ios-alert-title',
+        htmlContainer: 'ios-alert-text ingredientes-saving-html'
+      },
+      buttonsStyling: false,
+      returnFocus: false
+    });
+    try {
+      record.lotConfig = {
+        configured: Array.isArray(draft.tokens) && draft.tokens.length > 0,
+        collapsed: Array.isArray(draft.tokens) && draft.tokens.length > 0,
+        tokens: [...(Array.isArray(draft.tokens) ? draft.tokens : [])],
+        customAcronym: normalizeValue(draft.customAcronym),
+        includeSeparator: Boolean(draft.includeSeparator),
+        separator: normalizeValue(draft.separator) || '-'
+      };
+      state.inventario.items[ingredientId] = record;
+      rebuildInventarioIndexes();
+      await persistInventario();
+      state.editorDirty = false;
+      if (Swal.isVisible()) Swal.close();
+      await openIosSwal({ title: 'Configuración guardada', html: '<p>Se guardó la configuración de lote sin cargar stock.</p>', icon: 'success', confirmButtonText: 'Continuar' });
+      renderEditor(ingredientId, state.editorDraft);
+    } catch (error) {
+      if (Swal.isVisible()) Swal.close();
+      await openIosSwal({ title: 'No se pudo actualizar lote', html: '<p>Ocurrió un error guardando la configuración de lote.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+    }
   };
 
   const saveEntry = async (event) => {

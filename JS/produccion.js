@@ -1061,7 +1061,9 @@
     const maxKg = Math.max(0, minCoverage);
     const maxKgIncludingExpired = Math.max(0, minTotalCoverage);
     const readyCount = requirements.filter((item) => item.missingForMin <= 0.0001).length;
+    const readyCountIncludingExpired = requirements.filter((item) => item.missingForMinIncludingExpired <= 0.0001).length;
     const progress = Math.max(0, Math.min(100, (readyCount / Math.max(requirements.length, 1)) * 100));
+    const progressIncludingExpired = Math.max(0, Math.min(100, (readyCountIncludingExpired / Math.max(requirements.length, 1)) * 100));
     const canProduce = maxKg >= minKg;
     const canProduceConsideringExpired = maxKgIncludingExpired >= minKg;
     const missingForMin = requirements.filter((item) => item.missingForMin > 0.0001);
@@ -1086,6 +1088,7 @@
       maxKg,
       maxKgIncludingExpired,
       progress,
+      progressIncludingExpired,
       canProduce,
       canProduceConsideringExpired,
       errors,
@@ -3698,6 +3701,23 @@
     });
     return result.isConfirmed;
   };
+  const showRestoringStockOverlay = (title = 'Restaurando stock...') => {
+    Swal.fire({
+      title,
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Restaurando stock" class="meta-spinner-login"><p style="margin-top:8px;color:#5f6f95;font-weight:600">Restaurando stock...</p></div>',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      customClass: {
+        popup: 'ios-alert ingredientes-alert ingredientes-saving-alert',
+        title: 'ios-alert-title',
+        htmlContainer: 'ios-alert-text ingredientes-saving-html'
+      },
+      buttonsStyling: false,
+      returnFocus: false
+    });
+  };
+
   const cancelProduction = async (registro) => {
     const productionId = normalizeValue(registro?.id);
     if (!productionId) return;
@@ -3717,20 +3737,27 @@
     if (!confirmDelete.isConfirmed) return;
     const auth = await askSensitivePassword('Clave general requerida', '<p>Confirmá para eliminar la producción y revertir su impacto.</p>', true);
     if (!auth.isConfirmed) return;
-    const latestInventory = safeObject(await window.dbLaJamoneraRest.read('/inventario'));
-    const restored = applyPlanOnInventory(latestInventory, { ingredientPlans: registro.lots || [] }, productionId, registro.productionDate, 'restore');
-    const registros = deepClone(state.registros);
-    const previous = deepClone(registros[productionId]);
-    delete registros[productionId];
-    removeRecipeMovementsBySource({ recipeId: registro.recipeId, sourceId: productionId, sourceCode: productionId });
-    await window.dbLaJamoneraRest.write('/inventario', restored);
-    await window.dbLaJamoneraRest.write(REGISTROS_PATH, registros);
-    await persistRepartoStore();
-    await appendAudit({ action: 'produccion_eliminada', productionId, before: previous, after: null, reason: auth.value.reason });
-    state.inventario = restored;
-    state.registros = registros;
-    await refreshAfterMutation();
-    await openIosSwal({ title: 'Producción eliminada', html: `<p>Se eliminó ${productionId} y se restauró el stock.</p>`, icon: 'success', confirmButtonText: 'Entendido' });
+    showRestoringStockOverlay();
+    try {
+      const latestInventory = safeObject(await window.dbLaJamoneraRest.read('/inventario'));
+      const restored = applyPlanOnInventory(latestInventory, { ingredientPlans: registro.lots || [] }, productionId, registro.productionDate, 'restore');
+      const registros = deepClone(state.registros);
+      const previous = deepClone(registros[productionId]);
+      delete registros[productionId];
+      removeRecipeMovementsBySource({ recipeId: registro.recipeId, sourceId: productionId, sourceCode: productionId });
+      await window.dbLaJamoneraRest.write('/inventario', restored);
+      await window.dbLaJamoneraRest.write(REGISTROS_PATH, registros);
+      await persistRepartoStore();
+      await appendAudit({ action: 'produccion_eliminada', productionId, before: previous, after: null, reason: auth.value.reason });
+      state.inventario = restored;
+      state.registros = registros;
+      await refreshAfterMutation();
+      if (Swal.isVisible()) Swal.close();
+      await openIosSwal({ title: 'Producción eliminada', html: `<p>Se eliminó ${productionId} y se restauró el stock.</p>`, icon: 'success', confirmButtonText: 'Entendido' });
+    } catch (error) {
+      if (Swal.isVisible()) Swal.close();
+      await openIosSwal({ title: 'No se pudo eliminar', html: '<p>Ocurrió un error restaurando stock. Intentá nuevamente.</p>', icon: 'error' });
+    }
   };
 
 
@@ -3765,17 +3792,24 @@
     if (!confirmDelete.isConfirmed) return;
     const auth = await askSensitivePassword('Clave general requerida', '<p>Confirmá para eliminar la salida de productos.</p>', true);
     if (!auth.isConfirmed) return;
-    const repartoNext = normalizeDispatchStore(deepClone(state.reparto));
-    const previous = deepClone(repartoNext.registros[dispatchId]);
-    delete repartoNext.registros[dispatchId];
-    state.reparto = repartoNext;
-    (Array.isArray(dispatchRow?.products) ? dispatchRow.products : []).forEach((product) => {
-      removeRecipeMovementsBySource({ recipeId: product.recipeId, sourceId: dispatchId, sourceCode: dispatchRow.code });
-    });
-    await persistRepartoStore();
-    await appendAudit({ action: 'reparto_eliminado', dispatchId, before: previous, after: null, reason: auth.value.reason });
-    await refreshAfterMutation();
-    await openIosSwal({ title: 'Salida eliminada', html: `<p>Se eliminó ${escapeHtml(dispatchRow.code || dispatchId)} y se restauró el stock disponible.</p>`, icon: 'success' });
+    showRestoringStockOverlay();
+    try {
+      const repartoNext = normalizeDispatchStore(deepClone(state.reparto));
+      const previous = deepClone(repartoNext.registros[dispatchId]);
+      delete repartoNext.registros[dispatchId];
+      state.reparto = repartoNext;
+      (Array.isArray(dispatchRow?.products) ? dispatchRow.products : []).forEach((product) => {
+        removeRecipeMovementsBySource({ recipeId: product.recipeId, sourceId: dispatchId, sourceCode: dispatchRow.code });
+      });
+      await persistRepartoStore();
+      await appendAudit({ action: 'reparto_eliminado', dispatchId, before: previous, after: null, reason: auth.value.reason });
+      await refreshAfterMutation();
+      if (Swal.isVisible()) Swal.close();
+      await openIosSwal({ title: 'Salida eliminada', html: `<p>Se eliminó ${escapeHtml(dispatchRow.code || dispatchId)} y se restauró el stock disponible.</p>`, icon: 'success' });
+    } catch (error) {
+      if (Swal.isVisible()) Swal.close();
+      await openIosSwal({ title: 'No se pudo eliminar', html: '<p>Ocurrió un error restaurando stock. Intentá nuevamente.</p>', icon: 'error' });
+    }
   };
 
   const editProduction = async (registro) => {
@@ -3934,7 +3968,10 @@
       const analysis = state.analysis[recipe.id] || analyzeRecipe(recipe);
       const dispatchMeta = getProducedStockMeta(recipe.id);
       const draftLock = getRecipeDraftLockInfo(recipe.id);
-      const statusClass = analysis.status === 'success' ? 'tone-success' : analysis.status === 'warning' ? 'tone-warning' : 'tone-danger';
+      const isExpiredOnlyAvailable = Boolean(!analysis.canProduce && analysis.canProduceConsideringExpired);
+      const statusClass = isExpiredOnlyAvailable
+        ? 'tone-expired'
+        : (analysis.status === 'success' ? 'tone-success' : analysis.status === 'warning' ? 'tone-warning' : 'tone-danger');
       const canOpenProduction = Boolean(analysis.canProduce || analysis.canProduceConsideringExpired);
       const actionToneClass = canOpenProduction
         ? (analysis.canProduce ? 'ios-btn-success' : 'ios-btn-danger')
@@ -3965,14 +4002,16 @@
           <div class="ingrediente-main receta-main">
             <div class="produccion-row-head">
               <h6 class="ingrediente-name receta-name">${capitalize(recipe.title || 'Sin título')}</h6>
-              <span class="produccion-chip ${statusClass}"><span class="produccion-semaforo"></span>${analysis.statusText}</span>
+              <span class="produccion-chip ${statusClass}"><span class="produccion-semaforo"></span>${isExpiredOnlyAvailable ? 'Disponible con expirados' : analysis.statusText}</span>
             </div>
             <div class="produccion-stats-line">
               <div class="produccion-stat-block">
                 <small>Máximo producible</small>
-                ${draftLock?.blockedKg > 0
-      ? `<div class="produccion-max-values"><strong class="produccion-max-base">${analysis.maxKg.toFixed(2)} kg</strong><strong class="produccion-max-adjusted">${Math.max(0, analysis.maxKg - draftLock.blockedKg).toFixed(2)} kg</strong></div>`
-      : `<strong>${analysis.maxKg.toFixed(2)} kg</strong>`}
+                ${isExpiredOnlyAvailable
+      ? `<strong class="produccion-max-expired-only">${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg*</strong>`
+      : (draftLock?.blockedKg > 0
+        ? `<div class="produccion-max-values"><strong class="produccion-max-base">${analysis.maxKg.toFixed(2)} kg</strong><strong class="produccion-max-adjusted">${Math.max(0, analysis.maxKg - draftLock.blockedKg).toFixed(2)} kg</strong></div>`
+        : `<strong>${analysis.maxKg.toFixed(2)} kg</strong>`)}
               </div>
               <div class="produccion-stat-sep" aria-hidden="true"></div>
               <div class="produccion-stat-block">
@@ -3998,9 +4037,9 @@
             ${(!analysis.canProduce && analysis.canProduceConsideringExpired) ? `<p class="produccion-last-line produccion-last-line-expired"><i class="fa-solid fa-calendar-days"></i> Podes producir con lote vencido ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg, pero en el rango de fecha ${formatDateRangeForRecipe(recipe)}.</p>` : ''}
             ${draftLock?.blockedKg > 0 ? `<p class="produccion-last-line" data-draft-lock-line="${recipe.id}"><i class="fa-solid fa-lock"></i> Bloqueado por borrador: <strong>${draftLock.blockedKg.toFixed(2)} kg</strong> · disponible en <strong data-draft-lock-time="${recipe.id}">${formatCountdown(draftLock.remainingMs)}</strong></p>` : ''}
             <p class="produccion-last-line"><i class="fa-regular fa-clock"></i> Última producción: <strong>${formatDate(lastProductionAt)}</strong></p>
-            <div class="produccion-progress-wrap">
-              <div class="produccion-progress-bar"><span class="${analysis.status === 'danger' ? 'is-danger' : analysis.progress >= 100 ? 'is-success' : 'is-warning'}" style="width:${analysis.progress.toFixed(1)}%"></span></div>
-              <small>Cobertura del mínimo: ${analysis.progress.toFixed(0)}%</small>
+            <div class="produccion-progress-wrap ${isExpiredOnlyAvailable ? 'is-expired-only' : ''}">
+              <div class="produccion-progress-bar"><span class="${isExpiredOnlyAvailable ? 'is-expired' : (analysis.status === 'danger' ? 'is-danger' : analysis.progress >= 100 ? 'is-success' : 'is-warning')}" style="width:${(isExpiredOnlyAvailable ? Number(analysis.progressIncludingExpired || 0) : analysis.progress).toFixed(1)}%"></span></div>
+              <small>Cobertura del mínimo: ${(isExpiredOnlyAvailable ? Number(analysis.progressIncludingExpired || 0) : analysis.progress).toFixed(0)}%${isExpiredOnlyAvailable ? ' (con expirados)' : ''}</small>
             </div>
             ${buildCoverageChecksHtml(analysis)}
             <div class="produccion-badges">${badges}</div>
