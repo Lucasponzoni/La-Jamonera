@@ -7210,6 +7210,9 @@ html.login-protected.auth-ok body {
   font-size: 0.82rem;
 }
 
+#copyIngredientIdBtn {
+  border-radius: 0 14px 14px 0 !important;
+}
 
 .produccion-dispatch-table-center th,
 .produccion-dispatch-table-center td {
