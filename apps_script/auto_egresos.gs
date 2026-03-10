@@ -24,9 +24,12 @@ const CFG = {
   MAX_DAILY_SPLITS: 3,
   MIN_WEIGHT_VOL_MOVE_QTY: 0.25,
   MIN_UNIT_MOVE_QTY: 1,
-  DEEPSEEK_API_KEY: PropertiesService.getScriptProperties().getProperty('DEEPSEEK_API_KEY') || '',
-  DEEPSEEK_MODEL: PropertiesService.getScriptProperties().getProperty('DEEPSEEK_MODEL') || 'deepseek-chat',
+  DEEPSEEK_MODEL_FALLBACK: PropertiesService.getScriptProperties().getProperty('DEEPSEEK_MODEL') || 'deepseek-chat',
   DEEPSEEK_ENABLED: String(PropertiesService.getScriptProperties().getProperty('DEEPSEEK_ENABLED') || 'true').toLowerCase() !== 'false'
+};
+
+const RUNTIME = {
+  deepseek: null
 };
 
 function runAutoEgresos() {
@@ -34,12 +37,12 @@ function runAutoEgresos() {
 
   const now = new Date();
   if (CFG.STRICT_RUN_WINDOW && !isWithinOpenWindows(now, CFG.TIMEZONE, CFG.OPEN_WINDOWS)) {
-    Logger.log('Fuera de horario comercial. No se ejecuta.');
+    logInfo('⏰ Fuera de horario comercial. No se ejecuta.');
     return;
   }
 
   const runId = `run_${Date.now()}`;
-  Logger.log(`[AutoEgreso] Inicio run ${runId}`);
+  logInfo(`🚀 Inicio run ${runId}`);
   const inventario = workerRead(CFG.INVENTARIO_PATH) || {};
   const items = safeObj(inventario.items);
   const ingredientes = safeObj(workerRead('/ingredientes/items') || {});
@@ -80,12 +83,12 @@ function runAutoEgresos() {
     if (changedRecord) {
       recalcRecordStock(record);
       workerWrite(`/inventario/items/${ingredientId}`, record);
-      Logger.log(`[AutoEgreso] Producto ${ingredientId} actualizado. stockBase=${record.stockBase} stockKg=${record.stockKg}`);
+      logInfo(`📦 Producto ${ingredientId} actualizado | stockBase=${record.stockBase} | stockKg=${record.stockKg}`);
       affectedProducts += 1;
     }
   });
 
-  Logger.log(`Auto-egresos OK | productos: ${affectedProducts} | movimientos: ${generatedMovements} | runId: ${runId}`);
+  logInfo(`✅ Auto-egresos OK | productos=${affectedProducts} | movimientos=${generatedMovements} | runId=${runId}`);
 }
 
 function processEntryAutoEgreso(ctx) {
@@ -221,8 +224,6 @@ function processEntryAutoEgreso(ctx) {
     entry.availableBase = 0;
     entry.availableKg = 0;
     entry.lotStatus = 'consumido_en_produccion';
-    entry.expiryResolutionStatus = 'sold_counter';
-    entry.status = 'sold_counter';
   } else {
     entry.lotStatus = 'disponible';
   }
@@ -245,7 +246,7 @@ function pushAutoEgresoMovement(entry, meta) {
   entry.expiryResolutions.unshift({
     id: `auto_res_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     createdAt: atTs,
-    type: 'sold_counter',
+    type: 'auto_sold_local',
     qtyKg: roundedKg,
     qty: roundedQty,
     unit: unitLabel,
@@ -350,7 +351,7 @@ function fetchHolidaySet(years) {
         }
       });
     } catch (e) {
-      Logger.log(`No se pudo leer feriados ${year}: ${e.message}`);
+      logWarn(`📅 No se pudo leer feriados ${year}: ${e.message}`);
     }
   });
   return set;
@@ -573,11 +574,12 @@ function recalcRecordStock(record) {
 
 function buildAiPlanForEntry(ctx) {
   if (!CFG.DEEPSEEK_ENABLED) {
-    Logger.log('[AutoEgreso][AI] DeepSeek deshabilitado. Uso fallback local.');
+    logWarn('🤖 DeepSeek deshabilitado. Uso fallback local.');
     return null;
   }
-  if (!CFG.DEEPSEEK_API_KEY) {
-    Logger.log('[AutoEgreso][AI] Sin DEEPSEEK_API_KEY. Uso fallback local.');
+  const deepseekConfig = getDeepseekConfig();
+  if (!deepseekConfig.apiKey) {
+    logWarn('🤖 Sin clave DeepSeek en Firebase (/deepseek/apiKey). Uso fallback local.');
     return null;
   }
 
@@ -609,7 +611,7 @@ function buildAiPlanForEntry(ctx) {
     const sys = 'Sos un planificador de ventas en local para frigorífico. Responde SOLO JSON válido.';
     const usr = `Genera movimientos de egreso realistas para el contexto: ${JSON.stringify(prompt)}.\nFormato estricto de salida: {"movements":[{"dayIso":"YYYY-MM-DD","qty":number}]} .\nReglas: no inventar días fuera de processDays, cantidades positivas, y suma <= availableQty.`;
     const payload = {
-      model: CFG.DEEPSEEK_MODEL,
+      model: deepseekConfig.model,
       temperature: 0.25,
       messages: [
         { role: 'system', content: sys },
@@ -617,12 +619,12 @@ function buildAiPlanForEntry(ctx) {
       ]
     };
 
-    Logger.log(`[AutoEgreso][AI] Consultando DeepSeek para ${ingredientId} run=${runId}`);
-    const response = callDeepseek(payload);
+    logInfo(`🤖 Consultando DeepSeek para ${ingredientId} run=${runId}`);
+    const response = callDeepseek(payload, deepseekConfig);
     const content = String(response?.choices?.[0]?.message?.content || '');
     const parsed = parseAiJsonFromText(content);
     if (!parsed || !Array.isArray(parsed.movements)) {
-      Logger.log(`[AutoEgreso][AI] Respuesta inválida para ${ingredientId}. Fallback local.`);
+      logWarn(`🤖 Respuesta inválida para ${ingredientId}. Fallback local.`);
       return null;
     }
 
@@ -641,7 +643,7 @@ function buildAiPlanForEntry(ctx) {
 
     const totalBase = Object.values(planByDay).flat().reduce((acc, item) => acc + Number(item || 0), 0);
     if (totalBase <= CFG.EPS) {
-      Logger.log(`[AutoEgreso][AI] Sin movimientos utilizables para ${ingredientId}. Fallback local.`);
+      logWarn(`🤖 Sin movimientos utilizables para ${ingredientId}. Fallback local.`);
       return null;
     }
 
@@ -652,19 +654,19 @@ function buildAiPlanForEntry(ctx) {
       });
     }
 
-    Logger.log(`[AutoEgreso][AI] Plan aplicado para ${ingredientId}. días=${Object.keys(planByDay).length}`);
+    logInfo(`🤖 Plan AI aplicado para ${ingredientId}. días=${Object.keys(planByDay).length}`);
     return planByDay;
   } catch (error) {
-    Logger.log(`[AutoEgreso][AI] Error para ${ctx.ingredientId}: ${error.message}. Fallback local.`);
+    logError(`🤖 Error AI para ${ctx.ingredientId}: ${error.message}. Fallback local.`);
     return null;
   }
 }
 
-function callDeepseek(payload) {
+function callDeepseek(payload, deepseekConfig) {
   const response = UrlFetchApp.fetch('https://api.deepseek.com/chat/completions', {
     method: 'post',
     contentType: 'application/json',
-    headers: { Authorization: `Bearer ${CFG.DEEPSEEK_API_KEY}` },
+    headers: { Authorization: `Bearer ${deepseekConfig.apiKey}` },
     payload: JSON.stringify(payload),
     muteHttpExceptions: true
   });
@@ -694,6 +696,31 @@ function parseAiJsonFromText(text) {
     return null;
   }
 }
+
+
+function getDeepseekConfig() {
+  if (RUNTIME.deepseek) return RUNTIME.deepseek;
+  try {
+    const keyNode = workerRead('/deepseek/apiKey');
+    const apiKey = typeof keyNode === 'string' ? String(keyNode).trim() : String((keyNode && keyNode.apiKey) || '').trim();
+    const deepseekNode = safeObj(workerRead('/deepseek'));
+    const model = String(deepseekNode.model || CFG.DEEPSEEK_MODEL_FALLBACK || 'deepseek-chat').trim() || 'deepseek-chat';
+    const cfg = { apiKey, model };
+    if (apiKey) {
+      logInfo(`🔐 DeepSeek clave cargada desde Firebase. Modelo=${model}`);
+    }
+    RUNTIME.deepseek = cfg;
+    return cfg;
+  } catch (error) {
+    logError(`🔐 Error leyendo configuración DeepSeek desde Firebase: ${error.message}`);
+    RUNTIME.deepseek = { apiKey: '', model: CFG.DEEPSEEK_MODEL_FALLBACK || 'deepseek-chat' };
+    return RUNTIME.deepseek;
+  }
+}
+
+function logInfo(msg) { Logger.log(`🟦 ${msg}`); }
+function logWarn(msg) { Logger.log(`🟨 ${msg}`); }
+function logError(msg) { Logger.log(`🟥 ${msg}`); }
 
 function withDefaultWeeklyConfig(cfg) {
   return Object.assign({
