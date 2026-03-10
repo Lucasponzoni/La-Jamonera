@@ -9083,3 +9083,20 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   border-radius: 999px;
   object-fit: cover;
 }
+
+/* =========================================
+   INVENTARIO · AUTO EGRESOS
+========================================= */
+.inventario-auto-egreso-row td {
+  background: #eef8ff !important;
+  border-bottom: 1px dashed #9ec7f5 !important;
+}
+
+.inventario-auto-egreso-badge {
+  background: #dff0ff;
+  border-color: #9fc9f5;
+  color: #1f5e9f;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

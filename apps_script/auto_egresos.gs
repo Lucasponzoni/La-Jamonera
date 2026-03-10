@@ -23,7 +23,10 @@ const CFG = {
   // Cantidad máxima de movimientos por día para un lote.
   MAX_DAILY_SPLITS: 3,
   MIN_WEIGHT_VOL_MOVE_QTY: 0.25,
-  MIN_UNIT_MOVE_QTY: 1
+  MIN_UNIT_MOVE_QTY: 1,
+  DEEPSEEK_API_KEY: PropertiesService.getScriptProperties().getProperty('DEEPSEEK_API_KEY') || '',
+  DEEPSEEK_MODEL: PropertiesService.getScriptProperties().getProperty('DEEPSEEK_MODEL') || 'deepseek-chat',
+  DEEPSEEK_ENABLED: String(PropertiesService.getScriptProperties().getProperty('DEEPSEEK_ENABLED') || 'true').toLowerCase() !== 'false'
 };
 
 function runAutoEgresos() {
@@ -36,8 +39,10 @@ function runAutoEgresos() {
   }
 
   const runId = `run_${Date.now()}`;
+  Logger.log(`[AutoEgreso] Inicio run ${runId}`);
   const inventario = workerRead(CFG.INVENTARIO_PATH) || {};
   const items = safeObj(inventario.items);
+  const ingredientes = safeObj(workerRead('/ingredientes/items') || {});
   const todayIso = dateToIso(now, CFG.TIMEZONE);
 
   let affectedProducts = 0;
@@ -58,6 +63,8 @@ function runAutoEgresos() {
     record.entries = record.entries.map((entry) => {
       const result = processEntryAutoEgreso({
         ingredientId,
+        ingredient: safeObj(ingredientes[ingredientId]),
+        record,
         entry,
         weeklyCfg,
         todayIso,
@@ -73,6 +80,7 @@ function runAutoEgresos() {
     if (changedRecord) {
       recalcRecordStock(record);
       workerWrite(`/inventario/items/${ingredientId}`, record);
+      Logger.log(`[AutoEgreso] Producto ${ingredientId} actualizado. stockBase=${record.stockBase} stockKg=${record.stockKg}`);
       affectedProducts += 1;
     }
   });
@@ -81,7 +89,7 @@ function runAutoEgresos() {
 }
 
 function processEntryAutoEgreso(ctx) {
-  const { entry, weeklyCfg, todayIso, holidaySet, runId } = ctx;
+  const { ingredientId, ingredient, record, entry, weeklyCfg, todayIso, holidaySet, runId } = ctx;
   const out = { changed: false, movementsCreated: 0, entry };
 
   const unitMeta = getUnitMeta(entry.unit);
@@ -115,6 +123,19 @@ function processEntryAutoEgreso(ctx) {
   const processDays = listBusinessDays(fromIso, toIso, holidaySet);
   if (!processDays.length) return out;
 
+  const aiPlanByDay = buildAiPlanForEntry({
+    ingredientId,
+    ingredient,
+    record,
+    entry,
+    weeklyCfg,
+    processDays,
+    limitIso,
+    availableBase,
+    unitMeta,
+    runId
+  });
+
   let businessDaysLeft = listBusinessDays(fromIso, limitIso, holidaySet).length;
   if (businessDaysLeft <= 0) businessDaysLeft = 1;
 
@@ -122,20 +143,27 @@ function processEntryAutoEgreso(ctx) {
     availableBase = getAvailableBase(entry, unitMeta);
     if (availableBase <= CFG.EPS) return;
 
-    const isLastLimitDay = dayIso === limitIso;
-    const baseTarget = availableBase / businessDaysLeft;
-
-    const factor = randBetween(0.85, 1.15);
-    let dayBase = isLastLimitDay ? availableBase : (baseTarget * factor);
-    dayBase = roundBaseReasonable(dayBase, unitMeta);
-
-    if (dayBase <= 0) {
-      businessDaysLeft = Math.max(1, businessDaysLeft - 1);
-      return;
+    const aiSplits = Array.isArray(aiPlanByDay?.[dayIso]) ? aiPlanByDay[dayIso] : [];
+    let splits = [];
+    if (aiSplits.length) {
+      splits = aiSplits.map((item) => Number(item || 0)).filter((item) => item > CFG.EPS).map((item) => roundBaseReasonable(item, unitMeta));
+      Logger.log(`[AutoEgreso][AI] ${ingredientId} ${dayIso} movimientos=${splits.length}`);
     }
-    if (dayBase > availableBase) dayBase = availableBase;
 
-    const splits = splitBaseQuantity(dayBase, unitMeta);
+    if (!splits.length) {
+      const isLastLimitDay = dayIso === limitIso;
+      const baseTarget = availableBase / businessDaysLeft;
+      const factor = randBetween(0.85, 1.15);
+      let dayBase = isLastLimitDay ? availableBase : (baseTarget * factor);
+      dayBase = roundBaseReasonable(dayBase, unitMeta);
+
+      if (dayBase <= 0) {
+        businessDaysLeft = Math.max(1, businessDaysLeft - 1);
+        return;
+      }
+      if (dayBase > availableBase) dayBase = availableBase;
+      splits = splitBaseQuantity(dayBase, unitMeta);
+    }
 
     splits.forEach((partBase) => {
       if (partBase <= 0) return;
@@ -540,6 +568,131 @@ function recalcRecordStock(record) {
     record.stockKg = Number(entries.reduce((acc, e) => acc + num(e.availableKg), 0).toFixed(4));
   }
   record.hasEntries = entries.length > 0;
+}
+
+
+function buildAiPlanForEntry(ctx) {
+  if (!CFG.DEEPSEEK_ENABLED) {
+    Logger.log('[AutoEgreso][AI] DeepSeek deshabilitado. Uso fallback local.');
+    return null;
+  }
+  if (!CFG.DEEPSEEK_API_KEY) {
+    Logger.log('[AutoEgreso][AI] Sin DEEPSEEK_API_KEY. Uso fallback local.');
+    return null;
+  }
+
+  const { ingredientId, ingredient, record, entry, weeklyCfg, processDays, limitIso, availableBase, unitMeta, runId } = ctx;
+  try {
+    const prompt = {
+      ingredientId,
+      ingredientName: String(ingredient?.name || ''),
+      ingredientDescription: String(ingredient?.description || ''),
+      provider: String(entry?.provider || ''),
+      unit: String(entry?.unit || ''),
+      packageQty: Number(entry?.packageQty || record?.packageQty || 0) || 0,
+      entryDate: String(entry?.entryDate || ''),
+      expiryDate: String(entry?.expiryDate || ''),
+      limitDate: limitIso,
+      rotationDays: Number(weeklyCfg?.rotationDays || 0),
+      availableQty: Number(entry?.availableQty || 0),
+      availableBase,
+      processDays,
+      rules: {
+        mondayToSaturdayOnly: true,
+        excludeHolidayTypes: ['inamovible', 'puente'],
+        openWindows: CFG.OPEN_WINDOWS,
+        minWeightOrVolumeQty: CFG.MIN_WEIGHT_VOL_MOVE_QTY,
+        minUnitQty: CFG.MIN_UNIT_MOVE_QTY
+      }
+    };
+
+    const sys = 'Sos un planificador de ventas en local para frigorífico. Responde SOLO JSON válido.';
+    const usr = `Genera movimientos de egreso realistas para el contexto: ${JSON.stringify(prompt)}.\nFormato estricto de salida: {"movements":[{"dayIso":"YYYY-MM-DD","qty":number}]} .\nReglas: no inventar días fuera de processDays, cantidades positivas, y suma <= availableQty.`;
+    const payload = {
+      model: CFG.DEEPSEEK_MODEL,
+      temperature: 0.25,
+      messages: [
+        { role: 'system', content: sys },
+        { role: 'user', content: usr }
+      ]
+    };
+
+    Logger.log(`[AutoEgreso][AI] Consultando DeepSeek para ${ingredientId} run=${runId}`);
+    const response = callDeepseek(payload);
+    const content = String(response?.choices?.[0]?.message?.content || '');
+    const parsed = parseAiJsonFromText(content);
+    if (!parsed || !Array.isArray(parsed.movements)) {
+      Logger.log(`[AutoEgreso][AI] Respuesta inválida para ${ingredientId}. Fallback local.`);
+      return null;
+    }
+
+    const allowed = new Set(processDays);
+    const planByDay = {};
+    parsed.movements.forEach((move) => {
+      const dayIso = normalizeIso(move?.dayIso);
+      if (!dayIso || !allowed.has(dayIso)) return;
+      const qty = Number(move?.qty || 0);
+      if (!Number.isFinite(qty) || qty <= 0) return;
+      const base = roundBaseReasonable(toBase(qty, unitMeta), unitMeta);
+      if (base <= CFG.EPS) return;
+      if (!Array.isArray(planByDay[dayIso])) planByDay[dayIso] = [];
+      planByDay[dayIso].push(base);
+    });
+
+    const totalBase = Object.values(planByDay).flat().reduce((acc, item) => acc + Number(item || 0), 0);
+    if (totalBase <= CFG.EPS) {
+      Logger.log(`[AutoEgreso][AI] Sin movimientos utilizables para ${ingredientId}. Fallback local.`);
+      return null;
+    }
+
+    if (totalBase > availableBase) {
+      const ratio = availableBase / totalBase;
+      Object.keys(planByDay).forEach((day) => {
+        planByDay[day] = planByDay[day].map((b) => roundBaseReasonable(Number(b || 0) * ratio, unitMeta)).filter((b) => b > CFG.EPS);
+      });
+    }
+
+    Logger.log(`[AutoEgreso][AI] Plan aplicado para ${ingredientId}. días=${Object.keys(planByDay).length}`);
+    return planByDay;
+  } catch (error) {
+    Logger.log(`[AutoEgreso][AI] Error para ${ctx.ingredientId}: ${error.message}. Fallback local.`);
+    return null;
+  }
+}
+
+function callDeepseek(payload) {
+  const response = UrlFetchApp.fetch('https://api.deepseek.com/chat/completions', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: `Bearer ${CFG.DEEPSEEK_API_KEY}` },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  });
+  const code = response.getResponseCode();
+  const txt = response.getContentText() || '{}';
+  if (code < 200 || code >= 300) {
+    throw new Error(`DeepSeek ${code}: ${txt}`);
+  }
+  return JSON.parse(txt);
+}
+
+function parseAiJsonFromText(text) {
+  const content = String(text || '').trim();
+  if (!content) return null;
+  try {
+    return JSON.parse(content);
+  } catch (_error) {
+    const block = content.match(/```json([\s\S]*?)```/i) || content.match(/```([\s\S]*?)```/);
+    if (block?.[1]) {
+      try { return JSON.parse(block[1].trim()); } catch (_inner) {}
+    }
+    const first = content.indexOf('{');
+    const last = content.lastIndexOf('}');
+    if (first >= 0 && last > first) {
+      try { return JSON.parse(content.slice(first, last + 1)); } catch (_inner2) {}
+    }
+    return null;
+  }
 }
 
 function withDefaultWeeklyConfig(cfg) {
