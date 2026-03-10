@@ -26,7 +26,10 @@ const CFG = {
   MIN_UNIT_MOVE_QTY: 1,
   DEEPSEEK_MODEL_FALLBACK: PropertiesService.getScriptProperties().getProperty('DEEPSEEK_MODEL') || 'deepseek-chat',
   DEEPSEEK_ENABLED: String(PropertiesService.getScriptProperties().getProperty('DEEPSEEK_ENABLED') || 'true').toLowerCase() !== 'false',
-  DEEPSEEK_MAX_BATCH_ITEMS: Number(PropertiesService.getScriptProperties().getProperty('DEEPSEEK_MAX_BATCH_ITEMS') || 20)
+  DEEPSEEK_MAX_BATCH_ITEMS: Number(PropertiesService.getScriptProperties().getProperty('DEEPSEEK_MAX_BATCH_ITEMS') || 20),
+  MAX_RUN_MILLIS: Number(PropertiesService.getScriptProperties().getProperty('AUTO_EGRESOS_MAX_RUN_MILLIS') || 330000),
+  MAX_PRODUCTS_PER_RUN: Number(PropertiesService.getScriptProperties().getProperty('AUTO_EGRESOS_MAX_PRODUCTS_PER_RUN') || 60),
+  RUN_CURSOR_KEY: 'AUTO_EGRESOS_CURSOR'
 };
 
 const RUNTIME = {
@@ -36,6 +39,7 @@ const RUNTIME = {
 function runAutoEgresos() {
   if (!CFG.WORKER_BASE_URL) throw new Error('Falta Script Property WORKER_BASE_URL');
 
+  const runStartedAt = Date.now();
   const now = new Date();
   if (CFG.STRICT_RUN_WINDOW && !isWithinOpenWindows(now, CFG.TIMEZONE, CFG.OPEN_WINDOWS)) {
     logInfo('⏰ Fuera de horario comercial. No se ejecuta.');
@@ -49,60 +53,114 @@ function runAutoEgresos() {
   const ingredientes = safeObj(workerRead('/ingredientes/items') || {});
   const todayIso = dateToIso(now, CFG.TIMEZONE);
 
+  const allIngredientIds = Object.keys(items);
+  if (!allIngredientIds.length) {
+    clearRunCursor_();
+    logInfo(`✅ Auto-egresos OK sin items | runId=${runId}`);
+    return;
+  }
+
   let affectedProducts = 0;
   let generatedMovements = 0;
 
-  const yearsNeeded = collectYearsToFetch(items, todayIso);
-  const holidaySet = fetchHolidaySet(yearsNeeded);
-  const aiPlansByEntryId = buildAiBatchPlans({ items, ingredientes, todayIso, holidaySet, runId });
+  const resumeCursor = getRunCursor_();
+  const startIndex = resolveStartIndex_(allIngredientIds, resumeCursor);
+  const maxProducts = Math.max(1, Number(CFG.MAX_PRODUCTS_PER_RUN || 60));
+  const selectedIds = allIngredientIds.slice(startIndex, startIndex + maxProducts);
+  const hasMoreByCap = (startIndex + selectedIds.length) < allIngredientIds.length;
+  if (!selectedIds.length) {
+    clearRunCursor_();
+    logInfo(`✅ Auto-egresos OK | sin productos pendientes | runId=${runId}`);
+    return;
+  }
 
-  Object.keys(items).forEach((ingredientId) => {
+  const scopedItems = {};
+  selectedIds.forEach((ingredientId) => { scopedItems[ingredientId] = items[ingredientId]; });
+
+  const yearsNeeded = collectYearsToFetch(scopedItems, todayIso);
+  const holidaySet = fetchHolidaySet(yearsNeeded);
+  const aiPlansByEntryId = buildAiBatchPlans({ items: scopedItems, ingredientes, todayIso, holidaySet, runId });
+
+  let timedOut = false;
+  for (let i = 0; i < selectedIds.length; i += 1) {
+    const ingredientId = selectedIds[i];
+    if (Date.now() - runStartedAt >= CFG.MAX_RUN_MILLIS) {
+      timedOut = true;
+      setRunCursor_(ingredientId);
+      logWarn(`⏱️ Corte por tiempo de ejecución. Continúa en próxima corrida desde ${ingredientId}.`);
+      break;
+    }
+
     const record = items[ingredientId];
-    if (!record || !Array.isArray(record.entries) || !record.entries.length) return;
+    if (!record || !Array.isArray(record.entries) || !record.entries.length) continue;
 
     const weeklyCfg = withDefaultWeeklyConfig(record.weeklySheetConfig);
-    if (!weeklyCfg.egresoEnabled) return;
+    if (!weeklyCfg.egresoEnabled) continue;
 
     let changedRecord = false;
+    const ingredientInfo = safeObj(ingredientes[ingredientId]);
+    const ingredientName = String(ingredientInfo.name || ingredientId);
+    const ingredientDesc = String(ingredientInfo.description || 'Sin descripción');
+    const entries = Array.isArray(record.entries) ? record.entries : [];
 
-    record.entries = record.entries.map((entry) => {
-      const normalized = normalizeLegacyAutoEgresoEntry(entry);
-      if (normalized.changed) {
-        changedRecord = true;
-        logInfo(`🧹 Normalizado legado auto-egreso en lote ${entry.id || '-'} (${ingredientId})`);
-      }
-      const ingredientInfo = safeObj(ingredientes[ingredientId]);
-      const ingredientName = String(ingredientInfo.name || ingredientId);
-      const ingredientDesc = String(ingredientInfo.description || 'Sin descripción');
-      const result = processEntryAutoEgreso({
-        ingredientId,
-        ingredient: ingredientInfo,
-        record,
-        entry: normalized.entry,
-        weeklyCfg,
-        todayIso,
-        holidaySet,
-        runId,
-        aiPlanByDay: safeObj(aiPlansByEntryId[normalizeText(normalized.entry.id)])
-      });
-      if (result.changed) {
-        logInfo(`🧾 ${ingredientName} | ${ingredientDesc} | lote ${normalized.entry.id || '-'} | +${result.movementsCreated} mov.`);
-      }
-      if (!result.changed) return normalized.entry;
-      changedRecord = true;
-      generatedMovements += result.movementsCreated;
-      return result.entry;
-    });
+    for (let j = 0; j < entries.length; j += 1) {
+      const entry = entries[j];
+      try {
+        const normalized = normalizeLegacyAutoEgresoEntry(entry);
+        if (normalized.changed) {
+          changedRecord = true;
+          logInfo(`🧹 Normalizado legado auto-egreso en lote ${entry.id || '-'} (${ingredientId})`);
+        }
 
+        const result = processEntryAutoEgreso({
+          ingredientId,
+          ingredient: ingredientInfo,
+          record,
+          entry: normalized.entry,
+          weeklyCfg,
+          todayIso,
+          holidaySet,
+          runId,
+          aiPlanByDay: safeObj(aiPlansByEntryId[normalizeText(normalized.entry.id)])
+        });
+        entries[j] = result.entry;
+
+        if (result.changed) {
+          logInfo(`🧾 ${ingredientName} | ${ingredientDesc} | lote ${normalized.entry.id || '-'} | +${result.movementsCreated} mov.`);
+          changedRecord = true;
+          generatedMovements += result.movementsCreated;
+        }
+      } catch (error) {
+        logError(`❌ Error procesando lote ${entry?.id || '-'} de ${ingredientId}: ${error.message}`);
+      }
+    }
+
+    record.entries = entries;
     if (changedRecord) {
       recalcRecordStock(record);
       workerWrite(`/inventario/items/${ingredientId}`, record);
       logInfo(`📦 Producto ${ingredientId} actualizado | stockBase=${record.stockBase} | stockKg=${record.stockKg}`);
       affectedProducts += 1;
     }
-  });
 
-  logInfo(`✅ Auto-egresos OK | productos=${affectedProducts} | movimientos=${generatedMovements} | runId=${runId}`);
+    const nextId = selectedIds[i + 1] || '';
+    if (nextId) {
+      setRunCursor_(nextId);
+    } else if (hasMoreByCap) {
+      setRunCursor_(allIngredientIds[startIndex + selectedIds.length] || '');
+    }
+  }
+
+  if (!timedOut) {
+    if (hasMoreByCap) {
+      setRunCursor_(allIngredientIds[startIndex + selectedIds.length] || '');
+      logInfo(`⏭️ Quedaron productos pendientes por límite de corrida. Sigue desde ${allIngredientIds[startIndex + selectedIds.length] || '-'}.`);
+    } else {
+      clearRunCursor_();
+    }
+  }
+
+  logInfo(`✅ Auto-egresos OK | productos=${affectedProducts} | movimientos=${generatedMovements} | runId=${runId} | cursor=${getRunCursor_() || '-'}`);
 }
 
 
@@ -237,6 +295,7 @@ function processEntryAutoEgreso(ctx) {
     entry.lotStatus = 'disponible';
   }
 
+  entry.autoEgresoState = safeObj(entry.autoEgresoState);
   entry.autoEgresoState.lastProcessedDate = toIso;
   entry.autoEgresoState.lastRunAt = Date.now();
   entry.autoEgresoState.lastRunId = runId;
@@ -300,6 +359,29 @@ function pushAutoEgresoMovement(entry, meta) {
     source: 'apps_script_auto_egreso',
     reference: runId
   });
+}
+
+function resolveStartIndex_(ingredientIds, cursorId) {
+  if (!cursorId) return 0;
+  const idx = ingredientIds.indexOf(String(cursorId));
+  return idx >= 0 ? idx : 0;
+}
+
+function getRunCursor_() {
+  return String(PropertiesService.getScriptProperties().getProperty(CFG.RUN_CURSOR_KEY) || '').trim();
+}
+
+function setRunCursor_(ingredientId) {
+  const value = String(ingredientId || '').trim();
+  if (!value) {
+    clearRunCursor_();
+    return;
+  }
+  PropertiesService.getScriptProperties().setProperty(CFG.RUN_CURSOR_KEY, value);
+}
+
+function clearRunCursor_() {
+  PropertiesService.getScriptProperties().deleteProperty(CFG.RUN_CURSOR_KEY);
 }
 
 function installAutoEgresoTriggerHourly() {
