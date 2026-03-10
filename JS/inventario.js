@@ -4561,7 +4561,7 @@
     const draft = safeObject(state.editorDraft);
     Swal.fire({
       title: 'Actualizando lote...',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Actualizando lote" class="meta-spinner-login"><p style="margin-top:8px;color:#5f6f95;font-weight:600">Actualizando lote...</p></div>',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Actualizando lote" class="meta-spinner-login"></div>',
       allowOutsideClick: false,
       allowEscapeKey: false,
       showConfirmButton: false,
