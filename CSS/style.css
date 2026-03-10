@@ -6170,6 +6170,35 @@ html.login-protected.auth-ok body {
   word-break: break-word;
 }
 
+.dispatch-expiry-cell.is-danger {
+  color: #b42338;
+  font-weight: 700;
+}
+
+.dispatch-expiry-text-danger {
+  color: #b42338;
+  font-weight: 800;
+}
+
+.dispatch-expired-row td {
+  background: #fff0f3 !important;
+  border-top: 1px solid #f2b9c5 !important;
+}
+
+.dispatch-expired-copy {
+  margin: 0;
+  color: #ad1f3a;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.dispatch-expired-actions {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .dispatch-stock-block {
   display: block;
 }
@@ -6395,6 +6424,12 @@ html.login-protected.auth-ok body {
   border-color: #f2c8d0;
   background: #fff0f3;
   color: #b53c53;
+}
+
+.produccion-check-item.is-expired {
+  border-color: #ffd6a4;
+  background: #fff4e4;
+  color: #b26b08;
 }
 
 .produccion-badges {
@@ -9142,22 +9177,22 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 
 
 .produccion-card.tone-expired {
-  border-color: #c9b4f8;
-  background: #f3edff;
+  border-color: #f1cf9a;
+  background: #fff8ee;
 }
 
 .produccion-chip.tone-expired {
-  color: #6d35b3;
-  background: #efe6ff;
-  border-color: #ccb4f4;
+  color: #a86409;
+  background: #fff1df;
+  border-color: #f3d2a5;
 }
 
 .produccion-progress-wrap.is-expired-only small {
-  color: #6d35b3;
+  color: #9f5b00;
 }
 
 .produccion-progress-bar span.is-expired {
-  background: linear-gradient(90deg, #8b5cf6 0%, #a855f7 100%);
+  background: linear-gradient(90deg, #ffb85c 0%, #ff8a00 100%);
 }
 
 .produccion-max-expired-only {
