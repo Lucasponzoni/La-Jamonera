@@ -156,9 +156,14 @@
         </div>
         <div class="home-content panel-home-content">
           <section id="panelDashboard" class="panel-grid" aria-live="polite">
+            <article id="panelResumen" class="glass-card panel-card panel-card-wide panel-summary-card">
+              <header class="panel-card-head"><h3><i class="bi bi-bell-fill"></i> Recordatorios y estado general</h3></header>
+              <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando métricas" class="panel-spinner"></div></div>
+            </article>
+
             <article id="panelUltimoInforme" class="glass-card panel-card">
               <header class="panel-card-head">
-                <h3>Último informe</h3>
+                <h3><i class="bi bi-journal-medical"></i> Último informe</h3>
                 <span id="panelInformeAgo" class="panel-pill d-none"></span>
               </header>
               <div class="panel-card-body">
@@ -166,29 +171,24 @@
               </div>
             </article>
 
-            <article id="panelResumen" class="glass-card panel-card panel-card-wide">
-              <header class="panel-card-head"><h3>Recordatorios y estado general</h3></header>
-              <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando métricas" class="panel-spinner"></div></div>
-            </article>
-
             <article id="panelRne" class="glass-card panel-card d-none">
-              <header class="panel-card-head"><h3>Inventario · Proveedores con RNE pendiente</h3></header>
+              <header class="panel-card-head"><h3><i class="bi bi-clipboard2-pulse"></i> Inventario · Proveedores con RNE pendiente</h3></header>
               <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando proveedores" class="panel-spinner"></div></div>
             </article>
 
             <article id="panelRnpa" class="glass-card panel-card d-none">
-              <header class="panel-card-head"><h3>RNPA de recetas</h3></header>
+              <header class="panel-card-head"><h3><i class="bi bi-card-checklist"></i> RNPA de recetas</h3></header>
               <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando RNPA" class="panel-spinner"></div></div>
             </article>
 
             <article id="panelTransporte" class="glass-card panel-card d-none">
-              <header class="panel-card-head"><h3>Transporte habilitado (UTA/URA)</h3></header>
+              <header class="panel-card-head"><h3><i class="bi bi-truck"></i> Transporte habilitado (UTA/URA)</h3></header>
               <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando transporte" class="panel-spinner"></div></div>
             </article>
 
             <article id="panelProduccion" class="glass-card panel-card panel-card-wide">
               <header class="panel-card-head">
-                <h3>Producción en kilos</h3>
+                <h3><i class="bi bi-bar-chart-fill"></i> Producción en kilos</h3>
                 <input id="panelChartRange" class="form-control ios-input panel-range-input" placeholder="Filtrar rango de fechas">
               </header>
               <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando producción" class="panel-spinner"></div></div>
