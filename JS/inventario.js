@@ -2099,7 +2099,7 @@
             ? 'Decomisado'
             : '';
     if (!baseLabel) return { badge: '', status };
-    if (isFull) return { badge: `${baseLabel} (lote completo)`, status };
+    if (isFull) return { badge: `${baseLabel}`, status };
     if (resolvedKg > 0.0001 && totalKg > 0.0001) {
       return { badge: `${baseLabel} ${resolvedKg.toFixed(1)}Kg de ${totalKg.toFixed(0)}Kg`, status };
     }
