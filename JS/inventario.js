@@ -2065,6 +2065,8 @@
   const getEntryResolutionMeta = (entry) => {
     const resolutions = Array.isArray(entry?.expiryResolutions) ? entry.expiryResolutions : [];
     const latest = resolutions[0] || null;
+    const latestIsAuto = Boolean(latest?.generatedAutomatically) || normalizeValue(latest?.source) === 'apps_script_auto_egreso' || normalizeValue(latest?.type) === 'auto_sold_local';
+    if (latestIsAuto) return { badge: '', status: '' };
     const status = normalizeValue(entry?.expiryResolutionStatus || entry?.status || latest?.type);
     const totalKg = Number(entry?.qtyKg || 0);
     const availableKg = getAvailableKg(entry);
