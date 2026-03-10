@@ -50,6 +50,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <link rel="stylesheet" href="./CSS/style.css">
+  <link rel="stylesheet" href="./CSS/panel.css">
 </head>
 <body>
   <main class="app-shell container-fluid px-0">
@@ -153,9 +154,46 @@
             </button>
           </div>
         </div>
-        <div class="home-content">
-          <h2 class="home-title">Panel de La Jamonera</h2>
-          <p class="home-text">Sesión iniciada correctamente.</p>
+        <div class="home-content panel-home-content">
+          <section id="panelDashboard" class="panel-grid" aria-live="polite">
+            <article id="panelUltimoInforme" class="glass-card panel-card">
+              <header class="panel-card-head">
+                <h3>Último informe</h3>
+                <span id="panelInformeAgo" class="panel-pill d-none"></span>
+              </header>
+              <div class="panel-card-body">
+                <div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando informe" class="panel-spinner"></div>
+              </div>
+            </article>
+
+            <article id="panelResumen" class="glass-card panel-card panel-card-wide">
+              <header class="panel-card-head"><h3>Recordatorios y estado general</h3></header>
+              <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando métricas" class="panel-spinner"></div></div>
+            </article>
+
+            <article id="panelRne" class="glass-card panel-card d-none">
+              <header class="panel-card-head"><h3>Inventario · Proveedores con RNE pendiente</h3></header>
+              <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando proveedores" class="panel-spinner"></div></div>
+            </article>
+
+            <article id="panelRnpa" class="glass-card panel-card d-none">
+              <header class="panel-card-head"><h3>RNPA de recetas</h3></header>
+              <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando RNPA" class="panel-spinner"></div></div>
+            </article>
+
+            <article id="panelTransporte" class="glass-card panel-card d-none">
+              <header class="panel-card-head"><h3>Transporte habilitado (UTA/URA)</h3></header>
+              <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando transporte" class="panel-spinner"></div></div>
+            </article>
+
+            <article id="panelProduccion" class="glass-card panel-card panel-card-wide">
+              <header class="panel-card-head">
+                <h3>Producción en kilos</h3>
+                <input id="panelChartRange" class="form-control ios-input panel-range-input" placeholder="Filtrar rango de fechas">
+              </header>
+              <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando producción" class="panel-spinner"></div></div>
+            </article>
+          </section>
         </div>
       </div>
 
@@ -542,6 +580,7 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
   <script src="./JS/swal-a11y-guard.js"></script>
   <script src="./JS/firebase-init.js"></script>
+  <script src="./JS/panelcontrol.js"></script>
   <script src="./JS/ingredientes.js"></script>
   <script src="./JS/recetas.js"></script>
   <script src="./JS/inventario.js"></script>
