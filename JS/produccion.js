@@ -3039,24 +3039,25 @@
       hasStock: remaining <= 0.0001
     };
   };
-  const registerDispatchExpiredResolution = async ({ recipeId = '', lotNumber = '', qtyKg = 0, expiryDate = '', resolutionType = 'retail_sale', dispatchDate = toIsoDate() } = {}) => {
+  const registerDispatchExpiredResolution = async ({ recipeId = '', lotNumber = '', productionId = '', qtyKg = 0, expiryDate = '', resolutionType = 'retail_sale', dispatchDate = toIsoDate() } = {}) => {
     const safeRecipeId = normalizeValue(recipeId);
     const safeLot = normalizeValue(lotNumber) || '-';
     const safeExpiry = normalizeValue(expiryDate);
     const safeQty = Number(qtyKg || 0);
     if (!safeRecipeId || safeQty <= 0) return false;
     const movementLabel = resolutionType === 'decommissioned' ? 'Decomisado' : 'Venta en Sucursal';
+    const safeProductionId = normalizeValue(productionId) || safeLot;
     appendRecipeMovement(safeRecipeId, {
       id: makeId('egr_sin_trazabilidad'),
       type: 'egreso',
       qtyKg: Number(safeQty.toFixed(3)),
       at: nowTs(),
-      sourceId: '',
-      sourceCode: 'SIN TRAZABILIDAD',
+      sourceId: safeProductionId,
+      sourceCode: safeProductionId,
       label: movementLabel,
       date: dispatchDate,
       reason: resolutionType,
-      nonTraceable: true,
+      nonTraceable: false,
       lotNumber: safeLot,
       expiryDate: safeExpiry
     });
@@ -6007,8 +6008,8 @@
       const upcomingLot = buildRecipeLotsForDispatch(recipeId).find((lot) => !isDispatchLotExpiredForDate(lot, dispatchDate) && Number(lot.availableKg || 0) > 0.0001);
       const confirmTitle = actionType === 'decommissioned' ? '¿Marcar lote como decomisado?' : '¿Marcar lote como venta en sucursal?';
       const confirmText = actionType === 'decommissioned'
-        ? 'Se descontará todo el disponible del lote vencido y se registrará un egreso sin trazabilidad como Decomisado.'
-        : 'Se descontará todo el disponible del lote vencido y se registrará un egreso sin trazabilidad como Venta en Sucursal.';
+        ? 'Se descontará todo el disponible del lote vencido y se registrará un egreso como Decomisado, vinculado al número de producción.'
+        : 'Se descontará todo el disponible del lote vencido y se registrará un egreso como Venta en Sucursal, vinculado al número de producción.';
       const extraLotText = upcomingLot
         ? `<small>Al confirmar cargaremos otro lote disponible: <strong>${escapeHtml(upcomingLot.lotNumber || '-')}</strong> con <strong>${Number(upcomingLot.availableKg || 0).toFixed(2)} kg</strong>.</small>`
         : '<small>Si no hay otro lote vigente, la fila del producto se quitará para que puedas seguir cargando el reparto.</small>';
@@ -6024,6 +6025,7 @@
       const applied = await registerDispatchExpiredResolution({
         recipeId,
         lotNumber: normalizeValue(expiredLot.lotNumber),
+        productionId: normalizeValue(expiredLot.productionId),
         qtyKg: Number(expiredLot.availableKg || 0),
         expiryDate: normalizeValue(expiredLot.expiryDate),
         resolutionType: actionType === 'decommissioned' ? 'decommissioned' : 'retail_sale',
