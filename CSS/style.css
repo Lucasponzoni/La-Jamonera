@@ -6336,6 +6336,7 @@ html.login-protected.auth-ok body {
 .dispatch-client-row-main small {
   display: block;
   color: #6f7fa2;
+  text-align: center;
 }
 
 .dispatch-client-row .dispatch-client-suggest-avatar {
@@ -7206,7 +7207,6 @@ html.login-protected.auth-ok body {
 .inventario-internal-use-row td {
   background: #fff2e3 !important;
   border-top: 1px dashed #ef8f27 !important;
-  color: #9a4f0a;
   font-size: 0.82rem;
 }
 
