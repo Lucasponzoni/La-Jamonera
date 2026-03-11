@@ -5123,14 +5123,18 @@
             { key: 'warning', label: '< de 6 meses', tone: 'warning', count: counts.warning },
             { key: 'danger', label: '< de 60 días', tone: 'danger', count: counts.danger }
           ];
-          const providers = sortedProviders().filter((provider) => {
-            if (state.providerRneFilter !== 'all' && getProviderRneStatus(provider).key !== state.providerRneFilter) return false;
-            if (!state.providerRneSearch) return true;
-            const blob = [provider.name, provider.email, provider.phone, provider.rne?.number].map(normalizeLower).join(' ');
-            return blob.includes(state.providerRneSearch);
-          });
-          const pager = getPagedRows(providers, state.providerRnePage, PAGE_SIZE);
-          state.providerRnePage = pager.page;
+          const buildPager = () => {
+            const providers = sortedProviders().filter((provider) => {
+              if (state.providerRneFilter !== 'all' && getProviderRneStatus(provider).key !== state.providerRneFilter) return false;
+              if (!state.providerRneSearch) return true;
+              const blob = [provider.name, provider.email, provider.phone, provider.rne?.number].map(normalizeLower).join(' ');
+              return blob.includes(state.providerRneSearch);
+            });
+            const pager = getPagedRows(providers, state.providerRnePage, PAGE_SIZE);
+            state.providerRnePage = pager.page;
+            return pager;
+          };
+          const pager = buildPager();
 
           root.innerHTML = `<div class="inventario-provider-manager-head">
             <div class="inventario-provider-manager-copy-wrap">
@@ -5143,11 +5147,23 @@
           <div id="inventarioProviderRneFilters" class="inventario-status-filters">${options.map((option) => `<button type="button" class="inventario-status-btn tone-${option.tone} ${state.providerRneFilter === option.key ? 'is-active' : ''}" data-provider-rne-filter="${option.key}" ${option.count === 0 ? "disabled" : ""}><span>${option.label}</span><strong>${option.count}</strong></button>`).join('')}</div>
           <div id="inventarioProviderRneList" class="inventario-provider-rne-list">${pager.rows.length ? pager.rows.map(renderProviderCard).join('') : '<div class="ingrediente-empty-list">No hay proveedores para este filtro.</div>'}</div>
           <div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-provider-page="prev" ${pager.page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${pager.page} de ${pager.pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-provider-page="next" ${pager.page >= pager.pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+          const renderProviderRowsOnly = () => {
+            const nextPager = buildPager();
+            const listNode = root.querySelector('#inventarioProviderRneList');
+            const pagerWrap = root.querySelector('.inventario-pagination.enhanced');
+            if (listNode) {
+              listNode.innerHTML = nextPager.rows.length ? nextPager.rows.map(renderProviderCard).join('') : '<div class="ingrediente-empty-list">No hay proveedores para este filtro.</div>';
+            }
+            if (pagerWrap) {
+              pagerWrap.innerHTML = `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-provider-page="prev" ${nextPager.page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${nextPager.page} de ${nextPager.pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-provider-page="next" ${nextPager.page >= nextPager.pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button>`;
+            }
+            initThumbLoading(root);
+          };
           const searchInput = root.querySelector('#inventarioProviderSearchInput');
           searchInput?.addEventListener('input', (event) => {
             state.providerRneSearch = normalizeLower(event.target.value);
             state.providerRnePage = 1;
-            rerender();
+            renderProviderRowsOnly();
           });
           if (activeSearch && searchInput) {
             requestAnimationFrame(() => {

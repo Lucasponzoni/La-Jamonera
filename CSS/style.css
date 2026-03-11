@@ -4210,7 +4210,10 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   display: flex;
   gap: 8px;
   align-items: center;
-  overflow: visible;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
   white-space: nowrap;
   padding-bottom: 4px;
 }
@@ -5672,6 +5675,19 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 
 .produccion-recipe-history-modal .inventario-table-compact-wrap.is-expanded {
   max-height: 70vh;
+}
+
+.produccion-recipe-history-modal .inventario-table-compact-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+}
+
+.produccion-recipe-history-table-host {
+  max-height: 52vh;
+  overflow: auto;
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 @media (max-width: 768px) {
