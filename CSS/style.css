@@ -46,7 +46,10 @@ html.login-protected.auth-ok body {
   visibility: visible;
 }
 
-
+div:where(.swal2-container).swal2-center>.swal2-popup {
+    padding: 15px 20px;
+    border-radius: 24px;
+}
 /* =========================================
    MODAL OVERLAY SPINNER
 ========================================= */
