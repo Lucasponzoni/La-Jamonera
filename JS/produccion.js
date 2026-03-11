@@ -408,7 +408,7 @@
     return `${match[3]}-${match[2]}-${match[1]}`;
   };
   const hasPlanillaDisponible = (registro) => Number(registro?.planillaVersion || 0) >= 1;
-  const getPublicTraceUrlForProduction = (productionId) => `https://lucasponzoni.github.io/La-Jamonera/${encodeURIComponent(normalizeValue(productionId))}`;
+  const getPublicTraceUrlForProduction = (productionId) => `https://www.lajamonera.online/${encodeURIComponent(normalizeValue(productionId))}`;
   const formatValidProductionRange = (entryDate, expiryDate) => {
     const from = formatIsoEs(normalizeValue(entryDate));
     const to = formatIsoEs(normalizeValue(expiryDate));
@@ -1977,7 +1977,7 @@
     if (window.laJamoneraPlanillaProduccion?.getTraceUrl) {
       return window.laJamoneraPlanillaProduccion.getTraceUrl(registro);
     }
-    return `https://lucasponzoni.github.io/La-Jamonera/produccion_publica.html?id=${encodeURIComponent(normalizeValue(registro?.id))}`;
+    return `https://www.lajamonera.online/produccion_publica.html?id=${encodeURIComponent(normalizeValue(registro?.id))}`;
   };
 
   const getQrPrintSizeConfig = (value) => {
@@ -3180,7 +3180,7 @@
   )));
   const getDispatchTraceUrl = (productionId) => {
     const id = encodeURIComponent(normalizeValue(productionId));
-    return `https://lucasponzoni.github.io/La-Jamonera/produccion_publica.html?id=${id}`;
+    return `https://www.lajamonera.online/produccion_publica.html?id=${id}`;
   };
   const renderDispatchPlanillaQr = async (host, dispatchRow) => {
     if (!host || !dispatchRow?.id) return;
