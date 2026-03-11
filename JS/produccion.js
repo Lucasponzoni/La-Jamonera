@@ -41,13 +41,12 @@
   const ALLOWED_RNE_UPLOAD_TYPES = [...ALLOWED_UPLOAD_TYPES, 'application/pdf'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
   const QR_PRINT_SIZES = [
-    { value: '40x30', label: '4cm x 3cm', widthMm: 40, heightMm: 30 },
-    { value: '40x30-landscape', label: '40 x 30', widthMm: 40, heightMm: 30 },
-    { value: '80x40', label: '80 x 40', widthMm: 80, heightMm: 40 },
-    { value: '50x25', label: '50 x 25', widthMm: 50, heightMm: 25 },
-    { value: '100x80', label: '100 x 80', widthMm: 100, heightMm: 80 },
-    { value: '80x25', label: '80 x 25', widthMm: 80, heightMm: 25 },
-    { value: '100x35', label: '100 x 35', widthMm: 100, heightMm: 35 }
+    { value: '40x30', label: '4cm x 3cm (40 x 30 mm)', widthMm: 40, heightMm: 30 },
+    { value: '80x40', label: '8cm x 4cm (80 x 40 mm)', widthMm: 80, heightMm: 40 },
+    { value: '50x25', label: '5cm x 2.5cm (50 x 25 mm)', widthMm: 50, heightMm: 25 },
+    { value: '100x80', label: '10cm x 8cm (100 x 80 mm)', widthMm: 100, heightMm: 80 },
+    { value: '80x25', label: '8cm x 2.5cm (80 x 25 mm)', widthMm: 80, heightMm: 25 },
+    { value: '100x35', label: '10cm x 3.5cm (100 x 35 mm)', widthMm: 100, heightMm: 35 }
   ];
   const ROSARIO_DEPT_LOCALITIES = ['Rosario', 'Villa Gobernador Gálvez', 'Pérez', 'Funes', 'Roldán', 'Ibarlucea', 'Alvear', 'Pueblo Esther', 'General Lagos', 'Arroyo Seco', 'Piñero'];
   const state = {
@@ -1983,6 +1982,18 @@
     return `https://lucasponzoni.github.io/La-Jamonera/produccion_publica.html?id=${encodeURIComponent(normalizeValue(registro?.id))}`;
   };
 
+  const getQrPrintSizeConfig = (value) => {
+    const item = QR_PRINT_SIZES.find((size) => size.value === value);
+    return item || QR_PRINT_SIZES[0];
+  };
+
+  const loadImageFromDataUrl = (src) => new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('No se pudo generar el QR para impresión.'));
+    img.src = src;
+  });
+
   const getQrDataUrl = async (text) => {
     const ready = await ensureQrCodeLib();
     if (!ready || !window.QRCode) return '';
@@ -2002,6 +2013,123 @@
     }
   };
 
+  const drawRoundRect = (ctx, x, y, w, h, radius) => {
+    const r = Math.max(0, Math.min(radius, Math.min(w, h) / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  };
+
+  const wrapTextLines = (ctx, text, maxWidth) => {
+    const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return ['-'];
+    const lines = [];
+    let line = '';
+    words.forEach((word) => {
+      const trial = line ? `${line} ${word}` : word;
+      if (ctx.measureText(trial).width <= maxWidth || !line) {
+        line = trial;
+      } else {
+        lines.push(line);
+        line = word;
+      }
+    });
+    if (line) lines.push(line);
+    return lines;
+  };
+
+  const splitProductionId = (raw) => {
+    const value = normalizeValue(raw) || '-';
+    const tokens = value.split('-').filter(Boolean);
+    if (tokens.length <= 2) return [value];
+    const first = tokens.slice(0, 2).join('-');
+    const second = tokens.slice(2).join('-');
+    return second ? [first, second] : [first];
+  };
+
+  const buildProductionQrCanvas = ({ registro, qrImage, sizeConfig }) => {
+    const scale = 12;
+    const width = Math.max(360, Math.round(sizeConfig.widthMm * scale));
+    const height = Math.max(250, Math.round(sizeConfig.heightMm * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+
+    const pagePad = Math.round(Math.min(width, height) * 0.055);
+    const cardX = pagePad;
+    const cardY = pagePad;
+    const cardW = width - (pagePad * 2);
+    const cardH = height - (pagePad * 2);
+
+    drawRoundRect(ctx, cardX, cardY, cardW, cardH, Math.round(cardH * 0.09));
+    ctx.fillStyle = '#fefefe';
+    ctx.fill();
+    ctx.strokeStyle = '#cfdaf2';
+    ctx.lineWidth = Math.max(2, Math.round(Math.min(cardW, cardH) * 0.012));
+    ctx.stroke();
+
+    const contentPad = Math.round(cardH * 0.11);
+    const qrSize = Math.round(Math.min(cardH - contentPad * 2, cardW * 0.36));
+    const qrX = cardX + contentPad;
+    const qrY = cardY + (cardH - qrSize) / 2;
+    ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
+
+    const textX = qrX + qrSize + Math.round(cardW * 0.08);
+    const textW = cardX + cardW - contentPad - textX;
+    const title = 'PRODUCCION • LA JAMONERA';
+    const idLines = splitProductionId(registro?.id);
+    const note = 'Escaneá el QR con tu celular para acceder a la trazabilidad completa del producto.';
+
+    ctx.fillStyle = '#1a2f5c';
+    ctx.font = `800 ${Math.max(22, Math.round(cardH * 0.11))}px Inter, Arial, sans-serif`;
+    const titleLines = wrapTextLines(ctx, title, textW);
+    let cursorY = cardY + contentPad + Math.round(cardH * 0.06);
+    titleLines.forEach((line) => {
+      ctx.fillText(line, textX, cursorY);
+      cursorY += Math.round(cardH * 0.12);
+    });
+
+    ctx.fillStyle = '#2452a6';
+    ctx.font = `900 ${Math.max(28, Math.round(cardH * 0.19))}px Inter, Arial, sans-serif`;
+    idLines.forEach((line) => {
+      ctx.fillText(line, textX, cursorY);
+      cursorY += Math.round(cardH * 0.19);
+    });
+
+    ctx.fillStyle = '#4d628f';
+    ctx.font = `600 ${Math.max(15, Math.round(cardH * 0.082))}px Inter, Arial, sans-serif`;
+    const noteLines = wrapTextLines(ctx, note, textW);
+    const lineH = Math.round(cardH * 0.095);
+    const noteBlockY = Math.min(cardY + cardH - contentPad - (lineH * Math.max(1, noteLines.length - 1)), cursorY + Math.round(cardH * 0.02));
+    noteLines.forEach((line, index) => {
+      ctx.fillText(line, textX, noteBlockY + (index * lineH));
+    });
+
+    return canvas;
+  };
+
+  const buildPdfFromQrCanvases = (canvases, sizeConfig) => {
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+      throw new Error('No se pudo cargar la librería PDF.');
+    }
+    const { jsPDF } = window.jspdf;
+    const orientation = sizeConfig.widthMm > sizeConfig.heightMm ? 'landscape' : 'portrait';
+    const pdf = new jsPDF({ orientation, unit: 'mm', format: [sizeConfig.widthMm, sizeConfig.heightMm] });
+    canvases.forEach((canvas, index) => {
+      if (index > 0) pdf.addPage([sizeConfig.widthMm, sizeConfig.heightMm], orientation);
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, sizeConfig.widthMm, sizeConfig.heightMm, undefined, 'FAST');
+    });
+    return pdf;
+  };
+
   const openProductionQrPrintConfigurator = async (registro) => {
     const qrDataUrl = await getQrDataUrl(getProductionTraceUrl(registro));
     if (!qrDataUrl) {
@@ -2009,32 +2137,35 @@
       return;
     }
 
+    const qrImage = await loadImageFromDataUrl(qrDataUrl);
+
     const result = await openIosSwal({
       title: `Impresión · QR ${escapeHtml(registro.id || '')}`,
       width: 820,
-      customClass: { popup: 'recipe-print-alert', denyButton: 'ios-btn ios-btn-success' },
+      customClass: {
+        popup: 'recipe-print-alert',
+        denyButton: 'ios-btn ios-btn-success'
+      },
       html: `
         <div class="recipe-print-panel">
           <div class="recipe-print-controls">
             <label class="recipe-print-field">
               <span>Tamaño de hoja</span>
-              <select id="prodQrSheetSize" class="form-select ios-input">
+              <select id="printQrSheetType" class="form-select ios-input">
                 ${QR_PRINT_SIZES.map((item) => `<option value="${item.value}">${item.label}</option>`).join('')}
               </select>
             </label>
             <label class="recipe-print-field">
-              <span>Cantidad de hojas</span>
-              <input id="prodQrSheetCount" type="number" min="1" step="1" value="1" class="form-control ios-input">
+              <span>Cantidad por hoja</span>
+              <input id="printQrPerSheet" type="number" min="1" step="1" value="1" class="form-control ios-input" disabled>
             </label>
             <label class="recipe-print-field">
-              <span>Cantidad por hoja</span>
-              <input type="number" value="1" class="form-control ios-input" disabled>
+              <span>Cantidad de hojas</span>
+              <input id="printQrSheetCount" type="number" min="1" step="1" value="1" class="form-control ios-input">
             </label>
           </div>
-          <div class="recipe-print-meta" id="prodQrMeta"></div>
-          <div class="recipe-print-preview-wrap">
-            <div id="prodQrPreview" class="produccion-qr-print-preview"></div>
-          </div>
+          <div class="recipe-print-meta" id="printQrLayoutMeta"></div>
+          <div class="recipe-print-preview-wrap produccion-qr-preview-wrap" id="printQrPreviewPages"></div>
         </div>
       `,
       showCancelButton: true,
@@ -2043,44 +2174,117 @@
       denyButtonText: 'Descargar',
       confirmButtonText: 'Imprimir',
       didOpen: (popup) => {
-        const sizeNode = popup.querySelector('#prodQrSheetSize');
-        const countNode = popup.querySelector('#prodQrSheetCount');
-        const metaNode = popup.querySelector('#prodQrMeta');
-        const previewNode = popup.querySelector('#prodQrPreview');
-        const renderPreview = () => {
-          const selected = QR_PRINT_SIZES.find((item) => item.value === sizeNode.value) || QR_PRINT_SIZES[0];
-          const sheetCount = Math.max(1, Math.floor(Number(countNode.value) || 1));
-          countNode.value = String(sheetCount);
-          previewNode.innerHTML = `<article class="produccion-qr-print-card" style="--sheet-w:${selected.widthMm}mm;--sheet-h:${selected.heightMm}mm;"><img src="${qrDataUrl}" alt="QR ${escapeHtml(registro.id)}"><div class="produccion-qr-print-copy"><strong>PRODUCCION • LA JAMONERA</strong><h4>${escapeHtml(registro.id || '-')}</h4><p>Escaneá el QR con tu celular para acceder a la trazabilidad completa del producto.</p></div></article>`;
-          metaNode.innerHTML = `<strong>Formato: ${selected.label}</strong><span>Cantidad por hoja: 1</span><span>Cantidad de hojas: ${sheetCount}</span>`;
+        const panel = popup.querySelector('.recipe-print-panel');
+        const sheetTypeNode = panel.querySelector('#printQrSheetType');
+        const perSheetNode = panel.querySelector('#printQrPerSheet');
+        const sheetCountNode = panel.querySelector('#printQrSheetCount');
+        const metaNode = panel.querySelector('#printQrLayoutMeta');
+        const previewPagesNode = panel.querySelector('#printQrPreviewPages');
+
+        const panelState = { sheet: QR_PRINT_SIZES[0].value, perSheet: 1, sheetCount: 1 };
+
+        const normalizePanel = () => {
+          panelState.sheet = getQrPrintSizeConfig(sheetTypeNode.value).value;
+          panelState.perSheet = 1;
+          panelState.sheetCount = Math.max(1, Math.floor(Number(sheetCountNode.value) || 1));
+          perSheetNode.value = '1';
+          sheetCountNode.value = String(panelState.sheetCount);
+          panel.dataset.sheet = panelState.sheet;
+          panel.dataset.perSheet = '1';
+          panel.dataset.sheetCount = String(panelState.sheetCount);
         };
-        sizeNode.addEventListener('change', renderPreview);
-        countNode.addEventListener('input', renderPreview);
-        renderPreview();
+
+        const drawPreview = () => {
+          const sizeConfig = getQrPrintSizeConfig(panelState.sheet);
+          const pageCanvas = buildProductionQrCanvas({ registro, qrImage, sizeConfig });
+          const previewCount = Math.min(8, panelState.sheetCount);
+          previewPagesNode.innerHTML = '';
+          for (let index = 0; index < previewCount; index += 1) {
+            const image = document.createElement('img');
+            image.className = 'recipe-print-preview-canvas produccion-qr-preview-page';
+            image.alt = `Preview ${index + 1}`;
+            image.src = pageCanvas.toDataURL('image/png');
+            previewPagesNode.appendChild(image);
+          }
+          if (panelState.sheetCount > previewCount) {
+            const extra = document.createElement('p');
+            extra.className = 'produccion-qr-preview-extra';
+            extra.textContent = `+${panelState.sheetCount - previewCount} hoja(s) más`;
+            previewPagesNode.appendChild(extra);
+          }
+          metaNode.innerHTML = `
+            <strong>${escapeHtml(normalizeValue(registro.id) || 'Producción')}</strong>
+            <span>Formato: ${sizeConfig.label}</span>
+            <span>Disposición: 1 fila(s) × 1 columna(s)</span>
+            <span>Cantidad por hoja: 1</span>
+            <span>Cantidad de hojas: ${panelState.sheetCount}</span>
+          `;
+        };
+
+        sheetTypeNode.addEventListener('change', () => {
+          normalizePanel();
+          drawPreview();
+        });
+        sheetCountNode.addEventListener('input', () => {
+          normalizePanel();
+          drawPreview();
+        });
+
+        normalizePanel();
+        drawPreview();
       },
       preConfirm: () => {
-        const selected = QR_PRINT_SIZES.find((item) => item.value === document.getElementById('prodQrSheetSize')?.value) || QR_PRINT_SIZES[0];
-        const sheetCount = Math.max(1, Math.floor(Number(document.getElementById('prodQrSheetCount')?.value) || 1));
-        return { selected, sheetCount };
+        const panel = Swal.getPopup().querySelector('.recipe-print-panel');
+        return {
+          action: 'print',
+          sheet: panel.dataset.sheet,
+          perSheet: 1,
+          sheetCount: Number(panel.dataset.sheetCount)
+        };
+      },
+      preDeny: () => {
+        const panel = Swal.getPopup().querySelector('.recipe-print-panel');
+        return {
+          action: 'download',
+          sheet: panel.dataset.sheet,
+          perSheet: 1,
+          sheetCount: Number(panel.dataset.sheetCount)
+        };
       }
     });
 
     if (!result.isConfirmed && !result.isDenied) return;
-    const config = result.value || { selected: QR_PRINT_SIZES[0], sheetCount: 1 };
-    const pageStyle = `@page{size:${config.selected.widthMm}mm ${config.selected.heightMm}mm;margin:2mm;}body{font-family:Inter,Arial,sans-serif;background:#fff;margin:0;padding:0;}section{width:${config.selected.widthMm}mm;height:${config.selected.heightMm}mm;box-sizing:border-box;padding:2mm;display:flex;align-items:center;justify-content:center;break-after:page;}section:last-child{break-after:auto;}.card{width:100%;height:100%;border:1px solid #d8e2f7;border-radius:3mm;background:#fff;display:grid;grid-template-columns:auto 1fr;align-items:center;gap:2.5mm;padding:2.5mm;}.card img{width:30%;max-height:100%;object-fit:contain;}.copy{min-width:0}.copy strong{display:block;font-size:9pt;color:#1f2a44;}.copy h2{margin:1mm 0;font-size:16pt;line-height:1;color:#1b4ea2;}.copy p{margin:0;font-size:8pt;color:#4d5f85;line-height:1.25;}`;
-    const pages = Array.from({ length: config.sheetCount }).map(() => `<section><article class="card"><img src="${qrDataUrl}" alt="QR"><div class="copy"><strong>PRODUCCION • LA JAMONERA</strong><h2>${escapeHtml(registro.id || '-')}</h2><p>Escaneá el QR con tu celular para acceder a la trazabilidad completa del producto.</p></div></article></section>`).join('');
-    const win = window.open('', '_blank', 'width=1200,height=900');
-    if (!win) return;
-    win.document.write(`<html><head><title>QR ${escapeHtml(registro.id || '')}</title><style>${pageStyle}</style></head><body>${pages}</body></html>`);
-    win.document.close();
-    await waitPrintAssets(win);
-    if (result.isDenied) {
-      win.focus();
+
+    const config = result.value || {};
+    const sizeConfig = getQrPrintSizeConfig(config.sheet);
+    const canvases = Array.from({ length: Math.max(1, Number(config.sheetCount) || 1) }, () => buildProductionQrCanvas({ registro, qrImage, sizeConfig }));
+    const pdf = buildPdfFromQrCanvases(canvases, sizeConfig);
+    const safeName = `${normalizeLower(normalizeValue(registro?.id) || 'produccion').replace(/[^a-z0-9]+/g, '-') || 'produccion'}-qr-${sizeConfig.value}`;
+
+    if (config.action === 'download') {
+      pdf.save(`${safeName}.pdf`);
+      window.laJamoneraNotify?.show({ type: 'success', title: 'Descarga lista', message: 'Se descargó el PDF de impresión.' });
       return;
     }
-    win.focus();
-    win.print();
+
+    const pdfBlob = pdf.output('blob');
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    const printWindow = window.open(pdfUrl, '_blank');
+    if (!printWindow) {
+      URL.revokeObjectURL(pdfUrl);
+      window.laJamoneraNotify?.show({ type: 'error', title: 'Bloqueado', message: 'Permití ventanas emergentes para imprimir.' });
+      return;
+    }
+
+    const releaseUrl = () => setTimeout(() => URL.revokeObjectURL(pdfUrl), 60000);
+    printWindow.addEventListener('load', () => {
+      setTimeout(() => {
+        try { printWindow.focus(); printWindow.print(); } catch (e) {}
+        releaseUrl();
+      }, 600);
+    }, { once: true });
   };
+
   const exportProductionExcel = async (registro) => {
     if (!window.ExcelJS) return;
     const wb = new window.ExcelJS.Workbook();
@@ -4597,7 +4801,7 @@
         const planillaDisabled = hasPlanillaDisponible(item) ? '' : 'disabled';
         const traceHtml = (!isCollapsed && traceRows.length)
           ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${escapeHtml(trace.ingredientName)}</span></div></td><td></td><td><span class="produccion-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="produccion-trace-expiry">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td><td><span class="produccion-trace-badge">Trazabilidad</span></td><td>-</td><td>${trace.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images="${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td>-</td></tr>`).join('') : '';
-        return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isCollapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(item.id || '-')}</span></div></td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-recipe-prod-delete="${escapeHtml(item.id || '')}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${traceHtml}`;
+        return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isCollapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(item.id || '-')}</span></div></td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td><div class="produccion-planilla-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></button></div></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-recipe-prod-delete="${escapeHtml(item.id || '')}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${traceHtml}`;
       }).join('');
       node.innerHTML = `
         <div class="inventario-table-head enhanced">
@@ -4752,6 +4956,12 @@
         if (reg) await window.laJamoneraPlanillaProduccion?.openByRegistro?.(reg, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users) });
         return;
       }
+      const recipeQrPrintBtn = event.target.closest('[data-recipe-prod-qr-print]');
+      if (recipeQrPrintBtn) {
+        const reg = state.registros[recipeQrPrintBtn.dataset.recipeProdQrPrint];
+        if (reg) await openProductionQrPrintConfigurator(reg);
+        return;
+      }
       const recipeTraceBtn = event.target.closest('[data-recipe-prod-trace]');
       if (recipeTraceBtn) {
         const reg = state.registros[recipeTraceBtn.dataset.recipeProdTrace];
@@ -4805,7 +5015,7 @@
             const traceHtml = (!isCollapsed && traceRows.length)
               ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${escapeHtml(trace.ingredientName)}</span></div></td><td></td><td><span class="produccion-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="produccion-trace-expiry">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td><td><span class="produccion-trace-badge">Trazabilidad</span></td><td>-</td><td>${trace.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images="${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td></tr>`).join('')
               : '';
-            return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isCollapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(item.id || '-')}</span></div></td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-recipe-prod-delete="${escapeHtml(item.id || '')}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${traceHtml}`;
+            return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isCollapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(item.id || '-')}</span></div></td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td><div class="produccion-planilla-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></button></div></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-recipe-prod-delete="${escapeHtml(item.id || '')}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${traceHtml}`;
           }).join('')
           : '<tr><td colspan="10" class="text-center">Sin producciones.</td></tr>';
         const renderExpandedContent = (popup) => {
@@ -4858,6 +5068,12 @@
               if (planillaBtn) {
                 const reg = state.registros[planillaBtn.dataset.recipeProdPlanilla];
                 if (reg) await window.laJamoneraPlanillaProduccion?.openByRegistro?.(reg, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users) });
+                return;
+              }
+              const qrPrintBtn = clickEvent.target.closest('[data-recipe-prod-qr-print]');
+              if (qrPrintBtn) {
+                const reg = state.registros[qrPrintBtn.dataset.recipeProdQrPrint];
+                if (reg) await openProductionQrPrintConfigurator(reg);
                 return;
               }
               const traceBtn = clickEvent.target.closest('[data-recipe-prod-trace]');
@@ -5471,7 +5687,7 @@
         <td>${trace.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}'><i class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td>
         <td>-</td>
       </tr>`).join('') : '';
-      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-expanded-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isCollapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(item.id)}</span></div></td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)} (${escapeHtml(manager.role)})</td><td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-prod-cancel="${escapeHtml(item.id || '')}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${traceHtml}`;
+      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-expanded-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isCollapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(item.id)}</span></div></td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)} (${escapeHtml(manager.role)})</td><td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td><div class="produccion-planilla-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></button></div></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-prod-cancel="${escapeHtml(item.id || '')}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${traceHtml}`;
     }).join('') : '<tr><td colspan="10" class="text-center">Sin producciones.</td></tr>';
     const renderExpandedContent = (popup) => {
       const host = popup.querySelector('#produccionExpandedHistoryHost');
@@ -5516,6 +5732,12 @@
           if (pageBtn) {
             expandedPage += pageBtn.dataset.prodExpandedPage === 'next' ? 1 : -1;
             renderExpandedContent(popup);
+            return;
+          }
+          const qrPrintBtn = event.target.closest('[data-recipe-prod-qr-print]');
+          if (qrPrintBtn) {
+            const reg = state.registros[qrPrintBtn.dataset.recipeProdQrPrint];
+            if (reg) await openProductionQrPrintConfigurator(reg);
             return;
           }
           const traceBtn = event.target.closest('[data-recipe-prod-trace]');
