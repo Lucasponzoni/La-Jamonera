@@ -59,11 +59,13 @@
 
   const toneImportance = (value) => {
     const n = Math.max(0, Math.min(100, Number(value || 0)));
-    if (n >= 90) return { tone: 'critical', label: 'Muy importante' };
-    if (n >= 75) return { tone: 'high', label: 'Alta' };
-    if (n >= 55) return { tone: 'warn', label: 'Atención' };
-    if (n >= 30) return { tone: 'normal', label: 'Normal' };
-    return { tone: 'ok', label: 'Baja' };
+    if (n <= 14) return { tone: 'ok', label: 'Excelente 😄' };
+    if (n <= 28) return { tone: 'ok', label: 'Muy bueno 🙂' };
+    if (n <= 42) return { tone: 'normal', label: 'Bueno 😊' };
+    if (n <= 56) return { tone: 'normal', label: 'Normal 😐' };
+    if (n <= 70) return { tone: 'warn', label: 'Atención 😶' };
+    if (n <= 84) return { tone: 'high', label: 'Importante ⚠️' };
+    return { tone: 'critical', label: 'Muy importante 🚨' };
   };
 
   const dayDiff = (iso) => {
@@ -82,9 +84,11 @@
   };
 
   const agoDaysLabel = (ts) => {
-    const days = Math.max(0, Math.floor((Date.now() - Number(ts || Date.now())) / 86400000));
-    if (days === 0) return 'Hoy';
-    if (days === 1) return 'Hace 1 día';
+    const days = Math.floor((Date.now() - Number(ts || Date.now())) / 86400000);
+    if (days === 0) return 'CREADO HOY';
+    if (days === 1) return 'Hace <strong>1 día</strong>';
+    if (days === -1) return 'Hace -<strong>1 día</strong>-';
+    if (days < 0) return `Hace -${Math.abs(days)} días-`;
     return `Hace ${days} días`;
   };
 
@@ -172,11 +176,10 @@
 
   const openProcessingAlert = (message) => openIosSwal({
     title: 'Procesando',
-    html: `<p>${escapeHtml(message || 'Estamos trabajando...')}</p>`,
+    html: `<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Procesando" class="meta-spinner-login"><p>${escapeHtml(message || 'Estamos trabajando...')}</p></div>`,
     allowOutsideClick: false,
     allowEscapeKey: false,
-    showConfirmButton: false,
-    didOpen: () => Swal.showLoading()
+    showConfirmButton: false
   });
 
   const fetchLatestReportData = async (report) => {
@@ -497,7 +500,7 @@
           <span class="informe-attach-chip"><i class="fa-regular fa-image"></i> ${attachments.filter((x) => x?.type === 'image').length}</span>
           <span class="informe-attach-chip"><i class="fa-regular fa-file-lines"></i> ${Math.max(0, attachments.length - attachments.filter((x) => x?.type === 'image').length)}</span>
           <span class="importance-chip importance-${importance.tone}">${Math.max(0, Math.min(100, Number(report.importance || 0)))}% · ${importance.label}</span>
-          <span class="informe-attach-chip panel-report-age-chip"><i class="fa-regular fa-clock"></i> ${escapeHtml(agoDaysLabel(report.createdAt))}</span>
+          <span class="informe-attach-chip panel-report-age-chip"><i class="fa-regular fa-clock"></i> ${agoDaysLabel(report.createdAt)}</span>
           <button class="btn informe-print-chip" type="button" data-print-report="${escapeHtml(report.id)}" title="Imprimir informe"><i class="fa-solid fa-print"></i></button>
         </div>
         <div class="informe-card-user">
@@ -506,9 +509,6 @@
         </div>
         <div class="informe-card-actions">
           <button class="btn ios-btn ios-btn-primary" type="button" data-view-report="${escapeHtml(report.id)}">Ver informe completo</button>
-          <button class="btn informe-icon-btn" type="button" data-comment-report="${escapeHtml(report.id)}" title="Comentar"><i class="fa-regular fa-message"></i></button>
-          <button class="btn informe-icon-btn" type="button" data-edit-report="${escapeHtml(report.id)}" title="Editar"><i class="fa-solid fa-pen"></i></button>
-          <button class="btn informe-icon-btn danger" type="button" data-delete-report="${escapeHtml(report.id)}" title="Borrar"><i class="fa-solid fa-trash"></i></button>
         </div>
       </article>`;
 
@@ -549,8 +549,7 @@
         : `<div class="panel-avatar">${escapeHtml(initials(provider.name))}</div>`;
       return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(provider.name || 'Proveedor')}</strong><small><i class="fa-solid fa-triangle-exclamation"></i> RNE pendiente</small><p class="panel-status is-danger">Completar registro del proveedor</p></div></article>`;
     });
-    if (!rows.length) { nodes.wrapRne.classList.add('d-none'); return; }
-    nodes.wrapRne.classList.remove('d-none');
+    if (!rows.length) { nodes.rne.innerHTML = '<div class="panel-empty">No hay alertas para mostrar.</div>'; return; }
     nodes.rne.innerHTML = makeMarquee(rows, 3, 7);
   };
 
@@ -564,8 +563,7 @@
         : `<div class="panel-avatar">${escapeHtml(initials(recipe.title))}</div>`;
       return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(recipe.title || 'Receta')}</strong><small><i class="fa-regular fa-calendar"></i> Vence: ${escapeHtml(recipe.rnpa?.expiryDate || '-')}</small><p class="panel-status ${expired ? 'is-danger' : 'is-warning'}">${expired ? `Venció hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`}</p></div></article>`;
     });
-    if (!rows.length) { nodes.wrapRnpa.classList.add('d-none'); return; }
-    nodes.wrapRnpa.classList.remove('d-none');
+    if (!rows.length) { nodes.rnpa.innerHTML = '<div class="panel-empty">No hay alertas para mostrar.</div>'; return; }
     nodes.rnpa.innerHTML = makeMarquee(rows, 3, 7);
   };
 
@@ -574,8 +572,7 @@
       const days = dayDiff(vehicle.expiryDate);
       return `<article class="panel-list-card"><div class="panel-avatar"><i class="fa-solid fa-id-card-clip"></i></div><div class="panel-item-text"><strong>${escapeHtml(vehicle.number || '-')} · ${escapeHtml(vehicle.patent || '-')}</strong><small>${escapeHtml(vehicle.brand || vehicle.type || 'Unidad')} · ${escapeHtml(vehicle.expiryDate || '-')}</small><p class="panel-status ${days < 0 ? 'is-danger' : 'is-warning'}">${days < 0 ? `Vencido hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`}</p></div></article>`;
     });
-    if (!rows.length) { nodes.wrapTransporte.classList.add('d-none'); return; }
-    nodes.wrapTransporte.classList.remove('d-none');
+    if (!rows.length) { nodes.transporte.innerHTML = '<div class="panel-empty">No hay alertas para mostrar.</div>'; return; }
     nodes.transporte.innerHTML = makeMarquee(rows, 99, 7);
   };
 
@@ -639,9 +636,6 @@
   };
 
   const setLoading = () => {
-    nodes.wrapRne.classList.remove('d-none');
-    nodes.wrapRnpa.classList.remove('d-none');
-    nodes.wrapTransporte.classList.remove('d-none');
     nodes.informe.innerHTML = spinner('Cargando informe');
     nodes.resumen.innerHTML = spinner('Cargando métricas');
     nodes.rne.innerHTML = spinner('Cargando proveedores');
