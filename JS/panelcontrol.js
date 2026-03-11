@@ -105,6 +105,8 @@
     return output.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
   };
 
+  const findReportById = (id) => (state.reports || []).find((item) => item.id === id);
+
   const makeMarquee = (rows, minToAnimate = 3, rowSeconds = 7) => {
     const animate = rows.length >= minToAnimate;
     const clone = animate ? rows.concat(rows) : rows;
@@ -168,14 +170,126 @@
     });
   };
 
-  const printReport = (report) => {
-    const user = getReportUser(report);
-    const win = window.open('', '_blank', 'noopener,noreferrer,width=960,height=740');
-    if (!win) return;
-    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Informe ${escapeHtml(report.id || '')}</title><style>body{font-family:Inter,Arial,sans-serif;padding:20px;color:#1f2b47}h1{font-size:24px;margin:0 0 10px}.meta{margin-bottom:12px;color:#51618e}.content{border:1px solid #dbe3f6;border-radius:12px;padding:12px}</style></head><body><h1>Informe bromatológico</h1><p class="meta"><strong>Fecha:</strong> ${escapeHtml(formatDateTime(report.createdAt))} · <strong>Usuario:</strong> ${escapeHtml(user.name)}</p><section class="content">${report.html || '<p>Sin contenido</p>'}</section></body></html>`);
-    win.document.close();
-    win.focus();
-    win.print();
+  const openProcessingAlert = (message) => openIosSwal({
+    title: 'Procesando',
+    html: `<p>${escapeHtml(message || 'Estamos trabajando...')}</p>`,
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    showConfirmButton: false,
+    didOpen: () => Swal.showLoading()
+  });
+
+  const fetchLatestReportData = async (report) => {
+    await window.laJamoneraReady;
+    const latest = safeObject(await window.dbLaJamoneraRest.read(reportPath(report)));
+    return { ...report, ...latest };
+  };
+
+  const waitPrintWindowAssets = async (printWindow) => {
+    const images = [...(printWindow?.document?.images || [])];
+    if (!images.length) return;
+    await Promise.all(images.map((img) => new Promise((resolve) => {
+      if (img.complete) { resolve(); return; }
+      img.addEventListener('load', resolve, { once: true });
+      img.addEventListener('error', resolve, { once: true });
+    })));
+  };
+
+  const printReportDirect = async (report, includeAttachments) => {
+    const attachments = Array.isArray(report?.attachments) ? report.attachments : [];
+    const images = attachments.filter((item) => item?.type === 'image' && item?.url);
+    const docs = attachments.filter((item) => item?.type !== 'image' && item?.url);
+    const printWindow = window.open('', '_blank', 'width=1300,height=900');
+    if (!printWindow) return;
+    const attachmentsHtml = includeAttachments
+      ? `<section style="margin-top:18px;"><h2 style="margin:0 0 10px;font-size:18px;">Imágenes adjuntas</h2>${images.length ? `<div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${images.map((item, idx) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><img src="${escapeHtml(item.url)}" style="width:100%;max-height:320px;object-fit:contain;border-radius:10px;"><figcaption style="font-size:12px;color:#4b5f8e;margin-top:6px;">${escapeHtml(item.name || `Adjunto ${idx + 1}`)}</figcaption></figure>`).join('')}</div>` : '<p style="margin:0;color:#5a6482;">Sin imágenes adjuntas.</p>'}</section><section style="margin-top:16px;"><h2 style="margin:0 0 8px;font-size:18px;">Otros adjuntos</h2>${docs.length ? `<ul style="margin:0;padding-left:18px;">${docs.map((item) => `<li><a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.name || 'Archivo adjunto')}</a></li>`).join('')}</ul>` : '<p style="margin:0;color:#5a6482;">Sin archivos adjuntos.</p>'}</section>`
+      : '<p style="margin-top:14px;color:#5a6482;">Adjuntos no incluidos en esta impresión.</p>';
+    printWindow.document.write(`<html><head><title>Informe ${escapeHtml(report.id || '')}</title><style>body{font-family:Inter,Arial,sans-serif;padding:24px;color:#1f2a44}h1{font-size:24px;margin:0 0 10px}.meta{margin:0 0 16px;color:#55607f;font-size:14px}.content{border:1px solid #d7def2;border-radius:12px;padding:12px;background:#fff}</style></head><body><h1>Informe bromatológico</h1><p class="meta"><strong>Usuario:</strong> ${escapeHtml(report.userName || '-')} · <strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')} · <strong>Fecha:</strong> ${escapeHtml(getDateLabel(report.createdAt))}</p><section class="content">${report.html || '<p>Sin contenido</p>'}</section>${attachmentsHtml}</body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    await waitPrintWindowAssets(printWindow);
+    printWindow.print();
+  };
+
+  const printReport = async (report) => {
+    const choice = await openIosSwal({ title: 'Imprimir informe', html: '<p>Elegí cómo querés generar el informe.</p>', showDenyButton: true, showCancelButton: true, confirmButtonText: 'Imprimir directo', denyButtonText: 'Descargar PDF', cancelButtonText: 'Cancelar' });
+    if (!choice.isConfirmed && !choice.isDenied) return;
+    const attachmentsChoice = await openIosSwal({ title: 'Imprimir período', html: '<p>¿Querés incluir imágenes adjuntas?</p>', showCancelButton: true, showDenyButton: true, confirmButtonText: 'Incluir', denyButtonText: 'No incluir', cancelButtonText: 'Cancelar', customClass: { confirmButton: 'ios-btn ios-btn-success', denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical', cancelButton: 'ios-btn ios-btn-secondary' } });
+    if (!attachmentsChoice.isConfirmed && !attachmentsChoice.isDenied) return;
+    const includeAttachments = attachmentsChoice.isConfirmed;
+    try {
+      openProcessingAlert(choice.isConfirmed ? 'Leyendo informe y preparando impresión...' : 'Leyendo informe desde Firebase y generando PDF...');
+      const latestReport = await fetchLatestReportData(report);
+      if (choice.isConfirmed) {
+        await printReportDirect(latestReport, includeAttachments);
+      } else if (window.pdfMake && window.htmlToPdfmake) {
+        const htmlContent = window.htmlToPdfmake(latestReport.html || '<p>Sin contenido</p>', { window });
+        const docDefinition = { pageMargins: [28, 28, 28, 28], content: [{ text: 'Informe bromatológico', style: 'header' }, { text: `Usuario: ${latestReport.userName || '-'} · Fecha: ${getDateLabel(latestReport.createdAt)}`, style: 'meta' }, htmlContent], styles: { header: { fontSize: 18, bold: true, margin: [0, 0, 0, 8] }, meta: { fontSize: 10, color: '#4f5f86', margin: [0, 0, 0, 10] } } };
+        window.pdfMake.createPdf(docDefinition).download(`informe_${latestReport.id || Date.now()}.pdf`);
+      } else {
+        await openIosSwal({ title: 'Error al generar PDF', html: '<p>No pudimos cargar la librería PDF (pdfmake/html-to-pdfmake). Reintentá en unos segundos.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      }
+    } finally {
+      Swal.close();
+    }
+  };
+
+  const buildReportEmailHtml = (report, attachments = []) => {
+    const imageBlocks = attachments.filter((item) => item?.type === 'image' && item?.url).map((item) => `<figure style="margin:0;border:1px solid #d8e3fb;border-radius:12px;overflow:hidden;"><img src="${escapeHtml(item.url)}" style="width:100%;max-height:420px;object-fit:contain;background:#f6f9ff;"><figcaption style="padding:8px 10px;font-size:12px;color:#526a97;">${escapeHtml(item.name || 'Imagen adjunta')}</figcaption></figure>`).join('') || '<p style="margin:0;color:#5f729b;">Sin imágenes adjuntas.</p>';
+    const attachmentItems = attachments.length ? attachments.map((item) => `<li>${item?.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.name || 'Adjunto')}</a>` : escapeHtml(item?.name || 'Adjunto')}</li>`).join('') : '<li>Sin adjuntos.</li>';
+    return `<div style="font-family:Inter,Arial,sans-serif;background:#f4f7ff;padding:18px;"><div style="max-width:720px;margin:0 auto;background:#fff;border:1px solid #dbe4fb;border-radius:18px;padding:18px;"><h2 style="margin:0 0 6px;color:#2351a0;">Nuevo informe bromatológico</h2><p style="margin:0 0 14px;color:#4f638c;">Creador: <strong>${escapeHtml(report.userName || 'La Jamonera')}</strong> · Fecha: ${getDateLabel(report.createdAt)}</p><div style="border:1px solid #e2e8fb;border-radius:14px;padding:12px;background:#fbfdff;">${report.html || '<p>Sin contenido</p>'}</div><h3 style="margin:14px 0 8px;color:#2d4f91;font-size:15px;">Imágenes adjuntas</h3><div style="display:grid;gap:10px;">${imageBlocks}</div><h3 style="margin:14px 0 6px;color:#2d4f91;font-size:15px;">Documentos y enlaces</h3><ul style="margin:0;padding-left:18px;color:#4b5f89;">${attachmentItems}</ul></div></div>`;
+  };
+
+  const openResendReportEmailPrompt = async (report) => {
+    const usersWithEmail = Object.values(state.usersMap || {}).filter((user) => normalize(user.email)).sort((a, b) => String(a.fullName || '').localeCompare(String(b.fullName || '')));
+    const usersHtml = usersWithEmail.length ? usersWithEmail.map((user) => `<label class="notify-user-card"><div class="notify-user-main">${renderUserAvatar(user)}<div class="notify-user-text"><strong>${escapeHtml(user.fullName || 'Usuario')}</strong><small>${escapeHtml(user.email || '')}</small></div></div><input type="checkbox" data-resend-user-email="${escapeHtml(user.email || '')}" data-resend-user-name="${escapeHtml(user.fullName || '')}"></label>`).join('') : '<div class="informes-empty">No hay usuarios con email cargado.</div>';
+    const response = await openIosSwal({ title: 'Reenviar informe por email', width: 760, showCancelButton: true, confirmButtonText: 'Reenviar', cancelButtonText: 'Cancelar', html: `<div class="text-start report-resend-wrap"><p class="mb-2">Seleccioná usuarios del listado o escribí emails nuevos (separados por coma).</p><div id="resendUsersList" class="notify-specific-users-list">${usersHtml}</div><label class="form-label mt-3" for="resendExtraEmails">Emails adicionales</label><textarea id="resendExtraEmails" class="swal2-textarea ios-input" placeholder="ejemplo@dominio.com, otro@dominio.com"></textarea></div>`, didOpen: bindThumbs, preConfirm: () => {
+      const selectedNodes = Array.from(document.querySelectorAll('[data-resend-user-email]:checked'));
+      const selected = selectedNodes.map((node) => ({ email: normalize(node.dataset.resendUserEmail), name: normalize(node.dataset.resendUserName) || 'Usuario' })).filter((item) => item.email);
+      const extraRaw = normalize(document.getElementById('resendExtraEmails')?.value || '');
+      const extraEmails = extraRaw ? extraRaw.split(',').map((item) => normalize(item)).filter(Boolean) : [];
+      const invalid = extraEmails.find((item) => !/^\S+@\S+\.\S+$/.test(item));
+      if (invalid) { Swal.showValidationMessage(`Email inválido: ${invalid}`); return false; }
+      const recipientsByEmail = new Map();
+      selected.forEach((item) => recipientsByEmail.set(item.email.toLowerCase(), item));
+      extraEmails.forEach((email) => { if (!recipientsByEmail.has(email.toLowerCase())) recipientsByEmail.set(email.toLowerCase(), { email, name: email }); });
+      const recipients = Array.from(recipientsByEmail.values());
+      if (!recipients.length) { Swal.showValidationMessage('Seleccioná al menos un destinatario o escribí un email.'); return false; }
+      return recipients;
+    } });
+    if (!response.isConfirmed) return;
+    if (!window.laJamoneraEmailSender) {
+      await openIosSwal({ title: 'Email no disponible', html: '<p>No está cargado el módulo de envío en esta pantalla.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+      return;
+    }
+    await window.laJamoneraEmailSender.ensureConfigLoaded();
+    const latestReport = findReportById(report.id) || report;
+    const emailHtml = buildReportEmailHtml(latestReport, latestReport.attachments || []);
+    for (const target of (response.value || [])) {
+      await window.laJamoneraEmailSender.sendEmail('La Jamonera', `Reenvío de informe bromatológico · ${latestReport.userName || 'La Jamonera'}`, emailHtml, target.name || target.email, target.email);
+    }
+    await openIosSwal({ title: 'Emails enviados', html: '<p>El informe se reenvió correctamente.</p>', icon: 'success', confirmButtonText: 'Entendido' });
+  };
+
+  const getCommentsCount = (report) => commentsList(report).length;
+
+  const verifyReportCreatorPin = async (report) => {
+    const user = safeObject(state.usersMap[report?.userId]);
+    if (!user?.pin) return true;
+    const result = await openIosSwal({
+      title: 'Clave de usuario',
+      html: '<input id="panelCreatorPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos">',
+      showCancelButton: true,
+      confirmButtonText: 'Validar',
+      cancelButtonText: 'Cancelar',
+      preConfirm: () => normalize(document.getElementById('panelCreatorPin')?.value)
+    });
+    if (!result.isConfirmed) return false;
+    if (String(result.value || '') !== String(user.pin || '')) {
+      await openIosSwal({ title: 'Clave incorrecta', html: '<p>La clave no coincide con el creador del informe.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      return false;
+    }
+    return true;
   };
 
   const getCommentsCount = (report) => commentsList(report).length;
@@ -246,11 +360,7 @@
         });
 
         popup.querySelector('[data-resend-report-email]')?.addEventListener('click', async () => {
-          if (!window.laJamoneraEmailSender) {
-            await openIosSwal({ title: 'Email no disponible', html: '<p>No está cargado el módulo de envío en esta pantalla.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
-            return;
-          }
-          await openIosSwal({ title: 'Reenviar email', html: '<p>Usá la pantalla Informes para reenviar con destinatarios configurables.</p>', icon: 'info', confirmButtonText: 'Entendido' });
+          await openResendReportEmailPrompt(report);
         });
 
         commentsBody?.addEventListener('click', (event) => {
@@ -304,7 +414,7 @@
     const users = Object.values(state.usersMap || {}).sort((a, b) => String(a.fullName || '').localeCompare(String(b.fullName || '')));
     const options = ['<option value="">Seleccioná un usuario</option>', ...users.map((user) => `<option value="${escapeHtml(user.id)}">${escapeHtml(user.fullName || 'Usuario')}</option>`)].join('');
     const result = await openIosSwal({
-      title: 'Nuevo comentario',
+      title: 'Agregar comentario',
       html: `<select id="panelCommentUser" class="form-select ios-input mb-2">${options}</select><textarea id="panelCommentText" class="swal2-textarea ios-input" maxlength="500" placeholder="Escribí un comentario"></textarea><input id="panelCommentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos">`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
@@ -368,11 +478,11 @@
     if (!allowed) return;
 
     const ask = await openIosSwal({
-      title: 'Eliminar informe',
-      html: '<p>Esta acción no se puede deshacer.</p>',
+      title: 'Borrar informe',
+      html: '<p>Esta acción eliminará el informe de forma definitiva.</p>',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonText: 'Eliminar',
+      confirmButtonText: 'Borrar',
       cancelButtonText: 'Cancelar'
     });
     if (!ask.isConfirmed) return;

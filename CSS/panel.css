@@ -98,8 +98,8 @@
   line-height: 1;
   display: block;
   font-weight: 900;
-  font-family: 'Viga', 'Inter', sans-serif;
-  letter-spacing: .02em;
+  font-family: 'SF Pro Display', 'Avenir Next', 'Inter', sans-serif;
+  letter-spacing: .01em;
 }
 
 .panel-metric span {
@@ -126,7 +126,7 @@
 /* =========================================
    LISTAS
 ========================================= */
-.panel-marquee { max-height: 280px; overflow-y: auto; padding-right: 4px; }
+.panel-marquee { max-height: none; height: 100%; overflow-y: auto; padding-right: 4px; }
 .panel-marquee-track { display: grid; gap: 10px; }
 .panel-marquee-track.is-animated { animation: panelTicker var(--panel-marquee-duration, 24s) linear infinite; }
 .panel-marquee:hover .panel-marquee-track.is-animated { animation-play-state: paused; }
@@ -200,6 +200,10 @@
 .swal2-popup.panel-report-alert {
   border: 0 !important;
   box-shadow: none !important;
+}
+
+.swal2-popup.panel-report-alert .swal2-html-container {
+  padding: 8px 10px 2px !important;
 }
 
 .panel-empty {
