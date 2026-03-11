@@ -65,6 +65,13 @@
     return `HACE ${days} DÍAS`;
   };
 
+  const agoDaysLabel = (ts) => {
+    const days = Math.max(0, Math.floor((Date.now() - Number(ts || Date.now())) / 86400000));
+    if (days === 0) return 'Hoy';
+    if (days === 1) return 'Hace 1 día';
+    return `Hace ${days} días`;
+  };
+
   const spinner = (alt) => `<div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="${escapeHtml(alt)}" class="panel-spinner"></div>`;
 
   const flattenReports = (tree) => {
@@ -228,7 +235,7 @@
     nodes.informeAgo.textContent = ago(report.createdAt);
 
     nodes.informe.innerHTML = `
-      <article class="informe-card panel-last-report-card" data-report-id="${escapeHtml(report.id)}">
+      <article class="informe-card" data-report-id="${escapeHtml(report.id)}">
         <div class="informe-card-head">
           <span class="informe-card-date"><i class="fa-regular fa-calendar"></i> ${escapeHtml(formatDateTime(report.createdAt))}</span>
           <span class="informe-card-comments ${commentsCount ? 'has-comments' : 'no-comments'}"><i class="fa-solid ${commentsCount ? 'fa-comment-dots' : 'fa-comment-slash'}"></i> ${commentsCount ? `${commentsCount} comentario(s)` : 'Sin comentarios'}</span>
@@ -237,31 +244,49 @@
         <div class="informe-card-meta">
           <span class="informe-attach-chip"><i class="fa-regular fa-image"></i> ${attachments.filter((x) => x?.type === 'image').length}</span>
           <span class="informe-attach-chip"><i class="fa-regular fa-file-lines"></i> ${Math.max(0, attachments.length - attachments.filter((x) => x?.type === 'image').length)}</span>
-          <span class="importance-chip importance-${importance.tone}">${Math.max(0, Math.min(100, Number(report.importance || 0)))}% · ${importance.label} 📌</span>
-          <button id="panelReportPrintBtn" class="btn informe-print-chip" type="button" title="Imprimir informe"><i class="fa-solid fa-print"></i></button>
+          <span class="importance-chip importance-${importance.tone}">${Math.max(0, Math.min(100, Number(report.importance || 0)))}% · ${importance.label}</span>
+          <span class="informe-attach-chip panel-report-age-chip"><i class="fa-regular fa-clock"></i> ${escapeHtml(agoDaysLabel(report.createdAt))}</span>
+          <button class="btn informe-print-chip" type="button" data-print-report="${escapeHtml(report.id)}" title="Imprimir informe"><i class="fa-solid fa-print"></i></button>
         </div>
         <div class="informe-card-user">
           ${renderUserAvatar(user)}
           <div class="informe-card-user-text"><strong>${escapeHtml(user.name)}</strong><small>${escapeHtml(user.position)}</small></div>
         </div>
-        <div class="informe-card-actions panel-last-report-actions">
-          <button id="panelOpenReportBtn" class="btn ios-btn ios-btn-primary" type="button">VER INFORME COMPLETO</button>
-          <button id="panelCommentBtn" class="btn ios-btn ios-btn-secondary" type="button" title="Comentar"><i class="fa-regular fa-message"></i></button>
-          <button id="panelEditBtn" class="btn ios-btn ios-btn-secondary" type="button" title="Editar"><i class="fa-solid fa-pen"></i></button>
-          <button id="panelDeleteBtn" class="btn ios-btn ios-btn-danger" type="button" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+        <div class="informe-card-actions">
+          <button class="btn ios-btn ios-btn-primary" type="button" data-view-report="${escapeHtml(report.id)}">Ver informe completo</button>
+          <button class="btn informe-icon-btn" type="button" data-comment-report="${escapeHtml(report.id)}" title="Comentar"><i class="fa-regular fa-message"></i></button>
+          <button class="btn informe-icon-btn" type="button" data-edit-report="${escapeHtml(report.id)}" title="Editar"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn informe-icon-btn danger" type="button" data-delete-report="${escapeHtml(report.id)}" title="Borrar"><i class="fa-solid fa-trash"></i></button>
         </div>
       </article>`;
 
     bindThumbs();
-    document.getElementById('panelOpenReportBtn')?.addEventListener('click', () => openViewer(report));
-    document.getElementById('panelCommentBtn')?.addEventListener('click', () => promptComment(report));
-    document.getElementById('panelEditBtn')?.addEventListener('click', () => promptEdit(report));
-    document.getElementById('panelDeleteBtn')?.addEventListener('click', () => deleteReport(report));
-    document.getElementById('panelReportPrintBtn')?.addEventListener('click', () => printReport(report));
+    const card = nodes.informe.querySelector('.informe-card');
+    card?.addEventListener('click', async (event) => {
+      if (event.target.closest('[data-print-report]')) {
+        await printReport(report);
+        return;
+      }
+      if (event.target.closest('[data-view-report]')) {
+        await openViewer(report);
+        return;
+      }
+      if (event.target.closest('[data-edit-report]')) {
+        await promptEdit(report);
+        return;
+      }
+      if (event.target.closest('[data-delete-report]')) {
+        await deleteReport(report);
+        return;
+      }
+      if (event.target.closest('[data-comment-report]')) {
+        await promptComment(report);
+      }
+    });
   };
 
   const renderSummary = () => {
-    nodes.resumen.innerHTML = `<div class="panel-mini-grid panel-mini-grid-only"><div class="panel-metric panel-metric-rne"><strong>${state.providers.length}</strong><span><i class="bi bi-clipboard2-pulse"></i> RNE pendientes</span></div><div class="panel-metric panel-metric-rnpa"><strong>${state.recipes.length}</strong><span><i class="bi bi-card-checklist"></i> RNPA críticos</span></div><div class="panel-metric panel-metric-transport"><strong>${state.vehicles.length}</strong><span><i class="bi bi-truck"></i> UTA/URA con alerta</span></div><div class="panel-metric panel-metric-reports"><strong>${state.reports.length}</strong><span><i class="bi bi-journal-medical"></i> Informes cargados</span></div></div>`;
+    nodes.resumen.innerHTML = `<div class="panel-kpi-row"><div class="panel-metric panel-metric-rne"><strong>${state.providers.length}</strong><span><i class="fa-solid fa-file-shield"></i> RNE pendientes</span></div><div class="panel-metric panel-metric-rnpa"><strong>${state.recipes.length}</strong><span><i class="fa-solid fa-clipboard-check"></i> RNPA críticos</span></div><div class="panel-metric panel-metric-transport"><strong>${state.vehicles.length}</strong><span><i class="fa-solid fa-id-card-clip"></i> UTA/URA con alerta</span></div><div class="panel-metric panel-metric-reports"><strong>${state.reports.length}</strong><span><i class="fa-solid fa-file-waveform"></i> Informes cargados</span></div></div>`;
   };
 
   const renderProviders = () => {
@@ -270,7 +295,7 @@
       const avatar = photo
         ? `<div class="panel-avatar"><img src="${escapeHtml(photo)}" alt="${escapeHtml(provider.name)}" onload="this.classList.add('is-loaded')"><img src="./IMG/Meta-ai-logo.webp" class="panel-spinner" alt="cargando"></div>`
         : `<div class="panel-avatar">${escapeHtml(initials(provider.name))}</div>`;
-      return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(provider.name || 'Proveedor')}</strong><small><i class="bi bi-patch-exclamation"></i> RNE pendiente</small><p class="panel-status is-danger">Completar registro del proveedor</p></div></article>`;
+      return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(provider.name || 'Proveedor')}</strong><small><i class="fa-solid fa-triangle-exclamation"></i> RNE pendiente</small><p class="panel-status is-danger">Completar registro del proveedor</p></div></article>`;
     });
     if (!rows.length) { nodes.wrapRne.classList.add('d-none'); return; }
     nodes.wrapRne.classList.remove('d-none');
@@ -285,7 +310,7 @@
       const avatar = photo
         ? `<div class="panel-avatar"><img src="${escapeHtml(photo)}" alt="${escapeHtml(recipe.title)}" onload="this.classList.add('is-loaded')"><img src="./IMG/Meta-ai-logo.webp" class="panel-spinner" alt="cargando"></div>`
         : `<div class="panel-avatar">${escapeHtml(initials(recipe.title))}</div>`;
-      return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(recipe.title || 'Receta')}</strong><small><i class="bi bi-calendar2-week"></i> Vence: ${escapeHtml(recipe.rnpa?.expiryDate || '-')}</small><p class="panel-status ${expired ? 'is-danger' : 'is-warning'}">${expired ? `Venció hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`}</p></div></article>`;
+      return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(recipe.title || 'Receta')}</strong><small><i class="fa-regular fa-calendar"></i> Vence: ${escapeHtml(recipe.rnpa?.expiryDate || '-')}</small><p class="panel-status ${expired ? 'is-danger' : 'is-warning'}">${expired ? `Venció hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`}</p></div></article>`;
     });
     if (!rows.length) { nodes.wrapRnpa.classList.add('d-none'); return; }
     nodes.wrapRnpa.classList.remove('d-none');
@@ -295,7 +320,7 @@
   const renderTransport = () => {
     const rows = state.vehicles.map((vehicle) => {
       const days = dayDiff(vehicle.expiryDate);
-      return `<article class="panel-list-card"><div class="panel-avatar"><i class="bi bi-truck"></i></div><div class="panel-item-text"><strong>${escapeHtml(vehicle.number || '-')} · ${escapeHtml(vehicle.patent || '-')}</strong><small>${escapeHtml(vehicle.brand || vehicle.type || 'Unidad')} · ${escapeHtml(vehicle.expiryDate || '-')}</small><p class="panel-status ${days < 0 ? 'is-danger' : 'is-warning'}">${days < 0 ? `Vencido hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`}</p></div></article>`;
+      return `<article class="panel-list-card"><div class="panel-avatar"><i class="fa-solid fa-id-card-clip"></i></div><div class="panel-item-text"><strong>${escapeHtml(vehicle.number || '-')} · ${escapeHtml(vehicle.patent || '-')}</strong><small>${escapeHtml(vehicle.brand || vehicle.type || 'Unidad')} · ${escapeHtml(vehicle.expiryDate || '-')}</small><p class="panel-status ${days < 0 ? 'is-danger' : 'is-warning'}">${days < 0 ? `Vencido hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`}</p></div></article>`;
     });
     if (!rows.length) { nodes.wrapTransporte.classList.add('d-none'); return; }
     nodes.wrapTransporte.classList.remove('d-none');
@@ -327,11 +352,11 @@
     if (!top.length) { nodes.produccion.innerHTML = '<div class="panel-empty">No hay producción en el rango seleccionado.</div>'; return; }
 
     const max = Math.max(...top.map((x) => x.kg));
-    nodes.produccion.innerHTML = `<div class="panel-chart-wrap">${top.map((item) => {
+    nodes.produccion.innerHTML = `<div class="panel-chart-wrap">${top.map((item, index) => {
       const avatar = item.imageUrl
         ? `<span class="panel-chart-avatar"><img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name)}" onload="this.classList.add('is-loaded')"><img src="./IMG/Meta-ai-logo.webp" class="panel-spinner" alt="cargando"></span>`
         : `<span class="panel-chart-avatar">${escapeHtml(initials(item.name))}</span>`;
-      return `<div class="panel-chart-row"><div class="panel-chart-label">${avatar}<span>${escapeHtml(item.name)}</span></div><div class="panel-chart-bar"><div class="panel-chart-fill" style="width:${Math.max(8, (item.kg / max) * 100)}%"></div></div><div class="panel-chart-value">${item.kg.toFixed(2)} kg</div></div>`;
+      return `<div class="panel-chart-row"><div class="panel-chart-rank">${index + 1}</div><div class="panel-chart-label">${avatar}<span>${escapeHtml(item.name)}</span></div><div class="panel-chart-bar"><div class="panel-chart-fill" style="width:${Math.max(10, (item.kg / max) * 100)}%"></div></div><div class="panel-chart-value">${item.kg.toFixed(2)} kg</div></div>`;
     }).join('')}</div>`;
   };
 

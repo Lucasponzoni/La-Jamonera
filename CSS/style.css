@@ -8242,11 +8242,13 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   overflow: hidden;
 }
 
-.inventario-provider-avatar img {
+.inventario-provider-avatar .thumb-image,
+.inventario-provider-editor-avatar .thumb-image {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 6px;
+  object-position: center;
+  padding: 4px;
   background: #f7f9ff;
 }
 
