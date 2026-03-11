@@ -1504,7 +1504,7 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 991.98px) {
   .contenido {
     width: calc(100%);
     padding-top: 16px;
@@ -7982,7 +7982,7 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   display: block;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 991.98px) {
   .toolbar-scroll-x,
   .produccion-toolbar-actions,
   .inventario-toolbar-actions {
@@ -9263,9 +9263,10 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   font-weight: 700;
 }
 
-.produccion-qr-print-alert .swal2-deny.ios-btn,
-.produccion-qr-print-alert .swal2-deny.ios-btn-warning,
-.produccion-qr-print-alert .swal2-deny.ios-btn-success {
+.swal2-popup.produccion-qr-print-alert .swal2-deny,
+.swal2-popup.produccion-qr-print-alert .swal2-deny.ios-btn,
+.swal2-popup.produccion-qr-print-alert .swal2-deny.ios-btn-warning,
+.swal2-popup.produccion-qr-print-alert .swal2-deny.ios-btn-success {
   background: #34c759 !important;
   border-color: #2fb44f !important;
   color: #fff !important;

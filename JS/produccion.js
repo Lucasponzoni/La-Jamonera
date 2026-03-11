@@ -41,10 +41,8 @@
   const ALLOWED_RNE_UPLOAD_TYPES = [...ALLOWED_UPLOAD_TYPES, 'application/pdf'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
   const QR_PRINT_SIZES = [
-    { value: '40x30', label: '4cm x 3cm (40 x 30 mm)', widthMm: 40, heightMm: 30 },
     { value: '80x40', label: '8cm x 4cm (80 x 40 mm)', widthMm: 80, heightMm: 40 },
     { value: '50x25', label: '5cm x 2.5cm (50 x 25 mm)', widthMm: 50, heightMm: 25 },
-    { value: '100x80', label: '10cm x 8cm (100 x 80 mm)', widthMm: 100, heightMm: 80 },
     { value: '80x25', label: '8cm x 2.5cm (80 x 25 mm)', widthMm: 80, heightMm: 25 },
     { value: '100x35', label: '10cm x 3.5cm (100 x 35 mm)', widthMm: 100, heightMm: 35 }
   ];
