@@ -9227,3 +9227,46 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 .produccion-max-expired-only {
   color: #c4314f !important;
 }
+
+/* =========================================
+   PRODUCCIÓN · IMPRESIÓN QR
+========================================= */
+.produccion-planilla-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.produccion-planilla-actions .inventario-threshold-btn {
+  min-height: 34px;
+}
+
+.produccion-qr-preview-wrap {
+  display: grid;
+  gap: 12px;
+  max-height: min(60vh, 680px);
+  overflow: auto;
+}
+
+.produccion-qr-preview-page {
+  width: 100%;
+  height: auto;
+  border: 1px solid #cfd8ee;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.produccion-qr-preview-extra {
+  margin: 0;
+  text-align: center;
+  color: #5a6f97;
+  font-weight: 700;
+}
+
+.produccion-qr-print-alert .swal2-deny.ios-btn,
+.produccion-qr-print-alert .swal2-deny.ios-btn-warning,
+.produccion-qr-print-alert .swal2-deny.ios-btn-success {
+  background: #34c759 !important;
+  border-color: #2fb44f !important;
+  color: #fff !important;
+}
