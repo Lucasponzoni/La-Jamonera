@@ -71,7 +71,7 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   border-radius: 22px;
   border: 1px solid #dbe3f7;
   background: rgb(248 250 255 / 92%);
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
 }
@@ -5154,14 +5154,14 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 }
 
 .inventario-bulk-row-extras {
-  display: inline-flex;
+  display: flex;
   gap: 12px;
   flex-wrap: wrap;
   padding: 4px 8px;
   border-radius: 999px;
   border: 1px solid #d7def2;
   background: #f6f8ff;
-  margin-left: auto;
+  width: 100%;
   justify-content: flex-end;
 }
 

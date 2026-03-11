@@ -4026,7 +4026,7 @@
         if (pick) {
           const ingredientPick = state.ingredientes[pick.dataset.ingId];
           if (ingredientPick) applyBulkIngredient(Number(pick.dataset.bulkPick), ingredientPick);
-          bulkSuggestSuppressUntil = Date.now() + 420;
+          bulkSuggestSuppressUntil = Date.now() + 900;
           closeBulkSuggestions();
           return;
         }
@@ -4060,10 +4060,6 @@
           return;
         }
         openBulkSuggestions(input, idx, query);
-      });
-      input.addEventListener('focus', () => {
-        const query = normalizeValue(input.value);
-        if (query.length >= 1) openBulkSuggestions(input, Number(input.dataset.bulkSearch), query);
       });
       input.addEventListener('blur', () => {
         setTimeout(() => closeBulkSuggestions(), 320);
