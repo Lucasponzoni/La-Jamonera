@@ -865,7 +865,6 @@
   };
 
   const openPrintConfigurator = async (recipe, mode) => {
-    const payload = getPrintPayload(recipe, mode);
     const loadingTitle = mode === 'nutrition'
       ? 'Generando tabla nutricional...'
       : 'Generando etiquetado frontal...';
@@ -887,7 +886,10 @@
     });
 
     let sourceImage;
+    let payload;
     try {
+      await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+      payload = getPrintPayload(recipe, mode);
       sourceImage = await withTimeout(renderHtmlToImage(payload), 20000, "Tiempo de espera agotado al generar la tabla para impresión.");
     } finally {
       Swal.close();

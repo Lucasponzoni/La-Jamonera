@@ -115,7 +115,7 @@
     const animate = rows.length >= minToAnimate;
     const clone = animate ? rows.concat(rows) : rows;
     const duration = Math.max(18, rows.length * rowSeconds);
-    return `<div class="panel-marquee"><div class="panel-marquee-track ${animate ? 'is-animated' : ''}" style="--panel-marquee-duration:${duration}s;">${clone.join('')}</div></div>`;
+    return `<div class="panel-marquee ${animate ? 'is-animated-wrap' : ''}"><div class="panel-marquee-track ${animate ? 'is-animated' : ''}" style="--panel-marquee-duration:${duration}s;">${clone.join('')}</div></div>`;
   };
 
   const reportPath = (report) => `/informes/${report.year}/${report.month}/${report.day}/${report.id}`;
@@ -138,17 +138,26 @@
 
   const bindThumbs = () => {
     document.querySelectorAll('.js-panel-thumb').forEach((img) => {
-      img.addEventListener('load', () => {
+      const stopThumbLoading = () => {
         img.classList.add('is-loaded');
-        img.closest('.user-avatar-thumb')?.querySelector('.thumb-loading')?.classList.add('d-none');
+        img.closest('.user-avatar-thumb, .panel-avatar, .panel-chart-avatar')?.querySelector('.thumb-loading')?.classList.add('d-none');
+      };
+      img.addEventListener('load', stopThumbLoading, { once: true });
+      img.addEventListener('error', () => {
+        stopThumbLoading();
+        img.closest('.panel-user-avatar')?.classList.add('is-fallback');
       }, { once: true });
-      img.addEventListener('error', () => img.closest('.panel-user-avatar')?.classList.add('is-fallback'), { once: true });
+      if (img.complete) stopThumbLoading();
     });
-    document.querySelectorAll('.panel-avatar img:first-child, .panel-chart-avatar img:first-child').forEach((img) => {
-      const stopSpinner = () => img.parentElement?.querySelector('.panel-spinner')?.classList.add('d-none');
-      img.addEventListener('load', stopSpinner, { once: true });
-      img.addEventListener('error', stopSpinner, { once: true });
-      if (img.complete) stopSpinner();
+
+    document.querySelectorAll('.js-report-attachment-image').forEach((img) => {
+      const stop = () => {
+        img.classList.add('is-loaded');
+        img.closest('.attachment-card')?.querySelector('.attachment-loader')?.classList.add('d-none');
+      };
+      img.addEventListener('load', stop, { once: true });
+      img.addEventListener('error', stop, { once: true });
+      if (img.complete) stop();
     });
   };
 
@@ -345,7 +354,7 @@ const printReport = async (report) => {
     for (const target of (response.value || [])) {
       await window.laJamoneraEmailSender.sendEmail('La Jamonera', `Reenvío de informe bromatológico · ${latestReport.userName || 'La Jamonera'}`, emailHtml, target.name || target.email, target.email);
     }
-    await openIosSwal({ title: 'Emails enviados', html: '<p>El informe se reenvió correctamente.</p>', icon: 'success', confirmButtonText: 'Entendido' });
+    window.laJamoneraNotify?.show({ type: 'success', title: 'Emails enviados', message: 'El informe se reenvió correctamente.' });
   };
 
   const getCommentsCount = (report) => commentsList(report).length;
@@ -377,7 +386,7 @@ const printReport = async (report) => {
     const attachmentHtml = attachments.length
       ? attachments.map((item, index) => {
         if (item?.type === 'image') {
-          return `<button type="button" class="attachment-card" data-open-report-image="${index}"><img src="${escapeHtml(item.url || '')}" alt="${escapeHtml(item.name || 'Adjunto')}" class="attachment-image is-loaded"></button>`;
+          return `<button type="button" class="attachment-card" data-open-report-image="${index}"><span class="attachment-loader"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"></span><img src="${escapeHtml(item.url || '')}" alt="${escapeHtml(item.name || 'Adjunto')}" class="attachment-image js-report-attachment-image"></button>`;
         }
         return `<a href="${escapeHtml(item?.url || '#')}" target="_blank" rel="noopener noreferrer" class="attachment-card attachment-doc"><i class="bi bi-file-earmark"></i><span>${escapeHtml(item?.name || 'Documento')}</span></a>`;
       }).join('')
@@ -619,7 +628,7 @@ const printReport = async (report) => {
     const rows = state.providers.map((provider) => {
       const photo = normalize(provider.photoUrl);
       const avatar = photo
-        ? `<div class="panel-avatar"><img src="${escapeHtml(photo)}" alt="${escapeHtml(provider.name)}" onload="this.classList.add('is-loaded')"><img src="./IMG/Meta-ai-logo.webp" class="panel-spinner" alt="cargando"></div>`
+        ? `<div class="panel-avatar"><span class="thumb-loading"><img src="./IMG/Meta-ai-logo.webp" class="panel-spinner" alt="cargando"></span><img class="js-panel-thumb" src="${escapeHtml(photo)}" alt="${escapeHtml(provider.name)}"></div>`
         : `<div class="panel-avatar">${escapeHtml(initials(provider.name))}</div>`;
       return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(provider.name || 'Proveedor')}</strong><small><i class="fa-solid fa-triangle-exclamation"></i> RNE pendiente</small><p class="panel-status is-danger">Completar registro del proveedor</p></div></article>`;
     });
@@ -633,7 +642,7 @@ const printReport = async (report) => {
       const expired = Number(days) < 0;
       const photo = normalize(recipe.imageUrl);
       const avatar = photo
-        ? `<div class="panel-avatar"><img src="${escapeHtml(photo)}" alt="${escapeHtml(recipe.title)}" onload="this.classList.add('is-loaded')"><img src="./IMG/Meta-ai-logo.webp" class="panel-spinner" alt="cargando"></div>`
+        ? `<div class="panel-avatar"><span class="thumb-loading"><img src="./IMG/Meta-ai-logo.webp" class="panel-spinner" alt="cargando"></span><img class="js-panel-thumb" src="${escapeHtml(photo)}" alt="${escapeHtml(recipe.title)}"></div>`
         : `<div class="panel-avatar">${escapeHtml(initials(recipe.title))}</div>`;
       return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(recipe.title || 'Receta')}</strong><small><i class="fa-regular fa-calendar"></i> Vence: ${escapeHtml(recipe.rnpa?.expiryDate || '-')}</small><p class="panel-status ${expired ? 'is-danger' : 'is-warning'}">${expired ? `Venció hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`}</p></div></article>`;
     });
@@ -647,7 +656,7 @@ const printReport = async (report) => {
       return `<article class="panel-list-card"><div class="panel-avatar"><i class="fa-solid fa-id-card-clip"></i></div><div class="panel-item-text"><strong>${escapeHtml(vehicle.number || '-')} · ${escapeHtml(vehicle.patent || '-')}</strong><small>${escapeHtml(vehicle.brand || vehicle.type || 'Unidad')} · ${escapeHtml(vehicle.expiryDate || '-')}</small><p class="panel-status ${days < 0 ? 'is-danger' : 'is-warning'}">${days < 0 ? `Vencido hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`}</p></div></article>`;
     });
     if (!rows.length) { nodes.transporte.innerHTML = '<div class="panel-empty">No hay alertas para mostrar.</div>'; return; }
-    nodes.transporte.innerHTML = makeMarquee(rows, 99, 7);
+    nodes.transporte.innerHTML = makeMarquee(rows, 3, 7);
   };
 
   const renderChart = () => {
@@ -677,7 +686,7 @@ const printReport = async (report) => {
     const max = Math.max(...top.map((x) => x.kg));
     nodes.produccion.innerHTML = `<div class="panel-chart-wrap">${top.map((item, index) => {
       const avatar = item.imageUrl
-        ? `<span class="panel-chart-avatar"><img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name)}" onload="this.classList.add('is-loaded')"><img src="./IMG/Meta-ai-logo.webp" class="panel-spinner" alt="cargando"></span>`
+        ? `<span class="panel-chart-avatar"><span class="thumb-loading"><img src="./IMG/Meta-ai-logo.webp" class="panel-spinner" alt="cargando"></span><img class="js-panel-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name)}"></span>`
         : `<span class="panel-chart-avatar">${escapeHtml(initials(item.name))}</span>`;
       return `<div class="panel-chart-row"><div class="panel-chart-rank">${index + 1}</div><div class="panel-chart-label">${avatar}<span>${escapeHtml(item.name)}</span></div><div class="panel-chart-bar"><div class="panel-chart-fill" style="width:${Math.max(10, (item.kg / max) * 100)}%"></div></div><div class="panel-chart-value">${item.kg.toFixed(2)} kg</div></div>`;
     }).join('')}</div>`;
@@ -690,6 +699,7 @@ const printReport = async (report) => {
     renderProviders();
     renderRnpa();
     renderTransport();
+    bindThumbs();
   };
 
   const applyData = (raw) => {

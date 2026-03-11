@@ -1600,7 +1600,7 @@
     const attachmentHtml = attachments.length
       ? attachments.map((item, index) => {
         if (item.type === 'image') {
-          return `<button type="button" class="attachment-card" data-open-report-image="${index}"><img src="${item.url}" alt="${escapeHtml(item.name)}" class="attachment-image is-loaded"></button>`;
+          return `<button type="button" class="attachment-card" data-open-report-image="${index}"><span class="attachment-loader"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"></span><img src="${item.url}" alt="${escapeHtml(item.name)}" class="attachment-image js-informe-viewer-image"></button>`;
         }
         return `<a href="${item.url}" target="_blank" rel="noopener noreferrer" class="attachment-card attachment-doc"><i class="bi bi-file-earmark"></i><span>${escapeHtml(item.name)}</span></a>`;
       }).join('')
@@ -1651,6 +1651,15 @@
       `,
       confirmButtonText: 'Cerrar',
       didOpen: (popup) => {
+        popup.querySelectorAll('.js-informe-viewer-image').forEach((img) => {
+          const stop = () => {
+            img.classList.add('is-loaded');
+            img.closest('.attachment-card')?.querySelector('.attachment-loader')?.classList.add('d-none');
+          };
+          img.addEventListener('load', stop, { once: true });
+          img.addEventListener('error', stop, { once: true });
+          if (img.complete) stop();
+        });
         const commentsBody = popup.querySelector('#reportCommentsBody');
         const userSelect = popup.querySelector('#inlineCommentUser');
         const textArea = popup.querySelector('#inlineCommentText');
