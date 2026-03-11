@@ -176,7 +176,25 @@
 
   const openProcessingAlert = (message) => openIosSwal({
     title: 'Procesando',
-    html: `<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Procesando" class="meta-spinner-login"><p>${escapeHtml(message || 'Estamos trabajando...')}</p></div>`,
+    html: `
+      <div class="informes-saving-spinner" style="
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        justify-content:center;
+        gap:12px;
+        text-align:center;
+      ">
+        <img
+          src="./IMG/Meta-ai-logo.webp"
+          alt="Procesando"
+          class="meta-spinner-login"
+        >
+        <p style="margin:0;">
+          ${escapeHtml(message || 'Estamos trabajando...')}
+        </p>
+      </div>
+    `,
     allowOutsideClick: false,
     allowEscapeKey: false,
     showConfirmButton: false
@@ -214,28 +232,84 @@
     printWindow.print();
   };
 
-  const printReport = async (report) => {
-    const choice = await openIosSwal({ title: 'Imprimir informe', html: '<p>Elegí cómo querés generar el informe.</p>', showDenyButton: true, showCancelButton: true, confirmButtonText: 'Imprimir directo', denyButtonText: 'Descargar PDF', cancelButtonText: 'Cancelar' });
-    if (!choice.isConfirmed && !choice.isDenied) return;
-    const attachmentsChoice = await openIosSwal({ title: 'Imprimir período', html: '<p>¿Querés incluir imágenes adjuntas?</p>', showCancelButton: true, showDenyButton: true, confirmButtonText: 'Incluir', denyButtonText: 'No incluir', cancelButtonText: 'Cancelar', customClass: { confirmButton: 'ios-btn ios-btn-success', denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical', cancelButton: 'ios-btn ios-btn-secondary' } });
-    if (!attachmentsChoice.isConfirmed && !attachmentsChoice.isDenied) return;
-    const includeAttachments = attachmentsChoice.isConfirmed;
-    try {
-      openProcessingAlert(choice.isConfirmed ? 'Leyendo informe y preparando impresión...' : 'Leyendo informe desde Firebase y generando PDF...');
-      const latestReport = await fetchLatestReportData(report);
-      if (choice.isConfirmed) {
-        await printReportDirect(latestReport, includeAttachments);
-      } else if (window.pdfMake && window.htmlToPdfmake) {
-        const htmlContent = window.htmlToPdfmake(latestReport.html || '<p>Sin contenido</p>', { window });
-        const docDefinition = { pageMargins: [28, 28, 28, 28], content: [{ text: 'Informe bromatológico', style: 'header' }, { text: `Usuario: ${latestReport.userName || '-'} · Fecha: ${getDateLabel(latestReport.createdAt)}`, style: 'meta' }, htmlContent], styles: { header: { fontSize: 18, bold: true, margin: [0, 0, 0, 8] }, meta: { fontSize: 10, color: '#4f5f86', margin: [0, 0, 0, 10] } } };
-        window.pdfMake.createPdf(docDefinition).download(`informe_${latestReport.id || Date.now()}.pdf`);
-      } else {
-        await openIosSwal({ title: 'Error al generar PDF', html: '<p>No pudimos cargar la librería PDF (pdfmake/html-to-pdfmake). Reintentá en unos segundos.</p>', icon: 'error', confirmButtonText: 'Entendido' });
-      }
-    } finally {
-      Swal.close();
+const printReport = async (report) => {
+  const choice = await openIosSwal({
+    title: 'Imprimir informe',
+    html: '<p>Elegí cómo querés generar el informe.</p>',
+    showDenyButton: true,
+    showCancelButton: true,
+    confirmButtonText: 'Imprimir directo',
+    denyButtonText: 'Descargar PDF',
+    cancelButtonText: 'Cancelar'
+  });
+
+  if (!choice.isConfirmed && !choice.isDenied) return;
+
+  const attachmentsChoice = await openIosSwal({
+    title: 'Imprimir período',
+    html: '<p>¿Querés incluir imágenes adjuntas?</p>',
+    showCancelButton: true,
+    showDenyButton: true,
+    confirmButtonText: 'Incluir',
+    denyButtonText: 'No incluir',
+    cancelButtonText: 'Cancelar',
+    customClass: {
+      confirmButton: 'ios-btn ios-btn-success',
+      denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical',
+      cancelButton: 'ios-btn ios-btn-secondary'
     }
-  };
+  });
+
+  if (!attachmentsChoice.isConfirmed && !attachmentsChoice.isDenied) return;
+
+  const includeAttachments = attachmentsChoice.isConfirmed;
+
+  try {
+    openProcessingAlert(
+      choice.isConfirmed
+        ? 'Leyendo informe y preparando impresión...'
+        : 'Leyendo informe desde Firebase y generando PDF...'
+    );
+
+    const latestReport = await fetchLatestReportData(report);
+
+    if (choice.isConfirmed) {
+      await printReportDirect(latestReport, includeAttachments);
+    } else if (window.pdfMake && window.htmlToPdfmake) {
+      const htmlContent = window.htmlToPdfmake(
+        latestReport.html || '<p>Sin contenido</p>',
+        { window }
+      );
+
+      const docDefinition = {
+        pageMargins: [28, 28, 28, 28],
+        content: [
+          { text: 'Informe bromatológico', style: 'header' },
+          {
+            text: `Usuario: ${latestReport.userName || '-'} · Fecha: ${getDateLabel(latestReport.createdAt)}`,
+            style: 'meta'
+          },
+          htmlContent
+        ],
+        styles: {
+          header: { fontSize: 18, bold: true, margin: [0, 0, 0, 8] },
+          meta: { fontSize: 10, color: '#4f5f86', margin: [0, 0, 0, 10] }
+        }
+      };
+
+      window.pdfMake.createPdf(docDefinition).download(`informe_${latestReport.id || Date.now()}.pdf`);
+    } else {
+      await openIosSwal({
+        title: 'Error al generar PDF',
+        html: '<p>No pudimos cargar la librería PDF (pdfmake/html-to-pdfmake). Reintentá en unos segundos.</p>',
+        icon: 'error',
+        confirmButtonText: 'Entendido'
+      });
+    }
+  } finally {
+    Swal.close();
+  }
+};
 
   const buildReportEmailHtml = (report, attachments = []) => {
     const imageBlocks = attachments.filter((item) => item?.type === 'image' && item?.url).map((item) => `<figure style="margin:0;border:1px solid #d8e3fb;border-radius:12px;overflow:hidden;"><img src="${escapeHtml(item.url)}" style="width:100%;max-height:420px;object-fit:contain;background:#f6f9ff;"><figcaption style="padding:8px 10px;font-size:12px;color:#526a97;">${escapeHtml(item.name || 'Imagen adjunta')}</figcaption></figure>`).join('') || '<p style="margin:0;color:#5f729b;">Sin imágenes adjuntas.</p>';
