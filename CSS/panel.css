@@ -86,30 +86,37 @@
 .panel-mini-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 10px;
 }
 
 .panel-metric {
   border: 1px solid #d7e1f8;
-  border-radius: 14px;
+  border-radius: 16px;
   background: linear-gradient(160deg, #f8faff, #f1f5ff);
-  padding: 10px;
+  padding: 14px;
 }
 
 .panel-metric strong {
-  font-size: 1.2rem;
-  color: #1f4ea5;
+  font-size: clamp(2.1rem, 4vw, 2.8rem);
+  line-height: 1;
   display: block;
+  font-weight: 900;
 }
 
 .panel-metric span {
-  font-size: .78rem;
-  color: #63739a;
+  margin-top: 8px;
+  font-size: .86rem;
   display: inline-flex;
   gap: 6px;
   align-items: center;
+  font-weight: 700;
 }
+
+.panel-metric-rne strong,.panel-metric-rne span{color:#cc3a3a;}
+.panel-metric-rnpa strong,.panel-metric-rnpa span{color:#cc6f00;}
+.panel-metric-transport strong,.panel-metric-transport span{color:#0f8d4a;}
+.panel-metric-reports strong,.panel-metric-reports span{color:#2b5fc4;}
+
 
 .panel-reminder-card {
   border: 1px solid #d7e2fb;
@@ -210,9 +217,9 @@
 }
 
 .panel-chart-avatar {
-  width: 52px;
-  height: 52px;
-  font-size: 1rem;
+  width: 70px;
+  height: 70px;
+  font-size: 1.2rem;
 }
 
 .panel-avatar img,
@@ -274,6 +281,14 @@
   min-width: 220px;
 }
 
+.panel-last-report-actions .ios-btn-secondary,
+.panel-last-report-actions .ios-btn-danger {
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+  padding: 0;
+}
+
 .panel-report-alert .swal2-html-container {
   padding: 0 !important;
 }
@@ -298,7 +313,7 @@
 
 .panel-chart-row {
   display: grid;
-  grid-template-columns: 280px 1fr auto;
+  grid-template-columns: 360px 1fr auto;
   gap: 10px;
   align-items: center;
 }
@@ -308,8 +323,8 @@
   align-items: center;
   gap: 10px;
   color: #344b7c;
-  font-size: .84rem;
-  font-weight: 700;
+  font-size: 1.02rem;
+  font-weight: 800;
 }
 
 .panel-chart-bar {

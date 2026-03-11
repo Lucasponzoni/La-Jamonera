@@ -3,7 +3,6 @@
   if (!root) return;
 
   const rangeInput = document.getElementById('panelChartRange');
-
   const nodes = {
     informe: document.querySelector('#panelUltimoInforme .panel-card-body'),
     informeAgo: document.getElementById('panelInformeAgo'),
@@ -42,6 +41,15 @@
     return [];
   };
 
+  const toneImportance = (value) => {
+    const n = Math.max(0, Math.min(100, Number(value || 0)));
+    if (n >= 90) return { tone: 'critical', label: 'Muy importante' };
+    if (n >= 75) return { tone: 'high', label: 'Alta' };
+    if (n >= 55) return { tone: 'warn', label: 'Atención' };
+    if (n >= 30) return { tone: 'normal', label: 'Normal' };
+    return { tone: 'ok', label: 'Baja' };
+  };
+
   const dayDiff = (iso) => {
     const d = new Date(`${normalize(iso)}T00:00:00`);
     if (Number.isNaN(d.getTime())) return null;
@@ -55,15 +63,6 @@
     if (days <= 0) return 'HOY';
     if (days === 1) return 'HACE 1 DÍA';
     return `HACE ${days} DÍAS`;
-  };
-
-  const toneImportance = (value) => {
-    const n = Math.max(0, Math.min(100, Number(value || 0)));
-    if (n >= 90) return { tone: 'critical', label: 'Muy importante' };
-    if (n >= 75) return { tone: 'high', label: 'Alta' };
-    if (n >= 55) return { tone: 'warn', label: 'Atención' };
-    if (n >= 30) return { tone: 'normal', label: 'Normal' };
-    return { tone: 'ok', label: 'Baja' };
   };
 
   const spinner = (alt) => `<div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="${escapeHtml(alt)}" class="panel-spinner"></div>`;
@@ -83,12 +82,14 @@
     return output.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
   };
 
-  const makeMarquee = (rows, minToAnimate = 3, rowSeconds = 6) => {
+  const makeMarquee = (rows, minToAnimate = 3, rowSeconds = 7) => {
     const animate = rows.length >= minToAnimate;
     const clone = animate ? rows.concat(rows) : rows;
     const duration = Math.max(18, rows.length * rowSeconds);
     return `<div class="panel-marquee"><div class="panel-marquee-track ${animate ? 'is-animated' : ''}" style="--panel-marquee-duration:${duration}s;">${clone.join('')}</div></div>`;
   };
+
+  const reportPath = (report) => `/informes/${report.year}/${report.month}/${report.day}/${report.id}`;
 
   const getReportUser = (report) => {
     const user = safeObject(state.usersMap[report?.userId]);
@@ -106,98 +107,115 @@
     return `<span class="user-avatar-thumb">${escapeHtml(initials(user.name))}</span>`;
   };
 
-  const openReportViewerAlert = async (report) => {
+  const bindThumbs = () => {
+    document.querySelectorAll('.js-panel-thumb').forEach((img) => {
+      img.addEventListener('load', () => img.classList.add('is-loaded'), { once: true });
+      img.addEventListener('error', () => img.closest('.panel-user-avatar')?.classList.add('is-fallback'), { once: true });
+    });
+  };
+
+  const printReport = (report) => {
+    const user = getReportUser(report);
+    const win = window.open('', '_blank', 'noopener,noreferrer,width=960,height=740');
+    if (!win) return;
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Informe ${escapeHtml(report.id || '')}</title><style>body{font-family:Inter,Arial,sans-serif;padding:20px;color:#1f2b47}h1{font-size:24px;margin:0 0 10px}.meta{margin-bottom:12px;color:#51618e}.content{border:1px solid #dbe3f6;border-radius:12px;padding:12px}</style></head><body><h1>Informe bromatológico</h1><p class="meta"><strong>Fecha:</strong> ${escapeHtml(formatDateTime(report.createdAt))} · <strong>Usuario:</strong> ${escapeHtml(user.name)}</p><section class="content">${report.html || '<p>Sin contenido</p>'}</section></body></html>`);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
+
+  const openViewer = async (report) => {
     const user = getReportUser(report);
     const commentsCount = commentsList(report).length;
     const attachments = Array.isArray(report.attachments) ? report.attachments : [];
     const importance = toneImportance(report.importance);
 
-    const result = await Swal.fire({
+    await Swal.fire({
       title: 'Informe bromatológico',
-      html: `
-        <article class="informe-card panel-report-alert-card">
-          <div class="informe-card-head">
-            <span class="informe-card-date"><i class="fa-regular fa-calendar"></i> ${escapeHtml(formatDateTime(report.createdAt))}</span>
-            <span class="informe-card-comments ${commentsCount ? 'has-comments' : 'no-comments'}"><i class="fa-solid ${commentsCount ? 'fa-comment-dots' : 'fa-comment-slash'}"></i> ${commentsCount ? `${commentsCount} comentario(s)` : 'Sin comentarios'}</span>
-          </div>
-          <div class="informe-card-preview">${report.html || '<p>Sin contenido</p>'}</div>
-          <div class="informe-card-meta">
-            <span class="informe-attach-chip"><i class="fa-regular fa-image"></i> ${attachments.filter((x) => x?.type === 'image').length}</span>
-            <span class="informe-attach-chip"><i class="fa-regular fa-file-lines"></i> ${Math.max(0, attachments.length - attachments.filter((x) => x?.type === 'image').length)}</span>
-            <span class="importance-chip importance-${importance.tone}">${Math.max(0, Math.min(100, Number(report.importance || 0)))}% · ${importance.label}</span>
-          </div>
-          <div class="informe-card-user">
-            ${renderUserAvatar(user)}
-            <div class="informe-card-user-text"><strong>${escapeHtml(user.name)}</strong><small>${escapeHtml(user.position)}</small></div>
-          </div>
-        </article>
-      `,
-      showCancelButton: true,
-      showDenyButton: true,
-      confirmButtonText: 'Comentar',
-      denyButtonText: 'Imprimir',
-      cancelButtonText: 'Ver informe completo',
-      reverseButtons: true,
+      html: `<article class="informe-card panel-report-alert-card"><div class="informe-card-head"><span class="informe-card-date"><i class="fa-regular fa-calendar"></i> ${escapeHtml(formatDateTime(report.createdAt))}</span><span class="informe-card-comments ${commentsCount ? 'has-comments' : 'no-comments'}"><i class="fa-solid ${commentsCount ? 'fa-comment-dots' : 'fa-comment-slash'}"></i> ${commentsCount ? `${commentsCount} comentario(s)` : 'Sin comentarios'}</span></div><div class="informe-card-preview">${report.html || '<p>Sin contenido</p>'}</div><div class="informe-card-meta"><span class="informe-attach-chip"><i class="fa-regular fa-image"></i> ${attachments.filter((x) => x?.type === 'image').length}</span><span class="informe-attach-chip"><i class="fa-regular fa-file-lines"></i> ${Math.max(0, attachments.length - attachments.filter((x) => x?.type === 'image').length)}</span><span class="importance-chip importance-${importance.tone}">${Math.max(0, Math.min(100, Number(report.importance || 0)))}% · ${importance.label}</span></div><div class="informe-card-user">${renderUserAvatar(user)}<div class="informe-card-user-text"><strong>${escapeHtml(user.name)}</strong><small>${escapeHtml(user.position)}</small></div></div></article>`,
       customClass: {
         popup: 'ios-alert panel-report-alert',
         title: 'ios-alert-title',
         htmlContainer: 'ios-alert-text',
-        confirmButton: 'ios-btn ios-btn-secondary',
-        denyButton: 'ios-btn ios-btn-secondary',
-        cancelButton: 'ios-btn ios-btn-primary'
+        confirmButton: 'ios-btn ios-btn-primary'
       },
       buttonsStyling: false,
-      didOpen: () => {
-        document.querySelectorAll('.js-panel-thumb').forEach((img) => {
-          img.addEventListener('load', () => img.classList.add('is-loaded'), { once: true });
-          img.addEventListener('error', () => img.closest('.panel-user-avatar')?.classList.add('is-fallback'), { once: true });
-        });
-      }
+      confirmButtonText: 'Cerrar',
+      didOpen: bindThumbs
     });
+  };
 
-    if (result.dismiss === Swal.DismissReason.cancel) {
-      window.location.href = './informes.html';
-      return;
-    }
+  const promptComment = async (report) => {
+    const result = await Swal.fire({
+      title: 'Nuevo comentario',
+      input: 'textarea',
+      inputAttributes: { maxlength: 500, placeholder: 'Escribí un comentario' },
+      showCancelButton: true,
+      confirmButtonText: 'Guardar',
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        popup: 'ios-alert',
+        confirmButton: 'ios-btn ios-btn-primary',
+        cancelButton: 'ios-btn ios-btn-secondary'
+      },
+      buttonsStyling: false
+    });
+    const text = normalize(result.value);
+    if (!result.isConfirmed || !text) return;
+    const path = reportPath(report);
+    const latest = safeObject(await window.dbLaJamoneraRest.read(path));
+    const comments = commentsList(latest);
+    comments.push({ id: `comment_${Date.now()}`, createdAt: Date.now(), userName: 'Panel', text });
+    await window.dbLaJamoneraRest.update(path, { comments });
+    await loadOnce();
+  };
 
-    if (result.isDenied) {
-      window.open('./informes.html', '_blank', 'noopener,noreferrer');
-      return;
-    }
+  const promptEdit = async (report) => {
+    const result = await Swal.fire({
+      title: 'Editar informe',
+      html: `<textarea id="panelEditReportHtml" class="swal2-textarea ios-input" style="min-height:220px;">${(report.html || '').replace(/<[^>]+>/g, '')}</textarea>`,
+      showCancelButton: true,
+      confirmButtonText: 'Guardar cambios',
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        popup: 'ios-alert',
+        confirmButton: 'ios-btn ios-btn-primary',
+        cancelButton: 'ios-btn ios-btn-secondary'
+      },
+      buttonsStyling: false,
+      preConfirm: () => normalize(document.getElementById('panelEditReportHtml')?.value)
+    });
+    const text = normalize(result.value);
+    if (!result.isConfirmed || !text) return;
+    await window.dbLaJamoneraRest.update(reportPath(report), { html: `<p>${escapeHtml(text).replace(/\n/g, '</p><p>')}</p>` });
+    await loadOnce();
+  };
 
-    if (result.isConfirmed) {
-      const commentPrompt = await Swal.fire({
-        title: 'Nuevo comentario',
-        input: 'textarea',
-        inputAttributes: { maxlength: 500, placeholder: 'Escribí un comentario' },
-        showCancelButton: true,
-        confirmButtonText: 'Guardar',
-        cancelButtonText: 'Cancelar',
-        customClass: {
-          popup: 'ios-alert',
-          confirmButton: 'ios-btn ios-btn-primary',
-          cancelButton: 'ios-btn ios-btn-secondary'
-        },
-        buttonsStyling: false
-      });
-
-      const text = normalize(commentPrompt.value);
-      if (!commentPrompt.isConfirmed || !text) return;
-
-      const path = `/informes/${report.year}/${report.month}/${report.day}/${report.id}`;
-      const latest = safeObject(await window.dbLaJamoneraRest.read(path));
-      const comments = commentsList(latest);
-      comments.push({ id: `comment_${Date.now()}`, createdAt: Date.now(), userName: 'Panel', text });
-      await window.dbLaJamoneraRest.update(path, { comments });
-      await loadOnce();
-    }
+  const deleteReport = async (report) => {
+    const ask = await Swal.fire({
+      title: 'Eliminar informe',
+      html: '<p>Esta acción no se puede deshacer.</p>',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Eliminar',
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        popup: 'ios-alert',
+        confirmButton: 'ios-btn ios-btn-danger',
+        cancelButton: 'ios-btn ios-btn-secondary'
+      },
+      buttonsStyling: false
+    });
+    if (!ask.isConfirmed) return;
+    await window.dbLaJamoneraRest.write(reportPath(report), null);
+    await loadOnce();
   };
 
   const renderLastReport = () => {
     const report = state.report;
     if (!report) {
-      nodes.informe.innerHTML = '<div class="panel-empty">Todavía no hay informes cargados.</div>';
       nodes.informeAgo.classList.add('d-none');
+      nodes.informe.innerHTML = '<div class="panel-empty">Todavía no hay informes cargados.</div>';
       return;
     }
 
@@ -215,62 +233,35 @@
           <span class="informe-card-date"><i class="fa-regular fa-calendar"></i> ${escapeHtml(formatDateTime(report.createdAt))}</span>
           <span class="informe-card-comments ${commentsCount ? 'has-comments' : 'no-comments'}"><i class="fa-solid ${commentsCount ? 'fa-comment-dots' : 'fa-comment-slash'}"></i> ${commentsCount ? `${commentsCount} comentario(s)` : 'Sin comentarios'}</span>
         </div>
-
         <div class="informe-card-preview">${report.html || '<p>Sin contenido.</p>'}</div>
-
         <div class="informe-card-meta">
           <span class="informe-attach-chip"><i class="fa-regular fa-image"></i> ${attachments.filter((x) => x?.type === 'image').length}</span>
           <span class="informe-attach-chip"><i class="fa-regular fa-file-lines"></i> ${Math.max(0, attachments.length - attachments.filter((x) => x?.type === 'image').length)}</span>
           <span class="importance-chip importance-${importance.tone}">${Math.max(0, Math.min(100, Number(report.importance || 0)))}% · ${importance.label} 📌</span>
+          <button id="panelReportPrintBtn" class="btn informe-print-chip" type="button" title="Imprimir informe"><i class="fa-solid fa-print"></i></button>
         </div>
-
         <div class="informe-card-user">
           ${renderUserAvatar(user)}
-          <div class="informe-card-user-text">
-            <strong>${escapeHtml(user.name)}</strong>
-            <small>${escapeHtml(user.position)}</small>
-          </div>
+          <div class="informe-card-user-text"><strong>${escapeHtml(user.name)}</strong><small>${escapeHtml(user.position)}</small></div>
         </div>
-
         <div class="informe-card-actions panel-last-report-actions">
           <button id="panelOpenReportBtn" class="btn ios-btn ios-btn-primary" type="button">VER INFORME COMPLETO</button>
+          <button id="panelCommentBtn" class="btn ios-btn ios-btn-secondary" type="button" title="Comentar"><i class="fa-regular fa-message"></i></button>
+          <button id="panelEditBtn" class="btn ios-btn ios-btn-secondary" type="button" title="Editar"><i class="fa-solid fa-pen"></i></button>
+          <button id="panelDeleteBtn" class="btn ios-btn ios-btn-danger" type="button" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
         </div>
-      </article>
-    `;
+      </article>`;
 
-    document.querySelectorAll('.js-panel-thumb').forEach((img) => {
-      img.addEventListener('load', () => img.classList.add('is-loaded'), { once: true });
-      img.addEventListener('error', () => img.closest('.panel-user-avatar')?.classList.add('is-fallback'), { once: true });
-    });
-
-    document.getElementById('panelOpenReportBtn')?.addEventListener('click', () => openReportViewerAlert(report));
+    bindThumbs();
+    document.getElementById('panelOpenReportBtn')?.addEventListener('click', () => openViewer(report));
+    document.getElementById('panelCommentBtn')?.addEventListener('click', () => promptComment(report));
+    document.getElementById('panelEditBtn')?.addEventListener('click', () => promptEdit(report));
+    document.getElementById('panelDeleteBtn')?.addEventListener('click', () => deleteReport(report));
+    document.getElementById('panelReportPrintBtn')?.addEventListener('click', () => printReport(report));
   };
 
   const renderSummary = () => {
-    const reminders = [];
-
-    state.recipes.slice(0, 8).forEach((item) => {
-      const days = dayDiff(item.rnpa?.expiryDate);
-      reminders.push(`<article class="panel-reminder-card tone-orange"><div class="panel-reminder-icon"><i class="bi bi-exclamation-triangle-fill"></i></div><div class="panel-item-text"><strong>${escapeHtml(item.title || 'Receta')}</strong><small>RNPA ${days < 0 ? `vencido hace ${Math.abs(days)} día(s)` : `vence en ${days} día(s)`}</small></div></article>`);
-    });
-
-    state.vehicles.slice(0, 8).forEach((item) => {
-      const days = dayDiff(item.expiryDate);
-      reminders.push(`<article class="panel-reminder-card tone-red"><div class="panel-reminder-icon"><i class="bi bi-truck"></i></div><div class="panel-item-text"><strong>${escapeHtml(item.number || 'UTA/URA')}</strong><small>${days < 0 ? `Venció hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`}</small></div></article>`);
-    });
-
-    state.reports.slice(0, 4).forEach((item) => {
-      reminders.push(`<article class="panel-reminder-card tone-blue"><div class="panel-reminder-icon"><i class="bi bi-journal-check"></i></div><div class="panel-item-text"><strong>Informe ${escapeHtml(formatDateTime(item.createdAt))}</strong><small>Usuario: ${escapeHtml(normalize(item.userName) || 'Sin nombre')}</small></div></article>`);
-    });
-
-    const metrics = `<div class="panel-mini-grid"><div class="panel-metric"><strong>${state.providers.length}</strong><span><i class="bi bi-clipboard2-pulse"></i> RNE pendientes</span></div><div class="panel-metric"><strong>${state.recipes.length}</strong><span><i class="bi bi-card-checklist"></i> RNPA críticos</span></div><div class="panel-metric"><strong>${state.vehicles.length}</strong><span><i class="bi bi-truck"></i> UTA/URA con alerta</span></div><div class="panel-metric"><strong>${state.reports.length}</strong><span><i class="bi bi-journal-medical"></i> Informes cargados</span></div></div>`;
-
-    if (!reminders.length) {
-      nodes.resumen.innerHTML = `${metrics}<div class="panel-empty">Sin recordatorios activos por el momento.</div>`;
-      return;
-    }
-
-    nodes.resumen.innerHTML = `${metrics}${makeMarquee(reminders, 3, 7)}`;
+    nodes.resumen.innerHTML = `<div class="panel-mini-grid panel-mini-grid-only"><div class="panel-metric panel-metric-rne"><strong>${state.providers.length}</strong><span><i class="bi bi-clipboard2-pulse"></i> RNE pendientes</span></div><div class="panel-metric panel-metric-rnpa"><strong>${state.recipes.length}</strong><span><i class="bi bi-card-checklist"></i> RNPA críticos</span></div><div class="panel-metric panel-metric-transport"><strong>${state.vehicles.length}</strong><span><i class="bi bi-truck"></i> UTA/URA con alerta</span></div><div class="panel-metric panel-metric-reports"><strong>${state.reports.length}</strong><span><i class="bi bi-journal-medical"></i> Informes cargados</span></div></div>`;
   };
 
   const renderProviders = () => {
@@ -281,12 +272,7 @@
         : `<div class="panel-avatar">${escapeHtml(initials(provider.name))}</div>`;
       return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(provider.name || 'Proveedor')}</strong><small><i class="bi bi-patch-exclamation"></i> RNE pendiente</small><p class="panel-status is-danger">Completar registro del proveedor</p></div></article>`;
     });
-
-    if (!rows.length) {
-      nodes.wrapRne.classList.add('d-none');
-      return;
-    }
-
+    if (!rows.length) { nodes.wrapRne.classList.add('d-none'); return; }
     nodes.wrapRne.classList.remove('d-none');
     nodes.rne.innerHTML = makeMarquee(rows, 3, 7);
   };
@@ -301,12 +287,7 @@
         : `<div class="panel-avatar">${escapeHtml(initials(recipe.title))}</div>`;
       return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(recipe.title || 'Receta')}</strong><small><i class="bi bi-calendar2-week"></i> Vence: ${escapeHtml(recipe.rnpa?.expiryDate || '-')}</small><p class="panel-status ${expired ? 'is-danger' : 'is-warning'}">${expired ? `Venció hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`}</p></div></article>`;
     });
-
-    if (!rows.length) {
-      nodes.wrapRnpa.classList.add('d-none');
-      return;
-    }
-
+    if (!rows.length) { nodes.wrapRnpa.classList.add('d-none'); return; }
     nodes.wrapRnpa.classList.remove('d-none');
     nodes.rnpa.innerHTML = makeMarquee(rows, 3, 7);
   };
@@ -316,12 +297,7 @@
       const days = dayDiff(vehicle.expiryDate);
       return `<article class="panel-list-card"><div class="panel-avatar"><i class="bi bi-truck"></i></div><div class="panel-item-text"><strong>${escapeHtml(vehicle.number || '-')} · ${escapeHtml(vehicle.patent || '-')}</strong><small>${escapeHtml(vehicle.brand || vehicle.type || 'Unidad')} · ${escapeHtml(vehicle.expiryDate || '-')}</small><p class="panel-status ${days < 0 ? 'is-danger' : 'is-warning'}">${days < 0 ? `Vencido hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`}</p></div></article>`;
     });
-
-    if (!rows.length) {
-      nodes.wrapTransporte.classList.add('d-none');
-      return;
-    }
-
+    if (!rows.length) { nodes.wrapTransporte.classList.add('d-none'); return; }
     nodes.wrapTransporte.classList.remove('d-none');
     nodes.transporte.innerHTML = makeMarquee(rows, 99, 7);
   };
@@ -338,30 +314,17 @@
     const map = {};
     inRange.forEach((item) => {
       const key = normalize(item.recipeId || item.recipeTitle || item.recipeName || 'sin_nombre');
-      if (!map[key]) {
-        map[key] = {
-          id: normalize(item.recipeId),
-          name: normalize(item.recipeTitle || item.recipeName || item.recipeId || 'Sin nombre'),
-          kg: 0,
-          imageUrl: normalize(item.recipeImageUrl)
-        };
-      }
+      if (!map[key]) map[key] = { id: normalize(item.recipeId), name: normalize(item.recipeTitle || item.recipeName || item.recipeId || 'Sin nombre'), kg: 0, imageUrl: normalize(item.recipeImageUrl) };
       map[key].kg = Number((Number(map[key].kg || 0) + Number(item.quantityKg || 0)).toFixed(2));
     });
 
-    const top = Object.values(map)
-      .map((item) => {
-        const recipe = safeObject(state.recipesById[item.id]);
-        if (!item.imageUrl && normalize(recipe.imageUrl)) item.imageUrl = normalize(recipe.imageUrl);
-        return item;
-      })
-      .sort((a, b) => b.kg - a.kg)
-      .slice(0, 10);
+    const top = Object.values(map).map((item) => {
+      const recipe = safeObject(state.recipesById[item.id]);
+      if (!item.imageUrl && normalize(recipe.imageUrl)) item.imageUrl = normalize(recipe.imageUrl);
+      return item;
+    }).sort((a, b) => b.kg - a.kg).slice(0, 10);
 
-    if (!top.length) {
-      nodes.produccion.innerHTML = '<div class="panel-empty">No hay producción en el rango seleccionado.</div>';
-      return;
-    }
+    if (!top.length) { nodes.produccion.innerHTML = '<div class="panel-empty">No hay producción en el rango seleccionado.</div>'; return; }
 
     const max = Math.max(...top.map((x) => x.kg));
     nodes.produccion.innerHTML = `<div class="panel-chart-wrap">${top.map((item) => {
@@ -374,30 +337,27 @@
 
   const renderAll = () => {
     renderSummary();
+    renderChart();
     renderLastReport();
     renderProviders();
     renderRnpa();
     renderTransport();
-    renderChart();
   };
 
   const applyData = (raw) => {
     state.reports = flattenReports(raw.reportsTree);
     state.report = state.reports[0] || null;
     state.usersMap = safeObject(raw.informesUsers);
-
     state.recipesById = safeObject(raw.recetas);
     state.providers = (Array.isArray(raw.inventario?.config?.providers) ? raw.inventario.config.providers : []).filter((p) => !normalize(p?.rne?.number));
     state.recipes = Object.values(state.recipesById).filter((r) => {
       const days = dayDiff(r?.rnpa?.expiryDate);
       return Number.isFinite(days) && days <= 60;
     });
-
     state.vehicles = Object.values(safeObject(raw.reparto?.vehicles)).filter((v) => v?.enabled !== false).filter((v) => {
       const days = dayDiff(v.expiryDate);
       return Number.isFinite(days) && days <= 60;
     });
-
     state.registros = Object.values(safeObject(raw.registros));
   };
 
@@ -425,7 +385,7 @@
       applyData({ reportsTree, inventario, recetas, reparto, registros, informesUsers });
       renderAll();
       state.initialized = true;
-    } catch (error) {
+    } catch {
       const fallback = '<div class="panel-empty">No se pudieron cargar los datos del panel.</div>';
       [nodes.informe, nodes.resumen, nodes.rne, nodes.rnpa, nodes.transporte, nodes.produccion].forEach((n) => { if (n) n.innerHTML = fallback; });
     }
@@ -434,9 +394,7 @@
   const attachRealtimeListeners = () => {
     const db = window.dbLaJamonera;
     if (!db?.ref) return;
-    ['/informes', '/inventario', '/recetas', '/Reparto', '/produccion/registros', '/informes/users'].forEach((path) => {
-      db.ref(path).on('value', () => loadOnce());
-    });
+    ['/informes', '/inventario', '/recetas', '/Reparto', '/produccion/registros', '/informes/users'].forEach((path) => db.ref(path).on('value', () => loadOnce()));
   };
 
   const initRange = () => {
