@@ -34,6 +34,22 @@
   const escapeHtml = (v) => normalize(v).replace(/[&<>'"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
   const initials = (name) => normalize(name).split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() || '').join('') || 'PS';
   const formatDateTime = (ts) => new Date(Number(ts || Date.now())).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const getDateLabel = formatDateTime;
+  const getSwalTarget = () => document.body;
+  const openIosSwal = (options) => Swal.fire({
+    target: getSwalTarget(),
+    ...options,
+    customClass: {
+      popup: `ios-alert informes-alert ${options?.customClass?.popup || ''}`.trim(),
+      title: 'ios-alert-title',
+      htmlContainer: 'ios-alert-text',
+      confirmButton: 'ios-btn ios-btn-primary',
+      denyButton: 'ios-btn ios-btn-secondary',
+      cancelButton: 'ios-btn ios-btn-secondary',
+      ...options.customClass
+    },
+    buttonsStyling: false
+  });
 
   const commentsList = (report) => {
     if (Array.isArray(report?.comments)) return report.comments;
@@ -63,6 +79,13 @@
     if (days <= 0) return 'HOY';
     if (days === 1) return 'HACE 1 DÍA';
     return `HACE ${days} DÍAS`;
+  };
+
+  const agoDaysLabel = (ts) => {
+    const days = Math.max(0, Math.floor((Date.now() - Number(ts || Date.now())) / 86400000));
+    if (days === 0) return 'Hoy';
+    if (days === 1) return 'Hace 1 día';
+    return `Hace ${days} días`;
   };
 
   const spinner = (alt) => `<div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="${escapeHtml(alt)}" class="panel-spinner"></div>`;
@@ -109,8 +132,39 @@
 
   const bindThumbs = () => {
     document.querySelectorAll('.js-panel-thumb').forEach((img) => {
-      img.addEventListener('load', () => img.classList.add('is-loaded'), { once: true });
+      img.addEventListener('load', () => {
+        img.classList.add('is-loaded');
+        img.closest('.user-avatar-thumb')?.querySelector('.thumb-loading')?.classList.add('d-none');
+      }, { once: true });
       img.addEventListener('error', () => img.closest('.panel-user-avatar')?.classList.add('is-fallback'), { once: true });
+    });
+    document.querySelectorAll('.panel-avatar img:first-child, .panel-chart-avatar img:first-child').forEach((img) => {
+      const stopSpinner = () => img.parentElement?.querySelector('.panel-spinner')?.classList.add('d-none');
+      img.addEventListener('load', stopSpinner, { once: true });
+      img.addEventListener('error', stopSpinner, { once: true });
+      if (img.complete) stopSpinner();
+    });
+  };
+
+  const sortComments = (list = []) => [...list].sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
+  const getCommentList = (report) => sortComments(commentsList(report));
+  const renderCommentTree = (comments = [], level = 0) => sortComments(comments).map((comment) => `
+    <article class="report-comment-item ${level > 0 ? 'is-reply' : ''}" data-comment-id="${escapeHtml(comment.id || '')}">
+      <header class="report-comment-head"><strong>${escapeHtml(comment.userName || 'Usuario')}</strong><small>${escapeHtml(getDateLabel(comment.createdAt))}</small></header>
+      <p class="report-comment-text">${escapeHtml(comment.text || '').replaceAll('\n', '<br>')}</p>
+      <div class="report-comment-actions"><button type="button" class="btn report-comment-reply-btn" data-reply-comment="${escapeHtml(comment.id || '')}">Responder</button></div>
+      ${Array.isArray(comment.replies) && comment.replies.length ? `<div class="report-comment-replies">${renderCommentTree(comment.replies, level + 1)}</div>` : ''}
+    </article>
+  `).join('');
+
+  const insertReplyInTree = (comments, targetId, payload) => {
+    const source = Array.isArray(comments) ? comments : [];
+    return source.map((item) => {
+      if (item.id === targetId) {
+        const replies = Array.isArray(item.replies) ? [...item.replies, payload] : [payload];
+        return { ...item, replies };
+      }
+      return { ...item, replies: insertReplyInTree(item.replies, targetId, payload) };
     });
   };
 
@@ -124,90 +178,206 @@
     win.print();
   };
 
+  const getCommentsCount = (report) => commentsList(report).length;
+
+  const verifyReportCreatorPin = async (report) => {
+    const user = safeObject(state.usersMap[report?.userId]);
+    if (!user?.pin) return true;
+    const result = await openIosSwal({
+      title: 'Clave de usuario',
+      html: '<input id="panelCreatorPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos">',
+      showCancelButton: true,
+      confirmButtonText: 'Validar',
+      cancelButtonText: 'Cancelar',
+      preConfirm: () => normalize(document.getElementById('panelCreatorPin')?.value)
+    });
+    if (!result.isConfirmed) return false;
+    if (String(result.value || '') !== String(user.pin || '')) {
+      await openIosSwal({ title: 'Clave incorrecta', html: '<p>La clave no coincide con el creador del informe.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      return false;
+    }
+    return true;
+  };
+
   const openViewer = async (report) => {
     const user = getReportUser(report);
-    const commentsCount = commentsList(report).length;
+    const commentsCount = getCommentsCount(report);
     const attachments = Array.isArray(report.attachments) ? report.attachments : [];
     const importance = toneImportance(report.importance);
+    const attachmentHtml = attachments.length
+      ? attachments.map((item, index) => {
+        if (item?.type === 'image') {
+          return `<button type="button" class="attachment-card" data-open-report-image="${index}"><img src="${escapeHtml(item.url || '')}" alt="${escapeHtml(item.name || 'Adjunto')}" class="attachment-image is-loaded"></button>`;
+        }
+        return `<a href="${escapeHtml(item?.url || '#')}" target="_blank" rel="noopener noreferrer" class="attachment-card attachment-doc"><i class="bi bi-file-earmark"></i><span>${escapeHtml(item?.name || 'Documento')}</span></a>`;
+      }).join('')
+      : '<div class="informes-empty">Sin adjuntos</div>';
+    const users = Object.values(state.usersMap || {}).sort((a, b) => String(a.fullName || '').localeCompare(String(b.fullName || '')));
+    const commentUserOptions = ['<option value="">Seleccioná un usuario</option>', ...users.map((user) => `<option value="${escapeHtml(user.id || '')}">${escapeHtml(user.fullName || 'Usuario')}</option>`)].join('');
+    const comments = getCommentList(report);
+    const commentsHtml = comments.length
+      ? `<div class="report-comments-thread">${renderCommentTree(comments)}</div>`
+      : '<div class="informes-empty report-comments-empty">Sin comentarios todavía.</div>';
 
-    await Swal.fire({
-      title: 'Informe bromatológico',
-      html: `<article class="informe-card panel-report-alert-card"><div class="informe-card-head"><span class="informe-card-date"><i class="fa-regular fa-calendar"></i> ${escapeHtml(formatDateTime(report.createdAt))}</span><span class="informe-card-comments ${commentsCount ? 'has-comments' : 'no-comments'}"><i class="fa-solid ${commentsCount ? 'fa-comment-dots' : 'fa-comment-slash'}"></i> ${commentsCount ? `${commentsCount} comentario(s)` : 'Sin comentarios'}</span></div><div class="informe-card-preview">${report.html || '<p>Sin contenido</p>'}</div><div class="informe-card-meta"><span class="informe-attach-chip"><i class="fa-regular fa-image"></i> ${attachments.filter((x) => x?.type === 'image').length}</span><span class="informe-attach-chip"><i class="fa-regular fa-file-lines"></i> ${Math.max(0, attachments.length - attachments.filter((x) => x?.type === 'image').length)}</span><span class="importance-chip importance-${importance.tone}">${Math.max(0, Math.min(100, Number(report.importance || 0)))}% · ${importance.label}</span></div><div class="informe-card-user">${renderUserAvatar(user)}<div class="informe-card-user-text"><strong>${escapeHtml(user.name)}</strong><small>${escapeHtml(user.position)}</small></div></div></article>`,
-      customClass: {
-        popup: 'ios-alert panel-report-alert',
-        title: 'ios-alert-title',
-        htmlContainer: 'ios-alert-text',
-        confirmButton: 'ios-btn ios-btn-primary'
-      },
-      buttonsStyling: false,
+    await openIosSwal({
+      title: 'Informe completo',
+      width: 980,
+      html: `<div class="report-viewer"><div class="report-viewer-meta"><p><strong>Creador:</strong> ${escapeHtml(user.name || '-')}</p><p><strong>Puesto:</strong> ${escapeHtml(user.position || '-')}</p><p><strong>Fecha:</strong> ${escapeHtml(getDateLabel(report.createdAt))}</p><p><strong>Última actualización:</strong> ${escapeHtml(getDateLabel(report.updatedAt || report.createdAt))}</p><div class="report-viewer-meta-actions"><button type="button" class="btn ios-btn ios-btn-warning report-resend-btn" data-resend-report-email="1"><i class="fa-regular fa-paper-plane"></i><span>Reenviar email</span></button></div></div><div class="report-viewer-content-wrap"><div class="report-viewer-content">${report.html || ''}</div></div><div class="attachments-grid">${attachmentHtml}</div><section class="report-comments-wrap"><div class="report-comments-head"><h6><i class="fa-regular fa-comments"></i> <span class="report-comments-title-text">Comentarios</span></h6></div><div class="report-inline-comment-form"><div class="report-inline-comment-reply d-none" id="inlineReplyLabel"></div><select id="inlineCommentUser" class="form-select ios-input mb-2">${commentUserOptions}</select><textarea id="inlineCommentText" class="swal2-textarea ios-input" placeholder="Escribí un comentario"></textarea><input id="inlineCommentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos"><div class="d-flex justify-content-end gap-2"><button type="button" class="btn ios-btn ios-btn-secondary d-none" id="inlineCancelReplyBtn">Cancelar respuesta</button><button type="button" class="btn ios-btn ios-btn-primary" id="inlineSendCommentBtn"><i class="fa-solid fa-paper-plane"></i><span>Enviar comentario</span></button></div></div><div id="reportCommentsBody">${commentsHtml}</div></section></div>`,
+      customClass: { popup: 'panel-report-alert' },
       confirmButtonText: 'Cerrar',
-      didOpen: bindThumbs
+      didOpen: (popup) => {
+        bindThumbs();
+        let replyToId = '';
+        const commentsBody = popup.querySelector('#reportCommentsBody');
+        const replyLabel = popup.querySelector('#inlineReplyLabel');
+        const cancelReplyBtn = popup.querySelector('#inlineCancelReplyBtn');
+        const sendBtn = popup.querySelector('#inlineSendCommentBtn');
+
+        popup.querySelectorAll('.attachment-card[data-open-report-image]').forEach((node) => {
+          node.addEventListener('click', async (event) => {
+            event.preventDefault();
+            const index = Number(node.dataset.openReportImage || 0);
+            const imageAttachments = attachments.filter((item) => item?.type === 'image').map((item) => item?.url).filter(Boolean);
+            if (!imageAttachments.length) return;
+            if (typeof window.laJamoneraOpenImageViewer === 'function') {
+              await window.laJamoneraOpenImageViewer([{ invoiceImageUrls: imageAttachments }], Math.max(0, index), 'Adjuntos del informe');
+            }
+          });
+        });
+
+        popup.querySelector('[data-resend-report-email]')?.addEventListener('click', async () => {
+          if (!window.laJamoneraEmailSender) {
+            await openIosSwal({ title: 'Email no disponible', html: '<p>No está cargado el módulo de envío en esta pantalla.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+            return;
+          }
+          await openIosSwal({ title: 'Reenviar email', html: '<p>Usá la pantalla Informes para reenviar con destinatarios configurables.</p>', icon: 'info', confirmButtonText: 'Entendido' });
+        });
+
+        commentsBody?.addEventListener('click', (event) => {
+          const btn = event.target.closest('[data-reply-comment]');
+          if (!btn) return;
+          replyToId = btn.dataset.replyComment || '';
+          const author = btn.closest('.report-comment-item')?.querySelector('.report-comment-head strong')?.textContent || 'usuario';
+          replyLabel.textContent = `Respondiendo a ${author}`;
+          replyLabel.classList.remove('d-none');
+          cancelReplyBtn.classList.remove('d-none');
+        });
+
+        cancelReplyBtn?.addEventListener('click', () => {
+          replyToId = '';
+          replyLabel.classList.add('d-none');
+          replyLabel.textContent = '';
+          cancelReplyBtn.classList.add('d-none');
+        });
+
+        sendBtn?.addEventListener('click', async () => {
+          const userId = normalize(popup.querySelector('#inlineCommentUser')?.value);
+          const text = normalize(popup.querySelector('#inlineCommentText')?.value);
+          const pin = normalize(popup.querySelector('#inlineCommentPin')?.value);
+          if (!userId || !text) return;
+          const author = safeObject(state.usersMap[userId]);
+          const authorId = normalize(author.id || userId);
+          if (!authorId || String(author.pin || '') !== String(pin || '')) {
+            await openIosSwal({ title: 'Clave incorrecta', html: '<p>La clave no coincide con el usuario seleccionado.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+            return;
+          }
+          const latest = safeObject(await window.dbLaJamoneraRest.read(reportPath(report)));
+          const list = getCommentList(latest);
+          const payload = { id: `comment_${Date.now()}`, createdAt: Date.now(), userId: authorId, userName: author.fullName || 'Usuario', text, replies: [] };
+          const nextComments = replyToId ? insertReplyInTree(list, replyToId, payload) : [...list, payload];
+          await window.dbLaJamoneraRest.update(reportPath(report), { comments: nextComments });
+          await window.dbLaJamoneraRest.update(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, { commentsCount: nextComments.length, updatedAt: Date.now() });
+          const refreshed = safeObject(await window.dbLaJamoneraRest.read(reportPath(report)));
+          commentsBody.innerHTML = `<div class="report-comments-thread">${renderCommentTree(getCommentList(refreshed))}</div>`;
+          popup.querySelector('#inlineCommentText').value = '';
+          popup.querySelector('#inlineCommentPin').value = '';
+          replyToId = '';
+          replyLabel.classList.add('d-none');
+          cancelReplyBtn.classList.add('d-none');
+          await loadOnce();
+        });
+      }
     });
   };
 
   const promptComment = async (report) => {
-    const result = await Swal.fire({
+    const users = Object.values(state.usersMap || {}).sort((a, b) => String(a.fullName || '').localeCompare(String(b.fullName || '')));
+    const options = ['<option value="">Seleccioná un usuario</option>', ...users.map((user) => `<option value="${escapeHtml(user.id)}">${escapeHtml(user.fullName || 'Usuario')}</option>`)].join('');
+    const result = await openIosSwal({
       title: 'Nuevo comentario',
-      input: 'textarea',
-      inputAttributes: { maxlength: 500, placeholder: 'Escribí un comentario' },
+      html: `<select id="panelCommentUser" class="form-select ios-input mb-2">${options}</select><textarea id="panelCommentText" class="swal2-textarea ios-input" maxlength="500" placeholder="Escribí un comentario"></textarea><input id="panelCommentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos">`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
-      customClass: {
-        popup: 'ios-alert',
-        confirmButton: 'ios-btn ios-btn-primary',
-        cancelButton: 'ios-btn ios-btn-secondary'
-      },
-      buttonsStyling: false
+      preConfirm: () => ({
+        userId: normalize(document.getElementById('panelCommentUser')?.value),
+        text: normalize(document.getElementById('panelCommentText')?.value),
+        pin: normalize(document.getElementById('panelCommentPin')?.value)
+      })
     });
-    const text = normalize(result.value);
-    if (!result.isConfirmed || !text) return;
+    if (!result.isConfirmed) return;
+    const payload = safeObject(result.value);
+    if (!payload.userId || !payload.text) return;
+    const author = safeObject(state.usersMap[payload.userId]);
+    const authorId = normalize(author.id || payload.userId);
+    if (!authorId || String(author.pin || '') !== String(payload.pin || '')) {
+      await openIosSwal({ title: 'Clave incorrecta', html: '<p>La clave no coincide con el usuario seleccionado.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      return;
+    }
     const path = reportPath(report);
     const latest = safeObject(await window.dbLaJamoneraRest.read(path));
     const comments = commentsList(latest);
-    comments.push({ id: `comment_${Date.now()}`, createdAt: Date.now(), userName: 'Panel', text });
+    comments.push({ id: `comment_${Date.now()}`, createdAt: Date.now(), userId: authorId, userName: author.fullName || 'Usuario', text: payload.text });
     await window.dbLaJamoneraRest.update(path, { comments });
+    await window.dbLaJamoneraRest.write(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, {
+      id: report.id,
+      reportDate: report.reportDate,
+      userId: report.userId,
+      userName: report.userName,
+      importance: Math.max(0, Math.min(100, Number(report.importance || 50))),
+      createdAt: Number(report.createdAt || Date.now()),
+      attachmentsCount: Array.isArray(report.attachments) ? report.attachments.length : 0,
+      commentsCount: comments.length,
+      updatedAt: Date.now()
+    });
     await loadOnce();
   };
 
   const promptEdit = async (report) => {
-    const result = await Swal.fire({
+    const allowed = await verifyReportCreatorPin(report);
+    if (!allowed) return;
+
+    const result = await openIosSwal({
       title: 'Editar informe',
       html: `<textarea id="panelEditReportHtml" class="swal2-textarea ios-input" style="min-height:220px;">${(report.html || '').replace(/<[^>]+>/g, '')}</textarea>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar cambios',
       cancelButtonText: 'Cancelar',
-      customClass: {
-        popup: 'ios-alert',
-        confirmButton: 'ios-btn ios-btn-primary',
-        cancelButton: 'ios-btn ios-btn-secondary'
-      },
-      buttonsStyling: false,
       preConfirm: () => normalize(document.getElementById('panelEditReportHtml')?.value)
     });
     const text = normalize(result.value);
     if (!result.isConfirmed || !text) return;
-    await window.dbLaJamoneraRest.update(reportPath(report), { html: `<p>${escapeHtml(text).replace(/\n/g, '</p><p>')}</p>` });
+    const updatedAt = Date.now();
+    await window.dbLaJamoneraRest.update(reportPath(report), { html: `<p>${escapeHtml(text).replace(/\n/g, '</p><p>')}</p>`, updatedAt });
+    await window.dbLaJamoneraRest.update(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, { updatedAt });
     await loadOnce();
   };
 
   const deleteReport = async (report) => {
-    const ask = await Swal.fire({
+    const allowed = await verifyReportCreatorPin(report);
+    if (!allowed) return;
+
+    const ask = await openIosSwal({
       title: 'Eliminar informe',
       html: '<p>Esta acción no se puede deshacer.</p>',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Eliminar',
-      cancelButtonText: 'Cancelar',
-      customClass: {
-        popup: 'ios-alert',
-        confirmButton: 'ios-btn ios-btn-danger',
-        cancelButton: 'ios-btn ios-btn-secondary'
-      },
-      buttonsStyling: false
+      cancelButtonText: 'Cancelar'
     });
     if (!ask.isConfirmed) return;
     await window.dbLaJamoneraRest.write(reportPath(report), null);
+    await window.dbLaJamoneraRest.write(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, null);
     await loadOnce();
   };
 
@@ -228,7 +398,7 @@
     nodes.informeAgo.textContent = ago(report.createdAt);
 
     nodes.informe.innerHTML = `
-      <article class="informe-card panel-last-report-card" data-report-id="${escapeHtml(report.id)}">
+      <article class="informe-card" data-report-id="${escapeHtml(report.id)}">
         <div class="informe-card-head">
           <span class="informe-card-date"><i class="fa-regular fa-calendar"></i> ${escapeHtml(formatDateTime(report.createdAt))}</span>
           <span class="informe-card-comments ${commentsCount ? 'has-comments' : 'no-comments'}"><i class="fa-solid ${commentsCount ? 'fa-comment-dots' : 'fa-comment-slash'}"></i> ${commentsCount ? `${commentsCount} comentario(s)` : 'Sin comentarios'}</span>
@@ -237,31 +407,49 @@
         <div class="informe-card-meta">
           <span class="informe-attach-chip"><i class="fa-regular fa-image"></i> ${attachments.filter((x) => x?.type === 'image').length}</span>
           <span class="informe-attach-chip"><i class="fa-regular fa-file-lines"></i> ${Math.max(0, attachments.length - attachments.filter((x) => x?.type === 'image').length)}</span>
-          <span class="importance-chip importance-${importance.tone}">${Math.max(0, Math.min(100, Number(report.importance || 0)))}% · ${importance.label} 📌</span>
-          <button id="panelReportPrintBtn" class="btn informe-print-chip" type="button" title="Imprimir informe"><i class="fa-solid fa-print"></i></button>
+          <span class="importance-chip importance-${importance.tone}">${Math.max(0, Math.min(100, Number(report.importance || 0)))}% · ${importance.label}</span>
+          <span class="informe-attach-chip panel-report-age-chip"><i class="fa-regular fa-clock"></i> ${escapeHtml(agoDaysLabel(report.createdAt))}</span>
+          <button class="btn informe-print-chip" type="button" data-print-report="${escapeHtml(report.id)}" title="Imprimir informe"><i class="fa-solid fa-print"></i></button>
         </div>
         <div class="informe-card-user">
           ${renderUserAvatar(user)}
           <div class="informe-card-user-text"><strong>${escapeHtml(user.name)}</strong><small>${escapeHtml(user.position)}</small></div>
         </div>
-        <div class="informe-card-actions panel-last-report-actions">
-          <button id="panelOpenReportBtn" class="btn ios-btn ios-btn-primary" type="button">VER INFORME COMPLETO</button>
-          <button id="panelCommentBtn" class="btn ios-btn ios-btn-secondary" type="button" title="Comentar"><i class="fa-regular fa-message"></i></button>
-          <button id="panelEditBtn" class="btn ios-btn ios-btn-secondary" type="button" title="Editar"><i class="fa-solid fa-pen"></i></button>
-          <button id="panelDeleteBtn" class="btn ios-btn ios-btn-danger" type="button" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+        <div class="informe-card-actions">
+          <button class="btn ios-btn ios-btn-primary" type="button" data-view-report="${escapeHtml(report.id)}">Ver informe completo</button>
+          <button class="btn informe-icon-btn" type="button" data-comment-report="${escapeHtml(report.id)}" title="Comentar"><i class="fa-regular fa-message"></i></button>
+          <button class="btn informe-icon-btn" type="button" data-edit-report="${escapeHtml(report.id)}" title="Editar"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn informe-icon-btn danger" type="button" data-delete-report="${escapeHtml(report.id)}" title="Borrar"><i class="fa-solid fa-trash"></i></button>
         </div>
       </article>`;
 
     bindThumbs();
-    document.getElementById('panelOpenReportBtn')?.addEventListener('click', () => openViewer(report));
-    document.getElementById('panelCommentBtn')?.addEventListener('click', () => promptComment(report));
-    document.getElementById('panelEditBtn')?.addEventListener('click', () => promptEdit(report));
-    document.getElementById('panelDeleteBtn')?.addEventListener('click', () => deleteReport(report));
-    document.getElementById('panelReportPrintBtn')?.addEventListener('click', () => printReport(report));
+    const card = nodes.informe.querySelector('.informe-card');
+    card?.addEventListener('click', async (event) => {
+      if (event.target.closest('[data-print-report]')) {
+        await printReport(report);
+        return;
+      }
+      if (event.target.closest('[data-view-report]')) {
+        await openViewer(report);
+        return;
+      }
+      if (event.target.closest('[data-edit-report]')) {
+        await promptEdit(report);
+        return;
+      }
+      if (event.target.closest('[data-delete-report]')) {
+        await deleteReport(report);
+        return;
+      }
+      if (event.target.closest('[data-comment-report]')) {
+        await promptComment(report);
+      }
+    });
   };
 
   const renderSummary = () => {
-    nodes.resumen.innerHTML = `<div class="panel-mini-grid panel-mini-grid-only"><div class="panel-metric panel-metric-rne"><strong>${state.providers.length}</strong><span><i class="bi bi-clipboard2-pulse"></i> RNE pendientes</span></div><div class="panel-metric panel-metric-rnpa"><strong>${state.recipes.length}</strong><span><i class="bi bi-card-checklist"></i> RNPA críticos</span></div><div class="panel-metric panel-metric-transport"><strong>${state.vehicles.length}</strong><span><i class="bi bi-truck"></i> UTA/URA con alerta</span></div><div class="panel-metric panel-metric-reports"><strong>${state.reports.length}</strong><span><i class="bi bi-journal-medical"></i> Informes cargados</span></div></div>`;
+    nodes.resumen.innerHTML = `<div class="panel-kpi-row"><div class="panel-metric panel-metric-rne"><strong>${state.providers.length}</strong><span><i class="fa-solid fa-file-shield"></i> RNE pendientes</span></div><div class="panel-metric panel-metric-rnpa"><strong>${state.recipes.length}</strong><span><i class="fa-solid fa-clipboard-check"></i> RNPA críticos</span></div><div class="panel-metric panel-metric-transport"><strong>${state.vehicles.length}</strong><span><i class="fa-solid fa-id-card-clip"></i> UTA/URA con alerta</span></div><div class="panel-metric panel-metric-reports"><strong>${state.reports.length}</strong><span><i class="fa-solid fa-file-waveform"></i> Informes cargados</span></div></div>`;
   };
 
   const renderProviders = () => {
@@ -270,7 +458,7 @@
       const avatar = photo
         ? `<div class="panel-avatar"><img src="${escapeHtml(photo)}" alt="${escapeHtml(provider.name)}" onload="this.classList.add('is-loaded')"><img src="./IMG/Meta-ai-logo.webp" class="panel-spinner" alt="cargando"></div>`
         : `<div class="panel-avatar">${escapeHtml(initials(provider.name))}</div>`;
-      return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(provider.name || 'Proveedor')}</strong><small><i class="bi bi-patch-exclamation"></i> RNE pendiente</small><p class="panel-status is-danger">Completar registro del proveedor</p></div></article>`;
+      return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(provider.name || 'Proveedor')}</strong><small><i class="fa-solid fa-triangle-exclamation"></i> RNE pendiente</small><p class="panel-status is-danger">Completar registro del proveedor</p></div></article>`;
     });
     if (!rows.length) { nodes.wrapRne.classList.add('d-none'); return; }
     nodes.wrapRne.classList.remove('d-none');
@@ -285,7 +473,7 @@
       const avatar = photo
         ? `<div class="panel-avatar"><img src="${escapeHtml(photo)}" alt="${escapeHtml(recipe.title)}" onload="this.classList.add('is-loaded')"><img src="./IMG/Meta-ai-logo.webp" class="panel-spinner" alt="cargando"></div>`
         : `<div class="panel-avatar">${escapeHtml(initials(recipe.title))}</div>`;
-      return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(recipe.title || 'Receta')}</strong><small><i class="bi bi-calendar2-week"></i> Vence: ${escapeHtml(recipe.rnpa?.expiryDate || '-')}</small><p class="panel-status ${expired ? 'is-danger' : 'is-warning'}">${expired ? `Venció hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`}</p></div></article>`;
+      return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(recipe.title || 'Receta')}</strong><small><i class="fa-regular fa-calendar"></i> Vence: ${escapeHtml(recipe.rnpa?.expiryDate || '-')}</small><p class="panel-status ${expired ? 'is-danger' : 'is-warning'}">${expired ? `Venció hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`}</p></div></article>`;
     });
     if (!rows.length) { nodes.wrapRnpa.classList.add('d-none'); return; }
     nodes.wrapRnpa.classList.remove('d-none');
@@ -295,7 +483,7 @@
   const renderTransport = () => {
     const rows = state.vehicles.map((vehicle) => {
       const days = dayDiff(vehicle.expiryDate);
-      return `<article class="panel-list-card"><div class="panel-avatar"><i class="bi bi-truck"></i></div><div class="panel-item-text"><strong>${escapeHtml(vehicle.number || '-')} · ${escapeHtml(vehicle.patent || '-')}</strong><small>${escapeHtml(vehicle.brand || vehicle.type || 'Unidad')} · ${escapeHtml(vehicle.expiryDate || '-')}</small><p class="panel-status ${days < 0 ? 'is-danger' : 'is-warning'}">${days < 0 ? `Vencido hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`}</p></div></article>`;
+      return `<article class="panel-list-card"><div class="panel-avatar"><i class="fa-solid fa-id-card-clip"></i></div><div class="panel-item-text"><strong>${escapeHtml(vehicle.number || '-')} · ${escapeHtml(vehicle.patent || '-')}</strong><small>${escapeHtml(vehicle.brand || vehicle.type || 'Unidad')} · ${escapeHtml(vehicle.expiryDate || '-')}</small><p class="panel-status ${days < 0 ? 'is-danger' : 'is-warning'}">${days < 0 ? `Vencido hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`}</p></div></article>`;
     });
     if (!rows.length) { nodes.wrapTransporte.classList.add('d-none'); return; }
     nodes.wrapTransporte.classList.remove('d-none');
@@ -327,11 +515,11 @@
     if (!top.length) { nodes.produccion.innerHTML = '<div class="panel-empty">No hay producción en el rango seleccionado.</div>'; return; }
 
     const max = Math.max(...top.map((x) => x.kg));
-    nodes.produccion.innerHTML = `<div class="panel-chart-wrap">${top.map((item) => {
+    nodes.produccion.innerHTML = `<div class="panel-chart-wrap">${top.map((item, index) => {
       const avatar = item.imageUrl
         ? `<span class="panel-chart-avatar"><img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name)}" onload="this.classList.add('is-loaded')"><img src="./IMG/Meta-ai-logo.webp" class="panel-spinner" alt="cargando"></span>`
         : `<span class="panel-chart-avatar">${escapeHtml(initials(item.name))}</span>`;
-      return `<div class="panel-chart-row"><div class="panel-chart-label">${avatar}<span>${escapeHtml(item.name)}</span></div><div class="panel-chart-bar"><div class="panel-chart-fill" style="width:${Math.max(8, (item.kg / max) * 100)}%"></div></div><div class="panel-chart-value">${item.kg.toFixed(2)} kg</div></div>`;
+      return `<div class="panel-chart-row"><div class="panel-chart-rank">${index + 1}</div><div class="panel-chart-label">${avatar}<span>${escapeHtml(item.name)}</span></div><div class="panel-chart-bar"><div class="panel-chart-fill" style="width:${Math.max(10, (item.kg / max) * 100)}%"></div></div><div class="panel-chart-value">${item.kg.toFixed(2)} kg</div></div>`;
     }).join('')}</div>`;
   };
 
@@ -362,6 +550,9 @@
   };
 
   const setLoading = () => {
+    nodes.wrapRne.classList.remove('d-none');
+    nodes.wrapRnpa.classList.remove('d-none');
+    nodes.wrapTransporte.classList.remove('d-none');
     nodes.informe.innerHTML = spinner('Cargando informe');
     nodes.resumen.innerHTML = spinner('Cargando métricas');
     nodes.rne.innerHTML = spinner('Cargando proveedores');

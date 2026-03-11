@@ -8242,12 +8242,27 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   overflow: hidden;
 }
 
-.inventario-provider-avatar img {
+.inventario-provider-avatar .thumb-image,
+.inventario-provider-editor-avatar .thumb-image {
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  padding: 6px;
+  object-fit: cover;
+  object-position: center;
+  padding: 0;
   background: #f7f9ff;
+}
+
+.swal2-popup.inventario-provider-rne-alert {
+  width: min(960px, 94vw) !important;
+}
+
+.inventario-provider-rne-html,
+#inventarioProviderRneManagerRoot {
+  min-height: min(68vh, 620px);
+}
+
+#inventarioProviderRneList {
+  min-height: min(45vh, 420px);
 }
 
 .inventario-provider-avatar .thumb-loading {

@@ -5082,6 +5082,9 @@
         };
 
         const renderList = () => {
+          const activeSearch = document.activeElement?.id === 'inventarioProviderSearchInput';
+          const cursorStart = activeSearch ? document.activeElement.selectionStart : null;
+          const cursorEnd = activeSearch ? document.activeElement.selectionEnd : null;
           const counts = getProviderRneCounts();
           const options = [
             { key: 'all', label: 'Todos', tone: 'neutral', count: counts.all },
@@ -5109,11 +5112,20 @@
           <div id="inventarioProviderRneFilters" class="inventario-status-filters">${options.map((option) => `<button type="button" class="inventario-status-btn tone-${option.tone} ${state.providerRneFilter === option.key ? 'is-active' : ''}" data-provider-rne-filter="${option.key}" ${option.count === 0 ? "disabled" : ""}><span>${option.label}</span><strong>${option.count}</strong></button>`).join('')}</div>
           <div id="inventarioProviderRneList" class="inventario-provider-rne-list">${pager.rows.length ? pager.rows.map(renderProviderCard).join('') : '<div class="ingrediente-empty-list">No hay proveedores para este filtro.</div>'}</div>
           <div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-provider-page="prev" ${pager.page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${pager.page} de ${pager.pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-provider-page="next" ${pager.page >= pager.pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
-          root.querySelector('#inventarioProviderSearchInput')?.addEventListener('input', (event) => {
+          const searchInput = root.querySelector('#inventarioProviderSearchInput');
+          searchInput?.addEventListener('input', (event) => {
             state.providerRneSearch = normalizeLower(event.target.value);
             state.providerRnePage = 1;
             rerender();
           });
+          if (activeSearch && searchInput) {
+            requestAnimationFrame(() => {
+              searchInput.focus({ preventScroll: true });
+              if (Number.isFinite(cursorStart) && Number.isFinite(cursorEnd)) {
+                searchInput.setSelectionRange(cursorStart, cursorEnd);
+              }
+            });
+          }
           initThumbLoading(root);
         };
 
