@@ -5159,7 +5159,6 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   flex-wrap: wrap;
   padding: 4px 8px;
   border-radius: 999px;
-  border: 1px solid #d7def2;
   background: #f6f8ff;
   width: 100%;
   justify-content: flex-end;
