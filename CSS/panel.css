@@ -126,7 +126,18 @@
 /* =========================================
    LISTAS
 ========================================= */
-.panel-marquee { max-height: 400px; height: 100%; min-height: 146px; overflow-y: auto; padding-right: 4px; }
+.panel-marquee { max-height: 400px; height: 100%; min-height: 146px; overflow-y: auto; padding-right: 4px; position: relative; }
+.panel-marquee.is-animated-wrap::before {
+  content: '';
+  position: sticky;
+  top: 0;
+  display: block;
+  height: 18px;
+  margin-bottom: -18px;
+  background: linear-gradient(to bottom, #ffffff 0%, rgba(255, 255, 255, 0) 100%);
+  z-index: 2;
+  pointer-events: none;
+}
 .panel-marquee-track { display: grid; gap: 10px; }
 .panel-marquee-track.is-animated { animation: panelTicker var(--panel-marquee-duration, 24s) linear infinite; }
 .panel-marquee:hover .panel-marquee-track.is-animated { animation-play-state: paused; }
@@ -161,8 +172,8 @@
 
 .panel-chart-avatar { width: 60px; height: 60px; font-size: .9rem; }
 
-.panel-avatar img,
-.panel-chart-avatar img,
+.panel-avatar > img,
+.panel-chart-avatar > img,
 .panel-user-avatar .thumb-image {
   width: 100%;
   height: 100%;
@@ -171,15 +182,23 @@
   transition: opacity .2s ease;
 }
 
-.panel-avatar img.is-loaded,
-.panel-chart-avatar img.is-loaded,
+.panel-avatar > img.is-loaded,
+.panel-chart-avatar > img.is-loaded,
 .panel-user-avatar .thumb-image.is-loaded { opacity: 1; }
+
+.panel-avatar .thumb-loading,
+.panel-chart-avatar .thumb-loading {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 
 .panel-avatar .panel-spinner,
 .panel-chart-avatar .panel-spinner {
   width: 22px;
   height: 22px;
-  position: absolute;
 }
 
 .panel-item-text strong { color: #2b3f6f; display: block; }

@@ -4018,6 +4018,7 @@
       document.body.appendChild(dropdown);
       positionBulkSuggestions(dropdown, input);
       initThumbLoading(dropdown);
+      dropdown.addEventListener('mousedown', (event) => { event.preventDefault(); });
       dropdown.addEventListener('click', async (event) => {
         const pick = event.target.closest('[data-bulk-pick]');
         if (pick) {
@@ -4062,7 +4063,7 @@
         if (query.length >= 1) openBulkSuggestions(input, Number(input.dataset.bulkSearch), query);
       });
       input.addEventListener('blur', () => {
-        setTimeout(() => closeBulkSuggestions(), 140);
+        setTimeout(() => closeBulkSuggestions(), 260);
       });
     });
 
@@ -4428,7 +4429,8 @@
         dateFormat: 'Y-m-d',
         altInput: true,
         altFormat: 'd/m/Y',
-        allowInput: true
+        allowInput: true,
+        disableMobile: true
       });
       const entryInput = nodes.editorForm.querySelector('#inventoryEntryDate');
       const expiryInput = nodes.editorForm.querySelector('#inventoryExpiryDate');
@@ -4447,7 +4449,8 @@
         dateFormat: 'Y-m-d',
         altInput: true,
         altFormat: 'd/m/Y',
-        allowInput: true
+        allowInput: true,
+        disableMobile: true
       });
       nodes.editorForm.querySelectorAll('[data-bulk-entry-date]').forEach((input) => {
         window.flatpickr(input, {
@@ -4469,6 +4472,23 @@
       }
       entryInput?.addEventListener('change', syncExpiryMinDate);
       entryInput?.addEventListener('input', syncExpiryMinDate);
+      const bindPickerTouchOpen = (input) => {
+        const picker = input?._flatpickr;
+        if (!picker) return;
+        const openPicker = () => {
+          try { picker.open(); } catch (_e) {}
+        };
+        input.addEventListener('focus', openPicker);
+        input.addEventListener('click', openPicker);
+        if (picker.altInput) {
+          picker.altInput.addEventListener('focus', openPicker);
+          picker.altInput.addEventListener('click', openPicker);
+          picker.altInput.setAttribute('inputmode', 'none');
+        }
+      };
+      bindPickerTouchOpen(entryInput);
+      bindPickerTouchOpen(expiryInput);
+      nodes.editorForm.querySelectorAll('[data-bulk-entry-date], [data-bulk-expiry-date]').forEach((input) => bindPickerTouchOpen(input));
       syncExpiryMinDate();
     }
 
