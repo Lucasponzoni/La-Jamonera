@@ -2042,6 +2042,19 @@
     return lines;
   };
 
+
+  const fitFontSizeByWidth = (ctx, textList, weight, startPx, minPx, maxWidth) => {
+    const values = Array.isArray(textList) ? textList.filter(Boolean) : [textList].filter(Boolean);
+    let size = Math.max(minPx, startPx);
+    while (size > minPx) {
+      ctx.font = `${weight} ${size}px Inter, Arial, sans-serif`;
+      const widest = values.reduce((max, item) => Math.max(max, ctx.measureText(String(item)).width), 0);
+      if (widest <= maxWidth) return size;
+      size -= 1;
+    }
+    return minPx;
+  };
+
   const splitProductionId = (raw) => {
     const value = normalizeValue(raw) || '-';
     const tokens = value.split('-').filter(Boolean);
@@ -2076,42 +2089,48 @@
     ctx.lineWidth = Math.max(2, Math.round(Math.min(cardW, cardH) * 0.012));
     ctx.stroke();
 
-    const contentPad = Math.round(cardH * 0.11);
-    const qrSize = Math.round(Math.min(cardH - contentPad * 2, cardW * 0.36));
+    const contentPad = Math.round(cardH * 0.10);
+    const qrSize = Math.round(Math.min(cardH - contentPad * 2, cardW * 0.35));
     const qrX = cardX + contentPad;
     const qrY = cardY + (cardH - qrSize) / 2;
     ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
 
     const textX = qrX + qrSize + Math.round(cardW * 0.08);
-    const textW = cardX + cardW - contentPad - textX;
+    const textW = Math.max(80, cardX + cardW - contentPad - textX);
     const title = 'PRODUCCION • LA JAMONERA';
     const idLines = splitProductionId(registro?.id);
-    const note = 'Escaneá el QR con tu celular para acceder a la trazabilidad completa del producto.';
 
+    const titleFont = fitFontSizeByWidth(ctx, title, 800, Math.round(cardH * 0.105), Math.max(14, Math.round(cardH * 0.07)), textW);
     ctx.fillStyle = '#1a2f5c';
-    ctx.font = `800 ${Math.max(22, Math.round(cardH * 0.11))}px Inter, Arial, sans-serif`;
-    const titleLines = wrapTextLines(ctx, title, textW);
-    let cursorY = cardY + contentPad + Math.round(cardH * 0.06);
-    titleLines.forEach((line) => {
-      ctx.fillText(line, textX, cursorY);
-      cursorY += Math.round(cardH * 0.12);
-    });
+    ctx.font = `800 ${titleFont}px Inter, Arial, sans-serif`;
+    const titleY = cardY + contentPad + titleFont;
+    ctx.fillText(title, textX, titleY);
 
+    const idFont = fitFontSizeByWidth(ctx, idLines, 900, Math.round(cardH * 0.18), Math.max(16, Math.round(cardH * 0.1)), textW);
     ctx.fillStyle = '#2452a6';
-    ctx.font = `900 ${Math.max(28, Math.round(cardH * 0.19))}px Inter, Arial, sans-serif`;
+    ctx.font = `900 ${idFont}px Inter, Arial, sans-serif`;
+    let idY = titleY + Math.round(idFont * 0.95);
     idLines.forEach((line) => {
-      ctx.fillText(line, textX, cursorY);
-      cursorY += Math.round(cardH * 0.19);
+      ctx.fillText(line, textX, idY);
+      idY += Math.round(idFont * 0.98);
     });
 
+    const noteBase = Math.max(13, Math.round(cardH * 0.075));
+    const noteNormal = fitFontSizeByWidth(ctx, 'Escaneá el QR con tu celular para acceder a la', 500, noteBase, 12, textW);
+    const noteBold = fitFontSizeByWidth(ctx, 'trazabilidad completa del producto.', 800, Math.max(noteNormal, noteBase), 12, textW);
+    const note1 = wrapTextLines(ctx, 'Escaneá el QR con tu celular para acceder a la', textW);
     ctx.fillStyle = '#4d628f';
-    ctx.font = `600 ${Math.max(15, Math.round(cardH * 0.082))}px Inter, Arial, sans-serif`;
-    const noteLines = wrapTextLines(ctx, note, textW);
-    const lineH = Math.round(cardH * 0.095);
-    const noteBlockY = Math.min(cardY + cardH - contentPad - (lineH * Math.max(1, noteLines.length - 1)), cursorY + Math.round(cardH * 0.02));
-    noteLines.forEach((line, index) => {
-      ctx.fillText(line, textX, noteBlockY + (index * lineH));
+    ctx.font = `500 ${noteNormal}px Inter, Arial, sans-serif`;
+    const noteLineH = Math.round(noteNormal * 1.18);
+    let noteY = Math.max(idY + Math.round(cardH * 0.02), cardY + cardH - contentPad - (noteLineH * (note1.length + 1)));
+    note1.forEach((line) => {
+      ctx.fillText(line, textX, noteY);
+      noteY += noteLineH;
     });
+
+    ctx.fillStyle = '#304f8c';
+    ctx.font = `800 ${noteBold}px Inter, Arial, sans-serif`;
+    ctx.fillText('trazabilidad completa del producto.', textX, noteY);
 
     return canvas;
   };
@@ -2143,7 +2162,7 @@
       title: `Impresión · QR ${escapeHtml(registro.id || '')}`,
       width: 820,
       customClass: {
-        popup: 'recipe-print-alert',
+        popup: 'recipe-print-alert produccion-qr-print-alert',
         denyButton: 'ios-btn ios-btn-success'
       },
       html: `
