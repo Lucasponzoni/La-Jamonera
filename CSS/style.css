@@ -5161,6 +5161,8 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   border-radius: 999px;
   border: 1px solid #d7def2;
   background: #f6f8ff;
+  margin-left: auto;
+  justify-content: flex-end;
 }
 
 @media (max-width: 991.98px) {

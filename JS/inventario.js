@@ -3976,6 +3976,7 @@
     });
 
     let bulkSuggestDropdown = null;
+    let bulkSuggestSuppressUntil = 0;
     const closeBulkSuggestions = () => {
       if (bulkSuggestDropdown) {
         bulkSuggestDropdown.remove();
@@ -3998,6 +3999,7 @@
       select.dispatchEvent(new Event('change', { bubbles: true }));
     };
     const openBulkSuggestions = (input, idx, query) => {
+      if (Date.now() < bulkSuggestSuppressUntil) return;
       closeBulkSuggestions();
       const source = Object.values(state.ingredientes)
         .filter((item) => normalizeLower(item.name).includes(normalizeLower(query)))
@@ -4024,6 +4026,7 @@
         if (pick) {
           const ingredientPick = state.ingredientes[pick.dataset.ingId];
           if (ingredientPick) applyBulkIngredient(Number(pick.dataset.bulkPick), ingredientPick);
+          bulkSuggestSuppressUntil = Date.now() + 420;
           closeBulkSuggestions();
           return;
         }
@@ -4063,7 +4066,7 @@
         if (query.length >= 1) openBulkSuggestions(input, Number(input.dataset.bulkSearch), query);
       });
       input.addEventListener('blur', () => {
-        setTimeout(() => closeBulkSuggestions(), 260);
+        setTimeout(() => closeBulkSuggestions(), 320);
       });
     });
 
@@ -4458,7 +4461,19 @@
           dateFormat: 'Y-m-d',
           altInput: true,
           altFormat: 'd/m/Y',
-          allowInput: true
+          allowInput: true,
+          disableMobile: true
+        });
+      });
+      nodes.editorForm.querySelectorAll('[data-bulk-expiry-date]').forEach((input) => {
+        window.flatpickr(input, {
+          locale,
+          dateFormat: 'Y-m-d',
+          altInput: true,
+          altFormat: 'd/m/Y',
+          allowInput: true,
+          disableMobile: true,
+          minDate: getEntryDateValue() || null
         });
       });
 
