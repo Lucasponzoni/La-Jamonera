@@ -60,7 +60,6 @@
 .panel-card-body {
   padding: 12px;
   flex: 1;
-  min-height: 170px;
 }
 
 .panel-spinner-wrap {
@@ -95,7 +94,7 @@
 }
 
 .panel-metric strong {
-  font-size: clamp(1.55rem, 2.7vw, 2.1rem);
+  font-size: 4rem;
   line-height: 1;
   display: block;
   font-weight: 900;
@@ -115,19 +114,19 @@
 
 .panel-metric span i { color: #475467; }
 
-.panel-metric-rne { border-top-color: #ef4444; }
-.panel-metric-rnpa { border-top-color: #f59e0b; }
+.panel-metric-rne { border-top-color: orangered; }
+.panel-metric-rnpa { border-top-color: orange; }
 .panel-metric-transport { border-top-color: #10b981; }
-.panel-metric-reports { border-top-color: #3b82f6; }
-.panel-metric-rne strong { color:#cc3a3a; }
-.panel-metric-rnpa strong { color:#cc6f00; }
-.panel-metric-transport strong { color:#0f8d4a; }
-.panel-metric-reports strong { color:#2b5fc4; }
+.panel-metric-reports { border-top-color: #4b78e8; }
+.panel-metric-rne strong { color:orangered; }
+.panel-metric-rnpa strong { color:orange; }
+.panel-metric-transport strong { color: #10b981; }
+.panel-metric-reports strong { color:#4b78e8; }
 
 /* =========================================
    LISTAS
 ========================================= */
-.panel-marquee { max-height: none; height: 100%; min-height: 146px; overflow-y: auto; padding-right: 4px; }
+.panel-marquee { max-height: 400px; height: 100%; min-height: 146px; overflow-y: auto; padding-right: 4px; }
 .panel-marquee-track { display: grid; gap: 10px; }
 .panel-marquee-track.is-animated { animation: panelTicker var(--panel-marquee-duration, 24s) linear infinite; }
 .panel-marquee:hover .panel-marquee-track.is-animated { animation-play-state: paused; }
@@ -160,7 +159,7 @@
   position: relative;
 }
 
-.panel-chart-avatar { width: 42px; height: 42px; font-size: .9rem; }
+.panel-chart-avatar { width: 60px; height: 60px; font-size: .9rem; }
 
 .panel-avatar img,
 .panel-chart-avatar img,
@@ -255,10 +254,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 18px;
 }
 
 .panel-chart-bar {
-  height: 12px;
+  height: 18px;
   border-radius: 999px;
   background: #e8efff;
   overflow: hidden;
@@ -272,7 +272,7 @@
 }
 
 .panel-chart-value {
-  font-size: .84rem;
+  font-size: 1.5rem;
   color: #37518c;
   font-weight: 800;
 }
