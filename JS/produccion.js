@@ -40,6 +40,15 @@
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const ALLOWED_RNE_UPLOAD_TYPES = [...ALLOWED_UPLOAD_TYPES, 'application/pdf'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
+  const QR_PRINT_SIZES = [
+    { value: '40x30', label: '4cm x 3cm', widthMm: 40, heightMm: 30 },
+    { value: '40x30-landscape', label: '40 x 30', widthMm: 40, heightMm: 30 },
+    { value: '80x40', label: '80 x 40', widthMm: 80, heightMm: 40 },
+    { value: '50x25', label: '50 x 25', widthMm: 50, heightMm: 25 },
+    { value: '100x80', label: '100 x 80', widthMm: 100, heightMm: 80 },
+    { value: '80x25', label: '80 x 25', widthMm: 80, heightMm: 25 },
+    { value: '100x35', label: '100 x 35', widthMm: 100, heightMm: 35 }
+  ];
   const ROSARIO_DEPT_LOCALITIES = ['Rosario', 'Villa Gobernador Gálvez', 'Pérez', 'Funes', 'Roldán', 'Ibarlucea', 'Alvear', 'Pueblo Esther', 'General Lagos', 'Arroyo Seco', 'Piñero'];
   const state = {
     recetas: {},
@@ -1966,6 +1975,112 @@
     win.print();
     await markProductionExport(registro.id, 'print');
   };
+
+  const getProductionTraceUrl = (registro) => {
+    if (window.laJamoneraPlanillaProduccion?.getTraceUrl) {
+      return window.laJamoneraPlanillaProduccion.getTraceUrl(registro);
+    }
+    return `https://lucasponzoni.github.io/La-Jamonera/produccion_publica.html?id=${encodeURIComponent(normalizeValue(registro?.id))}`;
+  };
+
+  const getQrDataUrl = async (text) => {
+    const ready = await ensureQrCodeLib();
+    if (!ready || !window.QRCode) return '';
+    const holder = document.createElement('div');
+    holder.style.cssText = 'position:fixed;left:-99999px;top:-99999px;width:240px;height:240px;';
+    document.body.appendChild(holder);
+    try {
+      // eslint-disable-next-line no-new
+      new window.QRCode(holder, { text, width: 220, height: 220, colorDark: '#111827', colorLight: '#ffffff' });
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      const canvas = holder.querySelector('canvas');
+      if (canvas?.toDataURL) return canvas.toDataURL('image/png');
+      const img = holder.querySelector('img');
+      return normalizeValue(img?.src);
+    } finally {
+      holder.remove();
+    }
+  };
+
+  const openProductionQrPrintConfigurator = async (registro) => {
+    const qrDataUrl = await getQrDataUrl(getProductionTraceUrl(registro));
+    if (!qrDataUrl) {
+      await openIosSwal({ title: 'QR no disponible', html: '<p>No pudimos generar el código QR para esta producción.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+      return;
+    }
+
+    const result = await openIosSwal({
+      title: `Impresión · QR ${escapeHtml(registro.id || '')}`,
+      width: 820,
+      customClass: { popup: 'recipe-print-alert', denyButton: 'ios-btn ios-btn-success' },
+      html: `
+        <div class="recipe-print-panel">
+          <div class="recipe-print-controls">
+            <label class="recipe-print-field">
+              <span>Tamaño de hoja</span>
+              <select id="prodQrSheetSize" class="form-select ios-input">
+                ${QR_PRINT_SIZES.map((item) => `<option value="${item.value}">${item.label}</option>`).join('')}
+              </select>
+            </label>
+            <label class="recipe-print-field">
+              <span>Cantidad de hojas</span>
+              <input id="prodQrSheetCount" type="number" min="1" step="1" value="1" class="form-control ios-input">
+            </label>
+            <label class="recipe-print-field">
+              <span>Cantidad por hoja</span>
+              <input type="number" value="1" class="form-control ios-input" disabled>
+            </label>
+          </div>
+          <div class="recipe-print-meta" id="prodQrMeta"></div>
+          <div class="recipe-print-preview-wrap">
+            <div id="prodQrPreview" class="produccion-qr-print-preview"></div>
+          </div>
+        </div>
+      `,
+      showCancelButton: true,
+      cancelButtonText: 'Cerrar',
+      showDenyButton: true,
+      denyButtonText: 'Descargar',
+      confirmButtonText: 'Imprimir',
+      didOpen: (popup) => {
+        const sizeNode = popup.querySelector('#prodQrSheetSize');
+        const countNode = popup.querySelector('#prodQrSheetCount');
+        const metaNode = popup.querySelector('#prodQrMeta');
+        const previewNode = popup.querySelector('#prodQrPreview');
+        const renderPreview = () => {
+          const selected = QR_PRINT_SIZES.find((item) => item.value === sizeNode.value) || QR_PRINT_SIZES[0];
+          const sheetCount = Math.max(1, Math.floor(Number(countNode.value) || 1));
+          countNode.value = String(sheetCount);
+          previewNode.innerHTML = `<article class="produccion-qr-print-card" style="--sheet-w:${selected.widthMm}mm;--sheet-h:${selected.heightMm}mm;"><img src="${qrDataUrl}" alt="QR ${escapeHtml(registro.id)}"><div class="produccion-qr-print-copy"><strong>PRODUCCION • LA JAMONERA</strong><h4>${escapeHtml(registro.id || '-')}</h4><p>Escaneá el QR con tu celular para acceder a la trazabilidad completa del producto.</p></div></article>`;
+          metaNode.innerHTML = `<strong>Formato: ${selected.label}</strong><span>Cantidad por hoja: 1</span><span>Cantidad de hojas: ${sheetCount}</span>`;
+        };
+        sizeNode.addEventListener('change', renderPreview);
+        countNode.addEventListener('input', renderPreview);
+        renderPreview();
+      },
+      preConfirm: () => {
+        const selected = QR_PRINT_SIZES.find((item) => item.value === document.getElementById('prodQrSheetSize')?.value) || QR_PRINT_SIZES[0];
+        const sheetCount = Math.max(1, Math.floor(Number(document.getElementById('prodQrSheetCount')?.value) || 1));
+        return { selected, sheetCount };
+      }
+    });
+
+    if (!result.isConfirmed && !result.isDenied) return;
+    const config = result.value || { selected: QR_PRINT_SIZES[0], sheetCount: 1 };
+    const pageStyle = `@page{size:${config.selected.widthMm}mm ${config.selected.heightMm}mm;margin:2mm;}body{font-family:Inter,Arial,sans-serif;background:#fff;margin:0;padding:0;}section{width:${config.selected.widthMm}mm;height:${config.selected.heightMm}mm;box-sizing:border-box;padding:2mm;display:flex;align-items:center;justify-content:center;break-after:page;}section:last-child{break-after:auto;}.card{width:100%;height:100%;border:1px solid #d8e2f7;border-radius:3mm;background:#fff;display:grid;grid-template-columns:auto 1fr;align-items:center;gap:2.5mm;padding:2.5mm;}.card img{width:30%;max-height:100%;object-fit:contain;}.copy{min-width:0}.copy strong{display:block;font-size:9pt;color:#1f2a44;}.copy h2{margin:1mm 0;font-size:16pt;line-height:1;color:#1b4ea2;}.copy p{margin:0;font-size:8pt;color:#4d5f85;line-height:1.25;}`;
+    const pages = Array.from({ length: config.sheetCount }).map(() => `<section><article class="card"><img src="${qrDataUrl}" alt="QR"><div class="copy"><strong>PRODUCCION • LA JAMONERA</strong><h2>${escapeHtml(registro.id || '-')}</h2><p>Escaneá el QR con tu celular para acceder a la trazabilidad completa del producto.</p></div></article></section>`).join('');
+    const win = window.open('', '_blank', 'width=1200,height=900');
+    if (!win) return;
+    win.document.write(`<html><head><title>QR ${escapeHtml(registro.id || '')}</title><style>${pageStyle}</style></head><body>${pages}</body></html>`);
+    win.document.close();
+    await waitPrintAssets(win);
+    if (result.isDenied) {
+      win.focus();
+      return;
+    }
+    win.focus();
+    win.print();
+  };
   const exportProductionExcel = async (registro) => {
     if (!window.ExcelJS) return;
     const wb = new window.ExcelJS.Workbook();
@@ -2567,7 +2682,7 @@
         <td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td>
         <td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td>
         <td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${item.id}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td>
-        <td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-planilla="${escapeHtml(item.id)}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button></td>
+        <td><div class="produccion-planilla-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-planilla="${escapeHtml(item.id)}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-qr-print="${escapeHtml(item.id)}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></button></div></td>
         <td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td>
         <td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-prod-cancel="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td>
       </tr>${traceHtml}`;
@@ -6743,6 +6858,12 @@
     if (planillaBtn) {
       const reg = getRegistro(planillaBtn.dataset.prodPlanilla);
       if (reg) await window.laJamoneraPlanillaProduccion?.openByRegistro?.(reg, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users) });
+      return;
+    }
+    const qrPrintBtn = event.target.closest('[data-prod-qr-print]');
+    if (qrPrintBtn) {
+      const reg = getRegistro(qrPrintBtn.dataset.prodQrPrint);
+      if (reg) await openProductionQrPrintConfigurator(reg);
       return;
     }
     const traceBtn = event.target.closest('[data-prod-trace]');
