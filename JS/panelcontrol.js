@@ -132,8 +132,39 @@
 
   const bindThumbs = () => {
     document.querySelectorAll('.js-panel-thumb').forEach((img) => {
-      img.addEventListener('load', () => img.classList.add('is-loaded'), { once: true });
+      img.addEventListener('load', () => {
+        img.classList.add('is-loaded');
+        img.closest('.user-avatar-thumb')?.querySelector('.thumb-loading')?.classList.add('d-none');
+      }, { once: true });
       img.addEventListener('error', () => img.closest('.panel-user-avatar')?.classList.add('is-fallback'), { once: true });
+    });
+    document.querySelectorAll('.panel-avatar img:first-child, .panel-chart-avatar img:first-child').forEach((img) => {
+      const stopSpinner = () => img.parentElement?.querySelector('.panel-spinner')?.classList.add('d-none');
+      img.addEventListener('load', stopSpinner, { once: true });
+      img.addEventListener('error', stopSpinner, { once: true });
+      if (img.complete) stopSpinner();
+    });
+  };
+
+  const sortComments = (list = []) => [...list].sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
+  const getCommentList = (report) => sortComments(commentsList(report));
+  const renderCommentTree = (comments = [], level = 0) => sortComments(comments).map((comment) => `
+    <article class="report-comment-item ${level > 0 ? 'is-reply' : ''}" data-comment-id="${escapeHtml(comment.id || '')}">
+      <header class="report-comment-head"><strong>${escapeHtml(comment.userName || 'Usuario')}</strong><small>${escapeHtml(getDateLabel(comment.createdAt))}</small></header>
+      <p class="report-comment-text">${escapeHtml(comment.text || '').replaceAll('\n', '<br>')}</p>
+      <div class="report-comment-actions"><button type="button" class="btn report-comment-reply-btn" data-reply-comment="${escapeHtml(comment.id || '')}">Responder</button></div>
+      ${Array.isArray(comment.replies) && comment.replies.length ? `<div class="report-comment-replies">${renderCommentTree(comment.replies, level + 1)}</div>` : ''}
+    </article>
+  `).join('');
+
+  const insertReplyInTree = (comments, targetId, payload) => {
+    const source = Array.isArray(comments) ? comments : [];
+    return source.map((item) => {
+      if (item.id === targetId) {
+        const replies = Array.isArray(item.replies) ? [...item.replies, payload] : [payload];
+        return { ...item, replies };
+      }
+      return { ...item, replies: insertReplyInTree(item.replies, targetId, payload) };
     });
   };
 
@@ -174,25 +205,98 @@
     const attachments = Array.isArray(report.attachments) ? report.attachments : [];
     const importance = toneImportance(report.importance);
     const attachmentHtml = attachments.length
-      ? attachments.map((item) => {
+      ? attachments.map((item, index) => {
         if (item?.type === 'image') {
-          return `<a href="${escapeHtml(item.url || '')}" target="_blank" rel="noopener noreferrer" class="attachment-card"><img src="${escapeHtml(item.url || '')}" alt="${escapeHtml(item.name || 'Adjunto')}" class="attachment-image is-loaded"></a>`;
+          return `<button type="button" class="attachment-card" data-open-report-image="${index}"><img src="${escapeHtml(item.url || '')}" alt="${escapeHtml(item.name || 'Adjunto')}" class="attachment-image is-loaded"></button>`;
         }
         return `<a href="${escapeHtml(item?.url || '#')}" target="_blank" rel="noopener noreferrer" class="attachment-card attachment-doc"><i class="bi bi-file-earmark"></i><span>${escapeHtml(item?.name || 'Documento')}</span></a>`;
       }).join('')
       : '<div class="informes-empty">Sin adjuntos</div>';
-    const comments = commentsList(report);
+    const users = Object.values(state.usersMap || {}).sort((a, b) => String(a.fullName || '').localeCompare(String(b.fullName || '')));
+    const commentUserOptions = ['<option value="">Seleccioná un usuario</option>', ...users.map((user) => `<option value="${escapeHtml(user.id || '')}">${escapeHtml(user.fullName || 'Usuario')}</option>`)].join('');
+    const comments = getCommentList(report);
     const commentsHtml = comments.length
-      ? `<div class="report-comments-thread">${comments.map((comment) => `<article class="report-comment-item"><header class="report-comment-head"><strong>${escapeHtml(comment.userName || 'Usuario')}</strong><small>${escapeHtml(getDateLabel(comment.createdAt))}</small></header><p class="report-comment-text">${escapeHtml(comment.text || '').replaceAll('\n', '<br>')}</p></article>`).join('')}</div>`
+      ? `<div class="report-comments-thread">${renderCommentTree(comments)}</div>`
       : '<div class="informes-empty report-comments-empty">Sin comentarios todavía.</div>';
 
     await openIosSwal({
       title: 'Informe completo',
       width: 980,
-      html: `<div class="report-viewer"><div class="report-viewer-meta"><p><strong>Creador:</strong> ${escapeHtml(user.name || '-')}</p><p><strong>Puesto:</strong> ${escapeHtml(user.position || '-')}</p><p><strong>Fecha:</strong> ${escapeHtml(getDateLabel(report.createdAt))}</p><p><strong>Última actualización:</strong> ${escapeHtml(getDateLabel(report.updatedAt || report.createdAt))}</p></div><div class="report-viewer-content-wrap"><div class="report-viewer-content">${report.html || ''}</div></div><div class="attachments-grid">${attachmentHtml}</div><section class="report-comments-wrap"><div class="report-comments-head"><h6><i class="fa-regular fa-comments"></i> <span class="report-comments-title-text">Comentarios</span></h6></div><div id="reportCommentsBody">${commentsHtml}</div></section></div>`,
+      html: `<div class="report-viewer"><div class="report-viewer-meta"><p><strong>Creador:</strong> ${escapeHtml(user.name || '-')}</p><p><strong>Puesto:</strong> ${escapeHtml(user.position || '-')}</p><p><strong>Fecha:</strong> ${escapeHtml(getDateLabel(report.createdAt))}</p><p><strong>Última actualización:</strong> ${escapeHtml(getDateLabel(report.updatedAt || report.createdAt))}</p><div class="report-viewer-meta-actions"><button type="button" class="btn ios-btn ios-btn-warning report-resend-btn" data-resend-report-email="1"><i class="fa-regular fa-paper-plane"></i><span>Reenviar email</span></button></div></div><div class="report-viewer-content-wrap"><div class="report-viewer-content">${report.html || ''}</div></div><div class="attachments-grid">${attachmentHtml}</div><section class="report-comments-wrap"><div class="report-comments-head"><h6><i class="fa-regular fa-comments"></i> <span class="report-comments-title-text">Comentarios</span></h6></div><div class="report-inline-comment-form"><div class="report-inline-comment-reply d-none" id="inlineReplyLabel"></div><select id="inlineCommentUser" class="form-select ios-input mb-2">${commentUserOptions}</select><textarea id="inlineCommentText" class="swal2-textarea ios-input" placeholder="Escribí un comentario"></textarea><input id="inlineCommentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos"><div class="d-flex justify-content-end gap-2"><button type="button" class="btn ios-btn ios-btn-secondary d-none" id="inlineCancelReplyBtn">Cancelar respuesta</button><button type="button" class="btn ios-btn ios-btn-primary" id="inlineSendCommentBtn"><i class="fa-solid fa-paper-plane"></i><span>Enviar comentario</span></button></div></div><div id="reportCommentsBody">${commentsHtml}</div></section></div>`,
       customClass: { popup: 'panel-report-alert' },
       confirmButtonText: 'Cerrar',
-      didOpen: bindThumbs
+      didOpen: (popup) => {
+        bindThumbs();
+        let replyToId = '';
+        const commentsBody = popup.querySelector('#reportCommentsBody');
+        const replyLabel = popup.querySelector('#inlineReplyLabel');
+        const cancelReplyBtn = popup.querySelector('#inlineCancelReplyBtn');
+        const sendBtn = popup.querySelector('#inlineSendCommentBtn');
+
+        popup.querySelectorAll('.attachment-card[data-open-report-image]').forEach((node) => {
+          node.addEventListener('click', async (event) => {
+            event.preventDefault();
+            const index = Number(node.dataset.openReportImage || 0);
+            const imageAttachments = attachments.filter((item) => item?.type === 'image').map((item) => item?.url).filter(Boolean);
+            if (!imageAttachments.length) return;
+            if (typeof window.laJamoneraOpenImageViewer === 'function') {
+              await window.laJamoneraOpenImageViewer([{ invoiceImageUrls: imageAttachments }], Math.max(0, index), 'Adjuntos del informe');
+            }
+          });
+        });
+
+        popup.querySelector('[data-resend-report-email]')?.addEventListener('click', async () => {
+          if (!window.laJamoneraEmailSender) {
+            await openIosSwal({ title: 'Email no disponible', html: '<p>No está cargado el módulo de envío en esta pantalla.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+            return;
+          }
+          await openIosSwal({ title: 'Reenviar email', html: '<p>Usá la pantalla Informes para reenviar con destinatarios configurables.</p>', icon: 'info', confirmButtonText: 'Entendido' });
+        });
+
+        commentsBody?.addEventListener('click', (event) => {
+          const btn = event.target.closest('[data-reply-comment]');
+          if (!btn) return;
+          replyToId = btn.dataset.replyComment || '';
+          const author = btn.closest('.report-comment-item')?.querySelector('.report-comment-head strong')?.textContent || 'usuario';
+          replyLabel.textContent = `Respondiendo a ${author}`;
+          replyLabel.classList.remove('d-none');
+          cancelReplyBtn.classList.remove('d-none');
+        });
+
+        cancelReplyBtn?.addEventListener('click', () => {
+          replyToId = '';
+          replyLabel.classList.add('d-none');
+          replyLabel.textContent = '';
+          cancelReplyBtn.classList.add('d-none');
+        });
+
+        sendBtn?.addEventListener('click', async () => {
+          const userId = normalize(popup.querySelector('#inlineCommentUser')?.value);
+          const text = normalize(popup.querySelector('#inlineCommentText')?.value);
+          const pin = normalize(popup.querySelector('#inlineCommentPin')?.value);
+          if (!userId || !text) return;
+          const author = safeObject(state.usersMap[userId]);
+          const authorId = normalize(author.id || userId);
+          if (!authorId || String(author.pin || '') !== String(pin || '')) {
+            await openIosSwal({ title: 'Clave incorrecta', html: '<p>La clave no coincide con el usuario seleccionado.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+            return;
+          }
+          const latest = safeObject(await window.dbLaJamoneraRest.read(reportPath(report)));
+          const list = getCommentList(latest);
+          const payload = { id: `comment_${Date.now()}`, createdAt: Date.now(), userId: authorId, userName: author.fullName || 'Usuario', text, replies: [] };
+          const nextComments = replyToId ? insertReplyInTree(list, replyToId, payload) : [...list, payload];
+          await window.dbLaJamoneraRest.update(reportPath(report), { comments: nextComments });
+          await window.dbLaJamoneraRest.update(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, { commentsCount: nextComments.length, updatedAt: Date.now() });
+          const refreshed = safeObject(await window.dbLaJamoneraRest.read(reportPath(report)));
+          commentsBody.innerHTML = `<div class="report-comments-thread">${renderCommentTree(getCommentList(refreshed))}</div>`;
+          popup.querySelector('#inlineCommentText').value = '';
+          popup.querySelector('#inlineCommentPin').value = '';
+          replyToId = '';
+          replyLabel.classList.add('d-none');
+          cancelReplyBtn.classList.add('d-none');
+          await loadOnce();
+        });
+      }
     });
   };
 
@@ -446,6 +550,9 @@
   };
 
   const setLoading = () => {
+    nodes.wrapRne.classList.remove('d-none');
+    nodes.wrapRnpa.classList.remove('d-none');
+    nodes.wrapTransporte.classList.remove('d-none');
     nodes.informe.innerHTML = spinner('Cargando informe');
     nodes.resumen.innerHTML = spinner('Cargando métricas');
     nodes.rne.innerHTML = spinner('Cargando proveedores');

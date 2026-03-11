@@ -87,7 +87,7 @@
 .panel-metric {
   border: 1px solid #e1e7f5;
   border-top-width: 4px;
-  border-radius: 16px;
+  border-radius: 0 0 16px 16px;
   background: #fff;
   padding: 12px 12px 10px;
   min-width: 0;
@@ -98,6 +98,8 @@
   line-height: 1;
   display: block;
   font-weight: 900;
+  font-family: 'Viga', 'Inter', sans-serif;
+  letter-spacing: .02em;
 }
 
 .panel-metric span {
@@ -193,6 +195,11 @@
   background: #eef4ff;
   border-color: #d4def6;
   color: #32549a;
+}
+
+.swal2-popup.panel-report-alert {
+  border: 0 !important;
+  box-shadow: none !important;
 }
 
 .panel-empty {
