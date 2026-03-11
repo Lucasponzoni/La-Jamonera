@@ -159,6 +159,16 @@
       img.addEventListener('error', stop, { once: true });
       if (img.complete) stop();
     });
+
+    document.querySelectorAll('.js-report-attachment-image').forEach((img) => {
+      const stop = () => {
+        img.classList.add('is-loaded');
+        img.closest('.attachment-card')?.querySelector('.attachment-loader')?.classList.add('d-none');
+      };
+      img.addEventListener('load', stop, { once: true });
+      img.addEventListener('error', stop, { once: true });
+      if (img.complete) stop();
+    });
   };
 
   const sortComments = (list = []) => [...list].sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
