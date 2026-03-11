@@ -292,6 +292,27 @@
     return true;
   };
 
+  const getCommentsCount = (report) => commentsList(report).length;
+
+  const verifyReportCreatorPin = async (report) => {
+    const user = safeObject(state.usersMap[report?.userId]);
+    if (!user?.pin) return true;
+    const result = await openIosSwal({
+      title: 'Clave de usuario',
+      html: '<input id="panelCreatorPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos">',
+      showCancelButton: true,
+      confirmButtonText: 'Validar',
+      cancelButtonText: 'Cancelar',
+      preConfirm: () => normalize(document.getElementById('panelCreatorPin')?.value)
+    });
+    if (!result.isConfirmed) return false;
+    if (String(result.value || '') !== String(user.pin || '')) {
+      await openIosSwal({ title: 'Clave incorrecta', html: '<p>La clave no coincide con el creador del informe.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      return false;
+    }
+    return true;
+  };
+
   const openViewer = async (report) => {
     const user = getReportUser(report);
     const commentsCount = getCommentsCount(report);
