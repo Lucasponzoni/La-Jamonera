@@ -34,6 +34,22 @@
   const escapeHtml = (v) => normalize(v).replace(/[&<>'"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
   const initials = (name) => normalize(name).split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() || '').join('') || 'PS';
   const formatDateTime = (ts) => new Date(Number(ts || Date.now())).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const getDateLabel = formatDateTime;
+  const getSwalTarget = () => document.body;
+  const openIosSwal = (options) => Swal.fire({
+    target: getSwalTarget(),
+    ...options,
+    customClass: {
+      popup: `ios-alert informes-alert ${options?.customClass?.popup || ''}`.trim(),
+      title: 'ios-alert-title',
+      htmlContainer: 'ios-alert-text',
+      confirmButton: 'ios-btn ios-btn-primary',
+      denyButton: 'ios-btn ios-btn-secondary',
+      cancelButton: 'ios-btn ios-btn-secondary',
+      ...options.customClass
+    },
+    buttonsStyling: false
+  });
 
   const commentsList = (report) => {
     if (Array.isArray(report?.comments)) return report.comments;
@@ -131,90 +147,133 @@
     win.print();
   };
 
+  const getCommentsCount = (report) => commentsList(report).length;
+
+  const verifyReportCreatorPin = async (report) => {
+    const user = safeObject(state.usersMap[report?.userId]);
+    if (!user?.pin) return true;
+    const result = await openIosSwal({
+      title: 'Clave de usuario',
+      html: '<input id="panelCreatorPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos">',
+      showCancelButton: true,
+      confirmButtonText: 'Validar',
+      cancelButtonText: 'Cancelar',
+      preConfirm: () => normalize(document.getElementById('panelCreatorPin')?.value)
+    });
+    if (!result.isConfirmed) return false;
+    if (String(result.value || '') !== String(user.pin || '')) {
+      await openIosSwal({ title: 'Clave incorrecta', html: '<p>La clave no coincide con el creador del informe.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      return false;
+    }
+    return true;
+  };
+
   const openViewer = async (report) => {
     const user = getReportUser(report);
-    const commentsCount = commentsList(report).length;
+    const commentsCount = getCommentsCount(report);
     const attachments = Array.isArray(report.attachments) ? report.attachments : [];
     const importance = toneImportance(report.importance);
+    const attachmentHtml = attachments.length
+      ? attachments.map((item) => {
+        if (item?.type === 'image') {
+          return `<a href="${escapeHtml(item.url || '')}" target="_blank" rel="noopener noreferrer" class="attachment-card"><img src="${escapeHtml(item.url || '')}" alt="${escapeHtml(item.name || 'Adjunto')}" class="attachment-image is-loaded"></a>`;
+        }
+        return `<a href="${escapeHtml(item?.url || '#')}" target="_blank" rel="noopener noreferrer" class="attachment-card attachment-doc"><i class="bi bi-file-earmark"></i><span>${escapeHtml(item?.name || 'Documento')}</span></a>`;
+      }).join('')
+      : '<div class="informes-empty">Sin adjuntos</div>';
+    const comments = commentsList(report);
+    const commentsHtml = comments.length
+      ? `<div class="report-comments-thread">${comments.map((comment) => `<article class="report-comment-item"><header class="report-comment-head"><strong>${escapeHtml(comment.userName || 'Usuario')}</strong><small>${escapeHtml(getDateLabel(comment.createdAt))}</small></header><p class="report-comment-text">${escapeHtml(comment.text || '').replaceAll('\n', '<br>')}</p></article>`).join('')}</div>`
+      : '<div class="informes-empty report-comments-empty">Sin comentarios todavía.</div>';
 
-    await Swal.fire({
-      title: 'Informe bromatológico',
-      html: `<article class="informe-card panel-report-alert-card"><div class="informe-card-head"><span class="informe-card-date"><i class="fa-regular fa-calendar"></i> ${escapeHtml(formatDateTime(report.createdAt))}</span><span class="informe-card-comments ${commentsCount ? 'has-comments' : 'no-comments'}"><i class="fa-solid ${commentsCount ? 'fa-comment-dots' : 'fa-comment-slash'}"></i> ${commentsCount ? `${commentsCount} comentario(s)` : 'Sin comentarios'}</span></div><div class="informe-card-preview">${report.html || '<p>Sin contenido</p>'}</div><div class="informe-card-meta"><span class="informe-attach-chip"><i class="fa-regular fa-image"></i> ${attachments.filter((x) => x?.type === 'image').length}</span><span class="informe-attach-chip"><i class="fa-regular fa-file-lines"></i> ${Math.max(0, attachments.length - attachments.filter((x) => x?.type === 'image').length)}</span><span class="importance-chip importance-${importance.tone}">${Math.max(0, Math.min(100, Number(report.importance || 0)))}% · ${importance.label}</span></div><div class="informe-card-user">${renderUserAvatar(user)}<div class="informe-card-user-text"><strong>${escapeHtml(user.name)}</strong><small>${escapeHtml(user.position)}</small></div></div></article>`,
-      customClass: {
-        popup: 'ios-alert panel-report-alert',
-        title: 'ios-alert-title',
-        htmlContainer: 'ios-alert-text',
-        confirmButton: 'ios-btn ios-btn-primary'
-      },
-      buttonsStyling: false,
+    await openIosSwal({
+      title: 'Informe completo',
+      width: 980,
+      html: `<div class="report-viewer"><div class="report-viewer-meta"><p><strong>Creador:</strong> ${escapeHtml(user.name || '-')}</p><p><strong>Puesto:</strong> ${escapeHtml(user.position || '-')}</p><p><strong>Fecha:</strong> ${escapeHtml(getDateLabel(report.createdAt))}</p><p><strong>Última actualización:</strong> ${escapeHtml(getDateLabel(report.updatedAt || report.createdAt))}</p></div><div class="report-viewer-content-wrap"><div class="report-viewer-content">${report.html || ''}</div></div><div class="attachments-grid">${attachmentHtml}</div><section class="report-comments-wrap"><div class="report-comments-head"><h6><i class="fa-regular fa-comments"></i> <span class="report-comments-title-text">Comentarios</span></h6></div><div id="reportCommentsBody">${commentsHtml}</div></section></div>`,
+      customClass: { popup: 'panel-report-alert' },
       confirmButtonText: 'Cerrar',
       didOpen: bindThumbs
     });
   };
 
   const promptComment = async (report) => {
-    const result = await Swal.fire({
+    const users = Object.values(state.usersMap || {}).sort((a, b) => String(a.fullName || '').localeCompare(String(b.fullName || '')));
+    const options = ['<option value="">Seleccioná un usuario</option>', ...users.map((user) => `<option value="${escapeHtml(user.id)}">${escapeHtml(user.fullName || 'Usuario')}</option>`)].join('');
+    const result = await openIosSwal({
       title: 'Nuevo comentario',
-      input: 'textarea',
-      inputAttributes: { maxlength: 500, placeholder: 'Escribí un comentario' },
+      html: `<select id="panelCommentUser" class="form-select ios-input mb-2">${options}</select><textarea id="panelCommentText" class="swal2-textarea ios-input" maxlength="500" placeholder="Escribí un comentario"></textarea><input id="panelCommentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos">`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
-      customClass: {
-        popup: 'ios-alert',
-        confirmButton: 'ios-btn ios-btn-primary',
-        cancelButton: 'ios-btn ios-btn-secondary'
-      },
-      buttonsStyling: false
+      preConfirm: () => ({
+        userId: normalize(document.getElementById('panelCommentUser')?.value),
+        text: normalize(document.getElementById('panelCommentText')?.value),
+        pin: normalize(document.getElementById('panelCommentPin')?.value)
+      })
     });
-    const text = normalize(result.value);
-    if (!result.isConfirmed || !text) return;
+    if (!result.isConfirmed) return;
+    const payload = safeObject(result.value);
+    if (!payload.userId || !payload.text) return;
+    const author = safeObject(state.usersMap[payload.userId]);
+    const authorId = normalize(author.id || payload.userId);
+    if (!authorId || String(author.pin || '') !== String(payload.pin || '')) {
+      await openIosSwal({ title: 'Clave incorrecta', html: '<p>La clave no coincide con el usuario seleccionado.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      return;
+    }
     const path = reportPath(report);
     const latest = safeObject(await window.dbLaJamoneraRest.read(path));
     const comments = commentsList(latest);
-    comments.push({ id: `comment_${Date.now()}`, createdAt: Date.now(), userName: 'Panel', text });
+    comments.push({ id: `comment_${Date.now()}`, createdAt: Date.now(), userId: authorId, userName: author.fullName || 'Usuario', text: payload.text });
     await window.dbLaJamoneraRest.update(path, { comments });
+    await window.dbLaJamoneraRest.write(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, {
+      id: report.id,
+      reportDate: report.reportDate,
+      userId: report.userId,
+      userName: report.userName,
+      importance: Math.max(0, Math.min(100, Number(report.importance || 50))),
+      createdAt: Number(report.createdAt || Date.now()),
+      attachmentsCount: Array.isArray(report.attachments) ? report.attachments.length : 0,
+      commentsCount: comments.length,
+      updatedAt: Date.now()
+    });
     await loadOnce();
   };
 
   const promptEdit = async (report) => {
-    const result = await Swal.fire({
+    const allowed = await verifyReportCreatorPin(report);
+    if (!allowed) return;
+
+    const result = await openIosSwal({
       title: 'Editar informe',
       html: `<textarea id="panelEditReportHtml" class="swal2-textarea ios-input" style="min-height:220px;">${(report.html || '').replace(/<[^>]+>/g, '')}</textarea>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar cambios',
       cancelButtonText: 'Cancelar',
-      customClass: {
-        popup: 'ios-alert',
-        confirmButton: 'ios-btn ios-btn-primary',
-        cancelButton: 'ios-btn ios-btn-secondary'
-      },
-      buttonsStyling: false,
       preConfirm: () => normalize(document.getElementById('panelEditReportHtml')?.value)
     });
     const text = normalize(result.value);
     if (!result.isConfirmed || !text) return;
-    await window.dbLaJamoneraRest.update(reportPath(report), { html: `<p>${escapeHtml(text).replace(/\n/g, '</p><p>')}</p>` });
+    const updatedAt = Date.now();
+    await window.dbLaJamoneraRest.update(reportPath(report), { html: `<p>${escapeHtml(text).replace(/\n/g, '</p><p>')}</p>`, updatedAt });
+    await window.dbLaJamoneraRest.update(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, { updatedAt });
     await loadOnce();
   };
 
   const deleteReport = async (report) => {
-    const ask = await Swal.fire({
+    const allowed = await verifyReportCreatorPin(report);
+    if (!allowed) return;
+
+    const ask = await openIosSwal({
       title: 'Eliminar informe',
       html: '<p>Esta acción no se puede deshacer.</p>',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Eliminar',
-      cancelButtonText: 'Cancelar',
-      customClass: {
-        popup: 'ios-alert',
-        confirmButton: 'ios-btn ios-btn-danger',
-        cancelButton: 'ios-btn ios-btn-secondary'
-      },
-      buttonsStyling: false
+      cancelButtonText: 'Cancelar'
     });
     if (!ask.isConfirmed) return;
     await window.dbLaJamoneraRest.write(reportPath(report), null);
+    await window.dbLaJamoneraRest.write(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, null);
     await loadOnce();
   };
 

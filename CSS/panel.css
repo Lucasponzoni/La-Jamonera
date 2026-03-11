@@ -29,14 +29,14 @@
 
 .panel-card {
   grid-column: span 6;
-  min-height: 260px;
+  min-height: 220px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 .panel-card-wide { grid-column: span 12; }
-.panel-summary-card { order: -2; }
+.panel-summary-card { order: -2; min-height: auto; }
 
 .panel-card-head {
   padding: 14px 14px 10px;
@@ -78,40 +78,48 @@
    KPIS
 ========================================= */
 .panel-kpi-row {
-  display: flex;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
   min-width: 0;
 }
 
 .panel-metric {
-  border: 1px solid #dbe4f7;
+  border: 1px solid #e1e7f5;
+  border-top-width: 4px;
   border-radius: 16px;
-  background: #f8faff;
-  padding: 12px;
-  flex: 1;
-  min-width: 170px;
+  background: #fff;
+  padding: 12px 12px 10px;
+  min-width: 0;
 }
 
 .panel-metric strong {
-  font-size: clamp(1.5rem, 2.8vw, 2rem);
+  font-size: clamp(1.55rem, 2.7vw, 2.1rem);
   line-height: 1;
   display: block;
   font-weight: 900;
 }
 
 .panel-metric span {
-  margin-top: 8px;
+  margin-top: 7px;
   font-size: .84rem;
   display: inline-flex;
   gap: 6px;
   align-items: center;
   font-weight: 700;
+  color: #101828;
 }
 
-.panel-metric-rne strong,.panel-metric-rne span{color:#cc3a3a;}
-.panel-metric-rnpa strong,.panel-metric-rnpa span{color:#cc6f00;}
-.panel-metric-transport strong,.panel-metric-transport span{color:#0f8d4a;}
-.panel-metric-reports strong,.panel-metric-reports span{color:#2b5fc4;}
+.panel-metric span i { color: #475467; }
+
+.panel-metric-rne { border-top-color: #ef4444; }
+.panel-metric-rnpa { border-top-color: #f59e0b; }
+.panel-metric-transport { border-top-color: #10b981; }
+.panel-metric-reports { border-top-color: #3b82f6; }
+.panel-metric-rne strong { color:#cc3a3a; }
+.panel-metric-rnpa strong { color:#cc6f00; }
+.panel-metric-transport strong { color:#0f8d4a; }
+.panel-metric-reports strong { color:#2b5fc4; }
 
 /* =========================================
    LISTAS
@@ -273,6 +281,7 @@
   }
 
   .panel-kpi-row {
+    display: flex;
     width: max-content;
     min-width: 100%;
   }
