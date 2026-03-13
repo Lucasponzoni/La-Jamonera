@@ -9488,3 +9488,28 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 .dispatch-xlsx-map-link.is-unmapped {
   color: #b23d4d;
 }
+
+
+.dispatch-xlsx-mapped-kg {
+  font-weight: 800;
+}
+
+.dispatch-xlsx-mapped-kg.is-ok {
+  color: #1a7f4d;
+}
+
+.dispatch-xlsx-mapped-kg.is-danger {
+  color: #b23d4d;
+}
+
+.dispatch-xlsx-kilos-cell small.is-ok,
+.dispatch-xlsx-kilos-cell small.is-ok strong {
+  color: #1a7f4d !important;
+  font-weight: 700;
+}
+
+.dispatch-xlsx-kilos-cell small.is-danger,
+.dispatch-xlsx-kilos-cell small.is-danger strong {
+  color: #b23d4d !important;
+  font-weight: 700;
+}
