@@ -5584,6 +5584,14 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   border: 1px solid #1f7ae8;
 }
 
+.produccion-dispatch-head-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .produccion-product-history-btn {
   width: auto;
   border: 1px solid #f2c08a;
@@ -9287,4 +9295,43 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   background: #34c759 !important;
   border-color: #2fb44f !important;
   color: #fff !important;
+}
+
+
+/* =========================================
+   REPARTOS POR XLSX
+========================================= */
+.dispatch-xlsx-overlay-text {
+  margin: 10px 0 0;
+  color: #2b4f8f;
+  font-weight: 700;
+  font-size: 0.86rem;
+}
+
+.dispatch-xlsx-client {
+  display: grid;
+  gap: 5px;
+}
+
+.dispatch-xlsx-mapping {
+  display: grid;
+  gap: 4px;
+}
+
+.dispatch-xlsx-row-disabled td {
+  opacity: 0.55;
+  background: #f4f6fb !important;
+}
+
+.dispatch-xlsx-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #3a4f79;
+}
+
+.dispatch-xlsx-toggle input {
+  accent-color: #2f7ef1;
 }
