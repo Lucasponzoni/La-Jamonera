@@ -6045,6 +6045,7 @@
     await cleanupExpiredReservations();
     await cleanupExpiredDrafts();
     recomputeAnalysis();
+    state.lastRefreshAt = nowTs();
   };
   const openInventarioFromProduccion = () => {
     const productionInstance = window.bootstrap?.Modal?.getOrCreateInstance(produccionModal);
@@ -7856,10 +7857,21 @@
   };
   produccionModal.addEventListener('show.bs.modal', async () => {
     try {
-      await refreshData();
+      const hasLocalCache = Object.keys(safeObject(state.recetas)).length > 0;
+      const shouldHardRefresh = !hasLocalCache || (nowTs() - Number(state.lastRefreshAt || 0)) > 45000;
+      if (shouldHardRefresh) {
+        await refreshData();
+      } else {
+        refreshData({ silent: true }).catch(() => {});
+      }
       state.historyTraceCollapse = {};
-      setHistoryMode(false);
-      renderList();
+      if (state.resumeDispatchXlsxSession && hasDispatchXlsxDraftChanges(state.dispatchXlsxDraft)) {
+        setDispatchMode(true);
+        renderDispatchXlsxCreate(state.dispatchXlsxDraft);
+      } else {
+        setHistoryMode(false);
+        renderList();
+      }
       renderModalRneBadge();
       alignScrollActionsToRight(document);
       if (window.flatpickr && nodes.historyRange) {
