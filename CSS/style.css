@@ -9393,6 +9393,8 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  width: fit-content;
+  white-space: nowrap;
   padding: 2px 8px;
   border-radius: 999px;
   font-size: 0.72rem;
@@ -9466,4 +9468,23 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   width: auto;
   max-width: none;
   white-space: nowrap;
+}
+
+
+.dispatch-xlsx-invoice-cell,
+.dispatch-xlsx-kilos-cell > span {
+  font-weight: 700;
+}
+
+.dispatch-xlsx-map-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  white-space: nowrap;
+  color: #3b4f79;
+}
+
+.dispatch-xlsx-map-link.is-unmapped {
+  color: #b23d4d;
 }

@@ -3962,7 +3962,7 @@
       const host = popup.querySelector('#dispatchXlsxHistoryHost');
       if (!host) return;
       const rows = filterRows();
-      const body = rows.length ? rows.map((row) => `<tr><td>${escapeHtml(row.fileName || '-')}</td><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${escapeHtml((Number(row.sizeBytes || 0) / 1024).toFixed(1))} KB</td><td><div class="dispatch-xlsx-history-actions"><a class="btn ios-btn ios-btn-secondary inventario-threshold-btn" href="${escapeHtml(row.fileUrl || '#')}" target="_blank" rel="noopener"><i class="fa-solid fa-eye"></i><span>Ver</span></a><a class="btn ios-btn ios-btn-primary inventario-threshold-btn" href="${escapeHtml(row.fileUrl || '#')}" download="${escapeHtml(row.fileName || 'archivo.xlsx')}"><i class="fa-solid fa-download"></i><span>Descargar</span></a></div></td></tr>`).join('') : '<tr><td colspan="4" class="text-center">Sin archivos en el período seleccionado.</td></tr>';
+      const body = rows.length ? rows.map((row) => `<tr><td>${escapeHtml(row.fileName || '-')}</td><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${escapeHtml((Number(row.sizeBytes || 0) / 1024).toFixed(1))} KB</td><td><div class="dispatch-xlsx-history-actions"><a class="btn ios-btn ios-btn-primary inventario-threshold-btn" href="${escapeHtml(row.fileUrl || '#')}" download="${escapeHtml(row.fileName || 'archivo.xlsx')}"><i class="fa-solid fa-download"></i><span>Descargar</span></a></div></td></tr>`).join('') : '<tr><td colspan="4" class="text-center">Sin archivos en el período seleccionado.</td></tr>';
       host.innerHTML = `<div class="table-responsive dispatch-xlsx-history-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Archivo</th><th>Fecha / hora</th><th>Tamaño</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div>`;
     };
     await openIosSwal({
@@ -4005,18 +4005,18 @@
     const rows = Array.isArray(draft.rows) ? draft.rows : [];
     const readyToProcess = rows.length > 0 && rows.every((row) => row.disabled || normalizeValue(row.mappedTargetId));
     const body = rows.length ? rows.map((row) => {
-      const mappingLabel = row.mappedTargetTitle
-        ? `${escapeHtml(row.sourceProduct || '-')} → ${escapeHtml(capitalize(row.mappedTargetTitle))}`
-        : `${escapeHtml(row.sourceProduct || '-')} → Sin relación`;
       const qtyClass = row.mappedHasStock ? 'is-ok' : 'is-danger';
       const qtyMap = row.mappedTargetTitle
-        ? `${Number(row.sourceQty || 0).toFixed(2)} → ${Number(row.mappedQty || 0).toFixed(2)} kg`
+        ? `${Number(row.sourceQty || 0).toFixed(2)} → <span class="dispatch-xlsx-mapped-kg ${qtyClass}">${Number(row.mappedQty || 0).toFixed(2)} kg</span>`
         : `${Number(row.sourceQty || 0).toFixed(2)} kg`;
+      const relationMeta = row.mappedTargetTitle
+        ? `<small class="dispatch-xlsx-map-link">↳ ${escapeHtml(capitalize(row.mappedTargetTitle))}</small>`
+        : '<small class="dispatch-xlsx-map-link is-unmapped"><i class="bi bi-x-circle-fill"></i></small>';
       const clientBadge = row.clientStatus === 'new'
         ? `<span class="produccion-badge is-warning dispatch-xlsx-client-badge">Alta automática · DNI ${escapeHtml(row.clientDoc || '-')}</span>`
         : `<span class="produccion-badge dispatch-xlsx-client-badge">Registrado · DNI ${escapeHtml(row.clientDoc || '-')}</span>`;
       const dateLabel = /^\d{4}-\d{2}-\d{2}$/.test(row.invoiceDate || '') ? formatIsoEs(row.invoiceDate) : (row.invoiceDate || '-');
-      return `<tr class="${row.disabled ? 'dispatch-xlsx-row-disabled' : ''}"><td><div class="dispatch-xlsx-client"><strong>${escapeHtml(row.clientName || '-')}</strong>${clientBadge}</div></td><td>${escapeHtml(row.invoiceNumber || '-')}</td><td class="dispatch-xlsx-date-cell">${escapeHtml(dateLabel)}</td><td><div class="dispatch-xlsx-mapping"><strong>${escapeHtml(row.sourceProduct || '-')}</strong><small class="${row.mappedTargetTitle ? '' : 'dispatch-expiry-text-danger'}">${mappingLabel}</small>${row.mappedTargetTitle ? `<span class="dispatch-xlsx-map-state is-related"><i class="fa-solid fa-circle-check"></i> Relacionado</span>` : `<span class="dispatch-xlsx-map-state is-pending"><i class="fa-solid fa-circle-exclamation"></i> Sin relación</span>`}</div></td><td><span class="${qtyClass}">${escapeHtml(qtyMap)}</span><small class="d-block ${qtyClass}">${row.mappedTargetTitle ? `${row.mappedHasStock ? 'Con stock para producir' : 'Sin stock, se creará igual'} · Disp.: ${Number(row.mappedAvailableKg || 0).toFixed(2)} kg` : 'Pendiente de relación'}</small></td><td><label class="dispatch-xlsx-toggle"><input type="checkbox" data-dispatch-xlsx-row-enabled="${escapeHtml(row.id)}" ${row.disabled ? '' : 'checked'}><span>${row.disabled ? 'Deshabilitado' : 'Activo'}</span></label></td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-xlsx-map="${escapeHtml(row.id)}"><i class="fa-solid fa-link"></i><span>Relacionar</span></button></td></tr>`;
+      return `<tr class="${row.disabled ? 'dispatch-xlsx-row-disabled' : ''}"><td><div class="dispatch-xlsx-client"><strong>${escapeHtml(row.clientName || '-')}</strong>${clientBadge}</div></td><td class="dispatch-xlsx-invoice-cell">${escapeHtml(row.invoiceNumber || '-')}</td><td class="dispatch-xlsx-date-cell">${escapeHtml(dateLabel)}</td><td><div class="dispatch-xlsx-mapping"><strong>${escapeHtml(row.sourceProduct || '-')}</strong>${relationMeta}<span class="dispatch-xlsx-map-state ${row.mappedTargetTitle ? 'is-related' : 'is-pending'}">${row.mappedTargetTitle ? `<i class="fa-solid fa-circle-check"></i> Relacionado` : `<i class="bi bi-x-circle-fill"></i>`}</span></div></td><td class="dispatch-xlsx-kilos-cell"><span class="${qtyClass}">${qtyMap}</span><small class="d-block ${qtyClass}">${row.mappedTargetTitle ? `${row.mappedHasStock ? 'Con stock para producir' : 'Sin stock, se creará igual'} · Disp.: <strong>${Number(row.mappedAvailableKg || 0).toFixed(2)} kg</strong>` : 'Pendiente de relación'}</small></td><td><label class="dispatch-xlsx-toggle"><input type="checkbox" data-dispatch-xlsx-row-enabled="${escapeHtml(row.id)}" ${row.disabled ? '' : 'checked'}><span>${row.disabled ? 'Deshabilitado' : 'Activo'}</span></label></td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-xlsx-map="${escapeHtml(row.id)}"><i class="fa-solid fa-link"></i><span>Relacionar</span></button></td></tr>`;
     }).join('') : '<tr><td colspan="7" class="text-center">Adjuntá un XLS/XLSX para comenzar.</td></tr>';
     nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Repartos por XLSX</h6><div class="dispatch-xlsx-head-actions"><button id="dispatchXlsxUploadBtn" type="button" class="btn recipe-table-action-btn recipe-table-action-btn-monography"><i class="fa-solid fa-file-arrow-up"></i><span>Adjuntar XLSX</span></button><button type="button" id="dispatchXlsxHistoryBtn" class="btn recipe-table-action-btn recipe-table-action-btn-neutral"><i class="fa-regular fa-message"></i><span>Historial de Archivos</span></button></div><input id="dispatchXlsxFileInput" class="d-none" type="file" accept=".xlsx,.xls"></div><section class="recipe-step-card step-block produccion-dispatch-create"><h6 class="step-title"><span class="recipe-step-number">1</span> Previsualización importada ${draft.uploadedFileName ? `<small>· ${escapeHtml(draft.uploadedFileName)}</small>` : ''}</h6><div class="table-responsive recipe-table-wrap dispatch-products-table dispatch-xlsx-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0 dispatch-xlsx-table"><thead><tr><th>Cliente</th><th>Factura</th><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchXlsxProcessBtn" ${readyToProcess ? '' : 'disabled'}><i class="fa-solid fa-gears"></i><span>Procesar ingresos</span></button></div>`;
     alignScrollActionsToRight(nodes.dispatchView);
@@ -6668,7 +6668,9 @@
     }
     if (event.target.closest('#produccionDispatchXlsxBtn')) {
       state.dispatchDraft = null;
-      state.dispatchXlsxDraft = buildDispatchXlsxDraft();
+      if (!state.dispatchXlsxDraft || !hasDispatchXlsxDraftChanges(state.dispatchXlsxDraft)) {
+        state.dispatchXlsxDraft = buildDispatchXlsxDraft();
+      }
       renderDispatchXlsxCreate(state.dispatchXlsxDraft);
       return;
     }
@@ -7325,7 +7327,7 @@
           html: '<p>Ya tenés una tabla cargada. Si importás otro archivo se sobreescribirá la vista actual.</p>',
           icon: 'warning',
           showCancelButton: true,
-          confirmButtonText: 'Cargar nuevo archivo',
+          confirmButtonText: 'Cargar',
           cancelButtonText: 'Cancelar'
         });
         if (!overwrite.isConfirmed) {
