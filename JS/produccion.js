@@ -3196,14 +3196,16 @@
     if (!host || !dispatchRow?.id) return;
     const ready = await ensureQrCodeLib();
     if (!ready || !window.QRCode) return;
-    const products = Array.isArray(dispatchRow.products) ? dispatchRow.products : [];
-    const lotIds = [...new Set(products.flatMap((item) => (Array.isArray(item.allocations) ? item.allocations : []).map((lot) => normalizeValue(lot.productionId)).filter(Boolean)))];
-    if (!lotIds.length) return;
+    const traces = buildDispatchTraceTargets(dispatchRow);
+    if (!traces.length) {
+      host.innerHTML = '';
+      return;
+    }
     host.innerHTML = '';
     host.style.display = 'grid';
     host.style.gridTemplateColumns = 'repeat(auto-fit,minmax(130px,1fr))';
     host.style.gap = '10px';
-    lotIds.forEach((id) => {
+    traces.forEach((trace) => {
       const wrap = document.createElement('div');
       wrap.style.display = 'flex';
       wrap.style.flexDirection = 'column';
@@ -3216,12 +3218,12 @@
       caption.style.fontWeight = '700';
       caption.style.color = '#1f2a44';
       caption.style.textAlign = 'center';
-      caption.textContent = id;
+      caption.textContent = trace.label;
       wrap.appendChild(qrBox);
       wrap.appendChild(caption);
       host.appendChild(wrap);
       // eslint-disable-next-line no-new
-      new window.QRCode(qrBox, { text: getDispatchTraceUrl(id), width: 130, height: 130, colorDark: '#111827', colorLight: '#ffffff' });
+      new window.QRCode(qrBox, { text: trace.url, width: 130, height: 130, colorDark: '#111827', colorLight: '#ffffff' });
     });
   };
   const printDispatchPlanilla = async (node, dispatchRow) => {
@@ -3264,7 +3266,11 @@
       : '<tr><td colspan="4"><strong>OBSERVACIÓN 1:</strong> Sin observaciones</td></tr>';
     const headerTable = `<table style="width:100%;border-collapse:collapse;table-layout:fixed"><tbody><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">FRIGORIFICO LA JAMONERA • REGISTRO DE SALIDA DE PRODUCTOS TERMINADOS</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">${escapeHtml(dispatchRow.code || dispatchRow.id)}</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px"><strong>FECHA Y HORA:</strong></td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(formatDateTime(dispatchRow.createdAt || dispatchRow.dispatchDate))}</strong></td><td style="border:1px solid #2f2f2f;padding:4px"><strong>CLIENTE:</strong></td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(normalizeValue(client.name) || '-')}</strong></td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px" colspan="4"><strong>DIRECCION:</strong> ${escapeHtml(location)}${location && clientDoc ? ' • ' : ''}${escapeHtml(clientDoc)}</td></tr></tbody></table>`;
     const planillaStyle = '<style>.dispatch-planilla-print{font-family:Inter,Arial,sans-serif;color:#111827;background:#fff}.dispatch-planilla-print table{width:100%;border-collapse:collapse;table-layout:fixed}.dispatch-planilla-print th,.dispatch-planilla-print td{border:1px solid #2f2f2f;padding:6px;word-break:break-word;background:#fff;color:#111827}</style>';
-    const html = `${planillaStyle}<div class="dispatch-planilla-print" id="dispatchPlanillaPrintable">${headerTable}<div class="table-responsive" style="margin-top:8px;"><table><thead><tr><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de lote</th></tr></thead><tbody>${detailRows}<tr><td colspan="4"><strong>VEHÍCULO (UTA-URA):</strong> ${escapeHtml(`${vehicle.number || '-'} - ${vehicle.patent || '-'} - ${vehicle.brand || vehicle.type || '-'}`)}</td></tr>${commentsRows}<tr><td colspan="4"><strong>CONTROLO:</strong> ${escapeHtml(managerLabel)}</td></tr><tr><td colspan="2"><strong>TEMPERATURA UNIDAD DE TRANSPORTE:</strong> 3 °C</td><td colspan="2"><strong>UNIDAD DE TRANSPORTE ESTADO:</strong> A (ACEPTABLE)</td></tr></tbody></table></div><div style="margin-top:10px;display:flex;gap:12px;align-items:center;"><div data-dispatch-planilla-qr></div><div><p style="margin:0 0 6px;font-weight:700;">QR de trazabilidad de los lotes</p><p style="margin:0;color:#556487;">Escaneá el QR con tu celular para acceder a la trazabilidad completa del producto.</p></div></div></div>`;
+    const hasTraceQr = buildDispatchTraceTargets(dispatchRow).length > 0;
+    const qrSection = hasTraceQr
+      ? '<div style="margin-top:10px;display:flex;gap:12px;align-items:center;"><div data-dispatch-planilla-qr></div><div><p style="margin:0 0 6px;font-weight:700;">QR de trazabilidad para las facturas</p><p style="margin:0;color:#556487;">Escaneá el QR con tu celular para acceder a la factura completa del producto.</p></div></div>'
+      : '';
+    const html = `${planillaStyle}<div class="dispatch-planilla-print" id="dispatchPlanillaPrintable">${headerTable}<div class="table-responsive" style="margin-top:8px;"><table><thead><tr><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de lote</th></tr></thead><tbody>${detailRows}<tr><td colspan="4"><strong>VEHÍCULO (UTA-URA):</strong> ${escapeHtml(`${vehicle.number || '-'} - ${vehicle.patent || '-'} - ${vehicle.brand || vehicle.type || '-'}`)}</td></tr>${commentsRows}<tr><td colspan="4"><strong>CONTROLO:</strong> ${escapeHtml(managerLabel)}</td></tr><tr><td colspan="2"><strong>TEMPERATURA UNIDAD DE TRANSPORTE:</strong> 3 °C</td><td colspan="2"><strong>UNIDAD DE TRANSPORTE ESTADO:</strong> A (ACEPTABLE)</td></tr></tbody></table></div>${qrSection}</div>`;
     return { html };
   };
   const printDispatchPlanillasBatch = async (rows = [], onProgress) => {
@@ -3820,7 +3826,7 @@
       const inventoryItem = safeObject(state.inventario?.items?.[ingredientId]);
       const qty = Number(parseDispatchXlsxQty(targetRow.qty));
       const unit = normalizeValue(targetRow.unit || inventoryItem.unit || ingredient.stockUnit || 'unidades');
-      const available = Number(inventoryItem.availableQty || 0);
+      const available = Number(getDispatchXlsxIngredientStockMeta(ingredientId).available || 0);
       return {
         id: ingredientId,
         title: normalizeValue(ingredient.name || ingredient.title || ingredientId),
@@ -3845,7 +3851,7 @@
     }
     const mappedQty = Number(rule.useCustomKg ? rule.customKg : sourceQty);
     const availableKg = targetId
-      ? (isIngredient ? Number(state.inventario?.items?.[targetId]?.availableQty || 0) : Number(getProducedStockMeta(targetId).available || 0))
+      ? (isIngredient ? Number(getDispatchXlsxIngredientStockMeta(targetId).available || 0) : Number(getProducedStockMeta(targetId).available || 0))
       : 0;
     const hasStock = targetId ? availableKg >= mappedQty : false;
     return {
@@ -3938,10 +3944,29 @@
   const getDispatchXlsxIngredientStockMeta = (ingredientId) => {
     const inventoryItem = safeObject(state.inventario?.items?.[ingredientId]);
     const ingredient = safeObject(state.ingredientes?.[ingredientId]);
-    const unit = normalizeValue(inventoryItem.unit || ingredient.stockUnit || 'unidades');
-    let available = Number(getEntryAvailableQty(inventoryItem));
-    if ((!Number.isFinite(available) || available < 0) && Number.isFinite(Number(ingredient.stockKg))) {
-      available = fromBase(Number(ingredient.stockKg || 0) * 1000, unit);
+    const unit = normalizeValue(inventoryItem.stockUnit || inventoryItem.unit || ingredient.stockUnit || 'unidades');
+    const entries = Array.isArray(inventoryItem.entries) ? inventoryItem.entries : [];
+    let availableFromEntries = 0;
+    entries.forEach((entry) => {
+      const entryUnit = normalizeValue(entry.unit || unit || 'unidades');
+      const entryAvailable = getEntryAvailableQty(entry);
+      const entryBase = toBase(entryAvailable, entryUnit);
+      if (Number.isFinite(entryBase) && entryBase >= 0) {
+        const converted = fromBase(entryBase, unit);
+        if (Number.isFinite(converted) && converted >= 0) availableFromEntries += converted;
+      }
+    });
+    let available = availableFromEntries;
+    if (!Number.isFinite(available) || available < 0.0001) {
+      const baseStock = Number(inventoryItem.stockBase);
+      if (Number.isFinite(baseStock) && baseStock > 0) {
+        const converted = fromBase(baseStock, unit);
+        if (Number.isFinite(converted)) available = converted;
+      }
+    }
+    if ((!Number.isFinite(available) || available < 0.0001) && Number.isFinite(Number(ingredient.stockKg))) {
+      const converted = fromBase(Number(ingredient.stockKg || 0) * 1000, unit);
+      if (Number.isFinite(converted)) available = converted;
     }
     if (!Number.isFinite(available) || available < 0) available = 0;
     return { unit, available: Number(available.toFixed(2)) };
@@ -4071,6 +4096,8 @@
   const openDispatchXlsxHistory = async () => {
     let range = '';
     let query = '';
+    let page = 1;
+    const PAGE_SIZE = 10;
     const filterRows = () => {
       const rows = getDispatchXlsxHistory();
       const parsed = parseDispatchRange(range);
@@ -4086,8 +4113,11 @@
       const host = popup.querySelector('#dispatchXlsxHistoryHost');
       if (!host) return;
       const rows = filterRows();
-      const body = rows.length ? rows.map((row) => `<tr><td>${escapeHtml(row.fileName || '-')}</td><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${escapeHtml((Number(row.sizeBytes || 0) / 1024).toFixed(1))} KB</td><td><div class="dispatch-xlsx-history-actions"><a class="btn ios-btn ios-btn-primary inventario-threshold-btn" href="${escapeHtml(row.fileUrl || '#')}" download="${escapeHtml(row.fileName || 'archivo.xlsx')}"><i class="fa-solid fa-download"></i><span>Descargar</span></a><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn dispatch-xlsx-history-delete" data-dispatch-xlsx-history-delete="${escapeHtml(row.id || '')}"><span>Eliminar</span></button></div></td></tr>`).join('') : '<tr><td colspan="4" class="text-center">Sin archivos en el período seleccionado.</td></tr>';
-      host.innerHTML = `<div class="table-responsive dispatch-xlsx-history-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Archivo</th><th>Fecha / hora</th><th>Tamaño</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div>`;
+      const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+      page = Math.min(Math.max(1, page), pages);
+      const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+      const body = pageRows.length ? pageRows.map((row) => `<tr><td>${escapeHtml(row.fileName || '-')}</td><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${escapeHtml((Number(row.sizeBytes || 0) / 1024).toFixed(1))} KB</td><td><div class="dispatch-xlsx-history-actions"><a class="btn ios-btn ios-btn-primary inventario-threshold-btn" href="${escapeHtml(row.fileUrl || '#')}" download="${escapeHtml(row.fileName || 'archivo.xlsx')}"><i class="fa-solid fa-download"></i><span>Descargar</span></a><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn dispatch-xlsx-history-delete" data-dispatch-xlsx-history-delete="${escapeHtml(row.id || '')}"><span>Eliminar</span></button></div></td></tr>`).join('') : '<tr><td colspan="4" class="text-center">Sin archivos en el período seleccionado.</td></tr>';
+      host.innerHTML = `<div class="table-responsive dispatch-xlsx-history-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Archivo</th><th>Fecha / hora</th><th>Tamaño</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-xlsx-history-page="prev" ${page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${page} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-xlsx-history-page="next" ${page >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
     };
     await openIosSwal({
       title: 'Historial de Archivos',
@@ -4100,6 +4130,7 @@
         const rangeInput = popup.querySelector('#dispatchXlsxHistoryRange');
         search?.addEventListener('input', () => {
           query = normalizeValue(search.value);
+          page = 1;
           render(popup);
         });
         if (window.flatpickr && rangeInput) {
@@ -4115,11 +4146,19 @@
               const from = instance.selectedDates[0] ? toIsoDate(instance.selectedDates[0].getTime()) : '';
               const to = instance.selectedDates[1] ? toIsoDate(instance.selectedDates[1].getTime()) : from;
               range = from && to ? `${from} a ${to}` : from;
+              page = 1;
               render(popup);
             }
           });
         }
         popup.addEventListener('click', async (event) => {
+          const pagerBtn = event.target.closest('[data-dispatch-xlsx-history-page]');
+          if (pagerBtn) {
+            const action = normalizeValue(pagerBtn.dataset.dispatchXlsxHistoryPage);
+            page = action === 'prev' ? page - 1 : page + 1;
+            render(popup);
+            return;
+          }
           const deleteBtn = event.target.closest('[data-dispatch-xlsx-history-delete]');
           if (!deleteBtn) return;
           const id = normalizeValue(deleteBtn.dataset.dispatchXlsxHistoryDelete);
@@ -4140,6 +4179,205 @@
         });
       }
     });
+  };
+
+  const normalizeDispatchXlsxObservation = (value) => {
+    const normalized = normalizeValue(value);
+    if (!normalized) return '';
+    const compact = normalized.replace(/[.\-_,;:]/g, '').trim();
+    return compact ? normalized : '';
+  };
+  const getRandomDispatchVehicleId = () => {
+    const vehicles = Object.values(safeObject(state.reparto.vehicles || {}))
+      .filter((item) => {
+        const status = normalizeLower(item.status || item.state || 'activo');
+        if (status && ['inactivo', 'baja', 'anulado'].includes(status)) return false;
+        const expiry = normalizeValue(item.expiryDate);
+        return !expiry || expiry >= toIsoDate();
+      });
+    if (!vehicles.length) return '';
+    const idx = Math.floor(Math.random() * vehicles.length);
+    return normalizeValue(vehicles[idx]?.id);
+  };
+  const buildDispatchTraceTargets = (dispatchRow = {}) => {
+    const list = [];
+    const seen = new Set();
+    (Array.isArray(dispatchRow.products) ? dispatchRow.products : []).forEach((item) => {
+      (Array.isArray(item.allocations) ? item.allocations : []).forEach((allocation) => {
+        const traceUrl = normalizeValue(allocation.traceUrl || '');
+        const productionId = normalizeValue(allocation.productionId || '');
+        const url = traceUrl || (productionId ? getDispatchTraceUrl(productionId) : '');
+        if (!url || seen.has(url)) return;
+        seen.add(url);
+        list.push({ url, label: normalizeValue(allocation.traceLabel || allocation.lotNumber || productionId || item.recipeTitle) || 'Trazabilidad' });
+      });
+    });
+    return list;
+  };
+  const consumeIngredientForDispatch = ({ ingredientId = '', requestedQty = 0, requestedUnit = 'kilos', dispatchCode = '', dispatchId = '', dispatchDate = toIsoDate(), invoiceNumber = '' } = {}) => {
+    state.inventario = safeObject(state.inventario);
+    state.inventario.items = safeObject(state.inventario.items);
+    const record = safeObject(state.inventario?.items?.[ingredientId]);
+    const entries = Array.isArray(record.entries) ? [...record.entries] : [];
+    const targetBase = toBase(Number(requestedQty || 0), requestedUnit);
+    if (!Number.isFinite(targetBase) || targetBase <= 0) {
+      return { consumedQty: 0, forcedQty: 0, allocations: [], qtyKg: 0, unit: requestedUnit };
+    }
+    let remainingBase = targetBase;
+    const allocations = [];
+    const sorted = entries.map((item) => ({ ...item })).sort((a, b) => {
+      const aExpiry = normalizeValue(a.expiryDate) || '9999-12-31';
+      const bExpiry = normalizeValue(b.expiryDate) || '9999-12-31';
+      if (aExpiry !== bExpiry) return aExpiry.localeCompare(bExpiry);
+      return Number(a.createdAt || 0) - Number(b.createdAt || 0);
+    });
+    sorted.forEach((entry) => {
+      if (remainingBase <= 0.0001) return;
+      const entryUnit = normalizeValue(entry.unit || record.stockUnit || requestedUnit || 'kilos');
+      const availableQty = getEntryAvailableQty(entry);
+      const availableBase = toBase(availableQty, entryUnit);
+      if (!Number.isFinite(availableBase) || availableBase <= 0.0001) return;
+      const takeBase = Math.min(remainingBase, availableBase);
+      const takeQty = Number(fromBase(takeBase, entryUnit).toFixed(4));
+      const nextAvailableQty = Number(Math.max(0, availableQty - takeQty).toFixed(4));
+      entry.availableQty = nextAvailableQty;
+      entry.availableBase = Number(Math.max(0, toBase(nextAvailableQty, entryUnit)).toFixed(6));
+      entry.availableKg = Number(Math.max(0, entry.availableBase / 1000).toFixed(4));
+      entry.movementHistory = Array.isArray(entry.movementHistory) ? entry.movementHistory : [];
+      entry.movementHistory.unshift({
+        id: makeId('mov_dispatch_ingredient'),
+        type: 'egreso_reparto_domicilio',
+        qty: takeQty,
+        qtyUnit: entryUnit,
+        qtyKg: Number((takeBase / 1000).toFixed(4)),
+        createdAt: nowTs(),
+        date: dispatchDate,
+        reference: dispatchCode || dispatchId,
+        sourceId: dispatchId,
+        sourceCode: dispatchCode,
+        observation: `Reparto a domicilio${invoiceNumber ? ` · Factura ${invoiceNumber}` : ''}`
+      });
+      allocations.push({
+        ingredientId,
+        entryId: normalizeValue(entry.id),
+        lotNumber: normalizeValue(entry.lotNumber || entry.invoiceNumber || entry.id),
+        qtyKg: Number((takeBase / 1000).toFixed(3)),
+        qty: takeQty,
+        unit: entryUnit,
+        expiryDate: normalizeValue(entry.expiryDate),
+        traceUrl: normalizeValue(Array.isArray(entry.invoiceImageUrls) ? entry.invoiceImageUrls[0] : entry.invoiceImageUrl),
+        traceLabel: normalizeValue(entry.invoiceNumber || entry.lotNumber || entry.id)
+      });
+      remainingBase = Number(Math.max(0, remainingBase - takeBase).toFixed(6));
+    });
+    const merged = entries.map((entry) => {
+      const match = sorted.find((row) => row.id === entry.id);
+      return match ? { ...entry, ...match } : entry;
+    });
+    const nextStockBase = merged.reduce((acc, entry) => acc + Number(entry.availableBase || toBase(getEntryAvailableQty(entry), normalizeValue(entry.unit || record.stockUnit || requestedUnit || 'kilos')) || 0), 0);
+    const nextStockKg = merged.reduce((acc, entry) => acc + Number(entry.availableKg || (toBase(getEntryAvailableQty(entry), normalizeValue(entry.unit || record.stockUnit || requestedUnit || 'kilos')) / 1000) || 0), 0);
+    state.inventario.items[ingredientId] = { ...record, entries: merged, stockBase: Number(nextStockBase.toFixed(6)), stockKg: Number(nextStockKg.toFixed(4)) };
+    const consumedBase = targetBase - remainingBase;
+    const forcedBase = Math.max(0, remainingBase);
+    return {
+      consumedQty: Number(fromBase(consumedBase, requestedUnit).toFixed(3)),
+      forcedQty: Number(fromBase(forcedBase, requestedUnit).toFixed(3)),
+      allocations,
+      qtyKg: Number((consumedBase / 1000).toFixed(3)),
+      unit: requestedUnit
+    };
+  };
+  const processDispatchXlsxRows = async () => {
+    const draft = state.dispatchXlsxDraft;
+    const rows = (Array.isArray(draft?.rows) ? draft.rows : []).filter((row) => !row.disabled && normalizeValue(row.mappedTargetId));
+    if (!rows.length) {
+      await openIosSwal({ title: 'Sin filas activas', html: '<p>No hay filas listas para procesar.</p>', icon: 'warning' });
+      return;
+    }
+    Swal.fire({ title: 'Procesando ingresos...', html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Procesando" class="meta-spinner-login"></div>', allowOutsideClick: false, showConfirmButton: false, customClass: { popup: 'ios-alert produccion-loading-alert' } });
+    try {
+      const byDispatch = {};
+      rows.forEach((row) => {
+        const key = `${normalizeValue(row.invoiceDate || toIsoDate())}__${normalizeValue(row.invoiceNumber)}__${normalizeValue(row.clientId || row.clientName)}`;
+        byDispatch[key] = byDispatch[key] || [];
+        byDispatch[key].push(row);
+      });
+      const dispatchDateNow = nowTs();
+      Object.values(byDispatch).forEach((groupRows) => {
+        const first = groupRows[0] || {};
+        const dispatchDate = normalizeDispatchDateToken(first.invoiceDate) || toIsoDate();
+        const dayToken = formatIsoToDmyCompact(dispatchDate);
+        const seq = Number(state.reparto.sequenceByDate?.[dayToken] || 0) + 1;
+        state.reparto.sequenceByDate[dayToken] = seq;
+        const code = `REP-LJ-${dayToken}-${String(seq).padStart(3, '0')}`;
+        const repartoId = makeId('reparto_xlsx');
+        const vehicleId = getRandomDispatchVehicleId();
+        const client = getDispatchClient(first.clientId);
+        const clientAddress = normalizeValue(client.address) || `Dirección relacionada a factura ${normalizeValue(first.invoiceNumber) || '-'}`;
+        const comments = [...new Set(groupRows.map((row) => normalizeDispatchXlsxObservation(row.observation)).filter(Boolean))];
+        const products = [];
+        groupRows.forEach((row) => {
+          if (normalizeValue(row.mappedType) === 'ingredient' && Array.isArray(row.mappedIngredients) && row.mappedIngredients.length) {
+            row.mappedIngredients.forEach((mappedItem) => {
+              const ingredientId = normalizeValue(mappedItem.id);
+              if (!ingredientId) return;
+              const ingredient = safeObject(state.ingredientes?.[ingredientId]);
+              const consumeResult = consumeIngredientForDispatch({
+                ingredientId,
+                requestedQty: Number(mappedItem.qty || 0),
+                requestedUnit: normalizeValue(mappedItem.unit || getDispatchXlsxIngredientStockMeta(ingredientId).unit || 'kilos'),
+                dispatchCode: code,
+                dispatchId: repartoId,
+                dispatchDate,
+                invoiceNumber: normalizeValue(row.invoiceNumber)
+              });
+              const itemAlloc = [...consumeResult.allocations];
+              if (consumeResult.forcedQty > 0.0001) {
+                itemAlloc.push({ lotNumber: normalizeValue(row.invoiceNumber) || 'Sin trazabilidad', qtyKg: Number((toBase(consumeResult.forcedQty, consumeResult.unit) / 1000).toFixed(3)), qty: consumeResult.forcedQty, unit: consumeResult.unit, expiryDate: '', productionId: '', forced: true, traceUrl: '' });
+              }
+              products.push({ recipeId: ingredientId, recipeTitle: normalizeValue(ingredient.name || ingredient.title || row.sourceProduct), recipeImageUrl: normalizeValue(ingredient.imageUrl), qtyKg: Number((toBase(Number(mappedItem.qty || 0), consumeResult.unit) / 1000).toFixed(3)), allocations: itemAlloc, sourceType: 'ingredient' });
+            });
+            return;
+          }
+          const recipeId = normalizeValue(row.mappedTargetId);
+          const recipe = safeObject(state.recetas?.[recipeId]);
+          const qtyKg = Number(row.mappedQty || row.sourceQty || 0);
+          const allocated = allocateDispatchLots(recipeId, qtyKg);
+          const allocs = [...allocated.allocations];
+          if (allocated.missingKg > 0.0001) {
+            allocs.push({ lotNumber: normalizeValue(row.invoiceNumber) || 'Sin trazabilidad', qtyKg: Number(allocated.missingKg.toFixed(3)), expiryDate: '', productionId: '', forced: true, traceUrl: '' });
+          }
+          products.push({ recipeId, recipeTitle: normalizeValue(recipe.title || row.sourceProduct), recipeImageUrl: normalizeValue(recipe.imageUrl), qtyKg: Number(qtyKg.toFixed(3)), allocations: allocs, sourceType: 'production' });
+          appendRecipeMovement(recipeId, { id: `egr_${repartoId}_${recipeId}_${makeId('mv')}`, type: 'egreso', qtyKg: Number(qtyKg.toFixed(3)), at: dispatchDateNow, sourceId: repartoId, sourceCode: code, label: 'Reparto a domicilio', date: dispatchDate, nonTraceable: allocated.missingKg > 0.0001 });
+        });
+        state.reparto.registros[repartoId] = {
+          id: repartoId,
+          code,
+          dispatchDate,
+          clientId: normalizeValue(first.clientId),
+          vehicleId,
+          managers: [],
+          managerProfiles: [],
+          comments,
+          proofs: [],
+          importedFromXlsx: true,
+          importedInvoice: normalizeValue(first.invoiceNumber),
+          clientSnapshot: { id: normalizeValue(first.clientId), name: normalizeValue(first.clientName || client.name), doc: normalizeValue(first.clientDoc || client.doc), address: clientAddress, city: normalizeValue(client.city || 'Sin localidad'), province: normalizeValue(client.province || 'Santa Fe'), country: normalizeValue(client.country || 'Argentina') },
+          products,
+          createdAt: dispatchDateNow,
+          createdBy: getCurrentUserLabel()
+        };
+      });
+      await persistRepartoStore();
+      await refreshData({ silent: true });
+      Swal.close();
+      state.dispatchXlsxDraft = buildDispatchXlsxDraft();
+      renderDispatchMain();
+      await openIosSwal({ title: 'Importación procesada', html: '<p>Se generaron los repartos con la lógica de trazabilidad disponible y faltantes forzados sin trazabilidad.</p>', icon: 'success' });
+    } catch (error) {
+      Swal.close();
+      await openIosSwal({ title: 'No se pudo procesar', html: '<p>Ocurrió un error al procesar el XLSX.</p>', icon: 'error' });
+    }
   };
   const renderDispatchXlsxCreate = (draft) => {
     if (!nodes.dispatchView) return;
@@ -6800,10 +7038,10 @@
         const canLeaveXlsx = await confirmLeaveDispatchXlsxCreate();
         if (!canLeaveXlsx) return;
       }
-      await runWithBackSpinner(async () => {
-        await refreshData({ silent: true });
-        setDispatchMode(false);
-        renderList();
+      setDispatchMode(false);
+      renderList();
+      refreshData({ silent: true }).catch((error) => {
+        console.warn('[produccion] refreshData back dispatch failed', error);
       });
       return;
     }
@@ -6840,9 +7078,9 @@
     if (event.target.closest('#produccionDispatchBackToListBtn')) {
       const canLeave = state.dispatchXlsxMode ? await confirmLeaveDispatchXlsxCreate() : await confirmLeaveDispatchCreate();
       if (!canLeave) return;
-      await runWithBackSpinner(async () => {
-        await refreshData({ silent: true });
-        renderDispatchMain();
+      renderDispatchMain();
+      refreshData({ silent: true }).catch((error) => {
+        console.warn('[produccion] refreshData back xlsx failed', error);
       });
       return;
     }
@@ -6902,7 +7140,7 @@
       return;
     }
     if (event.target.closest('#dispatchXlsxProcessBtn')) {
-      await openIosSwal({ title: 'Próximamente', html: '<p>La funcionalidad de procesamiento se implementará en el próximo paso.</p>', icon: 'info' });
+      await processDispatchXlsxRows();
       return;
     }
     if (event.target.closest('#dispatchAddProductBtn')) {
@@ -7256,7 +7494,7 @@
           const allocations = Array.isArray(item.allocations) && item.allocations.length
             ? item.allocations
             : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
-          return allocations.map((allocation) => `<tr class="is-dispatch-trace-row"><td>↳ <span style="display:inline-flex;align-items:center;gap:8px;">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(item.recipeTitle || '-')}</span></span></td><td>${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${Number(getRegistroById(allocation.productionId)?.quantityKg || allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${normalizeValue(allocation.productionId) ? 'Trazabilidad' : 'Sin trazabilidad'}</td><td>${escapeHtml(client.name || '-')}</td></tr>`);
+          return allocations.map((allocation) => `<tr class="is-dispatch-trace-row"><td>↳ <span style="display:inline-flex;align-items:center;gap:8px;">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(item.recipeTitle || '-')}</span></span></td><td>${Number(allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${Number(getRegistroById(allocation.productionId)?.quantityKg || allocation.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${(normalizeValue(allocation.productionId) || normalizeValue(allocation.traceUrl)) ? 'Trazabilidad' : 'Sin trazabilidad'}</td><td>${escapeHtml(client.name || '-')}</td></tr>`);
         });
         const locationRow = locationText
           ? `<tr class="is-dispatch-internal-row"><td colspan="6">🏠 ${escapeHtml(locationText)}</td></tr>`
@@ -7295,7 +7533,7 @@
             Productos: `${Number(allocation.qtyKg || 0).toFixed(2)} kg`,
             'Cantidad (kg)': `${allocation.lotNumber || '-'} · ${Number(getRegistroById(allocation.productionId)?.quantityKg || allocation.qtyKg || 0).toFixed(2)} kg`,
             Vencimiento: formatIsoEs(allocation.expiryDate || '') || '-',
-            'Número de reparto': normalizeValue(allocation.productionId) ? 'Trazabilidad' : 'Sin trazabilidad',
+            'Número de reparto': (normalizeValue(allocation.productionId) || normalizeValue(allocation.traceUrl)) ? 'Trazabilidad' : 'Sin trazabilidad',
             Cliente: client.name || '-',
             __tone: 'trace'
           }));
