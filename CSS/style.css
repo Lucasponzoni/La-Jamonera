@@ -5584,6 +5584,14 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   border: 1px solid #1f7ae8;
 }
 
+.produccion-dispatch-head-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .produccion-product-history-btn {
   width: auto;
   border: 1px solid #f2c08a;
@@ -6395,7 +6403,7 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 .dispatch-client-row-main small {
   display: block;
   color: #6f7fa2;
-  text-align: center;
+  text-align: start;
 }
 
 .dispatch-client-row .dispatch-client-suggest-avatar {
@@ -9287,4 +9295,285 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   background: #34c759 !important;
   border-color: #2fb44f !important;
   color: #fff !important;
+}
+
+
+/* =========================================
+   REPARTOS POR XLSX
+========================================= */
+.dispatch-xlsx-client {
+  display: grid;
+  gap: 5px;
+}
+
+.dispatch-xlsx-mapping {
+  display: grid;
+  gap: 4px;
+}
+
+.dispatch-xlsx-row-disabled td {
+  opacity: 0.55;
+  background: #f4f6fb !important;
+}
+
+.dispatch-xlsx-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #3a4f79;
+}
+
+.dispatch-xlsx-toggle input {
+  accent-color: #2f7ef1;
+}
+
+
+.dispatch-xlsx-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dispatch-xlsx-table {
+  min-width: 980px;
+}
+
+.dispatch-xlsx-type-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.dispatch-xlsx-type-divider {
+  width: 1px;
+  height: 30px;
+  background: #d2dbef;
+  margin: 0 4px;
+}
+
+.dispatch-xlsx-selector-wrap {
+  text-align: left;
+}
+
+.dispatch-xlsx-target-list {
+  margin-top: 8px;
+  max-height: 42vh;
+  overflow: auto;
+  display: grid;
+  gap: 6px;
+}
+
+.dispatch-xlsx-selector-row {
+  margin-bottom: 0;
+}
+
+.dispatch-xlsx-stock-hint.is-ok {
+  color: #1a7f4d !important;
+  font-weight: 700;
+}
+
+.dispatch-xlsx-stock-hint.is-danger {
+  color: #b23d4d !important;
+  font-weight: 700;
+}
+
+.dispatch-xlsx-ingredient-qty-list {
+  margin-top: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+
+.dispatch-xlsx-head-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dispatch-xlsx-uploading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: #2e5aac;
+}
+
+.dispatch-xlsx-client-badge {
+  width: fit-content;
+  white-space: nowrap;
+}
+
+.dispatch-xlsx-date-cell {
+  white-space: nowrap;
+}
+
+.dispatch-xlsx-map-state {
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  white-space: nowrap;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.dispatch-xlsx-map-state.is-related {
+  background: #ebf9f1;
+  color: #1a7f4d;
+  border: 1px solid #bfe7cf;
+}
+
+.dispatch-xlsx-map-state.is-pending {
+  background: #fff1f3;
+  color: #b23d4d;
+  border: 1px solid #f0c3c9;
+}
+
+#dispatchXlsxProcessBtn:disabled {
+  background-color: #e5e5e5 !important;
+  border-color: #d7d7d7 !important;
+  color: #6f6f6f !important;
+}
+
+.dispatch-xlsx-history-filters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.dispatch-xlsx-history-actions {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+#dispatchXlsxMapQty.swal2-input {
+  margin: 8px 0 0 !important;
+  width: 100% !important;
+}
+
+.dispatch-xlsx-selector-row .inventario-print-photo-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid #d7def2;
+  flex: 0 0 42px;
+}
+
+.dispatch-xlsx-selector-row .thumb-image {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+}
+
+@media (max-width: 640px) {
+  .dispatch-xlsx-type-actions {
+    flex-wrap: wrap;
+  }
+  .dispatch-xlsx-type-divider {
+    display: none;
+  }
+  .dispatch-xlsx-history-filters {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dispatch-xlsx-type-actions .ios-btn {
+  width: auto;
+  max-width: none;
+  white-space: nowrap;
+}
+
+
+.dispatch-xlsx-invoice-cell,
+.dispatch-xlsx-kilos-cell > span {
+  font-weight: 700;
+}
+
+.dispatch-xlsx-map-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  white-space: nowrap;
+  color: #3b4f79;
+}
+
+.dispatch-xlsx-map-link.is-unmapped {
+  color: #b23d4d;
+}
+
+
+.dispatch-xlsx-mapped-kg {
+  font-weight: 800;
+}
+
+.dispatch-xlsx-mapped-kg.is-ok {
+  color: #1a7f4d;
+}
+
+.dispatch-xlsx-mapped-kg.is-danger {
+  color: #b23d4d;
+}
+
+.dispatch-xlsx-kilos-cell small.is-ok,
+.dispatch-xlsx-kilos-cell small.is-ok strong {
+  color: #1a7f4d !important;
+  font-weight: 700;
+}
+
+.dispatch-xlsx-kilos-cell small.is-danger,
+.dispatch-xlsx-kilos-cell small.is-danger strong {
+  color: #b23d4d !important;
+  font-weight: 700;
+}
+
+
+.dispatch-xlsx-client-name {
+  display: block;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dispatch-xlsx-history-delete {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.05;
+}
+
+
+
+.dispatch-xlsx-ingredient-breakdown {
+  margin-top: 4px;
+  display: grid;
+  gap: 2px;
+}
+
+.dispatch-xlsx-ingredient-line {
+  margin: 0;
+  font-size: 0.74rem;
+}
+
+.dispatch-xlsx-ingredient-line.is-ok,
+.dispatch-xlsx-ingredient-line.is-ok strong {
+  color: #1a7f4d;
+}
+
+.dispatch-xlsx-ingredient-line.is-danger,
+.dispatch-xlsx-ingredient-line.is-danger strong {
+  color: #b23d4d;
 }
