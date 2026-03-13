@@ -5584,6 +5584,14 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   border: 1px solid #1f7ae8;
 }
 
+.produccion-dispatch-head-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .produccion-product-history-btn {
   width: auto;
   border: 1px solid #f2c08a;
@@ -6395,7 +6403,7 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 .dispatch-client-row-main small {
   display: block;
   color: #6f7fa2;
-  text-align: center;
+  text-align: start;
 }
 
 .dispatch-client-row .dispatch-client-suggest-avatar {
@@ -9287,4 +9295,77 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   background: #34c759 !important;
   border-color: #2fb44f !important;
   color: #fff !important;
+}
+
+
+/* =========================================
+   REPARTOS POR XLSX
+========================================= */
+.dispatch-xlsx-client {
+  display: grid;
+  gap: 5px;
+}
+
+.dispatch-xlsx-mapping {
+  display: grid;
+  gap: 4px;
+}
+
+.dispatch-xlsx-row-disabled td {
+  opacity: 0.55;
+  background: #f4f6fb !important;
+}
+
+.dispatch-xlsx-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #3a4f79;
+}
+
+.dispatch-xlsx-toggle input {
+  accent-color: #2f7ef1;
+}
+
+
+.dispatch-xlsx-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dispatch-xlsx-table {
+  min-width: 980px;
+}
+
+.dispatch-xlsx-type-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dispatch-xlsx-type-divider {
+  width: 1px;
+  height: 30px;
+  background: #d2dbef;
+  margin: 0 4px;
+}
+
+.dispatch-xlsx-selector-wrap {
+  text-align: left;
+}
+
+.dispatch-xlsx-target-list {
+  margin-top: 8px;
+  max-height: 42vh;
+  overflow: auto;
+  display: grid;
+  gap: 6px;
+}
+
+.dispatch-xlsx-selector-row {
+  margin-bottom: 0;
 }
