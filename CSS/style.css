@@ -9513,3 +9513,25 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   color: #b23d4d !important;
   font-weight: 700;
 }
+
+
+.dispatch-xlsx-client-name {
+  display: block;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dispatch-xlsx-history-delete {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.05;
+}
+
+.dispatch-xlsx-history-delete small {
+  font-size: 0.66rem;
+  opacity: 0.85;
+}
