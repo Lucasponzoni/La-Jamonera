@@ -69,6 +69,7 @@
     historyMode: false,
     dispatchMode: false,
     dispatchCreateMode: false,
+    dispatchXlsxMode: false,
     historySearch: '',
     historyRange: '',
     historyPage: 1,
@@ -78,6 +79,7 @@
     dispatchPage: 1,
     dispatchCollapse: {},
     dispatchDraft: null,
+    dispatchXlsxDraft: null,
     reparto: {
       registros: {},
       sequenceByDate: {},
@@ -109,6 +111,11 @@
     clients: safeObject(source?.clients),
     vehicles: safeObject(source?.vehicles),
     productIndex: safeObject(source?.productIndex),
+    xlsxConfig: {
+      productRules: safeObject(source?.xlsxConfig?.productRules),
+      disabledProducts: safeObject(source?.xlsxConfig?.disabledProducts),
+      clientSequence: Number(source?.xlsxConfig?.clientSequence || 0)
+    },
     localities: [...new Set([...(Array.isArray(source?.localities) ? source.localities : []), ...ROSARIO_DEPT_LOCALITIES].map((item) => normalizeValue(item)).filter(Boolean))]
   });
   const getWeekStartIso = (dateLike = nowTs()) => {
@@ -3535,7 +3542,8 @@
   const renderDispatchMain = () => {
     if (!nodes.dispatchView) return;
     state.dispatchCreateMode = false;
-    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Salida de Productos</h6><button id="produccionDispatchNewBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="bi bi-plus-lg"></i><span>Reparto</span></button></div><div class="inventario-period-filters"><input id="produccionDispatchSearch" type="search" class="form-control ios-input produccion-dispatch-filter" placeholder="Buscar reparto, cliente o producto" value="${escapeHtml(state.dispatchSearch)}"><input id="produccionDispatchRange" class="form-control ios-input produccion-dispatch-filter" placeholder="Seleccionar rango de fechas" value="${escapeHtml(state.dispatchRange)}"><div class="toolbar-scroll-x inventario-period-actions-scroll"><button id="produccionDispatchClearBtn" type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn ${(state.dispatchRange || state.dispatchSearch) ? '' : 'd-none'}"><i class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></button><button id="produccionDispatchApplyBtn" type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn"><i class="fa-solid fa-filter"></i><span>Aplicar</span></button><button id="produccionDispatchExpandBtn" type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button><button id="produccionDispatchExcelBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="fa-solid fa-file-excel"></i><span>Excel</span></button><span class="inventario-period-divider" aria-hidden="true"></span><button id="produccionDispatchPrintBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-print"></i><span>Imprimir período</span></button><button id="produccionDispatchMassBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-regular fa-file-lines"></i><span>Planillas masivas</span></button></div></div><div id="produccionDispatchTableWrap"></div>`;
+    state.dispatchXlsxMode = false;
+    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Salida de Productos</h6><div class="produccion-dispatch-head-actions"><button id="produccionDispatchNewBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="bi bi-plus-lg"></i><span>Reparto</span></button><button id="produccionDispatchXlsxBtn" type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn"><i class="bi bi-plus-lg"></i><span>Repartos por XLSX</span></button></div></div><div class="inventario-period-filters"><input id="produccionDispatchSearch" type="search" class="form-control ios-input produccion-dispatch-filter" placeholder="Buscar reparto, cliente o producto" value="${escapeHtml(state.dispatchSearch)}"><input id="produccionDispatchRange" class="form-control ios-input produccion-dispatch-filter" placeholder="Seleccionar rango de fechas" value="${escapeHtml(state.dispatchRange)}"><div class="toolbar-scroll-x inventario-period-actions-scroll"><button id="produccionDispatchClearBtn" type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn ${(state.dispatchRange || state.dispatchSearch) ? '' : 'd-none'}"><i class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></button><button id="produccionDispatchApplyBtn" type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn"><i class="fa-solid fa-filter"></i><span>Aplicar</span></button><button id="produccionDispatchExpandBtn" type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button><button id="produccionDispatchExcelBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="fa-solid fa-file-excel"></i><span>Excel</span></button><span class="inventario-period-divider" aria-hidden="true"></span><button id="produccionDispatchPrintBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-print"></i><span>Imprimir período</span></button><button id="produccionDispatchMassBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-regular fa-file-lines"></i><span>Planillas masivas</span></button></div></div><div id="produccionDispatchTableWrap"></div>`;
     const rangeInput = nodes.dispatchView.querySelector('#produccionDispatchRange');
     if (window.flatpickr && rangeInput) {
       const locale = window.flatpickr.l10ns?.es || undefined;
@@ -3626,6 +3634,172 @@
     state.dispatchPage = 1;
     setDispatchMode(true);
     renderDispatchMain();
+  };
+  const buildDispatchXlsxDraft = () => ({
+    rows: [],
+    uploadedFileName: '',
+    uploadedAt: 0,
+    processing: false
+  });
+  const toDispatchXlsxToken = (value) => normalizeUpper(String(value || '').replace(/\s+/g, ' ').trim().replace(/[.:]/g, ''));
+  const DISPATCH_XLSX_HEADERS = {
+    client: ['NOMBCLI', 'NOMBREDECLIENTE', 'NOMBRECLIENTE'],
+    invoice: ['NROCOMPROB', 'NROCOMPROBANTE', 'NUMERODEFACTURA', 'FACTURA'],
+    date: ['FECHEMISION', 'FECHAEMISIONDEFACTURA', 'FECHAEMISION'],
+    product: ['DETRENG', 'PRODUCTOS', 'PRODUCTO'],
+    qty: ['CANTIDAD', 'CANTIDADENKILOS', 'KILOS'],
+    observation: ['LEYENDACAB', 'OBSERVACIONES', 'OBSERVACION']
+  };
+  const normalizeDispatchXlsxProductKey = (value) => normalizeUpper(value).replace(/\s+/g, ' ').trim();
+  const getDispatchXlsxConfig = () => {
+    state.reparto.xlsxConfig = safeObject(state.reparto.xlsxConfig);
+    state.reparto.xlsxConfig.productRules = safeObject(state.reparto.xlsxConfig.productRules);
+    state.reparto.xlsxConfig.disabledProducts = safeObject(state.reparto.xlsxConfig.disabledProducts);
+    state.reparto.xlsxConfig.clientSequence = Number(state.reparto.xlsxConfig.clientSequence || 0);
+    return state.reparto.xlsxConfig;
+  };
+  const findDispatchXlsxLayout = (sheet) => {
+    const maxRows = Math.min(50, Number(sheet?.rowCount || 0));
+    for (let rowIdx = 1; rowIdx <= maxRows; rowIdx += 1) {
+      const row = sheet.getRow(rowIdx);
+      const values = Array.isArray(row?.values) ? row.values : [];
+      const map = {};
+      values.forEach((raw, col) => {
+        const token = toDispatchXlsxToken(raw);
+        if (!token) return;
+        Object.entries(DISPATCH_XLSX_HEADERS).forEach(([key, aliases]) => {
+          if (!map[key] && aliases.includes(token)) map[key] = col;
+        });
+      });
+      if (map.client && map.invoice && map.date && map.product && map.qty) {
+        return { headerRow: rowIdx, map };
+      }
+    }
+    return null;
+  };
+  const findDispatchClientByName = (name) => {
+    const needle = normalizeLower(name);
+    return Object.values(safeObject(state.reparto.clients)).find((client) => normalizeLower(client.name) === needle) || null;
+  };
+  const ensureDispatchXlsxClient = (name) => {
+    const existing = findDispatchClientByName(name);
+    if (existing?.id) return { client: existing, isNew: false };
+    const cfg = getDispatchXlsxConfig();
+    const next = Number(cfg.clientSequence || 0) + 1;
+    cfg.clientSequence = next;
+    const doc = String(next).padStart(7, '0');
+    const id = makeId('dispatch_client_xlsx');
+    const created = {
+      id,
+      name,
+      doc,
+      address: 'Sin dirección (XLSX)',
+      city: 'Sin localidad',
+      province: 'Santa Fe',
+      country: 'Argentina',
+      initials: initialsFromPersonName(name) || 'U',
+      createdAt: nowTs(),
+      source: 'xlsx_import'
+    };
+    state.reparto.clients[id] = created;
+    return { client: created, isNew: true };
+  };
+  const parseDispatchXlsxQty = (value) => {
+    const n = parseNumber(String(value || '').replace(/\./g, '').replace(',', '.'));
+    if (Number.isFinite(n)) return Number(n.toFixed(3));
+    const fallback = parseNumber(value);
+    return Number.isFinite(fallback) ? Number(fallback.toFixed(3)) : 0;
+  };
+  const getDispatchXlsxProductRule = (sourceName) => {
+    const key = normalizeDispatchXlsxProductKey(sourceName);
+    return safeObject(getDispatchXlsxConfig().productRules[key]);
+  };
+  const isDispatchXlsxProductDisabled = (sourceName) => Boolean(getDispatchXlsxConfig().disabledProducts[normalizeDispatchXlsxProductKey(sourceName)]);
+  const resolveDispatchXlsxProductMeta = (sourceName, qtyRaw) => {
+    const rule = getDispatchXlsxProductRule(sourceName);
+    const targetId = normalizeValue(rule.targetId);
+    const recipe = safeObject(state.recetas[targetId]);
+    const sourceQty = Number(parseDispatchXlsxQty(qtyRaw) || 0);
+    const mappedQty = Number(rule.useCustomKg ? rule.customKg : sourceQty);
+    const availableKg = targetId ? Number(getProducedStockMeta(targetId).available || 0) : 0;
+    const hasStock = targetId ? availableKg >= mappedQty : false;
+    return {
+      rule,
+      targetId,
+      targetTitle: normalizeValue(recipe.title),
+      sourceQty,
+      mappedQty,
+      availableKg,
+      hasStock,
+      disabled: isDispatchXlsxProductDisabled(sourceName)
+    };
+  };
+  const parseDispatchXlsxWorkbook = async (file) => {
+    const wb = new window.ExcelJS.Workbook();
+    const buf = await file.arrayBuffer();
+    await wb.xlsx.load(buf);
+    const sheet = wb.worksheets?.[0];
+    if (!sheet) throw new Error('sheet_missing');
+    const layout = findDispatchXlsxLayout(sheet);
+    if (!layout) throw new Error('headers_missing');
+    const rows = [];
+    const clientOps = [];
+    for (let rowIdx = layout.headerRow + 1; rowIdx <= sheet.rowCount; rowIdx += 1) {
+      const row = sheet.getRow(rowIdx);
+      const clientName = normalizeValue(row.getCell(layout.map.client).text || row.getCell(layout.map.client).value);
+      const invoiceNumber = normalizeValue(row.getCell(layout.map.invoice).text || row.getCell(layout.map.invoice).value);
+      const invoiceDate = normalizeDispatchDateToken(row.getCell(layout.map.date).text || row.getCell(layout.map.date).value);
+      const productName = normalizeValue(row.getCell(layout.map.product).text || row.getCell(layout.map.product).value);
+      const qtyRaw = normalizeValue(row.getCell(layout.map.qty).text || row.getCell(layout.map.qty).value);
+      const observation = layout.map.observation ? normalizeValue(row.getCell(layout.map.observation).text || row.getCell(layout.map.observation).value) : '';
+      if (!clientName && !invoiceNumber && !productName) continue;
+      const clientInfo = ensureDispatchXlsxClient(clientName || 'Cliente sin nombre');
+      clientOps.push(clientInfo);
+      const meta = resolveDispatchXlsxProductMeta(productName, qtyRaw);
+      rows.push({
+        id: makeId('dispatch_xlsx_row'),
+        rowIndex: rowIdx,
+        clientName: clientInfo.client.name,
+        clientId: clientInfo.client.id,
+        clientDoc: clientInfo.client.doc,
+        clientStatus: clientInfo.isNew ? 'new' : 'existing',
+        invoiceNumber,
+        invoiceDate,
+        sourceProduct: productName,
+        sourceQty: meta.sourceQty,
+        observation,
+        mappedTargetId: meta.targetId,
+        mappedTargetTitle: meta.targetTitle,
+        mappedQty: meta.mappedQty,
+        mappedHasStock: meta.hasStock,
+        mappedAvailableKg: meta.availableKg,
+        mappedType: normalizeValue(meta.rule.targetType) || 'production',
+        useCustomKg: Boolean(meta.rule.useCustomKg),
+        disabled: meta.disabled
+      });
+    }
+    return { rows, touchedClients: clientOps.some((item) => item.isNew) };
+  };
+  const renderDispatchXlsxCreate = (draft) => {
+    if (!nodes.dispatchView) return;
+    state.dispatchCreateMode = false;
+    state.dispatchXlsxMode = true;
+    const rows = Array.isArray(draft.rows) ? draft.rows : [];
+    const body = rows.length ? rows.map((row) => {
+      const mappingLabel = row.mappedTargetTitle
+        ? `${escapeHtml(row.sourceProduct || '-')} → ${escapeHtml(capitalize(row.mappedTargetTitle))}`
+        : `${escapeHtml(row.sourceProduct || '-')} → Sin relación`;
+      const qtyClass = row.mappedHasStock ? 'is-ok' : 'is-danger';
+      const qtyMap = row.mappedTargetTitle
+        ? `${Number(row.sourceQty || 0).toFixed(2)} → ${Number(row.mappedQty || 0).toFixed(2)} kg`
+        : `${Number(row.sourceQty || 0).toFixed(2)}`;
+      const clientBadge = row.clientStatus === 'new'
+        ? `<span class="produccion-badge is-warning">Alta automática · DNI ${escapeHtml(row.clientDoc || '-')}</span>`
+        : `<span class="produccion-badge">Cliente registrado · DNI ${escapeHtml(row.clientDoc || '-')}</span>`;
+      return `<tr class="${row.disabled ? 'dispatch-xlsx-row-disabled' : ''}"><td><div class="dispatch-xlsx-client"><strong>${escapeHtml(row.clientName || '-')}</strong>${clientBadge}</div></td><td>${escapeHtml(row.invoiceNumber || '-')}</td><td>${escapeHtml(formatIsoEs(row.invoiceDate || '') || row.invoiceDate || '-')}</td><td><div class="dispatch-xlsx-mapping"><strong>${escapeHtml(row.sourceProduct || '-')}</strong><small class="${row.mappedTargetTitle ? '' : 'dispatch-expiry-text-danger'}">${mappingLabel}</small></div></td><td><span class="${qtyClass}">${escapeHtml(qtyMap)}</span><small class="d-block ${qtyClass}">${row.mappedTargetTitle ? `${row.mappedHasStock ? 'Con stock para producir' : 'Sin stock, se creará igual'} · Disp.: ${Number(row.mappedAvailableKg || 0).toFixed(2)} kg` : 'Pendiente de relación'}</small></td><td><label class="dispatch-xlsx-toggle"><input type="checkbox" data-dispatch-xlsx-row-enabled="${escapeHtml(row.id)}" ${row.disabled ? '' : 'checked'}><span>${row.disabled ? 'Deshabilitado' : 'Activo'}</span></label></td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-xlsx-map="${escapeHtml(row.id)}"><i class="fa-solid fa-link"></i><span>Relacionar</span></button></td></tr>`;
+    }).join('') : '<tr><td colspan="7" class="text-center">Adjuntá un XLSX para comenzar.</td></tr>';
+    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Repartos por XLSX</h6><button id="dispatchXlsxUploadBtn" type="button" class="btn recipe-table-action-btn recipe-table-action-btn-monography"><i class="fa-solid fa-file-arrow-up"></i><span>Adjuntar XLSX</span></button><input id="dispatchXlsxFileInput" class="d-none" type="file" accept=".xlsx,.xls"></div><section class="recipe-step-card step-block produccion-dispatch-create"><h6 class="step-title"><span class="recipe-step-number">1</span> Previsualización importada ${draft.uploadedFileName ? `<small>· ${escapeHtml(draft.uploadedFileName)}</small>` : ''}</h6><div class="table-responsive recipe-table-wrap dispatch-products-table"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Cliente</th><th>Factura</th><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchXlsxProcessBtn"><i class="fa-solid fa-gears"></i><span>Procesar ingresos</span></button></div>`;
+    alignScrollActionsToRight(nodes.dispatchView);
   };
   const renderDispatchCreate = (draft) => {
     if (!nodes.dispatchView) return;
@@ -6259,8 +6433,15 @@
       return;
     }
     if (event.target.closest('#produccionDispatchNewBtn')) {
+      state.dispatchXlsxMode = false;
       state.dispatchDraft = buildDispatchDraft();
       renderDispatchCreate(state.dispatchDraft);
+      return;
+    }
+    if (event.target.closest('#produccionDispatchXlsxBtn')) {
+      state.dispatchDraft = null;
+      state.dispatchXlsxDraft = buildDispatchXlsxDraft();
+      renderDispatchXlsxCreate(state.dispatchXlsxDraft);
       return;
     }
     if (event.target.closest('#produccionDispatchBackToListBtn')) {
@@ -6270,6 +6451,64 @@
         await refreshData({ silent: true });
         renderDispatchMain();
       });
+      return;
+    }
+    if (event.target.closest('#dispatchXlsxUploadBtn')) {
+      nodes.dispatchView?.querySelector('#dispatchXlsxFileInput')?.click();
+      return;
+    }
+    const xlsxMapBtn = event.target.closest('[data-dispatch-xlsx-map]');
+    if (xlsxMapBtn && state.dispatchXlsxDraft) {
+      const rowId = normalizeValue(xlsxMapBtn.dataset.dispatchXlsxMap);
+      const row = (Array.isArray(state.dispatchXlsxDraft.rows) ? state.dispatchXlsxDraft.rows : []).find((item) => item.id === rowId);
+      if (!row) return;
+      const askType = await openIosSwal({
+        title: 'Relacionar producto',
+        html: '<p>Elegí el origen para vincular este producto.</p>',
+        showCancelButton: true,
+        showDenyButton: true,
+        confirmButtonText: 'INGREDIENTES',
+        denyButtonText: 'PRODUCCIONES',
+        cancelButtonText: 'Cancelar'
+      });
+      if (!askType.isConfirmed && !askType.isDenied) return;
+      const selectedType = askType.isConfirmed ? 'ingredient' : 'production';
+      const options = Object.values(state.recetas).map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(capitalize(item.title || item.id))}</option>`).join('');
+      const pick = await openIosSwal({
+        title: 'Seleccioná destino',
+        html: `<select id="dispatchXlsxMapTarget" class="swal2-select ios-input">${options}</select><input id="dispatchXlsxMapQty" type="number" class="swal2-input ios-input" placeholder="Kg específicos (opcional)">`,
+        showCancelButton: true,
+        confirmButtonText: 'Guardar',
+        cancelButtonText: 'Cancelar',
+        preConfirm: () => ({
+          targetId: normalizeValue(document.getElementById('dispatchXlsxMapTarget')?.value),
+          customKg: normalizeValue(document.getElementById('dispatchXlsxMapQty')?.value)
+        })
+      });
+      if (!pick.isConfirmed) return;
+      const key = normalizeDispatchXlsxProductKey(row.sourceProduct);
+      const cfg = getDispatchXlsxConfig();
+      cfg.productRules[key] = {
+        sourceProduct: row.sourceProduct,
+        targetType: selectedType,
+        targetId: pick.value.targetId,
+        useCustomKg: Boolean(normalizeValue(pick.value.customKg)),
+        customKg: parseDispatchXlsxQty(pick.value.customKg)
+      };
+      const meta = resolveDispatchXlsxProductMeta(row.sourceProduct, row.sourceQty);
+      row.mappedTargetId = meta.targetId;
+      row.mappedTargetTitle = meta.targetTitle;
+      row.mappedQty = meta.mappedQty;
+      row.mappedHasStock = meta.hasStock;
+      row.mappedAvailableKg = meta.availableKg;
+      row.mappedType = normalizeValue(meta.rule.targetType) || selectedType;
+      row.useCustomKg = Boolean(meta.rule.useCustomKg);
+      await persistRepartoStore();
+      renderDispatchXlsxCreate(state.dispatchXlsxDraft);
+      return;
+    }
+    if (event.target.closest('#dispatchXlsxProcessBtn')) {
+      await openIosSwal({ title: 'Próximamente', html: '<p>La funcionalidad de procesamiento se implementará en el próximo paso.</p>', icon: 'info' });
       return;
     }
     if (event.target.closest('#dispatchAddProductBtn')) {
@@ -6836,6 +7075,61 @@
   });
 
   nodes.dispatchView?.addEventListener('change', async (event) => {
+    const xlsxInput = event.target.closest('#dispatchXlsxFileInput');
+    if (xlsxInput && state.dispatchXlsxDraft) {
+      const file = xlsxInput.files?.[0];
+      if (!file) return;
+      try {
+        await runWithBackSpinner(async () => {
+          const overlayText = produccionModal?.querySelector('.modal-local-overlay-card');
+          if (overlayText) overlayText.insertAdjacentHTML('beforeend', '<p class="dispatch-xlsx-overlay-text">Procesando Excel...</p>');
+          const parsed = await parseDispatchXlsxWorkbook(file);
+          state.dispatchXlsxDraft.rows = parsed.rows;
+          state.dispatchXlsxDraft.uploadedFileName = file.name;
+          state.dispatchXlsxDraft.uploadedAt = nowTs();
+          await persistRepartoStore();
+        });
+        renderDispatchXlsxCreate(state.dispatchXlsxDraft);
+      } catch (error) {
+        const code = normalizeValue(error?.message);
+        const detail = code === 'headers_missing'
+          ? 'No encontramos encabezados válidos (Nomb.Cli, Nro.Comprob, Fech.Emision, Det.Reng, Cantidad).'
+          : 'No se pudo procesar el archivo. Verificá que sea XLSX válido.';
+        await openIosSwal({ title: 'Error al procesar Excel', html: `<p>${detail}</p>`, icon: 'error' });
+      }
+      return;
+    }
+    const xlsxToggle = event.target.closest('[data-dispatch-xlsx-row-enabled]');
+    if (xlsxToggle && state.dispatchXlsxDraft) {
+      const rowId = normalizeValue(xlsxToggle.dataset.dispatchXlsxRowEnabled);
+      const row = (Array.isArray(state.dispatchXlsxDraft.rows) ? state.dispatchXlsxDraft.rows : []).find((item) => item.id === rowId);
+      if (!row) return;
+      row.disabled = !xlsxToggle.checked;
+      const key = normalizeDispatchXlsxProductKey(row.sourceProduct);
+      const cfg = getDispatchXlsxConfig();
+      if (row.disabled) {
+        const ask = await openIosSwal({
+          title: 'Deshabilitar producto',
+          html: '<p>¿Deseás desactivarlo solo en esta fila o guardar la preferencia para este producto y futuras importaciones?</p>',
+          showCancelButton: true,
+          showDenyButton: true,
+          confirmButtonText: 'Solo esta fila',
+          denyButtonText: 'Guardar preferencia',
+          cancelButtonText: 'Cancelar'
+        });
+        if (!ask.isConfirmed && !ask.isDenied) {
+          row.disabled = false;
+          renderDispatchXlsxCreate(state.dispatchXlsxDraft);
+          return;
+        }
+        if (ask.isDenied) cfg.disabledProducts[key] = true;
+      } else {
+        delete cfg.disabledProducts[key];
+      }
+      await persistRepartoStore();
+      renderDispatchXlsxCreate(state.dispatchXlsxDraft);
+      return;
+    }
     if (!state.dispatchCreateMode || !state.dispatchDraft) return;
     if (event.target.matches('#dispatchDateInput')) {
       state.dispatchDraft.dispatchDate = normalizeValue(event.target.value) || toIsoDate();
