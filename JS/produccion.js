@@ -114,7 +114,8 @@
     xlsxConfig: {
       productRules: safeObject(source?.xlsxConfig?.productRules),
       disabledProducts: safeObject(source?.xlsxConfig?.disabledProducts),
-      clientSequence: Number(source?.xlsxConfig?.clientSequence || 0)
+      clientSequence: Number(source?.xlsxConfig?.clientSequence || 0),
+      importHistory: Array.isArray(source?.xlsxConfig?.importHistory) ? source.xlsxConfig.importHistory : []
     },
     localities: [...new Set([...(Array.isArray(source?.localities) ? source.localities : []), ...ROSARIO_DEPT_LOCALITIES].map((item) => normalizeValue(item)).filter(Boolean))]
   });
@@ -3604,6 +3605,23 @@
     });
     return Boolean(result.isConfirmed);
   };
+  const hasDispatchXlsxDraftChanges = (draft = {}) => {
+    if (!draft || typeof draft !== 'object') return false;
+    if (normalizeValue(draft.uploadedFileName)) return true;
+    return Array.isArray(draft.rows) && draft.rows.length > 0;
+  };
+  const confirmLeaveDispatchXlsxCreate = async () => {
+    if (!hasDispatchXlsxDraftChanges(state.dispatchXlsxDraft)) return true;
+    const result = await openIosSwal({
+      title: 'Abandonar importación XLS/XLSX',
+      html: '<p>Tenés una tabla cargada. Si salís, vas a abandonar la edición en curso.</p>',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, abandonar',
+      cancelButtonText: 'Seguir editando'
+    });
+    return Boolean(result.isConfirmed);
+  };
 
   const buildDispatchDraft = () => ({
     dispatchDate: toIsoDate(),
@@ -3656,7 +3674,24 @@
     state.reparto.xlsxConfig.productRules = safeObject(state.reparto.xlsxConfig.productRules);
     state.reparto.xlsxConfig.disabledProducts = safeObject(state.reparto.xlsxConfig.disabledProducts);
     state.reparto.xlsxConfig.clientSequence = Number(state.reparto.xlsxConfig.clientSequence || 0);
+    state.reparto.xlsxConfig.importHistory = Array.isArray(state.reparto.xlsxConfig.importHistory) ? state.reparto.xlsxConfig.importHistory : [];
     return state.reparto.xlsxConfig;
+  };
+  const getDispatchXlsxHistory = () => [...getDispatchXlsxConfig().importHistory].sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+  const appendDispatchXlsxHistory = (entry = {}) => {
+    const cfg = getDispatchXlsxConfig();
+    const next = [
+      {
+        id: makeId('dispatch_xlsx_file'),
+        fileName: normalizeValue(entry.fileName),
+        fileUrl: normalizeValue(entry.fileUrl),
+        mimeType: normalizeValue(entry.mimeType),
+        sizeBytes: Number(entry.sizeBytes || 0),
+        createdAt: Number(entry.createdAt || nowTs())
+      },
+      ...cfg.importHistory
+    ];
+    cfg.importHistory = next.slice(0, 120);
   };
   const findDispatchClientByName = (name) => {
     const needle = normalizeLower(name);
@@ -3909,6 +3944,60 @@
     });
     return result.isConfirmed ? result.value : null;
   };
+  const openDispatchXlsxHistory = async () => {
+    let range = '';
+    let query = '';
+    const filterRows = () => {
+      const rows = getDispatchXlsxHistory();
+      const parsed = parseDispatchRange(range);
+      return rows.filter((row) => {
+        const createdIso = toIsoDate(Number(row.createdAt || 0));
+        if (parsed.from && createdIso < parsed.from) return false;
+        if (parsed.to && createdIso > parsed.to) return false;
+        if (query && !normalizeLower(`${row.fileName} ${createdIso}`).includes(normalizeLower(query))) return false;
+        return true;
+      });
+    };
+    const render = (popup) => {
+      const host = popup.querySelector('#dispatchXlsxHistoryHost');
+      if (!host) return;
+      const rows = filterRows();
+      const body = rows.length ? rows.map((row) => `<tr><td>${escapeHtml(row.fileName || '-')}</td><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${escapeHtml((Number(row.sizeBytes || 0) / 1024).toFixed(1))} KB</td><td><div class="dispatch-xlsx-history-actions"><a class="btn ios-btn ios-btn-secondary inventario-threshold-btn" href="${escapeHtml(row.fileUrl || '#')}" target="_blank" rel="noopener"><i class="fa-solid fa-eye"></i><span>Ver</span></a><a class="btn ios-btn ios-btn-primary inventario-threshold-btn" href="${escapeHtml(row.fileUrl || '#')}" download="${escapeHtml(row.fileName || 'archivo.xlsx')}"><i class="fa-solid fa-download"></i><span>Descargar</span></a></div></td></tr>`).join('') : '<tr><td colspan="4" class="text-center">Sin archivos en el período seleccionado.</td></tr>';
+      host.innerHTML = `<div class="table-responsive dispatch-xlsx-history-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Archivo</th><th>Fecha / hora</th><th>Tamaño</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div>`;
+    };
+    await openIosSwal({
+      title: 'Historial de Archivos',
+      width: 'min(980px,96vw)',
+      html: '<div class="dispatch-xlsx-history-filters"><input id="dispatchXlsxHistorySearch" class="form-control ios-input" placeholder="Buscar por nombre de archivo"><input id="dispatchXlsxHistoryRange" class="form-control ios-input" placeholder="Rango de fechas"></div><div id="dispatchXlsxHistoryHost"></div>',
+      confirmButtonText: 'Cerrar',
+      didOpen: (popup) => {
+        render(popup);
+        const search = popup.querySelector('#dispatchXlsxHistorySearch');
+        const rangeInput = popup.querySelector('#dispatchXlsxHistoryRange');
+        search?.addEventListener('input', () => {
+          query = normalizeValue(search.value);
+          render(popup);
+        });
+        if (window.flatpickr && rangeInput) {
+          window.flatpickr(rangeInput, {
+            locale: window.flatpickr.l10ns?.es || undefined,
+            mode: 'range',
+            dateFormat: 'Y-m-d',
+            altInput: true,
+            altFormat: 'd/m/Y',
+            allowInput: true,
+            disableMobile: true,
+            onClose: (selectedDates, _dateStr, instance) => {
+              const from = instance.selectedDates[0] ? toIsoDate(instance.selectedDates[0].getTime()) : '';
+              const to = instance.selectedDates[1] ? toIsoDate(instance.selectedDates[1].getTime()) : from;
+              range = from && to ? `${from} a ${to}` : from;
+              render(popup);
+            }
+          });
+        }
+      }
+    });
+  };
   const renderDispatchXlsxCreate = (draft) => {
     if (!nodes.dispatchView) return;
     state.dispatchCreateMode = false;
@@ -3924,12 +4013,12 @@
         ? `${Number(row.sourceQty || 0).toFixed(2)} → ${Number(row.mappedQty || 0).toFixed(2)} kg`
         : `${Number(row.sourceQty || 0).toFixed(2)} kg`;
       const clientBadge = row.clientStatus === 'new'
-        ? `<span class="produccion-badge is-warning">Alta automática · DNI ${escapeHtml(row.clientDoc || '-')}</span>`
-        : `<span class="produccion-badge">Cliente registrado · DNI ${escapeHtml(row.clientDoc || '-')}</span>`;
+        ? `<span class="produccion-badge is-warning dispatch-xlsx-client-badge">Alta automática · DNI ${escapeHtml(row.clientDoc || '-')}</span>`
+        : `<span class="produccion-badge dispatch-xlsx-client-badge">Registrado · DNI ${escapeHtml(row.clientDoc || '-')}</span>`;
       const dateLabel = /^\d{4}-\d{2}-\d{2}$/.test(row.invoiceDate || '') ? formatIsoEs(row.invoiceDate) : (row.invoiceDate || '-');
-      return `<tr class="${row.disabled ? 'dispatch-xlsx-row-disabled' : ''}"><td><div class="dispatch-xlsx-client"><strong>${escapeHtml(row.clientName || '-')}</strong>${clientBadge}</div></td><td>${escapeHtml(row.invoiceNumber || '-')}</td><td>${escapeHtml(dateLabel)}</td><td><div class="dispatch-xlsx-mapping"><strong>${escapeHtml(row.sourceProduct || '-')}</strong><small class="${row.mappedTargetTitle ? '' : 'dispatch-expiry-text-danger'}">${mappingLabel}</small></div></td><td><span class="${qtyClass}">${escapeHtml(qtyMap)}</span><small class="d-block ${qtyClass}">${row.mappedTargetTitle ? `${row.mappedHasStock ? 'Con stock para producir' : 'Sin stock, se creará igual'} · Disp.: ${Number(row.mappedAvailableKg || 0).toFixed(2)} kg` : 'Pendiente de relación'}</small></td><td><label class="dispatch-xlsx-toggle"><input type="checkbox" data-dispatch-xlsx-row-enabled="${escapeHtml(row.id)}" ${row.disabled ? '' : 'checked'}><span>${row.disabled ? 'Deshabilitado' : 'Activo'}</span></label></td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-xlsx-map="${escapeHtml(row.id)}"><i class="fa-solid fa-link"></i><span>Relacionar</span></button></td></tr>`;
+      return `<tr class="${row.disabled ? 'dispatch-xlsx-row-disabled' : ''}"><td><div class="dispatch-xlsx-client"><strong>${escapeHtml(row.clientName || '-')}</strong>${clientBadge}</div></td><td>${escapeHtml(row.invoiceNumber || '-')}</td><td class="dispatch-xlsx-date-cell">${escapeHtml(dateLabel)}</td><td><div class="dispatch-xlsx-mapping"><strong>${escapeHtml(row.sourceProduct || '-')}</strong><small class="${row.mappedTargetTitle ? '' : 'dispatch-expiry-text-danger'}">${mappingLabel}</small>${row.mappedTargetTitle ? `<span class="dispatch-xlsx-map-state is-related"><i class="fa-solid fa-circle-check"></i> Relacionado</span>` : `<span class="dispatch-xlsx-map-state is-pending"><i class="fa-solid fa-circle-exclamation"></i> Sin relación</span>`}</div></td><td><span class="${qtyClass}">${escapeHtml(qtyMap)}</span><small class="d-block ${qtyClass}">${row.mappedTargetTitle ? `${row.mappedHasStock ? 'Con stock para producir' : 'Sin stock, se creará igual'} · Disp.: ${Number(row.mappedAvailableKg || 0).toFixed(2)} kg` : 'Pendiente de relación'}</small></td><td><label class="dispatch-xlsx-toggle"><input type="checkbox" data-dispatch-xlsx-row-enabled="${escapeHtml(row.id)}" ${row.disabled ? '' : 'checked'}><span>${row.disabled ? 'Deshabilitado' : 'Activo'}</span></label></td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-xlsx-map="${escapeHtml(row.id)}"><i class="fa-solid fa-link"></i><span>Relacionar</span></button></td></tr>`;
     }).join('') : '<tr><td colspan="7" class="text-center">Adjuntá un XLS/XLSX para comenzar.</td></tr>';
-    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Repartos por XLSX</h6><button id="dispatchXlsxUploadBtn" type="button" class="btn recipe-table-action-btn recipe-table-action-btn-monography"><i class="fa-solid fa-file-arrow-up"></i><span>Adjuntar XLSX</span></button><input id="dispatchXlsxFileInput" class="d-none" type="file" accept=".xlsx,.xls"></div><section class="recipe-step-card step-block produccion-dispatch-create"><h6 class="step-title"><span class="recipe-step-number">1</span> Previsualización importada ${draft.uploadedFileName ? `<small>· ${escapeHtml(draft.uploadedFileName)}</small>` : ''}</h6><div class="table-responsive recipe-table-wrap dispatch-products-table dispatch-xlsx-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0 dispatch-xlsx-table"><thead><tr><th>Cliente</th><th>Factura</th><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchXlsxProcessBtn" ${readyToProcess ? '' : 'disabled'}><i class="fa-solid fa-gears"></i><span>Procesar ingresos</span></button></div>`;
+    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Repartos por XLSX</h6><div class="dispatch-xlsx-head-actions"><button id="dispatchXlsxUploadBtn" type="button" class="btn recipe-table-action-btn recipe-table-action-btn-monography"><i class="fa-solid fa-file-arrow-up"></i><span>Adjuntar XLSX</span></button><button type="button" id="dispatchXlsxHistoryBtn" class="btn recipe-table-action-btn recipe-table-action-btn-neutral"><i class="fa-regular fa-message"></i><span>Historial de Archivos</span></button></div><input id="dispatchXlsxFileInput" class="d-none" type="file" accept=".xlsx,.xls"></div><section class="recipe-step-card step-block produccion-dispatch-create"><h6 class="step-title"><span class="recipe-step-number">1</span> Previsualización importada ${draft.uploadedFileName ? `<small>· ${escapeHtml(draft.uploadedFileName)}</small>` : ''}</h6><div class="table-responsive recipe-table-wrap dispatch-products-table dispatch-xlsx-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0 dispatch-xlsx-table"><thead><tr><th>Cliente</th><th>Factura</th><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchXlsxProcessBtn" ${readyToProcess ? '' : 'disabled'}><i class="fa-solid fa-gears"></i><span>Procesar ingresos</span></button></div>`;
     alignScrollActionsToRight(nodes.dispatchView);
   };
   const renderDispatchCreate = (draft) => {
@@ -6556,6 +6645,10 @@
         const canLeave = await confirmLeaveDispatchCreate();
         if (!canLeave) return;
       }
+      if (state.dispatchXlsxMode) {
+        const canLeaveXlsx = await confirmLeaveDispatchXlsxCreate();
+        if (!canLeaveXlsx) return;
+      }
       await runWithBackSpinner(async () => {
         await refreshData({ silent: true });
         setDispatchMode(false);
@@ -6564,6 +6657,10 @@
       return;
     }
     if (event.target.closest('#produccionDispatchNewBtn')) {
+      if (state.dispatchXlsxMode) {
+        const canLeaveXlsx = await confirmLeaveDispatchXlsxCreate();
+        if (!canLeaveXlsx) return;
+      }
       state.dispatchXlsxMode = false;
       state.dispatchDraft = buildDispatchDraft();
       renderDispatchCreate(state.dispatchDraft);
@@ -6576,7 +6673,7 @@
       return;
     }
     if (event.target.closest('#produccionDispatchBackToListBtn')) {
-      const canLeave = await confirmLeaveDispatchCreate();
+      const canLeave = state.dispatchXlsxMode ? await confirmLeaveDispatchXlsxCreate() : await confirmLeaveDispatchCreate();
       if (!canLeave) return;
       await runWithBackSpinner(async () => {
         await refreshData({ silent: true });
@@ -6588,12 +6685,44 @@
       nodes.dispatchView?.querySelector('#dispatchXlsxFileInput')?.click();
       return;
     }
+    if (event.target.closest('#dispatchXlsxHistoryBtn')) {
+      await openDispatchXlsxHistory();
+      return;
+    }
     const xlsxMapBtn = event.target.closest('[data-dispatch-xlsx-map]');
     if (xlsxMapBtn && state.dispatchXlsxDraft) {
       const rowId = normalizeValue(xlsxMapBtn.dataset.dispatchXlsxMap);
       const row = (Array.isArray(state.dispatchXlsxDraft.rows) ? state.dispatchXlsxDraft.rows : []).find((item) => item.id === rowId);
       if (!row) return;
-      const selectedType = await askDispatchXlsxRelationType();
+      let selectedType = '';
+      if (normalizeValue(row.mappedTargetId)) {
+        const decide = await openIosSwal({
+          title: 'Producto ya relacionado',
+          html: `<p><strong>${escapeHtml(row.sourceProduct || 'Producto')}</strong> está relacionado con <strong>${escapeHtml(row.mappedTargetTitle || '-')}</strong>.</p>`,
+          showCancelButton: true,
+          showDenyButton: true,
+          confirmButtonText: 'Editar relación',
+          denyButtonText: 'Borrar relación',
+          cancelButtonText: 'Cancelar'
+        });
+        if (decide.isDenied) {
+          const key = normalizeDispatchXlsxProductKey(row.sourceProduct);
+          const cfg = getDispatchXlsxConfig();
+          delete cfg.productRules[key];
+          row.mappedTargetId = '';
+          row.mappedTargetTitle = '';
+          row.mappedQty = Number(row.sourceQty || 0);
+          row.mappedHasStock = false;
+          row.mappedAvailableKg = 0;
+          row.mappedType = '';
+          row.useCustomKg = false;
+          await persistRepartoStore();
+          renderDispatchXlsxCreate(state.dispatchXlsxDraft);
+          return;
+        }
+        if (!decide.isConfirmed) return;
+      }
+      selectedType = await askDispatchXlsxRelationType();
       if (!selectedType) return;
       const pick = await askDispatchXlsxTarget(selectedType);
       if (!pick) return;
@@ -7190,12 +7319,34 @@
     if (xlsxInput && state.dispatchXlsxDraft) {
       const file = xlsxInput.files?.[0];
       if (!file) return;
+      if (hasDispatchXlsxDraftChanges(state.dispatchXlsxDraft)) {
+        const overwrite = await openIosSwal({
+          title: 'Tabla XLS/XLSX ya cargada',
+          html: '<p>Ya tenés una tabla cargada. Si importás otro archivo se sobreescribirá la vista actual.</p>',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: 'Cargar nuevo archivo',
+          cancelButtonText: 'Cancelar'
+        });
+        if (!overwrite.isConfirmed) {
+          xlsxInput.value = '';
+          return;
+        }
+      }
       try {
         await runWithBackSpinner(async () => {
           const parsed = await parseDispatchXlsxWorkbook(file);
+          const uploadedFileUrl = await uploadImageToStorage(file, 'reparto/xlsx');
           state.dispatchXlsxDraft.rows = parsed.rows;
           state.dispatchXlsxDraft.uploadedFileName = file.name;
           state.dispatchXlsxDraft.uploadedAt = nowTs();
+          appendDispatchXlsxHistory({
+            fileName: file.name,
+            fileUrl: uploadedFileUrl,
+            mimeType: file.type,
+            sizeBytes: file.size,
+            createdAt: state.dispatchXlsxDraft.uploadedAt
+          });
           await persistRepartoStore();
         });
         renderDispatchXlsxCreate(state.dispatchXlsxDraft);

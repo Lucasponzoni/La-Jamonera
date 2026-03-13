@@ -9344,7 +9344,7 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .dispatch-xlsx-type-divider {
@@ -9368,4 +9368,102 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 
 .dispatch-xlsx-selector-row {
   margin-bottom: 0;
+}
+
+
+.dispatch-xlsx-head-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dispatch-xlsx-client-badge {
+  width: fit-content;
+  white-space: nowrap;
+}
+
+.dispatch-xlsx-date-cell {
+  white-space: nowrap;
+}
+
+.dispatch-xlsx-map-state {
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.dispatch-xlsx-map-state.is-related {
+  background: #ebf9f1;
+  color: #1a7f4d;
+  border: 1px solid #bfe7cf;
+}
+
+.dispatch-xlsx-map-state.is-pending {
+  background: #fff1f3;
+  color: #b23d4d;
+  border: 1px solid #f0c3c9;
+}
+
+#dispatchXlsxProcessBtn:disabled {
+  background-color: #e5e5e5 !important;
+  border-color: #d7d7d7 !important;
+  color: #6f6f6f !important;
+}
+
+.dispatch-xlsx-history-filters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.dispatch-xlsx-history-actions {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+#dispatchXlsxMapQty.swal2-input {
+  margin: 8px 0 0 !important;
+  width: 100% !important;
+}
+
+.dispatch-xlsx-selector-row .inventario-print-photo-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid #d7def2;
+  flex: 0 0 42px;
+}
+
+.dispatch-xlsx-selector-row .thumb-image {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+}
+
+@media (max-width: 640px) {
+  .dispatch-xlsx-type-actions {
+    flex-wrap: wrap;
+  }
+  .dispatch-xlsx-type-divider {
+    display: none;
+  }
+  .dispatch-xlsx-history-filters {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dispatch-xlsx-type-actions .ios-btn {
+  width: auto;
+  max-width: none;
+  white-space: nowrap;
 }
