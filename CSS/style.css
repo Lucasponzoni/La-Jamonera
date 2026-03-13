@@ -6403,7 +6403,7 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 .dispatch-client-row-main small {
   display: block;
   color: #6f7fa2;
-  text-align: center;
+  text-align: start;
 }
 
 .dispatch-client-row .dispatch-client-suggest-avatar {
@@ -9301,13 +9301,6 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 /* =========================================
    REPARTOS POR XLSX
 ========================================= */
-.dispatch-xlsx-overlay-text {
-  margin: 10px 0 0;
-  color: #2b4f8f;
-  font-weight: 700;
-  font-size: 0.86rem;
-}
-
 .dispatch-xlsx-client {
   display: grid;
   gap: 5px;
@@ -9334,4 +9327,45 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 
 .dispatch-xlsx-toggle input {
   accent-color: #2f7ef1;
+}
+
+
+.dispatch-xlsx-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dispatch-xlsx-table {
+  min-width: 980px;
+}
+
+.dispatch-xlsx-type-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dispatch-xlsx-type-divider {
+  width: 1px;
+  height: 30px;
+  background: #d2dbef;
+  margin: 0 4px;
+}
+
+.dispatch-xlsx-selector-wrap {
+  text-align: left;
+}
+
+.dispatch-xlsx-target-list {
+  margin-top: 8px;
+  max-height: 42vh;
+  overflow: auto;
+  display: grid;
+  gap: 6px;
+}
+
+.dispatch-xlsx-selector-row {
+  margin-bottom: 0;
 }
