@@ -9370,6 +9370,22 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   margin-bottom: 0;
 }
 
+.dispatch-xlsx-stock-hint.is-ok {
+  color: #1a7f4d !important;
+  font-weight: 700;
+}
+
+.dispatch-xlsx-stock-hint.is-danger {
+  color: #b23d4d !important;
+  font-weight: 700;
+}
+
+.dispatch-xlsx-ingredient-qty-list {
+  margin-top: 8px;
+  display: grid;
+  gap: 8px;
+}
+
 
 .dispatch-xlsx-head-actions {
   margin-left: auto;
@@ -9377,6 +9393,14 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.dispatch-xlsx-uploading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: #2e5aac;
 }
 
 .dispatch-xlsx-client-badge {
