@@ -707,7 +707,11 @@ const printReport = async (report) => {
     state.report = state.reports[0] || null;
     state.usersMap = safeObject(raw.informesUsers);
     state.recipesById = safeObject(raw.recetas);
-    state.providers = (Array.isArray(raw.inventario?.config?.providers) ? raw.inventario.config.providers : []).filter((p) => !normalize(p?.rne?.number));
+    state.providers = (Array.isArray(raw.inventario?.config?.providers) ? raw.inventario.config.providers : []).filter((p) => {
+      const hasPendingRne = !normalize(p?.rne?.number);
+      const isNonFoodCategory = Boolean(p?.nonFoodCategory);
+      return hasPendingRne && !isNonFoodCategory;
+    });
     state.recipes = Object.values(state.recipesById).filter((r) => {
       const days = dayDiff(r?.rnpa?.expiryDate);
       return Number.isFinite(days) && days <= 60;
