@@ -9605,3 +9605,12 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   color: #b23d4d;
   font-weight: 700;
 }
+
+.dispatch-xlsx-kilos-cell small {
+  line-height: 1.45;
+}
+
+.dispatch-xlsx-stock-missing {
+  color: #b23d4d;
+  font-weight: 700;
+}

@@ -3665,7 +3665,11 @@
     rows: [],
     uploadedFileName: '',
     uploadedAt: 0,
-    processing: false
+    processing: false,
+    managers: [],
+    managerSearch: '',
+    vehicleId: '',
+    vehicleSearch: ''
   });
   const toDispatchXlsxToken = (value) => normalizeUpper(String(value || '').replace(/\s+/g, ' ').trim().replace(/[.:]/g, ''));
   const DISPATCH_XLSX_HEADERS = {
@@ -4352,6 +4356,18 @@
   };
   const processDispatchXlsxRows = async () => {
     const draft = state.dispatchXlsxDraft;
+    draft.vehicleId = normalizeValue(nodes.dispatchView?.querySelector('#dispatchXlsxVehicleSelect')?.value || draft.vehicleId);
+    draft.managers = [...(nodes.dispatchView?.querySelectorAll('[data-dispatch-xlsx-manager]:checked') || [])]
+      .map((n) => normalizeValue(n.dataset.dispatchXlsxManager || n.value))
+      .filter(Boolean);
+    if (!draft.vehicleId) {
+      await openIosSwal({ title: 'Vehículo requerido', html: '<p>Seleccioná o creá una UTA/URA para continuar.</p>', icon: 'warning' });
+      return;
+    }
+    if (!draft.managers.length) {
+      await openIosSwal({ title: 'Responsable requerido', html: '<p>Seleccioná al menos un responsable para procesar el XLSX.</p>', icon: 'warning' });
+      return;
+    }
     const rows = (Array.isArray(draft?.rows) ? draft.rows : []).filter((row) => !row.disabled && normalizeValue(row.mappedTargetId));
     if (!rows.length) {
       await openIosSwal({ title: 'Sin filas activas', html: '<p>No hay filas listas para procesar.</p>', icon: 'warning' });
@@ -4374,7 +4390,7 @@
         state.reparto.sequenceByDate[dayToken] = seq;
         const code = `REP-LJ-${dayToken}-${String(seq).padStart(3, '0')}`;
         const repartoId = makeId('reparto_xlsx');
-        const vehicleId = getRandomDispatchVehicleId();
+        const vehicleId = normalizeValue(draft.vehicleId) || getRandomDispatchVehicleId();
         const client = getDispatchClient(first.clientId);
         const clientAddress = normalizeValue(client.address) || `Dirección relacionada a factura ${normalizeValue(first.invoiceNumber) || '-'}`;
         const comments = [...new Set(groupRows.map((row) => normalizeDispatchXlsxObservation(row.observation)).filter(Boolean))];
@@ -4419,8 +4435,15 @@
           dispatchDate,
           clientId: normalizeValue(first.clientId),
           vehicleId,
-          managers: [],
-          managerProfiles: [],
+          managers: [...draft.managers],
+          managerProfiles: draft.managers.map((userId) => {
+            const user = safeObject(state.users?.[userId]);
+            return {
+              id: userId,
+              name: normalizeValue(user.fullName || user.email || userId),
+              role: getDispatchUserRole(user)
+            };
+          }),
           comments,
           proofs: [],
           importedFromXlsx: true,
@@ -4447,7 +4470,8 @@
     state.dispatchCreateMode = false;
     state.dispatchXlsxMode = true;
     const rows = Array.isArray(draft.rows) ? draft.rows : [];
-    const readyToProcess = rows.length > 0 && rows.every((row) => row.disabled || normalizeValue(row.mappedTargetId));
+    const hasVehicleAndManager = normalizeValue(draft.vehicleId) && Array.isArray(draft.managers) && draft.managers.length > 0;
+    const readyToProcess = rows.length > 0 && rows.every((row) => row.disabled || normalizeValue(row.mappedTargetId)) && hasVehicleAndManager;
     const body = rows.length ? rows.map((row) => {
       const qtyClass = row.mappedHasStock ? 'is-ok' : 'is-danger';
       const mappedIngredients = Array.isArray(row.mappedIngredients) ? row.mappedIngredients : [];
@@ -4469,7 +4493,7 @@
         ? `<div class="dispatch-xlsx-ingredient-breakdown">${mappedIngredients.map((item) => `<small class="dispatch-xlsx-ingredient-line ${item.hasStock ? 'is-ok' : 'is-danger'}">• ${escapeHtml(item.title)}: <strong>${Number(item.qty || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong> · Disp.: <strong>${Number(item.available || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong>${Number(item.expired || 0) > 0 ? ` · <span class="dispatch-xlsx-expired-part">${Number(item.expired || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')} vencidas</span>` : ''}</small>`).join('')}</div>`
         : '';
       const stockLine = row.mappedTargetTitle
-        ? `${row.mappedHasStock ? 'Con stock para producir' : 'Sin stock, se creará igual'} · Stock: <strong class="dispatch-xlsx-stock-ok">${availableQty.toFixed(2)} ${escapeHtml(stockUnit)}</strong>${expiredQty > 0 ? ` <span class="dispatch-xlsx-stock-expired">→ ${expiredQty.toFixed(2)} ${escapeHtml(stockUnit)} vencidas</span>` : ''}`
+        ? `${row.mappedHasStock ? 'Stock utilizable:' : 'Stock utilizable insuficiente:'} <strong class="dispatch-xlsx-stock-ok">${availableQty.toFixed(2)} ${escapeHtml(stockUnit)}</strong>${expiredQty > 0 ? ` <span class="dispatch-xlsx-stock-expired">· Vencido: ${expiredQty.toFixed(2)} ${escapeHtml(stockUnit)}</span>` : ''}${row.mappedHasStock ? '' : '<span class="dispatch-xlsx-stock-missing"> · Se completará con producción nueva al procesar.</span>'}`
         : 'Pendiente de relación';
       const clientBadge = row.clientStatus === 'new'
         ? `<span class="produccion-badge is-warning dispatch-xlsx-client-badge">Alta automática · DNI ${escapeHtml(row.clientDoc || '-')}</span>`
@@ -4478,7 +4502,8 @@
       return `<tr class="${row.disabled ? 'dispatch-xlsx-row-disabled' : ''}"><td><div class="dispatch-xlsx-client"><strong class="dispatch-xlsx-client-name" title="${escapeHtml(row.clientName || '-')}">${escapeHtml(row.clientName || '-')}</strong>${clientBadge}</div></td><td class="dispatch-xlsx-invoice-cell">${escapeHtml(row.invoiceNumber || '-')}</td><td class="dispatch-xlsx-date-cell">${escapeHtml(dateLabel)}</td><td><div class="dispatch-xlsx-mapping"><strong>${escapeHtml(row.sourceProduct || '-')}</strong>${relationMeta}${ingredientDetail}<span class="dispatch-xlsx-map-state ${row.mappedTargetTitle ? 'is-related' : 'is-pending'}">${row.mappedTargetTitle ? `<i class="fa-solid fa-circle-check"></i> Relacionado` : `<i class="bi bi-x-circle-fill"></i> Sin relacionado`}</span></div></td><td class="dispatch-xlsx-kilos-cell"><span class="${qtyClass}">${qtyMap}</span><small class="d-block ${qtyClass}">${stockLine}</small></td><td><label class="dispatch-xlsx-toggle"><input type="checkbox" data-dispatch-xlsx-row-enabled="${escapeHtml(row.id)}" ${row.disabled ? '' : 'checked'}><span>${row.disabled ? 'Deshabilitado' : 'Activo'}</span></label></td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-xlsx-map="${escapeHtml(row.id)}"><i class="fa-solid fa-link"></i><span>Relacionar</span></button></td></tr>`;
     }).join('') : '<tr><td colspan="7" class="text-center">Adjuntá un XLS/XLSX para comenzar.</td></tr>';
     const uploadHint = state.dispatchXlsxUploadInProgress ? '<span class="dispatch-xlsx-uploading"><i class="fa-solid fa-spinner fa-spin"></i> Subiendo Excel...</span>' : '';
-    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Repartos por XLSX</h6><div class="dispatch-xlsx-head-actions">${uploadHint}<button id="dispatchXlsxUploadBtn" type="button" class="btn recipe-table-action-btn recipe-table-action-btn-monography"><i class="fa-solid fa-file-arrow-up"></i><span>Adjuntar XLSX</span></button><button type="button" id="dispatchXlsxHistoryBtn" class="btn recipe-table-action-btn recipe-table-action-btn-neutral"><i class="fa-regular fa-message"></i><span>Historial de Archivos</span></button></div><input id="dispatchXlsxFileInput" class="d-none" type="file" accept=".xlsx,.xls"></div><section class="recipe-step-card step-block produccion-dispatch-create"><h6 class="step-title"><span class="recipe-step-number">1</span> Previsualización importada ${draft.uploadedFileName ? `<small>· ${escapeHtml(draft.uploadedFileName)}</small>` : ''}</h6><div class="table-responsive recipe-table-wrap dispatch-products-table dispatch-xlsx-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0 dispatch-xlsx-table"><thead><tr><th>Cliente</th><th>Factura</th><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchXlsxProcessBtn" ${readyToProcess ? '' : 'disabled'}><i class="fa-solid fa-gears"></i><span>Procesar ingresos</span></button></div>`;
+    const usersRows = Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-check" data-user-search="${escapeHtml(normalizeLower(`${user.fullName || ''} ${user.email || ''} ${getDispatchUserRole(user) || ''}`))}"><input type="checkbox" data-dispatch-xlsx-manager="${escapeHtml(user.id)}" value="${escapeHtml(user.id)}" ${(Array.isArray(draft.managers) && draft.managers.includes(user.id)) ? 'checked' : ''}>${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(getDispatchUserRole(user))}</small></span></label>`).join('');
+    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Repartos por XLSX</h6><div class="dispatch-xlsx-head-actions">${uploadHint}<button id="dispatchXlsxUploadBtn" type="button" class="btn recipe-table-action-btn recipe-table-action-btn-monography"><i class="fa-solid fa-file-arrow-up"></i><span>Adjuntar XLSX</span></button><button type="button" id="dispatchXlsxHistoryBtn" class="btn recipe-table-action-btn recipe-table-action-btn-neutral"><i class="fa-regular fa-message"></i><span>Historial de Archivos</span></button></div><input id="dispatchXlsxFileInput" class="d-none" type="file" accept=".xlsx,.xls"></div><section class="recipe-step-card step-block produccion-dispatch-create"><h6 class="step-title"><span class="recipe-step-number">1</span> Previsualización importada ${draft.uploadedFileName ? `<small>· ${escapeHtml(draft.uploadedFileName)}</small>` : ''}</h6><div class="table-responsive recipe-table-wrap dispatch-products-table dispatch-xlsx-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0 dispatch-xlsx-table"><thead><tr><th>Cliente</th><th>Factura</th><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div></section><section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">2</span> Vehículo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Transporte habilitado (UTA/URA)</label><small class="d-block text-muted mb-1">Unidad de Transporte Alimentario / Unidad de Reparto Alimentario.</small><div class="inventario-provider-search-wrap"><input id="dispatchXlsxVehicleInput" class="form-control ios-input" placeholder="Seleccionar unidad habilitada" value="${escapeHtml(draft.vehicleSearch || (draft.vehicleId ? formatDispatchVehicleLabel(getDispatchVehicle(draft.vehicleId)) : ''))}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"><input type="hidden" id="dispatchXlsxVehicleSelect" value="${escapeHtml(draft.vehicleId || '')}"></div><div class="dispatch-vehicle-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchXlsxAddVehicleBtn"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchXlsxManageVehiclesBtn"><i class="fa-solid fa-pen-to-square"></i><span>Gestionar UTA/URA</span></button></div></div><div class="recipe-field recipe-field-half"><label class="form-label">Responsables</label><div class="input-group ios-input-group ingredientes-search-group dispatch-managers-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchXlsxManagersSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar responsable" value="${escapeHtml(draft.managerSearch || '')}"></div><div class="produccion-managers-grid">${usersRows}</div></div></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchXlsxProcessBtn" ${readyToProcess ? '' : 'disabled'}><i class="fa-solid fa-gears"></i><span>Procesar ingresos</span></button></div>`;
     alignScrollActionsToRight(nodes.dispatchView);
   };
   const renderDispatchCreate = (draft) => {
@@ -7164,6 +7189,20 @@
       await openDispatchXlsxHistory();
       return;
     }
+    if (event.target.closest('#dispatchXlsxAddVehicleBtn') && state.dispatchXlsxDraft) {
+      const vehicle = await openCreateDispatchVehicle();
+      if (vehicle) {
+        state.dispatchXlsxDraft.vehicleId = vehicle.id;
+        state.dispatchXlsxDraft.vehicleSearch = formatDispatchVehicleLabel(vehicle);
+        renderDispatchXlsxCreate(state.dispatchXlsxDraft);
+      }
+      return;
+    }
+    if (event.target.closest('#dispatchXlsxManageVehiclesBtn') && state.dispatchXlsxDraft) {
+      await openDispatchVehiclesManager();
+      renderDispatchXlsxCreate(state.dispatchXlsxDraft);
+      return;
+    }
     const xlsxMapBtn = event.target.closest('[data-dispatch-xlsx-map]');
     if (xlsxMapBtn && state.dispatchXlsxDraft) {
       const rowId = normalizeValue(xlsxMapBtn.dataset.dispatchXlsxMap);
@@ -7860,6 +7899,13 @@
       renderDispatchXlsxCreate(state.dispatchXlsxDraft);
       return;
     }
+    const xlsxManagerCheck = event.target.closest('[data-dispatch-xlsx-manager]');
+    if (xlsxManagerCheck && state.dispatchXlsxDraft) {
+      state.dispatchXlsxDraft.managers = [...nodes.dispatchView.querySelectorAll('[data-dispatch-xlsx-manager]:checked')]
+        .map((n) => normalizeValue(n.dataset.dispatchXlsxManager || n.value))
+        .filter(Boolean);
+      return;
+    }
     if (!state.dispatchCreateMode || !state.dispatchDraft) return;
     if (event.target.matches('#dispatchDateInput')) {
       state.dispatchDraft.dispatchDate = normalizeValue(event.target.value) || toIsoDate();
@@ -7979,6 +8025,50 @@
     };
   };
 
+  const showDispatchXlsxVehicleSuggestions = (vehicleInput) => {
+    if (!state.dispatchXlsxDraft || !vehicleInput) return;
+    const query = normalizeLower(vehicleInput.value);
+    state.dispatchXlsxDraft.vehicleSearch = normalizeValue(vehicleInput.value);
+    state.dispatchXlsxDraft.vehicleId = '';
+    const hidden = nodes.dispatchView?.querySelector('#dispatchXlsxVehicleSelect');
+    if (hidden) hidden.value = '';
+    const list = Object.values(safeObject(state.reparto.vehicles || {}))
+      .filter((item) => item.enabled !== false)
+      .filter((item) => {
+        const hay = normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`);
+        return hay.includes(query);
+      })
+      .slice(0, 8);
+    const suggest = ensureFloatingSuggest('vehicle');
+    positionFloatingSuggest(suggest, vehicleInput);
+    suggest.innerHTML = `${list.map((item) => {
+      const meta = getDispatchVehicleExpiryMeta(item);
+      return `<button type="button" class="recipe-suggest-item" data-dispatch-xlsx-vehicle-pick="${escapeHtml(item.id)}"><span class="dispatch-vehicle-tone tone-${meta.tone}"></span><span><strong>${escapeHtml(item.number || item.id)}</strong><br><small>${escapeHtml(formatDispatchVehicleLabel(item))}</small></span></button>`;
+    }).join('')}${query ? `<button type="button" class="recipe-suggest-item recipe-suggest-create" data-dispatch-xlsx-vehicle-create="1"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button>` : ''}`;
+    suggest.onclick = async (ev) => {
+      const pick = ev.target.closest('[data-dispatch-xlsx-vehicle-pick]');
+      if (pick) {
+        const vehicle = getDispatchVehicle(pick.dataset.dispatchXlsxVehiclePick);
+        if (!vehicle.id) return;
+        state.dispatchXlsxDraft.vehicleId = vehicle.id;
+        state.dispatchXlsxDraft.vehicleSearch = formatDispatchVehicleLabel(vehicle);
+        vehicleInput.value = state.dispatchXlsxDraft.vehicleSearch;
+        if (hidden) hidden.value = vehicle.id;
+        closeDispatchSuggests();
+        return;
+      }
+      if (ev.target.closest('[data-dispatch-xlsx-vehicle-create]')) {
+        closeDispatchSuggests();
+        const created = await openCreateDispatchVehicle();
+        if (created) {
+          state.dispatchXlsxDraft.vehicleId = created.id;
+          state.dispatchXlsxDraft.vehicleSearch = formatDispatchVehicleLabel(created);
+          renderDispatchXlsxCreate(state.dispatchXlsxDraft);
+        }
+      }
+    };
+  };
+
   const showDispatchProductSuggestions = (productInput) => {
     if (!state.dispatchDraft || !productInput) return;
     const idx = Number(productInput.dataset.dispatchProductSearch);
@@ -8007,9 +8097,12 @@
   };
 
   nodes.dispatchView?.addEventListener('input', async (event) => {
-    if (!state.dispatchCreateMode || !state.dispatchDraft) return;
+    if (!state.dispatchCreateMode && !state.dispatchXlsxMode) return;
+    const activeIsXlsx = state.dispatchXlsxMode;
+    const activeDraft = activeIsXlsx ? state.dispatchXlsxDraft : state.dispatchDraft;
+    if (!activeDraft) return;
     const clientInput = event.target.closest('#dispatchClientInput');
-    if (clientInput) {
+    if (!activeIsXlsx && clientInput) {
       const query = normalizeLower(clientInput.value);
       state.dispatchDraft.clientName = normalizeValue(clientInput.value);
       state.dispatchDraft.clientId = '';
@@ -8057,6 +8150,23 @@
       };
       return;
     }
+    if (activeIsXlsx) {
+      const xlsxManagersSearchInput = event.target.closest('#dispatchXlsxManagersSearch');
+      if (xlsxManagersSearchInput) {
+        activeDraft.managerSearch = normalizeValue(xlsxManagersSearchInput.value);
+        const query = normalizeLower(xlsxManagersSearchInput.value);
+        nodes.dispatchView.querySelectorAll('.produccion-user-check[data-user-search]').forEach((row) => {
+          const hay = normalizeLower(row.dataset.userSearch || '');
+          row.classList.toggle('d-none', !!query && !hay.includes(query));
+        });
+        return;
+      }
+      const xlsxVehicleInput = event.target.closest('#dispatchXlsxVehicleInput');
+      if (xlsxVehicleInput) {
+        showDispatchXlsxVehicleSuggestions(xlsxVehicleInput);
+        return;
+      }
+    }
     const addressInput = event.target.closest('#dispatchClientAddressInput');
     if (addressInput) { state.dispatchDraft.clientAddress = normalizeValue(addressInput.value); return; }
     const cityInput = event.target.closest('#dispatchClientCityInput');
@@ -8076,21 +8186,23 @@
     }
 
     const vehicleInput = event.target.closest('#dispatchVehicleInput');
-    if (vehicleInput) {
+    if (!activeIsXlsx && vehicleInput) {
       showDispatchVehicleSuggestions(vehicleInput);
       return;
     }
 
     const productInput = event.target.closest('[data-dispatch-product-search]');
+    if (activeIsXlsx) return;
     if (!productInput) return;
     showDispatchProductSuggestions(productInput);
   });
 
   document.addEventListener('click', (event) => {
-    if (!state.dispatchCreateMode) return;
+    if (!state.dispatchCreateMode && !state.dispatchXlsxMode) return;
     if (event.target.closest('.produccion-dispatch-floating-suggest')) return;
     if (event.target.closest('#dispatchClientInput')) return;
     if (event.target.closest('#dispatchVehicleInput')) return;
+    if (event.target.closest('#dispatchXlsxVehicleInput')) return;
     if (event.target.closest('[data-dispatch-product-search]')) return;
     closeDispatchSuggests();
   });
