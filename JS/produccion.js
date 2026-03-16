@@ -4397,7 +4397,7 @@
           productionId: `AUTO-EGRESO-${dispatchCode || dispatchId || makeId('dispatch_xlsx')}`,
           producedAt: nowTs(),
           productionDate: dispatchDate,
-          expiryDateAtProduction: 'Venta en Local',
+          expiryDateAtProduction: 'Venta en mostrador',
           kilosUsed: Number((takeBase / 1000).toFixed(4)),
           usedQty: takeQty,
           usedUnit: entryUnit,
@@ -4408,7 +4408,7 @@
           ingredientId: safeIngredientId,
           generatedAutomatically: true,
           source: 'apps_script_auto_egreso',
-          type: 'auto_sold_local'
+          type: 'auto_sold_counter'
         });
       }
       entry.movementHistory = Array.isArray(entry.movementHistory) ? entry.movementHistory : [];
