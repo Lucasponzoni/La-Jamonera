@@ -9311,6 +9311,13 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   gap: 4px;
 }
 
+.dispatch-xlsx-multiplier-help {
+  display: block;
+  margin-top: 6px;
+  color: #5e6f97;
+  font-size: 0.78rem;
+}
+
 .dispatch-xlsx-row-disabled td {
   opacity: 0.55;
   background: #f4f6fb !important;
@@ -9384,6 +9391,18 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   margin-top: 8px;
   display: grid;
   gap: 8px;
+}
+
+.dispatch-xlsx-ingredient-qty-row {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.dispatch-xlsx-ingredient-qty-label {
+  color: #3f517d;
+  font-size: 0.88rem;
+  font-weight: 700;
 }
 
 
@@ -9505,7 +9524,8 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   align-items: center;
   gap: 6px;
   width: fit-content;
-  white-space: nowrap;
+  white-space: normal;
+  max-width: 100%;
   color: #3b4f79;
 }
 
@@ -9558,9 +9578,13 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 
 
 .dispatch-xlsx-ingredient-breakdown {
-  margin-top: 4px;
+  margin-top: 6px;
   display: grid;
-  gap: 2px;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 1px solid #dbe3f7;
+  border-radius: 12px;
+  background: #f7f9ff;
 }
 
 .dispatch-xlsx-ingredient-line {
@@ -9576,4 +9600,59 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 .dispatch-xlsx-ingredient-line.is-danger,
 .dispatch-xlsx-ingredient-line.is-danger strong {
   color: #b23d4d;
+}
+
+.dispatch-xlsx-qty-main {
+  display: inline-block;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+.dispatch-xlsx-stock-ok {
+  color: #1a7f4d;
+}
+
+.dispatch-xlsx-stock-expired,
+.dispatch-xlsx-expired-part {
+  color: #b23d4d;
+  font-weight: 700;
+}
+
+.dispatch-xlsx-kilos-cell small {
+  line-height: 1.45;
+}
+
+.dispatch-xlsx-stock-missing {
+  color: #b23d4d;
+  font-weight: 700;
+}
+
+.dispatch-xlsx-conflict-btn {
+  margin-left: 8px;
+  padding: 2px 8px;
+  min-height: 28px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+}
+
+.dispatch-xlsx-conflict-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  margin-left: 6px;
+}
+
+.dispatch-xlsx-conflict-badge.is-sold {
+  color: #1a7f4d;
+  background: #e9f8f0;
+  border: 1px solid #bfe7cf;
+}
+
+.dispatch-xlsx-conflict-badge.is-decommissioned {
+  color: #b23d4d;
+  background: #fff1f3;
+  border: 1px solid #f0c3c9;
 }
