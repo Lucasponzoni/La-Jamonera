@@ -4397,7 +4397,7 @@
           productionId: `AUTO-EGRESO-${dispatchCode || dispatchId || makeId('dispatch_xlsx')}`,
           producedAt: nowTs(),
           productionDate: dispatchDate,
-          expiryDateAtProduction: 'Venta en Local',
+          expiryDateAtProduction: 'Venta en mostrador',
           kilosUsed: Number((takeBase / 1000).toFixed(4)),
           usedQty: takeQty,
           usedUnit: entryUnit,
@@ -4408,7 +4408,7 @@
           ingredientId: safeIngredientId,
           generatedAutomatically: true,
           source: 'apps_script_auto_egreso',
-          type: 'auto_sold_local'
+          type: 'auto_sold_counter'
         });
       }
       entry.movementHistory = Array.isArray(entry.movementHistory) ? entry.movementHistory : [];
@@ -4632,6 +4632,19 @@
       if (clean.length === 2) return `${clean[0]} y ${clean[1]}`;
       return `${clean.slice(0, -1).join(', ')} y ${clean[clean.length - 1]}`;
     };
+    const formatDispatchXlsxQtyWithUnit = (qty, unit) => {
+      const amount = Number(qty || 0);
+      const safeUnit = normalizeValue(unit || 'unidades');
+      const singularMap = { kilos: 'kilo', kilo: 'kilo', unidades: 'unidad', unidad: 'unidad' };
+      const pluralMap = { kilo: 'kilos', kilos: 'kilos', unidad: 'unidades', unidades: 'unidades' };
+      const abs = Math.abs(amount);
+      const isSingular = abs > 0.0001 && abs < 1.0001;
+      if (singularMap[safeUnit] || pluralMap[safeUnit]) {
+        const unitLabel = isSingular ? (singularMap[safeUnit] || safeUnit) : (pluralMap[safeUnit] || safeUnit);
+        return `${amount.toFixed(2)} ${unitLabel}`;
+      }
+      return `${amount.toFixed(2)} ${safeUnit}`;
+    };
     const body = rows.length ? rows.map((row) => {
       const mappedIngredients = Array.isArray(row.mappedIngredients) ? row.mappedIngredients : [];
       const getResolvedMissingQty = (item) => {
@@ -4646,9 +4659,14 @@
       };
       const ingredientHasPendingConflict = (item) => getResolvedMissingQty(item) > 0.0001;
       const hasAnyIngredientPendingConflict = mappedIngredients.some((item) => ingredientHasPendingConflict(item));
+      const productMissingQty = Math.max(0, Number(row.mappedQty || 0) - Number(row.mappedAvailableKg || 0));
+      const productConflictResolutionType = normalizeValue(row.productConflictResolution);
+      const resolvedProductMissingQty = (productConflictResolutionType && Number(row.mappedExpiredQty || 0) > 0.0001)
+        ? Number(Math.max(0, productMissingQty - Math.min(productMissingQty, Number(row.mappedExpiredQty || 0))).toFixed(4))
+        : Number(productMissingQty.toFixed(4));
       const rowHasStock = mappedIngredients.length
         ? !hasAnyIngredientPendingConflict
-        : Boolean(row.mappedHasStock);
+        : resolvedProductMissingQty <= 0.0001;
       const qtyClass = rowHasStock ? 'is-ok' : 'is-danger';
       const stockUnit = normalizeValue(row.mappedAvailableUnit || (mappedIngredients[0]?.unit) || (normalizeValue(row.mappedType) === 'ingredient' ? 'unidades' : 'kg'));
       const availableQty = Number(row.mappedAvailableKg || 0);
@@ -4665,11 +4683,11 @@
             const hasExpiredConflict = Number(item.expired || 0) > 0.0001 && missing > 0.0001;
             const toneClass = missing <= 0.0001
               ? 'is-ok'
-              : (hasExpiredConflict ? 'is-danger' : (available > 0.0001 ? 'is-warning' : 'is-danger'));
-            return `<span class="dispatch-xlsx-mapped-kg ${toneClass}">${requested.toFixed(2)} ${escapeHtml(item.unit || 'u')}</span>`;
+              : (hasExpiredConflict ? 'is-danger' : (Number(item.expired || 0) <= 0.0001 && available > 0.0001 ? 'is-warning' : 'is-danger'));
+            return `<span class="dispatch-xlsx-mapped-kg ${toneClass}">${escapeHtml(formatDispatchXlsxQtyWithUnit(requested, item.unit || 'u'))}</span>`;
           }).join(' + ')}</span></span>`
-          : `<span class="dispatch-xlsx-qty-main">${multiplierLabel} → <span class="dispatch-xlsx-mapped-kg ${qtyClass}">${Number(row.mappedQty || 0).toFixed(2)} ${escapeHtml(stockUnit)}</span></span>`)
-        : `${Number(row.sourceQty || 0).toFixed(2)} ${escapeHtml(stockUnit)}`;
+          : `<span class="dispatch-xlsx-qty-main">${multiplierLabel} → <span class="dispatch-xlsx-mapped-kg ${qtyClass}">${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(row.mappedQty || 0), stockUnit))}</span></span>`)
+        : escapeHtml(formatDispatchXlsxQtyWithUnit(Number(row.sourceQty || 0), stockUnit));
       const relationMeta = row.mappedTargetTitle
         ? `<small class="dispatch-xlsx-map-link">🔗 ${escapeHtml(capitalize(row.mappedTargetTitle))}</small>`
         : '';
@@ -4681,13 +4699,18 @@
           const resolutionBadge = resolutionType
             ? `<span class="dispatch-xlsx-conflict-badge ${resolutionType === 'decommissioned' ? 'is-decommissioned' : 'is-sold'}">${resolutionType === 'decommissioned' ? 'Decomisado' : 'Vendido mostrador'}</span>`
             : '';
-          const resolveBtn = hasConflict
-            ? `<button type="button" class="btn ios-btn ios-btn-danger dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="ingredient" data-dispatch-xlsx-row="${escapeHtml(row.id)}" data-dispatch-xlsx-ingredient="${escapeHtml(item.id)}">Resolver conflicto</button>`
+          const hasExpiredForConflict = Number(item.expired || 0) > 0.0001;
+          const showResolveBtn = (hasConflict && hasExpiredForConflict) || Boolean(resolutionType);
+          const resolveBtn = showResolveBtn
+            ? `<button type="button" class="btn ios-btn ${resolutionType ? 'ios-btn-secondary' : 'ios-btn-danger'} dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="ingredient" data-dispatch-xlsx-row="${escapeHtml(row.id)}" data-dispatch-xlsx-ingredient="${escapeHtml(item.id)}">${resolutionType ? 'Cambiar elección' : 'Resolver conflicto'}</button>`
             : '';
           const toneClass = hasConflict
             ? ((Number(item.expired || 0) > 0.0001) ? 'is-danger' : (Number(item.available || 0) > 0.0001 ? 'is-warning' : 'is-danger'))
             : 'is-ok';
-          return `<div class="dispatch-xlsx-ingredient-item"><small class="dispatch-xlsx-ingredient-line ${toneClass}">• ${escapeHtml(item.title)}: <strong>${Number(item.qty || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong> · Disp.: <strong>${Number(item.available || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong>${Number(item.expired || 0) > 0 ? ` · <span class="dispatch-xlsx-expired-part">${Number(item.expired || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')} vencidas</span>` : ''}${hasConflict ? ` · <strong>Faltan ${missingQty.toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong>` : ''}</small>${(resolutionBadge || resolveBtn) ? `<div class="dispatch-xlsx-conflict-actions">${resolutionBadge}${resolveBtn}</div>` : ''}</div>`;
+          const createHint = hasConflict && !hasExpiredForConflict
+            ? ` · <span class="dispatch-xlsx-create-part">Se creará ${escapeHtml(formatDispatchXlsxQtyWithUnit(missingQty, item.unit || 'u'))}</span>`
+            : '';
+          return `<div class="dispatch-xlsx-ingredient-item"><small class="dispatch-xlsx-ingredient-line ${toneClass}">• ${escapeHtml(item.title)}: <strong>${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.qty || 0), item.unit || 'u'))}</strong> · Disp.: <strong>${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.available || 0), item.unit || 'u'))}</strong>${Number(item.expired || 0) > 0 ? ` · <span class="dispatch-xlsx-expired-part">${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.expired || 0), item.unit || 'u'))} vencidas</span>` : ''}${hasConflict ? ` · <strong>Faltan ${escapeHtml(formatDispatchXlsxQtyWithUnit(missingQty, item.unit || 'u'))}</strong>` : ''}${createHint}</small>${(resolutionBadge || resolveBtn) ? `<div class="dispatch-xlsx-conflict-actions">${resolutionBadge}${resolveBtn}</div>` : ''}</div>`;
         }).join('')}</div>`
         : '';
       const stockLine = row.mappedTargetTitle
@@ -4696,24 +4719,35 @@
             ? (rowHasStock
               ? 'Stock utilizable completo.'
               : '')
-            : `${rowHasStock ? 'Stock utilizable:' : 'Stock utilizable insuficiente:'} <strong class="dispatch-xlsx-stock-ok">${availableQty.toFixed(2)} ${escapeHtml(stockUnit)}</strong>${expiredQty > 0 ? ` <span class="dispatch-xlsx-stock-expired">· Vencido: ${expiredQty.toFixed(2)} ${escapeHtml(stockUnit)}</span>` : ''}`;
+            : `${rowHasStock ? 'Stock utilizable:' : 'Stock utilizable insuficiente:'} <strong class="dispatch-xlsx-stock-ok">${escapeHtml(formatDispatchXlsxQtyWithUnit(availableQty, stockUnit))}</strong>${expiredQty > 0 ? ` <span class="dispatch-xlsx-stock-expired">· Vencido: ${escapeHtml(formatDispatchXlsxQtyWithUnit(expiredQty, stockUnit))}</span>` : ''}`;
           if (rowHasStock) return base;
           const missingParts = mappedIngredients.length
             ? mappedIngredients.map((item) => {
               const missingQty = getResolvedMissingQty(item);
               if (missingQty <= 0.0001) return '';
-              return `${missingQty.toFixed(2)} ${escapeHtml(item.unit || 'u')} del producto ${escapeHtml(normalizeValue(item.title || item.id || ''))}`;
+              return `${escapeHtml(formatDispatchXlsxQtyWithUnit(missingQty, item.unit || 'u'))} del producto ${escapeHtml(normalizeValue(item.title || item.id || ''))}`;
             }).filter(Boolean)
             : (() => {
-              const missingQty = Math.max(0, Number(row.mappedQty || 0) - availableQty);
+              const missingQty = resolvedProductMissingQty;
               if (missingQty <= 0.0001) return [];
-              return [`${missingQty.toFixed(2)} ${escapeHtml(stockUnit)} del producto ${escapeHtml(capitalize(row.mappedTargetTitle || row.sourceProduct || ''))}`];
+              return [`${escapeHtml(formatDispatchXlsxQtyWithUnit(missingQty, stockUnit))} del producto ${escapeHtml(capitalize(row.mappedTargetTitle || row.sourceProduct || ''))}`];
             })();
           if (!missingParts.length) return base;
-          const productResolveBtn = (!mappedIngredients.length && expiredQty > 0 && Number(row.mappedQty || 0) > availableQty)
-            ? ` <button type="button" class="btn ios-btn ios-btn-danger dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="production" data-dispatch-xlsx-row="${escapeHtml(row.id)}">Resolver conflicto</button>`
+          const canResolveProductConflict = !mappedIngredients.length && Number(row.mappedQty || 0) > Number(row.mappedAvailableKg || 0) && (expiredQty > 0.0001 || Boolean(productConflictResolutionType));
+          const missingCreateQty = mappedIngredients.length
+            ? mappedIngredients.reduce((acc, item) => {
+              const unresolved = getResolvedMissingQty(item);
+              const hasExpiredStock = Number(item.expired || 0) > 0.0001;
+              return acc + (hasExpiredStock ? 0 : unresolved);
+            }, 0)
+            : (expiredQty > 0.0001 ? 0 : resolvedProductMissingQty);
+          const createHint = missingCreateQty > 0.0001
+            ? `<span class="dispatch-xlsx-stock-create"> Se creará ${escapeHtml(formatDispatchXlsxQtyWithUnit(missingCreateQty, mappedIngredients.length ? (mappedIngredients[0]?.unit || 'u') : stockUnit))} sin trazabilidad.</span>`
             : '';
-          return `${base}<span class="dispatch-xlsx-stock-missing"> ↳ Faltan ${formatMissingDispatchXlsxParts(missingParts)}.</span>${productResolveBtn}`;
+          const productResolveBtn = canResolveProductConflict
+            ? ` <button type="button" class="btn ios-btn ${productConflictResolutionType ? 'ios-btn-secondary' : 'ios-btn-danger'} dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="production" data-dispatch-xlsx-row="${escapeHtml(row.id)}">${productConflictResolutionType ? 'Cambiar elección' : 'Resolver conflicto'}</button>`
+            : '';
+          return `${base}<span class="dispatch-xlsx-stock-missing"> ↳ Faltan ${formatMissingDispatchXlsxParts(missingParts)}.</span>${createHint}${productResolveBtn}`;
         })()
         : 'Pendiente de relación';
       const clientBadge = row.clientStatus === 'new'

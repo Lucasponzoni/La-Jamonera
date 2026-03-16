@@ -9643,16 +9643,29 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 }
 
 .dispatch-xlsx-stock-missing {
-  color: #b23d4d;
-  font-weight: 700;
+  color: #6f7b98;
+  font-weight: 600;
+}
+
+
+.dispatch-xlsx-create-part,
+.dispatch-xlsx-stock-create {
+  color: #6f7b98;
+  font-weight: 600;
 }
 
 .dispatch-xlsx-conflict-btn {
   margin-left: 8px;
   padding: 2px 8px;
   min-height: 28px;
+  width: 170px;
+  min-width: 170px;
   border-radius: 10px;
   font-size: 0.72rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 .dispatch-xlsx-conflict-badge {
