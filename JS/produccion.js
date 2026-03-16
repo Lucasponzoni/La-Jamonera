@@ -3824,6 +3824,7 @@
     const target = safeObject(targetMap[targetId]);
     const sourceQty = Number(parseDispatchXlsxQty(qtyRaw) || 0);
     const dispatchDateIso = normalizeDispatchDateToken(options.dispatchDateIso) || toIsoDate();
+    const effectiveDispatchDateIso = [dispatchDateIso, toIsoDate()].filter(Boolean).sort().pop() || toIsoDate();
     const configuredMultiplier = Number(parseDispatchXlsxQty(rule.customKg) || 0);
     const hasConfiguredMultiplier = Boolean(rule.useCustomKg) && configuredMultiplier > 0;
     const effectiveMultiplier = hasConfiguredMultiplier ? configuredMultiplier : 1;
@@ -3831,7 +3832,7 @@
     const ingredientBreakdown = ingredientTargets.map((targetRow) => {
       const ingredientId = normalizeValue(targetRow.id);
       const ingredient = safeObject(state.ingredientes?.[ingredientId]);
-      const stockMeta = getDispatchXlsxIngredientStockMeta(ingredientId, dispatchDateIso);
+      const stockMeta = getDispatchXlsxIngredientStockMeta(ingredientId, effectiveDispatchDateIso);
       const configuredQty = Number(parseDispatchXlsxQty(targetRow.qty) || 0);
       const qty = Number((configuredQty * effectiveMultiplier).toFixed(2));
       const unit = normalizeValue(targetRow.unit || stockMeta.unit || ingredient.stockUnit || 'unidades');
@@ -3871,12 +3872,12 @@
     let availableUnit = 'kg';
     if (targetId) {
       if (isIngredient) {
-        const ingredientStock = getDispatchXlsxIngredientStockMeta(targetId, dispatchDateIso);
+        const ingredientStock = getDispatchXlsxIngredientStockMeta(targetId, effectiveDispatchDateIso);
         availableKg = Number(ingredientStock.available || 0);
         expiredQty = Number(ingredientStock.expired || 0);
         availableUnit = ingredientStock.unit || 'unidades';
       } else {
-        const recipeStock = getDispatchXlsxRecipeStockMeta(targetId, dispatchDateIso);
+        const recipeStock = getDispatchXlsxRecipeStockMeta(targetId, effectiveDispatchDateIso);
         availableKg = Number(recipeStock.available || 0);
         expiredQty = Number(recipeStock.expired || 0);
         availableUnit = recipeStock.unit || 'kg';
@@ -4707,10 +4708,7 @@
           const toneClass = hasConflict
             ? ((Number(item.expired || 0) > 0.0001) ? 'is-danger' : (Number(item.available || 0) > 0.0001 ? 'is-warning' : 'is-danger'))
             : 'is-ok';
-          const createHint = hasConflict && !hasExpiredForConflict
-            ? ` · <span class="dispatch-xlsx-create-part">Se creará ${escapeHtml(formatDispatchXlsxQtyWithUnit(missingQty, item.unit || 'u'))}</span>`
-            : '';
-          return `<div class="dispatch-xlsx-ingredient-item"><small class="dispatch-xlsx-ingredient-line ${toneClass}">• ${escapeHtml(item.title)}: <strong>${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.qty || 0), item.unit || 'u'))}</strong> · Disp.: <strong>${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.available || 0), item.unit || 'u'))}</strong>${Number(item.expired || 0) > 0 ? ` · <span class="dispatch-xlsx-expired-part">${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.expired || 0), item.unit || 'u'))} vencidas</span>` : ''}${hasConflict ? ` · <strong>Faltan ${escapeHtml(formatDispatchXlsxQtyWithUnit(missingQty, item.unit || 'u'))}</strong>` : ''}${createHint}</small>${(resolutionBadge || resolveBtn) ? `<div class="dispatch-xlsx-conflict-actions">${resolutionBadge}${resolveBtn}</div>` : ''}</div>`;
+          return `<div class="dispatch-xlsx-ingredient-item"><small class="dispatch-xlsx-ingredient-line ${toneClass}">• ${escapeHtml(item.title)}: <strong>${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.qty || 0), item.unit || 'u'))}</strong> · Disp.: <strong>${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.available || 0), item.unit || 'u'))}</strong>${Number(item.expired || 0) > 0 ? ` · <span class="dispatch-xlsx-expired-part">${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.expired || 0), item.unit || 'u'))} vencidas</span>` : ''}${hasConflict ? ` · <strong>Faltan ${escapeHtml(formatDispatchXlsxQtyWithUnit(missingQty, item.unit || 'u'))}</strong>` : ''}</small>${(resolutionBadge || resolveBtn) ? `<div class="dispatch-xlsx-conflict-actions">${resolutionBadge}${resolveBtn}</div>` : ''}</div>`;
         }).join('')}</div>`
         : '';
       const stockLine = row.mappedTargetTitle

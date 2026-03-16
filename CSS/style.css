@@ -9648,7 +9648,6 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 }
 
 
-.dispatch-xlsx-create-part,
 .dispatch-xlsx-stock-create {
   color: #6f7b98;
   font-weight: 600;
