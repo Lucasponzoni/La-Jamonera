@@ -4018,16 +4018,17 @@
         }
       }
     });
+    const hasEntryRows = entries.length > 0;
     let available = availableFromEntries;
     let expired = expiredFromEntries;
-    if (!Number.isFinite(available) || available < 0.0001) {
+    if (!hasEntryRows && (!Number.isFinite(available) || available < 0.0001)) {
       const baseStock = Number(inventoryItem.stockBase);
       if (Number.isFinite(baseStock) && baseStock > 0) {
         const converted = fromBase(baseStock, unit);
         if (Number.isFinite(converted)) available = converted;
       }
     }
-    if ((!Number.isFinite(available) || available < 0.0001) && Number.isFinite(Number(ingredient.stockKg))) {
+    if (!hasEntryRows && (!Number.isFinite(available) || available < 0.0001) && Number.isFinite(Number(ingredient.stockKg))) {
       const converted = fromBase(Number(ingredient.stockKg || 0) * 1000, unit);
       if (Number.isFinite(converted)) available = converted;
     }
@@ -4078,10 +4079,10 @@
           if (isIngredientMode) {
             const stockMeta = getDispatchXlsxIngredientStockMeta(item.id);
             const stockClass = stockMeta.available > 0 ? 'is-ok' : 'is-danger';
-            const expiredHint = stockMeta.expired > 0
-              ? `<small class="d-block dispatch-xlsx-stock-hint is-danger">→ ${stockMeta.expired.toFixed(2)} ${escapeHtml(stockMeta.unit)} vencidas</small>`
+            const expiredInline = stockMeta.expired > 0
+              ? ` <span class="dispatch-xlsx-stock-hint is-danger">→ ${stockMeta.expired.toFixed(2)} ${escapeHtml(stockMeta.unit)} vencidas</span>`
               : '';
-            return `<label class="inventario-check-row inventario-selector-row dispatch-xlsx-selector-row"><input type="checkbox" data-dispatch-xlsx-ingredient-pick="${escapeHtml(item.id)}" ${checked ? 'checked' : ''}><span class="inventario-print-photo-wrap">${item.imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-dispatch-xlsx-target-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><span><strong>${escapeHtml(capitalize(item.title))}</strong><small class="d-block dispatch-xlsx-stock-hint ${stockClass}">Stock: ${stockMeta.available.toFixed(2)} ${escapeHtml(stockMeta.unit)}</small>${expiredHint}</span></label>`;
+            return `<label class="inventario-check-row inventario-selector-row dispatch-xlsx-selector-row"><input type="checkbox" data-dispatch-xlsx-ingredient-pick="${escapeHtml(item.id)}" ${checked ? 'checked' : ''}><span class="inventario-print-photo-wrap">${item.imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-dispatch-xlsx-target-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><span><strong>${escapeHtml(capitalize(item.title))}</strong><small class="d-block dispatch-xlsx-stock-hint ${stockClass}">Stock: ${stockMeta.available.toFixed(2)} ${escapeHtml(stockMeta.unit)}${expiredInline}</small></span></label>`;
           }
           return `<label class="inventario-check-row inventario-selector-row dispatch-xlsx-selector-row"><input type="radio" name="dispatchXlsxTargetPick" value="${escapeHtml(item.id)}" ${picked === item.id ? 'checked' : ''}><span class="inventario-print-photo-wrap">${item.imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-dispatch-xlsx-target-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><span>${escapeHtml(capitalize(item.title))}</span></label>`;
         }).join('')
