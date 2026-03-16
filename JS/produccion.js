@@ -4390,6 +4390,27 @@
       entry.availableKg = Number(Math.max(0, entry.availableBase / 1000).toFixed(4));
       entry.expiryResolutions = Array.isArray(entry.expiryResolutions) ? entry.expiryResolutions : [];
       entry.expiryResolutions.unshift({ id: makeId('expiry_resolution_xlsx'), createdAt: nowTs(), type: resolutionType, qtyKg: Number((takeBase / 1000).toFixed(4)) });
+      entry.productionUsage = Array.isArray(entry.productionUsage) ? entry.productionUsage : [];
+      if (resolutionType === 'sold_counter') {
+        entry.productionUsage.unshift({
+          id: makeId('usage_auto_egreso'),
+          productionId: `AUTO-EGRESO-${dispatchCode || dispatchId || makeId('dispatch_xlsx')}`,
+          producedAt: nowTs(),
+          productionDate: dispatchDate,
+          expiryDateAtProduction: 'Venta en Local',
+          kilosUsed: Number((takeBase / 1000).toFixed(4)),
+          usedQty: takeQty,
+          usedUnit: entryUnit,
+          usedBaseQty: Number(takeBase.toFixed(6)),
+          lotNumber: normalizeValue(entry.lotNumber) || normalizeValue(entry.invoiceNumber) || entry.id,
+          ingredientLot: normalizeValue(entry.lotNumber) || normalizeValue(entry.invoiceNumber) || entry.id,
+          ingredientEntryId: entry.id,
+          ingredientId: safeIngredientId,
+          generatedAutomatically: true,
+          source: 'apps_script_auto_egreso',
+          type: 'auto_sold_local'
+        });
+      }
       entry.movementHistory = Array.isArray(entry.movementHistory) ? entry.movementHistory : [];
       entry.movementHistory.unshift({
         id: makeId('mov_dispatch_xlsx_expired'),
@@ -4473,7 +4494,7 @@
         byDispatch[key].push(row);
       });
       const dispatchDateNow = nowTs();
-      Object.values(byDispatch).forEach((groupRows) => {
+      for (const groupRows of Object.values(byDispatch)) {
         const first = groupRows[0] || {};
         const dispatchDate = normalizeDispatchDateToken(first.invoiceDate) || toIsoDate();
         const dayToken = formatIsoToDmyCompact(dispatchDate);
@@ -4486,7 +4507,7 @@
         const clientAddress = normalizeValue(client.address) || `Dirección relacionada a factura ${normalizeValue(first.invoiceNumber) || '-'}`;
         const comments = [...new Set(groupRows.map((row) => normalizeDispatchXlsxObservation(row.observation)).filter(Boolean))];
         const products = [];
-        groupRows.forEach((row) => {
+        for (const row of groupRows) {
           if (normalizeValue(row.mappedType) === 'ingredient' && Array.isArray(row.mappedIngredients) && row.mappedIngredients.length) {
             row.mappedIngredients.forEach((mappedItem) => {
               const ingredientId = normalizeValue(mappedItem.id);
@@ -4525,7 +4546,7 @@
               }
               products.push({ recipeId: ingredientId, recipeTitle: normalizeValue(ingredient.name || ingredient.title || row.sourceProduct), recipeImageUrl: normalizeValue(ingredient.imageUrl), qtyKg: Number((toBase(Number(mappedItem.qty || 0), consumeResult.unit) / 1000).toFixed(3)), allocations: itemAlloc, sourceType: 'ingredient' });
             });
-            return;
+            continue;
           }
           const recipeId = normalizeValue(row.mappedTargetId);
           const recipe = safeObject(state.recetas?.[recipeId]);
@@ -4537,7 +4558,7 @@
             if (!chosen) {
               throw new Error(`conflict_pending_product:${row.id}:${recipeId}`);
             }
-            resolveDispatchXlsxRecipeExpiredConflict({
+            await resolveDispatchXlsxRecipeExpiredConflict({
               recipeId,
               qtyKg: Math.min(missingKg, Number(stockMeta.expired || 0)),
               dispatchDate,
@@ -4551,7 +4572,7 @@
           }
           products.push({ recipeId, recipeTitle: normalizeValue(recipe.title || row.sourceProduct), recipeImageUrl: normalizeValue(recipe.imageUrl), qtyKg: Number(qtyKg.toFixed(3)), allocations: allocs, sourceType: 'production' });
           appendRecipeMovement(recipeId, { id: `egr_${repartoId}_${recipeId}_${makeId('mv')}`, type: 'egreso', qtyKg: Number(qtyKg.toFixed(3)), at: dispatchDateNow, sourceId: repartoId, sourceCode: code, label: 'Reparto a domicilio', date: dispatchDate, nonTraceable: allocated.missingKg > 0.0001 });
-        });
+        }
         state.reparto.registros[repartoId] = {
           id: repartoId,
           code,
@@ -4576,7 +4597,7 @@
           createdAt: dispatchDateNow,
           createdBy: getCurrentUserLabel()
         };
-      });
+      }
       await window.dbLaJamoneraRest.write('/inventario', state.inventario);
       await persistRepartoStore();
       await refreshData({ silent: true });
@@ -4612,8 +4633,23 @@
       return `${clean.slice(0, -1).join(', ')} y ${clean[clean.length - 1]}`;
     };
     const body = rows.length ? rows.map((row) => {
-      const qtyClass = row.mappedHasStock ? 'is-ok' : 'is-danger';
       const mappedIngredients = Array.isArray(row.mappedIngredients) ? row.mappedIngredients : [];
+      const getResolvedMissingQty = (item) => {
+        const requested = Number(item?.qty || 0);
+        const available = Number(item?.available || 0);
+        const missing = Math.max(0, requested - available);
+        const expired = Number(item?.expired || 0);
+        const resolutionType = normalizeValue(row.conflictResolutions?.[item?.id]?.type);
+        if (!resolutionType || expired <= 0.0001 || missing <= 0.0001) return missing;
+        const covered = Math.min(missing, expired);
+        return Number(Math.max(0, missing - covered).toFixed(4));
+      };
+      const ingredientHasPendingConflict = (item) => getResolvedMissingQty(item) > 0.0001;
+      const hasAnyIngredientPendingConflict = mappedIngredients.some((item) => ingredientHasPendingConflict(item));
+      const rowHasStock = mappedIngredients.length
+        ? !hasAnyIngredientPendingConflict
+        : Boolean(row.mappedHasStock);
+      const qtyClass = rowHasStock ? 'is-ok' : 'is-danger';
       const stockUnit = normalizeValue(row.mappedAvailableUnit || (mappedIngredients[0]?.unit) || (normalizeValue(row.mappedType) === 'ingredient' ? 'unidades' : 'kg'));
       const availableQty = Number(row.mappedAvailableKg || 0);
       const expiredQty = Number(row.mappedExpiredQty || 0);
@@ -4625,7 +4661,7 @@
           ? `<span class="dispatch-xlsx-qty-main">${multiplierLabel} → <span class="dispatch-xlsx-mapped-kg ${qtyClass}">${mappedIngredients.map((item) => {
             const requested = Number(item.qty || 0);
             const available = Number(item.available || 0);
-            const missing = Math.max(0, requested - available);
+            const missing = getResolvedMissingQty(item);
             const hasExpiredConflict = Number(item.expired || 0) > 0.0001 && missing > 0.0001;
             const toneClass = missing <= 0.0001
               ? 'is-ok'
@@ -4639,7 +4675,7 @@
         : '';
       const ingredientDetail = mappedIngredients.length
         ? `<div class="dispatch-xlsx-ingredient-breakdown">${mappedIngredients.map((item) => {
-          const missingQty = Math.max(0, Number(item.qty || 0) - Number(item.available || 0));
+          const missingQty = getResolvedMissingQty(item);
           const hasConflict = missingQty > 0.0001;
           const resolutionType = normalizeValue(row.conflictResolutions?.[item.id]?.type);
           const resolutionBadge = resolutionType
@@ -4657,14 +4693,14 @@
       const stockLine = row.mappedTargetTitle
         ? (() => {
           const base = mappedIngredients.length
-            ? (row.mappedHasStock
+            ? (rowHasStock
               ? 'Stock utilizable completo.'
               : '')
-            : `${row.mappedHasStock ? 'Stock utilizable:' : 'Stock utilizable insuficiente:'} <strong class="dispatch-xlsx-stock-ok">${availableQty.toFixed(2)} ${escapeHtml(stockUnit)}</strong>${expiredQty > 0 ? ` <span class="dispatch-xlsx-stock-expired">· Vencido: ${expiredQty.toFixed(2)} ${escapeHtml(stockUnit)}</span>` : ''}`;
-          if (row.mappedHasStock) return base;
+            : `${rowHasStock ? 'Stock utilizable:' : 'Stock utilizable insuficiente:'} <strong class="dispatch-xlsx-stock-ok">${availableQty.toFixed(2)} ${escapeHtml(stockUnit)}</strong>${expiredQty > 0 ? ` <span class="dispatch-xlsx-stock-expired">· Vencido: ${expiredQty.toFixed(2)} ${escapeHtml(stockUnit)}</span>` : ''}`;
+          if (rowHasStock) return base;
           const missingParts = mappedIngredients.length
             ? mappedIngredients.map((item) => {
-              const missingQty = Math.max(0, Number(item.qty || 0) - Number(item.available || 0));
+              const missingQty = getResolvedMissingQty(item);
               if (missingQty <= 0.0001) return '';
               return `${missingQty.toFixed(2)} ${escapeHtml(item.unit || 'u')} del producto ${escapeHtml(normalizeValue(item.title || item.id || ''))}`;
             }).filter(Boolean)
