@@ -4637,7 +4637,7 @@
           const resolutionBadge = resolutionType
             ? `<span class="dispatch-xlsx-conflict-badge ${resolutionType === 'decommissioned' ? 'is-decommissioned' : 'is-sold'}">${resolutionType === 'decommissioned' ? 'Decomisado' : 'Vendido mostrador'}</span>`
             : '';
-          const resolveBtn = hasConflict && Number(item.expired || 0) > 0
+          const resolveBtn = hasConflict
             ? `<button type="button" class="btn ios-btn ios-btn-danger dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="ingredient" data-dispatch-xlsx-row="${escapeHtml(row.id)}" data-dispatch-xlsx-ingredient="${escapeHtml(item.id)}">Resolver conflicto</button>`
             : '';
           return `<small class="dispatch-xlsx-ingredient-line ${item.hasStock ? 'is-ok' : 'is-danger'}">• ${escapeHtml(item.title)}: <strong>${Number(item.qty || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong> · Disp.: <strong>${Number(item.available || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong>${Number(item.expired || 0) > 0 ? ` · <span class="dispatch-xlsx-expired-part">${Number(item.expired || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')} vencidas</span>` : ''}${hasConflict ? ` · <strong>Faltan ${missingQty.toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong>` : ''}${resolutionBadge}${resolveBtn}</small>`;
@@ -4647,8 +4647,8 @@
         ? (() => {
           const base = mappedIngredients.length
             ? (row.mappedHasStock
-              ? 'Stock utilizable completo en ingredientes relacionados.'
-              : 'Stock utilizable insuficiente en ingredientes relacionados.')
+              ? 'Stock utilizable completo.'
+              : 'Stock utilizable insuficiente.')
             : `${row.mappedHasStock ? 'Stock utilizable:' : 'Stock utilizable insuficiente:'} <strong class="dispatch-xlsx-stock-ok">${availableQty.toFixed(2)} ${escapeHtml(stockUnit)}</strong>${expiredQty > 0 ? ` <span class="dispatch-xlsx-stock-expired">· Vencido: ${expiredQty.toFixed(2)} ${escapeHtml(stockUnit)}</span>` : ''}`;
           if (row.mappedHasStock) return base;
           const missingParts = mappedIngredients.length
