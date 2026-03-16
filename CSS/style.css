@@ -9626,3 +9626,33 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   color: #b23d4d;
   font-weight: 700;
 }
+
+.dispatch-xlsx-conflict-btn {
+  margin-left: 8px;
+  padding: 2px 8px;
+  min-height: 28px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+}
+
+.dispatch-xlsx-conflict-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  margin-left: 6px;
+}
+
+.dispatch-xlsx-conflict-badge.is-sold {
+  color: #1a7f4d;
+  background: #e9f8f0;
+  border: 1px solid #bfe7cf;
+}
+
+.dispatch-xlsx-conflict-badge.is-decommissioned {
+  color: #b23d4d;
+  background: #fff1f3;
+  border: 1px solid #f0c3c9;
+}

@@ -3917,6 +3917,8 @@
       row.mappingMultiplier = Number(meta.multiplier || 0);
       row.mappingMultiplierFromRule = Boolean(meta.multiplierFromRule);
       row.mappedIngredients = Array.isArray(meta.ingredientBreakdown) ? meta.ingredientBreakdown : [];
+      row.conflictResolutions = safeObject(row.conflictResolutions);
+      row.productConflictResolution = normalizeValue(row.productConflictResolution);
       row.disabled = meta.disabled;
     });
   };
@@ -3963,6 +3965,8 @@
         mappingMultiplier: Number(meta.multiplier || 0),
         mappingMultiplierFromRule: Boolean(meta.multiplierFromRule),
         mappedIngredients: Array.isArray(meta.ingredientBreakdown) ? meta.ingredientBreakdown : [],
+        conflictResolutions: {},
+        productConflictResolution: '',
         disabled: meta.disabled
       });
     }
@@ -4355,6 +4359,92 @@
       unit: requestedUnit
     };
   };
+  const resolveDispatchXlsxIngredientExpiredConflict = ({ ingredientId = '', requestedQty = 0, requestedUnit = 'kilos', dispatchDate = toIsoDate(), resolutionType = 'sold_counter', dispatchCode = '', dispatchId = '' } = {}) => {
+    const safeIngredientId = normalizeValue(ingredientId);
+    if (!safeIngredientId) return { resolvedQty: 0, unresolvedQty: Number(requestedQty || 0) };
+    state.inventario = safeObject(state.inventario);
+    state.inventario.items = safeObject(state.inventario.items);
+    const record = safeObject(state.inventario?.items?.[safeIngredientId]);
+    const entries = Array.isArray(record.entries) ? [...record.entries] : [];
+    let remainingBase = Number(toBase(Number(requestedQty || 0), requestedUnit) || 0);
+    if (remainingBase <= 0.0001) return { resolvedQty: 0, unresolvedQty: 0 };
+    const sorted = entries.map((item) => ({ ...item })).sort((a, b) => {
+      const aExpiry = normalizeValue(a.expiryDate) || '9999-12-31';
+      const bExpiry = normalizeValue(b.expiryDate) || '9999-12-31';
+      if (aExpiry !== bExpiry) return aExpiry.localeCompare(bExpiry);
+      return Number(a.createdAt || 0) - Number(b.createdAt || 0);
+    });
+    sorted.forEach((entry) => {
+      if (remainingBase <= 0.0001) return;
+      const expiryIso = normalizeValue(entry.expiryDate);
+      if (!expiryIso || expiryIso >= dispatchDate || isEntryNoPerecedero(entry)) return;
+      const entryUnit = normalizeValue(entry.unit || record.stockUnit || requestedUnit || 'kilos');
+      const availableQty = getEntryAvailableQty(entry);
+      const availableBase = toBase(availableQty, entryUnit);
+      if (!Number.isFinite(availableBase) || availableBase <= 0.0001) return;
+      const takeBase = Math.min(remainingBase, availableBase);
+      const takeQty = Number(fromBase(takeBase, entryUnit).toFixed(4));
+      const nextAvailableQty = Number(Math.max(0, availableQty - takeQty).toFixed(4));
+      entry.availableQty = nextAvailableQty;
+      entry.availableBase = Number(Math.max(0, toBase(nextAvailableQty, entryUnit)).toFixed(6));
+      entry.availableKg = Number(Math.max(0, entry.availableBase / 1000).toFixed(4));
+      entry.expiryResolutions = Array.isArray(entry.expiryResolutions) ? entry.expiryResolutions : [];
+      entry.expiryResolutions.unshift({ id: makeId('expiry_resolution_xlsx'), createdAt: nowTs(), type: resolutionType, qtyKg: Number((takeBase / 1000).toFixed(4)) });
+      entry.movementHistory = Array.isArray(entry.movementHistory) ? entry.movementHistory : [];
+      entry.movementHistory.unshift({
+        id: makeId('mov_dispatch_xlsx_expired'),
+        type: 'resolucion_vencido_reparto_xlsx',
+        qty: takeQty,
+        qtyUnit: entryUnit,
+        qtyKg: Number((takeBase / 1000).toFixed(4)),
+        createdAt: nowTs(),
+        date: dispatchDate,
+        reference: dispatchCode || dispatchId,
+        sourceId: dispatchId,
+        sourceCode: dispatchCode,
+        observation: resolutionType === 'decommissioned' ? 'Lote vencido decomisado' : 'Lote vencido vendido en mostrador'
+      });
+      if (entry.availableKg <= 0.0001) {
+        entry.expiryResolutionStatus = resolutionType;
+        entry.status = resolutionType;
+        entry.lotStatus = resolutionType === 'decommissioned' ? 'decomisado' : 'sin_trazabilidad';
+      }
+      remainingBase = Number(Math.max(0, remainingBase - takeBase).toFixed(6));
+    });
+    const merged = entries.map((entry) => {
+      const match = sorted.find((row) => row.id === entry.id);
+      return match ? { ...entry, ...match } : entry;
+    });
+    const nextStockBase = merged.reduce((acc, entry) => acc + Number(entry.availableBase || toBase(getEntryAvailableQty(entry), normalizeValue(entry.unit || record.stockUnit || requestedUnit || 'kilos')) || 0), 0);
+    const nextStockKg = merged.reduce((acc, entry) => acc + Number(entry.availableKg || (toBase(getEntryAvailableQty(entry), normalizeValue(entry.unit || record.stockUnit || requestedUnit || 'kilos')) / 1000) || 0), 0);
+    state.inventario.items[safeIngredientId] = { ...record, entries: merged, stockBase: Number(nextStockBase.toFixed(6)), stockKg: Number(nextStockKg.toFixed(4)) };
+    const unresolvedQty = Number(fromBase(remainingBase, requestedUnit).toFixed(3));
+    const resolvedQty = Number(Math.max(0, Number(requestedQty || 0) - unresolvedQty).toFixed(3));
+    return { resolvedQty, unresolvedQty };
+  };
+  const resolveDispatchXlsxRecipeExpiredConflict = async ({ recipeId = '', qtyKg = 0, dispatchDate = toIsoDate(), resolutionType = 'retail_sale' } = {}) => {
+    const safeRecipeId = normalizeValue(recipeId);
+    let remaining = Number(qtyKg || 0);
+    if (!safeRecipeId || remaining <= 0.0001) return { resolvedKg: 0, unresolvedKg: Math.max(0, remaining) };
+    const lots = buildRecipeLotsForDispatch(safeRecipeId).filter((lot) => isDispatchLotExpiredForDate(lot, dispatchDate));
+    for (const lot of lots) {
+      if (remaining <= 0.0001) break;
+      const lotAvailable = Number(lot.availableKg || 0);
+      if (lotAvailable <= 0.0001) continue;
+      const takeKg = Math.min(remaining, lotAvailable);
+      await registerDispatchExpiredResolution({
+        recipeId: safeRecipeId,
+        lotNumber: normalizeValue(lot.lotNumber),
+        productionId: normalizeValue(lot.productionId),
+        qtyKg: Number(takeKg.toFixed(3)),
+        expiryDate: normalizeValue(lot.expiryDate),
+        resolutionType,
+        dispatchDate
+      });
+      remaining = Number(Math.max(0, remaining - takeKg).toFixed(3));
+    }
+    return { resolvedKg: Number((Number(qtyKg || 0) - remaining).toFixed(3)), unresolvedKg: Number(remaining.toFixed(3)) };
+  };
   const processDispatchXlsxRows = async () => {
     const draft = state.dispatchXlsxDraft;
     draft.vehicleId = normalizeValue(nodes.dispatchView?.querySelector('#dispatchXlsxVehicleSelect')?.value || draft.vehicleId);
@@ -4401,10 +4491,28 @@
             row.mappedIngredients.forEach((mappedItem) => {
               const ingredientId = normalizeValue(mappedItem.id);
               if (!ingredientId) return;
+              const requestedQty = Number(mappedItem.qty || 0);
+              const availableQty = Number(mappedItem.available || 0);
+              const missingQty = Math.max(0, requestedQty - availableQty);
+              if (missingQty > 0.0001 && Number(mappedItem.expired || 0) > 0) {
+                const chosen = normalizeValue(row.conflictResolutions?.[ingredientId]?.type);
+                if (!chosen) {
+                  throw new Error(`conflict_pending_ingredient:${row.id}:${ingredientId}`);
+                }
+                resolveDispatchXlsxIngredientExpiredConflict({
+                  ingredientId,
+                  requestedQty: Math.min(missingQty, Number(mappedItem.expired || 0)),
+                  requestedUnit: normalizeValue(mappedItem.unit || 'kilos'),
+                  dispatchDate,
+                  resolutionType: chosen,
+                  dispatchCode: code,
+                  dispatchId: repartoId
+                });
+              }
               const ingredient = safeObject(state.ingredientes?.[ingredientId]);
               const consumeResult = consumeIngredientForDispatch({
                 ingredientId,
-                requestedQty: Number(mappedItem.qty || 0),
+                requestedQty,
                 requestedUnit: normalizeValue(mappedItem.unit || getDispatchXlsxIngredientStockMeta(ingredientId).unit || 'kilos'),
                 dispatchCode: code,
                 dispatchId: repartoId,
@@ -4422,6 +4530,20 @@
           const recipeId = normalizeValue(row.mappedTargetId);
           const recipe = safeObject(state.recetas?.[recipeId]);
           const qtyKg = Number(row.mappedQty || row.sourceQty || 0);
+          const stockMeta = getDispatchXlsxRecipeStockMeta(recipeId, dispatchDate);
+          const missingKg = Math.max(0, qtyKg - Number(stockMeta.available || 0));
+          if (missingKg > 0.0001 && Number(stockMeta.expired || 0) > 0) {
+            const chosen = normalizeValue(row.productConflictResolution);
+            if (!chosen) {
+              throw new Error(`conflict_pending_product:${row.id}:${recipeId}`);
+            }
+            resolveDispatchXlsxRecipeExpiredConflict({
+              recipeId,
+              qtyKg: Math.min(missingKg, Number(stockMeta.expired || 0)),
+              dispatchDate,
+              resolutionType: chosen === 'decommissioned' ? 'decommissioned' : 'retail_sale'
+            });
+          }
           const allocated = allocateDispatchLots(recipeId, qtyKg);
           const allocs = [...allocated.allocations];
           if (allocated.missingKg > 0.0001) {
@@ -4455,6 +4577,7 @@
           createdBy: getCurrentUserLabel()
         };
       });
+      await window.dbLaJamoneraRest.write('/inventario', state.inventario);
       await persistRepartoStore();
       await refreshData({ silent: true });
       Swal.close();
@@ -4463,6 +4586,15 @@
       await openIosSwal({ title: 'Importación procesada', html: '<p>Se generaron los repartos con la lógica de trazabilidad disponible y faltantes forzados sin trazabilidad.</p>', icon: 'success' });
     } catch (error) {
       Swal.close();
+      const errText = normalizeValue(error?.message);
+      if (errText.startsWith('conflict_pending_ingredient')) {
+        await openIosSwal({ title: 'Conflicto pendiente', html: '<p>Tenés ingredientes con faltantes por vencimiento sin resolver. Usá "Resolver conflicto" antes de procesar.</p>', icon: 'warning' });
+        return;
+      }
+      if (errText.startsWith('conflict_pending_product')) {
+        await openIosSwal({ title: 'Conflicto pendiente', html: '<p>Tenés productos con faltantes por vencimiento sin resolver. Usá "Resolver conflicto" antes de procesar.</p>', icon: 'warning' });
+        return;
+      }
       await openIosSwal({ title: 'No se pudo procesar', html: '<p>Ocurrió un error al procesar el XLSX.</p>', icon: 'error' });
     }
   };
@@ -4498,11 +4630,26 @@
         ? `<small class="dispatch-xlsx-map-link">🔗 ${escapeHtml(capitalize(row.mappedTargetTitle))}</small>`
         : '';
       const ingredientDetail = mappedIngredients.length
-        ? `<div class="dispatch-xlsx-ingredient-breakdown">${mappedIngredients.map((item) => `<small class="dispatch-xlsx-ingredient-line ${item.hasStock ? 'is-ok' : 'is-danger'}">• ${escapeHtml(item.title)}: <strong>${Number(item.qty || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong> · Disp.: <strong>${Number(item.available || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong>${Number(item.expired || 0) > 0 ? ` · <span class="dispatch-xlsx-expired-part">${Number(item.expired || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')} vencidas</span>` : ''}</small>`).join('')}</div>`
+        ? `<div class="dispatch-xlsx-ingredient-breakdown">${mappedIngredients.map((item) => {
+          const missingQty = Math.max(0, Number(item.qty || 0) - Number(item.available || 0));
+          const hasConflict = missingQty > 0.0001;
+          const resolutionType = normalizeValue(row.conflictResolutions?.[item.id]?.type);
+          const resolutionBadge = resolutionType
+            ? `<span class="dispatch-xlsx-conflict-badge ${resolutionType === 'decommissioned' ? 'is-decommissioned' : 'is-sold'}">${resolutionType === 'decommissioned' ? 'Decomisado' : 'Vendido mostrador'}</span>`
+            : '';
+          const resolveBtn = hasConflict && Number(item.expired || 0) > 0
+            ? `<button type="button" class="btn ios-btn ios-btn-danger dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="ingredient" data-dispatch-xlsx-row="${escapeHtml(row.id)}" data-dispatch-xlsx-ingredient="${escapeHtml(item.id)}">Resolver conflicto</button>`
+            : '';
+          return `<small class="dispatch-xlsx-ingredient-line ${item.hasStock ? 'is-ok' : 'is-danger'}">• ${escapeHtml(item.title)}: <strong>${Number(item.qty || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong> · Disp.: <strong>${Number(item.available || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong>${Number(item.expired || 0) > 0 ? ` · <span class="dispatch-xlsx-expired-part">${Number(item.expired || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')} vencidas</span>` : ''}${hasConflict ? ` · <strong>Faltan ${missingQty.toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong>` : ''}${resolutionBadge}${resolveBtn}</small>`;
+        }).join('')}</div>`
         : '';
       const stockLine = row.mappedTargetTitle
         ? (() => {
-          const base = `${row.mappedHasStock ? 'Stock utilizable:' : 'Stock utilizable insuficiente:'} <strong class="dispatch-xlsx-stock-ok">${availableQty.toFixed(2)} ${escapeHtml(stockUnit)}</strong>${expiredQty > 0 ? ` <span class="dispatch-xlsx-stock-expired">· Vencido: ${expiredQty.toFixed(2)} ${escapeHtml(stockUnit)}</span>` : ''}`;
+          const base = mappedIngredients.length
+            ? (row.mappedHasStock
+              ? 'Stock utilizable completo en ingredientes relacionados.'
+              : 'Stock utilizable insuficiente en ingredientes relacionados.')
+            : `${row.mappedHasStock ? 'Stock utilizable:' : 'Stock utilizable insuficiente:'} <strong class="dispatch-xlsx-stock-ok">${availableQty.toFixed(2)} ${escapeHtml(stockUnit)}</strong>${expiredQty > 0 ? ` <span class="dispatch-xlsx-stock-expired">· Vencido: ${expiredQty.toFixed(2)} ${escapeHtml(stockUnit)}</span>` : ''}`;
           if (row.mappedHasStock) return base;
           const missingParts = mappedIngredients.length
             ? mappedIngredients.map((item) => {
@@ -4516,7 +4663,10 @@
               return [`${missingQty.toFixed(2)} ${escapeHtml(stockUnit)} del producto ${escapeHtml(capitalize(row.mappedTargetTitle || row.sourceProduct || ''))}`];
             })();
           if (!missingParts.length) return base;
-          return `${base}<span class="dispatch-xlsx-stock-missing"> ↳ Faltan ${formatMissingDispatchXlsxParts(missingParts)}.</span>`;
+          const productResolveBtn = (!mappedIngredients.length && expiredQty > 0 && Number(row.mappedQty || 0) > availableQty)
+            ? ` <button type="button" class="btn ios-btn ios-btn-danger dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="production" data-dispatch-xlsx-row="${escapeHtml(row.id)}">Resolver conflicto</button>`
+            : '';
+          return `${base}<span class="dispatch-xlsx-stock-missing"> ↳ Faltan ${formatMissingDispatchXlsxParts(missingParts)}.</span>${productResolveBtn}`;
         })()
         : 'Pendiente de relación';
       const clientBadge = row.clientStatus === 'new'
@@ -7281,6 +7431,33 @@
       delete cfg.disabledProducts[key];
       applyDispatchXlsxRuleToDraftRows(row.sourceProduct);
       await persistRepartoStore();
+      renderDispatchXlsxCreate(state.dispatchXlsxDraft);
+      return;
+    }
+    const xlsxResolveConflictBtn = event.target.closest('[data-dispatch-xlsx-resolve-conflict]');
+    if (xlsxResolveConflictBtn && state.dispatchXlsxDraft) {
+      const rowId = normalizeValue(xlsxResolveConflictBtn.dataset.dispatchXlsxRow);
+      const row = (Array.isArray(state.dispatchXlsxDraft.rows) ? state.dispatchXlsxDraft.rows : []).find((item) => item.id === rowId);
+      if (!row) return;
+      const conflictType = normalizeValue(xlsxResolveConflictBtn.dataset.dispatchXlsxResolveConflict);
+      const ingredientId = normalizeValue(xlsxResolveConflictBtn.dataset.dispatchXlsxIngredient);
+      const ask = await openIosSwal({
+        title: 'Resolver conflicto de vencido',
+        html: '<p>¿Cómo querés resolver este conflicto?</p>',
+        showCancelButton: true,
+        showDenyButton: true,
+        confirmButtonText: 'Venta en mostrador',
+        denyButtonText: 'Decomiso',
+        cancelButtonText: 'Cancelar'
+      });
+      if (!ask.isConfirmed && !ask.isDenied) return;
+      const selectedType = ask.isDenied ? 'decommissioned' : 'sold_counter';
+      if (conflictType === 'ingredient' && ingredientId) {
+        row.conflictResolutions = safeObject(row.conflictResolutions);
+        row.conflictResolutions[ingredientId] = { type: selectedType, at: nowTs() };
+      } else if (conflictType === 'production') {
+        row.productConflictResolution = selectedType;
+      }
       renderDispatchXlsxCreate(state.dispatchXlsxDraft);
       return;
     }
