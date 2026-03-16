@@ -4699,14 +4699,18 @@
           const resolutionBadge = resolutionType
             ? `<span class="dispatch-xlsx-conflict-badge ${resolutionType === 'decommissioned' ? 'is-decommissioned' : 'is-sold'}">${resolutionType === 'decommissioned' ? 'Decomisado' : 'Vendido mostrador'}</span>`
             : '';
-          const showResolveBtn = hasConflict || Boolean(resolutionType);
+          const hasExpiredForConflict = Number(item.expired || 0) > 0.0001;
+          const showResolveBtn = (hasConflict && hasExpiredForConflict) || Boolean(resolutionType);
           const resolveBtn = showResolveBtn
             ? `<button type="button" class="btn ios-btn ${resolutionType ? 'ios-btn-secondary' : 'ios-btn-danger'} dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="ingredient" data-dispatch-xlsx-row="${escapeHtml(row.id)}" data-dispatch-xlsx-ingredient="${escapeHtml(item.id)}">${resolutionType ? 'Cambiar elección' : 'Resolver conflicto'}</button>`
             : '';
           const toneClass = hasConflict
             ? ((Number(item.expired || 0) > 0.0001) ? 'is-danger' : (Number(item.available || 0) > 0.0001 ? 'is-warning' : 'is-danger'))
             : 'is-ok';
-          return `<div class="dispatch-xlsx-ingredient-item"><small class="dispatch-xlsx-ingredient-line ${toneClass}">• ${escapeHtml(item.title)}: <strong>${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.qty || 0), item.unit || 'u'))}</strong> · Disp.: <strong>${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.available || 0), item.unit || 'u'))}</strong>${Number(item.expired || 0) > 0 ? ` · <span class="dispatch-xlsx-expired-part">${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.expired || 0), item.unit || 'u'))} vencidas</span>` : ''}${hasConflict ? ` · <strong>Faltan ${escapeHtml(formatDispatchXlsxQtyWithUnit(missingQty, item.unit || 'u'))}</strong>` : ''}</small>${(resolutionBadge || resolveBtn) ? `<div class="dispatch-xlsx-conflict-actions">${resolutionBadge}${resolveBtn}</div>` : ''}</div>`;
+          const createHint = hasConflict && !hasExpiredForConflict
+            ? ` · <span class="dispatch-xlsx-create-part">Se creará ${escapeHtml(formatDispatchXlsxQtyWithUnit(missingQty, item.unit || 'u'))}</span>`
+            : '';
+          return `<div class="dispatch-xlsx-ingredient-item"><small class="dispatch-xlsx-ingredient-line ${toneClass}">• ${escapeHtml(item.title)}: <strong>${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.qty || 0), item.unit || 'u'))}</strong> · Disp.: <strong>${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.available || 0), item.unit || 'u'))}</strong>${Number(item.expired || 0) > 0 ? ` · <span class="dispatch-xlsx-expired-part">${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.expired || 0), item.unit || 'u'))} vencidas</span>` : ''}${hasConflict ? ` · <strong>Faltan ${escapeHtml(formatDispatchXlsxQtyWithUnit(missingQty, item.unit || 'u'))}</strong>` : ''}${createHint}</small>${(resolutionBadge || resolveBtn) ? `<div class="dispatch-xlsx-conflict-actions">${resolutionBadge}${resolveBtn}</div>` : ''}</div>`;
         }).join('')}</div>`
         : '';
       const stockLine = row.mappedTargetTitle
@@ -4730,10 +4734,20 @@
             })();
           if (!missingParts.length) return base;
           const canResolveProductConflict = !mappedIngredients.length && Number(row.mappedQty || 0) > Number(row.mappedAvailableKg || 0) && (expiredQty > 0.0001 || Boolean(productConflictResolutionType));
+          const missingCreateQty = mappedIngredients.length
+            ? mappedIngredients.reduce((acc, item) => {
+              const unresolved = getResolvedMissingQty(item);
+              const hasExpiredStock = Number(item.expired || 0) > 0.0001;
+              return acc + (hasExpiredStock ? 0 : unresolved);
+            }, 0)
+            : (expiredQty > 0.0001 ? 0 : resolvedProductMissingQty);
+          const createHint = missingCreateQty > 0.0001
+            ? `<span class="dispatch-xlsx-stock-create"> Se creará ${escapeHtml(formatDispatchXlsxQtyWithUnit(missingCreateQty, mappedIngredients.length ? (mappedIngredients[0]?.unit || 'u') : stockUnit))} sin trazabilidad.</span>`
+            : '';
           const productResolveBtn = canResolveProductConflict
             ? ` <button type="button" class="btn ios-btn ${productConflictResolutionType ? 'ios-btn-secondary' : 'ios-btn-danger'} dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="production" data-dispatch-xlsx-row="${escapeHtml(row.id)}">${productConflictResolutionType ? 'Cambiar elección' : 'Resolver conflicto'}</button>`
             : '';
-          return `${base}<span class="dispatch-xlsx-stock-missing"> ↳ Faltan ${formatMissingDispatchXlsxParts(missingParts)}.</span>${productResolveBtn}`;
+          return `${base}<span class="dispatch-xlsx-stock-missing"> ↳ Faltan ${formatMissingDispatchXlsxParts(missingParts)}.</span>${createHint}${productResolveBtn}`;
         })()
         : 'Pendiente de relación';
       const clientBadge = row.clientStatus === 'new'

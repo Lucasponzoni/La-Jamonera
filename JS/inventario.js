@@ -2109,18 +2109,36 @@
 
   const getEntryResolutionRowData = (entry) => {
     const meta = getEntryResolutionMeta(entry);
-    if (!meta.badge) return null;
     const resolutions = Array.isArray(entry?.expiryResolutions) ? entry.expiryResolutions : [];
     const latest = resolutions[0] || {};
     const totalKg = Number(entry?.qtyKg || 0);
     const availableKg = getAvailableKg(entry);
-    const resolvedKgRaw = Number(latest?.qtyKg || 0);
-    const resolvedKg = resolvedKgRaw > 0 ? resolvedKgRaw : Math.max(0, totalKg - availableKg);
+    if (meta.badge) {
+      const resolvedKgRaw = Number(latest?.qtyKg || 0);
+      const resolvedKg = resolvedKgRaw > 0 ? resolvedKgRaw : Math.max(0, totalKg - availableKg);
+      return {
+        badge: meta.badge,
+        status: meta.status,
+        at: Number(latest?.createdAt || entry?.createdAt || 0),
+        resolvedKg: Number(resolvedKg.toFixed(2)),
+        availableKg: Number(availableKg.toFixed(3))
+      };
+    }
+    const movements = Array.isArray(entry?.movementHistory) ? entry.movementHistory : [];
+    const latestDispatchMovement = movements.find((movement) => {
+      const type = normalizeValue(movement?.type);
+      return type === 'egreso_reparto_domicilio' || type === 'resolucion_vencido_reparto_xlsx';
+    });
+    if (!latestDispatchMovement) return null;
+    const qtyKg = Math.max(0, Number(latestDispatchMovement?.qtyKg || 0));
+    if (qtyKg <= 0.0001) return null;
+    const obs = normalizeLower(latestDispatchMovement?.observation || '');
+    const badge = obs.includes('decomis') ? 'Decomisado' : 'Vendido en mostrador';
     return {
-      badge: meta.badge,
-      status: meta.status,
-      at: Number(latest?.createdAt || entry?.createdAt || 0),
-      resolvedKg: Number(resolvedKg.toFixed(2)),
+      badge,
+      status: badge === 'Decomisado' ? 'decommissioned' : 'sold_counter',
+      at: Number(latestDispatchMovement?.createdAt || entry?.createdAt || 0),
+      resolvedKg: Number(qtyKg.toFixed(2)),
       availableKg: Number(availableKg.toFixed(3))
     };
   };
