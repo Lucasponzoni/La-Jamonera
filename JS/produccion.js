@@ -4473,6 +4473,13 @@
     const rows = Array.isArray(draft.rows) ? draft.rows : [];
     const hasVehicleAndManager = normalizeValue(draft.vehicleId) && Array.isArray(draft.managers) && draft.managers.length > 0;
     const readyToProcess = rows.length > 0 && rows.every((row) => row.disabled || normalizeValue(row.mappedTargetId)) && hasVehicleAndManager;
+    const formatMissingDispatchXlsxParts = (parts = []) => {
+      const clean = parts.filter(Boolean);
+      if (!clean.length) return '';
+      if (clean.length === 1) return clean[0];
+      if (clean.length === 2) return `${clean[0]} y ${clean[1]}`;
+      return `${clean.slice(0, -1).join(', ')} y ${clean[clean.length - 1]}`;
+    };
     const body = rows.length ? rows.map((row) => {
       const qtyClass = row.mappedHasStock ? 'is-ok' : 'is-danger';
       const mappedIngredients = Array.isArray(row.mappedIngredients) ? row.mappedIngredients : [];
@@ -4494,7 +4501,23 @@
         ? `<div class="dispatch-xlsx-ingredient-breakdown">${mappedIngredients.map((item) => `<small class="dispatch-xlsx-ingredient-line ${item.hasStock ? 'is-ok' : 'is-danger'}">• ${escapeHtml(item.title)}: <strong>${Number(item.qty || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong> · Disp.: <strong>${Number(item.available || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong>${Number(item.expired || 0) > 0 ? ` · <span class="dispatch-xlsx-expired-part">${Number(item.expired || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')} vencidas</span>` : ''}</small>`).join('')}</div>`
         : '';
       const stockLine = row.mappedTargetTitle
-        ? `${row.mappedHasStock ? 'Stock utilizable:' : 'Stock utilizable insuficiente:'} <strong class="dispatch-xlsx-stock-ok">${availableQty.toFixed(2)} ${escapeHtml(stockUnit)}</strong>${expiredQty > 0 ? ` <span class="dispatch-xlsx-stock-expired">· Vencido: ${expiredQty.toFixed(2)} ${escapeHtml(stockUnit)}</span>` : ''}${row.mappedHasStock ? '' : '<span class="dispatch-xlsx-stock-missing"> · Se completará con producción nueva al procesar.</span>'}`
+        ? (() => {
+          const base = `${row.mappedHasStock ? 'Stock utilizable:' : 'Stock utilizable insuficiente:'} <strong class="dispatch-xlsx-stock-ok">${availableQty.toFixed(2)} ${escapeHtml(stockUnit)}</strong>${expiredQty > 0 ? ` <span class="dispatch-xlsx-stock-expired">· Vencido: ${expiredQty.toFixed(2)} ${escapeHtml(stockUnit)}</span>` : ''}`;
+          if (row.mappedHasStock) return base;
+          const missingParts = mappedIngredients.length
+            ? mappedIngredients.map((item) => {
+              const missingQty = Math.max(0, Number(item.qty || 0) - Number(item.available || 0));
+              if (missingQty <= 0.0001) return '';
+              return `${missingQty.toFixed(2)} ${escapeHtml(item.unit || 'u')} del producto ${escapeHtml(normalizeValue(item.title || item.id || ''))}`;
+            }).filter(Boolean)
+            : (() => {
+              const missingQty = Math.max(0, Number(row.mappedQty || 0) - availableQty);
+              if (missingQty <= 0.0001) return [];
+              return [`${missingQty.toFixed(2)} ${escapeHtml(stockUnit)} del producto ${escapeHtml(capitalize(row.mappedTargetTitle || row.sourceProduct || ''))}`];
+            })();
+          if (!missingParts.length) return base;
+          return `${base}<span class="dispatch-xlsx-stock-missing"> ↳ Faltan ${formatMissingDispatchXlsxParts(missingParts)}.</span>`;
+        })()
         : 'Pendiente de relación';
       const clientBadge = row.clientStatus === 'new'
         ? `<span class="produccion-badge is-warning dispatch-xlsx-client-badge">Alta automática · DNI ${escapeHtml(row.clientDoc || '-')}</span>`
