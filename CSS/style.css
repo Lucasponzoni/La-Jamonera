@@ -9393,6 +9393,18 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   gap: 8px;
 }
 
+.dispatch-xlsx-ingredient-qty-row {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.dispatch-xlsx-ingredient-qty-label {
+  color: #3f517d;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
 
 .dispatch-xlsx-head-actions {
   margin-left: auto;

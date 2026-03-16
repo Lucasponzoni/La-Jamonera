@@ -4066,7 +4066,7 @@
       if (!host || !isIngredientMode) return;
       const selected = getSelectedIngredientsList();
       host.innerHTML = selected.length
-        ? selected.map((item) => `<input type="number" step="0.01" min="0" class="form-control ios-input dispatch-xlsx-ingredient-qty" data-dispatch-xlsx-ingredient-qty="${escapeHtml(item.id)}" placeholder="Producto ${item.idx}: ${escapeHtml(capitalize(item.title || item.id))} (${escapeHtml(item.unit)})" value="${escapeHtml(item.qty || '')}">`).join('')
+        ? selected.map((item) => `<label class="dispatch-xlsx-ingredient-qty-row"><span class="dispatch-xlsx-ingredient-qty-label">Producto ${item.idx}: ${escapeHtml(capitalize(item.title || item.id))} (${escapeHtml(item.unit)})</span><input type="number" step="0.01" min="0" class="form-control ios-input dispatch-xlsx-ingredient-qty" data-dispatch-xlsx-ingredient-qty="${escapeHtml(item.id)}" placeholder="Cantidad" value="${escapeHtml(item.qty || '1')}"></label>`).join('')
         : '';
     };
     const renderList = (popup) => {
@@ -4093,7 +4093,7 @@
     const result = await openIosSwal({
       title: 'Seleccioná destino',
       width: 'min(760px,96vw)',
-      html: `<div class="dispatch-xlsx-selector-wrap"><div class="input-group ios-input-group ingredientes-search-group dispatch-managers-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchXlsxTargetSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar producto o ingrediente"></div><div id="dispatchXlsxTargetList" class="dispatch-xlsx-target-list"></div>${isIngredientMode ? '<div id="dispatchXlsxIngredientQtyList" class="dispatch-xlsx-ingredient-qty-list"></div>' : ''}<input id="dispatchXlsxMapQty" type="number" step="0.01" class="swal2-input ios-input" placeholder="Cantidad (multiplicador opcional)"><small class="dispatch-xlsx-multiplier-help">Si lo dejás vacío, se usará la cantidad original del XLSX.</small></div>`,
+      html: `<div class="dispatch-xlsx-selector-wrap"><div class="input-group ios-input-group ingredientes-search-group dispatch-managers-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchXlsxTargetSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar producto o ingrediente"></div><div id="dispatchXlsxTargetList" class="dispatch-xlsx-target-list"></div>${isIngredientMode ? '<div id="dispatchXlsxIngredientQtyList" class="dispatch-xlsx-ingredient-qty-list"></div>' : '<input id="dispatchXlsxMapQty" type="number" step="0.01" class="swal2-input ios-input" placeholder="Cantidad (multiplicador opcional)"><small class="dispatch-xlsx-multiplier-help">Si lo dejás vacío, se usará la cantidad original del XLSX.</small>'}</div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
@@ -4115,7 +4115,7 @@
           if (!id) return;
           if (checkbox.checked) {
             const stockMeta = getDispatchXlsxIngredientStockMeta(id);
-            selectedIngredients[id] = { id, qty: '', unit: stockMeta.unit, title: catalog.find((item) => item.id === id)?.title || id };
+            selectedIngredients[id] = { id, qty: selectedIngredients[id]?.qty || '1', unit: stockMeta.unit, title: catalog.find((item) => item.id === id)?.title || id };
           } else {
             delete selectedIngredients[id];
           }
