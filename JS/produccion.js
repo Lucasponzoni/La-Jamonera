@@ -4393,11 +4393,12 @@
       entry.expiryResolutions.unshift({ id: makeId('expiry_resolution_xlsx'), createdAt: nowTs(), type: resolutionType, qtyKg: Number((takeBase / 1000).toFixed(4)) });
       entry.productionUsage = Array.isArray(entry.productionUsage) ? entry.productionUsage : [];
       if (resolutionType === 'sold_counter') {
+        const movementDate = normalizeValue(expiryIso) || dispatchDate;
         entry.productionUsage.unshift({
           id: makeId('usage_auto_egreso'),
           productionId: `AUTO-EGRESO-${dispatchCode || dispatchId || makeId('dispatch_xlsx')}`,
           producedAt: nowTs(),
-          productionDate: dispatchDate,
+          productionDate: movementDate,
           expiryDateAtProduction: 'Venta en mostrador',
           kilosUsed: Number((takeBase / 1000).toFixed(4)),
           usedQty: takeQty,
@@ -4467,8 +4468,80 @@
     }
     return { resolvedKg: Number((Number(qtyKg || 0) - remaining).toFixed(3)), unresolvedKg: Number(remaining.toFixed(3)) };
   };
+  const recomputeDispatchXlsxDraftRows = (draft) => {
+    if (!draft || !Array.isArray(draft.rows)) return;
+    draft.rows.forEach((row) => {
+      const meta = resolveDispatchXlsxProductMeta(row.sourceProduct, row.sourceQty, { dispatchDateIso: row.invoiceDate });
+      row.mappedTargetId = meta.targetId;
+      row.mappedTargetTitle = meta.targetTitle;
+      row.mappedQty = meta.mappedQty;
+      row.mappedHasStock = meta.hasStock;
+      row.mappedAvailableKg = meta.availableKg;
+      row.mappedAvailableUnit = meta.availableUnit || row.mappedAvailableUnit || 'kg';
+      row.mappedExpiredQty = Number(meta.expiredQty || 0);
+      row.mappedType = normalizeValue(meta.rule.targetType) || row.mappedType || '';
+      row.useCustomKg = Boolean(meta.rule.useCustomKg);
+      row.mappingMultiplier = Number(meta.multiplier || 0);
+      row.mappingMultiplierFromRule = Boolean(meta.multiplierFromRule);
+      row.mappedIngredients = Array.isArray(meta.ingredientBreakdown) ? meta.ingredientBreakdown : [];
+      row.conflictResolutions = safeObject(row.conflictResolutions);
+      row.productConflictResolution = normalizeValue(row.productConflictResolution);
+      row.disabled = meta.disabled;
+    });
+  };
+  const buildDispatchXlsxResolutionPreview = (draft) => {
+    const result = {
+      ingredient: {},
+      product: {}
+    };
+    if (!draft || !Array.isArray(draft.rows)) return result;
+    const remainingExpiredIngredients = {};
+    const remainingExpiredProducts = {};
+    draft.rows.forEach((row) => {
+      if (row.disabled || !normalizeValue(row.mappedTargetId)) return;
+      const rowId = normalizeValue(row.id);
+      const dispatchDateIso = normalizeDispatchDateToken(row.invoiceDate) || toIsoDate();
+      const effectiveDate = [dispatchDateIso, toIsoDate()].filter(Boolean).sort().pop() || toIsoDate();
+      const mappedIngredients = Array.isArray(row.mappedIngredients) ? row.mappedIngredients : [];
+      if (mappedIngredients.length) {
+        result.ingredient[rowId] = result.ingredient[rowId] || {};
+        mappedIngredients.forEach((item) => {
+          const ingredientId = normalizeValue(item.id);
+          if (!ingredientId) return;
+          if (remainingExpiredIngredients[ingredientId] === undefined) {
+            remainingExpiredIngredients[ingredientId] = Number(getDispatchXlsxIngredientStockMeta(ingredientId, effectiveDate).expired || 0);
+          }
+          const requested = Number(item.qty || 0);
+          const available = Number(item.available || 0);
+          const missing = Math.max(0, requested - available);
+          const before = Number(Math.max(0, remainingExpiredIngredients[ingredientId]).toFixed(4));
+          const chosen = normalizeValue(row.conflictResolutions?.[ingredientId]?.type);
+          const covered = chosen ? Math.min(missing, before) : 0;
+          remainingExpiredIngredients[ingredientId] = Number(Math.max(0, before - covered).toFixed(4));
+          result.ingredient[rowId][ingredientId] = { expiredAvailable: before, covered };
+        });
+        return;
+      }
+      const recipeId = normalizeValue(row.mappedTargetId);
+      if (!recipeId) return;
+      if (remainingExpiredProducts[recipeId] === undefined) {
+        remainingExpiredProducts[recipeId] = Number(getDispatchXlsxRecipeStockMeta(recipeId, effectiveDate).expired || 0);
+      }
+      const requestedKg = Number(row.mappedQty || row.sourceQty || 0);
+      const availableKg = Number(row.mappedAvailableKg || 0);
+      const missingKg = Math.max(0, requestedKg - availableKg);
+      const before = Number(Math.max(0, remainingExpiredProducts[recipeId]).toFixed(4));
+      const chosen = normalizeValue(row.productConflictResolution);
+      const covered = chosen ? Math.min(missingKg, before) : 0;
+      remainingExpiredProducts[recipeId] = Number(Math.max(0, before - covered).toFixed(4));
+      result.product[rowId] = { expiredAvailable: before, covered };
+    });
+    return result;
+  };
   const processDispatchXlsxRows = async () => {
     const draft = state.dispatchXlsxDraft;
+    recomputeDispatchXlsxDraftRows(draft);
+    const resolutionPreview = buildDispatchXlsxResolutionPreview(draft);
     draft.vehicleId = normalizeValue(nodes.dispatchView?.querySelector('#dispatchXlsxVehicleSelect')?.value || draft.vehicleId);
     draft.managers = [...(nodes.dispatchView?.querySelectorAll('[data-dispatch-xlsx-manager]:checked') || [])]
       .map((n) => normalizeValue(n.dataset.dispatchXlsxManager || n.value))
@@ -4513,17 +4586,19 @@
             row.mappedIngredients.forEach((mappedItem) => {
               const ingredientId = normalizeValue(mappedItem.id);
               if (!ingredientId) return;
+              const rowPreview = safeObject(resolutionPreview.ingredient?.[normalizeValue(row.id)]?.[ingredientId]);
               const requestedQty = Number(mappedItem.qty || 0);
               const availableQty = Number(mappedItem.available || 0);
               const missingQty = Math.max(0, requestedQty - availableQty);
-              if (missingQty > 0.0001 && Number(mappedItem.expired || 0) > 0) {
+              const expiredForRow = Number(rowPreview.expiredAvailable || 0);
+              if (missingQty > 0.0001 && expiredForRow > 0.0001) {
                 const chosen = normalizeValue(row.conflictResolutions?.[ingredientId]?.type);
                 if (!chosen) {
                   throw new Error(`conflict_pending_ingredient:${row.id}:${ingredientId}`);
                 }
                 resolveDispatchXlsxIngredientExpiredConflict({
                   ingredientId,
-                  requestedQty: Math.min(missingQty, Number(mappedItem.expired || 0)),
+                  requestedQty: Math.min(missingQty, expiredForRow),
                   requestedUnit: normalizeValue(mappedItem.unit || 'kilos'),
                   dispatchDate,
                   resolutionType: chosen,
@@ -4554,14 +4629,16 @@
           const qtyKg = Number(row.mappedQty || row.sourceQty || 0);
           const stockMeta = getDispatchXlsxRecipeStockMeta(recipeId, dispatchDate);
           const missingKg = Math.max(0, qtyKg - Number(stockMeta.available || 0));
-          if (missingKg > 0.0001 && Number(stockMeta.expired || 0) > 0) {
+          const rowProductPreview = safeObject(resolutionPreview.product?.[normalizeValue(row.id)]);
+          const expiredForRow = Number(rowProductPreview.expiredAvailable || 0);
+          if (missingKg > 0.0001 && expiredForRow > 0.0001) {
             const chosen = normalizeValue(row.productConflictResolution);
             if (!chosen) {
               throw new Error(`conflict_pending_product:${row.id}:${recipeId}`);
             }
             await resolveDispatchXlsxRecipeExpiredConflict({
               recipeId,
-              qtyKg: Math.min(missingKg, Number(stockMeta.expired || 0)),
+              qtyKg: Math.min(missingKg, expiredForRow),
               dispatchDate,
               resolutionType: chosen === 'decommissioned' ? 'decommissioned' : 'retail_sale'
             });
@@ -4624,6 +4701,8 @@
     if (!nodes.dispatchView) return;
     state.dispatchCreateMode = false;
     state.dispatchXlsxMode = true;
+    recomputeDispatchXlsxDraftRows(draft);
+    const resolutionPreview = buildDispatchXlsxResolutionPreview(draft);
     const rows = Array.isArray(draft.rows) ? draft.rows : [];
     const readyToProcess = rows.length > 0 && rows.every((row) => row.disabled || normalizeValue(row.mappedTargetId));
     const formatMissingDispatchXlsxParts = (parts = []) => {
@@ -4652,18 +4731,20 @@
         const requested = Number(item?.qty || 0);
         const available = Number(item?.available || 0);
         const missing = Math.max(0, requested - available);
-        const expired = Number(item?.expired || 0);
+        const preview = safeObject(resolutionPreview.ingredient?.[normalizeValue(row.id)]?.[normalizeValue(item?.id)]);
+        const expired = Number(preview.expiredAvailable || item?.expired || 0);
         const resolutionType = normalizeValue(row.conflictResolutions?.[item?.id]?.type);
         if (!resolutionType || expired <= 0.0001 || missing <= 0.0001) return missing;
-        const covered = Math.min(missing, expired);
+        const covered = Number(preview.covered || Math.min(missing, expired));
         return Number(Math.max(0, missing - covered).toFixed(4));
       };
       const ingredientHasPendingConflict = (item) => getResolvedMissingQty(item) > 0.0001;
       const hasAnyIngredientPendingConflict = mappedIngredients.some((item) => ingredientHasPendingConflict(item));
       const productMissingQty = Math.max(0, Number(row.mappedQty || 0) - Number(row.mappedAvailableKg || 0));
       const productConflictResolutionType = normalizeValue(row.productConflictResolution);
+      const rowProductPreview = safeObject(resolutionPreview.product?.[normalizeValue(row.id)]);
       const resolvedProductMissingQty = (productConflictResolutionType && Number(row.mappedExpiredQty || 0) > 0.0001)
-        ? Number(Math.max(0, productMissingQty - Math.min(productMissingQty, Number(row.mappedExpiredQty || 0))).toFixed(4))
+        ? Number(Math.max(0, productMissingQty - Number(rowProductPreview.covered || Math.min(productMissingQty, Number(row.mappedExpiredQty || 0)))).toFixed(4))
         : Number(productMissingQty.toFixed(4));
       const rowHasStock = mappedIngredients.length
         ? !hasAnyIngredientPendingConflict
@@ -4700,7 +4781,8 @@
           const resolutionBadge = resolutionType
             ? `<span class="dispatch-xlsx-conflict-badge ${resolutionType === 'decommissioned' ? 'is-decommissioned' : 'is-sold'}">${resolutionType === 'decommissioned' ? 'Decomisado' : 'Vendido mostrador'}</span>`
             : '';
-          const hasExpiredForConflict = Number(item.expired || 0) > 0.0001;
+          const itemPreview = safeObject(resolutionPreview.ingredient?.[normalizeValue(row.id)]?.[normalizeValue(item.id)]);
+          const hasExpiredForConflict = Number(itemPreview.expiredAvailable || item.expired || 0) > 0.0001;
           const showResolveBtn = (hasConflict && hasExpiredForConflict) || Boolean(resolutionType);
           const resolveBtn = showResolveBtn
             ? `<button type="button" class="btn ios-btn ${resolutionType ? 'ios-btn-secondary' : 'ios-btn-danger'} dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="ingredient" data-dispatch-xlsx-row="${escapeHtml(row.id)}" data-dispatch-xlsx-ingredient="${escapeHtml(item.id)}">${resolutionType ? 'Cambiar elección' : 'Resolver conflicto'}</button>`
@@ -4708,7 +4790,9 @@
           const toneClass = hasConflict
             ? ((Number(item.expired || 0) > 0.0001) ? 'is-danger' : (Number(item.available || 0) > 0.0001 ? 'is-warning' : 'is-danger'))
             : 'is-ok';
-          return `<div class="dispatch-xlsx-ingredient-item"><small class="dispatch-xlsx-ingredient-line ${toneClass}">• ${escapeHtml(item.title)}: <strong>${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.qty || 0), item.unit || 'u'))}</strong> · Disp.: <strong>${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.available || 0), item.unit || 'u'))}</strong>${Number(item.expired || 0) > 0 ? ` · <span class="dispatch-xlsx-expired-part">${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.expired || 0), item.unit || 'u'))} vencidas</span>` : ''}${hasConflict ? ` · <strong>Faltan ${escapeHtml(formatDispatchXlsxQtyWithUnit(missingQty, item.unit || 'u'))}</strong>` : ''}</small>${(resolutionBadge || resolveBtn) ? `<div class="dispatch-xlsx-conflict-actions">${resolutionBadge}${resolveBtn}</div>` : ''}</div>`;
+          const showExpiredPart = !resolutionType && Number(itemPreview.expiredAvailable || item.expired || 0) > 0;
+          const showMissingPart = !resolutionType && hasConflict;
+          return `<div class="dispatch-xlsx-ingredient-item"><small class="dispatch-xlsx-ingredient-line ${toneClass}">• ${escapeHtml(item.title)}: <strong>${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.qty || 0), item.unit || 'u'))}</strong> · Disp.: <strong>${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.available || 0), item.unit || 'u'))}</strong>${showExpiredPart ? ` · <span class="dispatch-xlsx-expired-part">${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(itemPreview.expiredAvailable || item.expired || 0), item.unit || 'u'))} vencidas</span>` : ''}${showMissingPart ? ` · <strong>Faltan ${escapeHtml(formatDispatchXlsxQtyWithUnit(missingQty, item.unit || 'u'))}</strong>` : ''}</small>${(resolutionBadge || resolveBtn) ? `<div class="dispatch-xlsx-conflict-actions">${resolutionBadge}${resolveBtn}</div>` : ''}</div>`;
         }).join('')}</div>`
         : '';
       const stockLine = row.mappedTargetTitle
@@ -4731,7 +4815,7 @@
               return [`${escapeHtml(formatDispatchXlsxQtyWithUnit(missingQty, stockUnit))} del producto ${escapeHtml(capitalize(row.mappedTargetTitle || row.sourceProduct || ''))}`];
             })();
           if (!missingParts.length) return base;
-          const canResolveProductConflict = !mappedIngredients.length && Number(row.mappedQty || 0) > Number(row.mappedAvailableKg || 0) && (expiredQty > 0.0001 || Boolean(productConflictResolutionType));
+          const canResolveProductConflict = !mappedIngredients.length && Number(row.mappedQty || 0) > Number(row.mappedAvailableKg || 0) && (Number(rowProductPreview.expiredAvailable || expiredQty) > 0.0001 || Boolean(productConflictResolutionType));
           const missingCreateQty = mappedIngredients.length
             ? mappedIngredients.reduce((acc, item) => {
               const unresolved = getResolvedMissingQty(item);
