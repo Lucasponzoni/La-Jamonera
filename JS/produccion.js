@@ -3812,27 +3812,35 @@
     return safeObject(getDispatchXlsxConfig().productRules[key]);
   };
   const isDispatchXlsxProductDisabled = (sourceName) => Boolean(getDispatchXlsxConfig().disabledProducts[normalizeDispatchXlsxProductKey(sourceName)]);
-  const resolveDispatchXlsxProductMeta = (sourceName, qtyRaw) => {
+  const resolveDispatchXlsxProductMeta = (sourceName, qtyRaw, options = {}) => {
     const rule = getDispatchXlsxProductRule(sourceName);
     const targetId = normalizeValue(rule.targetId);
     const isIngredient = normalizeValue(rule.targetType) === 'ingredient';
     const targetMap = isIngredient ? safeObject(state.ingredientes) : safeObject(state.recetas);
     const target = safeObject(targetMap[targetId]);
     const sourceQty = Number(parseDispatchXlsxQty(qtyRaw) || 0);
+    const dispatchDateIso = normalizeDispatchDateToken(options.dispatchDateIso) || toIsoDate();
+    const configuredMultiplier = Number(parseDispatchXlsxQty(rule.customKg) || 0);
+    const hasConfiguredMultiplier = Boolean(rule.useCustomKg) && configuredMultiplier > 0;
+    const effectiveMultiplier = hasConfiguredMultiplier ? configuredMultiplier : 1;
     const ingredientTargets = isIngredient && Array.isArray(rule.ingredientTargets) ? rule.ingredientTargets : [];
     const ingredientBreakdown = ingredientTargets.map((targetRow) => {
       const ingredientId = normalizeValue(targetRow.id);
       const ingredient = safeObject(state.ingredientes?.[ingredientId]);
-      const inventoryItem = safeObject(state.inventario?.items?.[ingredientId]);
-      const qty = Number(parseDispatchXlsxQty(targetRow.qty));
-      const unit = normalizeValue(targetRow.unit || inventoryItem.unit || ingredient.stockUnit || 'unidades');
-      const available = Number(getDispatchXlsxIngredientStockMeta(ingredientId).available || 0);
+      const stockMeta = getDispatchXlsxIngredientStockMeta(ingredientId, dispatchDateIso);
+      const configuredQty = Number(parseDispatchXlsxQty(targetRow.qty) || 0);
+      const qty = Number((configuredQty * effectiveMultiplier).toFixed(2));
+      const unit = normalizeValue(targetRow.unit || stockMeta.unit || ingredient.stockUnit || 'unidades');
+      const available = Number(stockMeta.available || 0);
+      const expired = Number(stockMeta.expired || 0);
       return {
         id: ingredientId,
         title: normalizeValue(ingredient.name || ingredient.title || ingredientId),
+        configuredQty,
         qty,
         unit,
         available,
+        expired,
         hasStock: available >= qty
       };
     }).filter((item) => item.id);
@@ -3846,13 +3854,30 @@
         availableKg: ingredientBreakdown.reduce((acc, item) => acc + Number(item.available || 0), 0),
         hasStock: ingredientBreakdown.every((item) => item.hasStock),
         ingredientBreakdown,
+        multiplier: hasConfiguredMultiplier ? configuredMultiplier : sourceQty,
+        multiplierFromRule: hasConfiguredMultiplier,
+        availableUnit: ingredientBreakdown[0]?.unit || 'unidades',
+        expiredQty: ingredientBreakdown.reduce((acc, item) => acc + Number(item.expired || 0), 0),
         disabled: isDispatchXlsxProductDisabled(sourceName)
       };
     }
-    const mappedQty = Number(rule.useCustomKg ? rule.customKg : sourceQty);
-    const availableKg = targetId
-      ? (isIngredient ? Number(getDispatchXlsxIngredientStockMeta(targetId).available || 0) : Number(getProducedStockMeta(targetId).available || 0))
-      : 0;
+    const mappedQty = Number((hasConfiguredMultiplier ? (sourceQty * configuredMultiplier) : sourceQty).toFixed(3));
+    let availableKg = 0;
+    let expiredQty = 0;
+    let availableUnit = 'kg';
+    if (targetId) {
+      if (isIngredient) {
+        const ingredientStock = getDispatchXlsxIngredientStockMeta(targetId, dispatchDateIso);
+        availableKg = Number(ingredientStock.available || 0);
+        expiredQty = Number(ingredientStock.expired || 0);
+        availableUnit = ingredientStock.unit || 'unidades';
+      } else {
+        const recipeStock = getDispatchXlsxRecipeStockMeta(targetId, dispatchDateIso);
+        availableKg = Number(recipeStock.available || 0);
+        expiredQty = Number(recipeStock.expired || 0);
+        availableUnit = recipeStock.unit || 'kg';
+      }
+    }
     const hasStock = targetId ? availableKg >= mappedQty : false;
     return {
       rule,
@@ -3861,8 +3886,12 @@
       sourceQty,
       mappedQty,
       availableKg,
+      availableUnit,
+      expiredQty,
       hasStock,
       ingredientBreakdown: [],
+      multiplier: hasConfiguredMultiplier ? configuredMultiplier : sourceQty,
+      multiplierFromRule: hasConfiguredMultiplier,
       disabled: isDispatchXlsxProductDisabled(sourceName)
     };
   };
@@ -3871,14 +3900,18 @@
     const sourceKey = normalizeDispatchXlsxProductKey(sourceProduct);
     state.dispatchXlsxDraft.rows.forEach((row) => {
       if (normalizeDispatchXlsxProductKey(row.sourceProduct) !== sourceKey) return;
-      const meta = resolveDispatchXlsxProductMeta(row.sourceProduct, row.sourceQty);
+      const meta = resolveDispatchXlsxProductMeta(row.sourceProduct, row.sourceQty, { dispatchDateIso: row.invoiceDate });
       row.mappedTargetId = meta.targetId;
       row.mappedTargetTitle = meta.targetTitle;
       row.mappedQty = meta.mappedQty;
       row.mappedHasStock = meta.hasStock;
       row.mappedAvailableKg = meta.availableKg;
+      row.mappedAvailableUnit = meta.availableUnit || row.mappedAvailableUnit || 'kg';
+      row.mappedExpiredQty = Number(meta.expiredQty || 0);
       row.mappedType = normalizeValue(meta.rule.targetType) || row.mappedType || '';
       row.useCustomKg = Boolean(meta.rule.useCustomKg);
+      row.mappingMultiplier = Number(meta.multiplier || 0);
+      row.mappingMultiplierFromRule = Boolean(meta.multiplierFromRule);
       row.mappedIngredients = Array.isArray(meta.ingredientBreakdown) ? meta.ingredientBreakdown : [];
       row.disabled = meta.disabled;
     });
@@ -3901,7 +3934,7 @@
       if (!clientName && !invoiceNumber && !productName) continue;
       const clientInfo = ensureDispatchXlsxClient(clientName || 'Cliente sin nombre');
       clientOps.push(clientInfo);
-      const meta = resolveDispatchXlsxProductMeta(productName, qtyRaw);
+      const meta = resolveDispatchXlsxProductMeta(productName, qtyRaw, { dispatchDateIso: invoiceDate });
       rows.push({
         id: makeId('dispatch_xlsx_row'),
         rowIndex: rowIdx + 1,
@@ -3919,8 +3952,12 @@
         mappedQty: meta.mappedQty,
         mappedHasStock: meta.hasStock,
         mappedAvailableKg: meta.availableKg,
+        mappedAvailableUnit: meta.availableUnit || 'kg',
+        mappedExpiredQty: Number(meta.expiredQty || 0),
         mappedType: normalizeValue(meta.rule.targetType) || 'production',
         useCustomKg: Boolean(meta.rule.useCustomKg),
+        mappingMultiplier: Number(meta.multiplier || 0),
+        mappingMultiplierFromRule: Boolean(meta.multiplierFromRule),
         mappedIngredients: Array.isArray(meta.ingredientBreakdown) ? meta.ingredientBreakdown : [],
         disabled: meta.disabled
       });
@@ -3941,22 +3978,44 @@
       imageUrl: sanitizeImageUrl(item.imageUrl)
     })).filter((item) => item.id && item.title);
   };
-  const getDispatchXlsxIngredientStockMeta = (ingredientId) => {
+  const getDispatchXlsxRecipeStockMeta = (recipeId, dispatchDateIso = toIsoDate()) => {
+    const lots = buildRecipeLotsForDispatch(recipeId);
+    const totals = lots.reduce((acc, lot) => {
+      const qty = Number(lot.availableKg || 0);
+      if (qty <= 0.0001) return acc;
+      if (isDispatchLotExpiredForDate(lot, dispatchDateIso)) acc.expired += qty;
+      else acc.available += qty;
+      return acc;
+    }, { available: 0, expired: 0 });
+    return {
+      unit: 'kg',
+      available: Number(totals.available.toFixed(2)),
+      expired: Number(totals.expired.toFixed(2))
+    };
+  };
+  const getDispatchXlsxIngredientStockMeta = (ingredientId, dispatchDateIso = toIsoDate()) => {
     const inventoryItem = safeObject(state.inventario?.items?.[ingredientId]);
     const ingredient = safeObject(state.ingredientes?.[ingredientId]);
     const unit = normalizeValue(inventoryItem.stockUnit || inventoryItem.unit || ingredient.stockUnit || 'unidades');
     const entries = Array.isArray(inventoryItem.entries) ? inventoryItem.entries : [];
     let availableFromEntries = 0;
+    let expiredFromEntries = 0;
     entries.forEach((entry) => {
       const entryUnit = normalizeValue(entry.unit || unit || 'unidades');
       const entryAvailable = getEntryAvailableQty(entry);
       const entryBase = toBase(entryAvailable, entryUnit);
-      if (Number.isFinite(entryBase) && entryBase >= 0) {
+      if (Number.isFinite(entryBase) && entryBase > 0) {
         const converted = fromBase(entryBase, unit);
-        if (Number.isFinite(converted) && converted >= 0) availableFromEntries += converted;
+        if (Number.isFinite(converted) && converted > 0) {
+          const expiryIso = normalizeValue(entry.expiryDate);
+          const isExpired = !isEntryNoPerecedero(entry) && expiryIso && dispatchDateIso && expiryIso < dispatchDateIso;
+          if (isExpired) expiredFromEntries += converted;
+          else availableFromEntries += converted;
+        }
       }
     });
     let available = availableFromEntries;
+    let expired = expiredFromEntries;
     if (!Number.isFinite(available) || available < 0.0001) {
       const baseStock = Number(inventoryItem.stockBase);
       if (Number.isFinite(baseStock) && baseStock > 0) {
@@ -3969,7 +4028,8 @@
       if (Number.isFinite(converted)) available = converted;
     }
     if (!Number.isFinite(available) || available < 0) available = 0;
-    return { unit, available: Number(available.toFixed(2)) };
+    if (!Number.isFinite(expired) || expired < 0) expired = 0;
+    return { unit, available: Number(available.toFixed(2)), expired: Number(expired.toFixed(2)) };
   };
   const askDispatchXlsxRelationType = async () => {
     let selected = '';
@@ -4014,7 +4074,10 @@
           if (isIngredientMode) {
             const stockMeta = getDispatchXlsxIngredientStockMeta(item.id);
             const stockClass = stockMeta.available > 0 ? 'is-ok' : 'is-danger';
-            return `<label class="inventario-check-row inventario-selector-row dispatch-xlsx-selector-row"><input type="checkbox" data-dispatch-xlsx-ingredient-pick="${escapeHtml(item.id)}" ${checked ? 'checked' : ''}><span class="inventario-print-photo-wrap">${item.imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-dispatch-xlsx-target-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><span><strong>${escapeHtml(capitalize(item.title))}</strong><small class="d-block dispatch-xlsx-stock-hint ${stockClass}">Stock: ${stockMeta.available.toFixed(2)} ${escapeHtml(stockMeta.unit)}</small></span></label>`;
+            const expiredHint = stockMeta.expired > 0
+              ? `<small class="d-block dispatch-xlsx-stock-hint is-danger">→ ${stockMeta.expired.toFixed(2)} ${escapeHtml(stockMeta.unit)} vencidas</small>`
+              : '';
+            return `<label class="inventario-check-row inventario-selector-row dispatch-xlsx-selector-row"><input type="checkbox" data-dispatch-xlsx-ingredient-pick="${escapeHtml(item.id)}" ${checked ? 'checked' : ''}><span class="inventario-print-photo-wrap">${item.imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-dispatch-xlsx-target-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><span><strong>${escapeHtml(capitalize(item.title))}</strong><small class="d-block dispatch-xlsx-stock-hint ${stockClass}">Stock: ${stockMeta.available.toFixed(2)} ${escapeHtml(stockMeta.unit)}</small>${expiredHint}</span></label>`;
           }
           return `<label class="inventario-check-row inventario-selector-row dispatch-xlsx-selector-row"><input type="radio" name="dispatchXlsxTargetPick" value="${escapeHtml(item.id)}" ${picked === item.id ? 'checked' : ''}><span class="inventario-print-photo-wrap">${item.imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-dispatch-xlsx-target-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><span>${escapeHtml(capitalize(item.title))}</span></label>`;
         }).join('')
@@ -4025,7 +4088,7 @@
     const result = await openIosSwal({
       title: 'Seleccioná destino',
       width: 'min(760px,96vw)',
-      html: `<div class="dispatch-xlsx-selector-wrap"><div class="input-group ios-input-group ingredientes-search-group dispatch-managers-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchXlsxTargetSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar producto o ingrediente"></div><div id="dispatchXlsxTargetList" class="dispatch-xlsx-target-list"></div>${isIngredientMode ? '<div id="dispatchXlsxIngredientQtyList" class="dispatch-xlsx-ingredient-qty-list"></div>' : '<input id="dispatchXlsxMapQty" type="number" step="0.01" class="swal2-input ios-input" placeholder="Kg específicos (opcional)">'}</div>`,
+      html: `<div class="dispatch-xlsx-selector-wrap"><div class="input-group ios-input-group ingredientes-search-group dispatch-managers-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchXlsxTargetSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar producto o ingrediente"></div><div id="dispatchXlsxTargetList" class="dispatch-xlsx-target-list"></div>${isIngredientMode ? '<div id="dispatchXlsxIngredientQtyList" class="dispatch-xlsx-ingredient-qty-list"></div>' : ''}<input id="dispatchXlsxMapQty" type="number" step="0.01" class="swal2-input ios-input" placeholder="Cantidad (multiplicador opcional)"><small class="dispatch-xlsx-multiplier-help">Si lo dejás vacío, se usará la cantidad original del XLSX.</small></div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
@@ -4388,22 +4451,31 @@
     const body = rows.length ? rows.map((row) => {
       const qtyClass = row.mappedHasStock ? 'is-ok' : 'is-danger';
       const mappedIngredients = Array.isArray(row.mappedIngredients) ? row.mappedIngredients : [];
+      const stockUnit = normalizeValue(row.mappedAvailableUnit || (mappedIngredients[0]?.unit) || (normalizeValue(row.mappedType) === 'ingredient' ? 'unidades' : 'kg'));
+      const availableQty = Number(row.mappedAvailableKg || 0);
+      const expiredQty = Number(row.mappedExpiredQty || 0);
+      const multiplierLabel = row.mappingMultiplierFromRule
+        ? Number(row.mappingMultiplier || 0).toFixed(2)
+        : (Number(row.sourceQty || 0) > 0 ? Number(row.sourceQty || 0).toFixed(2) : '1.00');
       const qtyMap = row.mappedTargetTitle
         ? (mappedIngredients.length
-          ? `${Number(row.sourceQty || 0).toFixed(2)} → <span class="dispatch-xlsx-mapped-kg ${qtyClass}">${mappedIngredients.map((item) => `${Number(item.qty || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}`).join(' + ')}</span>`
-          : `${Number(row.sourceQty || 0).toFixed(2)} → <span class="dispatch-xlsx-mapped-kg ${qtyClass}">${Number(row.mappedQty || 0).toFixed(2)} kg</span>`)
-        : `${Number(row.sourceQty || 0).toFixed(2)} kg`;
+          ? `<span class="dispatch-xlsx-qty-main">${multiplierLabel} → <span class="dispatch-xlsx-mapped-kg ${qtyClass}">${mappedIngredients.map((item) => `${Number(item.qty || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}`).join(' + ')}</span></span>`
+          : `<span class="dispatch-xlsx-qty-main">${multiplierLabel} → <span class="dispatch-xlsx-mapped-kg ${qtyClass}">${Number(row.mappedQty || 0).toFixed(2)} ${escapeHtml(stockUnit)}</span></span>`)
+        : `${Number(row.sourceQty || 0).toFixed(2)} ${escapeHtml(stockUnit)}`;
       const relationMeta = row.mappedTargetTitle
-        ? `<small class="dispatch-xlsx-map-link">↳ ${escapeHtml(capitalize(row.mappedTargetTitle))}</small>`
+        ? `<small class="dispatch-xlsx-map-link">🔗 ${escapeHtml(capitalize(row.mappedTargetTitle))}</small>`
         : '';
       const ingredientDetail = mappedIngredients.length
-        ? `<div class="dispatch-xlsx-ingredient-breakdown">${mappedIngredients.map((item) => `<small class="dispatch-xlsx-ingredient-line ${item.hasStock ? 'is-ok' : 'is-danger'}">• ${escapeHtml(item.title)}: <strong>${Number(item.qty || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong> · Disp.: <strong>${Number(item.available || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong></small>`).join('')}</div>`
+        ? `<div class="dispatch-xlsx-ingredient-breakdown">${mappedIngredients.map((item) => `<small class="dispatch-xlsx-ingredient-line ${item.hasStock ? 'is-ok' : 'is-danger'}">• ${escapeHtml(item.title)}: <strong>${Number(item.qty || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong> · Disp.: <strong>${Number(item.available || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong>${Number(item.expired || 0) > 0 ? ` · <span class="dispatch-xlsx-expired-part">${Number(item.expired || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')} vencidas</span>` : ''}</small>`).join('')}</div>`
         : '';
+      const stockLine = row.mappedTargetTitle
+        ? `${row.mappedHasStock ? 'Con stock para producir' : 'Sin stock, se creará igual'} · Stock: <strong class="dispatch-xlsx-stock-ok">${availableQty.toFixed(2)} ${escapeHtml(stockUnit)}</strong>${expiredQty > 0 ? ` <span class="dispatch-xlsx-stock-expired">→ ${expiredQty.toFixed(2)} ${escapeHtml(stockUnit)} vencidas</span>` : ''}`
+        : 'Pendiente de relación';
       const clientBadge = row.clientStatus === 'new'
         ? `<span class="produccion-badge is-warning dispatch-xlsx-client-badge">Alta automática · DNI ${escapeHtml(row.clientDoc || '-')}</span>`
         : `<span class="produccion-badge dispatch-xlsx-client-badge">Registrado · DNI ${escapeHtml(row.clientDoc || '-')}</span>`;
       const dateLabel = /^\d{4}-\d{2}-\d{2}$/.test(row.invoiceDate || '') ? formatIsoEs(row.invoiceDate) : (row.invoiceDate || '-');
-      return `<tr class="${row.disabled ? 'dispatch-xlsx-row-disabled' : ''}"><td><div class="dispatch-xlsx-client"><strong class="dispatch-xlsx-client-name" title="${escapeHtml(row.clientName || '-')}">${escapeHtml(row.clientName || '-')}</strong>${clientBadge}</div></td><td class="dispatch-xlsx-invoice-cell">${escapeHtml(row.invoiceNumber || '-')}</td><td class="dispatch-xlsx-date-cell">${escapeHtml(dateLabel)}</td><td><div class="dispatch-xlsx-mapping"><strong>${escapeHtml(row.sourceProduct || '-')}</strong>${relationMeta}<span class="dispatch-xlsx-map-state ${row.mappedTargetTitle ? 'is-related' : 'is-pending'}">${row.mappedTargetTitle ? `<i class="fa-solid fa-circle-check"></i> Relacionado` : `<i class="bi bi-x-circle-fill"></i> Sin relacionado`}</span></div></td><td class="dispatch-xlsx-kilos-cell"><span class="${qtyClass}">${qtyMap}</span><small class="d-block ${qtyClass}">${row.mappedTargetTitle ? `${row.mappedHasStock ? 'Con stock para producir' : 'Sin stock, se creará igual'} · Disp.: <strong>${Number(row.mappedAvailableKg || 0).toFixed(2)} kg</strong>` : 'Pendiente de relación'}</small>${ingredientDetail}</td><td><label class="dispatch-xlsx-toggle"><input type="checkbox" data-dispatch-xlsx-row-enabled="${escapeHtml(row.id)}" ${row.disabled ? '' : 'checked'}><span>${row.disabled ? 'Deshabilitado' : 'Activo'}</span></label></td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-xlsx-map="${escapeHtml(row.id)}"><i class="fa-solid fa-link"></i><span>Relacionar</span></button></td></tr>`;
+      return `<tr class="${row.disabled ? 'dispatch-xlsx-row-disabled' : ''}"><td><div class="dispatch-xlsx-client"><strong class="dispatch-xlsx-client-name" title="${escapeHtml(row.clientName || '-')}">${escapeHtml(row.clientName || '-')}</strong>${clientBadge}</div></td><td class="dispatch-xlsx-invoice-cell">${escapeHtml(row.invoiceNumber || '-')}</td><td class="dispatch-xlsx-date-cell">${escapeHtml(dateLabel)}</td><td><div class="dispatch-xlsx-mapping"><strong>${escapeHtml(row.sourceProduct || '-')}</strong>${relationMeta}${ingredientDetail}<span class="dispatch-xlsx-map-state ${row.mappedTargetTitle ? 'is-related' : 'is-pending'}">${row.mappedTargetTitle ? `<i class="fa-solid fa-circle-check"></i> Relacionado` : `<i class="bi bi-x-circle-fill"></i> Sin relacionado`}</span></div></td><td class="dispatch-xlsx-kilos-cell"><span class="${qtyClass}">${qtyMap}</span><small class="d-block ${qtyClass}">${stockLine}</small></td><td><label class="dispatch-xlsx-toggle"><input type="checkbox" data-dispatch-xlsx-row-enabled="${escapeHtml(row.id)}" ${row.disabled ? '' : 'checked'}><span>${row.disabled ? 'Deshabilitado' : 'Activo'}</span></label></td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-xlsx-map="${escapeHtml(row.id)}"><i class="fa-solid fa-link"></i><span>Relacionar</span></button></td></tr>`;
     }).join('') : '<tr><td colspan="7" class="text-center">Adjuntá un XLS/XLSX para comenzar.</td></tr>';
     const uploadHint = state.dispatchXlsxUploadInProgress ? '<span class="dispatch-xlsx-uploading"><i class="fa-solid fa-spinner fa-spin"></i> Subiendo Excel...</span>' : '';
     nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Repartos por XLSX</h6><div class="dispatch-xlsx-head-actions">${uploadHint}<button id="dispatchXlsxUploadBtn" type="button" class="btn recipe-table-action-btn recipe-table-action-btn-monography"><i class="fa-solid fa-file-arrow-up"></i><span>Adjuntar XLSX</span></button><button type="button" id="dispatchXlsxHistoryBtn" class="btn recipe-table-action-btn recipe-table-action-btn-neutral"><i class="fa-regular fa-message"></i><span>Historial de Archivos</span></button></div><input id="dispatchXlsxFileInput" class="d-none" type="file" accept=".xlsx,.xls"></div><section class="recipe-step-card step-block produccion-dispatch-create"><h6 class="step-title"><span class="recipe-step-number">1</span> Previsualización importada ${draft.uploadedFileName ? `<small>· ${escapeHtml(draft.uploadedFileName)}</small>` : ''}</h6><div class="table-responsive recipe-table-wrap dispatch-products-table dispatch-xlsx-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0 dispatch-xlsx-table"><thead><tr><th>Cliente</th><th>Factura</th><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchXlsxProcessBtn" ${readyToProcess ? '' : 'disabled'}><i class="fa-solid fa-gears"></i><span>Procesar ingresos</span></button></div>`;
