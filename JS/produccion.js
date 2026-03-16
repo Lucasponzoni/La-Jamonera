@@ -4603,8 +4603,7 @@
     state.dispatchCreateMode = false;
     state.dispatchXlsxMode = true;
     const rows = Array.isArray(draft.rows) ? draft.rows : [];
-    const hasVehicleAndManager = normalizeValue(draft.vehicleId) && Array.isArray(draft.managers) && draft.managers.length > 0;
-    const readyToProcess = rows.length > 0 && rows.every((row) => row.disabled || normalizeValue(row.mappedTargetId)) && hasVehicleAndManager;
+    const readyToProcess = rows.length > 0 && rows.every((row) => row.disabled || normalizeValue(row.mappedTargetId));
     const formatMissingDispatchXlsxParts = (parts = []) => {
       const clean = parts.filter(Boolean);
       if (!clean.length) return '';
@@ -4623,7 +4622,13 @@
         : (Number(row.sourceQty || 0) > 0 ? Number(row.sourceQty || 0).toFixed(2) : '1.00');
       const qtyMap = row.mappedTargetTitle
         ? (mappedIngredients.length
-          ? `<span class="dispatch-xlsx-qty-main">${multiplierLabel} → <span class="dispatch-xlsx-mapped-kg ${qtyClass}">${mappedIngredients.map((item) => `${Number(item.qty || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}`).join(' + ')}</span></span>`
+          ? `<span class="dispatch-xlsx-qty-main">${multiplierLabel} → <span class="dispatch-xlsx-mapped-kg ${qtyClass}">${mappedIngredients.map((item) => {
+            const requested = Number(item.qty || 0);
+            const available = Number(item.available || 0);
+            const missing = Math.max(0, requested - available);
+            const toneClass = missing <= 0.0001 ? 'is-ok' : (available > 0.0001 ? 'is-warning' : 'is-danger');
+            return `<span class="dispatch-xlsx-mapped-kg ${toneClass}">${requested.toFixed(2)} ${escapeHtml(item.unit || 'u')}</span>`;
+          }).join(' + ')}</span></span>`
           : `<span class="dispatch-xlsx-qty-main">${multiplierLabel} → <span class="dispatch-xlsx-mapped-kg ${qtyClass}">${Number(row.mappedQty || 0).toFixed(2)} ${escapeHtml(stockUnit)}</span></span>`)
         : `${Number(row.sourceQty || 0).toFixed(2)} ${escapeHtml(stockUnit)}`;
       const relationMeta = row.mappedTargetTitle
@@ -4640,7 +4645,8 @@
           const resolveBtn = hasConflict
             ? `<button type="button" class="btn ios-btn ios-btn-danger dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="ingredient" data-dispatch-xlsx-row="${escapeHtml(row.id)}" data-dispatch-xlsx-ingredient="${escapeHtml(item.id)}">Resolver conflicto</button>`
             : '';
-          return `<small class="dispatch-xlsx-ingredient-line ${item.hasStock ? 'is-ok' : 'is-danger'}">• ${escapeHtml(item.title)}: <strong>${Number(item.qty || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong> · Disp.: <strong>${Number(item.available || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong>${Number(item.expired || 0) > 0 ? ` · <span class="dispatch-xlsx-expired-part">${Number(item.expired || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')} vencidas</span>` : ''}${hasConflict ? ` · <strong>Faltan ${missingQty.toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong>` : ''}${resolutionBadge}${resolveBtn}</small>`;
+          const toneClass = hasConflict ? (Number(item.available || 0) > 0.0001 ? 'is-warning' : 'is-danger') : 'is-ok';
+          return `<div class="dispatch-xlsx-ingredient-item"><small class="dispatch-xlsx-ingredient-line ${toneClass}">• ${escapeHtml(item.title)}: <strong>${Number(item.qty || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong> · Disp.: <strong>${Number(item.available || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong>${Number(item.expired || 0) > 0 ? ` · <span class="dispatch-xlsx-expired-part">${Number(item.expired || 0).toFixed(2)} ${escapeHtml(item.unit || 'u')} vencidas</span>` : ''}${hasConflict ? ` · <strong>Faltan ${missingQty.toFixed(2)} ${escapeHtml(item.unit || 'u')}</strong>` : ''}</small>${(resolutionBadge || resolveBtn) ? `<div class="dispatch-xlsx-conflict-actions">${resolutionBadge}${resolveBtn}</div>` : ''}</div>`;
         }).join('')}</div>`
         : '';
       const stockLine = row.mappedTargetTitle
@@ -4648,7 +4654,7 @@
           const base = mappedIngredients.length
             ? (row.mappedHasStock
               ? 'Stock utilizable completo.'
-              : 'Stock utilizable insuficiente.')
+              : '')
             : `${row.mappedHasStock ? 'Stock utilizable:' : 'Stock utilizable insuficiente:'} <strong class="dispatch-xlsx-stock-ok">${availableQty.toFixed(2)} ${escapeHtml(stockUnit)}</strong>${expiredQty > 0 ? ` <span class="dispatch-xlsx-stock-expired">· Vencido: ${expiredQty.toFixed(2)} ${escapeHtml(stockUnit)}</span>` : ''}`;
           if (row.mappedHasStock) return base;
           const missingParts = mappedIngredients.length
