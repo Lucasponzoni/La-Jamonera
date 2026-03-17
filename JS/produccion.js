@@ -4410,6 +4410,7 @@
       entry.expiryResolutions.unshift({ id: makeId('expiry_resolution_xlsx'), createdAt: actionTs, type: resolutionType, qtyKg: Number((takeBase / 1000).toFixed(4)) });
       entry.productionUsage = Array.isArray(entry.productionUsage) ? entry.productionUsage : [];
       if (resolutionType === 'sold_counter') {
+        const movementDate = normalizeValue(expiryIso) || dispatchDate;
         entry.productionUsage.unshift({
           id: makeId('usage_auto_egreso'),
           productionId: `AUTO-EGRESO-${dispatchCode || dispatchId || makeId('dispatch_xlsx')}`,
