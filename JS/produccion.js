@@ -366,6 +366,21 @@
     if (Number.isNaN(date.getTime())) return '';
     return date.toISOString().slice(0, 10);
   };
+  const mergeIsoDateWithCurrentTimeTs = (isoDate, fallbackTs = nowTs()) => {
+    const safeIso = normalizeValue(isoDate);
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(safeIso);
+    if (!match) return Number(fallbackTs || nowTs());
+    const now = new Date();
+    return new Date(
+      Number(match[1]),
+      Number(match[2]) - 1,
+      Number(match[3]),
+      now.getHours(),
+      now.getMinutes(),
+      now.getSeconds(),
+      now.getMilliseconds()
+    ).getTime();
+  };
   const getArgentinaIsoDate = (dateObj) => {
     if (!(dateObj instanceof Date) || Number.isNaN(dateObj.getTime())) return '';
     const parts = new Intl.DateTimeFormat('en-CA', {
@@ -4397,7 +4412,7 @@
         entry.productionUsage.unshift({
           id: makeId('usage_auto_egreso'),
           productionId: `AUTO-EGRESO-${dispatchCode || dispatchId || makeId('dispatch_xlsx')}`,
-          producedAt: nowTs(),
+          producedAt: mergeIsoDateWithCurrentTimeTs(movementDate),
           productionDate: movementDate,
           expiryDateAtProduction: 'Venta en mostrador',
           kilosUsed: Number((takeBase / 1000).toFixed(4)),
@@ -4840,7 +4855,7 @@
           const productResolveBtn = canResolveProductConflict
             ? ` <button type="button" class="btn ios-btn ${productConflictResolutionType ? 'ios-btn-secondary' : 'ios-btn-danger'} dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="production" data-dispatch-xlsx-row="${escapeHtml(row.id)}">${productConflictResolutionType ? 'Cambiar elección' : 'Resolver conflicto'}</button>`
             : '';
-          return `${base}<span class="dispatch-xlsx-stock-missing"> ↳ Faltan ${formatMissingDispatchXlsxParts(missingParts)}.</span>${createHint}${productResolveBtn}`;
+          return `${base}<span class="dispatch-xlsx-stock-missing"> ↳ Faltan ${formatMissingDispatchXlsxParts(missingParts)}.</span>${createHint ? `<br>${createHint}` : ''}${productResolveBtn}`;
         })()
         : 'Pendiente de relación';
       const clientBadge = row.clientStatus === 'new'
