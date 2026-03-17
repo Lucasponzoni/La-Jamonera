@@ -4404,15 +4404,17 @@
       entry.availableQty = nextAvailableQty;
       entry.availableBase = Number(Math.max(0, toBase(nextAvailableQty, entryUnit)).toFixed(6));
       entry.availableKg = Number(Math.max(0, entry.availableBase / 1000).toFixed(4));
+      const movementDate = normalizeValue(expiryIso) || dispatchDate;
+      const actionTs = mergeIsoDateWithCurrentTimeTs(movementDate);
       entry.expiryResolutions = Array.isArray(entry.expiryResolutions) ? entry.expiryResolutions : [];
-      entry.expiryResolutions.unshift({ id: makeId('expiry_resolution_xlsx'), createdAt: nowTs(), type: resolutionType, qtyKg: Number((takeBase / 1000).toFixed(4)) });
+      entry.expiryResolutions.unshift({ id: makeId('expiry_resolution_xlsx'), createdAt: actionTs, type: resolutionType, qtyKg: Number((takeBase / 1000).toFixed(4)) });
       entry.productionUsage = Array.isArray(entry.productionUsage) ? entry.productionUsage : [];
       if (resolutionType === 'sold_counter') {
         const movementDate = normalizeValue(expiryIso) || dispatchDate;
         entry.productionUsage.unshift({
           id: makeId('usage_auto_egreso'),
           productionId: `AUTO-EGRESO-${dispatchCode || dispatchId || makeId('dispatch_xlsx')}`,
-          producedAt: mergeIsoDateWithCurrentTimeTs(movementDate),
+          producedAt: actionTs,
           productionDate: movementDate,
           expiryDateAtProduction: 'Venta en mostrador',
           kilosUsed: Number((takeBase / 1000).toFixed(4)),
@@ -4435,8 +4437,8 @@
         qty: takeQty,
         qtyUnit: entryUnit,
         qtyKg: Number((takeBase / 1000).toFixed(4)),
-        createdAt: nowTs(),
-        date: dispatchDate,
+        createdAt: actionTs,
+        date: movementDate,
         reference: dispatchCode || dispatchId,
         sourceId: dispatchId,
         sourceCode: dispatchCode,
@@ -4855,7 +4857,7 @@
           const productResolveBtn = canResolveProductConflict
             ? ` <button type="button" class="btn ios-btn ${productConflictResolutionType ? 'ios-btn-secondary' : 'ios-btn-danger'} dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="production" data-dispatch-xlsx-row="${escapeHtml(row.id)}">${productConflictResolutionType ? 'Cambiar elección' : 'Resolver conflicto'}</button>`
             : '';
-          return `${base}<span class="dispatch-xlsx-stock-missing"> ↳ Faltan ${formatMissingDispatchXlsxParts(missingParts)}.</span>${createHint ? `<br>${createHint}` : ''}${productResolveBtn}`;
+          return `${base ? `${base}<br>` : ''}<span class="dispatch-xlsx-stock-missing">↳ Faltan ${formatMissingDispatchXlsxParts(missingParts)}.</span>${createHint ? `<br>${createHint}` : ''}${productResolveBtn}`;
         })()
         : 'Pendiente de relación';
       const clientBadge = row.clientStatus === 'new'
