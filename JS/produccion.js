@@ -3272,18 +3272,9 @@
       new window.QRCode(qrBox, { text: trace.url, width: 130, height: 130, colorDark: '#111827', colorLight: '#ffffff' });
     });
   };
-  const printDispatchPlanilla = async (node, dispatchRow) => {
-    const win = window.open('', '_blank', 'width=1400,height=900');
-    if (!win) return;
-    win.document.write(`<html><head><title>Planilla reparto ${escapeHtml(dispatchRow?.code || '')}</title><style>@page{size:landscape;margin:10mm}body{font-family:Inter,Arial,sans-serif;color:#111827;background:#ffffff;margin:0;padding:8px}.dispatch-planilla-print{background:#fff}.dispatch-planilla-print table{width:100%;border-collapse:collapse;table-layout:fixed}.dispatch-planilla-print th,.dispatch-planilla-print td{border:1px solid #2f2f2f;padding:6px;word-break:break-word;background:#fff;color:#111827}.dispatch-planilla-print .head-title{font-size:20px;font-weight:800;margin:0}.dispatch-planilla-print .head-sub{font-size:14px;color:#374151;margin:0}.dispatch-planilla-top-title{font-weight:800;text-align:center;padding:8px;border:1px solid #2f2f2f;border-bottom:none}</style></head><body>${node.outerHTML}</body></html>`);
-    win.document.close();
-    await new Promise((resolve) => setTimeout(resolve, 180));
-    const qrHost = win.document.querySelector('[data-dispatch-planilla-qr]');
-    if (qrHost) await renderDispatchPlanillaQr(qrHost, dispatchRow);
-    await waitPrintAssets(win);
-    await new Promise((resolve) => setTimeout(resolve, 220));
-    win.focus();
-    win.print();
+  const printDispatchPlanilla = async (_node, dispatchRow) => {
+    if (!dispatchRow?.id) return;
+    await printDispatchPlanillasBatch([dispatchRow]);
   };
   const buildDispatchPlanillaHtml = (dispatchRow) => {
     const client = { ...getDispatchClient(dispatchRow.clientId), ...safeObject(dispatchRow.clientSnapshot) };
@@ -7166,46 +7157,39 @@
       return;
     }
 
-    const uniqueRecipes = Object.values(rows.reduce((acc, row) => {
-      const id = normalizeValue(row.recipeId || row.recipeTitle || row.id);
-      if (!id) return acc;
-      if (!acc[id]) {
-        const recipe = safeObject(state.recetas?.[row.recipeId]);
-        const imageUrl = normalizeValue(recipe.imageUrl || row?.traceability?.product?.imageUrl);
-        acc[id] = { id, title: normalizeValue(row.recipeTitle) || normalizeValue(recipe.title) || 'Sin nombre', imageUrl };
-      }
-      return acc;
-    }, {}));
+    const catalog = getDispatchProductCatalogByKind(rows);
 
     const selector = await openIosSwal({
       title: 'Selector de productos',
-      html: `<div class="swal-stack-fields text-start">
-        <label class="inventario-check-row"><input type="radio" name="massPlanillaScope" value="all" checked><span>Incluir todos los productos</span></label>
-        <label class="inventario-check-row"><input type="radio" name="massPlanillaScope" value="exclude"><span>Excluir algunos productos</span></label>
-        <div id="massPlanillasScope" class="notify-specific-users-list d-none">
-          <div class="step-block"><strong>Productos</strong>${uniqueRecipes.map((item) => `<label class="inventario-check-row inventario-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}"></span>` : ''}<input type="checkbox" data-mass-planilla-recipe value="${escapeHtml(item.id)}"><span>${escapeHtml(item.title)}</span></label>`).join('')}</div>
-        </div>
-      </div>`,
+      html: buildDispatchMassSelectorHtml(catalog),
       showCancelButton: true,
       confirmButtonText: 'Continuar',
       cancelButtonText: 'Cancelar',
       didOpen: () => {
-        const all = document.querySelector('input[name="massPlanillaScope"][value="all"]');
-        const exclude = document.querySelector('input[name="massPlanillaScope"][value="exclude"]');
-        const list = document.getElementById('massPlanillasScope');
-        const toggle = () => list?.classList.toggle('d-none', !exclude?.checked);
+        const all = document.querySelector('input[name="dispatchMassPlanillaScope"][value="all"]');
+        const exclude = document.querySelector('input[name="dispatchMassPlanillaScope"][value="exclude"]');
+        const withQr = document.querySelector('input[name="dispatchMassPlanillaScope"][value="with_qr"]');
+        const list = document.getElementById('dispatchMassPlanillasScope');
+        const qrScope = document.getElementById('dispatchMassQrScope');
+        const toggle = () => {
+          list?.classList.toggle('d-none', !exclude?.checked);
+          qrScope?.classList.toggle('d-none', !withQr?.checked);
+        };
         all?.addEventListener('change', toggle);
         exclude?.addEventListener('change', toggle);
-        prepareThumbLoaders('.js-produccion-thumb');
+        withQr?.addEventListener('change', toggle);
+        toggle();
+        prepareThumbLoaders('.js-dispatch-mass-thumb');
       },
       preConfirm: () => {
-        const mode = document.querySelector('input[name="massPlanillaScope"]:checked')?.value || 'all';
-        const selected = [...document.querySelectorAll('[data-mass-planilla-recipe]:checked')].map((node) => node.value);
+        const mode = document.querySelector('input[name="dispatchMassPlanillaScope"]:checked')?.value || 'all';
+        const selected = [...document.querySelectorAll('[data-dispatch-mass-planilla-recipe]:checked')].map((node) => node.value);
+        const qrKind = document.querySelector('input[name="dispatchMassQrKind"]:checked')?.value || 'all';
         if (mode === 'exclude' && !selected.length) {
-          Swal.showValidationMessage('Seleccioná al menos un producto para excluir.');
+          Swal.showValidationMessage('Seleccioná al menos un producto o ingrediente para excluir.');
           return false;
         }
-        return { mode, selected };
+        return { mode, selected, qrKind };
       }
     });
     if (!selector.isConfirmed) return;
@@ -7238,6 +7222,65 @@
       }
     });
   };
+  const getDispatchProductCatalogByKind = (rows = []) => {
+    const catalog = { production: {}, ingredient: {} };
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+      (Array.isArray(row.products) ? row.products : []).forEach((product) => {
+        const kind = normalizeValue(product.sourceType) === 'ingredient' ? 'ingredient' : 'production';
+        const id = normalizeValue(product.recipeId || product.recipeTitle);
+        if (!id || catalog[kind][id]) return;
+        catalog[kind][id] = {
+          id,
+          title: normalizeValue(product.recipeTitle) || 'Sin nombre',
+          imageUrl: normalizeValue(product.recipeImageUrl || state.recetas?.[product.recipeId]?.imageUrl),
+          kind
+        };
+      });
+    });
+    return {
+      production: Object.values(catalog.production),
+      ingredient: Object.values(catalog.ingredient)
+    };
+  };
+
+  const dispatchProductHasQr = (product = {}) => (Array.isArray(product.allocations) ? product.allocations : []).some((allocation) => Boolean(normalizeValue(allocation.traceUrl || allocation.productionId)));
+
+  const filterDispatchProductsForMassPrint = (products = [], options = {}) => {
+    const excluded = options.excluded instanceof Set ? options.excluded : new Set();
+    const qrMode = normalizeValue(options.qrMode || 'all');
+    const qrKind = normalizeValue(options.qrKind || 'all');
+    return (Array.isArray(products) ? products : []).filter((product) => {
+      const id = normalizeValue(product.recipeId || product.recipeTitle);
+      const kind = normalizeValue(product.sourceType) === 'ingredient' ? 'ingredient' : 'production';
+      if (excluded.has(id)) return false;
+      if (qrMode === 'with_qr') {
+        if (!dispatchProductHasQr(product)) return false;
+        if (qrKind !== 'all' && kind !== qrKind) return false;
+      }
+      return true;
+    });
+  };
+
+  const buildDispatchMassSelectorHtml = (catalog) => {
+    const renderItems = (items, key) => items.length
+      ? items.map((item) => `<label class="inventario-check-row inventario-selector-row dispatch-mass-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap dispatch-mass-photo-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-dispatch-mass-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}"></span>` : '<span class="inventario-print-photo-wrap dispatch-mass-photo-wrap"><span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span></span>'}<input type="checkbox" data-dispatch-mass-planilla-recipe="${key}" value="${escapeHtml(item.id)}"><span>${escapeHtml(item.title)}</span></label>`).join('')
+      : '<p class="text-muted mb-0">No hay elementos en esta sección.</p>';
+    return `<div class="swal-stack-fields text-start">
+      <label class="inventario-check-row"><input type="radio" name="dispatchMassPlanillaScope" value="all" checked><span>Incluir todos los productos</span></label>
+      <label class="inventario-check-row"><input type="radio" name="dispatchMassPlanillaScope" value="exclude"><span>Excluir algunos productos</span></label>
+      <label class="inventario-check-row"><input type="radio" name="dispatchMassPlanillaScope" value="with_qr"><span>Incluir solo con QR de trazabilidad</span></label>
+      <div id="dispatchMassPlanillasScope" class="notify-specific-users-list d-none">
+        <div class="step-block"><strong>Productos</strong>${renderItems(catalog.production, 'production')}</div>
+        <div class="step-block"><strong>Ingredientes</strong>${renderItems(catalog.ingredient, 'ingredient')}</div>
+      </div>
+      <div id="dispatchMassQrScope" class="notify-specific-users-list d-none">
+        <label class="inventario-check-row"><input type="radio" name="dispatchMassQrKind" value="all" checked><span>Imprimir todo</span></label>
+        <label class="inventario-check-row"><input type="radio" name="dispatchMassQrKind" value="production"><span>Imprimir solo producciones</span></label>
+        <label class="inventario-check-row"><input type="radio" name="dispatchMassQrKind" value="ingredient"><span>Imprimir solo ingredientes</span></label>
+      </div>
+    </div>`;
+  };
+
   const openMassDispatchPlanillasByPeriod = async () => {
     const rows = getDispatchRows();
     if (!rows.length) {
@@ -7245,61 +7288,52 @@
       return;
     }
 
-    const uniqueRecipes = Object.values(rows.reduce((acc, row) => {
-      const products = Array.isArray(row.products) ? row.products : [];
-      products.forEach((product) => {
-        const id = normalizeValue(product.recipeId || product.recipeTitle);
-        if (!id) return;
-        if (!acc[id]) {
-          acc[id] = {
-            id,
-            title: normalizeValue(product.recipeTitle) || normalizeValue(state.recetas?.[product.recipeId]?.title) || 'Sin nombre',
-            imageUrl: normalizeValue(product.recipeImageUrl || state.recetas?.[product.recipeId]?.imageUrl)
-          };
-        }
-      });
-      return acc;
-    }, {}));
+    const catalog = getDispatchProductCatalogByKind(rows);
 
     const selector = await openIosSwal({
       title: 'Selector de productos',
-      html: `<div class="swal-stack-fields text-start">
-        <label class="inventario-check-row"><input type="radio" name="dispatchMassPlanillaScope" value="all" checked><span>Incluir todos los productos</span></label>
-        <label class="inventario-check-row"><input type="radio" name="dispatchMassPlanillaScope" value="exclude"><span>Excluir algunos productos</span></label>
-        <div id="dispatchMassPlanillasScope" class="notify-specific-users-list d-none">
-          <div class="step-block"><strong>Productos</strong>${uniqueRecipes.map((item) => `<label class="inventario-check-row inventario-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-dispatch-mass-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}"></span>` : ''}<input type="checkbox" data-dispatch-mass-planilla-recipe value="${escapeHtml(item.id)}"><span>${escapeHtml(item.title)}</span></label>`).join('')}</div>
-        </div>
-      </div>`,
+      html: buildDispatchMassSelectorHtml(catalog),
       showCancelButton: true,
       confirmButtonText: 'Continuar',
       cancelButtonText: 'Cancelar',
       didOpen: () => {
         const all = document.querySelector('input[name="dispatchMassPlanillaScope"][value="all"]');
         const exclude = document.querySelector('input[name="dispatchMassPlanillaScope"][value="exclude"]');
+        const withQr = document.querySelector('input[name="dispatchMassPlanillaScope"][value="with_qr"]');
         const list = document.getElementById('dispatchMassPlanillasScope');
-        const toggle = () => list?.classList.toggle('d-none', !exclude?.checked);
+        const qrScope = document.getElementById('dispatchMassQrScope');
+        const toggle = () => {
+          list?.classList.toggle('d-none', !exclude?.checked);
+          qrScope?.classList.toggle('d-none', !withQr?.checked);
+        };
         all?.addEventListener('change', toggle);
         exclude?.addEventListener('change', toggle);
+        withQr?.addEventListener('change', toggle);
+        toggle();
         prepareThumbLoaders('.js-dispatch-mass-thumb');
       },
       preConfirm: () => {
         const mode = document.querySelector('input[name="dispatchMassPlanillaScope"]:checked')?.value || 'all';
         const selected = [...document.querySelectorAll('[data-dispatch-mass-planilla-recipe]:checked')].map((node) => node.value);
+        const qrKind = document.querySelector('input[name="dispatchMassQrKind"]:checked')?.value || 'all';
         if (mode === 'exclude' && !selected.length) {
-          Swal.showValidationMessage('Seleccioná al menos un producto para excluir.');
+          Swal.showValidationMessage('Seleccioná al menos un producto o ingrediente para excluir.');
           return false;
         }
-        return { mode, selected };
+        return { mode, selected, qrKind };
       }
     });
     if (!selector.isConfirmed) return;
 
     const excluded = new Set(selector.value.mode === 'exclude' ? selector.value.selected : []);
-    const filtered = rows.filter((row) => {
-      if (!excluded.size) return true;
-      const products = Array.isArray(row.products) ? row.products : [];
-      return products.some((product) => !excluded.has(normalizeValue(product.recipeId || product.recipeTitle)));
-    });
+    const filtered = rows.map((row) => {
+      const nextProducts = filterDispatchProductsForMassPrint(row.products, {
+        excluded,
+        qrMode: selector.value.mode === 'with_qr' ? 'with_qr' : 'all',
+        qrKind: selector.value.qrKind || 'all'
+      });
+      return nextProducts.length ? { ...row, products: nextProducts } : null;
+    }).filter(Boolean);
     if (!filtered.length) {
       await openIosSwal({ title: 'Sin resultados', html: '<p>El filtro dejó 0 planillas para imprimir.</p>', icon: 'warning' });
       return;

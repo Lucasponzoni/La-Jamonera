@@ -8497,6 +8497,15 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   animation: spin 1s linear infinite;
 }
 
+.dispatch-mass-photo-wrap .thumb-image,
+.dispatch-mass-photo-wrap .image-placeholder-circle-2 {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+
 /* =========================================
    INVENTARIO · RNE · AJUSTES UX
 ========================================= */
