@@ -3811,6 +3811,10 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   font-weight: 900;
 }
 
+.boton-fc{
+  width: fit-content !important;
+}
+
 @media (max-width: 768px) {
   .recetas-editor-form,
   .recipe-step-card,

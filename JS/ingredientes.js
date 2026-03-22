@@ -369,7 +369,7 @@
     printIngredientsBtn = document.createElement('button');
     printIngredientsBtn.type = 'button';
     printIngredientsBtn.id = 'printIngredientsBtn';
-    printIngredientsBtn.className = 'btn ios-btn ios-btn-secondary produccion-toolbar-icon-btn';
+    printIngredientsBtn.className = 'btn ios-btn ios-btn-secondary produccion-toolbar-icon-btn boton-fc';
     printIngredientsBtn.title = 'Imprimir';
     printIngredientsBtn.setAttribute('aria-label', 'Imprimir');
     printIngredientsBtn.innerHTML = '<i class="fa-solid fa-print"></i><span>Imprimir</span>';
