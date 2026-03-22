@@ -1791,6 +1791,12 @@
       </div>`;
   };
 
+  const buildRecipeRelatedRowNoteHtml = (row) => {
+    const related = normalizeRelatedIngredients(row?.relatedIngredients);
+    if (!related.length) return '';
+    return `<p class="recipe-related-row-note"><i class="fa-solid fa-link"></i><strong>Relacionados:</strong> ${related.map((item) => escapeHtml(capitalize(item.ingredientName || state.ingredientes[item.ingredientId]?.name || 'Ingrediente'))).join(' · ')}</p>`;
+  };
+
   const openRelatedIngredientsPicker = async (rowId) => {
     const row = state.editor?.rows.find((item) => item.id === rowId && item.type === 'ingredient');
     if (!row || !row.ingredientId || !state.ingredientes[row.ingredientId]) {
@@ -1985,16 +1991,13 @@
               <div class="recipe-ing-input-wrap">
                 ${ingredientAvatarHtml(state.ingredientes[row.ingredientId])}
                 <input class="form-control ios-input" data-ing-input="${row.id}" value="${row.ingredientName || ''}" placeholder="Buscar ingrediente...">
-                <button type="button" class="btn ios-btn ios-btn-secondary recipe-row-link-btn" data-row-relations="${row.id}" title="Relacionar sustitutos" ${row.ingredientId ? '' : 'disabled'}>
-                  <i class="fa-solid fa-link"></i>
-                </button>
               </div>
-              ${getRelatedIngredientsCount(row) ? `<div class="recipe-row-related-box">${buildRecipeRelatedSummaryHtml(row)}</div>` : ''}
+              ${buildRecipeRelatedRowNoteHtml(row)}
             </div>
           </td>
           <td><input class="form-control ios-input" data-qty-input="${row.id}" value="${row.quantity || ''}" placeholder="0,00"></td>
           <td><select class="form-select ios-input" data-unit-input="${row.id}">${getMeasureSelectOptionsHtml(row.unit, row.ingredientId)}</select></td>
-          <td><button type="button" class="btn family-manage-btn" data-remove-row="${row.id}"><i class="fa-solid fa-trash"></i></button></td>
+          <td><div class="recipe-row-actions"><button type="button" class="btn family-manage-btn" data-row-relations="${row.id}" title="Relacionar sustitutos" ${row.ingredientId ? '' : 'disabled'}><i class="fa-solid fa-link"></i></button><button type="button" class="btn family-manage-btn" data-remove-row="${row.id}"><i class="fa-solid fa-trash"></i></button></div></td>
         </tr>`;
     }).join('');
     prepareInlineThumbLoaders();

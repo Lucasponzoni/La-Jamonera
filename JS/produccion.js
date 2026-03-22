@@ -1069,12 +1069,32 @@
         unit,
         available: availability.available,
         totalAvailable: availability.total,
-        coverageKg: Math.max(0, Math.min(maxCoverageKg, maxShare)),
-        totalCoverageKg: Math.max(0, Math.min(totalCoverageKg, maxShare)),
+        coverageKg: Math.max(0, maxCoverageKg),
+        totalCoverageKg: Math.max(0, totalCoverageKg),
         hasExpired: availability.hasExpired
       };
     })
     .filter((item) => item.ingredientId);
+  const computeMaxKgWithCaps = (sources = []) => {
+    const valid = sources.filter((item) => Number(item.coverageKg || 0) > 0.0001);
+    if (!valid.length) return 0;
+    let low = 0;
+    let high = valid.reduce((sum, item) => sum + Number(item.coverageKg || 0), 0);
+    for (let i = 0; i < 32; i += 1) {
+      const mid = (low + high) / 2;
+      const supplied = valid.reduce((sum, item) => {
+        const cap = Number(item.maxShare || 1);
+        const maxForTarget = cap >= 1 ? Number(item.coverageKg || 0) : Math.min(Number(item.coverageKg || 0), mid * cap);
+        return sum + maxForTarget;
+      }, 0);
+      if (supplied >= mid) {
+        low = mid;
+      } else {
+        high = mid;
+      }
+    }
+    return Number(low.toFixed(4));
+  };
   const allocateAcrossFefoGroup = ({ entries = [], remaining = 0, requirement, productionDateIso, warnings }) => {
     const lots = [];
     let pending = Number(remaining || 0);
@@ -1163,12 +1183,12 @@
       const neededPerKg = reqQty / yieldKg;
       const availability = getInventoryAvailability(row.ingredientId, unit, productionDateIso);
       const relatedOptions = getRequirementRelatedOptions(row, neededPerKg, unit, productionDateIso);
-      const substituteCoverage = relatedOptions.reduce((sum, item) => sum + item.coverageKg, 0);
-      const substituteCoverageIncludingExpired = relatedOptions.reduce((sum, item) => sum + item.totalCoverageKg, 0);
       const coverage = neededPerKg > 0 ? Math.max(0, availability.available) / neededPerKg : 0;
       const totalCoverage = neededPerKg > 0 ? Math.max(0, availability.total) / neededPerKg : 0;
-      const effectiveCoverage = coverage + substituteCoverage;
-      const effectiveTotalCoverage = totalCoverage + substituteCoverageIncludingExpired;
+      const effectiveCoverage = computeMaxKgWithCaps([{ coverageKg: coverage, maxShare: 1 }, ...relatedOptions.map((item) => ({ coverageKg: item.coverageKg, maxShare: item.maxShare }))]);
+      const effectiveTotalCoverage = computeMaxKgWithCaps([{ coverageKg: totalCoverage, maxShare: 1 }, ...relatedOptions.map((item) => ({ coverageKg: item.totalCoverageKg, maxShare: item.maxShare }))]);
+      const substituteCoverage = Math.max(0, effectiveCoverage - coverage);
+      const substituteCoverageIncludingExpired = Math.max(0, effectiveTotalCoverage - totalCoverage);
       if (availability.incompatibleUnits.length) {
         errors.push(`Esta receta contiene unidades incompatibles para cálculo automático. Revisá ${capitalize(row.ingredientName)}.`);
       }
@@ -1394,15 +1414,125 @@
         isSubstitute: false
       });
 
-      requirement.relatedOptions.forEach((related) => {
-        if (remaining <= 0.0001) return;
-        consumeIngredientSource({
-          ingredientId: related.ingredientId,
-          ingredientName: related.ingredientName,
-          maxShare: related.maxShare,
-          isSubstitute: true
+      if (remaining > 0.0001 && requirement.relatedOptions.length) {
+        const substituteNeed = remaining;
+        const substituteGroups = [];
+        requirement.relatedOptions.forEach((related) => {
+          const maxAllowed = Math.min(substituteNeed, rowNeed * Math.max(0, Number(related.maxShare || 0)));
+          if (maxAllowed <= 0.0001) return;
+          const record = safeObject(state.inventario.items?.[related.ingredientId]);
+          const entries = sortEntriesFEFO(Array.isArray(record.entries) ? record.entries : []);
+          const reqMeta = getUnitMeta(requirement.unit);
+          entries.forEach((entry) => {
+            const entryUnit = normalizeLower(entry.unit || requirement.unit);
+            const entryMeta = getUnitMeta(entryUnit);
+            if (entryMeta.category !== reqMeta.category) return;
+            const expiryKey = isEntryNoPerecedero(entry) ? '9999-12-31' : (normalizeValue(entry.expiryDate) || '9999-12-31');
+            const createdKey = Number(entry.createdAt || 0);
+            const key = `${expiryKey}::${createdKey}`;
+            let group = substituteGroups.find((item) => item.key === key);
+            if (!group) {
+              group = { key, entries: [] };
+              substituteGroups.push(group);
+            }
+            group.entries.push({
+              entry,
+              related,
+              maxAllowed
+            });
+          });
         });
-      });
+
+        const usageByRelated = {};
+        substituteGroups.forEach((group) => {
+          if (remaining <= 0.0001) return;
+          const perRelatedCap = {};
+          group.entries.forEach(({ related }) => {
+            const alreadyUsed = Number(usageByRelated[related.ingredientId] || 0);
+            perRelatedCap[related.ingredientId] = Math.max(0, Number((Math.min(substituteNeed, rowNeed * Math.max(0, Number(related.maxShare || 0))) - alreadyUsed).toFixed(4)));
+          });
+          const prepared = group.entries.map(({ entry, related }) => {
+            const entryUnit = normalizeLower(entry.unit || requirement.unit);
+            const entryQty = getEntryAvailableQty(entry);
+            const reservedByOther = reservedByOthersForEntry(related.ingredientId, entry.id, entryUnit);
+            const available = Math.max(0, entryQty - reservedByOther);
+            const expiryIso = isEntryNoPerecedero(entry) ? '' : normalizeValue(entry.expiryDate);
+            const status = !expiryIso || expiryIso >= productionDateIso ? 'ok' : 'expired';
+            const isSoon = expiryIso && expiryIso >= productionDateIso && expiryIso <= toIsoDate(new Date(productionDateIso).getTime() + 2 * 86400000);
+            const availableInReqUnit = fromBase(toBase(available, entryUnit), requirement.unit);
+            if (isSoon) warnings.push(`${related.ingredientName}: lote próximo a vencer (${expiryIso}).`);
+            return { entry, related, entryUnit, available, availableInReqUnit, expiryIso, status, isSoon, takeQty: 0 };
+          });
+          let groupRemaining = Math.min(remaining, prepared.reduce((sum, item) => sum + (item.status === 'expired' ? 0 : Math.min(item.availableInReqUnit, perRelatedCap[item.related.ingredientId] || 0)), 0));
+          for (let pass = 0; pass < 6 && groupRemaining > 0.0001; pass += 1) {
+            const eligible = prepared.filter((item) => item.status !== 'expired' && item.availableInReqUnit - item.takeQty > 0.0001 && (perRelatedCap[item.related.ingredientId] || 0) > 0.0001);
+            if (!eligible.length) break;
+            const totalWeight = eligible.reduce((sum, item) => sum + Math.max(0, item.availableInReqUnit - item.takeQty), 0);
+            if (totalWeight <= 0.0001) break;
+            eligible.forEach((item) => {
+              if (groupRemaining <= 0.0001) return;
+              const remainingEntry = Math.max(0, item.availableInReqUnit - item.takeQty);
+              const relatedCap = Math.max(0, perRelatedCap[item.related.ingredientId] || 0);
+              const share = groupRemaining * (remainingEntry / totalWeight);
+              const take = Math.min(remainingEntry, relatedCap, share);
+              if (take <= 0.0001) return;
+              item.takeQty = Number((item.takeQty + take).toFixed(4));
+              perRelatedCap[item.related.ingredientId] = Number((relatedCap - take).toFixed(4));
+              groupRemaining = Math.max(0, Number((groupRemaining - take).toFixed(6)));
+            });
+          }
+          prepared.forEach((item) => {
+            const lotNumber = normalizeValue(item.entry.lotNumber) || normalizeValue(item.entry.invoiceNumber) || item.entry.id;
+            const lot = {
+              ingredientId: item.related.ingredientId,
+              ingredientName: item.related.ingredientName,
+              ingredientImage: state.ingredientes[item.related.ingredientId]?.imageUrl || '',
+              entryId: item.entry.id,
+              lotNumber,
+              entryDate: item.entry.entryDate || '',
+              createdAt: Number(item.entry.createdAt || 0),
+              expiryDate: item.expiryIso || (isEntryNoPerecedero(item.entry) ? 'No perecedero' : ''),
+              noPerecedero: isEntryNoPerecedero(item.entry),
+              provider: normalizeValue(item.entry.provider) || '-',
+              invoiceNumber: normalizeValue(item.entry.invoiceNumber) || '-',
+              invoiceImageUrls: Array.isArray(item.entry.invoiceImageUrls) ? item.entry.invoiceImageUrls : (item.entry.invoiceImageUrl ? [item.entry.invoiceImageUrl] : []),
+              unit: requirement.unit,
+              takeQty: item.status === 'expired' ? 0 : Number(item.takeQty.toFixed(4)),
+              takeBaseQty: item.status === 'expired' ? 0 : Number(toBase(item.takeQty, requirement.unit).toFixed(6)),
+              availableQty: Number(item.available.toFixed(4)),
+              availableKg: getEntryAvailableKg(item.entry),
+              entryAvailableQty: Number(item.available.toFixed(4)),
+              status: item.status === 'expired' ? 'expired' : (item.isSoon ? 'soon' : 'ok')
+            };
+            const plannedUsed = Number(lot.takeQty || 0);
+            if (!plannedUsed && lot.status !== 'expired') return;
+            const existing = ingredientPlans.find((plan) => plan.isSubstitute && normalizeValue(plan.ingredientId) === normalizeValue(item.related.ingredientId) && normalizeValue(plan.sourceIngredientId) === normalizeValue(requirement.ingredientId));
+            if (existing) {
+              existing.neededQty = Number((existing.neededQty + plannedUsed).toFixed(4));
+              existing.availableQty = Number((existing.availableQty + Number(lot.availableQty || 0)).toFixed(4));
+              existing.lots.push(lot);
+            } else {
+              ingredientPlans.push({
+                ingredientId: item.related.ingredientId,
+                ingredientName: item.related.ingredientName,
+                ingredientUnit: requirement.unit,
+                neededQty: Number(plannedUsed.toFixed(4)),
+                availableQty: Number(lot.availableQty || 0),
+                missingQty: 0,
+                sourceIngredientId: requirement.ingredientId,
+                sourceIngredientName: requirement.name,
+                substitutionLabel: `Sustituye a ${requirement.name}`,
+                isSubstitute: true,
+                lots: [lot]
+              });
+            }
+            if (plannedUsed > 0.0001) {
+              usageByRelated[item.related.ingredientId] = Number((Number(usageByRelated[item.related.ingredientId] || 0) + plannedUsed).toFixed(4));
+              remaining = Math.max(0, Number((remaining - plannedUsed).toFixed(6)));
+            }
+          });
+        });
+      }
 
       const missing = Math.max(0, Number(remaining.toFixed(4)));
       if (missing > 0.0001) {
