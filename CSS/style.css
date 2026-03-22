@@ -184,9 +184,14 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 }
 
 .ingredientes-print-thumb-fit {
+  width: 100%;
+  height: 100%;
   object-fit: contain !important;
-  padding: 6px;
+  object-position: center;
+  padding: 5px;
+  border-radius: 999px;
   background: #fff;
+  display: block;
 }
 
 .ingredientes-toolbar-separator {
@@ -734,12 +739,17 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #eef2fd;
+  background: radial-gradient(circle at center, #f8fbff 0%, #eef2fd 72%);
+  border-radius: inherit;
+  overflow: hidden;
 }
 
-.thumb-loading .meta-spinner-login {
+.thumb-loading .meta-spinner-login,
+.thumb-loading .meta-spinner {
   width: 22px;
   height: 22px;
+  object-fit: contain;
+  border-radius: 999px;
 }
 
 .thumb-image {
@@ -5331,7 +5341,12 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 .inventario-print-photo {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
+  padding: 5px;
+  border-radius: 999px;
+  display: block;
+  background: #fff;
 }
 
 .inventario-config-badge {

@@ -144,7 +144,12 @@
   };
 
   const resolveIngredientPerishableFlag = (item) => {
-    if (typeof item?.perishable === 'boolean') return item.perishable;
+    const ingredient = item && typeof item === 'object'
+      ? item
+      : safeObject(state.ingredientes.items?.[normalizeValue(item)]);
+    const inventoryConfig = safeObject(window.inventarioConfigSnapshot?.[ingredient?.id] || {});
+    if (typeof inventoryConfig.perishable === 'boolean') return inventoryConfig.perishable;
+    if (typeof ingredient?.perishable === 'boolean') return ingredient.perishable;
     return true;
   };
 
@@ -201,7 +206,7 @@
   const familyAvatar = (url, alt, itemCount = 0) => {
     const countBadge = Number(itemCount) > 0 ? `<span class="family-circle-count">${Math.min(99, Number(itemCount))}</span>` : '';
     return url
-      ? `<span class="family-circle-thumb"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-family-thumb" src="${url}" alt="${alt}" loading="lazy">${countBadge}</span>`
+      ? `<span class="family-circle-thumb"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-family-thumb" src="${url}" alt="${alt}" loading="lazy">${countBadge}</span>`
       : `<span class="family-circle-thumb family-circle-thumb-placeholder">${PLACEHOLDER_ICON}${countBadge}</span>`;
   };
 
@@ -249,7 +254,7 @@
   };
 
   const ingredientAvatar = (url, alt) => url
-    ? `<div class="ingrediente-avatar"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingrediente-thumb" src="${url}" alt="${alt}" loading="lazy"></div>`
+    ? `<div class="ingrediente-avatar"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingrediente-thumb" src="${url}" alt="${alt}" loading="lazy"></div>`
     : `<div class="ingrediente-avatar ingrediente-avatar-placeholder">${PLACEHOLDER_ICON}</div>`;
 
   const prepareThumbLoaders = (selector) => {
@@ -372,8 +377,8 @@
         <label class="inventario-check-row"><input type="radio" name="ingredientPerishableType" value="non_perishable"><span>Solo no perecederos</span></label>
       </div>
       <div id="ingredientPrintProductsScope" class="notify-specific-users-list d-none">
-        <div class="step-block"><strong>Familias</strong>${getFamiliasArray().map((family) => `<label class="inventario-check-row inventario-selector-row">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${escapeHtml(family.imageUrl)}" alt="${escapeHtml(capitalizeLabel(family.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<input type="checkbox" data-ingredient-print-family value="${family.id}"><span>${escapeHtml(capitalizeLabel(family.name))}</span></label>`).join('')}</div>
-        <div class="step-block"><strong>Productos</strong>${getIngredientesArray().map((item) => `<label class="inventario-check-row inventario-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(capitalizeLabel(item.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<input type="checkbox" data-ingredient-print-product data-family-id="${item.familyId || ''}" value="${item.id}"><span>${escapeHtml(capitalizeLabel(item.name))}</span></label>`).join('')}</div>
+        <div class="step-block"><strong>Familias</strong>${getFamiliasArray().map((family) => `<label class="inventario-check-row inventario-selector-row">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${escapeHtml(family.imageUrl)}" alt="${escapeHtml(capitalizeLabel(family.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<input type="checkbox" data-ingredient-print-family value="${family.id}"><span>${escapeHtml(capitalizeLabel(family.name))}</span></label>`).join('')}</div>
+        <div class="step-block"><strong>Productos</strong>${getIngredientesArray().map((item) => `<label class="inventario-check-row inventario-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(capitalizeLabel(item.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<input type="checkbox" data-ingredient-print-product data-family-id="${item.familyId || ''}" value="${item.id}"><span>${escapeHtml(capitalizeLabel(item.name))}</span></label>`).join('')}</div>
       </div>
     </div>`,
     showCancelButton: true,
@@ -429,18 +434,30 @@
 
   const printIngredientsCatalog = async () => {
     await fetchIngredientes();
+    try {
+      const inventoryConfig = await window.dbLaJamoneraRest.read('/inventario/items');
+      window.inventarioConfigSnapshot = Object.values(safeObject(inventoryConfig)).reduce((acc, record) => {
+        const recordSafe = safeObject(record);
+        const ingredientId = normalizeValue(recordSafe.ingredientId || recordSafe.id);
+        if (!ingredientId) return acc;
+        acc[ingredientId] = safeObject(recordSafe.weeklySheetConfig);
+        return acc;
+      }, {});
+    } catch (error) {
+      window.inventarioConfigSnapshot = {};
+    }
     const selector = await openIngredientsScopeSelector();
     if (!selector.isConfirmed) return;
-    const excluded = new Set(selector.value.mode === 'exclude' ? selector.value.selected : []);
+    const selectedOnly = new Set(selector.value.mode === 'exclude' ? selector.value.selected : []);
     const targetPerishable = selector.value.mode === 'perishable'
       ? selector.value.targetPerishable === 'perishable'
       : '';
     const filtered = getIngredientesArray()
-      .filter((item) => !excluded.has(item.id))
+      .filter((item) => (selector.value.mode === 'exclude' ? selectedOnly.has(item.id) : true))
       .filter((item) => {
-        if (!targetPerishable) return true;
+        if (typeof targetPerishable !== 'boolean') return true;
         const perishable = resolveIngredientPerishableFlag(item);
-        return targetPerishable === 'perishable' ? perishable : !perishable;
+        return targetPerishable ? perishable : !perishable;
       })
       .sort((a, b) => normalizeValue(a.name).localeCompare(normalizeValue(b.name), 'es'));
 
@@ -459,8 +476,8 @@
 
     const content = filtered.map((item) => `
       <article style="display:flex;align-items:center;gap:12px;border:1px solid #d7def2;border-radius:16px;padding:12px;background:#fff;break-inside:avoid;page-break-inside:avoid;">
-        <div style="width:74px;height:74px;border-radius:999px;overflow:hidden;border:1px solid #d7def2;background:#eff2fb;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          ${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" style="width:100%;height:100%;object-fit:contain;padding:6px;" alt="${escapeHtml(capitalizeLabel(item.name))}">` : '<i class="fa-solid fa-carrot" style="color:#5f6a89;font-size:28px;"></i>'}
+        <div style="width:74px;height:74px;border-radius:999px;overflow:hidden;border:1px solid #d7def2;background:#eff2fb;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:6px;">
+          ${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" style="width:100%;height:100%;object-fit:contain;object-position:center;border-radius:999px;display:block;" alt="${escapeHtml(capitalizeLabel(item.name))}">` : '<i class="fa-solid fa-carrot" style="color:#5f6a89;font-size:28px;"></i>'}
         </div>
         <div style="min-width:0;">
           <h2 style="margin:0 0 4px;font-size:18px;color:#1f2a44;">${escapeHtml(capitalizeLabel(item.name))}</h2>
