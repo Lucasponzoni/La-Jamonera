@@ -2695,8 +2695,19 @@
       const base = String(value || fallback || 'X').replace(/[^a-zA-Z0-9_]/g, '_');
       return /^[a-zA-Z_]/.test(base) ? base : `N_${base}`;
     };
-    const ingredients = Array.isArray(registro?.lots) ? registro.lots : [];
-    const totalIngredientsKg = ingredients.reduce((sum, item) => sum + getIngredientPlanQtyKg(item), 0);
+    const groupedIngredients = Object.values((Array.isArray(registro?.lots) ? registro.lots : []).reduce((acc, item, index) => {
+      const key = normalizeValue(item?.sourceIngredientId || item?.ingredientId || `trace_${index}`);
+      if (!acc[key]) {
+        acc[key] = {
+          sourceIngredientId: key,
+          sourceIngredientName: normalizeValue(item?.sourceIngredientName || item?.ingredientName || 'Ingrediente'),
+          plans: []
+        };
+      }
+      acc[key].plans.push(item);
+      return acc;
+    }, {}));
+    const totalIngredientsKg = groupedIngredients.reduce((sum, group) => sum + group.plans.reduce((subtotal, item) => subtotal + getIngredientPlanQtyKg(item), 0), 0);
     const mermaKg = Math.max(0, totalIngredientsKg - Number(registro?.quantityKg || 0));
     const manager = (Array.isArray(registro?.managers) && registro.managers[0]) ? getManagerDisplay(registro.managers[0]).name : 'Sin encargado';
     const productionDate = normalizeValue(registro?.productionDate) || toIsoDate(registro?.createdAt || nowTs());
@@ -2732,29 +2743,44 @@
       lines.push('R -.-> E');
     }
 
-    ingredients.forEach((item, index) => {
-      const lots = Array.isArray(item?.lots) && item.lots.length ? item.lots : [{}];
-      const nodeId = safeNodeId(`ING_${index + 1}_${item?.ingredientId || ''}`, `ING_${index + 1}`);
+    groupedIngredients.forEach((group, index) => {
+      const item = group.plans[0] || {};
+      const lots = group.plans.flatMap((plan) => Array.isArray(plan?.lots) && plan.lots.length ? plan.lots : []).length
+        ? group.plans.flatMap((plan) => Array.isArray(plan?.lots) ? plan.lots : [])
+        : [{}];
+      const nodeId = safeNodeId(`ING_${index + 1}_${group?.sourceIngredientId || ''}`, `ING_${index + 1}`);
       const nodeLabel = [
-        `<b>${index + 1}. ${esc((item?.ingredientName || 'Ingrediente').toUpperCase())}</b>`,
-        item?.isSubstitute ? `<b>Sustituye a:</b> ${esc(item?.sourceIngredientName || item?.sourceIngredientId || '-')}` : '',
-        `<b>Usado total:</b> ${esc(formatCompactQty(item?.requiredQty ?? item?.neededQty, item?.unit || item?.ingredientUnit || ''))}`,
+        `<b>${index + 1}. ${esc((group?.sourceIngredientName || item?.ingredientName || 'Ingrediente').toUpperCase())}</b>`,
+        group.plans.some((plan) => plan.isSubstitute) ? `<b>Sustitutos:</b> ${esc(group.plans.filter((plan) => plan.isSubstitute).map((plan) => plan.ingredientName).join(' + ') || '-')}` : '',
+        `<b>Usado total:</b> ${esc(formatCompactQty(group.plans.reduce((subtotal, plan) => subtotal + Number((plan?.requiredQty ?? plan?.neededQty) || 0), 0), item?.unit || item?.ingredientUnit || ''))}`,
         `<b>Lotes usados:</b> ${lots.length}`
       ].filter(Boolean).join('<br/>');
       lines.push(`${nodeId}["${nodeLabel}"]:::toneIngredient`);
       lines.push(`I --> ${nodeId}`);
-      let previousLotNodeId = '';
-      lots.forEach((lot, lotIndex) => {
-        const lotNodeId = `${nodeId}_LOT_${lotIndex + 1}`;
+      group.plans.forEach((plan, planIndex) => {
+        const planNodeId = group.plans.length > 1 ? `${nodeId}_SUB_${planIndex + 1}` : nodeId;
+        if (group.plans.length > 1) {
+          const subLabel = [
+            `<b>${esc((plan?.ingredientName || 'Ingrediente').toUpperCase())}</b>`,
+            `<b>Usado:</b> ${esc(formatCompactQty((plan?.requiredQty ?? plan?.neededQty), plan?.unit || plan?.ingredientUnit || ''))}`
+          ].join('<br/>');
+          lines.push(`${planNodeId}["${subLabel}"]:::toneIngredient`);
+          lines.push(`${nodeId} --> ${planNodeId}`);
+        }
+        let previousLotNodeId = '';
+        const planLots = Array.isArray(plan?.lots) && plan.lots.length ? plan.lots : [{}];
+        planLots.forEach((lot, lotIndex) => {
+          const lotNodeId = `${planNodeId}_LOT_${lotIndex + 1}`;
         const rneId = `${lotNodeId}_RNE`;
         const providerRne = resolveProviderRneFromLot(lot);
         const lotQty = Number(lot?.takeQty || 0);
         lines.push(`${lotNodeId}["<b>LOTE ${lotIndex + 1}</b><br/>${esc(lot?.lotNumber || lot?.entryId || '-')}<br/><b>Usado:</b> ${esc(formatCompactQty(lotQty, lot?.unit || item?.unit || item?.ingredientUnit || ''))}<br/><b>Ingreso:</b> ${esc(formatIsoEs(lot?.entryDate || ''))}<br/><b>VTO:</b> ${esc(formatIsoEs(lot?.expiryDate || ''))}<br/><b>Proveedor:</b> ${esc(lot?.provider || '-')}"]:::toneLot`);
         lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${esc(providerRne.number || '-')}"]:::toneRegistry`);
-        lines.push(`${nodeId} -.->|LOTE ${lotIndex + 1}| ${lotNodeId}`);
+        lines.push(`${planNodeId} -.->|LOTE ${lotIndex + 1}| ${lotNodeId}`);
         lines.push(`${lotNodeId} -.->|RNE| ${rneId}`);
         if (previousLotNodeId) lines.push(`${previousLotNodeId} -.-> ${lotNodeId}`);
         previousLotNodeId = lotNodeId;
+        });
       });
     });
 
@@ -2772,7 +2798,19 @@
   };
 
   const renderTraceabilityFallbackDiagram = (registro) => {
-    const ingredients = Array.isArray(registro?.lots) ? registro.lots : [];
+    const groupTraceIngredients = (plans = []) => Object.values((Array.isArray(plans) ? plans : []).reduce((acc, item, index) => {
+      const key = normalizeValue(item?.sourceIngredientId || item?.ingredientId || `trace_${index}`);
+      if (!acc[key]) {
+        acc[key] = {
+          sourceIngredientId: key,
+          sourceIngredientName: normalizeValue(item?.sourceIngredientName || item?.ingredientName || 'Ingrediente'),
+          plans: []
+        };
+      }
+      acc[key].plans.push(item);
+      return acc;
+    }, {}));
+    const ingredients = groupTraceIngredients(registro?.lots);
     const manager = (Array.isArray(registro?.managers) && registro.managers[0])
       ? getManagerDisplay(registro.managers[0]).name
       : 'Sin encargado';
@@ -2782,9 +2820,14 @@
     const totalIngredientsKg = ingredients.reduce((sum, item) => sum + getIngredientPlanQtyKg(item), 0);
     const mermaKg = Math.max(0, totalIngredientsKg - Number(registro?.quantityKg || 0));
     const productLabel = normalizeValue(registro?.recipeTitle || 'Producto');
-    const ingredientRows = ingredients.map((item, index) => {
-      const firstLot = Array.isArray(item?.lots) && item.lots[0] ? item.lots[0] : {};
-      return `<li><strong>${index + 1}. ${escapeHtml(item?.ingredientName || 'Ingrediente')}</strong><span>${escapeHtml(formatCompactQty(item?.requiredQty ?? item?.neededQty, item?.unit || item?.ingredientUnit || ''))} · Lote ${escapeHtml(firstLot?.lotNumber || firstLot?.entryId || '-')}</span></li>`;
+    const ingredientRows = ingredients.map((group, index) => {
+      const firstPlan = group.plans[0] || {};
+      const firstLot = Array.isArray(firstPlan?.lots) && firstPlan.lots[0] ? firstPlan.lots[0] : {};
+      const totalQty = group.plans.reduce((sum, plan) => sum + Number((plan?.requiredQty ?? plan?.neededQty) || 0), 0);
+      const substitutionText = group.plans.some((plan) => plan.isSubstitute)
+        ? ` · Sustitutos: ${group.plans.filter((plan) => plan.isSubstitute).map((plan) => plan.ingredientName).join(' + ')}`
+        : '';
+      return `<li><strong>${index + 1}. ${escapeHtml(group.sourceIngredientName || 'Ingrediente')}</strong><span>${escapeHtml(formatCompactQty(totalQty, firstPlan?.unit || firstPlan?.ingredientUnit || ''))} · Lote ${escapeHtml(firstLot?.lotNumber || firstLot?.entryId || '-')}${escapeHtml(substitutionText)}</span></li>`;
     }).join('');
     return `<div class="produccion-trace-fallback-diagram" aria-label="Diagrama alternativo de trazabilidad">
       <div class="produccion-trace-fallback-flow">
@@ -2808,17 +2851,31 @@
     const productRnpa = resolveRecipeRnpaFromRegistro(registro);
     const productRnpaNumber = normalizeValue(productRnpa.number || '-');
     const productRnpaLabel = normalizeValue(productRnpa.denomination || productRnpa.brand || productRnpa.businessName || '-');
-    const ingredients = (registro.lots || []).map((item, idx) => {
+    const groupedIngredients = Object.values((Array.isArray(registro.lots) ? registro.lots : []).reduce((acc, item, index) => {
+      const key = normalizeValue(item?.sourceIngredientId || item?.ingredientId || `trace_${index}`);
+      if (!acc[key]) {
+        acc[key] = {
+          sourceIngredientId: key,
+          sourceIngredientName: normalizeValue(item?.sourceIngredientName || item?.ingredientName || 'Ingrediente'),
+          plans: []
+        };
+      }
+      acc[key].plans.push(item);
+      return acc;
+    }, {}));
+    const ingredients = groupedIngredients.map((group, idx) => {
+      const item = group.plans[0] || {};
       const ingredientImage = normalizeValue(state.ingredientes[item.ingredientId]?.imageUrl);
-      const aggregatedImages = (item.lots || []).flatMap((lot) => Array.isArray(lot.invoiceImageUrls) ? lot.invoiceImageUrls : []);
-      const providerRneSummary = (item.lots || []).map((lot) => {
+      const mergedLots = group.plans.flatMap((plan) => Array.isArray(plan.lots) ? plan.lots : []);
+      const aggregatedImages = mergedLots.flatMap((lot) => Array.isArray(lot.invoiceImageUrls) ? lot.invoiceImageUrls : []);
+      const providerRneSummary = mergedLots.map((lot) => {
         const providerRne = resolveProviderRneFromLot(lot);
         return {
           number: providerRne.number,
           attachmentUrl: providerRne.attachmentUrl
         };
       }).find((row) => row.number || row.attachmentUrl) || { number: '', attachmentUrl: '' };
-      const lotCards = (item.lots || []).map((lot) => {
+      const lotCards = mergedLots.map((lot) => {
         const takenQty = Number(lot.takeQty || 0);
         const availableQty = Number(lot.availableQty || 0);
         const remainingQty = Math.max(0, availableQty - takenQty);
@@ -2846,9 +2903,9 @@
             <span class="produccion-trace-ingredient-index">${idx + 1}</span>
             <span class="produccion-trace-ingredient-avatar">${ingredientImage ? `<img src="${ingredientImage}" alt="${escapeHtml(item.ingredientName || 'Ingrediente')}">` : '<i class="bi bi-basket2-fill fa-solid fa-carrot"></i>'}</span>
             <div>
-              <h6><i class="bi bi-box-seam fa-solid fa-box-open"></i> ${escapeHtml(item.ingredientName || item.ingredientId || 'Ingrediente')}</h6>
-              ${item.isSubstitute ? `<small><i class="fa-solid fa-link"></i> Sustituye a ${escapeHtml(item.sourceIngredientName || item.sourceIngredientId || '-')}</small>` : ''}
-              <small>Cantidad usada: ${formatCompactQty(item.requiredQty ?? item.neededQty, item.unit || item.ingredientUnit || '')}</small>
+              <h6><i class="bi bi-box-seam fa-solid fa-box-open"></i> ${escapeHtml(group.sourceIngredientName || item.ingredientName || item.ingredientId || 'Ingrediente')}</h6>
+              ${group.plans.some((plan) => plan.isSubstitute) ? `<small><i class="fa-solid fa-link"></i> Sustitutos usados: ${escapeHtml(group.plans.filter((plan) => plan.isSubstitute).map((plan) => plan.ingredientName).join(' + ') || '-')}</small>` : ''}
+              <small>Cantidad usada: ${formatCompactQty(group.plans.reduce((sum, plan) => sum + Number((plan.requiredQty ?? plan.neededQty) || 0), 0), item.unit || item.ingredientUnit || '')}</small>
               <small>RNE proveedor: <strong>${escapeHtml(providerRneSummary.number || '-')}</strong></small>
             </div>
           </div>
@@ -6855,6 +6912,7 @@
         }
       });
     }
+    qtyInput.addEventListener('input', async () => { await updateEditorPlan(); });
     qtyInput.addEventListener('change', async () => { await updateEditorPlan(); });
     qtyInput.addEventListener('blur', async () => { await updateEditorPlan(); });
     nodes.editor.querySelector('#produccionQtyMaxBtn').addEventListener('click', async () => {
