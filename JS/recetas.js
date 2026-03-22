@@ -40,7 +40,9 @@
     editorDirty: false,
     print: {
       cssText: '',
-      cssPromise: null
+      cssPromise: null,
+      cacheKey: '',
+      cacheImage: null
     }
   };
 
@@ -234,6 +236,26 @@
     }
     const available = getMeasureOptions().map((item) => item.value);
     return available[0] || '';
+  };
+
+  const normalizeRelatedIngredients = (list = []) => (Array.isArray(list) ? list : [])
+    .map((item) => ({
+      ingredientId: normalizeValue(item?.ingredientId),
+      ingredientName: normalizeValue(item?.ingredientName || state.ingredientes?.[item?.ingredientId]?.name),
+      maxPercent: normalizeValue(item?.maxPercent)
+    }))
+    .filter((item) => item.ingredientId && normalizeLower(item.ingredientName));
+
+  const getRelatedIngredientsCount = (row) => normalizeRelatedIngredients(row?.relatedIngredients).length;
+  const formatRelatedIngredientsCountLabel = (row) => {
+    const count = getRelatedIngredientsCount(row);
+    if (!count) return '';
+    return count === 1 ? '(1 relacionado)' : `(${count} relacionados)`;
+  };
+  const getIngredientDisplayWithRelations = (row) => {
+    const base = capitalize(row?.ingredientName || '');
+    const countLabel = formatRelatedIngredientsCountLabel(row);
+    return [base, countLabel].filter(Boolean).join(' ');
   };
 
   const persistNewMeasure = async (name, abbr) => {
@@ -491,7 +513,7 @@
       const label = measureMap.get(normalizeLower(item.yieldUnit)) || capitalize(item.yieldUnit || '');
       const recipeIngredients = (Array.isArray(item.rows) ? item.rows : [])
         .filter((row) => row.type === 'ingredient' && normalizeValue(row.ingredientName))
-        .map((row) => capitalize(row.ingredientName));
+        .map((row) => getIngredientDisplayWithRelations(row));
       const frontLabels = Array.isArray(item.nutrition?.ai?.frontLabels) ? item.nutrition.ai.frontLabels : [];
       const hasNutritionLabel = Boolean(normalizeValue(item.nutrition?.ai?.tableHtml));
       const hasFrontLabels = frontLabels.length > 0;
@@ -888,9 +910,19 @@
     let sourceImage;
     let payload;
     try {
-      await new Promise((resolve) => requestAnimationFrame(() => resolve()));
       payload = getPrintPayload(recipe, mode);
-      sourceImage = await withTimeout(renderHtmlToImage(payload), 20000, "Tiempo de espera agotado al generar la tabla para impresión.");
+      const cacheKey = mode === 'nutrition'
+        ? `${normalizeValue(recipe?.id)}::${normalizeValue(recipe?.nutrition?.ai?.tableHtml)}`
+        : '';
+      if (mode === 'nutrition' && cacheKey && state.print.cacheKey === cacheKey && state.print.cacheImage) {
+        sourceImage = state.print.cacheImage;
+      } else {
+        sourceImage = await withTimeout(renderHtmlToImage(payload), 12000, "Tiempo de espera agotado al generar la tabla para impresión.");
+        if (mode === 'nutrition' && cacheKey) {
+          state.print.cacheKey = cacheKey;
+          state.print.cacheImage = sourceImage;
+        }
+      }
     } finally {
       Swal.close();
     }
@@ -1250,7 +1282,7 @@
 
   const ensureIngredientRow = () => {
     if (!getIngredientRows().length) {
-      pushRowBeforeMonography({ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: getMeasureOptions()[0]?.value || '' });
+      pushRowBeforeMonography({ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: getMeasureOptions()[0]?.value || '', relatedIngredients: [] });
     }
   };
 
@@ -1575,6 +1607,8 @@
   };
 
   const markNutritionAiAsStaleIfNeeded = () => {
+    state.print.cacheKey = '';
+    state.print.cacheImage = null;
     renderNutritionAiPreview();
   };
 
@@ -1669,6 +1703,8 @@
         inputHash: getNutritionGenerationHash(),
         updatedAt: Date.now()
       };
+      state.print.cacheKey = '';
+      state.print.cacheImage = null;
       markEditorDirty();
       renderNutritionAiPreview();
     } catch (error) {
@@ -1738,6 +1774,178 @@
     });
   };
 
+  const renderRelatedIngredientAvatar = (ingredient) => ingredient?.imageUrl
+    ? `<span class="recipe-inline-avatar-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-recipe-inline-thumb" src="${ingredient.imageUrl}" alt="${capitalize(ingredient.name)}" loading="lazy"></span>`
+    : `<span class="recipe-inline-avatar-wrap recipe-inline-avatar-fallback">${getSmallPlaceholder('fa-solid fa-link')}</span>`;
+
+  const buildRecipeRelatedSummaryHtml = (row) => {
+    const related = normalizeRelatedIngredients(row?.relatedIngredients);
+    if (!related.length) return '<p class="recipe-related-empty">Sin sustitutos relacionados.</p>';
+    return `
+      <div class="recipe-related-summary-list">
+        ${related.map((item) => {
+          const ingredient = state.ingredientes[item.ingredientId];
+          const percentLabel = normalizeValue(item.maxPercent) ? `${item.maxPercent}% máx.` : 'Reemplazo total';
+          return `<span class="recipe-related-chip">${renderRelatedIngredientAvatar(ingredient)}<span><strong>${escapeHtml(capitalize(item.ingredientName || ingredient?.name || 'Ingrediente'))}</strong><small>${escapeHtml(percentLabel)}</small></span></span>`;
+        }).join('')}
+      </div>`;
+  };
+
+  const buildRecipeRelatedRowNoteHtml = (row) => {
+    const related = normalizeRelatedIngredients(row?.relatedIngredients);
+    if (!related.length) return '';
+    return `<p class="recipe-related-row-note"><i class="fa-solid fa-link"></i><strong>Relacionados:</strong> ${related.map((item) => {
+      const label = capitalize(item.ingredientName || state.ingredientes[item.ingredientId]?.name || 'Ingrediente');
+      const percent = normalizeValue(item.maxPercent);
+      return `${escapeHtml(label)}${percent ? ` (${escapeHtml(percent)}%)` : ''}`;
+    }).join(' · ')}</p>`;
+  };
+
+  const openRelatedIngredientsPicker = async (rowId) => {
+    const row = state.editor?.rows.find((item) => item.id === rowId && item.type === 'ingredient');
+    if (!row || !row.ingredientId || !state.ingredientes[row.ingredientId]) {
+      await openIosSwal({ title: 'Ingrediente requerido', html: '<p>Primero seleccioná el ingrediente principal de la fila.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+      return;
+    }
+
+    const primaryId = normalizeValue(row.ingredientId);
+    const primary = state.ingredientes[primaryId];
+    let query = '';
+    let selected = normalizeRelatedIngredients(row.relatedIngredients);
+
+    const renderSelectedEditor = () => selected.length
+      ? `<div class="recipe-related-picker-selected">${selected.map((item) => {
+        const ingredient = state.ingredientes[item.ingredientId];
+        return `<label class="recipe-related-picker-chip">
+          ${renderRelatedIngredientAvatar(ingredient)}
+          <span class="recipe-related-picker-copy">
+            <strong>${escapeHtml(capitalize(item.ingredientName || ingredient?.name || 'Ingrediente'))}</strong>
+            <input type="number" min="0" max="100" step="0.01" class="form-control ios-input recipe-related-percent-input" data-related-percent="${escapeHtml(item.ingredientId)}" placeholder="% máximo (opcional)" value="${escapeHtml(item.maxPercent || '')}">
+            <small>Vacío = puede sustituir el total faltante.</small>
+          </span>
+          <button type="button" class="btn ios-btn ios-btn-secondary recipe-related-remove-btn" data-related-remove="${escapeHtml(item.ingredientId)}"><i class="fa-solid fa-xmark"></i></button>
+        </label>`;
+      }).join('')}</div>`
+      : '<p class="recipe-related-empty">Todavía no agregaste sustitutos para este ingrediente.</p>';
+
+    const renderSelectorList = () => {
+      const list = Object.values(safeObject(state.ingredientes))
+        .filter((item) => normalizeValue(item?.id) && normalizeValue(item?.id) !== primaryId)
+        .filter((item) => {
+          if (!query) return true;
+          return normalizeLower(`${item.name || ''} ${item.description || ''}`).includes(normalizeLower(query));
+        })
+        .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'es'))
+        .slice(0, 60);
+
+      return list.map((ingredient) => {
+        const checked = selected.some((item) => item.ingredientId === ingredient.id);
+        return `<label class="inventario-check-row inventario-selector-row recipe-related-picker-row">
+          <input type="checkbox" data-related-pick="${escapeHtml(ingredient.id)}" ${checked ? 'checked' : ''}>
+          ${renderRelatedIngredientAvatar(ingredient)}
+          <span class="recipe-related-picker-label">
+            <strong>${escapeHtml(capitalize(ingredient.name || 'Ingrediente'))}</strong>
+            <small>${escapeHtml(capitalize(ingredient.description || ingredient.category || 'Ingrediente relacionado'))}</small>
+          </span>
+        </label>`;
+      }).join('') || '<p class="recipe-related-empty">No encontramos ingredientes para ese filtro.</p>';
+    };
+
+    const swal = await openIosSwal({
+      title: `Relacionar · ${escapeHtml(capitalize(primary.name || row.ingredientName || 'Ingrediente'))}`,
+      width: 'min(900px, 96vw)',
+      html: `
+        <div class="recipe-related-picker">
+          <div class="recipe-related-picker-head">
+            <div class="recipe-related-primary">${renderRelatedIngredientAvatar(primary)}<div><strong>${escapeHtml(capitalize(primary.name || row.ingredientName || 'Ingrediente'))}</strong><small>Elegí uno o varios sustitutos posibles para producción.</small></div></div>
+            <div class="input-group ios-input-group ingredientes-search-group">
+              <span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+              <input id="recipeRelatedSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar ingrediente relacionado">
+            </div>
+          </div>
+          <div id="recipeRelatedSelected" class="recipe-related-selected-wrap"></div>
+          <div id="recipeRelatedList" class="recipe-related-picker-list"></div>
+        </div>`,
+      showCancelButton: true,
+      confirmButtonText: 'Guardar relación',
+      cancelButtonText: 'Cancelar',
+      didOpen: () => {
+        const popup = Swal.getPopup();
+        const selectedHost = popup.querySelector('#recipeRelatedSelected');
+        const listHost = popup.querySelector('#recipeRelatedList');
+        const searchInput = popup.querySelector('#recipeRelatedSearch');
+        const syncView = () => {
+          selectedHost.innerHTML = renderSelectedEditor();
+          listHost.innerHTML = renderSelectorList();
+          popup.querySelectorAll('.js-recipe-inline-thumb').forEach((image) => {
+            const wrapper = image.closest('.recipe-inline-avatar-wrap');
+            const loading = wrapper?.querySelector('.thumb-loading');
+            const showImage = () => {
+              image.classList.add('is-loaded');
+              loading?.classList.add('d-none');
+            };
+            const showFallback = () => {
+              if (wrapper) wrapper.innerHTML = getSmallPlaceholder('fa-solid fa-link');
+            };
+            if (image.complete && image.naturalWidth > 0) {
+              showImage();
+            } else {
+              image.addEventListener('load', showImage, { once: true });
+              image.addEventListener('error', showFallback, { once: true });
+            }
+          });
+          popup.querySelectorAll('[data-related-pick]').forEach((input) => {
+            input.addEventListener('change', (event) => {
+              const ingredientId = event.target.dataset.relatedPick;
+              const ingredient = state.ingredientes[ingredientId];
+              if (!ingredient) return;
+              if (event.target.checked) {
+                if (!selected.some((item) => item.ingredientId === ingredientId)) {
+                  selected.push({ ingredientId, ingredientName: ingredient.name, maxPercent: '' });
+                }
+              } else {
+                selected = selected.filter((item) => item.ingredientId !== ingredientId);
+              }
+              syncView();
+            });
+          });
+          popup.querySelectorAll('[data-related-remove]').forEach((button) => {
+            button.addEventListener('click', () => {
+              selected = selected.filter((item) => item.ingredientId !== button.dataset.relatedRemove);
+              syncView();
+            });
+          });
+          popup.querySelectorAll('[data-related-percent]').forEach((input) => {
+            input.addEventListener('input', (event) => {
+              const current = selected.find((item) => item.ingredientId === event.target.dataset.relatedPercent);
+              if (!current) return;
+              const clean = normalizeValue(event.target.value).replace(',', '.');
+              if (!clean) {
+                current.maxPercent = '';
+                return;
+              }
+              const numeric = Math.max(0, Math.min(100, Number(clean)));
+              current.maxPercent = Number.isFinite(numeric) ? String(numeric) : '';
+              event.target.value = current.maxPercent;
+            });
+          });
+        };
+        searchInput?.addEventListener('input', (event) => {
+          query = event.target.value;
+          syncView();
+        });
+        syncView();
+      },
+      preConfirm: () => normalizeRelatedIngredients(selected)
+    });
+
+    if (!swal.isConfirmed || !row) return;
+    row.relatedIngredients = normalizeRelatedIngredients(swal.value);
+    markEditorDirty();
+    markNutritionAiAsStaleIfNeeded();
+    renderRows();
+  };
+
   const renderRows = () => {
     const rowsBody = recipeEditorForm.querySelector('#recipeRowsBody');
     if (!rowsBody || !state.editor) return;
@@ -1782,10 +1990,18 @@
       return `
         <tr data-row-id="${row.id}" draggable="${state.editor.orderMode === 'custom'}">
           <td><i class="fa-solid fa-grip-lines"></i></td>
-          <td><div class="recipe-ing-autocomplete"><div class="recipe-ing-input-wrap">${ingredientAvatarHtml(state.ingredientes[row.ingredientId])}<input class="form-control ios-input" data-ing-input="${row.id}" value="${row.ingredientName || ''}" placeholder="Buscar ingrediente..."></div></div></td>
+          <td>
+            <div class="recipe-ing-autocomplete">
+              <div class="recipe-ing-input-wrap">
+                ${ingredientAvatarHtml(state.ingredientes[row.ingredientId])}
+                <input class="form-control ios-input" data-ing-input="${row.id}" value="${row.ingredientName || ''}" placeholder="Buscar ingrediente...">
+              </div>
+              ${buildRecipeRelatedRowNoteHtml(row)}
+            </div>
+          </td>
           <td><input class="form-control ios-input" data-qty-input="${row.id}" value="${row.quantity || ''}" placeholder="0,00"></td>
           <td><select class="form-select ios-input" data-unit-input="${row.id}">${getMeasureSelectOptionsHtml(row.unit, row.ingredientId)}</select></td>
-          <td><button type="button" class="btn family-manage-btn" data-remove-row="${row.id}"><i class="fa-solid fa-trash"></i></button></td>
+          <td><div class="recipe-row-actions"><button type="button" class="btn family-manage-btn" data-row-relations="${row.id}" title="Relacionar sustitutos" ${row.ingredientId ? '' : 'disabled'}><i class="fa-solid fa-link"></i></button><button type="button" class="btn family-manage-btn" data-remove-row="${row.id}"><i class="fa-solid fa-trash"></i></button></div></td>
         </tr>`;
     }).join('');
     prepareInlineThumbLoaders();
@@ -1848,7 +2064,7 @@
 
         const addIngredientBtn = event.target.closest('[data-add-ingredient-row]');
         if (addIngredientBtn) {
-          pushRowBeforeMonography({ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: getMeasureOptions()[0]?.value || '' });
+          pushRowBeforeMonography({ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: getMeasureOptions()[0]?.value || '', relatedIngredients: [] });
           markEditorDirty();
           markNutritionAiAsStaleIfNeeded();
           renderRows();
@@ -1914,6 +2130,13 @@
           markNutritionAiAsStaleIfNeeded();
           renderRows();
           clearSuggestions();
+          return;
+        }
+
+        const relationsBtn = event.target.closest('[data-row-relations]');
+        if (relationsBtn) {
+          await openRelatedIngredientsPicker(relationsBtn.dataset.rowRelations);
+          return;
         }
       });
 
@@ -1924,6 +2147,7 @@
           if (!row) return;
           row.ingredientName = input.value;
           row.ingredientId = '';
+          row.relatedIngredients = [];
           markEditorDirty();
           markNutritionAiAsStaleIfNeeded();
           showSuggestions(input, row.id, input.value);
@@ -2253,6 +2477,7 @@
             row.ingredientId = ingredient.id;
             row.ingredientName = ingredient.name;
             row.unit = getPreferredUnitForIngredient(ingredient);
+            row.relatedIngredients = normalizeRelatedIngredients(row.relatedIngredients);
             markEditorDirty();
             markNutritionAiAsStaleIfNeeded();
             renderRows();
@@ -2289,6 +2514,7 @@
               target.ingredientId = ingredientId;
               target.ingredientName = state.ingredientes[ingredientId].name;
               target.unit = getPreferredUnitForIngredient(state.ingredientes[ingredientId]);
+              target.relatedIngredients = normalizeRelatedIngredients(target.relatedIngredients);
               markEditorDirty();
               markNutritionAiAsStaleIfNeeded();
             } else {
@@ -2298,7 +2524,8 @@
                 ingredientId,
                 ingredientName: state.ingredientes[ingredientId].name,
                 quantity: '',
-                unit: getPreferredUnitForIngredient(state.ingredientes[ingredientId])
+                unit: getPreferredUnitForIngredient(state.ingredientes[ingredientId]),
+                relatedIngredients: []
               });
               markEditorDirty();
             }
@@ -2363,8 +2590,8 @@
     state.editor = editorSeed || {
       image: { method: 'ai', url: initial?.imageUrl || '', prompt: '', file: null, generatedFile: null },
       rows: Array.isArray(initial?.rows) && initial.rows.length
-        ? initial.rows.map((row) => ({ ...row, id: row.id || makeId('row') }))
-        : [{ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: getMeasureOptions()[0]?.value || '' }],
+        ? initial.rows.map((row) => ({ ...row, id: row.id || makeId('row'), relatedIngredients: normalizeRelatedIngredients(row.relatedIngredients) }))
+        : [{ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: getMeasureOptions()[0]?.value || '', relatedIngredients: [] }],
       orderMode: initial?.orderMode || 'desc',
       agingDays: normalizeValue(initial?.agingDays),
       rnpa: {
@@ -2618,7 +2845,8 @@
           ingredientId: normalizeValue(row.ingredientId),
           ingredientName: normalizeValue(row.ingredientName),
           quantity: normalizeValue(row.quantity).replaceAll('.', ','),
-          unit: normalizeLower(row.unit)
+          unit: normalizeLower(row.unit),
+          relatedIngredients: normalizeRelatedIngredients(row.relatedIngredients)
         };
       })
       .filter((row) => row.type === 'comment' ? row.comment : (row.type === MONOGRAPHY_ROW_TYPE ? row.html : row.ingredientName));
