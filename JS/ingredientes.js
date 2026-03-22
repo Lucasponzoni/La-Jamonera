@@ -347,14 +347,16 @@
   const ensurePrintButton = () => {
     if (!createIngredientBtn || printIngredientsBtn) return;
     const separator = document.createElement('span');
-    separator.className = 'barra-separadora';
+    separator.className = 'barra-separadora ingredientes-toolbar-separator';
     separator.setAttribute('aria-hidden', 'true');
 
     printIngredientsBtn = document.createElement('button');
     printIngredientsBtn.type = 'button';
     printIngredientsBtn.id = 'printIngredientsBtn';
     printIngredientsBtn.className = 'btn ios-btn ios-btn-secondary produccion-toolbar-icon-btn';
-    printIngredientsBtn.innerHTML = '<i class="fa-solid fa-print"></i><span>Imprimir</span>';
+    printIngredientsBtn.title = 'Imprimir';
+    printIngredientsBtn.setAttribute('aria-label', 'Imprimir');
+    printIngredientsBtn.innerHTML = '<i class="fa-solid fa-print"></i>';
     createIngredientBtn.parentNode?.insertBefore(printIngredientsBtn, createIngredientBtn);
     createIngredientBtn.parentNode?.insertBefore(separator, createIngredientBtn);
   };

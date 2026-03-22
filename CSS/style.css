@@ -189,6 +189,28 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   background: #fff;
 }
 
+.ingredientes-toolbar-separator {
+  margin: 0 6px;
+  height: 34px;
+}
+
+.produccion-toolbar-icon-btn {
+  width: fit-content;
+  min-width: 46px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+
+#ingredientesModal .family-circle-thumb img,
+#ingredientesModal .ingrediente-avatar img {
+  object-fit: contain;
+  padding: 6px;
+  background: #fff;
+}
+
 .inventario-filter-helper {
   color: orangered;
   text-align: center;
