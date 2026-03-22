@@ -3207,6 +3207,28 @@
     const id = encodeURIComponent(normalizeValue(productionId));
     return `https://www.lajamonera.online/produccion_publica.html?id=${id}`;
   };
+  const formatDispatchPlanillaQty = (value, unit = 'kg') => {
+    const normalizedUnit = normalizeLower(unit || 'kg');
+    const amount = Number(value || 0);
+    const pretty = Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
+    if (['unidad', 'unidades', 'u', 'un'].includes(normalizedUnit)) {
+      return `${pretty} ${amount === 1 ? 'unidad' : 'unidades'}`;
+    }
+    if (['kilo', 'kilos', 'kg'].includes(normalizedUnit)) {
+      return `${pretty} ${amount === 1 ? 'kilo' : 'kilos'}`;
+    }
+    return `${pretty} ${normalizedUnit || ''}`.trim();
+  };
+  const formatDispatchPlanillaExpiry = (value) => {
+    const normalized = normalizeValue(value);
+    if (!normalized) return '✗';
+    const formatted = escapeHtml(formatIsoEs(normalized) || normalized);
+    return formatted || '✗';
+  };
+  const isDispatchPlaceholderAddress = (value = '') => {
+    const normalized = normalizeLower(value);
+    return !normalized || normalized.includes('sin dirección') || normalized.includes('sin direccion') || normalized.includes('xlsx');
+  };
   const renderDispatchPlanillaQr = async (host, dispatchRow) => {
     if (!host || !dispatchRow?.id) return;
     const ready = await ensureQrCodeLib();
@@ -3217,15 +3239,18 @@
       return;
     }
     host.innerHTML = '';
-    host.style.display = 'grid';
-    host.style.gridTemplateColumns = 'repeat(auto-fit,minmax(130px,1fr))';
-    host.style.gap = '10px';
+    host.style.display = 'flex';
+    host.style.flexWrap = 'wrap';
+    host.style.justifyContent = 'center';
+    host.style.alignItems = 'flex-start';
+    host.style.gap = '12px';
     traces.forEach((trace) => {
       const wrap = document.createElement('div');
       wrap.style.display = 'flex';
       wrap.style.flexDirection = 'column';
       wrap.style.alignItems = 'center';
       wrap.style.gap = '4px';
+      wrap.style.flex = '0 0 auto';
       const qrBox = document.createElement('div');
       qrBox.style.width = '130px';
       qrBox.style.height = '130px';
@@ -3234,8 +3259,14 @@
       caption.style.color = '#1f2a44';
       caption.style.textAlign = 'center';
       caption.textContent = trace.label;
+      const subcaption = document.createElement('small');
+      subcaption.style.color = '#6b7280';
+      subcaption.style.textAlign = 'center';
+      subcaption.style.fontSize = '10px';
+      subcaption.textContent = normalizeValue(trace.productTitle || trace.parentLabel || 'Producto');
       wrap.appendChild(qrBox);
       wrap.appendChild(caption);
+      wrap.appendChild(subcaption);
       host.appendChild(wrap);
       // eslint-disable-next-line no-new
       new window.QRCode(qrBox, { text: trace.url, width: 130, height: 130, colorDark: '#111827', colorLight: '#ffffff' });
@@ -3267,23 +3298,52 @@
       : (managerProfiles.length
         ? managerProfiles.map((m) => `${normalizeValue(m.name) || 'Sin responsable'} (${normalizeValue(m.role) || 'Encargado'})`).join(', ')
         : 'Sin responsable (Encargado)');
-    const location = [client.address, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean).join(' • ');
     const clientDoc = normalizeValue(client.doc || client.dni || client.cuit || client.cuil || client.document || client.taxId);
+    const importedInvoice = normalizeValue(dispatchRow.importedInvoice || (Array.isArray(dispatchRow.products) ? dispatchRow.products.find((item) => normalizeValue(item.sourceInvoiceNumber))?.sourceInvoiceNumber : ''));
+    const rawAddress = normalizeValue(client.address);
+    const location = !isDispatchPlaceholderAddress(rawAddress)
+      ? [rawAddress, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean).join(' • ')
+      : `${clientDoc ? `Cliente ${clientDoc}` : (normalizeValue(client.name) || 'Cliente sin dirección')} • Dirección cargada en factura ${importedInvoice || '-'}`;
     const products = Array.isArray(dispatchRow.products) ? dispatchRow.products : [];
-    const detailRows = products.flatMap((item) => {
-      const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
-      const allocations = Array.isArray(item.allocations) && item.allocations.length ? item.allocations : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '' }];
-      return allocations.map((allocation) => `<tr><td><span style="display:inline-flex;align-items:center;gap:8px;">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(item.recipeTitle || '-')}</span></span></td><td><strong>${Number(allocation.qtyKg || 0).toFixed(2)} kg</strong></td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td><strong>${escapeHtml(allocation.lotNumber || '-')} · ${Number(getRegistroById(allocation.productionId)?.quantityKg || allocation.qtyKg || 0).toFixed(2)} kg</strong></td></tr>`);
-    }).join('') || '<tr><td colspan="4">Sin productos.</td></tr>';
+    const groups = [];
+    const standaloneRows = [];
+    products.forEach((item, index) => {
+      const allocations = Array.isArray(item.allocations) && item.allocations.length
+        ? item.allocations
+        : [{ lotNumber: '-', qtyKg: item.qtyKg, qty: item.qty, unit: item.qtyUnit || 'kilos', expiryDate: '', productionId: '' }];
+      const renderedAllocations = allocations.map((allocation) => {
+        const itemUnit = normalizeValue(allocation.unit || item.qtyUnit || (item.sourceType === 'ingredient' ? 'unidades' : 'kilos'));
+        const amount = Number(allocation.qty || 0) > 0 ? Number(allocation.qty || 0) : (['unidad', 'unidades', 'u', 'un'].includes(normalizeLower(itemUnit)) ? Number(item.qty || 0) : Number(allocation.qtyKg || item.qtyKg || 0));
+        const qtyText = formatDispatchPlanillaQty(amount, itemUnit);
+        const expiryText = formatDispatchPlanillaExpiry(allocation.expiryDate);
+        const lotText = `${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(qtyText)}`;
+        return `<tr class="${normalizeValue(item.sourceRowId) ? 'dispatch-planilla-child-row' : ''}"><td>${normalizeValue(item.sourceRowId) ? `<span class="dispatch-planilla-child-label">↳</span> ` : ''}<span style="display:inline-flex;align-items:center;gap:8px;">${sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl) ? `<img src="${escapeHtml(sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl))}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(item.recipeTitle || '-')}</span></span></td><td><strong>${escapeHtml(qtyText)}</strong></td><td>${expiryText}</td><td><strong>${lotText}</strong></td></tr>`;
+      }).join('');
+      const parentKey = normalizeValue(item.sourceRowId);
+      if (dispatchRow.importedFromXlsx && parentKey) {
+        const existing = groups.find((group) => group.key === parentKey);
+        if (existing) {
+          existing.rows.push(renderedAllocations);
+          return;
+        }
+        groups.push({ key: parentKey, label: normalizeValue(item.sourceParentLabel || item.recipeTitle || `Producto ${index + 1}`), rows: [renderedAllocations] });
+        return;
+      }
+      standaloneRows.push(renderedAllocations);
+    });
+    const detailRows = [
+      ...groups.map((group) => `<tr class="dispatch-planilla-parent-row"><td colspan="4"><strong>${escapeHtml(group.label)}</strong></td></tr>${group.rows.join('')}`),
+      ...standaloneRows
+    ].join('') || '<tr><td colspan="4">Sin productos.</td></tr>';
     const comments = (Array.isArray(dispatchRow.comments) ? dispatchRow.comments : []).map((c) => normalizeValue(c)).filter(Boolean);
     const commentsRows = comments.length
       ? comments.map((item, idx) => `<tr><td colspan="4"><strong>OBSERVACIÓN ${idx + 1}:</strong> ${escapeHtml(item)}</td></tr>`).join('')
       : '<tr><td colspan="4"><strong>OBSERVACIÓN 1:</strong> Sin observaciones</td></tr>';
-    const headerTable = `<table style="width:100%;border-collapse:collapse;table-layout:fixed"><tbody><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">FRIGORIFICO LA JAMONERA • REGISTRO DE SALIDA DE PRODUCTOS TERMINADOS</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">${escapeHtml(dispatchRow.code || dispatchRow.id)}</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px"><strong>FECHA Y HORA:</strong></td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(formatDateTime(dispatchRow.createdAt || dispatchRow.dispatchDate))}</strong></td><td style="border:1px solid #2f2f2f;padding:4px"><strong>CLIENTE:</strong></td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(normalizeValue(client.name) || '-')}</strong></td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px" colspan="4"><strong>DIRECCION:</strong> ${escapeHtml(location)}${location && clientDoc ? ' • ' : ''}${escapeHtml(clientDoc)}</td></tr></tbody></table>`;
-    const planillaStyle = '<style>.dispatch-planilla-print{font-family:Inter,Arial,sans-serif;color:#111827;background:#fff}.dispatch-planilla-print table{width:100%;border-collapse:collapse;table-layout:fixed}.dispatch-planilla-print th,.dispatch-planilla-print td{border:1px solid #2f2f2f;padding:6px;word-break:break-word;background:#fff;color:#111827}</style>';
+    const headerTable = `<table style="width:100%;border-collapse:collapse;table-layout:fixed"><tbody><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">FRIGORIFICO LA JAMONERA • REGISTRO DE SALIDA DE PRODUCTOS TERMINADOS</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">${escapeHtml(dispatchRow.code || dispatchRow.id)}</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px">FECHA Y HORA:</td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(formatDateTime(dispatchRow.createdAt || dispatchRow.dispatchDate))}</strong></td><td style="border:1px solid #2f2f2f;padding:4px">CLIENTE:</td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(normalizeValue(client.name) || '-')}</strong></td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px" colspan="4">DIRECCION: ${escapeHtml(location)}</td></tr></tbody></table>`;
+    const planillaStyle = '<style>.dispatch-planilla-print{font-family:Inter,Arial,sans-serif;color:#111827;background:#fff}.dispatch-planilla-print table{width:100%;border-collapse:collapse;table-layout:fixed}.dispatch-planilla-print th,.dispatch-planilla-print td{border:1px solid #2f2f2f;padding:6px;word-break:break-word;background:#fff;color:#111827}.dispatch-planilla-parent-row td{background:#eef3ff;font-weight:800;color:#223863}.dispatch-planilla-child-row td{background:#fbfcff}.dispatch-planilla-child-label{color:#4b78e8;font-weight:800;margin-right:4px}.dispatch-planilla-qr-section{margin-top:10px;display:grid;gap:10px}.dispatch-planilla-qr-copy{text-align:center}.dispatch-planilla-qr-copy p{margin:0 0 6px;font-weight:700}.dispatch-planilla-qr-copy small{color:#556487}.dispatch-planilla-qr-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:12px}</style>';
     const hasTraceQr = buildDispatchTraceTargets(dispatchRow).length > 0;
     const qrSection = hasTraceQr
-      ? '<div style="margin-top:10px;display:flex;gap:12px;align-items:center;"><div data-dispatch-planilla-qr></div><div><p style="margin:0 0 6px;font-weight:700;">QR de trazabilidad para las facturas</p><p style="margin:0;color:#556487;">Escaneá el QR con tu celular para acceder a la factura completa del producto.</p></div></div>'
+      ? '<div class="dispatch-planilla-qr-section"><div data-dispatch-planilla-qr class="dispatch-planilla-qr-grid"></div><div class="dispatch-planilla-qr-copy"><p>QR de trazabilidad para las facturas</p><small>Escaneá el QR con tu celular para acceder a la factura completa del producto.</small></div></div>'
       : '';
     const html = `${planillaStyle}<div class="dispatch-planilla-print" id="dispatchPlanillaPrintable">${headerTable}<div class="table-responsive" style="margin-top:8px;"><table><thead><tr><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de lote</th></tr></thead><tbody>${detailRows}<tr><td colspan="4"><strong>VEHÍCULO (UTA-URA):</strong> ${escapeHtml(`${vehicle.number || '-'} - ${vehicle.patent || '-'} - ${vehicle.brand || vehicle.type || '-'}`)}</td></tr>${commentsRows}<tr><td colspan="4"><strong>CONTROLO:</strong> ${escapeHtml(managerLabel)}</td></tr><tr><td colspan="2"><strong>TEMPERATURA UNIDAD DE TRANSPORTE:</strong> 3 °C</td><td colspan="2"><strong>UNIDAD DE TRANSPORTE ESTADO:</strong> A (ACEPTABLE)</td></tr></tbody></table></div>${qrSection}</div>`;
     return { html };
@@ -4297,7 +4357,7 @@
         const url = traceUrl || (productionId ? getDispatchTraceUrl(productionId) : '');
         if (!url || seen.has(url)) return;
         seen.add(url);
-        list.push({ url, label: normalizeValue(allocation.traceLabel || allocation.lotNumber || productionId || item.recipeTitle) || 'Trazabilidad' });
+        list.push({ url, label: normalizeValue(allocation.traceLabel || allocation.lotNumber || productionId || item.recipeTitle) || 'Trazabilidad', productTitle: normalizeValue(item.recipeTitle || item.sourceParentLabel || item.sourceProductLabel), parentLabel: normalizeValue(item.sourceParentLabel || item.sourceProductLabel) });
       });
     });
     return list;
@@ -4344,6 +4404,25 @@
         sourceId: dispatchId,
         sourceCode: dispatchCode,
         observation: `Reparto a domicilio${invoiceNumber ? ` · Factura ${invoiceNumber}` : ''}`
+      });
+      entry.productionUsage = Array.isArray(entry.productionUsage) ? entry.productionUsage : [];
+      entry.productionUsage.unshift({
+        id: makeId('usage_dispatch_home'),
+        productionId: `AUTO-EGRESO-${dispatchCode || dispatchId || makeId('dispatch_xlsx')}`,
+        producedAt: nowTs(),
+        productionDate: dispatchDate,
+        expiryDateAtProduction: 'Reparto a domicilio',
+        kilosUsed: Number((takeBase / 1000).toFixed(4)),
+        usedQty: takeQty,
+        usedUnit: entryUnit,
+        usedBaseQty: Number(takeBase.toFixed(6)),
+        lotNumber: normalizeValue(entry.lotNumber) || normalizeValue(entry.invoiceNumber) || entry.id,
+        ingredientLot: normalizeValue(entry.lotNumber) || normalizeValue(entry.invoiceNumber) || entry.id,
+        ingredientEntryId: entry.id,
+        ingredientId,
+        generatedAutomatically: true,
+        source: 'dispatch_xlsx_home_delivery',
+        type: 'auto_dispatch_home_xlsx'
       });
       allocations.push({
         ingredientId,
@@ -4616,7 +4695,7 @@
         const repartoId = makeId('reparto_xlsx');
         const vehicleId = normalizeValue(draft.vehicleId) || getRandomDispatchVehicleId();
         const client = getDispatchClient(first.clientId);
-        const clientAddress = normalizeValue(client.address) || `Dirección relacionada a factura ${normalizeValue(first.invoiceNumber) || '-'}`;
+        const clientAddress = normalizeValue(client.address);
         const comments = [...new Set(groupRows.map((row) => normalizeDispatchXlsxObservation(row.observation)).filter(Boolean))];
         const products = [];
         for (const row of groupRows) {
@@ -4658,7 +4737,7 @@
               if (consumeResult.forcedQty > 0.0001) {
                 itemAlloc.push({ lotNumber: normalizeValue(row.invoiceNumber) || 'Sin trazabilidad', qtyKg: Number((toBase(consumeResult.forcedQty, consumeResult.unit) / 1000).toFixed(3)), qty: consumeResult.forcedQty, unit: consumeResult.unit, expiryDate: '', productionId: '', forced: true, traceUrl: '' });
               }
-              products.push({ recipeId: ingredientId, recipeTitle: normalizeValue(ingredient.name || ingredient.title || row.sourceProduct), recipeImageUrl: normalizeValue(ingredient.imageUrl), qtyKg: Number((toBase(Number(mappedItem.qty || 0), consumeResult.unit) / 1000).toFixed(3)), allocations: itemAlloc, sourceType: 'ingredient' });
+              products.push({ recipeId: ingredientId, recipeTitle: normalizeValue(ingredient.name || ingredient.title || row.sourceProduct), recipeImageUrl: normalizeValue(ingredient.imageUrl), qtyKg: Number((toBase(Number(mappedItem.qty || 0), consumeResult.unit) / 1000).toFixed(3)), qty: Number(mappedItem.qty || 0), qtyUnit: normalizeValue(consumeResult.unit || mappedItem.unit || 'kilos'), allocations: itemAlloc, sourceType: 'ingredient', sourceRowId: normalizeValue(row.id), sourceParentLabel: normalizeValue(row.sourceProduct), sourceInvoiceNumber: normalizeValue(row.invoiceNumber) });
             });
             continue;
           }
@@ -4686,7 +4765,7 @@
           if (allocated.missingKg > 0.0001) {
             allocs.push({ lotNumber: normalizeValue(row.invoiceNumber) || 'Sin trazabilidad', qtyKg: Number(allocated.missingKg.toFixed(3)), expiryDate: '', productionId: '', forced: true, traceUrl: '' });
           }
-          products.push({ recipeId, recipeTitle: normalizeValue(recipe.title || row.sourceProduct), recipeImageUrl: normalizeValue(recipe.imageUrl), qtyKg: Number(qtyKg.toFixed(3)), allocations: allocs, sourceType: 'production' });
+          products.push({ recipeId, recipeTitle: normalizeValue(recipe.title || row.sourceProduct), recipeImageUrl: normalizeValue(recipe.imageUrl), qtyKg: Number(qtyKg.toFixed(3)), qty: Number(qtyKg.toFixed(3)), qtyUnit: 'kilos', allocations: allocs, sourceType: 'production', sourceRowId: normalizeValue(row.id), sourceParentLabel: normalizeValue(row.sourceProduct), sourceInvoiceNumber: normalizeValue(row.invoiceNumber) });
           appendRecipeMovement(recipeId, { id: `egr_${repartoId}_${recipeId}_${makeId('mv')}`, type: 'egreso', qtyKg: Number(qtyKg.toFixed(3)), at: dispatchDateNow, sourceId: repartoId, sourceCode: code, label: 'Reparto a domicilio', date: dispatchDate, nonTraceable: allocated.missingKg > 0.0001 });
         }
         state.reparto.registros[repartoId] = {
@@ -4708,7 +4787,7 @@
           proofs: [],
           importedFromXlsx: true,
           importedInvoice: normalizeValue(first.invoiceNumber),
-          clientSnapshot: { id: normalizeValue(first.clientId), name: normalizeValue(first.clientName || client.name), doc: normalizeValue(first.clientDoc || client.doc), address: clientAddress, city: normalizeValue(client.city || 'Sin localidad'), province: normalizeValue(client.province || 'Santa Fe'), country: normalizeValue(client.country || 'Argentina') },
+          clientSnapshot: { id: normalizeValue(first.clientId), name: normalizeValue(first.clientName || client.name), doc: normalizeValue(first.clientDoc || client.doc), address: clientAddress, city: normalizeValue(client.city || ''), province: normalizeValue(client.province || ''), country: normalizeValue(client.country || 'Argentina') },
           products,
           createdAt: dispatchDateNow,
           createdBy: getCurrentUserLabel()
