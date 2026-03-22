@@ -9329,6 +9329,12 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   overflow: auto;
 }
 
+.input-group.ios-input-group.ingredientes-search-group
+  > button[data-recipe-history-range-clear] {
+  border-top-right-radius: 14px !important;
+  border-bottom-right-radius: 14px !important;
+}
+
 .produccion-qr-preview-page {
   width: 100%;
   height: auto;
