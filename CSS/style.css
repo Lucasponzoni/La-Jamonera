@@ -770,6 +770,22 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   border-radius: inherit;
 }
 
+.ingrediente-avatar > .thumb-loading .meta-spinner-login,
+.ingrediente-avatar > .thumb-loading .meta-spinner,
+.family-circle-thumb > .thumb-loading .meta-spinner-login,
+.family-circle-thumb > .thumb-loading .meta-spinner,
+.receta-thumb-wrap > .thumb-loading .meta-spinner-login,
+.receta-thumb-wrap > .thumb-loading .meta-spinner,
+.recipe-inline-avatar-wrap > .thumb-loading .meta-spinner-login,
+.recipe-inline-avatar-wrap > .thumb-loading .meta-spinner,
+.recipe-suggest-avatar-wrap > .thumb-loading .meta-spinner-login,
+.recipe-suggest-avatar-wrap > .thumb-loading .meta-spinner {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
 .thumb-image {
   opacity: 0;
   transition: opacity 0.2s ease;
