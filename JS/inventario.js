@@ -5392,12 +5392,20 @@
             const providerId = normalizeValue(acceptProviderDeleteBtn.dataset.providerDeleteAccept);
             const provider = findProviderById(providerId);
             if (!provider) return;
-            state.inventario.config = safeObject(state.inventario.config);
-            state.inventario.config.providers = safeObject(state.inventario.config.providers);
-            delete state.inventario.config.providers[providerId];
-            state.pendingProviderDeleteId = '';
-            await persistInventario();
-            rerenderPreservingScroll();
+            acceptProviderDeleteBtn.disabled = true;
+            acceptProviderDeleteBtn.innerHTML = '<img src="./IMG/Meta-ai-logo.webp" alt="Eliminando" class="inventario-inline-delete-spinner">';
+            try {
+              state.inventario.config = safeObject(state.inventario.config);
+              state.inventario.config.providers = safeObject(state.inventario.config.providers);
+              delete state.inventario.config.providers[providerId];
+              state.pendingProviderDeleteId = '';
+              await persistInventario();
+              rerenderPreservingScroll();
+            } catch (error) {
+              acceptProviderDeleteBtn.disabled = false;
+              acceptProviderDeleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i><span>Eliminar proveedor</span>';
+              await openIosSwal({ title: 'No se pudo eliminar', html: '<p>Ocurrió un error al borrar el proveedor. Intentá nuevamente.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+            }
             return;
           }
 

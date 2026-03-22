@@ -8491,6 +8491,11 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   gap: 8px;
 }
 
+.inventario-inline-delete-spinner {
+  width: 18px;
+  height: 18px;
+}
+
 /* =========================================
    INVENTARIO · RNE · AJUSTES UX
 ========================================= */
@@ -9209,19 +9214,19 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
    INVENTARIO · AUTO EGRESOS
 ========================================= */
 .inventario-auto-egreso-row td {
-  background: #fff1f3 !important;
-  border-bottom: 1px dashed #d96b7c !important;
+  background: #fff6dc !important;
+  border-bottom: 1px dashed #d99b18 !important;
 }
 
 .inventario-auto-egreso-home-row td {
-  background: #fff1f3 !important;
-  border-bottom: 1px dashed #d96b7c !important;
+  background: #ffe8ed !important;
+  border-bottom: 1px dashed #d94b68 !important;
 }
 
 .inventario-auto-egreso-badge {
-  background: #ffe3e8;
-  border-color: #d96b7c;
-  color: #9f1239;
+  background: #fff0bf;
+  border-color: #d99b18;
+  color: #8a4f00;
   display: inline-flex;
   align-items: center;
   gap: 6px;

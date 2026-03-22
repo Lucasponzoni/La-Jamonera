@@ -3281,7 +3281,7 @@
     const qrHost = win.document.querySelector('[data-dispatch-planilla-qr]');
     if (qrHost) await renderDispatchPlanillaQr(qrHost, dispatchRow);
     await waitPrintAssets(win);
-    onProgress?.(100);
+    await new Promise((resolve) => setTimeout(resolve, 220));
     win.focus();
     win.print();
   };
@@ -3317,7 +3317,8 @@
         const qtyText = formatDispatchPlanillaQty(amount, itemUnit);
         const expiryText = formatDispatchPlanillaExpiry(allocation.expiryDate);
         const lotText = `${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(qtyText)}`;
-        return `<tr class="${normalizeValue(item.sourceRowId) ? 'dispatch-planilla-child-row' : ''}"><td>${normalizeValue(item.sourceRowId) ? `<span class="dispatch-planilla-child-label">↳</span> ` : ''}<span style="display:inline-flex;align-items:center;gap:8px;">${sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl) ? `<img src="${escapeHtml(sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl))}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(item.recipeTitle || '-')}</span></span></td><td><strong>${escapeHtml(qtyText)}</strong></td><td>${expiryText}</td><td><strong>${lotText}</strong></td></tr>`;
+        const markerCell = normalizeValue(item.sourceRowId) ? '<span class="dispatch-planilla-child-label">↳</span>' : '';
+        return `<tr class="${normalizeValue(item.sourceRowId) ? 'dispatch-planilla-child-row' : ''}"><td class="dispatch-planilla-marker-cell">${markerCell}</td><td><span style="display:inline-flex;align-items:center;gap:8px;">${sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl) ? `<img src="${escapeHtml(sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl))}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(item.recipeTitle || '-')}</span></span></td><td><strong>${escapeHtml(qtyText)}</strong></td><td>${expiryText}</td><td><strong>${lotText}</strong></td></tr>`;
       }).join('');
       const parentKey = normalizeValue(item.sourceRowId);
       if (dispatchRow.importedFromXlsx && parentKey) {
@@ -3332,20 +3333,20 @@
       standaloneRows.push(renderedAllocations);
     });
     const detailRows = [
-      ...groups.map((group) => `<tr class="dispatch-planilla-parent-row"><td colspan="4"><strong>${escapeHtml(group.label)}</strong></td></tr>${group.rows.join('')}`),
+      ...groups.map((group) => `<tr class="dispatch-planilla-parent-row"><td colspan="5"><strong>${escapeHtml(group.label)}</strong></td></tr>${group.rows.join('')}`),
       ...standaloneRows
-    ].join('') || '<tr><td colspan="4">Sin productos.</td></tr>';
+    ].join('') || '<tr><td colspan="5">Sin productos.</td></tr>';
     const comments = (Array.isArray(dispatchRow.comments) ? dispatchRow.comments : []).map((c) => normalizeValue(c)).filter(Boolean);
     const commentsRows = comments.length
-      ? comments.map((item, idx) => `<tr><td colspan="4"><strong>OBSERVACIÓN ${idx + 1}:</strong> ${escapeHtml(item)}</td></tr>`).join('')
-      : '<tr><td colspan="4"><strong>OBSERVACIÓN 1:</strong> Sin observaciones</td></tr>';
-    const headerTable = `<table style="width:100%;border-collapse:collapse;table-layout:fixed"><tbody><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">FRIGORIFICO LA JAMONERA • REGISTRO DE SALIDA DE PRODUCTOS TERMINADOS</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">${escapeHtml(dispatchRow.code || dispatchRow.id)}</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px">FECHA Y HORA:</td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(formatDateTime(dispatchRow.createdAt || dispatchRow.dispatchDate))}</strong></td><td style="border:1px solid #2f2f2f;padding:4px">CLIENTE:</td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(normalizeValue(client.name) || '-')}</strong></td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px" colspan="4">DIRECCION: ${escapeHtml(location)}</td></tr></tbody></table>`;
-    const planillaStyle = '<style>.dispatch-planilla-print{font-family:Inter,Arial,sans-serif;color:#111827;background:#fff}.dispatch-planilla-print table{width:100%;border-collapse:collapse;table-layout:fixed}.dispatch-planilla-print th,.dispatch-planilla-print td{border:1px solid #2f2f2f;padding:6px;word-break:break-word;background:#fff;color:#111827}.dispatch-planilla-parent-row td{background:#eef3ff;font-weight:800;color:#223863}.dispatch-planilla-child-row td{background:#fbfcff}.dispatch-planilla-child-label{color:#4b78e8;font-weight:800;margin-right:4px}.dispatch-planilla-qr-section{margin-top:10px;display:grid;gap:10px}.dispatch-planilla-qr-copy{text-align:center}.dispatch-planilla-qr-copy p{margin:0 0 6px;font-weight:700}.dispatch-planilla-qr-copy small{color:#556487}.dispatch-planilla-qr-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:12px}</style>';
+      ? comments.map((item, idx) => `<tr><td colspan="5"><strong>OBSERVACIÓN ${idx + 1}:</strong> ${escapeHtml(item)}</td></tr>`).join('')
+      : '<tr><td colspan="5"><strong>OBSERVACIÓN 1:</strong> Sin observaciones</td></tr>';
+    const headerTable = `<table style="width:100%;border-collapse:collapse;table-layout:fixed"><tbody><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">FRIGORIFICO LA JAMONERA • REGISTRO DE SALIDA DE PRODUCTOS TERMINADOS</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">${escapeHtml(dispatchRow.code || dispatchRow.id)}</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px">FECHA Y HORA:</td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(formatDateTime(dispatchRow.createdAt || dispatchRow.dispatchDate))}</strong></td><td style="border:1px solid #2f2f2f;padding:4px">CLIENTE:</td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(normalizeValue(client.name) || '-')}</strong></td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px" colspan="4">DIRECCION: <strong>${escapeHtml(location)}</strong></td></tr></tbody></table>`;
+    const planillaStyle = '<style>.dispatch-planilla-print{font-family:Inter,Arial,sans-serif;color:#111827;background:#fff}.dispatch-planilla-print table{width:100%;border-collapse:collapse;table-layout:fixed}.dispatch-planilla-print th,.dispatch-planilla-print td{border:1px solid #2f2f2f;padding:6px;word-break:break-word;background:#fff;color:#111827}.dispatch-planilla-parent-row td{background:#eef3ff;font-weight:800;color:#223863}.dispatch-planilla-child-row td{background:#fbfcff}.dispatch-planilla-marker-cell{width:28px;text-align:center;padding:6px 4px}.dispatch-planilla-child-label{color:#4b78e8;font-weight:800;display:inline-flex;align-items:center;justify-content:center}.dispatch-planilla-qr-section{margin-top:24px;padding-top:18px;display:grid;gap:14px;border-top:1px solid #d7def2}.dispatch-planilla-qr-copy{text-align:center}.dispatch-planilla-qr-copy p{margin:0 0 6px;font-weight:700}.dispatch-planilla-qr-copy small{color:#556487}.dispatch-planilla-qr-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:12px}</style>';
     const hasTraceQr = buildDispatchTraceTargets(dispatchRow).length > 0;
     const qrSection = hasTraceQr
-      ? '<div class="dispatch-planilla-qr-section"><div data-dispatch-planilla-qr class="dispatch-planilla-qr-grid"></div><div class="dispatch-planilla-qr-copy"><p>QR de trazabilidad para las facturas</p><small>Escaneá el QR con tu celular para acceder a la factura completa del producto.</small></div></div>'
+      ? '<div class="dispatch-planilla-qr-section"><div data-dispatch-planilla-qr class="dispatch-planilla-qr-grid"></div><div class="dispatch-planilla-qr-copy"><p>QR de trazabilidad para las facturas y producciones</p><small>Escaneá el QR con tu celular para acceder.</small></div></div>'
       : '';
-    const html = `${planillaStyle}<div class="dispatch-planilla-print" id="dispatchPlanillaPrintable">${headerTable}<div class="table-responsive" style="margin-top:8px;"><table><thead><tr><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de lote</th></tr></thead><tbody>${detailRows}<tr><td colspan="4"><strong>VEHÍCULO (UTA-URA):</strong> ${escapeHtml(`${vehicle.number || '-'} - ${vehicle.patent || '-'} - ${vehicle.brand || vehicle.type || '-'}`)}</td></tr>${commentsRows}<tr><td colspan="4"><strong>CONTROLO:</strong> ${escapeHtml(managerLabel)}</td></tr><tr><td colspan="2"><strong>TEMPERATURA UNIDAD DE TRANSPORTE:</strong> 3 °C</td><td colspan="2"><strong>UNIDAD DE TRANSPORTE ESTADO:</strong> A (ACEPTABLE)</td></tr></tbody></table></div>${qrSection}</div>`;
+    const html = `${planillaStyle}<div class="dispatch-planilla-print" id="dispatchPlanillaPrintable">${headerTable}<div class="table-responsive" style="margin-top:8px;"><table><thead><tr><th style="width:28px"></th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de lote</th></tr></thead><tbody>${detailRows}<tr><td colspan="5"><strong>VEHÍCULO (UTA-URA):</strong> ${escapeHtml(`${vehicle.number || '-'} - ${vehicle.patent || '-'} - ${vehicle.brand || vehicle.type || '-'}`)}</td></tr>${commentsRows}<tr><td colspan="5"><strong>CONTROLO:</strong> ${escapeHtml(managerLabel)}</td></tr><tr><td colspan="3"><strong>TEMPERATURA UNIDAD DE TRANSPORTE:</strong> 3 °C</td><td colspan="2"><strong>UNIDAD DE TRANSPORTE ESTADO:</strong> A (ACEPTABLE)</td></tr></tbody></table></div>${qrSection}</div>`;
     return { html };
   };
   const printDispatchPlanillasBatch = async (rows = [], onProgress) => {
@@ -3371,7 +3372,7 @@
       }
     }
     await waitPrintAssets(win);
-    onProgress?.(100);
+    await new Promise((resolve) => setTimeout(resolve, 220));
     win.focus();
     win.print();
   };
