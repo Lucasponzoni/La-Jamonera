@@ -206,7 +206,7 @@
   const familyAvatar = (url, alt, itemCount = 0) => {
     const countBadge = Number(itemCount) > 0 ? `<span class="family-circle-count">${Math.min(99, Number(itemCount))}</span>` : '';
     return url
-      ? `<span class="family-circle-thumb"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-family-thumb" src="${url}" alt="${alt}" loading="lazy">${countBadge}</span>`
+      ? `<span class="family-circle-thumb"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-family-thumb" src="${url}" alt="${alt}" loading="lazy">${countBadge}</span>`
       : `<span class="family-circle-thumb family-circle-thumb-placeholder">${PLACEHOLDER_ICON}${countBadge}</span>`;
   };
 
@@ -254,7 +254,7 @@
   };
 
   const ingredientAvatar = (url, alt) => url
-    ? `<div class="ingrediente-avatar"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingrediente-thumb" src="${url}" alt="${alt}" loading="lazy"></div>`
+    ? `<div class="ingrediente-avatar"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingrediente-thumb" src="${url}" alt="${alt}" loading="lazy"></div>`
     : `<div class="ingrediente-avatar ingrediente-avatar-placeholder">${PLACEHOLDER_ICON}</div>`;
 
   const prepareThumbLoaders = (selector) => {
@@ -389,8 +389,8 @@
         <label class="inventario-check-row"><input type="radio" name="ingredientPerishableType" value="non_perishable"><span>Solo no perecederos</span></label>
       </div>
       <div id="ingredientPrintProductsScope" class="notify-specific-users-list d-none">
-        <div class="step-block"><strong>Familias</strong>${getFamiliasArray().map((family) => `<label class="inventario-check-row inventario-selector-row">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${escapeHtml(family.imageUrl)}" alt="${escapeHtml(capitalizeLabel(family.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<input type="checkbox" data-ingredient-print-family value="${family.id}"><span>${escapeHtml(capitalizeLabel(family.name))}</span></label>`).join('')}</div>
-        <div class="step-block"><strong>Productos</strong>${getIngredientesArray().map((item) => `<label class="inventario-check-row inventario-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(capitalizeLabel(item.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<input type="checkbox" data-ingredient-print-product data-family-id="${item.familyId || ''}" value="${item.id}"><span>${escapeHtml(capitalizeLabel(item.name))}</span></label>`).join('')}</div>
+        <div class="step-block"><strong>Familias</strong>${getFamiliasArray().map((family) => `<label class="inventario-check-row inventario-selector-row">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${escapeHtml(family.imageUrl)}" alt="${escapeHtml(capitalizeLabel(family.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<input type="checkbox" data-ingredient-print-family value="${family.id}"><span>${escapeHtml(capitalizeLabel(family.name))}</span></label>`).join('')}</div>
+        <div class="step-block"><strong>Productos</strong>${getIngredientesArray().map((item) => `<label class="inventario-check-row inventario-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(capitalizeLabel(item.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<input type="checkbox" data-ingredient-print-product data-family-id="${item.familyId || ''}" value="${item.id}"><span>${escapeHtml(capitalizeLabel(item.name))}</span></label>`).join('')}</div>
       </div>
     </div>`,
     showCancelButton: true,
