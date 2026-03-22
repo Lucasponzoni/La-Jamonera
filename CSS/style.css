@@ -169,7 +169,7 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   height: 40px;
   margin: 0 10px;
   vertical-align: middle;
-  background: linear-gradient(to bottom, rgb(216 216 216), rgba(150, 150, 150, 0.9), rgb(216 216 216));
+  background: linear-gradient(to bottom, rgb(230 235 250), rgba(150, 150, 150, 0.9), rgb(230 235 250));
   border-radius: 999px;
 }
 
