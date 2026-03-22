@@ -1794,7 +1794,11 @@
   const buildRecipeRelatedRowNoteHtml = (row) => {
     const related = normalizeRelatedIngredients(row?.relatedIngredients);
     if (!related.length) return '';
-    return `<p class="recipe-related-row-note"><i class="fa-solid fa-link"></i><strong>Relacionados:</strong> ${related.map((item) => escapeHtml(capitalize(item.ingredientName || state.ingredientes[item.ingredientId]?.name || 'Ingrediente'))).join(' · ')}</p>`;
+    return `<p class="recipe-related-row-note"><i class="fa-solid fa-link"></i><strong>Relacionados:</strong> ${related.map((item) => {
+      const label = capitalize(item.ingredientName || state.ingredientes[item.ingredientId]?.name || 'Ingrediente');
+      const percent = normalizeValue(item.maxPercent);
+      return `${escapeHtml(label)}${percent ? ` (${escapeHtml(percent)}%)` : ''}`;
+    }).join(' · ')}</p>`;
   };
 
   const openRelatedIngredientsPicker = async (rowId) => {

@@ -3735,22 +3735,6 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-}
-
-.recipe-related-row-note {
-  margin: 8px 0 0;
-  color: #5f73a2;
-  font-size: 0.78rem;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.recipe-related-summary-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
   padding: 6px 10px;
   border-radius: 999px;
   border: 1px solid #d7e2fb;
@@ -3803,6 +3787,11 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   padding-right: 4px;
 }
 
+.recipe-related-picker-selected {
+  display: grid;
+  gap: 10px;
+}
+
 .recipe-related-picker-chip,
 .recipe-related-picker-row {
   border-radius: 18px;
@@ -3833,6 +3822,22 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   height: 34px;
   padding: 0;
   border-radius: 999px;
+}
+
+.recipe-related-row-note {
+  margin: 8px 0 0;
+  color: #5f73a2;
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.recipe-related-summary-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .recipe-related-chip {
@@ -3880,6 +3885,11 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   border-radius: 18px;
   background: #f6f9ff;
   border: 1px solid #d8e3fb;
+}
+
+.recipe-related-primary > div {
+  display: grid;
+  gap: 4px;
 }
 
 .recipe-related-selected-wrap,

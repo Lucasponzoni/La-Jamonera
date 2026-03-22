@@ -1462,7 +1462,7 @@
             const availableInReqUnit = fromBase(toBase(available, entryUnit), requirement.unit);
             if (isSoon) warnings.push(`${related.ingredientName}: lote próximo a vencer (${expiryIso}).`);
             return { entry, related, entryUnit, available, availableInReqUnit, expiryIso, status, isSoon, takeQty: 0 };
-          });
+          }).filter((item) => item.availableInReqUnit > 0.0001);
           let groupRemaining = Math.min(remaining, prepared.reduce((sum, item) => sum + (item.status === 'expired' ? 0 : Math.min(item.availableInReqUnit, perRelatedCap[item.related.ingredientId] || 0)), 0));
           for (let pass = 0; pass < 6 && groupRemaining > 0.0001; pass += 1) {
             const eligible = prepared.filter((item) => item.status !== 'expired' && item.availableInReqUnit - item.takeQty > 0.0001 && (perRelatedCap[item.related.ingredientId] || 0) > 0.0001);
