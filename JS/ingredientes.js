@@ -351,6 +351,17 @@
 
   const ensurePrintButton = () => {
     if (!createIngredientBtn || printIngredientsBtn) return;
+    const toolbar = createIngredientBtn.parentNode;
+    if (!toolbar) return;
+
+    let actionsWrap = toolbar.querySelector('.ingredientes-toolbar-actions');
+    if (!actionsWrap) {
+      actionsWrap = document.createElement('div');
+      actionsWrap.className = 'ingredientes-toolbar-actions';
+      toolbar.appendChild(actionsWrap);
+      actionsWrap.appendChild(createIngredientBtn);
+    }
+
     const separator = document.createElement('span');
     separator.className = 'barra-separadora ingredientes-toolbar-separator';
     separator.setAttribute('aria-hidden', 'true');
@@ -362,8 +373,9 @@
     printIngredientsBtn.title = 'Imprimir';
     printIngredientsBtn.setAttribute('aria-label', 'Imprimir');
     printIngredientsBtn.innerHTML = '<i class="fa-solid fa-print"></i>';
-    createIngredientBtn.parentNode?.insertBefore(printIngredientsBtn, createIngredientBtn);
-    createIngredientBtn.parentNode?.insertBefore(separator, createIngredientBtn);
+
+    actionsWrap.insertBefore(separator, createIngredientBtn);
+    actionsWrap.insertBefore(printIngredientsBtn, separator);
   };
 
   const openIngredientsScopeSelector = async () => openIosSwal({
@@ -420,6 +432,20 @@
     }
   });
 
+
+  const showPreparingPrintAlert = () => Swal.fire({
+    title: 'Preparando selector...',
+    html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Preparando selector" class="meta-spinner-login"></div>',
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    showConfirmButton: false,
+    customClass: {
+      popup: 'ios-alert ingredientes-alert',
+      title: 'ios-alert-title',
+      htmlContainer: 'ios-alert-text'
+    }
+  });
+
   const waitPrintAssets = async (win) => {
     const images = [...win.document.images];
     if (!images.length) return;
@@ -433,18 +459,25 @@
   };
 
   const printIngredientsCatalog = async () => {
-    await fetchIngredientes();
+    showPreparingPrintAlert();
+    await new Promise((resolve) => requestAnimationFrame(() => resolve()));
     try {
-      const inventoryConfig = await window.dbLaJamoneraRest.read('/inventario/items');
-      window.inventarioConfigSnapshot = Object.values(safeObject(inventoryConfig)).reduce((acc, record) => {
-        const recordSafe = safeObject(record);
-        const ingredientId = normalizeValue(recordSafe.ingredientId || recordSafe.id);
-        if (!ingredientId) return acc;
-        acc[ingredientId] = safeObject(recordSafe.weeklySheetConfig);
-        return acc;
-      }, {});
-    } catch (error) {
-      window.inventarioConfigSnapshot = {};
+      await fetchIngredientes();
+      try {
+        const inventoryConfig = await window.dbLaJamoneraRest.read('/inventario/items');
+        window.inventarioConfigSnapshot = Object.values(safeObject(inventoryConfig)).reduce((acc, record) => {
+          const recordSafe = safeObject(record);
+          const ingredientId = normalizeValue(recordSafe.ingredientId || recordSafe.id);
+          if (!ingredientId) return acc;
+          acc[ingredientId] = safeObject(recordSafe.weeklySheetConfig);
+          return acc;
+        }, {});
+      } catch (error) {
+        window.inventarioConfigSnapshot = {};
+      }
+    } finally {
+      Swal.close();
+      ingredientesModal.removeAttribute('inert');
     }
     const selector = await openIngredientsScopeSelector();
     if (!selector.isConfirmed) return;
