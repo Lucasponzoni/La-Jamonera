@@ -695,7 +695,7 @@ const printReport = async (report) => {
     const max = Math.max(...top.map((x) => x.kg));
     nodes.produccion.innerHTML = `<div class="panel-chart-wrap">${top.map((item, index) => {
       const avatar = item.imageUrl
-        ? `<span class="panel-chart-avatar"><span class="thumb-loading"><img src="./IMG/Meta-ai-logo.webp" class="panel-spinner" alt="cargando"></span><img class="js-panel-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name)}"></span>`
+        ? `<span class="panel-chart-avatar"><img class="js-panel-thumb is-loaded" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name)}" loading="eager" decoding="async"></span>`
         : `<span class="panel-chart-avatar">${escapeHtml(initials(item.name))}</span>`;
       return `<div class="panel-chart-row"><div class="panel-chart-rank">${index + 1}</div><div class="panel-chart-label">${avatar}<span>${escapeHtml(item.name)}</span></div><div class="panel-chart-bar"><div class="panel-chart-fill" style="width:${Math.max(10, (item.kg / max) * 100)}%"></div></div><div class="panel-chart-value">${item.kg.toFixed(2)} kg</div></div>`;
     }).join('')}</div>`;
