@@ -8494,6 +8494,7 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 .inventario-inline-delete-spinner {
   width: 18px;
   height: 18px;
+  animation: spin 1s linear infinite;
 }
 
 /* =========================================

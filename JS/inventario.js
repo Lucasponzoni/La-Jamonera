@@ -5149,8 +5149,8 @@
               ${(provider.email || provider.phone) ? `<p class="inventario-provider-line"><small>${provider.email ? `<i class="fa-regular fa-envelope"></i> ${escapeHtml(provider.email)}` : ''}${provider.email && provider.phone ? ' · ' : ''}${provider.phone ? `<i class="fa-solid fa-phone"></i> ${escapeHtml(provider.phone)}` : ''}</small></p>` : ''}
               ${hasNoFood ? '<p class="inventario-provider-line"><strong>RNE:</strong> No requerido para este proveedor.</p>' : (hasRne ? `<p class="inventario-provider-line"><strong>N° RNE:</strong> ${escapeHtml(rne.number || 'Sin número')}</p><p class="inventario-provider-line"><strong>Vigencia:</strong> ${validityText}</p>` : '')}
               <div class="inventario-provider-actions inventario-provider-actions-top">
-                <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-edit="${provider.id}"><i class="fa-solid fa-file-pen"></i><span>${hasRne ? 'Editar registro' : 'Cargar Registro'}</span></button>
-                <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-photo-view="${provider.id}" ${sanitizeImageUrl(provider.photoUrl) ? '' : 'disabled'}><i class="fa-regular fa-image"></i><span>Ver foto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-view="${provider.id}" ${normalizeValue(rne.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i><span>Visualizar adjunto</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-provider-delete-request="${provider.id}" aria-label="Eliminar proveedor"><i class="fa-solid fa-trash"></i></button>
+                <button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-provider-delete-request="${provider.id}" aria-label="Eliminar proveedor"><i class="fa-solid fa-trash"></i></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-edit="${provider.id}"><i class="fa-solid fa-file-pen"></i><span>${hasRne ? 'Editar registro' : 'Cargar Registro'}</span></button>
+                <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-photo-view="${provider.id}" ${sanitizeImageUrl(provider.photoUrl) ? '' : 'disabled'}><i class="fa-regular fa-image"></i><span>Ver foto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-view="${provider.id}" ${normalizeValue(rne.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i><span>Visualizar adjunto</span></button>
               </div>
               ${state.pendingProviderDeleteId === provider.id ? buildProviderDeleteConfirmHtml(provider) : ''}
             </div>
@@ -5396,8 +5396,8 @@
             acceptProviderDeleteBtn.innerHTML = '<img src="./IMG/Meta-ai-logo.webp" alt="Eliminando" class="inventario-inline-delete-spinner">';
             try {
               state.inventario.config = safeObject(state.inventario.config);
-              state.inventario.config.providers = safeObject(state.inventario.config.providers);
-              delete state.inventario.config.providers[providerId];
+              const providers = Array.isArray(state.inventario.config.providers) ? state.inventario.config.providers : [];
+              state.inventario.config.providers = providers.filter((item) => normalizeValue(item?.id) !== providerId);
               state.pendingProviderDeleteId = '';
               await persistInventario();
               rerenderPreservingScroll();
