@@ -3225,6 +3225,10 @@
     const formatted = escapeHtml(formatIsoEs(normalized) || normalized);
     return formatted || '✗';
   };
+  const isDispatchPlaceholderAddress = (value = '') => {
+    const normalized = normalizeLower(value);
+    return !normalized || normalized.includes('sin dirección') || normalized.includes('sin direccion') || normalized.includes('xlsx');
+  };
   const renderDispatchPlanillaQr = async (host, dispatchRow) => {
     if (!host || !dispatchRow?.id) return;
     const ready = await ensureQrCodeLib();
@@ -3297,9 +3301,8 @@
     const clientDoc = normalizeValue(client.doc || client.dni || client.cuit || client.cuil || client.document || client.taxId);
     const importedInvoice = normalizeValue(dispatchRow.importedInvoice || (Array.isArray(dispatchRow.products) ? dispatchRow.products.find((item) => normalizeValue(item.sourceInvoiceNumber))?.sourceInvoiceNumber : ''));
     const rawAddress = normalizeValue(client.address);
-    const locationParts = [rawAddress, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean);
-    const location = locationParts.length
-      ? locationParts.join(' • ')
+    const location = !isDispatchPlaceholderAddress(rawAddress)
+      ? [rawAddress, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean).join(' • ')
       : `${clientDoc ? `Cliente ${clientDoc}` : (normalizeValue(client.name) || 'Cliente sin dirección')} • Dirección cargada en factura ${importedInvoice || '-'}`;
     const products = Array.isArray(dispatchRow.products) ? dispatchRow.products : [];
     const groups = [];
@@ -3336,7 +3339,7 @@
     const commentsRows = comments.length
       ? comments.map((item, idx) => `<tr><td colspan="4"><strong>OBSERVACIÓN ${idx + 1}:</strong> ${escapeHtml(item)}</td></tr>`).join('')
       : '<tr><td colspan="4"><strong>OBSERVACIÓN 1:</strong> Sin observaciones</td></tr>';
-    const headerTable = `<table style="width:100%;border-collapse:collapse;table-layout:fixed"><tbody><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">FRIGORIFICO LA JAMONERA • REGISTRO DE SALIDA DE PRODUCTOS TERMINADOS</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">${escapeHtml(dispatchRow.code || dispatchRow.id)}</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px">FECHA Y HORA:</td><td style="border:1px solid #2f2f2f;padding:4px">${escapeHtml(formatDateTime(dispatchRow.createdAt || dispatchRow.dispatchDate))}</td><td style="border:1px solid #2f2f2f;padding:4px">CLIENTE:</td><td style="border:1px solid #2f2f2f;padding:4px">${escapeHtml(normalizeValue(client.name) || '-')}</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px" colspan="4">DIRECCION: ${escapeHtml(location)}</td></tr></tbody></table>`;
+    const headerTable = `<table style="width:100%;border-collapse:collapse;table-layout:fixed"><tbody><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">FRIGORIFICO LA JAMONERA • REGISTRO DE SALIDA DE PRODUCTOS TERMINADOS</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">${escapeHtml(dispatchRow.code || dispatchRow.id)}</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px">FECHA Y HORA:</td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(formatDateTime(dispatchRow.createdAt || dispatchRow.dispatchDate))}</strong></td><td style="border:1px solid #2f2f2f;padding:4px">CLIENTE:</td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(normalizeValue(client.name) || '-')}</strong></td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px" colspan="4">DIRECCION: ${escapeHtml(location)}</td></tr></tbody></table>`;
     const planillaStyle = '<style>.dispatch-planilla-print{font-family:Inter,Arial,sans-serif;color:#111827;background:#fff}.dispatch-planilla-print table{width:100%;border-collapse:collapse;table-layout:fixed}.dispatch-planilla-print th,.dispatch-planilla-print td{border:1px solid #2f2f2f;padding:6px;word-break:break-word;background:#fff;color:#111827}.dispatch-planilla-parent-row td{background:#eef3ff;font-weight:800;color:#223863}.dispatch-planilla-child-row td{background:#fbfcff}.dispatch-planilla-child-label{color:#4b78e8;font-weight:800;margin-right:4px}.dispatch-planilla-qr-section{margin-top:10px;display:grid;gap:10px}.dispatch-planilla-qr-copy{text-align:center}.dispatch-planilla-qr-copy p{margin:0 0 6px;font-weight:700}.dispatch-planilla-qr-copy small{color:#556487}.dispatch-planilla-qr-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:12px}</style>';
     const hasTraceQr = buildDispatchTraceTargets(dispatchRow).length > 0;
     const qrSection = hasTraceQr

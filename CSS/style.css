@@ -9213,6 +9213,11 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   border-bottom: 1px dashed #d96b7c !important;
 }
 
+.inventario-auto-egreso-home-row td {
+  background: #fff1f3 !important;
+  border-bottom: 1px dashed #d96b7c !important;
+}
+
 .inventario-auto-egreso-badge {
   background: #ffe3e8;
   border-color: #d96b7c;
