@@ -183,6 +183,12 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   border-radius: 999px;
 }
 
+.ingredientes-print-thumb-fit {
+  object-fit: contain !important;
+  padding: 6px;
+  background: #fff;
+}
+
 .inventario-filter-helper {
   color: orangered;
   text-align: center;
@@ -7302,6 +7308,15 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   color: #1f2a44;
 }
 
+.produccion-dispatch-table-center .inventario-dispatch-group-row td {
+  background: #f0f2f5 !important;
+  border-top: 1px dashed #c3cad6 !important;
+  color: #425066;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-align: left;
+}
+
 .produccion-dispatch-table-center .inventario-internal-use-row td {
   text-align: center;
 }
@@ -8460,6 +8475,52 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   margin-top: 8px;
 }
 
+.inventario-provider-inline-confirm {
+  margin-top: 10px;
+  border: 1px solid #f2c7cf;
+  background: #fff4f6;
+  border-radius: 16px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.inventario-provider-inline-confirm-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.inventario-provider-inline-confirm-copy strong {
+  color: #922b3e;
+}
+
+.inventario-provider-inline-confirm-copy p,
+.inventario-provider-inline-confirm-copy small {
+  margin: 0;
+  color: #6f4051;
+}
+
+.inventario-provider-inline-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inventario-inline-delete-spinner {
+  width: 18px;
+  height: 18px;
+  animation: spin 1s linear infinite;
+}
+
+.dispatch-mass-photo-wrap .thumb-image,
+.dispatch-mass-photo-wrap .image-placeholder-circle-2 {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+
 /* =========================================
    INVENTARIO · RNE · AJUSTES UX
 ========================================= */
@@ -9178,17 +9239,28 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
    INVENTARIO · AUTO EGRESOS
 ========================================= */
 .inventario-auto-egreso-row td {
-  background: #fff8e8 !important;
-  border-bottom: 1px dashed #e0b04b !important;
+  background: #fff6dc !important;
+  border-bottom: 1px dashed #d99b18 !important;
+}
+
+.inventario-auto-egreso-home-row td {
+  background: #ffe8ed !important;
+  border-bottom: 1px dashed #d94b68 !important;
 }
 
 .inventario-auto-egreso-badge {
-  background: #fff1cc;
-  border-color: #e0b04b;
-  color: #8a5a00;
+  background: #fff0bf;
+  border-color: #d99b18;
+  color: #8a4f00;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.inventario-auto-egreso-badge.is-home-delivery {
+  background: #ffd9e1;
+  border-color: #cc5b73;
+  color: #8f1231;
 }
 
 .swal2-popup.inventario-expand-alert {
