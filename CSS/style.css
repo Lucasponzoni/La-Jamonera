@@ -169,7 +169,7 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   height: 40px;
   margin: 0 10px;
   vertical-align: middle;
-  background: linear-gradient(to bottom, rgb(216 216 216), rgba(150, 150, 150, 0.9), rgb(216 216 216));
+  background: linear-gradient(to bottom, rgb(230 235 250), rgba(150, 150, 150, 0.9), rgb(230 235 250));
   border-radius: 999px;
 }
 
@@ -9364,6 +9364,12 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   gap: 12px;
   max-height: min(60vh, 680px);
   overflow: auto;
+}
+
+.input-group.ios-input-group.ingredientes-search-group
+  > button[data-recipe-history-range-clear] {
+  border-top-right-radius: 14px !important;
+  border-bottom-right-radius: 14px !important;
 }
 
 .produccion-qr-preview-page {
