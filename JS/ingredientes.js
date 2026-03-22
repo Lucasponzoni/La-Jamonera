@@ -372,7 +372,7 @@
     printIngredientsBtn.className = 'btn ios-btn ios-btn-secondary produccion-toolbar-icon-btn';
     printIngredientsBtn.title = 'Imprimir';
     printIngredientsBtn.setAttribute('aria-label', 'Imprimir');
-    printIngredientsBtn.innerHTML = '<i class="fa-solid fa-print"></i>';
+    printIngredientsBtn.innerHTML = '<i class="fa-solid fa-print"></i><span>Imprimir</span>';
 
     actionsWrap.insertBefore(separator, createIngredientBtn);
     actionsWrap.insertBefore(printIngredientsBtn, separator);

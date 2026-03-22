@@ -215,6 +215,7 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   height: 100%;
   object-fit: contain;
   object-position: center;
+  padding: 8px;
   border-radius: 999px;
   background: #fff;
   display: block;
@@ -765,8 +766,8 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 
 .thumb-loading .meta-spinner-login,
 .thumb-loading .meta-spinner {
-  width: 30px;
-  height: 30px;
+  width: 22px;
+  height: 22px;
   object-fit: contain;
   border-radius: inherit;
 }
