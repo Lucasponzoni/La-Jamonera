@@ -353,10 +353,10 @@
     printIngredientsBtn = document.createElement('button');
     printIngredientsBtn.type = 'button';
     printIngredientsBtn.id = 'printIngredientsBtn';
-    printIngredientsBtn.className = 'btn ios-btn ios-btn-secondary inventario-threshold-btn';
+    printIngredientsBtn.className = 'btn ios-btn ios-btn-secondary produccion-toolbar-icon-btn';
     printIngredientsBtn.innerHTML = '<i class="fa-solid fa-print"></i><span>Imprimir</span>';
-    createIngredientBtn.parentNode?.insertBefore(separator, createIngredientBtn);
     createIngredientBtn.parentNode?.insertBefore(printIngredientsBtn, createIngredientBtn);
+    createIngredientBtn.parentNode?.insertBefore(separator, createIngredientBtn);
   };
 
   const openIngredientsScopeSelector = async () => openIosSwal({
@@ -370,8 +370,8 @@
         <label class="inventario-check-row"><input type="radio" name="ingredientPerishableType" value="non_perishable"><span>Solo no perecederos</span></label>
       </div>
       <div id="ingredientPrintProductsScope" class="notify-specific-users-list d-none">
-        <div class="step-block"><strong>Familias</strong>${getFamiliasArray().map((family) => `<label class="inventario-check-row inventario-selector-row">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingredientes-print-thumb" src="${escapeHtml(family.imageUrl)}" alt="${escapeHtml(capitalizeLabel(family.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<input type="checkbox" data-ingredient-print-family value="${family.id}"><span>${escapeHtml(capitalizeLabel(family.name))}</span></label>`).join('')}</div>
-        <div class="step-block"><strong>Productos</strong>${getIngredientesArray().map((item) => `<label class="inventario-check-row inventario-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingredientes-print-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(capitalizeLabel(item.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<input type="checkbox" data-ingredient-print-product data-family-id="${item.familyId || ''}" value="${item.id}"><span>${escapeHtml(capitalizeLabel(item.name))}</span></label>`).join('')}</div>
+        <div class="step-block"><strong>Familias</strong>${getFamiliasArray().map((family) => `<label class="inventario-check-row inventario-selector-row">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${escapeHtml(family.imageUrl)}" alt="${escapeHtml(capitalizeLabel(family.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<input type="checkbox" data-ingredient-print-family value="${family.id}"><span>${escapeHtml(capitalizeLabel(family.name))}</span></label>`).join('')}</div>
+        <div class="step-block"><strong>Productos</strong>${getIngredientesArray().map((item) => `<label class="inventario-check-row inventario-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(capitalizeLabel(item.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<input type="checkbox" data-ingredient-print-product data-family-id="${item.familyId || ''}" value="${item.id}"><span>${escapeHtml(capitalizeLabel(item.name))}</span></label>`).join('')}</div>
       </div>
     </div>`,
     showCancelButton: true,
@@ -458,7 +458,7 @@
     const content = filtered.map((item) => `
       <article style="display:flex;align-items:center;gap:12px;border:1px solid #d7def2;border-radius:16px;padding:12px;background:#fff;break-inside:avoid;page-break-inside:avoid;">
         <div style="width:74px;height:74px;border-radius:999px;overflow:hidden;border:1px solid #d7def2;background:#eff2fb;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          ${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" style="width:100%;height:100%;object-fit:cover;" alt="${escapeHtml(capitalizeLabel(item.name))}">` : '<i class="fa-solid fa-carrot" style="color:#5f6a89;font-size:28px;"></i>'}
+          ${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" style="width:100%;height:100%;object-fit:contain;padding:6px;" alt="${escapeHtml(capitalizeLabel(item.name))}">` : '<i class="fa-solid fa-carrot" style="color:#5f6a89;font-size:28px;"></i>'}
         </div>
         <div style="min-width:0;">
           <h2 style="margin:0 0 4px;font-size:18px;color:#1f2a44;">${escapeHtml(capitalizeLabel(item.name))}</h2>
@@ -471,7 +471,7 @@
 
     const win = window.open('', '_blank', 'width=1100,height=900');
     if (!win) return;
-    win.document.write(`<html><head><title>Productos</title><style>body{font-family:Inter,Arial,sans-serif;padding:20px;color:#1f2a44;background:#f7f9ff}h1{margin:0 0 14px}.ingredients-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));}</style></head><body><h1>Productos</h1><div class="ingredients-grid">${content}</div></body></html>`);
+    win.document.write(`<html><head><title>Productos</title><style>body{font-family:Inter,Arial,sans-serif;padding:20px;color:#1f2a44;background:#f7f9ff}h1{margin:0 0 14px}.ingredients-grid{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr));}@media print{.ingredients-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}</style></head><body><h1>Productos</h1><div class="ingredients-grid">${content}</div></body></html>`);
     win.document.close();
     win.focus();
     await waitPrintAssets(win);

@@ -183,6 +183,12 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   border-radius: 999px;
 }
 
+.ingredientes-print-thumb-fit {
+  object-fit: contain !important;
+  padding: 6px;
+  background: #fff;
+}
+
 .inventario-filter-helper {
   color: orangered;
   text-align: center;
