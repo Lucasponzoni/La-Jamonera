@@ -8460,6 +8460,43 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   margin-top: 8px;
 }
 
+.inventario-provider-inline-confirm {
+  margin-top: 10px;
+  border: 1px solid #f2c7cf;
+  background: #fff4f6;
+  border-radius: 16px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.inventario-provider-inline-confirm-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.inventario-provider-inline-confirm-copy strong {
+  color: #922b3e;
+}
+
+.inventario-provider-inline-confirm-copy p,
+.inventario-provider-inline-confirm-copy small {
+  margin: 0;
+  color: #6f4051;
+}
+
+.inventario-provider-inline-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inventario-inline-delete-spinner {
+  width: 18px;
+  height: 18px;
+  animation: spin 1s linear infinite;
+}
+
 /* =========================================
    INVENTARIO · RNE · AJUSTES UX
 ========================================= */
@@ -9178,17 +9215,28 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
    INVENTARIO · AUTO EGRESOS
 ========================================= */
 .inventario-auto-egreso-row td {
-  background: #fff8e8 !important;
-  border-bottom: 1px dashed #e0b04b !important;
+  background: #fff6dc !important;
+  border-bottom: 1px dashed #d99b18 !important;
+}
+
+.inventario-auto-egreso-home-row td {
+  background: #ffe8ed !important;
+  border-bottom: 1px dashed #d94b68 !important;
 }
 
 .inventario-auto-egreso-badge {
-  background: #fff1cc;
-  border-color: #e0b04b;
-  color: #8a5a00;
+  background: #fff0bf;
+  border-color: #d99b18;
+  color: #8a4f00;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.inventario-auto-egreso-badge.is-home-delivery {
+  background: #ffd9e1;
+  border-color: #cc5b73;
+  color: #8f1231;
 }
 
 .swal2-popup.inventario-expand-alert {
