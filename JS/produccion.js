@@ -700,8 +700,9 @@
   const prepareThumbLoaders = (selector) => {
     const list = Array.from(document.querySelectorAll(selector));
     list.forEach((img) => {
-      const parent = img.closest('.user-avatar-thumb, .receta-thumb-wrap, .produccion-hero-avatar, .inventario-trace-avatar, .inventario-print-photo-wrap, .recipe-inline-avatar-wrap, .recipe-suggest-avatar-wrap');
-      const spinner = parent ? parent.querySelector('.thumb-loading') : null;
+      const parent = img.closest('.user-avatar-thumb, .receta-thumb-wrap, .produccion-hero-avatar, .inventario-trace-avatar, .inventario-print-photo-wrap, .recipe-inline-avatar-wrap, .recipe-suggest-avatar-wrap, .produccion-trace-ingredient-avatar') || img.parentElement;
+      const siblingSpinner = img.previousElementSibling?.classList?.contains('thumb-loading') ? img.previousElementSibling : null;
+      const spinner = parent?.querySelector('.thumb-loading') || siblingSpinner;
       const done = () => {
         img.classList.add('is-loaded');
         spinner?.remove();
@@ -711,6 +712,9 @@
       } else {
         img.addEventListener('load', done, { once: true });
         img.addEventListener('error', () => { spinner?.remove(); }, { once: true });
+        if (typeof img.decode === 'function') {
+          img.decode().then(done).catch(() => {});
+        }
         setTimeout(() => {
           if (!img.classList.contains('is-loaded')) {
             spinner?.remove();
@@ -2943,8 +2947,8 @@
             <div>
               <h6><i class="bi bi-box-seam fa-solid fa-box-open"></i> ${escapeHtml(group.sourceIngredientName || item.ingredientName || item.ingredientId || 'Ingrediente')}</h6>
               ${group.plans.some((plan) => plan.isSubstitute) ? `<small><i class="fa-solid fa-link"></i> Sustitutos usados: ${escapeHtml(group.plans.filter((plan) => plan.isSubstitute).map((plan) => plan.ingredientName).join(' + ') || '-')}</small>` : ''}
-              <small>Cantidad usada: ${formatCompactQty(group.plans.reduce((sum, plan) => sum + Number((plan.requiredQty ?? plan.neededQty) || 0), 0), item.unit || item.ingredientUnit || '')}</small>
-              <small>RNE proveedor: <strong>${escapeHtml(providerRneSummary.number || '-')}</strong></small>
+              <small>Cantidad usada: ${formatCompactQty(group.plans.reduce((sum, plan) => sum + getIngredientPlanUsedQty(plan, { hasSiblingSubstitute: group.plans.some((candidate) => candidate?.isSubstitute) }), 0), item.unit || item.ingredientUnit || '')}</small>
+              <small> - RNE proveedor: <strong>${escapeHtml(providerRneSummary.number || '-')}</strong></small>
             </div>
           </div>
           <div class="produccion-trace-card-actions">${aggregatedImages.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(aggregatedImages))}"><i class="bi bi-images fa-regular fa-images"></i><span>Ver adjunto (${aggregatedImages.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}${providerRneSummary.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify([providerRneSummary.attachmentUrl]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE sin adjunto</button>'}</div>
