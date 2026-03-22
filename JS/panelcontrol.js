@@ -56,6 +56,16 @@
     if (report?.comments && typeof report.comments === 'object') return Object.values(report.comments);
     return [];
   };
+  const commentAccentFromUserId = (userId) => {
+    const seed = String(userId || 'anon');
+    let hash = 0;
+    for (let i = 0; i < seed.length; i += 1) {
+      hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+      hash |= 0;
+    }
+    const hue = Math.abs(hash) % 360;
+    return `hsl(${hue}, 65%, 46%)`;
+  };
 
   const toneImportance = (value) => {
     const n = Math.max(0, Math.min(100, Number(value || 0)));
@@ -138,16 +148,25 @@
 
   const bindThumbs = () => {
     document.querySelectorAll('.js-panel-thumb').forEach((img) => {
+      const wrapper = img.closest('.user-avatar-thumb, .panel-avatar, .panel-chart-avatar') || img.parentElement;
+      const spinner = wrapper?.querySelector('.thumb-loading');
       const stopThumbLoading = () => {
         img.classList.add('is-loaded');
-        img.closest('.user-avatar-thumb, .panel-avatar, .panel-chart-avatar')?.querySelector('.thumb-loading')?.classList.add('d-none');
+        spinner?.classList.add('d-none');
       };
       img.addEventListener('load', stopThumbLoading, { once: true });
       img.addEventListener('error', () => {
         stopThumbLoading();
         img.closest('.panel-user-avatar')?.classList.add('is-fallback');
       }, { once: true });
-      if (img.complete) stopThumbLoading();
+      if (img.complete && img.naturalWidth > 0) {
+        stopThumbLoading();
+      } else if (typeof img.decode === 'function') {
+        img.decode().then(stopThumbLoading).catch(() => {});
+      }
+      setTimeout(() => {
+        if (!img.classList.contains('is-loaded')) stopThumbLoading();
+      }, 7000);
     });
 
     document.querySelectorAll('.js-report-attachment-image').forEach((img) => {
@@ -164,7 +183,7 @@
   const sortComments = (list = []) => [...list].sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
   const getCommentList = (report) => sortComments(commentsList(report));
   const renderCommentTree = (comments = [], level = 0) => sortComments(comments).map((comment) => `
-    <article class="report-comment-item ${level > 0 ? 'is-reply' : ''}" data-comment-id="${escapeHtml(comment.id || '')}">
+    <article class="report-comment-item ${level > 0 ? 'is-reply' : ''}" style="--comment-accent:${commentAccentFromUserId(comment.userId || comment.userName || 'anon')};" data-comment-id="${escapeHtml(comment.id || '')}" data-comment-level="${level}">
       <header class="report-comment-head"><strong>${escapeHtml(comment.userName || 'Usuario')}</strong><small>${escapeHtml(getDateLabel(comment.createdAt))}</small></header>
       <p class="report-comment-text">${escapeHtml(comment.text || '').replaceAll('\n', '<br>')}</p>
       <div class="report-comment-actions"><button type="button" class="btn report-comment-reply-btn" data-reply-comment="${escapeHtml(comment.id || '')}">Responder</button></div>
@@ -352,9 +371,13 @@ const printReport = async (report) => {
     const latestReport = findReportById(report.id) || report;
     const emailHtml = buildReportEmailHtml(latestReport, latestReport.attachments || []);
     for (const target of (response.value || [])) {
-      await window.laJamoneraEmailSender.sendEmail('La Jamonera', `Reenvío de informe bromatológico · ${latestReport.userName || 'La Jamonera'}`, emailHtml, target.name || target.email, target.email);
+      const sendResponse = await window.laJamoneraEmailSender.sendEmail('La Jamonera', `Reenvío de informe bromatológico · ${latestReport.userName || 'La Jamonera'}`, emailHtml, target.name || target.email, target.email);
+      if (sendResponse?.ok) {
+        window.laJamoneraNotify?.show({ type: 'success', title: 'Email enviado', message: `Se notificó a ${target.name || target.email}.` });
+      } else {
+        window.laJamoneraNotify?.show({ type: 'error', title: 'Error de email', message: `No se pudo notificar a ${target.name || target.email}.` });
+      }
     }
-    window.laJamoneraNotify?.show({ type: 'success', title: 'Emails enviados', message: 'El informe se reenvió correctamente.' });
   };
 
   const getCommentsCount = (report) => commentsList(report).length;
@@ -686,7 +709,7 @@ const printReport = async (report) => {
     const max = Math.max(...top.map((x) => x.kg));
     nodes.produccion.innerHTML = `<div class="panel-chart-wrap">${top.map((item, index) => {
       const avatar = item.imageUrl
-        ? `<span class="panel-chart-avatar"><span class="thumb-loading"><img src="./IMG/Meta-ai-logo.webp" class="panel-spinner" alt="cargando"></span><img class="js-panel-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name)}"></span>`
+        ? `<span class="panel-chart-avatar"><img class="js-panel-thumb is-loaded" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name)}" loading="eager" decoding="async"></span>`
         : `<span class="panel-chart-avatar">${escapeHtml(initials(item.name))}</span>`;
       return `<div class="panel-chart-row"><div class="panel-chart-rank">${index + 1}</div><div class="panel-chart-label">${avatar}<span>${escapeHtml(item.name)}</span></div><div class="panel-chart-bar"><div class="panel-chart-fill" style="width:${Math.max(10, (item.kg / max) * 100)}%"></div></div><div class="panel-chart-value">${item.kg.toFixed(2)} kg</div></div>`;
     }).join('')}</div>`;
