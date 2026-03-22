@@ -2737,9 +2737,10 @@
       const nodeId = safeNodeId(`ING_${index + 1}_${item?.ingredientId || ''}`, `ING_${index + 1}`);
       const nodeLabel = [
         `<b>${index + 1}. ${esc((item?.ingredientName || 'Ingrediente').toUpperCase())}</b>`,
+        item?.isSubstitute ? `<b>Sustituye a:</b> ${esc(item?.sourceIngredientName || item?.sourceIngredientId || '-')}` : '',
         `<b>Usado total:</b> ${esc(formatCompactQty(item?.requiredQty ?? item?.neededQty, item?.unit || item?.ingredientUnit || ''))}`,
         `<b>Lotes usados:</b> ${lots.length}`
-      ].join('<br/>');
+      ].filter(Boolean).join('<br/>');
       lines.push(`${nodeId}["${nodeLabel}"]:::toneIngredient`);
       lines.push(`I --> ${nodeId}`);
       let previousLotNodeId = '';
@@ -2748,7 +2749,7 @@
         const rneId = `${lotNodeId}_RNE`;
         const providerRne = resolveProviderRneFromLot(lot);
         const lotQty = Number(lot?.takeQty || 0);
-        lines.push(`${lotNodeId}["<b>LOTE ${lotIndex + 1}</b><br/>${esc(lot?.lotNumber || lot?.entryId || '-')}<br/><b>Usado:</b> ${esc(formatCompactQty(lotQty, lot?.unit || item?.unit || item?.ingredientUnit || ''))}<br/><b>Proveedor:</b> ${esc(lot?.provider || '-')}"]:::toneLot`);
+        lines.push(`${lotNodeId}["<b>LOTE ${lotIndex + 1}</b><br/>${esc(lot?.lotNumber || lot?.entryId || '-')}<br/><b>Usado:</b> ${esc(formatCompactQty(lotQty, lot?.unit || item?.unit || item?.ingredientUnit || ''))}<br/><b>Ingreso:</b> ${esc(formatIsoEs(lot?.entryDate || ''))}<br/><b>VTO:</b> ${esc(formatIsoEs(lot?.expiryDate || ''))}<br/><b>Proveedor:</b> ${esc(lot?.provider || '-')}"]:::toneLot`);
         lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${esc(providerRne.number || '-')}"]:::toneRegistry`);
         lines.push(`${nodeId} -.->|LOTE ${lotIndex + 1}| ${lotNodeId}`);
         lines.push(`${lotNodeId} -.->|RNE| ${rneId}`);
@@ -2846,6 +2847,7 @@
             <span class="produccion-trace-ingredient-avatar">${ingredientImage ? `<img src="${ingredientImage}" alt="${escapeHtml(item.ingredientName || 'Ingrediente')}">` : '<i class="bi bi-basket2-fill fa-solid fa-carrot"></i>'}</span>
             <div>
               <h6><i class="bi bi-box-seam fa-solid fa-box-open"></i> ${escapeHtml(item.ingredientName || item.ingredientId || 'Ingrediente')}</h6>
+              ${item.isSubstitute ? `<small><i class="fa-solid fa-link"></i> Sustituye a ${escapeHtml(item.sourceIngredientName || item.sourceIngredientId || '-')}</small>` : ''}
               <small>Cantidad usada: ${formatCompactQty(item.requiredQty ?? item.neededQty, item.unit || item.ingredientUnit || '')}</small>
               <small>RNE proveedor: <strong>${escapeHtml(providerRneSummary.number || '-')}</strong></small>
             </div>
@@ -6167,13 +6169,16 @@
     return `<div class="produccion-lote-global-actions">
         <button type="button" class="btn ios-btn ios-btn-secondary" id="produccionCollapseAllBtn" ${allCollapsed ? 'disabled' : ''}>Colapsar todo</button>
         <button type="button" class="btn ios-btn ios-btn-secondary" id="produccionExpandAllBtn" ${allExpanded ? 'disabled' : ''}>Descolapsar todo</button>
-      </div>` + plan.ingredientPlans.map((row, index) => `
-      <article class="produccion-lote-group ${row.missingQty > 0 ? 'is-missing' : ''}" data-lot-group="${row.ingredientId}_${index}">
+      </div>` + plan.ingredientPlans.map((row, index) => {
+      const hasSubstituteCoverage = !row.isSubstitute && plan.ingredientPlans.some((item) => item.isSubstitute && normalizeValue(item.sourceIngredientId) === normalizeValue(row.ingredientId) && Number(item.availableQty || 0) > 0.0001);
+      const toneClass = row.missingQty > 0 ? (hasSubstituteCoverage ? 'is-substitutable' : 'is-missing') : '';
+      return `
+      <article class="produccion-lote-group ${toneClass}" data-lot-group="${row.ingredientId}_${index}">
         <header class="produccion-lote-head">
           <div class="produccion-lote-main">
             <img src="${state.ingredientes[row.ingredientId]?.imageUrl || FIAMBRES_IMAGE}" alt="${row.ingredientName}" class="produccion-lote-ingredient-image">
             <div>
-              <h6>${row.ingredientName}</h6>
+              <h6>${row.ingredientName}${hasSubstituteCoverage ? ' <span class="produccion-lote-substitute-state"><i class="fa-solid fa-link"></i> Disponible con sustitutos</span>' : ''}</h6>
               ${row.isSubstitute ? `<p class="produccion-lote-substitute-line"><i class="fa-solid fa-link"></i> Sustituye a <strong>${escapeHtml(row.sourceIngredientName || row.sourceIngredientId || '')}</strong></p>` : ''}
               <p>
                 <span class="produccion-needs-label">Necesita</span>
@@ -6195,10 +6200,10 @@
           ${row.lots.length ? row.lots.map((lot) => `
           <div class="produccion-lote-row tone-${lot.status}">
             <div><strong class="produccion-lote-key">Lote:</strong> <span class="produccion-lote-value">${lot.lotNumber}</span></div>
-            <div><strong>Ingreso:</strong> ${lot.entryDate || formatDateTime(lot.createdAt)}</div>
+            <div><strong>Ingreso:</strong> ${formatIsoEs(lot.entryDate || '') || formatDateTime(lot.createdAt)}</div>
             <div><strong>Vence:</strong> ${formatExpiryHuman(lot.expiryDate)} ${normalizeLower(lot.expiryDate) === 'no perecedero' ? '' : getExpiryBadge(lot.expiryDate)}</div>
             <div><strong>Usar:</strong> ${formatCompactQty(lot.takeQty, lot.unit)}</div>
-            ${lot.status === 'expired' ? `<div class="produccion-lote-expired-help"><strong>Lote expirado:</strong> no se usará con fecha ${plan.productionDate}. Cambiá la fecha o resolvelo manualmente ${formatValidProductionRange(lot.entryDate, lot.expiryDate)}.</div>` : ''}
+            ${lot.status === 'expired' ? `<div class="produccion-lote-expired-help"><strong>Lote expirado:</strong> no se usará con fecha ${formatIsoEs(plan.productionDate)}. Cambiá la fecha o resolvelo manualmente ${formatValidProductionRange(lot.entryDate, lot.expiryDate)}.</div>` : ''}
             <div><strong class="produccion-provider-key">Proveedor:</strong> ${lot.provider || '-'}</div>
             <div><strong>Factura:</strong> ${lot.invoiceNumber || '-'}</div>
             <div class="produccion-lote-adjuntos-row"><strong>Adjuntos:</strong> ${lot.invoiceImageUrls.length
@@ -6208,7 +6213,8 @@
           </div>`).join('<hr class="produccion-lote-separator">') : '<p class="produccion-lote-empty">Sin lotes aptos para la fecha elegida.</p>'}
         </div>
       </article>
-    `).join('');
+    `;
+    }).join('');
   };
   const saveEditorDraft = async () => {
     const recipe = state.recetas[state.activeRecipeId];
@@ -6571,7 +6577,6 @@
         const ingredientId = toggleBtn.dataset.lotToggle;
         state.lotCollapseState[ingredientId] = !state.lotCollapseState[ingredientId];
         lotsWrap.innerHTML = buildLotsBreakdownHtml(state.editorPlan);
-      renderRecipeHistory();
         return;
       }
       if (event.target.closest('#produccionCollapseAllBtn') && state.editorPlan) {
@@ -6579,7 +6584,6 @@
           state.lotCollapseState[`${item.ingredientId}_${index}`] = true;
         });
         lotsWrap.innerHTML = buildLotsBreakdownHtml(state.editorPlan);
-      renderRecipeHistory();
         return;
       }
       if (event.target.closest('#produccionExpandAllBtn') && state.editorPlan) {
@@ -6587,7 +6591,6 @@
           state.lotCollapseState[`${item.ingredientId}_${index}`] = false;
         });
         lotsWrap.innerHTML = buildLotsBreakdownHtml(state.editorPlan);
-      renderRecipeHistory();
         return;
       }
       if (event.target.closest('#produccionRecipeHistoryClearBtn')) {
@@ -6843,6 +6846,8 @@
       window.flatpickr(dateInput, {
         locale,
         dateFormat: 'Y-m-d',
+        altInput: true,
+        altFormat: 'd/m/Y',
         defaultDate: initialDate,
         allowInput: true,
         onChange: async () => {
