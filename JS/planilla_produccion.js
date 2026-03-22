@@ -87,7 +87,27 @@
       const unique = [...new Set(normalized)];
       return unique.length ? unique.join(' | ') : '-';
     };
-    return plans.map((plan) => {
+    const groupedPlans = Object.values(plans.reduce((acc, plan) => {
+      const key = normalizeValue(plan?.sourceIngredientId || plan?.ingredientId || `ing_${Object.keys(acc).length}`);
+      if (!acc[key]) {
+        acc[key] = {
+          ...safeObject(plan),
+          ingredientId: key,
+          ingredientName: normalizeValue(plan?.sourceIngredientName || plan?.ingredientName || 'INGREDIENTE'),
+          ingredientImageUrl: normalizeValue(plan?.ingredientImageUrl || ''),
+          neededQty: 0,
+          requiredQty: 0,
+          lots: []
+        };
+      }
+      acc[key].neededQty = Number((Number(acc[key].neededQty || 0) + Number(plan?.neededQty || plan?.requiredQty || 0)).toFixed(4));
+      acc[key].requiredQty = acc[key].neededQty;
+      acc[key].lots.push(...(Array.isArray(plan?.lots) ? plan.lots : []));
+      if (!acc[key].ingredientImageUrl) acc[key].ingredientImageUrl = normalizeValue(plan?.ingredientImageUrl || '');
+      return acc;
+    }, {}));
+
+    return groupedPlans.map((plan) => {
       const traceIngredient = traceIngredients.find((row) => normalizeValue(row?.ingredientId) === normalizeValue(plan?.ingredientId));
       const planLots = Array.isArray(plan?.lots) ? plan.lots : [];
       const traceLots = Array.isArray(traceIngredient?.lots) ? traceIngredient.lots : [];

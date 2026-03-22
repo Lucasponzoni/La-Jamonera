@@ -138,16 +138,25 @@
 
   const bindThumbs = () => {
     document.querySelectorAll('.js-panel-thumb').forEach((img) => {
+      const wrapper = img.closest('.user-avatar-thumb, .panel-avatar, .panel-chart-avatar') || img.parentElement;
+      const spinner = wrapper?.querySelector('.thumb-loading');
       const stopThumbLoading = () => {
         img.classList.add('is-loaded');
-        img.closest('.user-avatar-thumb, .panel-avatar, .panel-chart-avatar')?.querySelector('.thumb-loading')?.classList.add('d-none');
+        spinner?.classList.add('d-none');
       };
       img.addEventListener('load', stopThumbLoading, { once: true });
       img.addEventListener('error', () => {
         stopThumbLoading();
         img.closest('.panel-user-avatar')?.classList.add('is-fallback');
       }, { once: true });
-      if (img.complete) stopThumbLoading();
+      if (img.complete && img.naturalWidth > 0) {
+        stopThumbLoading();
+      } else if (typeof img.decode === 'function') {
+        img.decode().then(stopThumbLoading).catch(() => {});
+      }
+      setTimeout(() => {
+        if (!img.classList.contains('is-loaded')) stopThumbLoading();
+      }, 7000);
     });
 
     document.querySelectorAll('.js-report-attachment-image').forEach((img) => {
