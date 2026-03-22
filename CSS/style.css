@@ -213,9 +213,7 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 #ingredientesModal .ingrediente-avatar img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
   object-position: center;
-  padding: 8px;
   border-radius: 999px;
   background: #fff;
   display: block;
