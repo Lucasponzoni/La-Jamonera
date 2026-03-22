@@ -3240,6 +3240,43 @@
     const firstAllocation = Array.isArray(item.allocations) ? item.allocations[0] : null;
     return getDispatchAllocationDisplay(item, firstAllocation || {}).label || formatDispatchPlanillaQty(Number(item.qtyKg || 0), 'kilos');
   };
+  const getDispatchLocationLabel = (dispatchRow = {}, clientInput = {}) => {
+    const client = { ...safeObject(clientInput) };
+    const clientDoc = normalizeValue(client.doc || client.dni || client.cuit || client.cuil || client.document || client.taxId);
+    const importedInvoice = normalizeValue(dispatchRow.importedInvoice || (Array.isArray(dispatchRow.products) ? dispatchRow.products.find((item) => normalizeValue(item.sourceInvoiceNumber))?.sourceInvoiceNumber : ''));
+    const rawAddress = normalizeValue(client.address);
+    if (!isDispatchPlaceholderAddress(rawAddress)) {
+      return [rawAddress, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean).join(' • ');
+    }
+    return `${clientDoc ? `Cliente ${clientDoc}` : (normalizeValue(client.name) || 'Cliente sin dirección')} • Dirección cargada en factura ${importedInvoice || '-'}`;
+  };
+  const getDispatchGroupedProducts = (dispatchRow = {}) => {
+    const products = Array.isArray(dispatchRow.products) ? dispatchRow.products : [];
+    const groups = [];
+    const standalone = [];
+    products.forEach((item, index) => {
+      const allocations = Array.isArray(item.allocations) && item.allocations.length
+        ? item.allocations
+        : [{ lotNumber: '-', qtyKg: item.qtyKg, qty: item.qty, unit: item.qtyUnit || 'kilos', expiryDate: '', productionId: '' }];
+      const normalizedItem = { ...item, allocations };
+      const parentKey = normalizeValue(item.sourceRowId);
+      if (dispatchRow.importedFromXlsx && parentKey) {
+        const existing = groups.find((group) => group.key === parentKey);
+        if (existing) {
+          existing.items.push(normalizedItem);
+          return;
+        }
+        groups.push({
+          key: parentKey,
+          label: normalizeValue(item.sourceParentLabel || item.recipeTitle || `Producto ${index + 1}`),
+          items: [normalizedItem]
+        });
+        return;
+      }
+      standalone.push(normalizedItem);
+    });
+    return { groups, standalone };
+  };
   const formatDispatchPlanillaExpiry = (value) => {
     const normalized = normalizeValue(value);
     if (!normalized) return '✗';
@@ -3310,16 +3347,10 @@
       : (managerProfiles.length
         ? managerProfiles.map((m) => `${normalizeValue(m.name) || 'Sin responsable'} (${normalizeValue(m.role) || 'Encargado'})`).join(', ')
         : 'Sin responsable (Encargado)');
-    const clientDoc = normalizeValue(client.doc || client.dni || client.cuit || client.cuil || client.document || client.taxId);
-    const importedInvoice = normalizeValue(dispatchRow.importedInvoice || (Array.isArray(dispatchRow.products) ? dispatchRow.products.find((item) => normalizeValue(item.sourceInvoiceNumber))?.sourceInvoiceNumber : ''));
-    const rawAddress = normalizeValue(client.address);
-    const location = !isDispatchPlaceholderAddress(rawAddress)
-      ? [rawAddress, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean).join(' • ')
-      : `${clientDoc ? `Cliente ${clientDoc}` : (normalizeValue(client.name) || 'Cliente sin dirección')} • Dirección cargada en factura ${importedInvoice || '-'}`;
-    const products = Array.isArray(dispatchRow.products) ? dispatchRow.products : [];
-    const groups = [];
+    const location = getDispatchLocationLabel(dispatchRow, client);
+    const { groups, standalone } = getDispatchGroupedProducts(dispatchRow);
     const standaloneRows = [];
-    products.forEach((item, index) => {
+    standalone.forEach((item) => {
       const allocations = Array.isArray(item.allocations) && item.allocations.length
         ? item.allocations
         : [{ lotNumber: '-', qtyKg: item.qtyKg, qty: item.qty, unit: item.qtyUnit || 'kilos', expiryDate: '', productionId: '' }];
@@ -3330,20 +3361,23 @@
         const markerCell = normalizeValue(item.sourceRowId) ? '<span class="dispatch-planilla-child-label">↳</span>' : '<span class="dispatch-planilla-parent-marker">⭬</span>';
         return `<tr class="${normalizeValue(item.sourceRowId) ? 'dispatch-planilla-child-row' : ''}"><td class="dispatch-planilla-marker-cell">${markerCell}</td><td><span style="display:inline-flex;align-items:center;gap:8px;">${sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl) ? `<img src="${escapeHtml(sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl))}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(item.recipeTitle || '-')}</span></span></td><td><strong>${escapeHtml(qtyText)}</strong></td><td>${expiryText}</td><td><strong>${lotText}</strong></td></tr>`;
       }).join('');
-      const parentKey = normalizeValue(item.sourceRowId);
-      if (dispatchRow.importedFromXlsx && parentKey) {
-        const existing = groups.find((group) => group.key === parentKey);
-        if (existing) {
-          existing.rows.push(renderedAllocations);
-          return;
-        }
-        groups.push({ key: parentKey, label: normalizeValue(item.sourceParentLabel || item.recipeTitle || `Producto ${index + 1}`), rows: [renderedAllocations] });
-        return;
-      }
       standaloneRows.push(renderedAllocations);
     });
     const detailRows = [
-      ...groups.map((group) => `<tr class="dispatch-planilla-parent-row"><td colspan="5"><strong>${escapeHtml(group.label)}</strong></td></tr>${group.rows.join('')}`),
+      ...groups.map((group) => {
+        const groupRows = group.items.map((item) => {
+          const allocations = Array.isArray(item.allocations) && item.allocations.length
+            ? item.allocations
+            : [{ lotNumber: '-', qtyKg: item.qtyKg, qty: item.qty, unit: item.qtyUnit || 'kilos', expiryDate: '', productionId: '' }];
+          return allocations.map((allocation) => {
+            const qtyText = getDispatchAllocationDisplay(item, allocation).label;
+            const expiryText = formatDispatchPlanillaExpiry(allocation.expiryDate);
+            const lotText = `${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(qtyText)}`;
+            return `<tr class="dispatch-planilla-child-row"><td class="dispatch-planilla-marker-cell"><span class="dispatch-planilla-child-label">↳</span></td><td><span style="display:inline-flex;align-items:center;gap:8px;">${sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl) ? `<img src="${escapeHtml(sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl))}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(item.recipeTitle || '-')}</span></span></td><td><strong>${escapeHtml(qtyText)}</strong></td><td>${expiryText}</td><td><strong>${lotText}</strong></td></tr>`;
+          }).join('');
+        }).join('');
+        return `<tr class="dispatch-planilla-parent-row"><td colspan="5"><strong>${escapeHtml(group.label)}</strong></td></tr>${groupRows}`;
+      }),
       ...standaloneRows
     ].join('') || '<tr><td colspan="5">Sin productos.</td></tr>';
     const comments = (Array.isArray(dispatchRow.comments) ? dispatchRow.comments : []).map((c) => normalizeValue(c)).filter(Boolean);
@@ -8127,16 +8161,28 @@
       const body = rows.flatMap((row, index) => {
         const client = { ...getDispatchClient(row.clientId), ...safeObject(row.clientSnapshot) };
         const products = Array.isArray(row.products) ? row.products : [];
-        const kg = products.reduce((acc, p) => acc + Number(p.qtyKg || 0), 0);
         const expiries = [...new Set(products.flatMap((item) => (Array.isArray(item.allocations) ? item.allocations : []).map((l) => normalizeValue(l.expiryDate)).filter(Boolean)))];
         const expiryLabel = expiries.length === 1 ? formatIsoEs(expiries[0]) : (expiries.length ? 'Ver detalle' : '-');
-        const customerDoc = normalizeValue(client.doc || client.dni || client.cuit || client.cuil || client.document || client.taxId);
-        const locationParts = [client.address, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean);
-        const locationText = `${locationParts.join(' • ')}${customerDoc ? ` • ${customerDoc}` : ''}`;
+        const locationText = getDispatchLocationLabel(row, client);
+        const { groups, standalone } = getDispatchGroupedProducts(row);
         const repartoHead = `<tr class="is-dispatch-head-row"><td colspan="6"><div class="dispatch-print-head"><span class="dispatch-print-truck">🚚</span><div><h3>${escapeHtml(row.code || '-')}</h3><p>${escapeHtml(locationText)}</p></div></div></td></tr>`;
         const summary = `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${products.length === 1 ? '1 producto' : `${products.length} productos`}</td><td>${products.map((item) => escapeHtml(getDispatchProductSummaryLabel(item))).join('<br>')}</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || '-')}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
         if (!includeDetail) return [repartoHead, summary];
-        const detailRows = products.flatMap((item) => {
+        const groupedRows = groups.flatMap((group) => {
+          const parentRow = `<tr class="dispatch-planilla-parent-row"><td colspan="6"><strong>${escapeHtml(group.label)}</strong></td></tr>`;
+          const childRows = group.items.flatMap((item) => {
+            const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
+            const allocations = Array.isArray(item.allocations) && item.allocations.length
+              ? item.allocations
+              : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
+            return allocations.map((allocation) => {
+              const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
+              return `<tr class="is-dispatch-trace-row"><td>↳ <span style="display:inline-flex;align-items:center;gap:8px;">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(item.recipeTitle || '-')}</span></span></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${(normalizeValue(allocation.productionId) || normalizeValue(allocation.traceUrl)) ? 'Trazabilidad' : 'Sin trazabilidad'}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
+            });
+          });
+          return [parentRow, ...childRows];
+        });
+        const detailRows = standalone.flatMap((item) => {
           const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
           const allocations = Array.isArray(item.allocations) && item.allocations.length
             ? item.allocations
@@ -8149,7 +8195,7 @@
         const locationRow = locationText
           ? `<tr class="is-dispatch-internal-row"><td colspan="6">🏠 ${escapeHtml(locationText)}</td></tr>`
           : '';
-        return [repartoHead, summary, ...detailRows, locationRow].filter(Boolean);
+        return [repartoHead, summary, ...groupedRows, ...detailRows, locationRow].filter(Boolean);
       }).join('');
       win.document.write(`<html><head><title>Repartos</title><style>body{font-family:Inter,Arial,sans-serif;padding:12px;color:#223457}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #d5def2;padding:8px;font-size:11px;vertical-align:top;word-break:break-word}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.03em}.is-dispatch-head-row td{background:#fff}.dispatch-print-head{display:flex;align-items:center;gap:10px}.dispatch-print-head h3{margin:0;font-size:26px;line-height:1.1;color:#1f2a44}.dispatch-print-head p{margin:2px 0 0;color:#6d7ca3;font-size:18px}.dispatch-print-truck{width:48px;height:48px;border-radius:999px;border:1px solid #d7def2;display:inline-flex;align-items:center;justify-content:center;background:#fff;font-size:24px}.is-dispatch-trace-row td{background:#ffecef;color:#1f2a44}.is-dispatch-internal-row td{background:#fff2e3;color:#1f2a44;font-weight:400;text-align:center}</style></head><body><h2>Salida de Productos</h2><table><thead><tr><th>Fecha</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th></tr></thead><tbody>${body || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table></body></html>`);
       win.document.close();
@@ -8162,10 +8208,11 @@
       const headers = ['Fecha', 'Productos', 'Cantidad (kg)', 'Vencimiento', 'Número de reparto', 'Cliente'];
       const rows = getDispatchRows().flatMap((row) => {
         const products = Array.isArray(row.products) ? row.products : [];
-        const kgTotal = products.reduce((acc, item) => acc + Number(item.qtyKg || 0), 0);
         const expiries = [...new Set(products.flatMap((item) => (Array.isArray(item.allocations) ? item.allocations : []).map((l) => normalizeValue(l.expiryDate)).filter(Boolean)))];
         const expiryLabel = expiries.length === 1 ? formatIsoEs(expiries[0]) : (expiries.length ? 'Ver detalle' : '-');
         const client = { ...getDispatchClient(row.clientId), ...safeObject(row.clientSnapshot) };
+        const locationLabel = getDispatchLocationLabel(row, client);
+        const { groups, standalone } = getDispatchGroupedProducts(row);
         const summary = {
           Fecha: formatDateTime(row.createdAt),
           Productos: `${products.length} ${products.length === 1 ? 'producto' : 'productos'}`,
@@ -8174,7 +8221,36 @@
           'Número de reparto': row.code || row.id || '-',
           Cliente: client.name || '-'
         };
-        const detailRows = products.flatMap((item) => {
+        const groupedRows = groups.flatMap((group) => {
+          const parentRow = {
+            Fecha: `↳ ${group.label || 'Producto relacionado'}`,
+            Productos: 'Relacionado',
+            'Cantidad (kg)': group.items.map((item) => getDispatchProductSummaryLabel(item)).join(' | '),
+            Vencimiento: '',
+            'Número de reparto': 'Grupo',
+            Cliente: client.name || '-',
+            __tone: 'trace'
+          };
+          const children = group.items.flatMap((item) => {
+            const allocations = Array.isArray(item.allocations) && item.allocations.length
+              ? item.allocations
+              : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
+            return allocations.map((allocation) => {
+              const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
+              return {
+                Fecha: `↳ ${item.recipeTitle || '-'}`,
+                Productos: allocationDisplay.label,
+                'Cantidad (kg)': `${allocation.lotNumber || '-'} · ${allocationDisplay.label}`,
+                Vencimiento: formatIsoEs(allocation.expiryDate || '') || '-',
+                'Número de reparto': (normalizeValue(allocation.productionId) || normalizeValue(allocation.traceUrl)) ? 'Trazabilidad' : 'Sin trazabilidad',
+                Cliente: client.name || '-',
+                __tone: 'trace'
+              };
+            });
+          });
+          return [parentRow, ...children];
+        });
+        const detailRows = standalone.flatMap((item) => {
           const allocations = Array.isArray(item.allocations) && item.allocations.length
             ? item.allocations
             : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
@@ -8191,12 +8267,9 @@
             };
           });
         });
-        const locationParts = [client.address, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean);
-        const customerDoc = normalizeValue(client.doc || client.dni || client.cuit || client.cuil || client.document || client.taxId);
-        const locationMeta = [normalizeValue(client.name), customerDoc].filter(Boolean).join(' · ');
-        const locationRow = (locationParts.length || locationMeta)
+        const locationRow = locationLabel
           ? [{
-            Fecha: `↳ 🏠 ${locationParts.join(' • ')}${locationMeta ? ` • ${locationMeta}` : ''}`,
+            Fecha: `↳ 🏠 ${locationLabel}`,
             Productos: '',
             'Cantidad (kg)': '',
             Vencimiento: '',
@@ -8206,7 +8279,7 @@
             __mergeAcross: true
           }]
           : [];
-        return [summary, ...detailRows, ...locationRow];
+        return [summary, ...groupedRows, ...detailRows, ...locationRow];
       });
       if (!rows.length) {
         await openIosSwal({ title: 'Sin datos', html: '<p>No hay repartos para exportar.</p>', icon: 'info' });
