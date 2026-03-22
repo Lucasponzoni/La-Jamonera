@@ -805,7 +805,7 @@
         return acc;
       }, {});
       const row = ws.addRow(rowData);
-      const tone = data.__tone === 'trace' ? 'FFFFECEF' : data.__tone === 'movement_in' ? 'FFECFDF3' : data.__tone === 'movement_out' ? 'FFFFF1F2' : data.__tone === 'internal_use' ? 'FFFFF2E3' : data.__tone === 'resolution_yellow' ? 'FFFFF6D9' : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
+      const tone = data.__tone === 'trace' ? 'FFFFECEF' : data.__tone === 'group_parent' ? 'FFF0F2F5' : data.__tone === 'movement_in' ? 'FFECFDF3' : data.__tone === 'movement_out' ? 'FFFFF1F2' : data.__tone === 'internal_use' ? 'FFFFF2E3' : data.__tone === 'resolution_yellow' ? 'FFFFF6D9' : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF');
       row.eachCell((cell) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tone } };
         cell.border = {
@@ -818,6 +818,8 @@
         const colHeader = headers[cell.col - 1];
         if (data.__tone === 'trace' || data.__tone === 'internal_use') {
           cell.font = { color: { argb: 'FF1F2A44' }, bold: false };
+        } else if (data.__tone === 'group_parent') {
+          cell.font = { color: { argb: 'FF334155' }, bold: true };
         } else if (data.__tone === 'movement_in') {
           if (colHeader === 'Tipo' || colHeader === 'Código' || colHeader === 'Cantidad (kg)') {
             cell.font = { color: { argb: 'FF17803D' }, bold: true };
@@ -3642,20 +3644,39 @@
       const client = { ...getDispatchClient(row.clientId), ...safeObject(row.clientSnapshot) };
       const collapsed = state.dispatchCollapse[row.id] !== false;
       const productLabel = `${products.length} ${products.length === 1 ? 'producto' : 'productos'}`;
-      const detailItems = products.flatMap((item) => {
-        const allocations = Array.isArray(item.allocations) && item.allocations.length
-          ? item.allocations
-          : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
-        return allocations.map((allocation) => ({ item, allocation }));
-      });
-      const detailRows = !collapsed ? detailItems.map(({ item, allocation }) => {
-        const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
-        const traceBtn = normalizeValue(allocation.productionId)
-          ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button>`
-          : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
-        const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
-        return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
-      }).join('') : '';
+      const { groups, standalone } = getDispatchGroupedProducts(row);
+      const detailRows = !collapsed ? [
+        ...groups.flatMap((group) => {
+          const parentRow = `<tr class="inventario-dispatch-group-row"><td colspan="8">${escapeHtml(group.label || 'Producto relacionado')}</td></tr>`;
+          const childRows = group.items.flatMap((item) => {
+            const allocations = Array.isArray(item.allocations) && item.allocations.length
+              ? item.allocations
+              : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
+            return allocations.map((allocation) => {
+              const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
+              const traceBtn = normalizeValue(allocation.productionId)
+                ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button>`
+                : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
+              const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
+              return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
+            });
+          });
+          return [parentRow, ...childRows];
+        }),
+        ...standalone.flatMap((item) => {
+          const allocations = Array.isArray(item.allocations) && item.allocations.length
+            ? item.allocations
+            : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
+          return allocations.map((allocation) => {
+            const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
+            const traceBtn = normalizeValue(allocation.productionId)
+              ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button>`
+              : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
+            const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
+            return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
+          });
+        })
+      ].join('') : '';
       const locationParts = [client.address, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean);
       const customerDoc = normalizeValue(client.doc || client.dni || client.cuit || client.cuil || client.document || client.taxId);
       const locationMeta = [normalizeValue(client.name), customerDoc].filter(Boolean).join(' · ');
@@ -8223,13 +8244,13 @@
         };
         const groupedRows = groups.flatMap((group) => {
           const parentRow = {
-            Fecha: `↳ ${group.label || 'Producto relacionado'}`,
+            Fecha: group.label || 'Producto relacionado',
             Productos: 'Relacionado',
             'Cantidad (kg)': group.items.map((item) => getDispatchProductSummaryLabel(item)).join(' | '),
             Vencimiento: '',
             'Número de reparto': 'Grupo',
             Cliente: client.name || '-',
-            __tone: 'trace'
+            __tone: 'group_parent'
           };
           const children = group.items.flatMap((item) => {
             const allocations = Array.isArray(item.allocations) && item.allocations.length
@@ -8316,17 +8337,35 @@
               const expiryLabel = expiries.length === 1 ? formatIsoEs(expiries[0]) : (expiries.length ? 'Ver detalle' : '-');
               const client = { ...getDispatchClient(row.clientId), ...safeObject(row.clientSnapshot) };
               const collapsed = state.dispatchCollapse[row.id] !== false;
-              const detail = !collapsed ? products.flatMap((item) => {
-                const allocations = Array.isArray(item.allocations) && item.allocations.length ? item.allocations : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
-                return allocations.map((allocation) => {
-                  const traceBtn = normalizeValue(allocation.productionId)
-                    ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button>`
-                    : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
-                  const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
-                  const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
-                  return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
-                });
-              }).join('') : '';
+              const { groups, standalone } = getDispatchGroupedProducts(row);
+              const detail = !collapsed ? [
+                ...groups.flatMap((group) => {
+                  const parentRow = `<tr class="inventario-dispatch-group-row"><td colspan="8">${escapeHtml(group.label || 'Producto relacionado')}</td></tr>`;
+                  const childRows = group.items.flatMap((item) => {
+                    const allocations = Array.isArray(item.allocations) && item.allocations.length ? item.allocations : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
+                    return allocations.map((allocation) => {
+                      const traceBtn = normalizeValue(allocation.productionId)
+                        ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button>`
+                        : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
+                      const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
+                      const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
+                      return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
+                    });
+                  });
+                  return [parentRow, ...childRows];
+                }),
+                ...standalone.flatMap((item) => {
+                  const allocations = Array.isArray(item.allocations) && item.allocations.length ? item.allocations : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
+                  return allocations.map((allocation) => {
+                    const traceBtn = normalizeValue(allocation.productionId)
+                      ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button>`
+                      : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
+                    const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
+                    const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
+                    return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
+                  });
+                })
+              ].join('') : '';
               const locationParts = [client.address, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean);
               const customerDoc = normalizeValue(client.doc || client.dni || client.cuit || client.cuil || client.document || client.taxId);
               const locationMeta = [normalizeValue(client.name), customerDoc].filter(Boolean).join(' · ');

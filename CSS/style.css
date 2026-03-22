@@ -7302,6 +7302,15 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   color: #1f2a44;
 }
 
+.produccion-dispatch-table-center .inventario-dispatch-group-row td {
+  background: #f0f2f5 !important;
+  border-top: 1px dashed #c3cad6 !important;
+  color: #425066;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-align: left;
+}
+
 .produccion-dispatch-table-center .inventario-internal-use-row td {
   text-align: center;
 }
