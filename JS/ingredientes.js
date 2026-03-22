@@ -144,7 +144,12 @@
   };
 
   const resolveIngredientPerishableFlag = (item) => {
-    if (typeof item?.perishable === 'boolean') return item.perishable;
+    const ingredient = item && typeof item === 'object'
+      ? item
+      : safeObject(state.ingredientes.items?.[normalizeValue(item)]);
+    const inventoryConfig = safeObject(window.inventarioConfigSnapshot?.[ingredient?.id] || {});
+    if (typeof inventoryConfig.perishable === 'boolean') return inventoryConfig.perishable;
+    if (typeof ingredient?.perishable === 'boolean') return ingredient.perishable;
     return true;
   };
 
@@ -346,6 +351,17 @@
 
   const ensurePrintButton = () => {
     if (!createIngredientBtn || printIngredientsBtn) return;
+    const toolbar = createIngredientBtn.parentNode;
+    if (!toolbar) return;
+
+    let actionsWrap = toolbar.querySelector('.ingredientes-toolbar-actions');
+    if (!actionsWrap) {
+      actionsWrap = document.createElement('div');
+      actionsWrap.className = 'ingredientes-toolbar-actions';
+      toolbar.appendChild(actionsWrap);
+      actionsWrap.appendChild(createIngredientBtn);
+    }
+
     const separator = document.createElement('span');
     separator.className = 'barra-separadora ingredientes-toolbar-separator';
     separator.setAttribute('aria-hidden', 'true');
@@ -357,8 +373,9 @@
     printIngredientsBtn.title = 'Imprimir';
     printIngredientsBtn.setAttribute('aria-label', 'Imprimir');
     printIngredientsBtn.innerHTML = '<i class="fa-solid fa-print"></i>';
-    createIngredientBtn.parentNode?.insertBefore(printIngredientsBtn, createIngredientBtn);
-    createIngredientBtn.parentNode?.insertBefore(separator, createIngredientBtn);
+
+    actionsWrap.insertBefore(separator, createIngredientBtn);
+    actionsWrap.insertBefore(printIngredientsBtn, separator);
   };
 
   const openIngredientsScopeSelector = async () => openIosSwal({
@@ -415,6 +432,20 @@
     }
   });
 
+
+  const showPreparingPrintAlert = () => Swal.fire({
+    title: 'Preparando selector...',
+    html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Preparando selector" class="meta-spinner-login"></div>',
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    showConfirmButton: false,
+    customClass: {
+      popup: 'ios-alert ingredientes-alert',
+      title: 'ios-alert-title',
+      htmlContainer: 'ios-alert-text'
+    }
+  });
+
   const waitPrintAssets = async (win) => {
     const images = [...win.document.images];
     if (!images.length) return;
@@ -428,19 +459,38 @@
   };
 
   const printIngredientsCatalog = async () => {
-    await fetchIngredientes();
+    showPreparingPrintAlert();
+    await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+    try {
+      await fetchIngredientes();
+      try {
+        const inventoryConfig = await window.dbLaJamoneraRest.read('/inventario/items');
+        window.inventarioConfigSnapshot = Object.values(safeObject(inventoryConfig)).reduce((acc, record) => {
+          const recordSafe = safeObject(record);
+          const ingredientId = normalizeValue(recordSafe.ingredientId || recordSafe.id);
+          if (!ingredientId) return acc;
+          acc[ingredientId] = safeObject(recordSafe.weeklySheetConfig);
+          return acc;
+        }, {});
+      } catch (error) {
+        window.inventarioConfigSnapshot = {};
+      }
+    } finally {
+      Swal.close();
+      ingredientesModal.removeAttribute('inert');
+    }
     const selector = await openIngredientsScopeSelector();
     if (!selector.isConfirmed) return;
-    const excluded = new Set(selector.value.mode === 'exclude' ? selector.value.selected : []);
+    const selectedOnly = new Set(selector.value.mode === 'exclude' ? selector.value.selected : []);
     const targetPerishable = selector.value.mode === 'perishable'
       ? selector.value.targetPerishable === 'perishable'
       : '';
     const filtered = getIngredientesArray()
-      .filter((item) => !excluded.has(item.id))
+      .filter((item) => (selector.value.mode === 'exclude' ? selectedOnly.has(item.id) : true))
       .filter((item) => {
-        if (!targetPerishable) return true;
+        if (typeof targetPerishable !== 'boolean') return true;
         const perishable = resolveIngredientPerishableFlag(item);
-        return targetPerishable === 'perishable' ? perishable : !perishable;
+        return targetPerishable ? perishable : !perishable;
       })
       .sort((a, b) => normalizeValue(a.name).localeCompare(normalizeValue(b.name), 'es'));
 
@@ -459,8 +509,8 @@
 
     const content = filtered.map((item) => `
       <article style="display:flex;align-items:center;gap:12px;border:1px solid #d7def2;border-radius:16px;padding:12px;background:#fff;break-inside:avoid;page-break-inside:avoid;">
-        <div style="width:74px;height:74px;border-radius:999px;overflow:hidden;border:1px solid #d7def2;background:#eff2fb;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          ${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" style="width:100%;height:100%;object-fit:contain;padding:6px;" alt="${escapeHtml(capitalizeLabel(item.name))}">` : '<i class="fa-solid fa-carrot" style="color:#5f6a89;font-size:28px;"></i>'}
+        <div style="width:74px;height:74px;border-radius:999px;overflow:hidden;border:1px solid #d7def2;background:#eff2fb;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:6px;">
+          ${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" style="width:100%;height:100%;object-fit:contain;object-position:center;border-radius:999px;display:block;" alt="${escapeHtml(capitalizeLabel(item.name))}">` : '<i class="fa-solid fa-carrot" style="color:#5f6a89;font-size:28px;"></i>'}
         </div>
         <div style="min-width:0;">
           <h2 style="margin:0 0 4px;font-size:18px;color:#1f2a44;">${escapeHtml(capitalizeLabel(item.name))}</h2>
