@@ -1146,6 +1146,7 @@
       const deepseekNode = safeObject(await window.dbLaJamoneraRest.read('/deepseek'));
       const compactRows = rows.map((row) => ({
         key: `${row.ingredientId}|${row.entryId}`,
+        sharedKey: normalizeValue(row.lotNumber || row.invoiceNumber || row.entryId || ''),
         producto: row.ingredientName,
         proveedor: row.provider,
         unidad: row.unit,
@@ -1166,6 +1167,7 @@
       const data = await res.json();
       const parsed = parseAiJsonFromText(data?.choices?.[0]?.message?.content || '');
       const map = safeObject(parsed?.temperaturas);
+      const sharedTemperatures = {};
       rows.forEach((row) => {
         const key = `${row.ingredientId}|${row.entryId}`;
         const raw = Number(String(map[key] || '').replace(',', '.'));
@@ -1173,15 +1175,23 @@
         const isMeat = /(carne|pollo|cerdo|vacuno|res|chacin|hamburguesa|bondiola|jamon)/i.test(name);
         const isBread = isBreadLikeProduct(name);
         if (!Number.isFinite(raw)) return;
+        const sharedKey = normalizeValue(row.lotNumber || row.invoiceNumber || row.entryId || '');
+        if (sharedKey && sharedTemperatures[sharedKey]) {
+          fallback[key] = sharedTemperatures[sharedKey];
+          return;
+        }
         if (isMeat) {
           fallback[key] = Math.min(raw, 4).toFixed(1);
+          if (sharedKey) sharedTemperatures[sharedKey] = fallback[key];
           return;
         }
         if (isBread) {
           fallback[key] = Math.max(12, raw).toFixed(1);
+          if (sharedKey) sharedTemperatures[sharedKey] = fallback[key];
           return;
         }
         fallback[key] = raw.toFixed(1);
+        if (sharedKey) sharedTemperatures[sharedKey] = fallback[key];
       });
     } catch (error) {
     }

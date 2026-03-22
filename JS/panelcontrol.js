@@ -56,6 +56,16 @@
     if (report?.comments && typeof report.comments === 'object') return Object.values(report.comments);
     return [];
   };
+  const commentAccentFromUserId = (userId) => {
+    const seed = String(userId || 'anon');
+    let hash = 0;
+    for (let i = 0; i < seed.length; i += 1) {
+      hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+      hash |= 0;
+    }
+    const hue = Math.abs(hash) % 360;
+    return `hsl(${hue}, 65%, 46%)`;
+  };
 
   const toneImportance = (value) => {
     const n = Math.max(0, Math.min(100, Number(value || 0)));
@@ -173,7 +183,7 @@
   const sortComments = (list = []) => [...list].sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
   const getCommentList = (report) => sortComments(commentsList(report));
   const renderCommentTree = (comments = [], level = 0) => sortComments(comments).map((comment) => `
-    <article class="report-comment-item ${level > 0 ? 'is-reply' : ''}" data-comment-id="${escapeHtml(comment.id || '')}">
+    <article class="report-comment-item ${level > 0 ? 'is-reply' : ''}" style="--comment-accent:${commentAccentFromUserId(comment.userId || comment.userName || 'anon')};" data-comment-id="${escapeHtml(comment.id || '')}" data-comment-level="${level}">
       <header class="report-comment-head"><strong>${escapeHtml(comment.userName || 'Usuario')}</strong><small>${escapeHtml(getDateLabel(comment.createdAt))}</small></header>
       <p class="report-comment-text">${escapeHtml(comment.text || '').replaceAll('\n', '<br>')}</p>
       <div class="report-comment-actions"><button type="button" class="btn report-comment-reply-btn" data-reply-comment="${escapeHtml(comment.id || '')}">Responder</button></div>
@@ -361,9 +371,13 @@ const printReport = async (report) => {
     const latestReport = findReportById(report.id) || report;
     const emailHtml = buildReportEmailHtml(latestReport, latestReport.attachments || []);
     for (const target of (response.value || [])) {
-      await window.laJamoneraEmailSender.sendEmail('La Jamonera', `Reenvío de informe bromatológico · ${latestReport.userName || 'La Jamonera'}`, emailHtml, target.name || target.email, target.email);
+      const sendResponse = await window.laJamoneraEmailSender.sendEmail('La Jamonera', `Reenvío de informe bromatológico · ${latestReport.userName || 'La Jamonera'}`, emailHtml, target.name || target.email, target.email);
+      if (sendResponse?.ok) {
+        window.laJamoneraNotify?.show({ type: 'success', title: 'Email enviado', message: `Se notificó a ${target.name || target.email}.` });
+      } else {
+        window.laJamoneraNotify?.show({ type: 'error', title: 'Error de email', message: `No se pudo notificar a ${target.name || target.email}.` });
+      }
     }
-    window.laJamoneraNotify?.show({ type: 'success', title: 'Emails enviados', message: 'El informe se reenvió correctamente.' });
   };
 
   const getCommentsCount = (report) => commentsList(report).length;
