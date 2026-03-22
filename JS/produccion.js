@@ -1482,6 +1482,20 @@
               groupRemaining = Math.max(0, Number((groupRemaining - take).toFixed(6)));
             });
           }
+          if (groupRemaining > 0.0001) {
+            prepared
+              .filter((item) => item.status !== 'expired')
+              .forEach((item) => {
+                if (groupRemaining <= 0.0001) return;
+                const remainingEntry = Math.max(0, item.availableInReqUnit - item.takeQty);
+                const relatedCap = Math.max(0, perRelatedCap[item.related.ingredientId] || 0);
+                const take = Math.min(remainingEntry, relatedCap, groupRemaining);
+                if (take <= 0.0001) return;
+                item.takeQty = Number((item.takeQty + take).toFixed(4));
+                perRelatedCap[item.related.ingredientId] = Number((relatedCap - take).toFixed(4));
+                groupRemaining = Math.max(0, Number((groupRemaining - take).toFixed(6)));
+              });
+          }
           prepared.forEach((item) => {
             const lotNumber = normalizeValue(item.entry.lotNumber) || normalizeValue(item.entry.invoiceNumber) || item.entry.id;
             const lot = {
@@ -2193,6 +2207,13 @@
     if (!trace?.isSubstitute || !normalizeValue(trace?.sourceIngredientName)) return ingredientName;
     return `${ingredientName} (sustituye a ${trace.sourceIngredientName})`;
   };
+  const getIngredientPlanUsedQty = (plan, { hasSiblingSubstitute = false } = {}) => {
+    const lots = Array.isArray(plan?.lots) ? plan.lots : [];
+    const usedFromLots = lots.reduce((sum, lot) => sum + Number(lot?.takeQty || 0), 0);
+    if (usedFromLots > 0.0001) return Number(usedFromLots.toFixed(4));
+    if (plan?.isSubstitute || hasSiblingSubstitute) return 0;
+    return Number(((plan?.requiredQty ?? plan?.neededQty) || 0).toFixed(4));
+  };
   const markProductionExport = async (productionId, type) => {
     const registros = deepClone(state.registros);
     const reg = registros[productionId];
@@ -2759,7 +2780,8 @@
     }
 
     groupedIngredients.forEach((group, index) => {
-      const usedPlans = group.plans.filter((plan) => Number((plan?.requiredQty ?? plan?.neededQty) || 0) > 0.0001);
+      const hasSiblingSubstitute = group.plans.some((plan) => plan?.isSubstitute);
+      const usedPlans = group.plans.filter((plan) => getIngredientPlanUsedQty(plan, { hasSiblingSubstitute }) > 0.0001);
       const plansToRender = usedPlans.length ? usedPlans : group.plans;
       const item = plansToRender[0] || group.plans[0] || {};
       const lots = plansToRender.flatMap((plan) => Array.isArray(plan?.lots) ? plan.lots.filter((lot) => Number(lot?.takeQty || 0) > 0.0001) : []);
@@ -2767,7 +2789,7 @@
       const nodeLabel = [
         `<b>${index + 1}. ${esc((group?.sourceIngredientName || item?.ingredientName || 'Ingrediente').toUpperCase())}</b>`,
         plansToRender.some((plan) => plan.isSubstitute) ? `<b>Sustitutos:</b> ${esc(plansToRender.filter((plan) => plan.isSubstitute).map((plan) => plan.ingredientName).join(' + ') || '-')}` : '',
-        `<b>Usado total:</b> ${esc(formatCompactQty(plansToRender.reduce((subtotal, plan) => subtotal + Number((plan?.requiredQty ?? plan?.neededQty) || 0), 0), item?.unit || item?.ingredientUnit || ''))}`,
+        `<b>Usado total:</b> ${esc(formatCompactQty(plansToRender.reduce((subtotal, plan) => subtotal + getIngredientPlanUsedQty(plan, { hasSiblingSubstitute }), 0), item?.unit || item?.ingredientUnit || ''))}`,
         `<b>Lotes usados:</b> ${lots.length}`
       ].filter(Boolean).join('<br/>');
       lines.push(`${nodeId}["${nodeLabel}"]:::toneIngredient`);
@@ -2777,7 +2799,7 @@
         if (plansToRender.length > 1) {
           const subLabel = [
             `<b>${esc((plan?.ingredientName || 'Ingrediente').toUpperCase())}</b>`,
-            `<b>Usado:</b> ${esc(formatCompactQty((plan?.requiredQty ?? plan?.neededQty), plan?.unit || plan?.ingredientUnit || ''))}`
+            `<b>Usado:</b> ${esc(formatCompactQty(getIngredientPlanUsedQty(plan, { hasSiblingSubstitute }), plan?.unit || plan?.ingredientUnit || ''))}`
           ].join('<br/>');
           lines.push(`${planNodeId}["${subLabel}"]:::toneIngredient`);
           lines.push(`${nodeId} --> ${planNodeId}`);
@@ -7138,7 +7160,7 @@
       }
     };
     let isConfirmingProduction = false;
-    nodes.editor.querySelector('#produccionConfirmBtn').addEventListener('click', async () => {
+    nodes.editor.querySelector('#produccionConfirmBtn')?.addEventListener('click', async () => {
       if (isConfirmingProduction) return;
       isConfirmingProduction = true;
       confirmBtn.setAttribute('disabled', 'disabled');
