@@ -4314,7 +4314,9 @@
       const ingredient = safeObject(state.ingredientes?.[ingredientId]);
       const stockMeta = getDispatchXlsxIngredientStockMeta(ingredientId, effectiveDispatchDateIso);
       const configuredQty = Number(parseDispatchXlsxQty(targetRow.qty) || 0);
-      const qty = Number((configuredQty * effectiveMultiplier).toFixed(2));
+      const useSourceQty = Boolean(targetRow.useSourceQty);
+      const baseQty = useSourceQty ? sourceQty : configuredQty;
+      const qty = Number(((useSourceQty ? baseQty : (baseQty * effectiveMultiplier)) || 0).toFixed(2));
       const unit = normalizeValue(targetRow.unit || stockMeta.unit || ingredient.stockUnit || 'unidades');
       const available = Number(stockMeta.available || 0);
       const expired = Number(stockMeta.expired || 0);
@@ -4322,6 +4324,7 @@
         id: ingredientId,
         title: normalizeValue(ingredient.name || ingredient.title || ingredientId),
         configuredQty,
+        useSourceQty,
         qty,
         unit,
         available,
@@ -4551,7 +4554,7 @@
       if (!host || !isIngredientMode) return;
       const selected = getSelectedIngredientsList();
       host.innerHTML = selected.length
-        ? selected.map((item) => `<label class="dispatch-xlsx-ingredient-qty-row"><span class="dispatch-xlsx-ingredient-qty-label">Producto ${item.idx}: ${escapeHtml(capitalize(item.title || item.id))} (${escapeHtml(item.unit)})</span><input type="number" step="0.01" min="0" class="form-control ios-input dispatch-xlsx-ingredient-qty" data-dispatch-xlsx-ingredient-qty="${escapeHtml(item.id)}" placeholder="Cantidad" value="${escapeHtml(item.qty || '1')}"></label>`).join('')
+        ? selected.map((item) => `<label class="dispatch-xlsx-ingredient-qty-row"><span class="dispatch-xlsx-ingredient-qty-label">Producto ${item.idx}: ${escapeHtml(capitalize(item.title || item.id))} (${escapeHtml(item.unit)})</span><input type="number" step="0.01" min="0" class="form-control ios-input dispatch-xlsx-ingredient-qty" data-dispatch-xlsx-ingredient-qty="${escapeHtml(item.id)}" placeholder="Si lo dejás vacío, usa la cantidad del XLSX" value="${escapeHtml(item.qty || '')}"></label>`).join('')
         : '';
     };
     const renderList = (popup) => {
@@ -4600,7 +4603,7 @@
           if (!id) return;
           if (checkbox.checked) {
             const stockMeta = getDispatchXlsxIngredientStockMeta(id);
-            selectedIngredients[id] = { id, qty: selectedIngredients[id]?.qty || '1', unit: stockMeta.unit, title: catalog.find((item) => item.id === id)?.title || id };
+            selectedIngredients[id] = { id, qty: selectedIngredients[id]?.qty || '', unit: stockMeta.unit, title: catalog.find((item) => item.id === id)?.title || id };
           } else {
             delete selectedIngredients[id];
           }
@@ -4617,13 +4620,20 @@
       preConfirm: () => {
         if (isIngredientMode) {
           const selectedList = getSelectedIngredientsList()
-            .map((item) => ({ ...item, qty: parseDispatchXlsxQty(item.qty) }))
+            .map((item) => {
+              const rawQty = normalizeValue(item.qty);
+              return {
+                ...item,
+                qty: rawQty ? parseDispatchXlsxQty(rawQty) : 0,
+                useSourceQty: !rawQty
+              };
+            })
             .filter((item) => item.id);
           if (!selectedList.length) {
             Swal.showValidationMessage('Seleccioná al menos un ingrediente.');
             return false;
           }
-          if (selectedList.some((item) => Number(item.qty || 0) <= 0)) {
+          if (selectedList.some((item) => !item.useSourceQty && Number(item.qty || 0) <= 0)) {
             Swal.showValidationMessage('Completá cantidad mayor a 0 para cada ingrediente seleccionado.');
             return false;
           }
@@ -5348,7 +5358,10 @@
         ? `<span class="produccion-badge is-warning dispatch-xlsx-client-badge">Alta automática · DNI ${escapeHtml(row.clientDoc || '-')}</span>`
         : `<span class="produccion-badge dispatch-xlsx-client-badge">Registrado · DNI ${escapeHtml(row.clientDoc || '-')}</span>`;
       const dateLabel = /^\d{4}-\d{2}-\d{2}$/.test(row.invoiceDate || '') ? formatIsoEs(row.invoiceDate) : (row.invoiceDate || '-');
-      return `<tr class="${row.disabled ? 'dispatch-xlsx-row-disabled' : ''}"><td><div class="dispatch-xlsx-client"><strong class="dispatch-xlsx-client-name" title="${escapeHtml(row.clientName || '-')}">${escapeHtml(row.clientName || '-')}</strong>${clientBadge}</div></td><td class="dispatch-xlsx-invoice-cell">${escapeHtml(row.invoiceNumber || '-')}</td><td class="dispatch-xlsx-date-cell">${escapeHtml(dateLabel)}</td><td><div class="dispatch-xlsx-mapping"><strong>${escapeHtml(row.sourceProduct || '-')}</strong>${relationMeta}${ingredientDetail}<span class="dispatch-xlsx-map-state ${row.mappedTargetTitle ? 'is-related' : 'is-pending'}">${row.mappedTargetTitle ? `<i class="fa-solid fa-circle-check"></i> Relacionado` : `<i class="bi bi-x-circle-fill"></i> Sin relacionado`}</span></div></td><td class="dispatch-xlsx-kilos-cell"><span class="${qtyClass}">${qtyMap}</span><small class="d-block ${qtyClass}">${stockLine}</small></td><td><label class="dispatch-xlsx-toggle"><input type="checkbox" data-dispatch-xlsx-row-enabled="${escapeHtml(row.id)}" ${row.disabled ? '' : 'checked'}><span>${row.disabled ? 'Deshabilitado' : 'Activo'}</span></label></td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-xlsx-map="${escapeHtml(row.id)}"><i class="fa-solid fa-link"></i><span>Relacionar</span></button></td></tr>`;
+      const rowStateClass = row.disabled
+        ? 'dispatch-xlsx-row-disabled'
+        : (row.mappedTargetTitle ? 'dispatch-xlsx-row-related' : 'dispatch-xlsx-row-pending');
+      return `<tr class="${rowStateClass}"><td><div class="dispatch-xlsx-client"><strong class="dispatch-xlsx-client-name" title="${escapeHtml(row.clientName || '-')}">${escapeHtml(row.clientName || '-')}</strong>${clientBadge}</div></td><td class="dispatch-xlsx-invoice-cell">${escapeHtml(row.invoiceNumber || '-')}</td><td class="dispatch-xlsx-date-cell">${escapeHtml(dateLabel)}</td><td><div class="dispatch-xlsx-mapping"><strong>${escapeHtml(row.sourceProduct || '-')}</strong>${relationMeta}${ingredientDetail}<span class="dispatch-xlsx-map-state ${row.mappedTargetTitle ? 'is-related' : 'is-pending'}">${row.mappedTargetTitle ? `<i class="fa-solid fa-circle-check"></i> Relacionado` : `<i class="bi bi-x-circle-fill"></i> Sin relacionado`}</span></div></td><td class="dispatch-xlsx-kilos-cell"><span class="${qtyClass}">${qtyMap}</span><small class="d-block ${qtyClass}">${stockLine}</small></td><td><label class="dispatch-xlsx-toggle"><input type="checkbox" data-dispatch-xlsx-row-enabled="${escapeHtml(row.id)}" ${row.disabled ? '' : 'checked'}><span>${row.disabled ? 'Deshabilitado' : 'Activo'}</span></label></td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-xlsx-map="${escapeHtml(row.id)}"><i class="fa-solid fa-link"></i><span>Relacionar</span></button></td></tr>`;
     }).join('') : '<tr><td colspan="7" class="text-center">Adjuntá un XLS/XLSX para comenzar.</td></tr>';
     const uploadHint = state.dispatchXlsxUploadInProgress ? '<span class="dispatch-xlsx-uploading"><i class="fa-solid fa-spinner fa-spin"></i> Subiendo Excel...</span>' : '';
     const usersRows = Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-check" data-user-search="${escapeHtml(normalizeLower(`${user.fullName || ''} ${user.email || ''} ${getDispatchUserRole(user) || ''}`))}"><input type="checkbox" data-dispatch-xlsx-manager="${escapeHtml(user.id)}" value="${escapeHtml(user.id)}" ${(Array.isArray(draft.managers) && draft.managers.includes(user.id)) ? 'checked' : ''}>${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(getDispatchUserRole(user))}</small></span></label>`).join('');

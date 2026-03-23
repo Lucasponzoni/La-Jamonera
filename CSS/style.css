@@ -9656,6 +9656,14 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   background: #f4f6fb !important;
 }
 
+.dispatch-xlsx-row-related td {
+  background: #eefaf2 !important;
+}
+
+.dispatch-xlsx-row-pending td {
+  background: #fff1f3 !important;
+}
+
 .dispatch-xlsx-toggle {
   display: inline-flex;
   align-items: center;
