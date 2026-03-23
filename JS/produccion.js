@@ -3907,6 +3907,27 @@
     const to = chunks[1] || from;
     return { from, to };
   };
+  const getDispatchRowDateMeta = (row = {}) => {
+    const dispatchIso = normalizeDispatchDateToken(row.dispatchDate);
+    if (dispatchIso) {
+      const createdAt = Number(row.createdAt || 0);
+      const timeLabel = Number.isFinite(createdAt) && createdAt > 0
+        ? new Date(createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+        : '';
+      return {
+        token: dispatchIso,
+        label: `${formatIsoEs(dispatchIso)}${timeLabel ? `, ${timeLabel}` : ''}`
+      };
+    }
+    const createdAt = Number(row.createdAt || 0);
+    if (Number.isFinite(createdAt) && createdAt > 0) {
+      return {
+        token: toIsoDate(createdAt),
+        label: formatDateTime(createdAt)
+      };
+    }
+    return { token: '', label: '-' };
+  };
   const getDispatchRows = () => {
     const all = getDispatchRecordsList().sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
     const query = normalizeLower(state.dispatchSearch);
@@ -3915,7 +3936,7 @@
       const client = getDispatchClient(row.clientId);
       const text = `${row.code || ''} ${client.name || ''} ${(Array.isArray(row.products) ? row.products.map((p) => p.recipeTitle).join(' ') : '')}`.toLowerCase();
       if (query && !text.includes(query)) return false;
-      const day = normalizeValue(row.dispatchDate);
+      const day = getDispatchRowDateMeta(row).token;
       if (from && day < from) return false;
       if (to && day > to) return false;
       return true;
@@ -3984,6 +4005,7 @@
       const client = { ...getDispatchClient(row.clientId), ...safeObject(row.clientSnapshot) };
       const collapsed = state.dispatchCollapse[row.id] !== false;
       const productLabel = `${products.length} ${products.length === 1 ? 'producto' : 'productos'}`;
+      const dispatchDateMeta = getDispatchRowDateMeta(row);
       const { groups, standalone } = getDispatchGroupedProducts(row);
       const detailRows = !collapsed ? [
         ...groups.flatMap((group) => {
@@ -4021,7 +4043,7 @@
       const locationRow = !collapsed && locationLabel
         ? `<tr class="inventario-internal-use-row"><td colspan="8"><i class="fa-solid fa-house"></i> ${escapeHtml(locationLabel)}</td></tr>`
         : '';
-      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${products.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-collapse="${escapeHtml(row.id)}" title="${collapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${collapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${collapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(formatDateTime(row.createdAt))}</span></div></td><td>${productLabel}</td><td>${products.map((item) => escapeHtml(getDispatchProductSummaryLabel(item))).join('<br>')}</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || row.id || '-')}</td><td>${escapeHtml(client.name || '-')}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-planilla="${escapeHtml(row.id)}"><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button></td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-dispatch-delete="${escapeHtml(row.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${detailRows}${locationRow}`;
+      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${products.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-collapse="${escapeHtml(row.id)}" title="${collapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${collapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${collapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(dispatchDateMeta.label)}</span></div></td><td>${productLabel}</td><td>${products.map((item) => escapeHtml(getDispatchProductSummaryLabel(item))).join('<br>')}</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || row.id || '-')}</td><td>${escapeHtml(client.name || '-')}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-planilla="${escapeHtml(row.id)}"><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button></td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-dispatch-delete="${escapeHtml(row.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${detailRows}${locationRow}`;
     }).join('') : '<tr><td colspan="8" class="text-center">Sin repartos para el filtro seleccionado.</td></tr>';
     const tableWrap = nodes.dispatchView.querySelector('#produccionDispatchTableWrap');
     if (!tableWrap) return;
