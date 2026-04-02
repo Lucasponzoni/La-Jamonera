@@ -940,6 +940,18 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   color: #60708f;
 }
 
+.ingrediente-empty-image-wrap {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+}
+
+.ingrediente-empty-image {
+  width: min(220px, 100%);
+  height: auto;
+  object-fit: contain;
+}
+
 .swal2-popup.ios-alert.ingredientes-alert {
   max-width: 720px;
 }
