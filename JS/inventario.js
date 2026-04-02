@@ -4117,6 +4117,10 @@
           select.value = '';
           select.dispatchEvent(new Event('change', { bubbles: true }));
         }
+        if (select) {
+          select.value = '';
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
         openBulkSuggestions(input, idx, query);
       });
       input.addEventListener('blur', () => {
