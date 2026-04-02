@@ -1422,7 +1422,7 @@
         : [];
       if (outsideMatches.length) {
         visibleItems = outsideMatches;
-        helperHtml = `<div class="ingrediente-empty-list">No hay resultados con los filtros actuales.<div class="ingrediente-empty-image-wrap"><img src="${escapeHtml(NO_DATA_IMAGE_URL)}" alt="Sin resultados" class="ingrediente-empty-image"></div></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del filtro</strong> seleccionado</p>`;
+        helperHtml = `<div class="ingrediente-empty-list with-illustration"><p class="ingrediente-empty-title">No hay resultados con los filtros actuales.</p><div class="ingrediente-empty-image-wrap"><img src="${escapeHtml(NO_DATA_IMAGE_URL)}" alt="Sin resultados" class="ingrediente-empty-image"></div></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del filtro</strong> seleccionado</p>`;
       } else {
         nodes.list.innerHTML = '<div class="ingrediente-empty-list">No encontramos ingredientes para inventario.</div>';
         updateListScrollHint();
@@ -4113,11 +4113,9 @@
           closeBulkSuggestions();
           return;
         }
-        const exact = Object.values(state.ingredientes).find((ing) => normalizeLower(ing.name) === normalizeLower(query));
-        if (exact) {
-          applyBulkIngredient(idx, exact);
-          closeBulkSuggestions();
-          return;
+        if (select) {
+          select.value = '';
+          select.dispatchEvent(new Event('change', { bubbles: true }));
         }
         if (select) {
           select.value = '';

@@ -940,14 +940,27 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   color: #60708f;
 }
 
+.ingrediente-empty-list.with-illustration {
+  background: #f3f5fb;
+  border: 1px dashed #c9d3ea;
+  padding: 14px 12px;
+}
+
+.ingrediente-empty-title {
+  margin: 0;
+  color: #56668d;
+  font-weight: 600;
+  font-size: 0.96rem;
+}
+
 .ingrediente-empty-image-wrap {
-  margin-top: 12px;
+  margin-top: 8px;
   display: flex;
   justify-content: center;
 }
 
 .ingrediente-empty-image {
-  width: min(220px, 100%);
+  width: min(128px, 100%);
   height: auto;
   object-fit: contain;
 }
