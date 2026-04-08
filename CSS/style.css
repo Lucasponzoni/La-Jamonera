@@ -940,6 +940,59 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   color: #60708f;
 }
 
+.ingrediente-empty-list.with-illustration {
+  background: linear-gradient(180deg, #f7f9ff 0%, #f1f4fb 100%);
+  border: 1px dashed #c7d4ef;
+  padding: 12px 10px;
+}
+
+.ingrediente-empty-title {
+  margin: 0;
+  color: #56668d;
+  font-weight: 600;
+  font-size: 0.96rem;
+}
+
+.ingrediente-empty-filters {
+  margin: 6px 0 6px;
+  font-size: 0.8rem;
+  color: #61719a;
+}
+
+.ingrediente-empty-tags {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.ingrediente-empty-tag {
+  border: 1px solid #c8d5f0;
+  border-radius: 999px;
+  background: #eef3ff;
+  color: #355a9d;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 3px 9px;
+}
+
+.ingrediente-empty-btn {
+  min-height: 34px !important;
+}
+
+.ingrediente-empty-image-wrap {
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+}
+
+.ingrediente-empty-image {
+  width: min(104px, 100%);
+  height: auto;
+  object-fit: contain;
+}
+
 .swal2-popup.ios-alert.ingredientes-alert {
   max-width: 720px;
 }
