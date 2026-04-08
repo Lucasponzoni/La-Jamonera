@@ -953,6 +953,12 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   font-size: 0.96rem;
 }
 
+.ingrediente-empty-filters {
+  margin: 8px 0 10px;
+  font-size: 0.86rem;
+  color: #61719a;
+}
+
 .ingrediente-empty-image-wrap {
   margin-top: 8px;
   display: flex;

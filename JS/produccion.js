@@ -5251,6 +5251,88 @@
       await openIosSwal({ title: 'No se pudo procesar', html: '<p>Ocurrió un error al procesar el XLSX.</p>', icon: 'error' });
     }
   };
+  const resolveDispatchXlsxConflictsNow = async ({ draft, conflictType = 'ingredient', ingredientId = '', resolutionType = 'sold_counter' } = {}) => {
+    if (!draft || !Array.isArray(draft.rows)) return;
+    recomputeDispatchXlsxDraftRows(draft);
+    Swal.fire({
+      title: 'Resolviendo conflictos...',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Resolviendo" class="meta-spinner-login"></div>',
+      allowOutsideClick: false,
+      showConfirmButton: false,
+      customClass: { popup: 'ios-alert produccion-loading-alert' }
+    });
+    try {
+      let resolvedCount = 0;
+      const rows = draft.rows.filter((row) => !row.disabled && normalizeValue(row.mappedTargetId));
+      for (const row of rows) {
+        const dispatchDate = normalizeDispatchDateToken(row.invoiceDate) || toIsoDate();
+        const mappedIngredients = Array.isArray(row.mappedIngredients) ? row.mappedIngredients : [];
+        if (conflictType === 'ingredient') {
+          if (!mappedIngredients.length) continue;
+          for (const item of mappedIngredients) {
+            const currentIngredientId = normalizeValue(item.id);
+            if (!currentIngredientId || (normalizeValue(ingredientId) && currentIngredientId !== normalizeValue(ingredientId))) continue;
+            const requestedQty = Number(item.qty || 0);
+            const stockMeta = getDispatchXlsxIngredientStockMeta(currentIngredientId, dispatchDate);
+            const availableQty = Number(stockMeta.available || 0);
+            const expiredQty = Number(stockMeta.expired || 0);
+            const missingQty = Math.max(0, requestedQty - availableQty);
+            const qtyToResolve = Math.min(missingQty, expiredQty);
+            if (qtyToResolve <= 0.0001) continue;
+            row.conflictResolutions = safeObject(row.conflictResolutions);
+            row.conflictResolutions[currentIngredientId] = { type: resolutionType, at: nowTs() };
+            const result = resolveDispatchXlsxIngredientExpiredConflict({
+              ingredientId: currentIngredientId,
+              requestedQty: qtyToResolve,
+              requestedUnit: normalizeValue(item.unit || 'kilos'),
+              dispatchDate,
+              resolutionType
+            });
+            if (Number(result?.resolvedQty || 0) > 0.0001) {
+              resolvedCount += 1;
+            }
+          }
+          continue;
+        }
+
+        if (mappedIngredients.length) continue;
+        const recipeId = normalizeValue(row.mappedTargetId);
+        if (!recipeId) continue;
+        const qtyKg = Number(row.mappedQty || row.sourceQty || 0);
+        const stockMeta = getDispatchXlsxRecipeStockMeta(recipeId, dispatchDate);
+        const missingKg = Math.max(0, qtyKg - Number(stockMeta.available || 0));
+        const expiredKg = Number(stockMeta.expired || 0);
+        const qtyToResolve = Math.min(missingKg, expiredKg);
+        if (qtyToResolve <= 0.0001) continue;
+        row.productConflictResolution = resolutionType;
+        const result = await resolveDispatchXlsxRecipeExpiredConflict({
+          recipeId,
+          qtyKg: qtyToResolve,
+          dispatchDate,
+          resolutionType: resolutionType === 'decommissioned' ? 'decommissioned' : 'retail_sale'
+        });
+        if (Number(result?.resolvedKg || 0) > 0.0001) {
+          resolvedCount += 1;
+        }
+      }
+
+      if (resolvedCount > 0) {
+        await window.dbLaJamoneraRest.write('/inventario', state.inventario);
+        await persistRepartoStore();
+      }
+      recomputeDispatchXlsxDraftRows(draft);
+      renderDispatchXlsxCreate(draft);
+      Swal.close();
+      await openIosSwal({
+        title: 'Conflicto resuelto',
+        html: `<p>Resolución aplicada en <strong>${resolvedCount}</strong> fila(s) y datos recalculados.</p>`,
+        icon: 'success'
+      });
+    } catch (error) {
+      Swal.close();
+      await openIosSwal({ title: 'No se pudo resolver', html: '<p>Ocurrió un error al resolver el conflicto de vencido.</p>', icon: 'error' });
+    }
+  };
   const renderDispatchXlsxCreate = (draft) => {
     if (!nodes.dispatchView) return;
     state.dispatchCreateMode = false;
@@ -8218,7 +8300,7 @@
       const ingredientId = normalizeValue(xlsxResolveConflictBtn.dataset.dispatchXlsxIngredient);
       const ask = await openIosSwal({
         title: 'Resolver conflicto de vencido',
-        html: '<p>¿Cómo querés resolver este conflicto?</p>',
+        html: '<p>¿Cómo querés resolver este conflicto?</p><p><small>Se aplicará a todas las filas con el mismo conflicto y luego se recalculará la previsualización.</small></p>',
         showCancelButton: true,
         showDenyButton: true,
         confirmButtonText: 'Venta en mostrador',
@@ -8227,13 +8309,12 @@
       });
       if (!ask.isConfirmed && !ask.isDenied) return;
       const selectedType = ask.isDenied ? 'decommissioned' : 'sold_counter';
-      if (conflictType === 'ingredient' && ingredientId) {
-        row.conflictResolutions = safeObject(row.conflictResolutions);
-        row.conflictResolutions[ingredientId] = { type: selectedType, at: nowTs() };
-      } else if (conflictType === 'production') {
-        row.productConflictResolution = selectedType;
-      }
-      renderDispatchXlsxCreate(state.dispatchXlsxDraft);
+      await resolveDispatchXlsxConflictsNow({
+        draft: state.dispatchXlsxDraft,
+        conflictType: conflictType === 'production' ? 'production' : 'ingredient',
+        ingredientId,
+        resolutionType: selectedType
+      });
       return;
     }
     if (event.target.closest('#dispatchXlsxProcessBtn')) {

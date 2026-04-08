@@ -1422,7 +1422,19 @@
         : [];
       if (outsideMatches.length) {
         visibleItems = outsideMatches;
-        helperHtml = `<div class="ingrediente-empty-list with-illustration"><p class="ingrediente-empty-title">No hay resultados con los filtros actuales.</p><div class="ingrediente-empty-image-wrap"><img src="${escapeHtml(NO_DATA_IMAGE_URL)}" alt="Sin resultados" class="ingrediente-empty-image"></div></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del filtro</strong> seleccionado</p>`;
+        const familyLabel = state.activeFamilyId === 'all'
+          ? 'Todas las familias'
+          : capitalize(state.familias?.[state.activeFamilyId]?.name || 'Sin familia');
+        const statusLabels = {
+          all: 'Todos',
+          none: 'Nunca ingresó',
+          low: 'Stock bajo',
+          ok: 'Con stock',
+          expiring: 'Por vencer',
+          expired: 'Vencidos'
+        };
+        const statusLabel = statusLabels[state.activeStockStatus] || 'Todos';
+        helperHtml = `<div class="ingrediente-empty-list with-illustration"><p class="ingrediente-empty-title">No hay resultados con los filtros actuales.</p><div class="ingrediente-empty-image-wrap"><img src="${escapeHtml(NO_DATA_IMAGE_URL)}" alt="Sin resultados" class="ingrediente-empty-image"></div><p class="ingrediente-empty-filters">Usando filtros: <strong>${escapeHtml(familyLabel)}</strong> · <strong>${escapeHtml(statusLabel)}</strong></p><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-inv-search-all><i class="bi bi-lightning-charge"></i><span>Buscar en toda la base</span></button></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del filtro</strong> seleccionado</p>`;
       } else {
         nodes.list.innerHTML = '<div class="ingrediente-empty-list">No encontramos ingredientes para inventario.</div>';
         updateListScrollHint();
@@ -4117,10 +4129,6 @@
           select.value = '';
           select.dispatchEvent(new Event('change', { bubbles: true }));
         }
-        if (select) {
-          select.value = '';
-          select.dispatchEvent(new Event('change', { bubbles: true }));
-        }
         openBulkSuggestions(input, idx, query);
       });
       input.addEventListener('blur', () => {
@@ -5629,9 +5637,21 @@
 
 
   const onListClick = async (event) => {
+    const searchAllBtn = event.target.closest('[data-inv-search-all]');
+    if (searchAllBtn) {
+      state.activeFamilyId = 'all';
+      state.activeStockStatus = 'all';
+      renderFamilies();
+      renderStatusFilters();
+      renderList();
+      return;
+    }
+
     const statusBtn = event.target.closest('[data-inv-status-filter]');
     if (statusBtn) {
       state.activeStockStatus = statusBtn.dataset.invStatusFilter;
+      state.search = '';
+      if (nodes.searchInput) nodes.searchInput.value = '';
       renderStatusFilters();
       renderList();
       return;
@@ -5640,6 +5660,8 @@
     const familyBtn = event.target.closest('[data-inv-family-filter]');
     if (familyBtn) {
       state.activeFamilyId = familyBtn.dataset.invFamilyFilter;
+      state.search = '';
+      if (nodes.searchInput) nodes.searchInput.value = '';
       renderFamilies();
       renderStatusFilters();
       renderList();

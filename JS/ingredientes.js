@@ -323,7 +323,10 @@
         : [];
       if (outsideMatches.length) {
         visibleItems = outsideMatches;
-        helperHtml = `<div class="ingrediente-empty-list with-illustration"><p class="ingrediente-empty-title">No hay resultados con los filtros actuales.</p><div class="ingrediente-empty-image-wrap"><img src="${escapeHtml(NO_DATA_IMAGE_URL)}" alt="Sin resultados" class="ingrediente-empty-image"></div></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del filtro</strong> seleccionado</p>`;
+        const familyLabel = state.activeFamilyId === 'all'
+          ? 'Todas las familias'
+          : capitalizeLabel(state.ingredientes.familias?.[state.activeFamilyId]?.name || 'Sin familia');
+        helperHtml = `<div class="ingrediente-empty-list with-illustration"><p class="ingrediente-empty-title">No hay resultados con los filtros actuales.</p><div class="ingrediente-empty-image-wrap"><img src="${escapeHtml(NO_DATA_IMAGE_URL)}" alt="Sin resultados" class="ingrediente-empty-image"></div><p class="ingrediente-empty-filters">Usando filtro: <strong>${escapeHtml(familyLabel)}</strong></p><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-ingredient-search-all><i class="bi bi-lightning-charge"></i><span>Buscar en toda la base</span></button></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del filtro</strong> seleccionado</p>`;
       } else {
         ingredientesList.innerHTML = '<div class="ingrediente-empty-list">No encontramos ingredientes con ese filtro.</div>';
         updateListScrollHint();
@@ -1008,9 +1011,19 @@
   };
 
   const handleDataClicks = async (event) => {
+    const searchAllButton = event.target.closest('[data-ingredient-search-all]');
+    if (searchAllButton) {
+      state.activeFamilyId = 'all';
+      renderFamilies();
+      renderIngredientes();
+      return;
+    }
+
     const filterButton = event.target.closest('[data-family-filter]');
     if (filterButton) {
       state.activeFamilyId = filterButton.dataset.familyFilter;
+      state.search = '';
+      if (searchInput) searchInput.value = '';
       renderFamilies();
       renderIngredientes();
       return;
