@@ -1427,14 +1427,15 @@
           : capitalize(state.familias?.[state.activeFamilyId]?.name || 'Sin familia');
         const statusLabels = {
           all: 'Todos',
-          none: 'Nunca ingresó',
-          low: 'Stock bajo',
-          ok: 'Con stock',
+          'status-empty': 'Sin stock',
+          'status-low': 'Stock bajo',
+          'status-good': 'Con stock',
+          'status-never': 'Nunca ingresó',
           expiring: 'Por vencer',
           expired: 'Vencidos'
         };
         const statusLabel = statusLabels[state.activeStockStatus] || 'Todos';
-        helperHtml = `<div class="ingrediente-empty-list with-illustration"><p class="ingrediente-empty-title">No hay resultados con los filtros actuales.</p><div class="ingrediente-empty-image-wrap"><img src="${escapeHtml(NO_DATA_IMAGE_URL)}" alt="Sin resultados" class="ingrediente-empty-image"></div><p class="ingrediente-empty-filters">Usando filtros: <strong>${escapeHtml(familyLabel)}</strong> · <strong>${escapeHtml(statusLabel)}</strong></p><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-inv-search-all><i class="bi bi-lightning-charge"></i><span>Buscar en toda la base</span></button></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del filtro</strong> seleccionado</p>`;
+        helperHtml = `<div class="ingrediente-empty-list with-illustration"><p class="ingrediente-empty-title">No hay resultados con los filtros actuales.</p><div class="ingrediente-empty-image-wrap"><img src="${escapeHtml(NO_DATA_IMAGE_URL)}" alt="Sin resultados" class="ingrediente-empty-image"></div><p class="ingrediente-empty-filters">Usando filtros:</p><div class="ingrediente-empty-tags"><span class="ingrediente-empty-tag">${escapeHtml(familyLabel)}</span><span class="ingrediente-empty-tag">${escapeHtml(statusLabel)}</span></div><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn ingrediente-empty-btn" data-inv-search-all><i class="bi bi-lightning-charge"></i><span>Buscar en toda la base</span></button></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del filtro</strong> seleccionado</p>`;
       } else {
         nodes.list.innerHTML = '<div class="ingrediente-empty-list">No encontramos ingredientes para inventario.</div>';
         updateListScrollHint();

@@ -5251,7 +5251,7 @@
       await openIosSwal({ title: 'No se pudo procesar', html: '<p>Ocurrió un error al procesar el XLSX.</p>', icon: 'error' });
     }
   };
-  const resolveDispatchXlsxConflictsNow = async ({ draft, conflictType = 'ingredient', ingredientId = '', resolutionType = 'sold_counter' } = {}) => {
+  const resolveDispatchXlsxConflictsNow = async ({ draft, rowId = '', conflictType = 'ingredient', ingredientId = '', resolutionType = 'sold_counter' } = {}) => {
     if (!draft || !Array.isArray(draft.rows)) return;
     recomputeDispatchXlsxDraftRows(draft);
     Swal.fire({
@@ -5263,7 +5263,8 @@
     });
     try {
       let resolvedCount = 0;
-      const rows = draft.rows.filter((row) => !row.disabled && normalizeValue(row.mappedTargetId));
+      const safeRowId = normalizeValue(rowId);
+      const rows = draft.rows.filter((row) => normalizeValue(row.id) === safeRowId && !row.disabled && normalizeValue(row.mappedTargetId));
       for (const row of rows) {
         const dispatchDate = normalizeDispatchDateToken(row.invoiceDate) || toIsoDate();
         const mappedIngredients = Array.isArray(row.mappedIngredients) ? row.mappedIngredients : [];
@@ -5325,7 +5326,7 @@
       Swal.close();
       await openIosSwal({
         title: 'Conflicto resuelto',
-        html: `<p>Resolución aplicada en <strong>${resolvedCount}</strong> fila(s) y datos recalculados.</p>`,
+        html: `<p>Resolución aplicada en <strong>${resolvedCount}</strong> fila(s). Recalculamos la previsualización del XLSX.</p>`,
         icon: 'success'
       });
     } catch (error) {
@@ -8300,7 +8301,7 @@
       const ingredientId = normalizeValue(xlsxResolveConflictBtn.dataset.dispatchXlsxIngredient);
       const ask = await openIosSwal({
         title: 'Resolver conflicto de vencido',
-        html: '<p>¿Cómo querés resolver este conflicto?</p><p><small>Se aplicará a todas las filas con el mismo conflicto y luego se recalculará la previsualización.</small></p>',
+        html: '<p>¿Cómo querés resolver este conflicto?</p><p><small>Se resolverá esta fila y luego se recalculará la previsualización del XLSX.</small></p>',
         showCancelButton: true,
         showDenyButton: true,
         confirmButtonText: 'Venta en mostrador',
@@ -8311,6 +8312,7 @@
       const selectedType = ask.isDenied ? 'decommissioned' : 'sold_counter';
       await resolveDispatchXlsxConflictsNow({
         draft: state.dispatchXlsxDraft,
+        rowId,
         conflictType: conflictType === 'production' ? 'production' : 'ingredient',
         ingredientId,
         resolutionType: selectedType

@@ -941,9 +941,9 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 }
 
 .ingrediente-empty-list.with-illustration {
-  background: #f3f5fb;
-  border: 1px dashed #c9d3ea;
-  padding: 14px 12px;
+  background: linear-gradient(180deg, #f7f9ff 0%, #f1f4fb 100%);
+  border: 1px dashed #c7d4ef;
+  padding: 12px 10px;
 }
 
 .ingrediente-empty-title {
@@ -954,9 +954,31 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 }
 
 .ingrediente-empty-filters {
-  margin: 8px 0 10px;
-  font-size: 0.86rem;
+  margin: 6px 0 6px;
+  font-size: 0.8rem;
   color: #61719a;
+}
+
+.ingrediente-empty-tags {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.ingrediente-empty-tag {
+  border: 1px solid #c8d5f0;
+  border-radius: 999px;
+  background: #eef3ff;
+  color: #355a9d;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 3px 9px;
+}
+
+.ingrediente-empty-btn {
+  min-height: 34px !important;
 }
 
 .ingrediente-empty-image-wrap {
@@ -966,7 +988,7 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 }
 
 .ingrediente-empty-image {
-  width: min(128px, 100%);
+  width: min(104px, 100%);
   height: auto;
   object-fit: contain;
 }
