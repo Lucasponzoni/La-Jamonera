@@ -1,6 +1,7 @@
 (function ingredientesModule() {
   const IA_WORKER_BASE = 'https://worker.lucasponzoninovogar.workers.dev';
   const IA_ICON_SRC = './IMG/ia-unscreen.gif';
+  const NO_DATA_IMAGE_URL = 'https://firebasestorage.googleapis.com/v0/b/fg-lj-d6325.firebasestorage.app/o/extras%2FNo%20data.png?alt=media&token=2d7086a4-6f7d-4fb8-aa8c-51c579f59828';
   const PLACEHOLDER_ICON = '<i class="fa-solid fa-carrot"></i>';
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
@@ -303,21 +304,38 @@
   };
 
   const renderIngredientes = () => {
-    const items = getIngredientesArray().filter((item) => {
+    const allItems = getIngredientesArray();
+    const items = allItems.filter((item) => {
       if (state.activeFamilyId !== 'all' && item.familyId !== state.activeFamilyId) {
         return false;
       }
       return matchesSearch(item);
     });
+    let visibleItems = items;
+    let helperHtml = '';
 
     if (!items.length) {
-      ingredientesList.innerHTML = '<div class="ingrediente-empty-list">No encontramos ingredientes con ese filtro.</div>';
-      updateListScrollHint();
-      return;
+      const outsideMatches = state.search
+        ? allItems.filter((item) => {
+          const content = [item.name, item.familyName, item.measure, item.description].map(normalizeLower).join(' ');
+          return content.includes(state.search);
+        })
+        : [];
+      if (outsideMatches.length) {
+        visibleItems = outsideMatches;
+        const familyLabel = state.activeFamilyId === 'all'
+          ? 'Todas las familias'
+          : capitalizeLabel(state.ingredientes.familias?.[state.activeFamilyId]?.name || 'Sin familia');
+        helperHtml = `<div class="ingrediente-empty-list with-illustration"><p class="ingrediente-empty-title">No hay resultados con los filtros actuales.</p><div class="ingrediente-empty-image-wrap"><img src="${escapeHtml(NO_DATA_IMAGE_URL)}" alt="Sin resultados" class="ingrediente-empty-image"></div><p class="ingrediente-empty-filters">Usando filtro: <strong>${escapeHtml(familyLabel)}</strong></p><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-ingredient-search-all><i class="bi bi-lightning-charge"></i><span>Buscar en toda la base</span></button></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del filtro</strong> seleccionado</p>`;
+      } else {
+        ingredientesList.innerHTML = '<div class="ingrediente-empty-list">No encontramos ingredientes con ese filtro.</div>';
+        updateListScrollHint();
+        return;
+      }
     }
 
-    const sorted = items.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
-    ingredientesList.innerHTML = sorted.map((item) => `
+    const sorted = visibleItems.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    ingredientesList.innerHTML = `${helperHtml}${sorted.map((item) => `
       <article class="ingrediente-card">
         ${ingredientAvatar(item.imageUrl, capitalizeLabel(item.name))}
         <div class="ingrediente-main">
@@ -334,7 +352,7 @@
           <button class="ingrediente-action" type="button" data-ingrediente-delete="${item.id}" title="Eliminar ingrediente"><i class="fa-solid fa-trash"></i></button>
         </div>
       </article>
-    `).join('');
+    `).join('')}`;
 
     prepareThumbLoaders('.js-ingrediente-thumb');
     updateListScrollHint();
@@ -993,9 +1011,19 @@
   };
 
   const handleDataClicks = async (event) => {
+    const searchAllButton = event.target.closest('[data-ingredient-search-all]');
+    if (searchAllButton) {
+      state.activeFamilyId = 'all';
+      renderFamilies();
+      renderIngredientes();
+      return;
+    }
+
     const filterButton = event.target.closest('[data-family-filter]');
     if (filterButton) {
       state.activeFamilyId = filterButton.dataset.familyFilter;
+      state.search = '';
+      if (searchInput) searchInput.value = '';
       renderFamilies();
       renderIngredientes();
       return;
@@ -1078,10 +1106,20 @@
   });
 
   ingredientesModal.addEventListener('show.bs.modal', loadIngredientes);
+  let searchRenderTimer = null;
+  const scheduleIngredientesSearchRender = () => {
+    if (searchRenderTimer) {
+      clearTimeout(searchRenderTimer);
+    }
+    searchRenderTimer = setTimeout(() => {
+      searchRenderTimer = null;
+      renderIngredientes();
+    }, 0);
+  };
   if (searchInput) {
     searchInput.addEventListener('input', (event) => {
       state.search = normalizeLower(event.target.value);
-      renderIngredientes();
+      scheduleIngredientesSearchRender();
     });
   }
   if (ingredientesData) {

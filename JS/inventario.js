@@ -12,6 +12,7 @@
   ];
   const LOT_SEPARATORS = ['.', '-', '_', ',', ';', '|'];
   const PAGE_SIZE = 10;
+  const NO_DATA_IMAGE_URL = 'https://firebasestorage.googleapis.com/v0/b/fg-lj-d6325.firebasestorage.app/o/extras%2FNo%20data.png?alt=media&token=2d7086a4-6f7d-4fb8-aa8c-51c579f59828';
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const ALLOWED_INVOICE_UPLOAD_TYPES = [...ALLOWED_UPLOAD_TYPES, 'application/pdf'];
   const ALLOWED_RNE_UPLOAD_TYPES = [...ALLOWED_UPLOAD_TYPES, 'application/pdf'];
@@ -97,7 +98,8 @@
     providerRnePage: 1,
     pendingProviderDeleteId: '',
     weeklyConfigSearch: '',
-    weeklyConfigPage: 1
+    weeklyConfigPage: 1,
+    searchRenderTimer: null
   };
 
   const safeObject = (value) => (value && typeof value === 'object' ? value : {});
@@ -1420,7 +1422,19 @@
         : [];
       if (outsideMatches.length) {
         visibleItems = outsideMatches;
-        helperHtml = '<div class="ingrediente-empty-list">No hay resultados con los filtros actuales.</div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del filtro</strong> seleccionado</p>';
+        const familyLabel = state.activeFamilyId === 'all'
+          ? 'Todas las familias'
+          : capitalize(state.familias?.[state.activeFamilyId]?.name || 'Sin familia');
+        const statusLabels = {
+          all: 'Todos',
+          none: 'Nunca ingresó',
+          low: 'Stock bajo',
+          ok: 'Con stock',
+          expiring: 'Por vencer',
+          expired: 'Vencidos'
+        };
+        const statusLabel = statusLabels[state.activeStockStatus] || 'Todos';
+        helperHtml = `<div class="ingrediente-empty-list with-illustration"><p class="ingrediente-empty-title">No hay resultados con los filtros actuales.</p><div class="ingrediente-empty-image-wrap"><img src="${escapeHtml(NO_DATA_IMAGE_URL)}" alt="Sin resultados" class="ingrediente-empty-image"></div><p class="ingrediente-empty-filters">Usando filtros: <strong>${escapeHtml(familyLabel)}</strong> · <strong>${escapeHtml(statusLabel)}</strong></p><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-inv-search-all><i class="bi bi-lightning-charge"></i><span>Buscar en toda la base</span></button></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del filtro</strong> seleccionado</p>`;
       } else {
         nodes.list.innerHTML = '<div class="ingrediente-empty-list">No encontramos ingredientes para inventario.</div>';
         updateListScrollHint();
@@ -4102,15 +4116,18 @@
       input.addEventListener('input', () => {
         const idx = Number(input.dataset.bulkSearch);
         const query = normalizeValue(input.value);
+        const select = nodes.editorForm.querySelector(`[data-bulk-ingredient="${idx}"]`);
         if (!query) {
+          if (select) {
+            select.value = '';
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+          }
           closeBulkSuggestions();
           return;
         }
-        const exact = Object.values(state.ingredientes).find((ing) => normalizeLower(ing.name) === normalizeLower(query));
-        if (exact) {
-          applyBulkIngredient(idx, exact);
-          closeBulkSuggestions();
-          return;
+        if (select) {
+          select.value = '';
+          select.dispatchEvent(new Event('change', { bubbles: true }));
         }
         openBulkSuggestions(input, idx, query);
       });
@@ -4801,6 +4818,7 @@
     saveBtn.setAttribute('disabled', 'disabled');
     spinner?.classList.remove('d-none');
     icon?.classList.add('d-none');
+    await new Promise((resolve) => requestAnimationFrame(() => resolve()));
 
     try {
       const invoiceImageUrls = [];
@@ -5421,6 +5439,9 @@
 
           const saveBtn = event.target.closest('[data-provider-rne-save]');
           if (saveBtn) {
+            const originalSaveHtml = saveBtn.innerHTML;
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="inventario-inline-delete-spinner">';
             const providerId = saveBtn.dataset.providerRneSave || '';
             const existing = findProviderById(providerId);
             const provider = existing || createProviderWithName('');
@@ -5438,74 +5459,93 @@
             const avatarNode = root.querySelector('.inventario-provider-editor-avatar');
 
             if (!name) {
+              saveBtn.disabled = false;
+              saveBtn.innerHTML = originalSaveHtml;
               await openIosSwal({ title: 'Dato faltante', html: '<p>Completá el nombre del proveedor.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
               return;
             }
             if (!nonFoodCategory && number && !/^[0-9-]+$/.test(number)) {
+              saveBtn.disabled = false;
+              saveBtn.innerHTML = originalSaveHtml;
               await openIosSwal({ title: 'RNE inválido', html: '<p>El RNE solo admite números y guiones.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
               return;
             }
             if (file && !ALLOWED_RNE_UPLOAD_TYPES.includes(file.type)) {
+              saveBtn.disabled = false;
+              saveBtn.innerHTML = originalSaveHtml;
               await openIosSwal({ title: 'Adjunto inválido', html: '<p>Permitido: PDF o imagen.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
               return;
             }
             if (file && file.size > MAX_UPLOAD_SIZE_BYTES) {
+              saveBtn.disabled = false;
+              saveBtn.innerHTML = originalSaveHtml;
               await openIosSwal({ title: 'Adjunto muy pesado', html: '<p>El adjunto RNE supera 5MB.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
               return;
             }
             if (photoFile && !ALLOWED_UPLOAD_TYPES.includes(photoFile.type)) {
+              saveBtn.disabled = false;
+              saveBtn.innerHTML = originalSaveHtml;
               await openIosSwal({ title: 'Foto inválida', html: '<p>La foto de perfil debe ser JPG, PNG, WEBP o GIF.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
               return;
             }
             if (photoFile && photoFile.size > MAX_UPLOAD_SIZE_BYTES) {
+              saveBtn.disabled = false;
+              saveBtn.innerHTML = originalSaveHtml;
               await openIosSwal({ title: 'Foto muy pesada', html: '<p>La foto de perfil supera 5MB.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
               return;
             }
 
-            let attachmentUrl = nonFoodCategory ? '' : normalizeValue(currentRne.attachmentUrl);
-            let attachmentType = nonFoodCategory ? '' : normalizeValue(currentRne.attachmentType);
-            let photoUrl = normalizeValue(provider.photoUrl);
-            const history = Array.isArray(currentRne.history) ? [...currentRne.history] : [];
-            if (file) {
-              if (normalizeValue(currentRne.attachmentUrl) || normalizeValue(currentRne.number)) {
-                history.unshift({ ...buildProviderRneHistoryEntry(currentRne), validFrom: normalizeValue(currentRne.validFrom), replacedAt: Date.now() });
+            try {
+              let attachmentUrl = nonFoodCategory ? '' : normalizeValue(currentRne.attachmentUrl);
+              let attachmentType = nonFoodCategory ? '' : normalizeValue(currentRne.attachmentType);
+              let photoUrl = normalizeValue(provider.photoUrl);
+              const history = Array.isArray(currentRne.history) ? [...currentRne.history] : [];
+              if (file) {
+                if (normalizeValue(currentRne.attachmentUrl) || normalizeValue(currentRne.number)) {
+                  history.unshift({ ...buildProviderRneHistoryEntry(currentRne), validFrom: normalizeValue(currentRne.validFrom), replacedAt: Date.now() });
+                }
+                loadingNode?.classList.remove('d-none');
+                attachmentUrl = await uploadImageToStorage(file, 'inventario/proveedores/rne');
+                attachmentType = file.type;
+                loadingNode?.classList.add('d-none');
               }
-              loadingNode?.classList.remove('d-none');
-              attachmentUrl = await uploadImageToStorage(file, 'inventario/proveedores/rne');
-              attachmentType = file.type;
-              loadingNode?.classList.add('d-none');
-            }
-            if (photoFile) {
-              if (avatarNode) {
-                avatarNode.innerHTML = '<span class="produccion-company-logo-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Subiendo foto" class="meta-spinner produccion-company-logo-spinner"></span>';
+              if (photoFile) {
+                if (avatarNode) {
+                  avatarNode.innerHTML = '<span class="produccion-company-logo-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Subiendo foto" class="meta-spinner produccion-company-logo-spinner"></span>';
+                }
+                photoUrl = await uploadImageToStorage(photoFile, 'inventario/proveedores/avatar');
               }
-              photoUrl = await uploadImageToStorage(photoFile, 'inventario/proveedores/avatar');
-            }
 
-            const nextProvider = {
-              id: provider.id,
-              name,
-              email,
-              phone,
-              photoUrl,
-              nonFoodCategory,
-              createdAt: Number(provider.createdAt || Date.now()),
-              rne: {
-                ...getDefaultProviderRne(),
-                ...currentRne,
-                number: nonFoodCategory ? '' : number,
-                expiryDate,
-                infiniteExpiry,
-                attachmentUrl: nonFoodCategory ? '' : attachmentUrl,
-                attachmentType: nonFoodCategory ? '' : attachmentType,
-                validFrom: normalizeValue(currentRne.validFrom) || getArgentinaIsoDate(),
-                history,
-                updatedAt: Date.now()
-              }
-            };
-            saveProviderInConfig(nextProvider);
-            await persistInventario();
-            ui.setMode('list');
+              const nextProvider = {
+                id: provider.id,
+                name,
+                email,
+                phone,
+                photoUrl,
+                nonFoodCategory,
+                createdAt: Number(provider.createdAt || Date.now()),
+                rne: {
+                  ...getDefaultProviderRne(),
+                  ...currentRne,
+                  number: nonFoodCategory ? '' : number,
+                  expiryDate,
+                  infiniteExpiry,
+                  attachmentUrl: nonFoodCategory ? '' : attachmentUrl,
+                  attachmentType: nonFoodCategory ? '' : attachmentType,
+                  validFrom: normalizeValue(currentRne.validFrom) || getArgentinaIsoDate(),
+                  history,
+                  updatedAt: Date.now()
+                }
+              };
+              saveProviderInConfig(nextProvider);
+              await persistInventario();
+              ui.setMode('list');
+            } catch (error) {
+              saveBtn.disabled = false;
+              saveBtn.innerHTML = originalSaveHtml;
+              loadingNode?.classList.add('d-none');
+              await openIosSwal({ title: 'No se pudo guardar', html: '<p>Ocurrió un error al guardar el proveedor. Intentá nuevamente.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+            }
             return;
           }
 
@@ -5597,9 +5637,21 @@
 
 
   const onListClick = async (event) => {
+    const searchAllBtn = event.target.closest('[data-inv-search-all]');
+    if (searchAllBtn) {
+      state.activeFamilyId = 'all';
+      state.activeStockStatus = 'all';
+      renderFamilies();
+      renderStatusFilters();
+      renderList();
+      return;
+    }
+
     const statusBtn = event.target.closest('[data-inv-status-filter]');
     if (statusBtn) {
       state.activeStockStatus = statusBtn.dataset.invStatusFilter;
+      state.search = '';
+      if (nodes.searchInput) nodes.searchInput.value = '';
       renderStatusFilters();
       renderList();
       return;
@@ -5608,6 +5660,8 @@
     const familyBtn = event.target.closest('[data-inv-family-filter]');
     if (familyBtn) {
       state.activeFamilyId = familyBtn.dataset.invFamilyFilter;
+      state.search = '';
+      if (nodes.searchInput) nodes.searchInput.value = '';
       renderFamilies();
       renderStatusFilters();
       renderList();
@@ -5707,7 +5761,13 @@
 
   nodes.searchInput?.addEventListener('input', (event) => {
     state.search = normalizeLower(event.target.value);
-    renderList();
+    if (state.searchRenderTimer) {
+      clearTimeout(state.searchRenderTimer);
+    }
+    state.searchRenderTimer = setTimeout(() => {
+      state.searchRenderTimer = null;
+      renderList();
+    }, 0);
   });
   nodes.list?.addEventListener('click', onListClick);
   nodes.families?.addEventListener('click', onListClick);
