@@ -2880,6 +2880,12 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
 
       <section class="step-block recipe-step-card recipe-nutrition-step">
         <h6 class="step-title"><span class="recipe-step-number">3</span> Información nutricional (opcional)</h6>
+        <div class="recipe-nutrition-head-actions">
+          <button id="autofillNutritionAiBtn" type="button" class="btn ios-btn ios-btn-secondary recipe-nutrition-ai-btn">
+            <img src="${IA_ICON_SRC}" alt="" aria-hidden="true">
+            <span>Completar con IA</span>
+          </button>
+        </div>
         <div class="step-content recipe-fields-flex">
           <div class="recipe-field recipe-field-half recipe-highlight-field recipe-highlight-field-nutrition">
             <label class="form-label" for="recipeNutritionProductType">Tipo de producto</label>

@@ -3298,9 +3298,20 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   gap: 8px;
 }
 
+.recipe-nutrition-head-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin: -2px 0 10px;
+}
+
 .recipe-nutrition-ai-btn {
   width: 100%;
   max-width: none;
+}
+
+.recipe-nutrition-head-actions .recipe-nutrition-ai-btn {
+  width: auto;
+  min-width: 220px;
 }
 
 .recipe-nutrition-ai-btn img {
