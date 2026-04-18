@@ -1586,6 +1586,7 @@
     const wrapper = recipeEditorForm.querySelector('#recipeNutritionAiPreview');
     const staleFlag = recipeEditorForm.querySelector('#recipeNutritionAiStale');
     const button = recipeEditorForm.querySelector('#generateNutritionAiBtn');
+    recipeEditorForm.querySelector('.recipe-nutrition-ai-actions #autofillNutritionAiBtn')?.remove();
     if (!wrapper || !button) return;
 
     const canGenerate = hasNutritionFieldsForAI();
