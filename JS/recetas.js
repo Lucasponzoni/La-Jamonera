@@ -38,6 +38,7 @@
     editorEventsBound: false,
     resumeEditor: null,
     editorDirty: false,
+    nutritionAutofillRecommendationTimer: null,
     print: {
       cssText: '',
       cssPromise: null,
@@ -1331,6 +1332,21 @@
     measureSelect.value = currentValue;
   };
 
+  const showNutritionAutofillRecommendation = (message, tone = 'info') => {
+    const recommendationNode = recipeEditorForm.querySelector('#recipeNutritionAutofillRecommendation');
+    if (!recommendationNode) return;
+    recommendationNode.textContent = normalizeValue(message);
+    recommendationNode.classList.remove('d-none', 'is-warning', 'is-error', 'is-info');
+    recommendationNode.classList.add(`is-${tone}`);
+    if (state.nutritionAutofillRecommendationTimer) clearTimeout(state.nutritionAutofillRecommendationTimer);
+    state.nutritionAutofillRecommendationTimer = window.setTimeout(() => {
+      recommendationNode.classList.add('d-none');
+      recommendationNode.classList.remove('is-warning', 'is-error', 'is-info');
+      recommendationNode.textContent = '';
+      state.nutritionAutofillRecommendationTimer = null;
+    }, 12000);
+  };
+
   const sortRowsByOrderMode = (rows, orderMode) => {
     const mode = normalizeLower(orderMode);
     if (mode === 'custom') {
@@ -1714,6 +1730,141 @@
     }
   };
 
+  const suggestNutritionFieldsWithIA = async () => {
+    const ingredients = (state.editor?.rows || [])
+      .filter((row) => row.type === 'ingredient' && normalizeValue(row.ingredientName))
+      .map((row) => ({
+        ingredientName: normalizeValue(row.ingredientName),
+        quantity: normalizeValue(row.quantity),
+        unit: normalizeLower(row.unit)
+      }));
+    const title = normalizeValue(recipeEditorForm.querySelector('#recipeTitle')?.value || state.editor?.title || '');
+    if (!title || !ingredients.length) {
+      await openIosSwal({ title: 'Faltan datos', html: '<p>Para completar con IA necesitamos título y al menos un ingrediente.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+      return;
+    }
+
+    Swal.fire({
+      title: 'Completando datos nutricionales...',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/ia-unscreen.gif" alt="Completando" class="recipe-ai-static-gif"></div>',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      customClass: { popup: 'ios-alert ingredientes-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' }
+    });
+
+    try {
+      await window.laJamoneraReady;
+      const keyNode = await window.dbLaJamoneraRest.read('/deepseek/apiKey');
+      const apiKey = typeof keyNode === 'string' ? normalizeValue(keyNode) : normalizeValue(keyNode?.apiKey);
+      if (!apiKey) throw new Error('No se encontró /deepseek/apiKey en Firebase.');
+
+      const deepseekNode = safeObject(await window.dbLaJamoneraRest.read('/deepseek'));
+      const payload = {
+        model: 'deepseek-chat',
+        temperature: 0.1,
+        messages: [
+          {
+            role: 'system',
+            content: 'Sos nutricionista de etiquetado argentino. Respondé SOLO JSON válido y breve.'
+          },
+          {
+            role: 'user',
+            content: `Con base en esta receta, sugerí valores para completar un formulario nutricional.
+Devolvé SOLO JSON con esta estructura:
+{"productType":"","category":"","subcategory":"","declarationUnit":"","declarationAmount":0,"servingsPerPackage":0,"householdMeasure":"","householdAmount":0,"recommendation":""}
+Reglas:
+- productType debe ser uno de: ${PRODUCT_TYPES.map((item) => item.value).join(', ')}
+- category debe ser una de: ${Object.keys(FOOD_CATEGORIES_AR).join(', ')}
+- subcategory debe pertenecer a la category elegida
+- declarationUnit debe ser una de: ${DECLARATION_UNITS.map((item) => item.value).join(', ')}
+- householdMeasure debe ser una de: ${HOUSEHOLD_MEASURES.map((item) => item.value).join(', ')}
+- recommendation: consejo corto (máximo 180 caracteres) para mejorar o validar el etiquetado
+Datos receta: ${JSON.stringify({ title, ingredients })}`
+          }
+        ]
+      };
+
+      const response = await callDeepseekWithFallback(payload, apiKey, { url_corsh: normalizeValue(deepseekNode.url_corsh), cosh_api_key: normalizeValue(deepseekNode.cosh_api_key) });
+      const data = await response.json();
+      const content = data?.choices?.[0]?.message?.content || '';
+      const parsed = safeObject(parseAiJsonFromText(content));
+
+      const allowedProductTypes = new Set(PRODUCT_TYPES.map((item) => item.value));
+      const allowedCategories = new Set(Object.keys(FOOD_CATEGORIES_AR));
+      const allowedUnits = new Set(DECLARATION_UNITS.map((item) => item.value));
+      const allowedHousehold = new Set(HOUSEHOLD_MEASURES.map((item) => item.value));
+
+      const productType = normalizeLower(parsed.productType);
+      const category = normalizeLower(parsed.category);
+      const declarationUnit = normalizeLower(parsed.declarationUnit);
+      const householdMeasure = normalizeLower(parsed.householdMeasure);
+      const declarationAmount = formatSmart(parsed.declarationAmount || 0, 2);
+      const servingsPerPackage = formatSmart(parsed.servingsPerPackage || 0, 2);
+      const householdAmount = formatSmart(parsed.householdAmount || 1, 2);
+      const recommendation = normalizeValue(parsed.recommendation);
+
+      const safeProductType = allowedProductTypes.has(productType) ? productType : '';
+      const safeCategory = allowedCategories.has(category) ? category : '';
+      const subcategories = FOOD_CATEGORIES_AR[safeCategory] || [];
+      const safeSubcategory = subcategories
+        .map((item) => normalizeLower(item))
+        .find((item) => item === normalizeLower(parsed.subcategory)) || '';
+      const safeDeclarationUnit = allowedUnits.has(declarationUnit) ? declarationUnit : 'g';
+      const safeHouseholdMeasure = allowedHousehold.has(householdMeasure) ? householdMeasure : 'unidad';
+
+      state.editor.nutrition = state.editor.nutrition || {};
+      state.editor.nutrition.productType = safeProductType;
+      state.editor.nutrition.category = safeCategory;
+      state.editor.nutrition.subcategory = safeSubcategory;
+      state.editor.nutrition.declarationUnit = safeDeclarationUnit;
+      state.editor.nutrition.declarationAmount = declarationAmount === '0' ? '' : declarationAmount;
+      state.editor.nutrition.servingsPerPackage = servingsPerPackage === '0' ? '' : servingsPerPackage;
+      state.editor.nutrition.householdMeasure = safeHouseholdMeasure;
+      state.editor.nutrition.householdAmount = householdAmount === '0' ? '1' : householdAmount;
+
+      const productTypeSelect = recipeEditorForm.querySelector('#recipeNutritionProductType');
+      const categorySelect = recipeEditorForm.querySelector('#recipeNutritionCategory');
+      const subcategorySelect = recipeEditorForm.querySelector('#recipeNutritionSubcategory');
+      const declarationUnitSelect = recipeEditorForm.querySelector('#recipeNutritionDeclarationUnit');
+      const declarationAmountInput = recipeEditorForm.querySelector('#recipeNutritionDeclarationAmount');
+      const servingsInput = recipeEditorForm.querySelector('#recipeNutritionServingsPerPackage');
+      const householdAmountInput = recipeEditorForm.querySelector('#recipeNutritionHouseholdAmount');
+      const householdMeasureSelect = recipeEditorForm.querySelector('#recipeNutritionHouseholdMeasure');
+
+      if (productTypeSelect) productTypeSelect.value = safeProductType;
+      if (categorySelect) categorySelect.value = safeCategory;
+      renderNutritionSubcategories(safeSubcategory);
+      if (subcategorySelect) subcategorySelect.value = safeSubcategory;
+      if (declarationUnitSelect) declarationUnitSelect.value = safeDeclarationUnit;
+      if (declarationAmountInput) declarationAmountInput.value = state.editor.nutrition.declarationAmount;
+      if (servingsInput) servingsInput.value = state.editor.nutrition.servingsPerPackage;
+      if (householdAmountInput) householdAmountInput.value = state.editor.nutrition.householdAmount;
+      renderHouseholdMeasureOptions();
+      if (householdMeasureSelect) householdMeasureSelect.value = safeHouseholdMeasure;
+
+      const warnings = [];
+      if (!safeProductType) warnings.push('tipo de producto');
+      if (!safeCategory) warnings.push('categoría');
+      if (!safeSubcategory) warnings.push('subcategoría');
+      if (!state.editor.nutrition.declarationAmount) warnings.push('cantidad por porción');
+      if (!state.editor.nutrition.servingsPerPackage) warnings.push('porciones por envase');
+      const recommendationMsg = recommendation || 'La IA completó los campos sugeridos. Revisá y ajustá según tu producto real.';
+      const message = warnings.length
+        ? `Completado con IA, pero revisá estos campos: ${warnings.join(', ')}. ${recommendationMsg}`
+        : recommendationMsg;
+
+      markEditorDirty();
+      markNutritionAiAsStaleIfNeeded();
+      showNutritionAutofillRecommendation(message, warnings.length ? 'warning' : 'info');
+    } catch (error) {
+      showNutritionAutofillRecommendation(normalizeValue(error.message || 'No se pudo completar con IA.'), 'error');
+      await openIosSwal({ title: 'No se pudo completar', html: `<p>${escapeHtml(error.message || 'Error consultando la IA.')}</p>`, icon: 'error', confirmButtonText: 'Entendido' });
+    } finally {
+      Swal.close();
+    }
+  };
+
   const clearSuggestions = () => {
     document.querySelectorAll('.recipe-suggest-floating').forEach((node) => node.remove());
     state.editor && (state.editor.activeSuggestRowId = '');
@@ -2059,6 +2210,11 @@
         const generateNutritionBtn = event.target.closest('#generateNutritionAiBtn');
         if (generateNutritionBtn) {
           await generateNutritionTableWithIA();
+          return;
+        }
+        const autofillNutritionBtn = event.target.closest('#autofillNutritionAiBtn');
+        if (autofillNutritionBtn) {
+          await suggestNutritionFieldsWithIA();
           return;
         }
 
@@ -2724,6 +2880,12 @@
 
       <section class="step-block recipe-step-card recipe-nutrition-step">
         <h6 class="step-title"><span class="recipe-step-number">3</span> Información nutricional (opcional)</h6>
+        <div class="recipe-nutrition-head-actions">
+          <button id="autofillNutritionAiBtn" type="button" class="btn ios-btn ios-btn-secondary recipe-nutrition-ai-btn">
+            <img src="${IA_ICON_SRC}" alt="" aria-hidden="true">
+            <span>Completar con IA</span>
+          </button>
+        </div>
         <div class="step-content recipe-fields-flex">
           <div class="recipe-field recipe-field-half recipe-highlight-field recipe-highlight-field-nutrition">
             <label class="form-label" for="recipeNutritionProductType">Tipo de producto</label>
@@ -2771,6 +2933,7 @@
               </button>
               <p class="recipe-nutrition-ai-disclaimer">La IA trabaja sobre tus datos reales de receta. No inventa información nutricional: genera una propuesta de diseño editable para la gráfica.</p>
               <span id="recipeNutritionAiStale" class="recipe-nutrition-ai-stale d-none">⚠️ Cambiaron datos: rehacé la tabla nutricional.</span>
+              <div id="recipeNutritionAutofillRecommendation" class="recipe-nutrition-autofill-recommendation d-none" aria-live="polite"></div>
             </div>
             <div id="recipeNutritionAiPreview" class="recipe-nutrition-ai-preview"></div>
           </div>
@@ -2883,11 +3046,9 @@
     }
     const rnpaValues = [rnpa.number, rnpa.denomination, rnpa.brand, rnpa.businessName, rnpa.city, rnpa.province, rnpa.expiryDate, rnpa.attachmentUrl];
     const hasSomeRnpa = rnpaValues.some(Boolean);
-    const hasAllRnpa = rnpaValues.every(Boolean);
-    if (hasSomeRnpa && !hasAllRnpa) throw new Error('RNPA incompleto: completá todos los campos o dejalo totalmente pendiente.');
-    if (hasAllRnpa) {
+    if (hasSomeRnpa) {
       const cityExists = (state.recipeCities || []).some((item) => normalizeLower(item) === normalizeLower(rnpa.city));
-      if (!cityExists) {
+      if (rnpa.city && !cityExists) {
         state.recipeCities = Array.from(new Set([...(state.recipeCities || []), rnpa.city])).sort((a, b) => a.localeCompare(b, 'es'));
       }
       if (rnpa.brand && !(state.recipeBrands || []).some((item) => normalizeLower(item) === normalizeLower(rnpa.brand))) {
@@ -2927,7 +3088,7 @@
       }
     }
 
-    return { title, description, yieldQuantity, yieldUnit, shelfLifeDays, agingDays, orderMode, rows: sortedRows, nutrition, rnpa: hasAllRnpa ? rnpa : { number: '', denomination: '', brand: '', businessName: '', city: '', province: '', country: RNPA_COUNTRY, expiryDate: '', attachmentUrl: '', attachmentType: '', attachmentName: '' }, imageUrl };
+    return { title, description, yieldQuantity, yieldUnit, shelfLifeDays, agingDays, orderMode, rows: sortedRows, nutrition, rnpa: hasSomeRnpa ? rnpa : { number: '', denomination: '', brand: '', businessName: '', city: '', province: '', country: RNPA_COUNTRY, expiryDate: '', attachmentUrl: '', attachmentType: '', attachmentName: '' }, imageUrl };
   };
 
   const removeRecipe = async (recipeId) => {
