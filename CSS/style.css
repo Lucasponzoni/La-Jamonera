@@ -3320,6 +3320,29 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   line-height: 1.35;
 }
 
+.recipe-nutrition-autofill-recommendation {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #c8dafd;
+  background: #eef4ff;
+  color: #1f3d7a;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.recipe-nutrition-autofill-recommendation.is-warning {
+  border-color: #f8d48b;
+  background: #fff6e5;
+  color: #7a4b00;
+}
+
+.recipe-nutrition-autofill-recommendation.is-error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
 .recipe-nutrition-ai-stale {
   color: #b91c1c;
   font-weight: 800;
