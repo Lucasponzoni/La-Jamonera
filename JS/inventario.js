@@ -579,12 +579,15 @@
     rotationDays: 7,
     updatedAt: 0
   });
+  const INFINITE_STOCK_NOTICE = 'Stock infinito, producto comprado en el dia por caja chica, sin trazabilidad.';
+  const isInfiniteStockRecord = (record = {}) => Boolean(record?.infiniteStock || record?.stockInfinito);
 
   const getDefaultRecord = (ingredientId) => ({
     ingredientId,
     stockKg: 0,
     stockBase: 0,
     stockUnit: '',
+    infiniteStock: false,
     hasEntries: false,
     entries: [],
     lowThresholdKg: null,
@@ -606,12 +609,14 @@
   const getRecord = (ingredientId) => {
     const saved = safeObject(state.inventario.items[ingredientId]);
     const base = getDefaultRecord(ingredientId);
-    return {
+    const merged = {
       ...base,
       ...saved,
       lotConfig: { ...base.lotConfig, ...safeObject(saved.lotConfig) },
       weeklySheetConfig: { ...getDefaultWeeklySheetConfig(), ...safeObject(saved.weeklySheetConfig) }
     };
+    merged.infiniteStock = isInfiniteStockRecord(merged);
+    return merged;
   };
 
   const recomputeRecordStock = (record, fallbackUnit = 'kilos') => {
@@ -661,6 +666,7 @@
   };
 
   const stockStatusFor = (record, fallbackUnit = 'kilos') => {
+    if (isInfiniteStockRecord(record)) return { label: 'Stock infinito', className: 'status-good', infinite: true };
     const unit = record.stockUnit || fallbackUnit || 'kilos';
     const stockBase = Number(record.stockBase || toBase(record.stockKg || 0, unit)) || 0;
     if (!record.hasEntries) return { label: 'Nunca ingresó stock', className: 'status-never' };
@@ -836,6 +842,7 @@
     };
     Object.values(state.ingredientes).forEach((ingredient) => {
       const current = getRecord(ingredient.id);
+      current.infiniteStock = isInfiniteStockRecord(current);
       const entries = Array.isArray(current.entries) ? current.entries : [];
       if (!entries.length) {
         current.hasEntries = false;
@@ -1445,6 +1452,7 @@
 
     nodes.list.innerHTML = `${helperHtml}${visibleItems.map((item) => {
       const record = getRecord(item.id);
+      const infiniteStock = isInfiniteStockRecord(record);
       const status = stockStatusFor(record, item.measure || 'kilos');
       const stockUnit = record.stockUnit || item.measure || 'kilos';
       const stockBase = Number(record.stockBase || toBase(record.stockKg || 0, stockUnit)) || 0;
@@ -1452,12 +1460,12 @@
       const thresholdBase = currentThresholdFor(record, stockUnit);
       const thresholdQty = fromBase(thresholdBase, stockUnit);
       const packageSuffix = Number(record.packageQty) > 0 ? ` x${Number(record.packageQty)}` : '';
-      const expiredRows = getExpiredEntries(record);
-      const expiringRows = getExpiringSoonEntries(record);
+      const expiredRows = infiniteStock ? [] : getExpiredEntries(record);
+      const expiringRows = infiniteStock ? [] : getExpiringSoonEntries(record);
       const expiredBase = expiredRows.reduce((acc, entry) => acc + toBase(entry.qty, entry.unit), 0);
       const expiredQtyInStockUnit = fromBase(expiredBase, stockUnit);
       const realAvailableQty = Math.max(0, stockQty - expiredQtyInStockUnit);
-      const stockClass = (stockQty <= 0.0001 && realAvailableQty <= 0.0001) ? 'is-zero' : '';
+      const stockClass = infiniteStock ? 'is-infinite' : ((stockQty <= 0.0001 && realAvailableQty <= 0.0001) ? 'is-zero' : '');
       const expiryRows = [
         ...expiredRows.map((entry) => ({ ...entry, type: 'expired' })),
         ...expiringRows.map((entry) => ({ ...entry, type: 'soon' }))
@@ -1472,6 +1480,9 @@
           return `<p class="inventario-expiring-line ${entry.type === 'expired' ? 'is-expired' : 'is-soon'}"><strong>${formatQtyUnit(entry.qty, entry.unit)}${pkg}</strong><span>${when}${lot}${entry.expiryDate ? ` · ${formatIsoDateEs(entry.expiryDate)}` : ''}</span></p>`;
         }).join('')}</div>`
         : '';
+      const stockLineHtml = infiniteStock
+        ? `<p class="inventario-stock-line ${stockClass}"><strong class="inventario-infinity-symbol">&infin;</strong><small class="inventario-stock-unit">Disponible</small><span>Sin control manual de stock</span></p>`
+        : `<p class="inventario-stock-line ${stockClass}"><strong class="${expiredQtyInStockUnit > 0.0001 ? 'inventario-expired-strike' : ''}">${stockQty.toFixed(2)}</strong><small class="inventario-stock-unit ${expiredQtyInStockUnit > 0.0001 ? 'inventario-expired-strike' : ''}">${escapeHtml(getMeasureAbbr(stockUnit))}${packageSuffix}</small>${expiredQtyInStockUnit > 0.0001 ? `<span class="inventario-stock-real-line">Real ${realAvailableQty.toFixed(2)} ${escapeHtml(getMeasureAbbr(stockUnit))}${packageSuffix}</span>` : ''}<span>Umbral: ${thresholdQty.toFixed(2)} ${escapeHtml(getMeasureAbbr(stockUnit))} ${normalizeValue(record.lowThresholdMode) === 'custom' ? '(personalizado)' : '(global)'}</span></p>`;
       return `
         <article class="ingrediente-card inventario-card ${status.className}" data-inventario-card="${item.id}">
           ${ingredientAvatar(item)}
@@ -1482,10 +1493,11 @@
             </div>
             <p class="ingrediente-meta">${capitalize(item.familyName)} · ${getMeasureLabel(item.measure || 'kilos')}</p>
             ${item.description ? `<p class="ingrediente-description">${sentenceCase(item.description)}</p>` : ''}
-            <p class="inventario-stock-line ${stockClass}"><strong class="${expiredQtyInStockUnit > 0.0001 ? 'inventario-expired-strike' : ''}">${stockQty.toFixed(2)}</strong><small class="inventario-stock-unit ${expiredQtyInStockUnit > 0.0001 ? 'inventario-expired-strike' : ''}">${escapeHtml(getMeasureAbbr(stockUnit))}${packageSuffix}</small>${expiredQtyInStockUnit > 0.0001 ? `<span class="inventario-stock-real-line">Real ${realAvailableQty.toFixed(2)} ${escapeHtml(getMeasureAbbr(stockUnit))}${packageSuffix}</span>` : ''}<span>Umbral: ${thresholdQty.toFixed(2)} ${escapeHtml(getMeasureAbbr(stockUnit))} ${normalizeValue(record.lowThresholdMode) === 'custom' ? '(personalizado)' : '(global)'}</span></p>
+            ${stockLineHtml}
             ${expiringHtml}
+            ${infiniteStock ? infiniteStockNoticeHtml() : ''}
             <div class="inventario-actions-row inventory-production-actions">
-              <button type="button" class="btn ios-btn ios-btn-success inventory-production-action-btn is-main" data-inventario-open-editor="${item.id}"><i class="fa-solid fa-plus"></i><span>Ingresar Stock</span></button>
+              <button type="button" class="btn ios-btn ios-btn-success inventory-production-action-btn is-main" data-inventario-open-editor="${item.id}" ${infiniteStock ? 'disabled title="Stock infinito sin carga manual"' : ''}><i class="fa-solid fa-plus"></i><span>Ingresar Stock</span></button>
               <button type="button" class="btn ios-btn inventory-production-action-btn is-view inventario-view-btn" data-inventario-open-editor="${item.id}"><i class="fa-regular fa-eye"></i><span>Visualizar</span></button>
               <button type="button" class="btn ios-btn inventory-production-action-btn is-threshold inventario-threshold-btn" data-inventario-config-item="${item.id}"><i class="fa-solid fa-sliders"></i><span>Umbral</span></button>
             </div>
@@ -3158,6 +3170,7 @@
   };
 
   const escapeHtml = (value) => String(value || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+  const infiniteStockNoticeHtml = () => `<div class="inventario-infinite-stock-note"><i class="fa-solid fa-infinity" aria-hidden="true"></i><span>${escapeHtml(INFINITE_STOCK_NOTICE)}</span></div>`;
 
 
   const openExpandedTable = async (title, tableHtml) => {
@@ -3357,11 +3370,13 @@
     const providers = sortedProviders();
     const providerSearchValue = findProviderById(state.editorDraft?.provider)?.name || '';
     const bulkEntries = Array.isArray(state.editorDraft?.bulkEntries) ? state.editorDraft.bulkEntries : [];
+    const infiniteStock = isInfiniteStockRecord(record);
+    const stockDisabledAttr = infiniteStock ? 'disabled' : '';
     const stockUnit = record.stockUnit || ingredient.measure || state.editorDraft.unit || 'kilos';
     const stockBase = Number(record.stockBase || toBase(record.stockKg || 0, stockUnit)) || 0;
     const stockQty = fromBase(stockBase, stockUnit);
-    const expiredRows = getExpiredEntries(record);
-    const expiringRows = getExpiringSoonEntries(record);
+    const expiredRows = infiniteStock ? [] : getExpiredEntries(record);
+    const expiringRows = infiniteStock ? [] : getExpiringSoonEntries(record);
     const expiredBase = expiredRows.reduce((acc, entry) => acc + toBase(entry.qty, entry.unit), 0);
     const expiredQtyInStockUnit = fromBase(expiredBase, stockUnit);
     const realAvailableQty = Math.max(0, stockQty - expiredQtyInStockUnit);
@@ -3379,6 +3394,9 @@
       : '';
     const packageUnit = state.editorDraft.unit || stockUnit;
     const shouldShowPackageQty = getUnitMeta(packageUnit).category === 'unidad' || Number(record.packageQty) > 0;
+    const editorStockHtml = infiniteStock
+      ? `<strong class="inventario-infinity-symbol">&infin;</strong><span>Disponible sin control manual</span>`
+      : `<strong class="${expiredQtyInStockUnit > 0.0001 ? 'inventario-expired-strike' : ''}">${formatQtyUnit(stockQty, stockUnit)}${record.packageQty ? ` x${record.packageQty}` : ''}</strong>${expiredQtyInStockUnit > 0.0001 ? `<span class="inventario-stock-real-line">Real ${formatQtyUnit(realAvailableQty, stockUnit)}${record.packageQty ? ` x${record.packageQty}` : ''}</span>` : ''}`;
 
     const lotOptionRows = LOT_TOKEN_OPTIONS.map((option) => `
       <label class="inventario-check-row">
@@ -3403,22 +3421,24 @@
             <p class="inventario-editor-measure">${getMeasureLabel(ingredient.measure || 'kilos')}</p>
           </div>
         </div>
-        <div class="inventario-product-head-stats">
+          <div class="inventario-product-head-stats">
           <div class="inventario-total-banner">
             <small>Stock total actual</small>
-            <strong class="${expiredQtyInStockUnit > 0.0001 ? 'inventario-expired-strike' : ''}">${formatQtyUnit(stockQty, stockUnit)}${record.packageQty ? ` x${record.packageQty}` : ''}</strong>
-            ${expiredQtyInStockUnit > 0.0001 ? `<span class="inventario-stock-real-line">Real ${formatQtyUnit(realAvailableQty, stockUnit)}${record.packageQty ? ` x${record.packageQty}` : ''}</span>` : ''}
+            ${editorStockHtml}
           </div>
           <div class="inventario-stat-row">
             ${expiryRows.length ? `<div class="inventario-stat-card is-alert"><small>Lotes con vencimiento (${expiringDays} días)</small>${editorExpiryHtml}</div>` : ''}
           </div>
           <div class="inventario-head-actions-row">
+            <label class="inventario-check-row inventario-check-row-compact inventario-infinite-toggle"><input type="checkbox" id="inventarioInfiniteStockToggle" ${infiniteStock ? 'checked' : ''}><span>Stock infinito</span></label>
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-head-action" id="inventarioProductThresholdBtn"><i class="fa-solid fa-sliders"></i><span>Configurar umbrales</span></button>
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-head-action" id="inventarioWeeklySheetBtn"><i class="fa-regular fa-file-lines"></i><span>Planilla Semanal</span></button>
             <button type="button" id="inventarioEditIngredientBtn" class="btn ios-btn ios-btn-success inventario-head-action"><i class="fa-solid fa-pen"></i><span>Editar ingrediente</span></button>
           </div>
         </div>
       </section>
+
+      ${infiniteStock ? infiniteStockNoticeHtml() : ''}
 
       <section class="recipe-step-card step-block inventario-lot-section">
         <div class="d-flex flex-wrap gap-2 align-items-center"><button type="button" class="inventario-collapse-head inventario-collapse-head-styled" id="lotConfigToggleBtn" aria-expanded="${state.editorDraft.showLotConfig}">
@@ -3447,59 +3467,59 @@
         <div class="step-content recipe-fields-flex inventario-stock-grid">
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryQty"><i class="fa-solid fa-weight-hanging inventario-step-icon"></i> Cantidad a ingresar</label>
-            <input id="inventoryQty" class="form-control ios-input" type="number" autocomplete="off" min="0" step="0.01" value="${state.editorDraft.qty}">
+            <input id="inventoryQty" class="form-control ios-input" type="number" autocomplete="off" min="0" step="0.01" value="${state.editorDraft.qty}" ${stockDisabledAttr}>
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryUnit"><i class="fa-solid fa-ruler-combined inventario-step-icon"></i> Unidad</label>
-            <select id="inventoryUnit" class="form-select ios-input" autocomplete="off" ${record.stockUnit ? 'disabled' : ''}>
+            <select id="inventoryUnit" class="form-select ios-input" autocomplete="off" ${(record.stockUnit || infiniteStock) ? 'disabled' : ''}>
               ${state.measures.map((m) => `<option value="${escapeHtml(m.name)}" ${measureKey(m.name) === measureKey(state.editorDraft.unit) ? 'selected' : ''}>${escapeHtml(getMeasureLabel(m.name))}</option>`).join('')}
               <option value="add_measure">+ Agregar medida</option>
             </select>
-            ${record.stockUnit ? '<small class="text-muted">Unidad bloqueada según ingresos previos.</small>' : ''}
+            ${infiniteStock ? '<small class="text-muted">Unidad bloqueada por stock infinito.</small>' : (record.stockUnit ? '<small class="text-muted">Unidad bloqueada según ingresos previos.</small>' : '')}
           </div>
           <div class="recipe-field recipe-field-half ${shouldShowPackageQty ? '' : 'd-none'}" id="inventoryPackageQtyWrap">
             <label class="form-label" for="inventoryPackageQty"><i class="fa-solid fa-box inventario-step-icon"></i> Cantidad por paquete (opcional)</label>
-            <input id="inventoryPackageQty" class="form-control ios-input" type="number" min="1" step="1" value="${escapeHtml(String(state.editorDraft.packageQty || ''))}" ${record.packageQty ? 'disabled' : ''}>
+            <input id="inventoryPackageQty" class="form-control ios-input" type="number" min="1" step="1" value="${escapeHtml(String(state.editorDraft.packageQty || ''))}" ${(record.packageQty || infiniteStock) ? 'disabled' : ''}>
             ${record.packageQty ? `<small class="text-muted">Fijado en ${record.packageQty} para este ingrediente.</small>` : ''}
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryEntryDate"><i class="fa-regular fa-calendar-plus inventario-step-icon"></i> Fecha de ingreso</label>
-            <input id="inventoryEntryDate" class="form-control ios-input" autocomplete="off" value="${escapeHtml(state.editorDraft.entryDate)}" placeholder="Seleccionar fecha">
+            <input id="inventoryEntryDate" class="form-control ios-input" autocomplete="off" value="${escapeHtml(state.editorDraft.entryDate)}" placeholder="Seleccionar fecha" ${stockDisabledAttr}>
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryExpiryDate"><i class="fa-regular fa-calendar-check inventario-step-icon"></i> Fecha de caducidad</label>
-            <input id="inventoryExpiryDate" class="form-control ios-input" autocomplete="off" value="${escapeHtml(state.editorDraft.expiryDate)}" placeholder="Seleccionar fecha" ${state.editorDraft.noPerecedero ? 'disabled' : ''}>
-            <label class="inventario-check-row inventario-check-row-compact mt-2"><input type="checkbox" id="inventoryNoPerecedero" ${state.editorDraft.noPerecedero ? 'checked' : ''}><span>No perecedero</span></label>
+            <input id="inventoryExpiryDate" class="form-control ios-input" autocomplete="off" value="${escapeHtml(state.editorDraft.expiryDate)}" placeholder="Seleccionar fecha" ${(state.editorDraft.noPerecedero || infiniteStock) ? 'disabled' : ''}>
+            <label class="inventario-check-row inventario-check-row-compact mt-2"><input type="checkbox" id="inventoryNoPerecedero" ${state.editorDraft.noPerecedero ? 'checked' : ''} ${stockDisabledAttr}><span>No perecedero</span></label>
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryInvoiceNumber"><i class="fa-solid fa-file-invoice inventario-step-icon"></i> Número de factura/remito</label>
-            <textarea id="inventoryInvoiceNumber" name="inventory_code_free" class="form-control ios-input inventario-invoice-textarea" rows="1" placeholder="Ej: A-000123" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text">${escapeHtml(state.editorDraft.invoiceNumber)}</textarea>
+            <textarea id="inventoryInvoiceNumber" name="inventory_code_free" class="form-control ios-input inventario-invoice-textarea" rows="1" placeholder="Ej: A-000123" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" ${stockDisabledAttr}>${escapeHtml(state.editorDraft.invoiceNumber)}</textarea>
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryProviderSearch"><i class="bi bi-box-seam-fill inventario-step-icon"></i> Proveedor</label>
             <div class="recipe-ing-autocomplete">
               <div class="recipe-ing-input-wrap">
                 <span class="recipe-inline-avatar-wrap recipe-inline-avatar-fallback"><span class="recipe-small-placeholder"><i class="fa-solid fa-truck-field"></i></span></span>
-                <input id="inventoryProviderSearch" type="search" class="form-control ios-input" placeholder="Buscar proveedor..." value="${escapeHtml(providerSearchValue)}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false">
+                <input id="inventoryProviderSearch" type="search" class="form-control ios-input" placeholder="Buscar proveedor..." value="${escapeHtml(providerSearchValue)}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" ${stockDisabledAttr}>
               </div>
             </div>
-            <select id="inventoryProvider" class="form-select ios-input d-none" autocomplete="off">
+            <select id="inventoryProvider" class="form-select ios-input d-none" autocomplete="off" ${stockDisabledAttr}>
               <option value="">Seleccionar proveedor (opcional)</option>
               ${providers.map((provider) => `<option value="${escapeHtml(provider.id)}" ${normalizeValue(state.editorDraft.provider) === provider.id ? 'selected' : ''}>${escapeHtml(provider.name)}</option>`).join('')}
               <option value="add_provider">nuevo proveedor</option>
             </select>
           </div>
           <div class="recipe-field recipe-field-full inventario-internal-switch-wrap">
-            <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="inventoryUsoInternoEmpresa" ${state.editorDraft.usoInternoEmpresa ? 'checked' : ''}><span>Envases primarios & más</span></label>
+            <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="inventoryUsoInternoEmpresa" ${state.editorDraft.usoInternoEmpresa ? 'checked' : ''} ${stockDisabledAttr}><span>Envases primarios & más</span></label>
             <small class="text-muted">Auto egreso</small>
           </div>
           <div class="recipe-field recipe-field-full">
             <label class="form-label" for="inventoryInvoiceImage"><i class="fa-regular fa-images inventario-step-icon"></i> Adjuntar archivos (imagen o PDF)</label>
-            <label for="inventoryInvoiceImage" class="inventario-upload-dropzone">
+            <label for="inventoryInvoiceImage" class="inventario-upload-dropzone ${infiniteStock ? 'is-disabled' : ''}">
               <i class="fa-regular fa-images"></i>
               <span>Arrastrá adjuntos o hacé click para seleccionar</span>
             </label>
-            <input id="inventoryInvoiceImage" class="form-control image-file-input inventario-hidden-file-input" autocomplete="off" type="file" accept="image/*,application/pdf" multiple>
+            <input id="inventoryInvoiceImage" class="form-control image-file-input inventario-hidden-file-input" autocomplete="off" type="file" accept="image/*,application/pdf" multiple ${stockDisabledAttr}>
             <small id="inventoryInvoiceImageFeedback" class="inventario-file-feedback">${escapeHtml(state.editorDraft.invoiceImageCountLabel || 'Sin archivos seleccionados')}</small>
           </div>
         </div>
@@ -3520,25 +3540,25 @@
             return `<tr data-bulk-index="${idx}" class="inventario-bulk-main-row">
               <td><i class="fa-solid fa-grip-lines"></i></td>
               <td>
-                <div class="recipe-ing-autocomplete"><div class="recipe-ing-input-wrap">${avatarHtml}<input type="search" class="form-control ios-input" data-bulk-search="${idx}" placeholder="Buscar producto..." value="${escapeHtml(extraIngredient ? capitalize(extraIngredient.name) : '')}"></div></div>
-                <select class="form-select ios-input d-none" data-bulk-ingredient="${idx}"><option value="">Seleccionar producto</option>${Object.values(state.ingredientes).map((ing) => `<option value="${escapeHtml(ing.id)}" ${ing.id === extra.ingredientId ? 'selected' : ''}>${escapeHtml(capitalize(ing.name))}</option>`).join('')}</select>
+                <div class="recipe-ing-autocomplete"><div class="recipe-ing-input-wrap">${avatarHtml}<input type="search" class="form-control ios-input" data-bulk-search="${idx}" placeholder="Buscar producto..." value="${escapeHtml(extraIngredient ? capitalize(extraIngredient.name) : '')}" ${stockDisabledAttr}></div></div>
+                <select class="form-select ios-input d-none" data-bulk-ingredient="${idx}" ${stockDisabledAttr}><option value="">Seleccionar producto</option>${Object.values(state.ingredientes).map((ing) => `<option value="${escapeHtml(ing.id)}" ${ing.id === extra.ingredientId ? 'selected' : ''}>${escapeHtml(capitalize(ing.name))}</option>`).join('')}</select>
               </td>
-              <td><input class="form-control ios-input" type="text" data-bulk-expiry-date="${idx}" value="${escapeHtml(extra.expiryDate || state.editorDraft.expiryDate)}" placeholder="Fecha" ${extra.noPerecedero ? 'disabled' : ''}></td>
-              <td><input class="form-control ios-input" type="number" min="0" step="0.01" data-bulk-qty="${idx}" placeholder="Cantidad" value="${escapeHtml(extra.qty || '')}"></td>
-              <td><div class="inventario-bulk-unit-cell"><select class="form-select ios-input" data-bulk-unit="${idx}" ${(extraRecord?.stockUnit || packageLocked) ? 'disabled' : ''}>${state.measures.map((m) => `<option value="${escapeHtml(m.name)}" ${measureKey(m.name) === measureKey(defaultUnit) ? 'selected' : ''}>${escapeHtml(getMeasureLabel(m.name))}</option>`).join('')}</select><div class="${isUnit ? '' : 'd-none'}" data-bulk-package-wrap="${idx}"><input class="form-control ios-input" type="number" min="1" step="1" data-bulk-package="${idx}" placeholder="Cant. por paquete" value="${escapeHtml(packageVal)}" ${packageLocked ? 'disabled' : ''}></div></div></td>
-              <td><button type="button" class="btn family-manage-btn" data-bulk-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td>
+              <td><input class="form-control ios-input" type="text" data-bulk-expiry-date="${idx}" value="${escapeHtml(extra.expiryDate || state.editorDraft.expiryDate)}" placeholder="Fecha" ${(extra.noPerecedero || infiniteStock) ? 'disabled' : ''}></td>
+              <td><input class="form-control ios-input" type="number" min="0" step="0.01" data-bulk-qty="${idx}" placeholder="Cantidad" value="${escapeHtml(extra.qty || '')}" ${stockDisabledAttr}></td>
+              <td><div class="inventario-bulk-unit-cell"><select class="form-select ios-input" data-bulk-unit="${idx}" ${(extraRecord?.stockUnit || packageLocked || infiniteStock) ? 'disabled' : ''}>${state.measures.map((m) => `<option value="${escapeHtml(m.name)}" ${measureKey(m.name) === measureKey(defaultUnit) ? 'selected' : ''}>${escapeHtml(getMeasureLabel(m.name))}</option>`).join('')}</select><div class="${isUnit ? '' : 'd-none'}" data-bulk-package-wrap="${idx}"><input class="form-control ios-input" type="number" min="1" step="1" data-bulk-package="${idx}" placeholder="Cant. por paquete" value="${escapeHtml(packageVal)}" ${(packageLocked || infiniteStock) ? 'disabled' : ''}></div></div></td>
+              <td><button type="button" class="btn family-manage-btn" data-bulk-remove="${idx}" ${stockDisabledAttr}><i class="fa-solid fa-trash"></i></button></td>
             </tr>
             <tr class="inventario-bulk-secondary-row">
               <td></td>
-              <td colspan="5"><div class="inventario-bulk-row-extras"><label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" data-bulk-no-perecedero="${idx}" ${extra.noPerecedero ? 'checked' : ''}><span>No perecedero</span></label><label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" data-bulk-auto-egreso="${idx}" ${extra.usoInternoEmpresa ? 'checked' : ''}><span>Autoegreso</span></label></div></td>
+              <td colspan="5"><div class="inventario-bulk-row-extras"><label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" data-bulk-no-perecedero="${idx}" ${extra.noPerecedero ? 'checked' : ''} ${stockDisabledAttr}><span>No perecedero</span></label><label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" data-bulk-auto-egreso="${idx}" ${extra.usoInternoEmpresa ? 'checked' : ''} ${stockDisabledAttr}><span>Autoegreso</span></label></div></td>
             </tr>`;
           }).join('')}</tbody>
               </table>
             </div>
           </div>
           <div class="recipe-table-actions inventario-save-inline">
-            <button type="button" id="addBulkInventoryBtn" class="btn ios-btn ios-btn-success recipe-table-action-btn inventario-add-bulk-btn"><i class="fa-solid fa-plus"></i><span>Productos en factura</span></button>
-            <button type="submit" id="saveInventoryBtn" class="btn ios-btn ios-btn-success recipe-table-action-btn recipe-table-action-btn-primary">
+            <button type="button" id="addBulkInventoryBtn" class="btn ios-btn ios-btn-success recipe-table-action-btn inventario-add-bulk-btn" ${stockDisabledAttr}><i class="fa-solid fa-plus"></i><span>Productos en factura</span></button>
+            <button type="submit" id="saveInventoryBtn" class="btn ios-btn ios-btn-success recipe-table-action-btn recipe-table-action-btn-primary" ${stockDisabledAttr}>
               <img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner d-none" id="saveInventorySpinner">
               <i class="fa-solid fa-floppy-disk" id="saveInventoryIcon"></i>
               <span>Guardar ingreso</span>
@@ -3600,6 +3620,12 @@
       const feedback = nodes.editorForm.querySelector('#inventoryInvoiceFeedback');
       const saveBtn = nodes.editorForm.querySelector('#saveInventoryBtn');
       if (!feedback || !saveBtn) return;
+      if (infiniteStock) {
+        feedback.textContent = '';
+        feedback.classList.remove('is-error');
+        saveBtn.setAttribute('disabled', 'disabled');
+        return;
+      }
       if (!hasDuplicateInvoice()) {
         feedback.textContent = '';
         feedback.classList.remove('is-error');
@@ -3681,6 +3707,27 @@
     });
     nodes.editorForm.querySelector('#inventarioWeeklySheetBtn')?.addEventListener('click', async () => {
       await openWeeklySheetConfig(ingredientId, { force: true });
+      renderEditor(ingredientId, state.editorDraft);
+    });
+    nodes.editorForm.querySelector('#inventarioInfiniteStockToggle')?.addEventListener('change', async (event) => {
+      const currentRecord = getRecord(ingredientId);
+      currentRecord.infiniteStock = Boolean(event.target.checked);
+      if (currentRecord.infiniteStock) {
+        state.editorDraft = {
+          ...state.editorDraft,
+          qty: '',
+          invoiceNumber: '',
+          provider: '',
+          invoiceImageFiles: [],
+          invoiceImageFile: null,
+          invoiceImageCountLabel: 'Sin archivos seleccionados',
+          bulkEntries: []
+        };
+      }
+      state.inventario.items[ingredientId] = currentRecord;
+      rebuildInventarioIndexes();
+      await persistInventario();
+      state.editorDirty = false;
       renderEditor(ingredientId, state.editorDraft);
     });
 
@@ -4722,6 +4769,11 @@
     const record = getRecord(ingredientId);
     const bulkEntries = Array.isArray(state.editorDraft.bulkEntries) ? state.editorDraft.bulkEntries : [];
 
+    if (isInfiniteStockRecord(record)) {
+      await openIosSwal({ title: 'Stock infinito', html: `<p>${escapeHtml(INFINITE_STOCK_NOTICE)}</p>`, icon: 'info', confirmButtonText: 'Entendido' });
+      return;
+    }
+
     if (!record.hasEntries && !state.editorDraft.tokens.length) {
       await openIosSwal({
         title: 'Configuración requerida',
@@ -4786,6 +4838,12 @@
       const extraIngredientId = normalizeValue(extra.ingredientId);
       if (!extraIngredientId) {
         await openIosSwal({ title: 'Producto faltante', html: '<p>Completá el producto en "Productos en factura" o eliminá la fila vacía.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+        return;
+      }
+      const extraRecord = getRecord(extraIngredientId);
+      if (isInfiniteStockRecord(extraRecord)) {
+        const extraIngredient = state.ingredientes[extraIngredientId] || {};
+        await openIosSwal({ title: 'Stock infinito', html: `<p>${escapeHtml(capitalize(extraIngredient.name || 'Producto'))} tiene stock infinito y no admite ingreso manual.</p>`, icon: 'info', confirmButtonText: 'Entendido' });
         return;
       }
       const extraQty = parseNumber(extra.qty);

@@ -106,6 +106,9 @@
   const normalizeValue = (value) => String(value || '').trim();
   const normalizeLower = (value) => normalizeValue(value).toLowerCase();
   const normalizeUpper = (value) => normalizeValue(value).toUpperCase();
+  const INFINITE_STOCK_AVAILABLE_QTY = 999999999;
+  const INFINITE_STOCK_NOTICE = 'Stock infinito, producto comprado en el dia por caja chica, sin trazabilidad.';
+  const isInfiniteStockRecord = (record = {}) => Boolean(record?.infiniteStock || record?.stockInfinito);
   const ARG_PROVINCIAS = ['Buenos Aires', 'CABA', 'Catamarca', 'Chaco', 'Chubut', 'Córdoba', 'Corrientes', 'Entre Ríos', 'Formosa', 'Jujuy', 'La Pampa', 'La Rioja', 'Mendoza', 'Misiones', 'Neuquén', 'Río Negro', 'Salta', 'San Juan', 'San Luis', 'Santa Cruz', 'Santa Fe', 'Santiago del Estero', 'Tierra del Fuego', 'Tucumán'];
   const COMPANY_LEGAL_NAME = 'FRIGORIFICO LA JAMONERA SA';
   const normalizeDispatchStore = (source = {}) => ({
@@ -972,6 +975,16 @@
   };
   const getInventoryAvailability = (ingredientId, targetUnit, productionDateIso = toIsoDate()) => {
     const record = safeObject(state.inventario.items?.[ingredientId]);
+    if (isInfiniteStockRecord(record)) {
+      return {
+        available: INFINITE_STOCK_AVAILABLE_QTY,
+        total: INFINITE_STOCK_AVAILABLE_QTY,
+        hasExpired: false,
+        incompatibleUnits: [],
+        nextToExpire: null,
+        infiniteStock: true
+      };
+    }
     const entries = Array.isArray(record.entries) ? record.entries : [];
     const targetMeta = getUnitMeta(targetUnit);
     if (!entries.length && targetMeta.category === 'peso') {
@@ -1017,6 +1030,7 @@
   };
   const getExpiredKgForIngredient = (ingredientId, productionDateIso = toIsoDate()) => {
     const record = safeObject(state.inventario.items?.[ingredientId]);
+    if (isInfiniteStockRecord(record)) return 0;
     const entries = Array.isArray(record.entries) ? record.entries : [];
     return entries.reduce((acc, entry) => {
       const expiryIso = isEntryNoPerecedero(entry) ? '' : normalizeValue(entry.expiryDate);
@@ -1076,7 +1090,8 @@
         totalAvailable: availability.total,
         coverageKg: Math.max(0, maxCoverageKg),
         totalCoverageKg: Math.max(0, totalCoverageKg),
-        hasExpired: availability.hasExpired
+        hasExpired: availability.hasExpired,
+        infiniteStock: Boolean(availability.infiniteStock)
       };
     })
     .filter((item) => item.ingredientId);
@@ -1194,6 +1209,10 @@
       const effectiveTotalCoverage = computeMaxKgWithCaps([{ coverageKg: totalCoverage, maxShare: 1 }, ...relatedOptions.map((item) => ({ coverageKg: item.totalCoverageKg, maxShare: item.maxShare }))]);
       const substituteCoverage = Math.max(0, effectiveCoverage - coverage);
       const substituteCoverageIncludingExpired = Math.max(0, effectiveTotalCoverage - totalCoverage);
+      const infiniteRelatedShare = relatedOptions
+        .filter((item) => item.infiniteStock)
+        .reduce((sum, item) => sum + Math.max(0, Number(item.maxShare || 1)), 0);
+      const hasFullInfiniteCoverage = Boolean(availability.infiniteStock || infiniteRelatedShare >= 0.9999);
       if (availability.incompatibleUnits.length) {
         errors.push(`Esta receta contiene unidades incompatibles para cálculo automático. Revisá ${capitalize(row.ingredientName)}.`);
       }
@@ -1215,7 +1234,9 @@
         substituteCoverageIncludingExpired,
         missingForMin: Math.max(0, (neededPerKg * minKg) - (availability.available + (substituteCoverage * neededPerKg))),
         missingForMinIncludingExpired: Math.max(0, (neededPerKg * minKg) - (availability.total + (substituteCoverageIncludingExpired * neededPerKg))),
-        hasExpired: availability.hasExpired || relatedOptions.some((item) => item.hasExpired)
+        hasExpired: availability.hasExpired || relatedOptions.some((item) => item.hasExpired),
+        infiniteStock: hasFullInfiniteCoverage,
+        hasInfiniteStockSource: Boolean(availability.infiniteStock || relatedOptions.some((item) => item.infiniteStock))
       });
     });
     if (!requirements.length) {
@@ -1238,6 +1259,7 @@
     const missingForMin = requirements.filter((item) => item.missingForMin > 0.0001);
     const missingForMinIncludingExpired = requirements.filter((item) => item.missingForMinIncludingExpired > 0.0001);
     const hasExpired = requirements.some((item) => item.hasExpired);
+    const hasInfiniteStock = requirements.some((item) => item.infiniteStock);
     let status = 'danger';
     let statusText = 'Faltan insumos';
     if (canProduce) {
@@ -1265,6 +1287,7 @@
       missingForMin,
       missingForMinIncludingExpired,
       hasExpired,
+      hasInfiniteStock,
       minKg,
       expiredKg
     };
@@ -1359,6 +1382,26 @@
         const plannedNeed = Math.min(remaining, rowNeed * Math.max(0, Number(maxShare || 0)));
         if (plannedNeed <= 0.0001) return;
         const record = safeObject(state.inventario.items?.[ingredientId]);
+        if (isInfiniteStockRecord(record)) {
+          const plannedUsed = Number(plannedNeed.toFixed(4));
+          remaining = Math.max(0, Number((remaining - plannedUsed).toFixed(6)));
+          ingredientPlans.push({
+            ingredientId,
+            ingredientName,
+            ingredientUnit: requirement.unit,
+            neededQty: plannedUsed,
+            availableQty: INFINITE_STOCK_AVAILABLE_QTY,
+            missingQty: 0,
+            sourceIngredientId: requirement.ingredientId,
+            sourceIngredientName: requirement.name,
+            substitutionLabel: isSubstitute ? `Sustituye a ${requirement.name}` : '',
+            isSubstitute,
+            infiniteStock: true,
+            noTraceability: true,
+            lots: []
+          });
+          return;
+        }
         const entries = sortEntriesFEFO(Array.isArray(record.entries) ? record.entries : []);
         const reqMeta = getUnitMeta(requirement.unit);
         const groups = [];
@@ -1422,10 +1465,33 @@
       if (remaining > 0.0001 && requirement.relatedOptions.length) {
         const substituteNeed = remaining;
         const substituteGroups = [];
+        const usageByRelated = {};
         requirement.relatedOptions.forEach((related) => {
           const maxAllowed = Math.min(substituteNeed, rowNeed * Math.max(0, Number(related.maxShare || 0)));
           if (maxAllowed <= 0.0001) return;
           const record = safeObject(state.inventario.items?.[related.ingredientId]);
+          if (isInfiniteStockRecord(record)) {
+            const plannedUsed = Number(Math.min(remaining, maxAllowed).toFixed(4));
+            if (plannedUsed <= 0.0001) return;
+            ingredientPlans.push({
+              ingredientId: related.ingredientId,
+              ingredientName: related.ingredientName,
+              ingredientUnit: requirement.unit,
+              neededQty: plannedUsed,
+              availableQty: INFINITE_STOCK_AVAILABLE_QTY,
+              missingQty: 0,
+              sourceIngredientId: requirement.ingredientId,
+              sourceIngredientName: requirement.name,
+              substitutionLabel: `Sustituye a ${requirement.name}`,
+              isSubstitute: true,
+              infiniteStock: true,
+              noTraceability: true,
+              lots: []
+            });
+            usageByRelated[related.ingredientId] = Number((Number(usageByRelated[related.ingredientId] || 0) + plannedUsed).toFixed(4));
+            remaining = Math.max(0, Number((remaining - plannedUsed).toFixed(6)));
+            return;
+          }
           const entries = sortEntriesFEFO(Array.isArray(record.entries) ? record.entries : []);
           const reqMeta = getUnitMeta(requirement.unit);
           entries.forEach((entry) => {
@@ -1448,7 +1514,6 @@
           });
         });
 
-        const usageByRelated = {};
         substituteGroups.forEach((group) => {
           if (remaining <= 0.0001) return;
           const perRelatedCap = {};
@@ -2785,6 +2850,7 @@
 
     groupedIngredients.forEach((group, index) => {
       const hasSiblingSubstitute = group.plans.some((plan) => plan?.isSubstitute);
+      const hasInfiniteStock = group.plans.some((plan) => plan?.infiniteStock || plan?.noTraceability);
       const usedPlans = group.plans.filter((plan) => getIngredientPlanUsedQty(plan, { hasSiblingSubstitute }) > 0.0001);
       const plansToRender = usedPlans.length ? usedPlans : group.plans;
       const item = plansToRender[0] || group.plans[0] || {};
@@ -2794,7 +2860,7 @@
         `<b>${index + 1}. ${esc((group?.sourceIngredientName || item?.ingredientName || 'Ingrediente').toUpperCase())}</b>`,
         plansToRender.some((plan) => plan.isSubstitute) ? `<b>Sustitutos:</b> ${esc(plansToRender.filter((plan) => plan.isSubstitute).map((plan) => plan.ingredientName).join(' + ') || '-')}` : '',
         `<b>Usado total:</b> ${esc(formatCompactQty(plansToRender.reduce((subtotal, plan) => subtotal + getIngredientPlanUsedQty(plan, { hasSiblingSubstitute }), 0), item?.unit || item?.ingredientUnit || ''))}`,
-        `<b>Lotes usados:</b> ${lots.length}`
+        hasInfiniteStock ? '<b>Stock:</b> infinito sin trazabilidad' : `<b>Lotes usados:</b> ${lots.length}`
       ].filter(Boolean).join('<br/>');
       lines.push(`${nodeId}["${nodeLabel}"]:::toneIngredient`);
       lines.push(`I --> ${nodeId}`);
@@ -2869,7 +2935,8 @@
       const substitutionText = group.plans.some((plan) => plan.isSubstitute)
         ? ` · Sustitutos: ${group.plans.filter((plan) => plan.isSubstitute).map((plan) => plan.ingredientName).join(' + ')}`
         : '';
-      return `<li><strong>${index + 1}. ${escapeHtml(group.sourceIngredientName || 'Ingrediente')}</strong><span>${escapeHtml(formatCompactQty(totalQty, firstPlan?.unit || firstPlan?.ingredientUnit || ''))} · Lote ${escapeHtml(firstLot?.lotNumber || firstLot?.entryId || '-')}${escapeHtml(substitutionText)}</span></li>`;
+      const infiniteText = group.plans.some((plan) => plan?.infiniteStock || plan?.noTraceability) ? ' · Stock infinito sin trazabilidad' : '';
+      return `<li><strong>${index + 1}. ${escapeHtml(group.sourceIngredientName || 'Ingrediente')}</strong><span>${escapeHtml(formatCompactQty(totalQty, firstPlan?.unit || firstPlan?.ingredientUnit || ''))} · Lote ${escapeHtml(firstLot?.lotNumber || firstLot?.entryId || '-')}${escapeHtml(substitutionText)}${escapeHtml(infiniteText)}</span></li>`;
     }).join('');
     return `<div class="produccion-trace-fallback-diagram" aria-label="Diagrama alternativo de trazabilidad">
       <div class="produccion-trace-fallback-flow">
@@ -2909,6 +2976,7 @@
       const item = group.plans[0] || {};
       const ingredientImage = normalizeValue(state.ingredientes[item.ingredientId]?.imageUrl);
       const mergedLots = group.plans.flatMap((plan) => Array.isArray(plan.lots) ? plan.lots : []);
+      const hasInfiniteStock = group.plans.some((plan) => plan?.infiniteStock || plan?.noTraceability);
       const aggregatedImages = mergedLots.flatMap((lot) => Array.isArray(lot.invoiceImageUrls) ? lot.invoiceImageUrls : []);
       const providerRneSummary = mergedLots.map((lot) => {
         const providerRne = resolveProviderRneFromLot(lot);
@@ -2947,13 +3015,14 @@
             <div>
               <h6><i class="bi bi-box-seam fa-solid fa-box-open"></i> ${escapeHtml(group.sourceIngredientName || item.ingredientName || item.ingredientId || 'Ingrediente')}</h6>
               ${group.plans.some((plan) => plan.isSubstitute) ? `<small><i class="fa-solid fa-link"></i> Sustitutos usados: ${escapeHtml(group.plans.filter((plan) => plan.isSubstitute).map((plan) => plan.ingredientName).join(' + ') || '-')}</small>` : ''}
+              ${hasInfiniteStock ? '<small><i class="fa-solid fa-infinity"></i> Stock infinito sin trazabilidad</small>' : ''}
               <small>Cantidad usada: ${formatCompactQty(group.plans.reduce((sum, plan) => sum + getIngredientPlanUsedQty(plan, { hasSiblingSubstitute: group.plans.some((candidate) => candidate?.isSubstitute) }), 0), item.unit || item.ingredientUnit || '')}</small>
               <small> - RNE proveedor: <strong>${escapeHtml(providerRneSummary.number || '-')}</strong></small>
             </div>
           </div>
           <div class="produccion-trace-card-actions">${aggregatedImages.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(aggregatedImages))}"><i class="bi bi-images fa-regular fa-images"></i><span>Ver adjunto (${aggregatedImages.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}${providerRneSummary.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify([providerRneSummary.attachmentUrl]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE sin adjunto</button>'}</div>
         </header>
-        <div class="produccion-trace-lots">${lotCards || '<p class="m-0">Sin lotes asociados.</p>'}</div>
+        <div class="produccion-trace-lots">${lotCards || (hasInfiniteStock ? `<div class="produccion-lote-infinite-note"><i class="fa-solid fa-infinity" aria-hidden="true"></i><span>${escapeHtml(INFINITE_STOCK_NOTICE)}</span></div>` : '<p class="m-0">Sin lotes asociados.</p>')}</div>
       </article>`;
     }).join('');
     return `<section class="produccion-trace-v2 produccion-trace-apple-viewer">
@@ -6205,6 +6274,7 @@
       const dispatchMeta = getProducedStockMeta(recipe.id);
       const draftLock = getRecipeDraftLockInfo(recipe.id);
       const isExpiredOnlyAvailable = Boolean(!analysis.canProduce && analysis.canProduceConsideringExpired);
+      const showInfiniteMax = Array.isArray(analysis.requirements) && analysis.requirements.length && analysis.requirements.every((item) => item.infiniteStock);
       const statusClass = isExpiredOnlyAvailable
         ? 'tone-expired'
         : (analysis.status === 'success' ? 'tone-success' : analysis.status === 'warning' ? 'tone-warning' : 'tone-danger');
@@ -6259,7 +6329,7 @@
       ? `<strong class="produccion-max-expired-only">${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg*</strong>`
       : (draftLock?.blockedKg > 0
         ? `<div class="produccion-max-values"><strong class="produccion-max-base">${analysis.maxKg.toFixed(2)} kg</strong><strong class="produccion-max-adjusted">${Math.max(0, analysis.maxKg - draftLock.blockedKg).toFixed(2)} kg</strong></div>`
-        : `<strong>${analysis.maxKg.toFixed(2)} kg</strong>`)}
+        : (showInfiniteMax ? '<strong class="produccion-infinite-symbol">&infin;</strong>' : `<strong>${analysis.maxKg.toFixed(2)} kg</strong>`))}
               </div>
               <div class="produccion-stat-sep" aria-hidden="true"></div>
               <div class="produccion-stat-block">
@@ -6388,7 +6458,11 @@
         <button type="button" class="btn ios-btn ios-btn-secondary" id="produccionExpandAllBtn" ${allExpanded ? 'disabled' : ''}>Descolapsar todo</button>
       </div>` + plan.ingredientPlans.map((row, index) => {
       const hasSubstituteCoverage = !row.isSubstitute && plan.ingredientPlans.some((item) => item.isSubstitute && normalizeValue(item.sourceIngredientId) === normalizeValue(row.ingredientId) && Number(item.availableQty || 0) > 0.0001);
-      const toneClass = row.missingQty > 0 ? (hasSubstituteCoverage ? 'is-substitutable' : 'is-missing') : '';
+      const rowInfiniteStock = Boolean(row.infiniteStock || row.noTraceability);
+      const toneClass = rowInfiniteStock ? 'is-infinite' : (row.missingQty > 0 ? (hasSubstituteCoverage ? 'is-substitutable' : 'is-missing') : '');
+      const availableHtml = rowInfiniteStock
+        ? '<span class="produccion-available-value">· Disponible <strong class="produccion-infinite-symbol">&infin;</strong></span>'
+        : `<span class="produccion-available-value">· Disponible <strong>${formatCompactQty(row.availableQty, row.ingredientUnit)}</strong></span>`;
       return `
       <article class="produccion-lote-group ${toneClass}" data-lot-group="${row.ingredientId}_${index}">
         <header class="produccion-lote-head">
@@ -6400,7 +6474,7 @@
               <p>
                 <span class="produccion-needs-label">Necesita</span>
                 <strong class="produccion-needs-value">${formatCompactQty(row.neededQty, row.ingredientUnit)}</strong>
-                <span class="produccion-available-value">· Disponible <strong>${formatCompactQty(row.availableQty, row.ingredientUnit)}</strong></span>
+                ${availableHtml}
                 ${row.missingQty > 0 ? ` <em>· Faltan ${formatCompactQty(row.missingQty, row.ingredientUnit)}</em>` : ''}
               </p>
             </div>
@@ -6427,7 +6501,7 @@
               ? `<button type="button" class="btn ios-btn ios-btn-secondary produccion-lote-adjuntos-btn" data-lot-images="${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Ver (${lot.invoiceImageUrls.length})</span></button>`
               : '<span>Sin adjuntos</span>'}</div>
             ${lot.status === 'expired' ? `<div class="produccion-lote-expired-actions"><button type="button" class="btn ios-btn ios-btn-secondary" data-resolve-expired-lot="${escapeHtml(lot.ingredientId)}" data-resolve-expired-entry="${escapeHtml(lot.entryId)}" data-resolve-expired-qtykg="${Number(lot.availableKg || 0).toFixed(4)}" data-resolve-expired-mode="sold_counter" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-shop"></i><span>Vendido en mostrador</span></button><button type="button" class="btn ios-btn ios-btn-danger" data-resolve-expired-lot="${escapeHtml(lot.ingredientId)}" data-resolve-expired-entry="${escapeHtml(lot.entryId)}" data-resolve-expired-qtykg="${Number(lot.availableKg || 0).toFixed(4)}" data-resolve-expired-mode="decommissioned" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-trash"></i><span>Decomisado</span></button></div>` : ''}
-          </div>`).join('<hr class="produccion-lote-separator">') : '<p class="produccion-lote-empty">Sin lotes aptos para la fecha elegida.</p>'}
+          </div>`).join('<hr class="produccion-lote-separator">') : (rowInfiniteStock ? `<div class="produccion-lote-infinite-note"><i class="fa-solid fa-infinity" aria-hidden="true"></i><span>${escapeHtml(INFINITE_STOCK_NOTICE)}</span></div>` : '<p class="produccion-lote-empty">Sin lotes aptos para la fecha elegida.</p>')}
         </div>
       </article>
     `;
@@ -6501,7 +6575,8 @@
     const preferredManagers = Array.isArray(state.config.preferredManagersByRecipe?.[recipe.id])
       ? state.config.preferredManagersByRecipe[recipe.id]
       : (Array.isArray(state.config.preferredManagers) ? state.config.preferredManagers : []);
-    const editorMaxKg = Math.max(0.1, Number(analysis.maxKg || 0), Number(analysis.maxKgIncludingExpired || 0));
+    const hasOnlyInfiniteStock = Array.isArray(analysis.requirements) && analysis.requirements.length && analysis.requirements.every((item) => item.infiniteStock);
+    const editorMaxKg = hasOnlyInfiniteStock ? 999999 : Math.max(0.1, Number(analysis.maxKg || 0), Number(analysis.maxKgIncludingExpired || 0));
     const requestedInitialQty = ownDraft ? parsePositive(ownDraft.quantityKg, analysis.minKg) : Math.max(analysis.minKg, 0.1);
     const initialQty = Math.min(editorMaxKg, Math.max(0.1, requestedInitialQty));
     const initialDate = ownDraft?.productionDate || toIsoDate();
@@ -6531,7 +6606,7 @@
           <p class="inventario-editor-kicker"><img src="./IMG/Octicons-git-branch.svg" class="produccion-head-icon" alt="Flujo"> Flujo de producción</p>
           <h3 class="inventario-editor-name">${capitalize(recipe.title || 'Sin título')}</h3>
           <p class="inventario-editor-meta">${capitalize(recipe.description || 'Sin descripción.')}</p>
-          <p class="produccion-max-line">Máximo según inventario: <strong>${analysis.maxKg.toFixed(2)} kg</strong>${Number(analysis.maxKgIncludingExpired || 0) > Number(analysis.maxKg || 0) ? ` <span class="produccion-expired-max-help">(con vencidos: ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg)</span>` : ''}</p>
+          <p class="produccion-max-line">Máximo según inventario: <strong>${hasOnlyInfiniteStock ? '&infin;' : `${analysis.maxKg.toFixed(2)} kg`}</strong>${(!hasOnlyInfiniteStock && Number(analysis.maxKgIncludingExpired || 0) > Number(analysis.maxKg || 0)) ? ` <span class="produccion-expired-max-help">(con vencidos: ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg)</span>` : ''}</p>
           <p id="produccionReservaTimer" class="produccion-reserva-timer"></p>
         </div>
       </section>
@@ -6539,7 +6614,7 @@
         <h6 class="step-title"><span class="recipe-step-number">1</span> ¿Qué cantidad deseás producir?</h6>
         <div class="produccion-qty-grid">
           <input id="produccionQtyInput" type="number" min="0.1" step="0.01" max="${editorMaxKg.toFixed(2)}" value="${initialQty.toFixed(2)}" class="form-control ios-input" ${isViewOnly ? 'disabled' : ''}>
-          <button id="produccionQtyMaxBtn" type="button" class="btn ios-btn ios-btn-secondary" ${isViewOnly ? 'disabled' : ''}>Usar máximo</button>
+          <button id="produccionQtyMaxBtn" type="button" class="btn ios-btn ios-btn-secondary" ${(isViewOnly || hasOnlyInfiniteStock) ? 'disabled' : ''}>Usar máximo</button>
         </div>
         <p id="produccionQtyHelp" class="produccion-qty-help"></p>
       </section>
@@ -7151,11 +7226,11 @@
         return `${escapeHtml(manager.name)} (${escapeHtml(manager.role)})`;
       }).join('<br>');
       const productExpiry = addDaysToIso(date, Number(recipe.shelfLifeDays || 0));
-      const summaryRows = revalidated.ingredientPlans.map((plan) => `<li><strong>${escapeHtml(plan.ingredientName)}</strong>: ${Number(plan.neededQty || 0).toFixed(3)} ${escapeHtml(plan.ingredientUnit || '')}${plan.isSubstitute ? ` <small>(sustituye a ${escapeHtml(plan.sourceIngredientName || '')})</small>` : ''}</li>`).join('');
+      const summaryRows = revalidated.ingredientPlans.map((plan) => `<li><strong>${escapeHtml(plan.ingredientName)}</strong>: ${Number(plan.neededQty || 0).toFixed(3)} ${escapeHtml(plan.ingredientUnit || '')}${plan.infiniteStock ? ' <small>(stock infinito sin trazabilidad)</small>' : ''}${plan.isSubstitute ? ` <small>(sustituye a ${escapeHtml(plan.sourceIngredientName || '')})</small>` : ''}</li>`).join('');
       const qtyGrams = Number((qty * 1000).toFixed(3));
       const confirm = await openIosSwal({
         title: 'Confirmar producción final',
-        html: `<div class="text-start produccion-confirm-summary produccion-confirm-card"><div class="produccion-confirm-head"><span class="produccion-confirm-icon"><i class="bi bi-check2-circle"></i></span><div><p class="produccion-confirm-kicker">Validación final</p><p class="produccion-confirm-note">Se descontará stock real del inventario al confirmar.</p></div></div><p><strong><i class="bi bi-box-seam fa-solid fa-box-open"></i> Producto:</strong> <span>${escapeHtml(recipe.title || '-')}</span></p><p><strong><i class="bi bi-calendar-event"></i> Fecha:</strong> <span class="produccion-trace-date">${escapeHtml(formatIsoEs(date))}</span></p><p><strong><i class="bi bi-hourglass-split"></i> VTO producto:</strong> <span class="produccion-confirm-vto">${escapeHtml(formatIsoEs(productExpiry || ''))} (VTO)</span></p><p><strong><i class="bi bi-speedometer2"></i> Total a producir:</strong> <span class="produccion-confirm-total">${qty.toFixed(3)} kg</span><br><small>${qtyGrams.toFixed(3)} gramos</small></p><p><strong><i class="bi bi-people"></i> Encargado/s:</strong><br>${managerSummary}</p><p><strong><i class="bi bi-list-check"></i> Resumen de insumos:</strong></p><ul>${summaryRows}</ul></div>`,
+        html: `<div class="text-start produccion-confirm-summary produccion-confirm-card"><div class="produccion-confirm-head"><span class="produccion-confirm-icon"><i class="bi bi-check2-circle"></i></span><div><p class="produccion-confirm-kicker">Validación final</p><p class="produccion-confirm-note">Se descontará stock real solo de insumos trazables.</p></div></div><p><strong><i class="bi bi-box-seam fa-solid fa-box-open"></i> Producto:</strong> <span>${escapeHtml(recipe.title || '-')}</span></p><p><strong><i class="bi bi-calendar-event"></i> Fecha:</strong> <span class="produccion-trace-date">${escapeHtml(formatIsoEs(date))}</span></p><p><strong><i class="bi bi-hourglass-split"></i> VTO producto:</strong> <span class="produccion-confirm-vto">${escapeHtml(formatIsoEs(productExpiry || ''))} (VTO)</span></p><p><strong><i class="bi bi-speedometer2"></i> Total a producir:</strong> <span class="produccion-confirm-total">${qty.toFixed(3)} kg</span><br><small>${qtyGrams.toFixed(3)} gramos</small></p><p><strong><i class="bi bi-people"></i> Encargado/s:</strong><br>${managerSummary}</p><p><strong><i class="bi bi-list-check"></i> Resumen de insumos:</strong></p><ul>${summaryRows}</ul></div>`,
         showCancelButton: true,
         confirmButtonText: 'Confirmar',
         cancelButtonText: 'Cancelar',
@@ -7230,6 +7305,8 @@
             ingredientImageUrl: normalizeValue(state.ingredientes[ingredientPlan.ingredientId]?.imageUrl),
             requiredQty: ingredientPlan.neededQty,
             unit: ingredientPlan.ingredientUnit,
+            infiniteStock: Boolean(ingredientPlan.infiniteStock),
+            noTraceability: Boolean(ingredientPlan.noTraceability),
             lots: (ingredientPlan.lots || []).map((lot) => ({
               entryId: lot.entryId,
               lotNumber: lot.lotNumber,

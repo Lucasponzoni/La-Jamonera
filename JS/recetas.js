@@ -17,6 +17,7 @@
   const recetasRnpaAlert = document.getElementById('recetasRnpaAlert');
   const recetasSearchInput = document.getElementById('recetasSearchInput');
   const createRecipeBtn = document.getElementById('createRecipeBtn');
+  let printRecipesBtn = document.getElementById('printRecipesBtn');
   const emptyCreateRecipeBtn = document.getElementById('emptyCreateRecipeBtn');
   const recipeBackBtn = document.getElementById('recipeBackBtn');
   const recipeEditorTitle = document.getElementById('recipeEditorTitle');
@@ -190,6 +191,55 @@
 
   const getIngredientesArray = () => Object.values(safeObject(state.ingredientes));
   const getRecetasArray = () => Object.values(safeObject(state.recetas));
+
+  const ensurePrintRecipesButton = () => {
+    if (!createRecipeBtn || printRecipesBtn) return;
+    const toolbar = createRecipeBtn.parentNode;
+    if (!toolbar) return;
+
+    let actionsWrap = toolbar.querySelector('.ingredientes-toolbar-actions');
+    if (!actionsWrap) {
+      actionsWrap = document.createElement('div');
+      actionsWrap.className = 'ingredientes-toolbar-actions';
+      toolbar.appendChild(actionsWrap);
+      actionsWrap.appendChild(createRecipeBtn);
+    }
+
+    const separator = document.createElement('span');
+    separator.className = 'barra-separadora ingredientes-toolbar-separator';
+    separator.setAttribute('aria-hidden', 'true');
+
+    printRecipesBtn = document.createElement('button');
+    printRecipesBtn.type = 'button';
+    printRecipesBtn.id = 'printRecipesBtn';
+    printRecipesBtn.className = 'btn ios-btn ios-btn-secondary produccion-toolbar-icon-btn boton-fc';
+    printRecipesBtn.title = 'Imprimir recetas';
+    printRecipesBtn.setAttribute('aria-label', 'Imprimir recetas');
+    printRecipesBtn.innerHTML = '<i class="fa-solid fa-print"></i><span>Imprimir</span>';
+
+    actionsWrap.insertBefore(separator, createRecipeBtn);
+    actionsWrap.insertBefore(printRecipesBtn, separator);
+  };
+
+  const prepareRecipePrintThumbLoaders = (selector) => {
+    document.querySelectorAll(selector).forEach((image) => {
+      const wrapper = image.closest('.inventario-print-photo-wrap, .receta-thumb-wrap');
+      const loading = wrapper?.querySelector('.thumb-loading');
+      const done = () => {
+        image.classList.add('is-loaded');
+        loading?.classList.add('d-none');
+      };
+      const fail = () => {
+        loading?.classList.add('d-none');
+        image.classList.add('is-loaded');
+      };
+      if (image.complete && image.naturalWidth > 0) done();
+      else {
+        image.addEventListener('load', done, { once: true });
+        image.addEventListener('error', fail, { once: true });
+      }
+    });
+  };
 
   const getMeasureOptions = () => {
     const list = Array.isArray(state.measures) ? state.measures : [];
@@ -549,6 +599,7 @@
           </div>
           <div class="ingrediente-actions recipe-row-actions">
             <button type="button" class="btn family-manage-btn" data-receta-rnpa-view="${item.id}" title="Ver RNPA" ${normalizeValue(item?.rnpa?.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i></button>
+            <button type="button" class="btn family-manage-btn receta-card-print-action" data-receta-full-print="${item.id}" title="Imprimir receta" aria-label="Imprimir receta"><i class="fa-solid fa-print"></i></button>
             <button type="button" class="btn family-manage-btn" data-receta-manual-view="${item.id}" title="Ver manual" ${Array.isArray(item?.rows) && item.rows.some((row) => row.type === MONOGRAPHY_ROW_TYPE && normalizeValue(row.manualUrl)) ? '' : 'disabled'}><i class="fa-solid fa-book-open"></i></button>
             <button type="button" class="btn family-manage-btn" data-receta-edit="${item.id}" title="Editar"><i class="fa-solid fa-pen"></i></button>
             <button type="button" class="btn family-manage-btn" data-receta-delete="${item.id}" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
@@ -604,6 +655,307 @@
       frontLabels,
       html: `<div class="recipe-print-front">${buildFrontLabelsHtml(frontLabels)}</div>`
     };
+  };
+
+  const getPrintMeasureLabel = (unit = '') => {
+    const value = normalizeLower(unit);
+    const match = getMeasureOptions().find((item) => item.value === value);
+    return match ? match.label : capitalize(value || '');
+  };
+
+  const buildRecipeFullPrintHtml = (recipe) => {
+    const rows = Array.isArray(recipe?.rows) ? recipe.rows : [];
+    const ingredientRows = rows.filter((row) => row.type === 'ingredient' && normalizeValue(row.ingredientName));
+    const noteRows = rows.filter((row) => row.type === 'comment' && normalizeValue(row.comment));
+    const rnpa = safeObject(recipe?.rnpa);
+    const nutrition = safeObject(recipe?.nutrition);
+    const nutritionAi = safeObject(nutrition?.ai);
+    const title = capitalize(recipe?.title || 'Receta');
+    const yieldLabel = [normalizeValue(recipe?.yieldQuantity), getPrintMeasureLabel(recipe?.yieldUnit)].filter(Boolean).join(' ');
+    const metaItems = [
+      ['Rinde', yieldLabel || '-'],
+      ['Vida util', normalizeValue(recipe?.shelfLifeDays) ? `${recipe.shelfLifeDays} dias` : '-'],
+      ['Estacionamiento', normalizeValue(recipe?.agingDays) ? `${recipe.agingDays} dias` : 'No posee']
+    ];
+    const rnpaItems = [
+      ['Numero RNPA', rnpa.number],
+      ['Denominacion', rnpa.denomination],
+      ['Marca', rnpa.brand],
+      ['Razon social', rnpa.businessName],
+      ['Localidad', rnpa.city],
+      ['Provincia', rnpa.province],
+      ['Pais', rnpa.country || RNPA_COUNTRY],
+      ['Vencimiento', rnpa.expiryDate],
+      ['Adjunto', rnpa.attachmentUrl ? 'Documentacion Adjunta' : 'No Posee']
+    ];
+    const nutritionItems = [
+      ['Tipo de producto', nutrition.productType ? capitalize(nutrition.productType) : ''],
+      ['Categoria', nutrition.category ? capitalize(String(nutrition.category).replaceAll('-', ' ')) : ''],
+      ['Subcategoria', nutrition.subcategory ? capitalize(nutrition.subcategory) : ''],
+      ['Porcion sugerida', [nutrition.declarationAmount, nutrition.declarationUnit].filter(Boolean).join(' ')],
+      ['Porciones por envase', nutrition.servingsPerPackage],
+      ['Medida casera', [nutrition.householdAmount, nutrition.householdMeasure].filter(Boolean).join(' ')]
+    ];
+    const ingredientHtml = ingredientRows.length ? ingredientRows.map((row, index) => {
+      const ingredient = state.ingredientes[row.ingredientId] || {};
+      const imageUrl = normalizeValue(ingredient.imageUrl || row.imageUrl);
+      const qty = normalizeValue(row.quantity);
+      const unitLabel = getPrintMeasureLabel(row.unit);
+      return `<tr>
+        <td class="recipe-print-full-index">${index + 1}</td>
+        <td>
+          <div class="recipe-print-full-table-item">
+            <span class="recipe-print-full-ingredient-thumb">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(row.ingredientName)}">` : '<span></span>'}</span>
+            <strong>${escapeHtml(capitalize(row.ingredientName))}</strong>
+          </div>
+        </td>
+        <td><strong>${escapeHtml(qty || '-')}</strong></td>
+        <td>${escapeHtml(unitLabel || '-')}</td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="4" class="recipe-print-full-empty-cell">Sin ingredientes cargados.</td></tr>';
+    const notesHtml = noteRows.length
+      ? noteRows.map((row, index) => `<tr><td class="recipe-print-full-index">${index + 1}</td><td>${escapeHtml(row.comment)}</td></tr>`).join('')
+      : '<tr><td colspan="2" class="recipe-print-full-empty-cell">Sin notas cargadas.</td></tr>';
+    const nutritionTable = normalizeValue(nutritionAi.tableHtml)
+      ? `<div class="recipe-print-full-nutrition-table">${nutritionAi.tableHtml}</div>`
+      : '<p class="recipe-print-full-empty">Sin tabla nutricional generada.</p>';
+
+    const keyValueGrid = (items) => items
+      .map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value || '-')}</dd></div>`)
+      .join('');
+
+    return `<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(title)} · Print</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #eef2f8; color: #18233a; font-family: Inter, Arial, sans-serif; }
+    .recipe-print-full-page { width: min(210mm, 100%); min-height: 297mm; margin: 0 auto 12mm; background: #fff; padding: 18mm; break-after: page; page-break-after: always; }
+    .recipe-print-full-page:last-child { margin-bottom: 0; break-after: auto; page-break-after: auto; }
+    .recipe-print-full-hero { display: grid; grid-template-columns: 1fr 110px; gap: 18px; align-items: center; border-bottom: 3px solid #18233a; padding-bottom: 18px; }
+    .recipe-print-full-kicker { margin: 0 0 6px; text-transform: uppercase; letter-spacing: .08em; color: #46649b; font-size: 11px; font-weight: 800; }
+    h1 { margin: 0; font-size: 34px; line-height: 1.05; letter-spacing: 0; }
+    .recipe-print-full-description { margin: 10px 0 0; color: #52627f; font-size: 14px; line-height: 1.55; }
+    .recipe-print-full-photo-wrap { width: 110px; height: 110px; border-radius: 999px; border: 1px solid #dbe3f2; background: #f5f7fb; overflow: hidden; display: grid; place-items: center; padding: 7px; }
+    .recipe-print-full-photo { width: 100%; height: 100%; border-radius: 999px; background: #fff; object-fit: contain; object-position: center; display: block; }
+    .recipe-print-full-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+    .recipe-print-full-meta div, .recipe-print-full-card { border: 1px solid #dce4f2; border-radius: 12px; background: #f8faff; }
+    .recipe-print-full-meta div { padding: 10px 12px; }
+    dt { margin: 0 0 3px; color: #657491; font-size: 10px; text-transform: uppercase; font-weight: 800; letter-spacing: .06em; }
+    dd { margin: 0; color: #17233b; font-size: 13px; font-weight: 800; }
+    .recipe-print-full-section { margin-top: 18px; break-inside: avoid; }
+    .recipe-print-full-section h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-size: 18px; }
+    .recipe-print-full-section h2 span { width: 26px; height: 26px; border-radius: 8px; display: inline-grid; place-items: center; background: #1d4ed8; color: #fff; font-size: 13px; }
+    .recipe-print-full-table { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid #dce4f2; border-radius: 12px; overflow: hidden; background: #fff; }
+    .recipe-print-full-table th { background: #f0f4ff; color: #344466; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; text-align: left; padding: 8px 10px; border-bottom: 1px solid #dce4f2; }
+    .recipe-print-full-table td { padding: 8px 10px; border-bottom: 1px solid #e7edf7; color: #25334d; font-size: 12px; vertical-align: middle; }
+    .recipe-print-full-table tbody tr:last-child td { border-bottom: 0; }
+    .recipe-print-full-index { width: 34px; color: #74819a !important; font-weight: 800; text-align: center; }
+    .recipe-print-full-table-item { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .recipe-print-full-ingredient-thumb { width: 42px; height: 42px; border-radius: 999px; border: 1px solid #d8e0ef; overflow: hidden; background: #eef3ff; display: inline-grid; place-items: center; flex: 0 0 42px; padding: 5px; }
+    .recipe-print-full-ingredient-thumb img { width: 100%; height: 100%; object-fit: contain; object-position: center; border-radius: 999px; display: block; background: #fff; }
+    .recipe-print-full-ingredient-thumb span { width: 18px; height: 18px; border-radius: 999px; background: #9fb2d8; display: block; }
+    .recipe-print-full-table-item strong { font-size: 12px; }
+    .recipe-print-full-notes-table td:last-child { line-height: 1.45; }
+    .recipe-print-full-empty-cell { color: #657491 !important; font-weight: 700; text-align: center; }
+    .recipe-print-full-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 12px; }
+    .recipe-print-full-grid div { border-bottom: 1px solid #e5ebf5; padding: 0 0 7px; }
+    .recipe-print-full-grid div:nth-last-child(-n+3) { border-bottom: 0; }
+    .recipe-print-full-nutrition-table { display: grid; place-items: start; padding: 12px; overflow: hidden; }
+    .recipe-nutrition-label-card { width: 100%; max-width: 390px; border: 2px solid #111; padding: 10px; background: #fff; color: #111; font-family: Arial, Helvetica, sans-serif; }
+    .recipe-nutrition-label-card h3 { margin: 0; font-size: 26px; font-weight: 900; color: #111; }
+    .recipe-nutrition-product-name, .recipe-nutrition-serving, .recipe-nutrition-subtitle, .recipe-nutrition-dv, .recipe-nutrition-micros, .recipe-nutrition-footnote { margin: 4px 0; color: #111; }
+    .recipe-nutrition-bar { height: 9px; background: #111; margin: 6px 0; }
+    .recipe-nutrition-rule { border-top: 1px solid #111; margin: 5px 0; }
+    .recipe-nutrition-two-cols { display: flex; justify-content: space-between; gap: 10px; font-weight: 800; }
+    .recipe-nutrition-table-fixed { width: 100%; border-collapse: collapse; color: #111; }
+    .recipe-nutrition-table-fixed td { border-top: 1px solid #111; padding: 4px 0; font-weight: 700; }
+    .recipe-nutrition-table-fixed td:last-child { text-align: right; }
+    .recipe-nutrition-table-fixed .indent { padding-left: 18px; font-weight: 500; }
+    .recipe-print-full-empty { margin: 0; color: #657491; font-weight: 700; }
+    .recipe-print-full-footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid #dce4f2; color: #6b7890; font-size: 11px; display: flex; justify-content: space-between; }
+    @media print {
+      body { background: #fff; }
+      .recipe-print-full-page { width: 210mm; margin: 0; padding: 14mm; box-shadow: none; }
+      @page { size: A4; margin: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main class="recipe-print-full-page">
+    <header class="recipe-print-full-hero">
+      <div>
+        <p class="recipe-print-full-kicker">Receta / La Jamonera</p>
+        <h1>${escapeHtml(title)}</h1>
+        <p class="recipe-print-full-description">${escapeHtml(recipe?.description || 'Sin descripcion cargada.')}</p>
+        <dl class="recipe-print-full-meta">${keyValueGrid(metaItems)}</dl>
+      </div>
+      ${normalizeValue(recipe?.imageUrl) ? `<div class="recipe-print-full-photo-wrap"><img class="recipe-print-full-photo" src="${escapeHtml(recipe.imageUrl)}" alt="${escapeHtml(title)}"></div>` : '<div class="recipe-print-full-photo-wrap"></div>'}
+    </header>
+    <section class="recipe-print-full-section">
+      <h2><span>1</span>Ingredientes</h2>
+      <table class="recipe-print-full-table">
+        <thead><tr><th>#</th><th>Ingrediente</th><th>Cantidad</th><th>Unidad</th></tr></thead>
+        <tbody>${ingredientHtml}</tbody>
+      </table>
+    </section>
+    <section class="recipe-print-full-section">
+      <h2><span>2</span>Nota</h2>
+      <table class="recipe-print-full-table recipe-print-full-notes-table">
+        <thead><tr><th>#</th><th>Detalle</th></tr></thead>
+        <tbody>${notesHtml}</tbody>
+      </table>
+    </section>
+    <section class="recipe-print-full-section">
+      <h2><span>3</span>RNPA</h2>
+      <dl class="recipe-print-full-card recipe-print-full-grid">${keyValueGrid(rnpaItems)}</dl>
+    </section>
+    <section class="recipe-print-full-section">
+      <h2><span>4</span>Datos nutricionales</h2>
+      <dl class="recipe-print-full-card recipe-print-full-grid">${keyValueGrid(nutritionItems)}</dl>
+    </section>
+    <section class="recipe-print-full-section">
+      <h2><span>5</span>Tabla nutricional</h2>
+      <div class="recipe-print-full-card">${nutritionTable}</div>
+    </section>
+    <footer class="recipe-print-full-footer"><span>&copy; Copyright 2026 - Back Office para empresas, powered by ABR</span></footer>
+  </main>
+  <script>
+    (() => {
+      const waitImages = Promise.all(Array.from(document.images).map((img) => img.complete ? Promise.resolve() : new Promise((resolve) => {
+        img.addEventListener('load', resolve, { once: true });
+        img.addEventListener('error', resolve, { once: true });
+      })));
+      const waitFonts = document.fonts ? document.fonts.ready : Promise.resolve();
+      Promise.all([waitImages, waitFonts]).finally(() => {
+        setTimeout(() => {
+          window.focus();
+          window.print();
+        }, 350);
+      });
+    })();
+  <\/script>
+</body>
+</html>`;
+  };
+
+  const extractRecipeFullPrintPageHtml = (html = '') => {
+    const match = String(html).match(/<main class="recipe-print-full-page">[\s\S]*?<\/main>/);
+    return match ? match[0] : '';
+  };
+
+  const buildRecipesFullPrintHtml = (recipes = []) => {
+    const list = (Array.isArray(recipes) ? recipes : [recipes]).filter(Boolean);
+    if (list.length <= 1) return buildRecipeFullPrintHtml(list[0] || {});
+    const firstDoc = buildRecipeFullPrintHtml(list[0]);
+    const pagesHtml = list.map((recipe, index) => {
+      const page = extractRecipeFullPrintPageHtml(buildRecipeFullPrintHtml(recipe));
+      return page.replace('Receta / La Jamonera</p>', `Receta / La Jamonera / ${index + 1} de ${list.length}</p>`);
+    }).join('\n');
+    return firstDoc
+      .replace(/<title>[\s\S]*?<\/title>/, '<title>Recetas La Jamonera - Print</title>')
+      .replace(/<main class="recipe-print-full-page">[\s\S]*?<\/main>/, pagesHtml);
+  };
+
+  const openRecipeFullPrint = async (recipeOrRecipes) => {
+    const recipes = (Array.isArray(recipeOrRecipes) ? recipeOrRecipes : [recipeOrRecipes]).filter(Boolean);
+    if (!recipes.length) {
+      await openIosSwal({ title: 'Sin recetas', html: '<p>No hay recetas para imprimir.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+      return;
+    }
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      await openIosSwal({ title: 'Ventana bloqueada', html: '<p>Permití ventanas emergentes para imprimir la receta.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+      return;
+    }
+
+    openIosSwal({
+      title: recipes.length > 1 ? 'Preparando recetas...' : 'Preparando receta...',
+      html: `
+        <div class="recipe-print-loading">
+          <p>Estamos armando la hoja de impresion.</p>
+          <img src="./IMG/Meta-ai-logo.webp" alt="Procesando" class="meta-spinner-login recipe-print-loader">
+        </div>
+      `,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      customClass: {
+        htmlContainer: 'recipe-print-loading-container'
+      }
+    });
+
+    try {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      printWindow.document.open();
+      printWindow.document.write(recipes.length > 1 ? buildRecipesFullPrintHtml(recipes) : buildRecipeFullPrintHtml(recipes[0]));
+      printWindow.document.close();
+    } catch (error) {
+      try { printWindow.close(); } catch (_) {}
+      await openIosSwal({ title: 'No se pudo imprimir', html: `<p>${escapeHtml(error.message || 'Ocurrio un error preparando la receta.')}</p>`, icon: 'error', confirmButtonText: 'Entendido' });
+    } finally {
+      if (Swal.isVisible()) Swal.close();
+    }
+  };
+
+  const getSortedRecipesForPrint = () => getRecetasArray()
+    .sort((a, b) => normalizeValue(a.title).localeCompare(normalizeValue(b.title), 'es'));
+
+  const openRecipesScopeSelector = async () => {
+    const recipes = getSortedRecipesForPrint();
+    return openIosSwal({
+      title: 'Imprimir recetas',
+      html: `<div class="swal-stack-fields text-start">
+        <label class="inventario-check-row"><input type="radio" name="recipePrintScope" value="all" checked><span>Todas las recetas</span></label>
+        <label class="inventario-check-row"><input type="radio" name="recipePrintScope" value="manual"><span>Seleccion manual</span></label>
+        <div id="recipePrintManualScope" class="notify-specific-users-list d-none">
+          <div class="step-block"><strong>Recetas</strong>${recipes.map((recipe) => `<label class="inventario-check-row inventario-selector-row">${normalizeValue(recipe.imageUrl) ? `<span class="inventario-print-photo-wrap receta-print-selector-thumb"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-recetas-print-thumb receta-print-thumb-fit" src="${escapeHtml(recipe.imageUrl)}" alt="${escapeHtml(capitalize(recipe.title || 'Receta'))}"></span>` : '<span class="inventario-print-photo-wrap receta-print-selector-thumb"><span class="image-placeholder-circle-2"><i class="fa-solid fa-bowl-food"></i></span></span>'}<input type="checkbox" data-recipe-print-select value="${escapeHtml(recipe.id)}"><span>${escapeHtml(capitalize(recipe.title || 'Receta sin titulo'))}</span></label>`).join('')}</div>
+        </div>
+      </div>`,
+      showCancelButton: true,
+      confirmButtonText: 'Continuar',
+      cancelButtonText: 'Cancelar',
+      didOpen: () => {
+        const all = document.querySelector('input[name="recipePrintScope"][value="all"]');
+        const manual = document.querySelector('input[name="recipePrintScope"][value="manual"]');
+        const manualScope = document.getElementById('recipePrintManualScope');
+        const toggle = () => manualScope?.classList.toggle('d-none', !manual?.checked);
+        all?.addEventListener('change', toggle);
+        manual?.addEventListener('change', toggle);
+        toggle();
+        prepareRecipePrintThumbLoaders('.js-recetas-print-thumb');
+      },
+      preConfirm: () => {
+        const mode = document.querySelector('input[name="recipePrintScope"]:checked')?.value || 'all';
+        const selected = [...document.querySelectorAll('[data-recipe-print-select]:checked')].map((node) => node.value);
+        if (mode === 'manual' && !selected.length) {
+          Swal.showValidationMessage('Selecciona al menos una receta para imprimir.');
+          return false;
+        }
+        return { mode, selected };
+      }
+    });
+  };
+
+  const printRecipesCatalog = async () => {
+    const recipes = getSortedRecipesForPrint();
+    if (!recipes.length) {
+      await openIosSwal({ title: 'Sin recetas', html: '<p>No hay recetas cargadas para imprimir.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+      return;
+    }
+    const selector = await openRecipesScopeSelector();
+    if (!selector.isConfirmed) return;
+    const selected = new Set(selector.value.mode === 'manual' ? selector.value.selected : []);
+    const targetRecipes = selector.value.mode === 'manual'
+      ? recipes.filter((recipe) => selected.has(recipe.id))
+      : recipes;
+    await openRecipeFullPrint(targetRecipes);
   };
 
   const escapeSvgText = (value) => String(value || '')
@@ -3196,6 +3548,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     blurActiveElement();
     recetasModal.removeAttribute('inert');
   });
+  ensurePrintRecipesButton();
   recetasModal.addEventListener('show.bs.modal', loadRecetas);
 
   recetasList?.addEventListener('scroll', updateListScrollHint);
@@ -3209,6 +3562,12 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
   emptyCreateRecipeBtn?.addEventListener('click', () => renderEditor());
 
   recetasData?.addEventListener('click', async (event) => {
+    const printRecipesModalBtn = event.target.closest('#printRecipesBtn');
+    if (printRecipesModalBtn) {
+      await printRecipesCatalog();
+      return;
+    }
+
     const rnpaFilterBtn = event.target.closest('[data-rnpa-filter]');
     if (rnpaFilterBtn) {
       const selected = normalizeValue(rnpaFilterBtn.dataset.rnpaFilter);
@@ -3230,6 +3589,14 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
           confirmButtonText: 'Entendido'
         });
       }
+      return;
+    }
+
+    const fullPrintBtn = event.target.closest('[data-receta-full-print]');
+    if (fullPrintBtn) {
+      const recipe = state.recetas[fullPrintBtn.dataset.recetaFullPrint];
+      if (!recipe) return;
+      await openRecipeFullPrint(recipe);
       return;
     }
 

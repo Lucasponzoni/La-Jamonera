@@ -4161,6 +4161,30 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   cursor: not-allowed;
 }
 
+.receta-card-print-action {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0;
+}
+
+.receta-print-selector-thumb {
+  width: 40px;
+  height: 40px;
+  flex-basis: 40px;
+}
+
+.receta-print-thumb-fit {
+  width: 100%;
+  height: 100%;
+  object-fit: contain !important;
+  object-position: center;
+  padding: 5px;
+  border-radius: 999px;
+  background: #fff;
+  display: block;
+}
+
 .recipe-print-render-host {
   position: fixed;
   left: 0;
@@ -4753,6 +4777,48 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 
 .inventario-stock-line.is-zero .inventario-stock-unit {
   color: #cc3f52;
+}
+
+.inventario-stock-line.is-infinite strong,
+.inventario-infinity-symbol {
+  color: #128a43;
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.inventario-infinite-stock-note,
+.produccion-lote-infinite-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #b8eac8;
+  background: #eefaf2;
+  color: #1d7540;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  font-weight: 650;
+  margin-top: 8px;
+}
+
+.inventario-infinite-stock-note i,
+.produccion-lote-infinite-note i {
+  color: #14a34a;
+}
+
+.inventario-infinite-toggle {
+  min-height: 38px;
+  border: 1px solid #cfe7d6;
+  background: #eefaf2;
+  color: #187a3c;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-weight: 750;
+}
+
+.inventario-upload-dropzone.is-disabled {
+  opacity: .55;
+  cursor: not-allowed;
 }
 
 .inventario-threshold-btn {
@@ -7192,6 +7258,17 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 .produccion-lote-group.is-substitutable {
   border-color: #f6c98c;
   background: #fff7ec;
+}
+
+.produccion-lote-group.is-infinite {
+  border-color: #b8eac8;
+  background: #f3fbf6;
+}
+
+.produccion-infinite-symbol {
+  color: #128a43;
+  font-size: 1.35rem;
+  line-height: 1;
 }
 
 .produccion-lote-head {
