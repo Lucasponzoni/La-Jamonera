@@ -218,8 +218,7 @@
     if (qrHost && window.QRCode) {
       renderQr(qrHost, registro);
     }
-    await waitImages(win.document.body);
-    onProgress?.(100);
+    try { await waitImages(win.document.body); } catch (e) {}
     win.focus();
     win.print();
   };
