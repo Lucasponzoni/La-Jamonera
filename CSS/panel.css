@@ -276,6 +276,10 @@
   text-transform: uppercase;
 }
 
+#swal2-html-container > .text-start {
+  text-align: center !important;
+}
+
 .panel-chart-bar {
   height: 18px;
   border-radius: 999px;
