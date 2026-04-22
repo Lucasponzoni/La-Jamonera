@@ -273,6 +273,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 18px;
+  text-transform: uppercase;
 }
 
 .panel-chart-bar {

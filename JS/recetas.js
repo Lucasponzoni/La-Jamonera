@@ -625,6 +625,7 @@
             <button type="button" class="btn family-manage-btn" data-receta-rnpa-view="${item.id}" title="Ver RNPA" ${normalizeValue(item?.rnpa?.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i></button>
             <button type="button" class="btn family-manage-btn receta-card-print-action" data-receta-full-print="${item.id}" title="Imprimir receta" aria-label="Imprimir receta"><i class="fa-solid fa-print"></i></button>
             <button type="button" class="btn family-manage-btn" data-receta-manual-view="${item.id}" title="Ver manual" ${Array.isArray(item?.rows) && item.rows.some((row) => row.type === MONOGRAPHY_ROW_TYPE && normalizeValue(row.manualUrl)) ? '' : 'disabled'}><i class="fa-solid fa-book-open"></i></button>
+            <button type="button" class="btn family-manage-btn" data-receta-duplicate="${item.id}" title="Duplicar"><i class="fa-regular fa-copy"></i></button>
             <button type="button" class="btn family-manage-btn" data-receta-edit="${item.id}" title="Editar"><i class="fa-solid fa-pen"></i></button>
             <button type="button" class="btn family-manage-btn" data-receta-delete="${item.id}" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
           </div>
@@ -3156,8 +3157,10 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     });
   };
 
-  const renderEditor = async (initial = null, editorSeed = null) => {
+  const renderEditor = async (initial = null, editorSeed = null, options = {}) => {
     await fetchIngredientesData();
+    const isNewRecipe = !initial || options.forceNew === true;
+    const formInitial = initial || {};
 
     state.editor = editorSeed || {
       image: { method: 'ai', url: initial?.imageUrl || '', prompt: '', file: null, generatedFile: null },
@@ -3219,19 +3222,19 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     ensureMonographyAtEnd();
     state.editorDirty = false;
 
-    recipeEditorTitle.textContent = initial ? 'Editar receta' : 'Nueva receta';
-    state.activeRecipeId = initial?.id || '';
+    recipeEditorTitle.textContent = isNewRecipe ? 'Nueva receta' : 'Editar receta';
+    state.activeRecipeId = isNewRecipe ? '' : (initial?.id || '');
     recipeEditorForm.innerHTML = `
       <section class="step-block recipe-step-card recipe-main-step">
         <h6 class="step-title"><span class="recipe-step-number">1</span> Datos generales</h6>
         <div class="step-content recipe-fields-flex">
           <div class="recipe-field recipe-field-full">
             <label class="form-label" for="recipeTitle">Título *</label>
-            <input id="recipeTitle" class="form-control ios-input" value="${initial?.title || ''}" placeholder="Ej: Chorizo parrillero">
+            <input id="recipeTitle" class="form-control ios-input" value="${escapeHtml(formInitial.title || '')}" placeholder="Ej: Chorizo parrillero">
           </div>
           <div class="recipe-field recipe-field-full">
             <label class="form-label" for="recipeDescription">Descripción (opcional)</label>
-            <textarea id="recipeDescription" class="form-control ios-input recipe-description-lg" placeholder="Detalle amplio de la receta">${initial?.description || ''}</textarea>
+            <textarea id="recipeDescription" class="form-control ios-input recipe-description-lg" placeholder="Detalle amplio de la receta">${escapeHtml(formInitial.description || '')}</textarea>
           </div>
           <div class="recipe-field recipe-field-full recipe-rnpa-block"><p class="recipe-subsection-title">RNPA (opcional)</p>
             <div class="recipe-rnpa-grid">
@@ -3250,7 +3253,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
           <div class="recipe-field recipe-field-full"><p class="recipe-subsection-title">Rendimiento / producción</p></div>
           <div class="recipe-field recipe-field-half recipe-highlight-field">
             <label class="form-label" for="recipeYieldQty"><i class="fa-solid fa-weight-hanging"></i> Cantidad final obtenida *</label>
-            <input id="recipeYieldQty" class="form-control ios-input" value="${initial?.yieldQuantity || ''}" placeholder="Ej: 10,50">
+            <input id="recipeYieldQty" class="form-control ios-input" value="${escapeHtml(formInitial.yieldQuantity || '')}" placeholder="Ej: 10,50">
           </div>
           <div class="recipe-field recipe-field-half recipe-highlight-field">
             <label class="form-label" for="recipeYieldUnit">Unidad de medida *</label>
@@ -3258,7 +3261,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
           </div>
           <div class="recipe-field recipe-field-half recipe-highlight-field">
             <label class="form-label" for="recipeShelfLifeDays"><i class="fa-regular fa-calendar-days"></i> Caducidad (días) *</label>
-            <input id="recipeShelfLifeDays" type="number" min="1" step="1" class="form-control ios-input" value="${initial?.shelfLifeDays || ''}" placeholder="Ej: 3">
+            <input id="recipeShelfLifeDays" type="number" min="1" step="1" class="form-control ios-input" value="${escapeHtml(formInitial.shelfLifeDays || '')}" placeholder="Ej: 3">
           </div>
           <div class="recipe-field recipe-field-half recipe-highlight-field">
             <label class="form-label" for="recipeAgingDays"><i class="fa-solid fa-hourglass-half"></i> Días de estacionado</label>
@@ -3360,8 +3363,8 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
         </div>
       </section>
 
-      ${buildImageStepHtml('recipeImage', initial?.imageUrl || '', 4)}
-      <div class="recipe-editor-actions"><button type="submit" class="btn ios-btn ios-btn-success"><i class="fa-solid fa-floppy-disk"></i><span>${initial ? 'Guardar receta' : 'Crear receta'}</span></button></div>`;
+      ${buildImageStepHtml('recipeImage', formInitial.imageUrl || '', 4)}
+      <div class="recipe-editor-actions"><button type="submit" class="btn ios-btn ios-btn-success"><i class="fa-solid fa-floppy-disk"></i><span>${isNewRecipe ? 'Crear receta' : 'Guardar receta'}</span></button></div>`;
 
     renderRows();
     wireImageStep('recipeImage', state.editor.image);
@@ -3509,6 +3512,58 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     }
 
     return { title, description, yieldQuantity, yieldUnit, shelfLifeDays, agingDays, orderMode, rows: sortedRows, nutrition, rnpa: hasSomeRnpa ? rnpa : { number: '', denomination: '', brand: '', businessName: '', city: '', province: '', country: RNPA_COUNTRY, expiryDate: '', attachmentUrl: '', attachmentType: '', attachmentName: '' }, imageUrl };
+  };
+
+  const buildDuplicateRecipeDraft = (recipe = {}) => {
+    const nutrition = safeObject(recipe.nutrition);
+    return {
+      ...recipe,
+      id: '',
+      title: '',
+      createdAt: undefined,
+      updatedAt: undefined,
+      rows: Array.isArray(recipe.rows)
+        ? recipe.rows.map((row) => ({
+          ...row,
+          id: makeId('row'),
+          relatedIngredients: normalizeRelatedIngredients(row.relatedIngredients)
+        }))
+        : [],
+      rnpa: { ...safeObject(recipe.rnpa) },
+      nutrition: {
+        productType: normalizeLower(nutrition.productType),
+        category: normalizeLower(nutrition.category),
+        subcategory: normalizeLower(nutrition.subcategory),
+        declarationUnit: normalizeLower(nutrition.declarationUnit || 'g'),
+        declarationAmount: normalizeValue(nutrition.declarationAmount),
+        servingsPerPackage: normalizeValue(nutrition.servingsPerPackage),
+        householdMeasure: normalizeLower(nutrition.householdMeasure || 'unidad'),
+        householdAmount: normalizeValue(nutrition.householdAmount || '1'),
+        ai: {}
+      }
+    };
+  };
+
+  const duplicateRecipe = async (recipeId) => {
+    const item = state.recetas[recipeId];
+    if (!item) return;
+    const result = await openIosSwal({
+      title: 'Duplicar receta',
+      html: `<p>Vas a crear una nueva receta basada en <strong>${escapeHtml(capitalize(item.title || 'sin titulo'))}</strong>.</p><p class="mb-0">Se copiaran los datos, ingredientes, RNPA, adjuntos e imagen; el titulo y la tabla nutricional quedaran vacios.</p>`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Duplicar',
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        confirmButton: 'ios-btn ios-btn-success',
+        cancelButton: 'ios-btn ios-btn-secondary'
+      }
+    });
+    if (!result.isConfirmed) return;
+    await renderEditor(buildDuplicateRecipeDraft(item), null, { forceNew: true });
+    state.editorDirty = true;
+    recetasModal.querySelector('.modal-body')?.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => recipeEditorForm.querySelector('#recipeTitle')?.focus(), 120);
   };
 
   const removeRecipe = async (recipeId) => {
@@ -3677,6 +3732,8 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
       if (manualUrl) window.open(manualUrl, '_blank', 'noopener,noreferrer');
       return;
     }
+    const duplicateBtn = event.target.closest('[data-receta-duplicate]');
+    if (duplicateBtn) return duplicateRecipe(duplicateBtn.dataset.recetaDuplicate);
     const editBtn = event.target.closest('[data-receta-edit]');
     if (editBtn) return renderEditor(state.recetas[editBtn.dataset.recetaEdit]);
     const deleteBtn = event.target.closest('[data-receta-delete]');

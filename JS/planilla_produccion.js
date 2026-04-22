@@ -31,6 +31,23 @@
     return d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
+  const sanitizeFileNamePart = (value, fallback = 'sin-dato') => {
+    const cleaned = normalizeValue(value)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[\\/:*?"<>|]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return cleaned || fallback;
+  };
+
+  const getPlanillaDocumentTitle = (registro = {}) => {
+    const product = sanitizeFileNamePart(registro?.recipeTitle || 'producto');
+    const production = sanitizeFileNamePart(registro?.id || 'produccion');
+    const date = sanitizeFileNamePart(registro?.productionDate || new Date().toISOString().slice(0, 10), 'fecha');
+    return `${production} - ${product} - ${date}`;
+  };
+
   const formatQty = (value, unit = '') => `${Number(value || 0).toFixed(3)} ${unit}`.trim();
   const getUnitFactor = (unitRaw) => {
     const unit = normalizeValue(unitRaw).toLowerCase();
@@ -321,7 +338,8 @@
   const printPlanilla = async (root, registro) => {
     const win = window.open('', '_blank', 'width=1240,height=900');
     if (!win) return;
-    win.document.write(`<html><head><title>Planilla de producción</title><link rel="stylesheet" href="./CSS/style.css"></head><body style="padding:8px;background:#ffffff;">${root.outerHTML}</body></html>`);
+    const documentTitle = escapeHtml(getPlanillaDocumentTitle(registro));
+    win.document.write(`<html><head><title>${documentTitle}</title><link rel="stylesheet" href="./CSS/style.css"></head><body style="padding:8px;background:#ffffff;">${root.outerHTML}</body></html>`);
     win.document.close();
     await new Promise((resolve) => setTimeout(resolve, 240));
     const printRoot = win.document.querySelector('#planillaProduccionPrintable');

@@ -41,6 +41,7 @@
     providersRneBtn: $('inventarioProvidersRneBtn'),
     weeklyConfigBtn: $('inventarioWeeklyConfigBtn'),
     providersRneAlert: $('inventarioProvidersRneAlert'),
+    expiryAlert: $('inventarioExpiryAlert'),
     editorWrap: $('inventarioEditor'),
     editorForm: $('inventarioEditorForm'),
     editorTitle: $('inventarioEditorTitle'),
@@ -1545,6 +1546,175 @@
     });
   };
 
+  const getInventoryExpiryAlertRows = () => {
+    const rows = [];
+    Object.values(state.ingredientes).forEach((ingredient) => {
+      const record = getRecord(ingredient.id);
+      if (isInfiniteStockRecord(record)) return;
+      const collect = (items, type) => {
+        items.forEach((item) => {
+          const sourceEntry = (Array.isArray(record.entries) ? record.entries : []).find((entry) => normalizeValue(entry.id) === normalizeValue(item.entryId));
+          const availableKg = Number(getAvailableKg(sourceEntry || item).toFixed(4));
+          rows.push({
+            id: `${ingredient.id}::${item.entryId}`,
+            ingredientId: ingredient.id,
+            entryId: item.entryId,
+            ingredientName: capitalize(ingredient.name),
+            imageUrl: normalizeValue(ingredient.imageUrl),
+            lotNumber: normalizeValue(item.lotNumber),
+            expiryDate: normalizeValue(item.expiryDate),
+            diffDays: Number(item.diffDays || 0),
+            qty: Number(item.qty || 0),
+            unit: normalizeValue(item.unit || record.stockUnit || ingredient.measure || 'kilos'),
+            packageQty: item.packageQty,
+            availableKg,
+            expired: type === 'expired'
+          });
+        });
+      };
+      collect(getExpiredEntries(record), 'expired');
+      collect(getExpiringSoonEntries(record), 'soon');
+    });
+    return rows.sort((a, b) => (a.expired === b.expired ? a.diffDays - b.diffDays : (a.expired ? -1 : 1)) || a.ingredientName.localeCompare(b.ingredientName, 'es'));
+  };
+
+  const inventoryExpiryWhenLabel = (row) => row.expired
+    ? `Expirado hace ${Math.abs(row.diffDays)} dia(s)`
+    : (row.diffDays === 0 ? 'Vence hoy' : `Vence en ${row.diffDays} dia(s)`);
+
+  const askInventoryExpiryResolutionType = async (count = 1) => {
+    const result = await openIosSwal({
+      title: count > 1 ? 'Resolver vencidos seleccionados' : 'Resolver lote vencido',
+      html: '<p>Elegi como queres resolver el stock vencido.</p><small>Se creara el movimiento en el historial del ingreso y se descontara el stock disponible.</small>',
+      icon: 'warning',
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: 'Venta en mostrador',
+      denyButtonText: 'Decomisado',
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        popup: 'expiry-resolution-alert',
+        confirmButton: 'ios-btn ios-btn-success',
+        denyButton: 'ios-btn ios-btn-danger',
+        cancelButton: 'ios-btn ios-btn-secondary'
+      }
+    });
+    if (result.isConfirmed) return 'sold_counter';
+    if (result.isDenied) return 'decommissioned';
+    return '';
+  };
+
+  const resolveInventoryExpiryRows = async (rows = [], resolutionType = '') => {
+    const targets = (Array.isArray(rows) ? rows : []).filter((row) => row?.expired && normalizeValue(row.ingredientId) && normalizeValue(row.entryId));
+    if (!targets.length || !normalizeValue(resolutionType)) return 0;
+    Swal.fire({
+      title: 'Resolviendo vencidos...',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Resolviendo" class="meta-spinner-login"></div>',
+      allowOutsideClick: false,
+      showConfirmButton: false,
+      customClass: { popup: 'ios-alert ingredientes-alert ingredientes-saving-alert' }
+    });
+    let resolved = 0;
+    try {
+      for (const row of targets) {
+        const result = await resolveExpiredEntryStock({
+          ingredientId: row.ingredientId,
+          entryId: row.entryId,
+          resolutionType,
+          qtyKg: Number(row.availableKg || 0)
+        });
+        if (result?.ok) resolved += 1;
+      }
+      state.activeFamilyId = 'all';
+      state.activeStockStatus = 'all';
+      state.search = '';
+      if (nodes.searchInput) nodes.searchInput.value = '';
+      await loadData();
+      renderFamilies();
+      renderStatusFilters();
+      renderList();
+      return resolved;
+    } finally {
+      if (Swal.isVisible()) Swal.close();
+    }
+  };
+
+  const renderInventoryExpiryAlert = () => {
+    if (!nodes.expiryAlert) return;
+    if (state.periodMode) {
+      nodes.expiryAlert.classList.add('d-none');
+      nodes.expiryAlert.innerHTML = '';
+      return;
+    }
+    const rows = getInventoryExpiryAlertRows();
+    if (!rows.length) {
+      nodes.expiryAlert.classList.add('d-none');
+      nodes.expiryAlert.innerHTML = '';
+      return;
+    }
+    const expiredRows = rows.filter((row) => row.expired);
+    const soonRows = rows.filter((row) => !row.expired);
+    const tone = expiredRows.length ? 'is-danger' : 'is-warning';
+    const title = expiredRows.length
+      ? `${expiredRows.length} lote(s) de inventario vencido(s) con stock`
+      : `${soonRows.length} lote(s) de inventario proximo(s) a vencer`;
+    const rowHtml = rows.map((row) => `<div class="produccion-expiry-row ${row.expired ? 'is-expired' : 'is-soon'}">
+      <label class="produccion-expiry-select"><input type="checkbox" data-inventory-expiry-select="${escapeHtml(row.id)}" ${row.expired ? '' : 'disabled'}><span class="visually-hidden">Seleccionar lote</span></label>
+      <span class="produccion-expiry-thumb">${row.imageUrl ? `<img src="${escapeHtml(row.imageUrl)}" alt="${escapeHtml(row.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span>
+      <span class="produccion-expiry-info"><strong>${escapeHtml(row.ingredientName)}</strong><small>Lote ${escapeHtml(row.lotNumber || row.entryId)} · ${escapeHtml(inventoryExpiryWhenLabel(row))} · ${escapeHtml(formatIsoDateEs(row.expiryDate))}</small></span>
+      <span class="produccion-expiry-qty">${escapeHtml(formatQtyUnit(row.qty, row.unit))}${row.packageQty ? ` x${row.packageQty}` : ''}</span>
+      ${row.expired ? `<button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-inventory-expiry-resolve-one="${escapeHtml(row.id)}"><i class="fa-solid fa-check"></i><span>Resolver</span></button>` : ''}
+    </div>`).join('');
+    nodes.expiryAlert.classList.remove('d-none');
+    nodes.expiryAlert.innerHTML = `<section class="produccion-expiry-alert-card ${tone}" data-inventory-expiry-alert>
+      <button type="button" class="produccion-rne-expiry-alert ${tone} is-collapsible" data-inventory-expiry-toggle aria-expanded="false">
+        <span class="produccion-rne-expiry-text"><i class="bi ${expiredRows.length ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill'}"></i><span>${escapeHtml(title)}</span></span>
+        <span class="produccion-rne-expiry-collapse-meta"><strong>${rows.length}</strong><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
+      </button>
+      <div class="produccion-expiry-alert-details" data-inventory-expiry-details hidden>
+        <div class="produccion-expiry-toolbar">
+          <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-inventory-expiry-config><i class="fa-solid fa-sliders"></i><span>Configurar dias</span></button>
+          <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-inventory-expiry-select-all ${expiredRows.length ? '' : 'disabled'}><i class="fa-regular fa-square-check"></i><span>Seleccionar vencidos</span></button>
+          <button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-inventory-expiry-resolve-selected ${expiredRows.length ? '' : 'disabled'}><i class="fa-solid fa-list-check"></i><span>Resolver seleccionados</span></button>
+          <button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-inventory-expiry-resolve-all ${expiredRows.length ? '' : 'disabled'}><i class="fa-solid fa-check-double"></i><span>Resolver todos</span></button>
+        </div>
+        <div class="produccion-expiry-list">${rowHtml}</div>
+      </div>
+    </section>`;
+
+    const toggle = nodes.expiryAlert.querySelector('[data-inventory-expiry-toggle]');
+    const details = nodes.expiryAlert.querySelector('[data-inventory-expiry-details]');
+    toggle?.addEventListener('click', () => {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+      details.hidden = expanded;
+      toggle.classList.toggle('is-open', !expanded);
+    });
+    nodes.expiryAlert.querySelector('[data-inventory-expiry-config]')?.addEventListener('click', openGlobalConfig);
+    nodes.expiryAlert.querySelector('[data-inventory-expiry-select-all]')?.addEventListener('click', () => {
+      nodes.expiryAlert.querySelectorAll('[data-inventory-expiry-select]:not(:disabled)').forEach((checkbox) => {
+        checkbox.checked = true;
+      });
+    });
+    const resolveRowsFromAlert = async (mode, id = '') => {
+      const latest = getInventoryExpiryAlertRows().filter((row) => row.expired);
+      const selected = new Set([...nodes.expiryAlert.querySelectorAll('[data-inventory-expiry-select]:checked')].map((node) => normalizeValue(node.dataset.inventoryExpirySelect)));
+      const targets = mode === 'all' ? latest : mode === 'one' ? latest.filter((row) => row.id === id) : latest.filter((row) => selected.has(row.id));
+      if (!targets.length) {
+        await openIosSwal({ title: 'Sin seleccion', html: '<p>Selecciona al menos un lote vencido para resolver.</p>', icon: 'info' });
+        return;
+      }
+      const resolutionType = await askInventoryExpiryResolutionType(targets.length);
+      if (!resolutionType) return;
+      await resolveInventoryExpiryRows(targets, resolutionType);
+    };
+    nodes.expiryAlert.querySelector('[data-inventory-expiry-resolve-selected]')?.addEventListener('click', () => resolveRowsFromAlert('selected'));
+    nodes.expiryAlert.querySelector('[data-inventory-expiry-resolve-all]')?.addEventListener('click', () => resolveRowsFromAlert('all'));
+    nodes.expiryAlert.querySelectorAll('[data-inventory-expiry-resolve-one]').forEach((button) => {
+      button.addEventListener('click', () => resolveRowsFromAlert('one', normalizeValue(button.dataset.inventoryExpiryResolveOne)));
+    });
+  };
+
 
   const renderFamilies = () => {
     const families = Object.values(state.familias).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
@@ -1574,6 +1744,7 @@
   const renderList = () => {
     renderStatusFilters();
     renderProviderRneAlert();
+    renderInventoryExpiryAlert();
     const items = filteredIngredients();
     let visibleItems = items;
     let helperHtml = '';
@@ -5055,9 +5226,20 @@
       type: normalizeValue(resolutionType),
       qtyKg: Number(safeQtyKg.toFixed(4))
     });
+    entry.movementHistory = Array.isArray(entry.movementHistory) ? entry.movementHistory : [];
+    entry.movementHistory.unshift({
+      type: 'resolucion_vencido',
+      createdAt: Date.now(),
+      qty: qtyToDiscount,
+      qtyUnit: normalizeValue(entry?.unit || record.stockUnit || 'kilos'),
+      qtyKg: Number(safeQtyKg.toFixed(4)),
+      reference: normalizeValue(resolutionType),
+      observation: normalizeValue(resolutionType) === 'decommissioned' ? 'Lote vencido decomisado' : 'Lote vencido vendido en mostrador'
+    });
     if (entry.availableKg <= 0.0001) {
       entry.expiryResolutionStatus = normalizeValue(resolutionType);
       entry.status = normalizeValue(resolutionType);
+      entry.lotStatus = normalizeValue(resolutionType) === 'decommissioned' ? 'decomisado' : 'sin_trazabilidad';
     }
     entries[index] = entry;
     record.entries = entries;
@@ -6221,10 +6403,12 @@
     nodes.periodView?.classList.toggle('d-none', !enabled);
     if (enabled) {
       nodes.providersRneAlert?.classList.add('d-none');
+      nodes.expiryAlert?.classList.add('d-none');
       nodes.globalClearBtn?.classList.toggle('d-none', !state.dashboardDateRange);
       return;
     }
     renderProviderRneAlert();
+    renderInventoryExpiryAlert();
   };
 
   const loadInventario = async () => {
