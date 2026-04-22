@@ -7225,6 +7225,77 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   font-size: 0.78rem;
 }
 
+.produccion-confirm-ingredients {
+  list-style: none;
+  padding: 0;
+  margin: 2px 0 0;
+  display: grid;
+  gap: 8px;
+}
+
+.produccion-confirm-ingredient {
+  border: 1px solid #d9e4f8;
+  border-radius: 10px;
+  background: #fff;
+  padding: 8px 10px;
+  display: grid;
+  gap: 4px;
+}
+
+.produccion-confirm-ingredient.is-substitution-group {
+  border-color: #f2c98b;
+  background: #fff8ec;
+}
+
+.produccion-confirm-ingredient-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.produccion-confirm-ingredient-main span {
+  font-weight: 800;
+  color: #1f7a46;
+  text-align: right;
+}
+
+.produccion-confirm-substitute-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #edbd75;
+  border-radius: 999px;
+  background: #fff1d9;
+  color: #8a4b12 !important;
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+.produccion-confirm-substitute-list {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0;
+  display: grid;
+  gap: 4px;
+}
+
+.produccion-confirm-substitute-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px dashed #edbd75;
+  padding-top: 4px;
+  color: #4b5d83;
+}
+
+.produccion-confirm-substitute-list span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
 .produccion-trace-date {
   color: #1f6fd6;
   font-weight: 700;
@@ -9463,6 +9534,16 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   gap: 8px;
 }
 
+.planilla-substitute-note {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  color: #8a4b12;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
 .planilla-kpis-grid {
   border: 1px solid #c9d1e8;
   padding: 6px;
@@ -9585,6 +9666,504 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 
   .planilla-qr-note {
     font-size: 13px !important;
+  }
+}
+
+.planilla-card {
+  border: 1px solid #d7deef;
+  border-radius: 10px;
+  background: #fff;
+  padding: 8px;
+  display: grid;
+  gap: 6px;
+  color: #111827;
+  text-transform: none;
+  box-shadow: none;
+  line-height: 1.18;
+}
+
+.planilla-print-a4 {
+  width: min(100%, 1120px);
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.planilla-doc-header {
+  border: 1px solid #13233c;
+  border-radius: 8px;
+  background: #13233c;
+  color: #fff;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 7px 10px;
+}
+
+.planilla-doc-header p,
+.planilla-doc-header h2,
+.planilla-doc-header span,
+.planilla-doc-brand strong,
+.planilla-doc-brand small {
+  margin: 0;
+}
+
+.planilla-doc-header p {
+  color: #a9b9dc;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.planilla-doc-header h2 {
+  font-size: 1.2rem;
+  line-height: 1.05;
+  font-weight: 900;
+}
+
+.planilla-doc-header span,
+.planilla-doc-brand small {
+  display: block;
+  color: #dbe5fb;
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.planilla-doc-brand {
+  text-align: right;
+  display: grid;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.planilla-doc-brand strong {
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+}
+
+.planilla-summary-grid {
+  border: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.planilla-summary-item {
+  border: 1px solid #dbe4f5;
+  border-radius: 7px;
+  padding: 4px 6px;
+  min-height: 34px;
+  display: grid;
+  align-content: center;
+  gap: 1px;
+}
+
+.planilla-summary-item strong {
+  color: #586783;
+  font-size: 0.6rem;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.planilla-summary-item span {
+  color: #18376b;
+  font-size: 0.78rem;
+  line-height: 1.1;
+  font-weight: 900;
+}
+
+.planilla-formula-card {
+  border: 1px solid #dbe4f5;
+  border-radius: 9px;
+  padding: 5px;
+}
+
+.planilla-formula-card h3 {
+  margin: 0 0 4px;
+  text-align: left;
+  color: #18376b;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.planilla-table-scroll {
+  overflow: visible;
+}
+
+.planilla-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.planilla-table th,
+.planilla-table td {
+  border: 1px solid #d7deef;
+  padding: 3px 4px;
+  font-size: 0.68rem;
+  line-height: 1.15;
+  vertical-align: top;
+  background: #fff;
+}
+
+.planilla-table th {
+  background: #13233c;
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+.planilla-formula-table th:nth-child(1),
+.planilla-formula-table td:nth-child(1) {
+  width: 30%;
+}
+
+.planilla-formula-table th:nth-child(2),
+.planilla-formula-table td:nth-child(2) {
+  width: 23%;
+}
+
+.planilla-formula-table th:nth-child(3),
+.planilla-formula-table td:nth-child(3) {
+  width: 16%;
+}
+
+.planilla-formula-table th:nth-child(4),
+.planilla-formula-table td:nth-child(4) {
+  width: 11%;
+}
+
+.planilla-formula-table th:nth-child(5),
+.planilla-formula-table td:nth-child(5) {
+  width: 9%;
+}
+
+.planilla-formula-table th:nth-child(6),
+.planilla-formula-table td:nth-child(6) {
+  width: 11%;
+}
+
+.planilla-ingredient-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+}
+
+.planilla-ingredient-main strong {
+  color: #14233d;
+  font-size: 0.7rem;
+  line-height: 1.1;
+}
+
+.planilla-avatar {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  border-radius: 999px;
+  border: 1px solid #d7deef;
+  background: #f7f9fe;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.planilla-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.planilla-avatar i {
+  color: #6b7ba0;
+  font-size: 0.7rem;
+}
+
+.planilla-substitute-note {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 1px;
+  color: #8a4b12;
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.planilla-source-row td {
+  background: #fff8ec !important;
+  border-color: #edbd75 !important;
+  padding: 4px 6px;
+}
+
+.planilla-source-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.planilla-source-head strong {
+  color: #18376b;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.planilla-source-head span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #edbd75;
+  border-radius: 999px;
+  background: #fff1d9;
+  color: #8a4b12;
+  padding: 2px 8px;
+  font-size: 0.6rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.planilla-source-meta {
+  color: #5f6f94;
+  font-size: 0.64rem;
+  margin-top: 2px;
+}
+
+.planilla-substitute-row td {
+  background: #fffdf8;
+  border-top: 1px dashed #edbd75;
+}
+
+.planilla-qty-cell {
+  color: #0f7a45;
+  font-weight: 900;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.planilla-bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 90px;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.planilla-kpis-grid {
+  border: 1px solid #dbe4f5;
+  border-radius: 8px;
+  padding: 5px;
+  display: grid;
+  gap: 3px;
+}
+
+.planilla-kpis-grid p {
+  margin: 0;
+  color: #26334d;
+  font-size: 0.68rem;
+  line-height: 1.2;
+}
+
+.planilla-footer-grid {
+  border: 1px solid #dbe4f5;
+  border-radius: 8px;
+  padding: 5px;
+}
+
+.planilla-qr-card {
+  border: 1px solid #dbe4f5;
+  border-radius: 8px;
+  padding: 4px;
+  display: grid;
+  place-items: center;
+  gap: 3px;
+  text-align: center;
+  min-height: 70px;
+}
+
+.planilla-qr-card canvas,
+.planilla-qr-card img {
+  width: 62px !important;
+  height: 62px !important;
+}
+
+.planilla-qr-note {
+  margin: 0;
+  color: #586783;
+  font-size: 0.58rem;
+  line-height: 1.15;
+  font-weight: 800;
+}
+
+@media (max-width: 768px) {
+  .planilla-doc-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .planilla-doc-brand {
+    text-align: left;
+  }
+
+  .planilla-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .planilla-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 6mm;
+  }
+
+  html,
+  body {
+    width: 100%;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .planilla-toolbar {
+    display: none !important;
+  }
+
+  .planilla-card {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border-radius: 0;
+    padding: 4mm !important;
+    gap: 3mm !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .planilla-card,
+  .planilla-card * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .planilla-doc-header {
+    padding: 4px 6px;
+    break-inside: avoid;
+  }
+
+  .planilla-doc-header h2 {
+    font-size: 15px;
+  }
+
+  .planilla-doc-header p,
+  .planilla-doc-header span,
+  .planilla-doc-brand strong,
+  .planilla-doc-brand small {
+    font-size: 8px;
+  }
+
+  .planilla-summary-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 3px;
+  }
+
+  .planilla-summary-item {
+    padding: 3px 4px;
+    min-height: 26px;
+  }
+
+  .planilla-summary-item strong {
+    font-size: 7px;
+  }
+
+  .planilla-summary-item span {
+    font-size: 9px;
+  }
+
+  .planilla-formula-card {
+    padding: 4px;
+  }
+
+  .planilla-formula-card h3 {
+    font-size: 10px;
+    margin-bottom: 3px;
+  }
+
+  .planilla-table {
+    min-width: 0 !important;
+    table-layout: fixed;
+  }
+
+  .planilla-table th,
+  .planilla-table td {
+    font-size: 8px !important;
+    padding: 2px 3px !important;
+  }
+
+  .planilla-table th {
+    font-size: 7px !important;
+  }
+
+  .planilla-ingredient-main strong {
+    font-size: 8px;
+  }
+
+  .planilla-avatar {
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+  }
+
+  .planilla-substitute-note {
+    font-size: 7px;
+  }
+
+  .planilla-source-row td {
+    padding: 3px 4px !important;
+  }
+
+  .planilla-source-head strong {
+    font-size: 9px;
+  }
+
+  .planilla-source-head span,
+  .planilla-source-meta {
+    font-size: 7px;
+  }
+
+  .planilla-bottom-grid {
+    grid-template-columns: 1fr 72px;
+    gap: 4px;
+  }
+
+  .planilla-kpis-grid {
+    padding: 4px;
+  }
+
+  .planilla-kpis-grid p {
+    font-size: 8px;
+  }
+
+  .planilla-qr-card {
+    min-height: 58px;
+    padding: 3px;
+  }
+
+  .planilla-qr-card canvas,
+  .planilla-qr-card img {
+    width: 54px !important;
+    height: 54px !important;
+  }
+
+  .planilla-qr-note {
+    font-size: 7px !important;
   }
 }
 

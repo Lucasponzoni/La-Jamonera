@@ -52,6 +52,18 @@
     if (!Number.isFinite(amount)) return 0;
     return Number(((amount * getUnitFactor(unit)) / 1000).toFixed(6));
   };
+  const getPlanUsedQty = (plan, { hasSiblingSubstitute = false } = {}) => {
+    const lots = Array.isArray(plan?.lots) ? plan.lots : [];
+    const usedFromLots = lots.reduce((sum, lot) => sum + Number(lot?.takeQty || 0), 0);
+    if (usedFromLots > 0.0001) return Number(usedFromLots.toFixed(4));
+    if (plan?.infiniteStock || plan?.noTraceability) return Number(((plan?.neededQty ?? plan?.requiredQty) || 0).toFixed(4));
+    if (plan?.isSubstitute || hasSiblingSubstitute) return 0;
+    return Number(((plan?.neededQty ?? plan?.requiredQty) || 0).toFixed(4));
+  };
+  const hasSubstituteSibling = (plans = [], plan = {}) => {
+    const sourceId = normalizeValue(plan?.sourceIngredientId || plan?.ingredientId);
+    return (Array.isArray(plans) ? plans : []).some((candidate) => candidate?.isSubstitute && normalizeValue(candidate?.sourceIngredientId || candidate?.ingredientId) === sourceId);
+  };
 
   const loadScript = (src, id) => new Promise((resolve) => {
     const existing = document.getElementById(id);
@@ -87,22 +99,47 @@
       const unique = [...new Set(normalized)];
       return unique.length ? unique.join(' | ') : '-';
     };
-    const groupedPlans = Object.values(plans.reduce((acc, plan) => {
-      const key = normalizeValue(plan?.sourceIngredientId || plan?.ingredientId || `ing_${Object.keys(acc).length}`);
+    const sourceMeta = plans.reduce((acc, plan, index) => {
+      const ingredientId = normalizeValue(plan?.ingredientId || `ing_${index}`);
+      const sourceIngredientId = normalizeValue(plan?.sourceIngredientId || ingredientId);
+      if (!acc[sourceIngredientId]) {
+        acc[sourceIngredientId] = {
+          sourceIngredientId,
+          sourceIngredientName: normalizeValue(plan?.sourceIngredientName || plan?.ingredientName || 'INGREDIENTE'),
+          requiredQty: 0,
+          unit: normalizeValue(plan?.ingredientUnit || plan?.unit || '')
+        };
+      }
+      if (!plan?.isSubstitute) {
+        acc[sourceIngredientId].requiredQty = Number((Number(acc[sourceIngredientId].requiredQty || 0) + Number(plan?.neededQty ?? plan?.requiredQty ?? 0)).toFixed(4));
+      }
+      if (!acc[sourceIngredientId].unit) acc[sourceIngredientId].unit = normalizeValue(plan?.ingredientUnit || plan?.unit || '');
+      return acc;
+    }, {});
+    const groupedPlans = Object.values(plans.reduce((acc, plan, index) => {
+      const hasSiblingSubstitute = hasSubstituteSibling(plans, plan);
+      const usedQty = getPlanUsedQty(plan, { hasSiblingSubstitute });
+      if (usedQty <= 0.0001) return acc;
+      const ingredientId = normalizeValue(plan?.ingredientId || `ing_${index}`);
+      const sourceIngredientId = normalizeValue(plan?.sourceIngredientId || ingredientId);
+      const key = `${ingredientId}::${sourceIngredientId}`;
       if (!acc[key]) {
         acc[key] = {
           ...safeObject(plan),
-          ingredientId: key,
-          ingredientName: normalizeValue(plan?.sourceIngredientName || plan?.ingredientName || 'INGREDIENTE'),
+          ingredientId,
+          sourceIngredientId,
+          sourceIngredientName: normalizeValue(plan?.sourceIngredientName),
+          ingredientName: normalizeValue(plan?.ingredientName || 'INGREDIENTE'),
           ingredientImageUrl: normalizeValue(plan?.ingredientImageUrl || ''),
+          isSubstitute: Boolean(plan?.isSubstitute),
           neededQty: 0,
           requiredQty: 0,
           lots: []
         };
       }
-      acc[key].neededQty = Number((Number(acc[key].neededQty || 0) + Number(plan?.neededQty || plan?.requiredQty || 0)).toFixed(4));
+      acc[key].neededQty = Number((Number(acc[key].neededQty || 0) + usedQty).toFixed(4));
       acc[key].requiredQty = acc[key].neededQty;
-      acc[key].lots.push(...(Array.isArray(plan?.lots) ? plan.lots : []));
+      acc[key].lots.push(...(Array.isArray(plan?.lots) ? plan.lots.filter((lot) => Number(lot?.takeQty || 0) > 0.0001) : []));
       if (!acc[key].ingredientImageUrl) acc[key].ingredientImageUrl = normalizeValue(plan?.ingredientImageUrl || '');
       return acc;
     }, {}));
@@ -141,15 +178,26 @@
       const providersSummary = hasMultiProvider
         ? `El proveedor es ${observationLots.map((lot) => `${lot.provider} para lote ${lot.index}`).join(' y ')}`
         : `El proveedor es ${normalizeValue(providers[0] || '-')}`;
+      const meta = sourceMeta[normalizeValue(plan?.sourceIngredientId || plan?.ingredientId)] || {};
+      const qtyRaw = Number(plan?.neededQty ?? plan?.requiredQty ?? 0);
+      const qtyUnit = normalizeValue(plan?.ingredientUnit || plan?.unit || '');
       return {
         ingredientName: plan?.ingredientName || traceIngredient?.ingredientName || 'INGREDIENTE',
+        relation: plan?.isSubstitute && normalizeValue(plan?.sourceIngredientName) ? `Sustituye a ${normalizeValue(plan.sourceIngredientName)}` : '',
+        isSubstitute: Boolean(plan?.isSubstitute),
+        sourceIngredientId: normalizeValue(plan?.sourceIngredientId || plan?.ingredientId),
+        sourceIngredientName: normalizeValue(meta.sourceIngredientName || plan?.sourceIngredientName || plan?.ingredientName || 'INGREDIENTE'),
+        sourceRequiredQty: Number(meta.requiredQty || qtyRaw || 0),
+        sourceUnit: normalizeValue(meta.unit || qtyUnit),
         ingredientImage: normalizeValue(plan?.ingredientImageUrl || traceIngredient?.ingredientImageUrl),
         provider: joinUnique(providers),
         lotNumber: joinUnique(lotNumbers),
         expiryDate: firstLot?.expiryDate || '-',
         rne: joinUnique(rnes),
-        qty: formatQty(plan?.neededQty ?? plan?.requiredQty, plan?.ingredientUnit || plan?.unit || ''),
-        qtyKg: toKg(plan?.neededQty ?? plan?.requiredQty, plan?.ingredientUnit || plan?.unit || ''),
+        qtyRaw,
+        qtyUnit,
+        qty: formatQty(qtyRaw, qtyUnit),
+        qtyKg: toKg(qtyRaw, qtyUnit),
         available: formatQty(availableQty, firstLot?.unit || plan?.ingredientUnit || plan?.unit || ''),
         remaining: formatQty(remainingQty, firstLot?.unit || plan?.ingredientUnit || plan?.unit || ''),
         invoiceNumber: normalizeValue(firstLot?.invoiceNumber || '-'),
@@ -161,9 +209,60 @@
     });
   };
 
+  const buildFormulaRows = (ingredientRows = []) => {
+    const groups = Object.values((Array.isArray(ingredientRows) ? ingredientRows : []).reduce((acc, row, index) => {
+      const key = normalizeValue(row?.sourceIngredientId || row?.ingredientName || `ing_${index}`);
+      if (!acc[key]) {
+        acc[key] = {
+          sourceIngredientName: normalizeValue(row?.sourceIngredientName || row?.ingredientName || 'INGREDIENTE'),
+          sourceRequiredQty: Number(row?.sourceRequiredQty || 0),
+          sourceUnit: normalizeValue(row?.sourceUnit || row?.qtyUnit || ''),
+          rows: []
+        };
+      }
+      acc[key].rows.push(row);
+      if (!acc[key].sourceRequiredQty && Number(row?.sourceRequiredQty || 0)) acc[key].sourceRequiredQty = Number(row.sourceRequiredQty || 0);
+      if (!acc[key].sourceUnit) acc[key].sourceUnit = normalizeValue(row?.sourceUnit || row?.qtyUnit || '');
+      return acc;
+    }, {}));
+
+    const renderIngredientCell = (row) => `<div class="planilla-ingredient-main">
+      <span class="planilla-avatar">${row.ingredientImage ? `<img src="${escapeHtml(row.ingredientImage)}" alt="${escapeHtml(row.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span>
+      <span><strong>${escapeHtml(row.ingredientName)}</strong>${row.relation ? `<small class="planilla-substitute-note"><i class="fa-solid fa-link"></i> ${escapeHtml(row.relation)}</small>` : ''}</span>
+    </div>`;
+
+    const renderDataRow = (row, className = '') => `<tr class="${className}">
+      <td>${renderIngredientCell(row)}</td>
+      <td>${escapeHtml(row.provider)}</td>
+      <td>${escapeHtml(row.lotNumber)}</td>
+      <td>${escapeHtml(formatIsoEs(row.expiryDate))}</td>
+      <td>${escapeHtml(row.rne)}</td>
+      <td class="planilla-qty-cell">${escapeHtml(row.qty)}</td>
+    </tr>`;
+
+    return groups.map((group) => {
+      const hasSubstitutes = group.rows.some((row) => row.isSubstitute);
+      const totalUsed = group.rows.reduce((sum, row) => sum + Number(row.qtyRaw || 0), 0);
+      const directUsed = group.rows.filter((row) => !row.isSubstitute).reduce((sum, row) => sum + Number(row.qtyRaw || 0), 0);
+      if (!hasSubstitutes) return group.rows.map((row) => renderDataRow(row)).join('');
+      const badge = directUsed > 0.0001 ? 'Combinado con sustitutos' : 'Cubierto con sustitutos';
+      const directText = directUsed > 0.0001 ? `Original usado: ${formatQty(directUsed, group.sourceUnit)}` : 'Ingrediente original sin consumo directo';
+      const sourceRequiredLabel = escapeHtml(formatQty(group.sourceRequiredQty || totalUsed, group.sourceUnit));
+      const totalUsedLabel = escapeHtml(formatQty(totalUsed, group.sourceUnit));
+      return `<tr class="planilla-source-row"><td colspan="6">
+        <div class="planilla-source-head">
+          <strong>${escapeHtml(group.sourceIngredientName)}</strong>
+          <span><i class="fa-solid fa-link"></i> ${badge}</span>
+        </div>
+        <div class="planilla-source-meta">Requerido: <b>${sourceRequiredLabel}</b> <span aria-hidden="true">|</span> Total usado: <b>${totalUsedLabel}</b> <span aria-hidden="true">|</span> ${escapeHtml(directText)}</div>
+      </td></tr>${group.rows.map((row) => renderDataRow(row, row.isSubstitute ? 'planilla-substitute-row' : '')).join('')}`;
+    }).join('') || '<tr><td colspan="6">SIN INGREDIENTES CARGADOS.</td></tr>';
+  };
+
   const buildPlanillaHtml = (registro, context = {}) => {
     const rnpa = safeObject(registro?.traceability?.product?.rnpa);
     const ingredientRows = resolveIngredientRows(registro);
+    const formulaRows = buildFormulaRows(ingredientRows);
     const managerLabel = resolveManagerNames(registro, context.usersMap);
     const totalIngredients = ingredientRows.reduce((acc, row) => acc + Number(row.qtyKg || 0), 0);
     const merma = Math.max(0, totalIngredients - Number(registro?.quantityKg || 0));
@@ -175,22 +274,35 @@
       .filter(Boolean)
       .join(' · ') || 'SIN OBSERVACIONES';
 
+    const observationsLabel = observations.replace(/\u00c2\u00b7/g, '|');
+
     return `<div class="planilla-card planilla-print-a4" id="planillaProduccionPrintable">
-      <header class="planilla-card-header"><h2>REGISTRO DE PROTOCOLO DE PRODUCCIÓN</h2><p>FRIGORIFICO • LA JAMONERA S.A.</p></header>
+      <header class="planilla-doc-header">
+        <div>
+          <p>Registro de protocolo de producci&oacute;n</p>
+          <h2>${escapeHtml(registro?.recipeTitle || '-')}</h2>
+          <span>${escapeHtml(registro?.id || '-')} &middot; ${escapeHtml(formatDateTime(registro?.createdAt))}</span>
+        </div>
+        <div class="planilla-doc-brand">
+          <strong>FRIGORIFICO LA JAMONERA S.A.</strong>
+          <small>RNE ${escapeHtml(registro?.traceability?.company?.rne?.number || '-')}</small>
+        </div>
+      </header>
       <section class="planilla-summary-grid">
-        <div class="planilla-summary-item"><strong>PERIODO DE ELABORACIÓN</strong><span>${escapeHtml(formatMonthYearEs(registro?.productionDate || ''))}</span></div>
-        <div class="planilla-summary-item"><strong>RNE</strong><span>${escapeHtml(registro?.traceability?.company?.rne?.number || '-')}</span></div>
-        <div class="planilla-summary-item"><strong>FECHA ELABORACIÓN</strong><span>${escapeHtml(formatIsoEs(registro?.productionDate || ''))}</span></div>
-        <div class="planilla-summary-item"><strong>FECHA ENVASADO</strong><span>${escapeHtml(formatIsoEs(registro?.packagingDate || ''))}</span></div>
-        <div class="planilla-summary-item"><strong>PRODUCTO</strong><span>${escapeHtml(registro?.recipeTitle || '-')}</span></div>
-        <div class="planilla-summary-item"><strong>N° LOTE</strong><span>${escapeHtml(registro?.id || '-')}</span></div>
+        <div class="planilla-summary-item"><strong>PERIODO</strong><span>${escapeHtml(formatMonthYearEs(registro?.productionDate || ''))}</span></div>
+        <div class="planilla-summary-item"><strong>ELABORACION</strong><span>${escapeHtml(formatIsoEs(registro?.productionDate || ''))}</span></div>
+        <div class="planilla-summary-item"><strong>ENVASADO</strong><span>${escapeHtml(formatIsoEs(registro?.packagingDate || ''))}</span></div>
         <div class="planilla-summary-item"><strong>VENCIMIENTO</strong><span>${escapeHtml(formatIsoEs(registro?.productExpiryDate || ''))}</span></div>
+        <div class="planilla-summary-item"><strong>NRO. LOTE</strong><span>${escapeHtml(registro?.id || '-')}</span></div>
         <div class="planilla-summary-item"><strong>RNPA PRODUCTO</strong><span>${escapeHtml(rnpa.number || '-')}</span></div>
+        <div class="planilla-summary-item"><strong>OBTENIDO</strong><span>${Number(registro?.quantityKg || 0).toFixed(2)} KG</span></div>
+        <div class="planilla-summary-item"><strong>MERMA</strong><span>${merma.toFixed(3)} KG</span></div>
       </section>
-      <section class="planilla-product-hero planilla-product-hero-no-image"><div><h3>${escapeHtml(registro?.recipeTitle || '-')}</h3><p>${escapeHtml(registro?.id || '-')} • ${escapeHtml(formatDateTime(registro?.createdAt))}</p></div></section>
-      <section class="planilla-formula-card"><h3>FÓRMULA</h3><div class="planilla-table-scroll"><table class="planilla-table"><thead><tr><th>MATERIA PRIMA</th><th>PROVEEDOR</th><th>LOTE</th><th>VENCIMIENTO</th><th>RNE</th><th>CANTIDAD</th></tr></thead><tbody>${ingredientRows.map((row) => `<tr><td><div class="planilla-ingredient-main"><span class="planilla-avatar">${row.ingredientImage ? `<img src="${escapeHtml(row.ingredientImage)}" alt="${escapeHtml(row.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><strong>${escapeHtml(row.ingredientName)}</strong></div></td><td>${escapeHtml(row.provider)}</td><td>${escapeHtml(row.lotNumber)}</td><td>${escapeHtml(formatIsoEs(row.expiryDate))}</td><td>${escapeHtml(row.rne)}</td><td>${escapeHtml(row.qty)}</td></tr>`).join('') || '<tr><td colspan="6">SIN INGREDIENTES CARGADOS.</td></tr>'}</tbody></table></div></section>
-      <section class="planilla-kpis-grid"><p><strong>CANTIDAD TOTAL OBTENIDA:</strong> ${Number(registro?.quantityKg || 0).toFixed(2)} KG</p><p><strong>MERMA:</strong> ${merma.toFixed(3)} KG</p><p><strong>RESPONSABLE:</strong> ${escapeHtml(managerLabel)}</p><p><strong>OBSERVACIONES:</strong> ${escapeHtml(observations)}</p></section>
-      <section class="planilla-footer-grid planilla-footer-grid-single"><article class="planilla-qr-card"><div id="planillaQrTarget"></div><p class="planilla-qr-note">Escaneá el <strong>QR</strong> con tu celular para acceder a la <strong>trazabilidad completa</strong> del producto.</p></article></section>
+      <section class="planilla-formula-card"><h3>Formula / Materias primas</h3><div class="planilla-table-scroll"><table class="planilla-table planilla-formula-table"><thead><tr><th>MATERIA PRIMA</th><th>PROVEEDOR</th><th>LOTE</th><th>VENCIMIENTO</th><th>RNE</th><th>CANTIDAD</th></tr></thead><tbody>${formulaRows}</tbody></table></div></section>
+      <section class="planilla-bottom-grid">
+        <div class="planilla-kpis-grid"><p><strong>RESPONSABLE:</strong> ${escapeHtml(managerLabel)}</p><p><strong>OBSERVACIONES:</strong> ${escapeHtml(observationsLabel)}</p></div>
+        <article class="planilla-qr-card"><div id="planillaQrTarget"></div><p class="planilla-qr-note">QR trazabilidad</p></article>
+      </section>
     </div>`;
   };
 
@@ -213,7 +325,7 @@
     win.document.close();
     await new Promise((resolve) => setTimeout(resolve, 240));
     const printRoot = win.document.querySelector('#planillaProduccionPrintable');
-    if (printRoot?.querySelector('.planilla-summary-grid')) printRoot.querySelector('.planilla-summary-grid').style.gridTemplateColumns = '1fr 1fr';
+    if (printRoot?.querySelector('.planilla-summary-grid')) printRoot.querySelector('.planilla-summary-grid').style.gridTemplateColumns = 'repeat(4, minmax(0, 1fr))';
     const qrHost = win.document.querySelector('#planillaQrTarget');
     if (qrHost && window.QRCode) {
       renderQr(qrHost, registro);

@@ -48,8 +48,20 @@
     if (!Number.isFinite(amount)) return Number.NaN;
     return amount * getUnitMeta(unit).factor;
   };
-  const getIngredientPlanQtyKg = (item = {}) => {
-    const qty = Number(item?.neededQty ?? item?.requiredQty ?? 0);
+  const getIngredientPlanUsedQty = (item = {}, { hasSiblingSubstitute = false } = {}) => {
+    const lots = Array.isArray(item?.lots) ? item.lots : [];
+    const usedFromLots = lots.reduce((sum, lot) => sum + Number(lot?.takeQty || 0), 0);
+    if (usedFromLots > 0.0001) return Number(usedFromLots.toFixed(4));
+    if (item?.infiniteStock || item?.noTraceability) return Number(((item?.neededQty ?? item?.requiredQty) || 0).toFixed(4));
+    if (item?.isSubstitute || hasSiblingSubstitute) return 0;
+    return Number(((item?.neededQty ?? item?.requiredQty) || 0).toFixed(4));
+  };
+  const hasSubstituteSibling = (plans = [], plan = {}) => {
+    const sourceId = normalize(plan?.sourceIngredientId || plan?.ingredientId);
+    return (Array.isArray(plans) ? plans : []).some((candidate) => candidate?.isSubstitute && normalize(candidate?.sourceIngredientId || candidate?.ingredientId) === sourceId);
+  };
+  const getIngredientPlanQtyKg = (item = {}, options = {}) => {
+    const qty = getIngredientPlanUsedQty(item, options);
     const base = toBase(qty, item?.ingredientUnit || item?.unit);
     if (!Number.isFinite(base)) return 0;
     return Number((base / 1000).toFixed(6));
@@ -96,8 +108,9 @@
   };
 
   const buildDefinition = (registro, config = {}) => {
-    const ingredients = Array.isArray(registro?.lots) ? registro.lots : [];
-    const totalIngredientsKg = ingredients.reduce((sum, item) => sum + getIngredientPlanQtyKg(item), 0);
+    const allPlans = Array.isArray(registro?.lots) ? registro.lots : [];
+    const ingredients = allPlans.filter((plan) => getIngredientPlanUsedQty(plan, { hasSiblingSubstitute: hasSubstituteSibling(allPlans, plan) }) > 0.0001);
+    const totalIngredientsKg = allPlans.reduce((sum, item) => sum + getIngredientPlanQtyKg(item, { hasSiblingSubstitute: hasSubstituteSibling(allPlans, item) }), 0);
     const mermaKg = Math.max(0, totalIngredientsKg - Number(registro?.quantityKg || 0));
     const managerToken = Array.isArray(registro?.managers) && registro.managers[0] ? registro.managers[0] : '';
     const userMap = safeObject(config?.usersMap);
@@ -126,10 +139,12 @@
       'I --> W'
     ];
     ingredients.forEach((plan, idx) => {
-      const lots = Array.isArray(plan?.lots) && plan.lots.length ? plan.lots : [{}];
+      const lots = Array.isArray(plan?.lots) && plan.lots.length ? plan.lots.filter((lot) => Number(lot?.takeQty || 0) > 0.0001) : [{}];
       const nodeId = `ING_${idx + 1}`;
       const traceIngredient = (Array.isArray(registro?.traceability?.ingredients) ? registro.traceability.ingredients : []).find((row) => normalize(row?.ingredientId) === normalize(plan?.ingredientId));
-      lines.push(`${nodeId}["<b>${idx + 1}. ${escapeHtml((plan?.ingredientName || traceIngredient?.ingredientName || 'Ingrediente').toUpperCase())}</b><br/><b>Usado total:</b> ${escapeHtml(String(Number(plan?.neededQty || plan?.requiredQty || 0).toFixed(3)))} ${escapeHtml(plan?.ingredientUnit || plan?.unit || '')}<br/><b>Lotes usados:</b> ${lots.length}"]:::toneIngredient`);
+      const usedQty = getIngredientPlanUsedQty(plan, { hasSiblingSubstitute: hasSubstituteSibling(allPlans, plan) });
+      const relationLabel = plan?.isSubstitute && normalize(plan?.sourceIngredientName) ? `<br/><b>Sustituye a:</b> ${escapeHtml(plan.sourceIngredientName)}` : '';
+      lines.push(`${nodeId}["<b>${idx + 1}. ${escapeHtml((plan?.ingredientName || traceIngredient?.ingredientName || 'Ingrediente').toUpperCase())}</b>${relationLabel}<br/><b>Usado total:</b> ${escapeHtml(String(Number(usedQty || 0).toFixed(3)))} ${escapeHtml(plan?.ingredientUnit || plan?.unit || '')}<br/><b>Lotes usados:</b> ${lots.length}"]:::toneIngredient`);
       lines.push(`I --> ${nodeId}`);
       let previousLotNodeId = '';
       lots.forEach((lot, lotIndex) => {
