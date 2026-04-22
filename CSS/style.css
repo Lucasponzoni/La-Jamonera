@@ -1405,7 +1405,19 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 
 .swal2-actions .ios-btn {
   min-width: 150px;
+  width: auto;
+  max-width: none;
   margin: 0;
+  padding-inline: 22px;
+  white-space: nowrap;
+}
+
+.swal2-actions .swal2-cancel.ios-btn-secondary {
+  min-width: 150px;
+}
+
+.swal2-actions .inventario-clear-movements-confirm-btn {
+  min-width: 220px;
 }
 
 /* =========================================

@@ -3295,7 +3295,7 @@
       confirmButtonText: 'Eliminar movimientos',
       cancelButtonText: 'Cancelar',
       customClass: {
-        confirmButton: 'ios-btn ios-btn-danger',
+        confirmButton: 'ios-btn ios-btn-danger inventario-clear-movements-confirm-btn',
         cancelButton: 'ios-btn ios-btn-secondary'
       }
     });
