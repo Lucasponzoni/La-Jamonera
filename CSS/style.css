@@ -10497,7 +10497,7 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   border-bottom: 1px solid #d9e0f3;
 }
 
-.weekly-sheet-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.weekly-sheet-table { width: 100%; border-collapse: collapse; table-layout: fixed; text-transform: uppercase;}
 
 .weekly-sheet-table th,
 .weekly-sheet-table td {
@@ -10506,6 +10506,7 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   text-align: center;
   vertical-align: middle;
   font-size: 0.9rem;
+  text-transform: uppercase !important;
   line-height: 1.15;
 }
 
@@ -10522,6 +10523,7 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   gap: 8px;
   justify-content: flex-start;
   text-align: left;
+  text-transform: uppercase !important;
 }
 
 .weekly-product-cell img {
