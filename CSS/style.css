@@ -3486,6 +3486,8 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   justify-content: center;
   font-family: Arial, Helvetica, sans-serif;
   box-sizing: border-box;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 /* =========================
@@ -3498,17 +3500,11 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   height: 112px;
   min-height: 112px;
   padding: 10px 8px 8px;
-  background: #111111;
-  clip-path: polygon(
-    26% 0%,
-    74% 0%,
-    100% 26%,
-    100% 74%,
-    74% 100%,
-    26% 100%,
-    0% 74%,
-    0% 26%
-  );
+  background-color: transparent;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'><polygon points='26,0 74,0 100,26 100,74 74,100 26,100 0,74 0,26' fill='%23111111'/></svg>");
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
   border: none;
   outline: none;
   box-shadow: none;

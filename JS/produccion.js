@@ -6821,11 +6821,15 @@
         });
       }
     };
-    const updateEditorPlan = async () => {
+    const updateEditorPlan = async (formatInput = false) => {
       const editorMaxKg = Math.max(analysis.maxKg, analysis.maxKgIncludingExpired || 0);
       let qty = parsePositive(qtyInput.value, 0.1);
-      if (qty > editorMaxKg) qty = editorMaxKg;
-      qtyInput.value = qty.toFixed(2);
+      if (qty > editorMaxKg) {
+        qty = editorMaxKg;
+        qtyInput.value = qty.toFixed(2);
+      } else if (formatInput) {
+        qtyInput.value = qty.toFixed(2);
+      }
       const productionDate = normalizeValue(dateInput.value) || toIsoDate();
       state.editorPlan = buildPlanForRecipe(recipe, qty, productionDate);
       lotsWrap.innerHTML = buildLotsBreakdownHtml(state.editorPlan);
