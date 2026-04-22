@@ -332,6 +332,30 @@
     return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
   };
 
+  const getRecipePrintDateStamp = () => new Date()
+    .toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    .replaceAll('/', '-');
+
+  const sanitizePrintDocumentTitle = (value = '') => normalizeValue(value)
+    .replace(/[\\/:*?"<>|]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const getRecipePrintDocumentTitle = (title = 'Receta') => {
+    const cleanTitle = sanitizePrintDocumentTitle(title) || 'Receta';
+    return `${cleanTitle} - ${getRecipePrintDateStamp()}`;
+  };
+
+  const getRecipePrintFileSlug = (title = 'receta') => {
+    const cleanTitle = sanitizePrintDocumentTitle(title)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    const slug = normalizeLower(cleanTitle)
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    return `${slug || 'receta'}-${getRecipePrintDateStamp()}`;
+  };
+
   const validateImageFile = (file) => {
     if (!file) return 'Seleccioná una imagen para subir.';
     if (!ALLOWED_UPLOAD_TYPES.includes(file.type)) return 'Archivo no admitido. Usá JPG, PNG, WEBP o GIF.';
@@ -671,6 +695,7 @@
     const nutrition = safeObject(recipe?.nutrition);
     const nutritionAi = safeObject(nutrition?.ai);
     const title = capitalize(recipe?.title || 'Receta');
+    const documentTitle = getRecipePrintDocumentTitle(title);
     const yieldLabel = [normalizeValue(recipe?.yieldQuantity), getPrintMeasureLabel(recipe?.yieldUnit)].filter(Boolean).join(' ');
     const metaItems = [
       ['Rinde', yieldLabel || '-'],
@@ -716,6 +741,8 @@
     const notesHtml = noteRows.length
       ? noteRows.map((row, index) => `<tr><td class="recipe-print-full-index">${index + 1}</td><td>${escapeHtml(row.comment)}</td></tr>`).join('')
       : '<tr><td colspan="2" class="recipe-print-full-empty-cell">Sin notas cargadas.</td></tr>';
+    const frontLabels = Array.isArray(nutritionAi.frontLabels) ? nutritionAi.frontLabels : [];
+    const frontLabelsHtml = `<div class="recipe-print-full-front-card">${buildFrontLabelsHtml(frontLabels)}</div>`;
     const nutritionTable = normalizeValue(nutritionAi.tableHtml)
       ? `<div class="recipe-print-full-nutrition-table">${nutritionAi.tableHtml}</div>`
       : '<p class="recipe-print-full-empty">Sin tabla nutricional generada.</p>';
@@ -729,7 +756,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${escapeHtml(title)} · Print</title>
+  <title>${escapeHtml(documentTitle)}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
@@ -749,10 +776,10 @@
     .recipe-print-full-meta div { padding: 10px 12px; }
     dt { margin: 0 0 3px; color: #657491; font-size: 10px; text-transform: uppercase; font-weight: 800; letter-spacing: .06em; }
     dd { margin: 0; color: #17233b; font-size: 13px; font-weight: 800; }
-    .recipe-print-full-section { margin-top: 18px; break-inside: avoid; }
+    .recipe-print-full-section { margin-top: 18px; break-inside: auto; page-break-inside: auto; }
     .recipe-print-full-section h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-size: 18px; }
     .recipe-print-full-section h2 span { width: 26px; height: 26px; border-radius: 8px; display: inline-grid; place-items: center; background: #1d4ed8; color: #fff; font-size: 13px; }
-    .recipe-print-full-table { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid #dce4f2; border-radius: 12px; overflow: hidden; background: #fff; }
+    .recipe-print-full-table { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid #dce4f2; border-radius: 12px; overflow: visible; background: #fff; }
     .recipe-print-full-table th { background: #f0f4ff; color: #344466; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; text-align: left; padding: 8px 10px; border-bottom: 1px solid #dce4f2; }
     .recipe-print-full-table td { padding: 8px 10px; border-bottom: 1px solid #e7edf7; color: #25334d; font-size: 12px; vertical-align: middle; }
     .recipe-print-full-table tbody tr:last-child td { border-bottom: 0; }
@@ -767,7 +794,20 @@
     .recipe-print-full-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 12px; }
     .recipe-print-full-grid div { border-bottom: 1px solid #e5ebf5; padding: 0 0 7px; }
     .recipe-print-full-grid div:nth-last-child(-n+3) { border-bottom: 0; }
-    .recipe-print-full-nutrition-table { display: grid; place-items: start; padding: 12px; overflow: hidden; }
+    .recipe-print-full-front-card { padding: 14px; display: grid; gap: 12px; justify-items: center; break-inside: avoid; page-break-inside: avoid; }
+    .recipe-print-full-front-card .recipe-octagons-wrap,
+    .recipe-print-full-front-card .recipe-front-rectangles { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+    .recipe-print-full-front-card .recipe-octagon,
+    .recipe-print-full-front-card .recipe-front-rectangle { position: relative; color: #fff; background: #111; display: inline-flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; font-family: Arial, Helvetica, sans-serif; font-weight: 900; page-break-inside: avoid; break-inside: avoid; }
+    .recipe-print-full-front-card .recipe-octagon { width: 96px; min-width: 96px; height: 96px; clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); }
+    .recipe-print-full-front-card .recipe-front-rectangle { width: 190px; min-height: 72px; border: 3px solid #fff; outline: 2px solid #111; }
+    .recipe-print-full-front-card .recipe-octagon-title,
+    .recipe-print-full-front-card .recipe-front-rectangle-title { font-size: 12px; line-height: 1; letter-spacing: 0; }
+    .recipe-print-full-front-card .recipe-octagon-ministry { margin-top: 5px; font-size: 7px; line-height: 1; font-weight: 800; }
+    .recipe-print-full-front-card .recipe-nutrition-front-empty { margin: 0; color: #657491; font-weight: 700; }
+    .recipe-print-full-nutrition-section { break-before: page; page-break-before: always; break-inside: avoid; page-break-inside: avoid; }
+    .recipe-print-full-nutrition-card { break-inside: avoid; page-break-inside: avoid; }
+    .recipe-print-full-nutrition-table { display: grid; place-items: start; padding: 12px; overflow: visible; break-inside: avoid; page-break-inside: avoid; }
     .recipe-nutrition-label-card { width: 100%; max-width: 390px; border: 2px solid #111; padding: 10px; background: #fff; color: #111; font-family: Arial, Helvetica, sans-serif; }
     .recipe-nutrition-label-card h3 { margin: 0; font-size: 26px; font-weight: 900; color: #111; }
     .recipe-nutrition-product-name, .recipe-nutrition-serving, .recipe-nutrition-subtitle, .recipe-nutrition-dv, .recipe-nutrition-micros, .recipe-nutrition-footnote { margin: 4px 0; color: #111; }
@@ -782,7 +822,22 @@
     .recipe-print-full-footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid #dce4f2; color: #6b7890; font-size: 11px; display: flex; justify-content: space-between; }
     @media print {
       body { background: #fff; }
-      .recipe-print-full-page { width: 210mm; margin: 0; padding: 14mm; box-shadow: none; }
+      .recipe-print-full-page { width: 210mm; min-height: auto; margin: 0; padding: 14mm; box-shadow: none; }
+      .recipe-print-full-hero { break-inside: avoid; page-break-inside: avoid; }
+      .recipe-print-full-section { break-inside: auto; page-break-inside: auto; }
+      .recipe-print-full-section h2 { break-after: avoid; page-break-after: avoid; }
+      .recipe-print-full-table { border-collapse: collapse; border-radius: 0; overflow: visible; break-inside: auto; page-break-inside: auto; }
+      .recipe-print-full-table thead { display: table-header-group; }
+      .recipe-print-full-table tfoot { display: table-footer-group; }
+      .recipe-print-full-table tr { break-inside: avoid; page-break-inside: avoid; }
+      .recipe-print-full-table th, .recipe-print-full-table td { break-inside: avoid; page-break-inside: avoid; }
+      .recipe-print-full-grid { break-inside: avoid; page-break-inside: avoid; }
+      .recipe-print-full-front-card { break-inside: avoid; page-break-inside: avoid; }
+      .recipe-print-full-nutrition-section { break-before: page; page-break-before: always; break-inside: avoid; page-break-inside: avoid; }
+      .recipe-print-full-nutrition-card,
+      .recipe-print-full-nutrition-table,
+      .recipe-nutrition-label-card { break-inside: avoid; page-break-inside: avoid; overflow: visible; }
+      .recipe-print-full-footer { break-inside: avoid; page-break-inside: avoid; }
       @page { size: A4; margin: 0; }
     }
   </style>
@@ -821,8 +876,12 @@
       <dl class="recipe-print-full-card recipe-print-full-grid">${keyValueGrid(nutritionItems)}</dl>
     </section>
     <section class="recipe-print-full-section">
-      <h2><span>5</span>Tabla nutricional</h2>
-      <div class="recipe-print-full-card">${nutritionTable}</div>
+      <h2><span>5</span>Etiquetado frontal</h2>
+      <div class="recipe-print-full-card">${frontLabelsHtml}</div>
+    </section>
+    <section class="recipe-print-full-section recipe-print-full-nutrition-section">
+      <h2><span>6</span>Tabla nutricional</h2>
+      <div class="recipe-print-full-card recipe-print-full-nutrition-card">${nutritionTable}</div>
     </section>
     <footer class="recipe-print-full-footer"><span>&copy; Copyright 2026 - Back Office para empresas, powered by ABR</span></footer>
   </main>
@@ -858,8 +917,9 @@
       const page = extractRecipeFullPrintPageHtml(buildRecipeFullPrintHtml(recipe));
       return page.replace('Receta / La Jamonera</p>', `Receta / La Jamonera / ${index + 1} de ${list.length}</p>`);
     }).join('\n');
+    const documentTitle = getRecipePrintDocumentTitle('Recetas La Jamonera');
     return firstDoc
-      .replace(/<title>[\s\S]*?<\/title>/, '<title>Recetas La Jamonera - Print</title>')
+      .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(documentTitle)}</title>`)
       .replace(/<main class="recipe-print-full-page">[\s\S]*?<\/main>/, pagesHtml);
   };
 
@@ -1427,7 +1487,10 @@
     }));
 
     const pdf = buildPdfFromCanvases(canvases, config.sheet);
-    const safeName = `${normalizeLower(payload.title).replace(/[^a-z0-9]+/g, '-') || 'receta'}-${mode}-${config.sheet}`;
+    const safeName = `${getRecipePrintFileSlug(payload.title)}-${mode}-${config.sheet}`;
+    if (typeof pdf.setProperties === 'function') {
+      pdf.setProperties({ title: getRecipePrintDocumentTitle(payload.title) });
+    }
 
     if (config.action === 'download') {
       pdf.save(`${safeName}.pdf`);

@@ -4816,9 +4816,30 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   font-weight: 750;
 }
 
+.inventario-infinite-toggle .meta-spinner {
+  width: 18px;
+  height: 18px;
+}
+
 .inventario-upload-dropzone.is-disabled {
   opacity: .55;
   cursor: not-allowed;
+}
+
+.inventario-editing-entry-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid #bed0f6;
+  background: #eef4ff;
+  color: #274d96;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin-bottom: 12px;
 }
 
 .inventario-threshold-btn {
@@ -5441,10 +5462,49 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 .inventario-entry-actions {
   display: inline-flex;
   gap: 6px;
+  align-items: center;
 }
 
 .inventario-entry-actions .inventario-delete-btn{
   border-radius: 5px !important;
+}
+
+.inventario-entry-more-wrap {
+  display: inline-flex;
+}
+
+.inventario-entry-more-menu {
+  position: fixed;
+  min-width: 190px;
+  padding: 6px;
+  border: 1px solid #d8e2f6;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(23, 36, 68, 0.18);
+  z-index: 3300;
+}
+
+.inventario-entry-more-menu button {
+  width: 100%;
+  min-height: 34px;
+  border: 0;
+  border-radius: 6px;
+  background: #fff4f4;
+  color: #b42338;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-start;
+  padding: 7px 9px;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.inventario-entry-more-menu button:disabled {
+  opacity: .48;
+  cursor: not-allowed;
+  color: #7d8799;
+  background: #f3f5fa;
 }
 
 .inventario-table-head.enhanced #inventarioEntriesSearch {
@@ -5595,6 +5655,82 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   color: #5f6f94;
   font-size: 0.8rem;
   text-align: center;
+}
+
+.inventario-file-upload-list {
+  display: grid;
+  gap: 6px;
+  text-align: left;
+}
+
+.inventario-file-upload-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 30px;
+  border: 1px solid #d8e2f6;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+.inventario-file-upload-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  color: #2c3d64;
+}
+
+.inventario-file-upload-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  font-weight: 800;
+}
+
+.inventario-file-upload-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.inventario-file-upload-remove {
+  width: 24px;
+  height: 24px;
+  border: 1px solid #f1b7bd;
+  border-radius: 999px;
+  background: #fff3f4;
+  color: #b42338;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  font-size: 0.72rem;
+}
+
+.inventario-file-upload-remove:hover {
+  background: #ffe1e5;
+}
+
+.inventario-file-upload-status .meta-spinner {
+  width: 16px;
+  height: 16px;
+}
+
+.inventario-file-upload-status.is-uploading {
+  color: #315eb7;
+}
+
+.inventario-file-upload-status.is-done {
+  color: #14833e;
+}
+
+.inventario-file-upload-status.is-error {
+  color: #c0392b;
 }
 
 #imageViewerModal {

@@ -1250,6 +1250,163 @@
     return [];
   };
 
+  const invoiceUploadFileKey = (file) => file
+    ? `${normalizeValue(file.name)}|${Number(file.size || 0)}|${Number(file.lastModified || 0)}`
+    : '';
+
+  const invoiceUploadSummary = (items = []) => {
+    const uploaded = items.filter((item) => item.status === 'done' && item.url).length;
+    const uploading = items.filter((item) => item.status === 'uploading').length;
+    const failed = items.filter((item) => item.status === 'error').length;
+    if (!uploaded && !uploading && !failed) return 'Sin archivos seleccionados';
+    const parts = [];
+    if (uploading) parts.push(`${uploading} subiendo`);
+    if (uploaded) parts.push(`${uploaded} adjunto${uploaded === 1 ? '' : 's'} listo${uploaded === 1 ? '' : 's'}`);
+    if (failed) parts.push(`${failed} con error`);
+    return parts.join(' · ');
+  };
+
+  const createInvoiceUploadItem = (file) => ({
+    id: makeId('invoice_upload'),
+    file,
+    fileKey: invoiceUploadFileKey(file),
+    name: normalizeValue(file?.name) || 'Adjunto',
+    status: 'uploading',
+    url: '',
+    error: ''
+  });
+
+  const createExistingInvoiceUploadItem = (url, index = 0) => ({
+    id: makeId('invoice_existing'),
+    file: null,
+    fileKey: '',
+    name: `Adjunto ${index + 1}`,
+    status: 'done',
+    url: normalizeValue(url),
+    error: '',
+    existing: true
+  });
+
+  const getInvoiceUploadItems = () => Array.isArray(state.editorDraft?.invoiceUploadItems)
+    ? state.editorDraft.invoiceUploadItems
+    : [];
+
+  const setInvoiceUploadItems = (items = []) => {
+    state.editorDraft.invoiceUploadItems = items;
+    state.editorDraft.invoiceImageFiles = items
+      .filter((item) => item.file && item.status !== 'done')
+      .map((item) => item.file);
+    state.editorDraft.invoiceImageCountLabel = invoiceUploadSummary(items);
+  };
+
+  const renderInvoiceUploadFeedbackHtml = (draft = state.editorDraft) => {
+    const items = Array.isArray(draft?.invoiceUploadItems) ? draft.invoiceUploadItems : [];
+    if (!items.length) {
+      return escapeHtml(draft?.invoiceImageCountLabel || 'Sin archivos seleccionados');
+    }
+    return `<div class="inventario-file-upload-list">${items.map((item) => {
+      const statusHtml = item.status === 'uploading'
+        ? '<span class="inventario-file-upload-status is-uploading"><img src="./IMG/Meta-ai-logo.webp" alt="Subiendo" class="meta-spinner"><span>Subiendo</span></span>'
+        : item.status === 'error'
+          ? `<span class="inventario-file-upload-status is-error"><i class="fa-solid fa-circle-exclamation"></i><span>${escapeHtml(item.error || 'Error al subir')}</span></span>`
+          : `<span class="inventario-file-upload-status is-done"><i class="fa-solid fa-circle-check"></i><span>${item.existing ? 'Cargado' : 'Subido'}</span></span>`;
+      return `<span class="inventario-file-upload-row"><span class="inventario-file-upload-name">${escapeHtml(item.name || 'Adjunto')}</span><span class="inventario-file-upload-actions">${statusHtml}<button type="button" class="inventario-file-upload-remove" data-invoice-upload-remove="${escapeHtml(item.id)}" aria-label="Quitar adjunto"><i class="fa-solid fa-xmark"></i></button></span></span>`;
+    }).join('')}</div>`;
+  };
+
+  const updateInvoiceUploadFeedback = () => {
+    const feedback = nodes.editorForm?.querySelector('#inventoryInvoiceImageFeedback');
+    if (feedback) feedback.innerHTML = renderInvoiceUploadFeedbackHtml();
+  };
+
+  const getInvoiceDraftImageUrls = () => {
+    const seen = new Set();
+    return getInvoiceUploadItems()
+      .filter((item) => item.status === 'done' && normalizeValue(item.url))
+      .map((item) => normalizeValue(item.url))
+      .filter((url) => {
+        if (seen.has(url)) return false;
+        seen.add(url);
+        return true;
+      });
+  };
+
+  const uploadInvoiceDraftFiles = async (files = []) => {
+    const selectedFiles = [...files].filter(Boolean);
+    if (!selectedFiles.length) return true;
+    const invalid = selectedFiles.map(validateInvoiceFile).find(Boolean);
+    if (invalid) {
+      await openIosSwal({ title: 'Adjunto inválido', html: `<p>${escapeHtml(invalid)}</p>`, icon: 'warning', confirmButtonText: 'Entendido' });
+      return false;
+    }
+    const currentItems = getInvoiceUploadItems().filter((item) => item.status !== 'error');
+    const knownKeys = new Set(currentItems.map((item) => item.fileKey).filter(Boolean));
+    const newItems = selectedFiles
+      .filter((file) => {
+        const key = invoiceUploadFileKey(file);
+        if (!key || knownKeys.has(key)) return false;
+        knownKeys.add(key);
+        return true;
+      })
+      .map(createInvoiceUploadItem);
+
+    if (!newItems.length) {
+      updateInvoiceUploadFeedback();
+      return true;
+    }
+
+    const nextItems = [...currentItems, ...newItems];
+    setInvoiceUploadItems(nextItems);
+    updateInvoiceUploadFeedback();
+
+    await Promise.all(newItems.map(async (item) => {
+      let status = 'done';
+      let url = '';
+      let errorMessage = '';
+      try {
+        url = await uploadImageToStorage(item.file, 'inventario/facturas');
+      } catch (error) {
+        status = 'error';
+        errorMessage = 'No se pudo subir';
+      } finally {
+        const liveItems = getInvoiceUploadItems();
+        const liveItem = liveItems.find((current) => current.id === item.id);
+        if (liveItem) {
+          liveItem.url = url;
+          liveItem.status = status;
+          liveItem.file = null;
+          liveItem.error = errorMessage;
+          setInvoiceUploadItems(liveItems);
+          updateInvoiceUploadFeedback();
+        }
+      }
+    }));
+
+    const newItemIds = new Set(newItems.map((item) => item.id));
+    return !getInvoiceUploadItems().some((item) => newItemIds.has(item.id) && item.status === 'error');
+  };
+
+  const waitInvoiceDraftUploads = async () => {
+    const legacyFiles = Array.isArray(state.editorDraft?.invoiceImageFiles) ? state.editorDraft.invoiceImageFiles : [];
+    if (legacyFiles.length) {
+      const uploadedLegacy = await uploadInvoiceDraftFiles(legacyFiles);
+      if (!uploadedLegacy) throw new Error('No se pudieron subir todos los adjuntos.');
+    }
+    let guard = 0;
+    while (getInvoiceUploadItems().some((item) => item.status === 'uploading') && guard < 400) {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      guard += 1;
+    }
+    const failed = getInvoiceUploadItems().find((item) => item.status === 'error');
+    if (failed) throw new Error(failed.error || 'No se pudieron subir todos los adjuntos.');
+    if (getInvoiceUploadItems().some((item) => item.status === 'uploading')) {
+      throw new Error('La subida de adjuntos sigue en curso.');
+    }
+    return getInvoiceDraftImageUrls();
+  };
+
+  const providerIdFromEntry = (entry) => resolveProvider(entry?.provider)?.id || '';
+
   const rerenderEditorKeepViewport = (ingredientId, draft, focusSelector = '') => {
     const modalBody = inventarioModal.querySelector('.modal-body');
     const scrollTop = modalBody?.scrollTop || 0;
@@ -3076,6 +3233,129 @@
     return true;
   };
 
+  const buildEntryEditDraft = (ingredientId, record, entry) => {
+    const urls = entryImageUrls(entry);
+    const uploadItems = urls.map((url, index) => createExistingInvoiceUploadItem(url, index));
+    const providerId = providerIdFromEntry(entry);
+    const qtyValue = Number(entry?.qty || 0);
+    return {
+      qty: Number.isFinite(qtyValue) && qtyValue > 0 ? String(qtyValue) : '',
+      unit: entry.unit || record.stockUnit || state.ingredientes[ingredientId]?.measure || 'kilos',
+      packageQty: entry.packageQty ?? record.packageQty ?? '',
+      entryDate: entry.entryDate || getArgentinaIsoDate(),
+      expiryDate: entry.noPerecedero ? '' : (entry.expiryDate || ''),
+      noPerecedero: Boolean(entry.noPerecedero),
+      usoInternoEmpresa: Boolean(entry.usoInternoEmpresa),
+      invoiceNumber: entry.invoiceNumber || '',
+      provider: providerId,
+      invoiceImageFile: null,
+      invoiceImageFiles: [],
+      invoiceUploadItems: uploadItems,
+      invoiceImageCountLabel: invoiceUploadSummary(uploadItems),
+      editingEntryId: entry.id,
+      tokens: [...record.lotConfig.tokens],
+      customAcronym: normalizeValue(record.lotConfig.customAcronym),
+      includeSeparator: Boolean(record.lotConfig.includeSeparator),
+      separator: record.lotConfig.separator || '-',
+      showLotConfig: !Boolean(record.lotConfig.configured || record.lotConfig.collapsed),
+      bulkEntries: []
+    };
+  };
+
+  const loadEntryIntoStockForm = (ingredientId, entryId) => {
+    const record = getRecord(ingredientId);
+    const entry = (Array.isArray(record.entries) ? record.entries : []).find((item) => item.id === entryId);
+    if (!entry) return false;
+    const draft = buildEntryEditDraft(ingredientId, record, entry);
+    renderEditor(ingredientId, draft);
+    requestAnimationFrame(() => {
+      const target = nodes.editorForm?.querySelector('#inventoryQty') || nodes.editorForm?.querySelector('#inventarioStockEntrySection');
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const qtyInput = nodes.editorForm?.querySelector('#inventoryQty');
+      qtyInput?.focus({ preventScroll: true });
+      if (qtyInput && typeof qtyInput.select === 'function') qtyInput.select();
+    });
+    return true;
+  };
+
+  const clearEntryMovements = async (ingredientId, entryId) => {
+    const record = getRecord(ingredientId);
+    const entries = Array.isArray(record.entries) ? [...record.entries] : [];
+    const idx = entries.findIndex((item) => item.id === entryId);
+    if (idx < 0) return false;
+    const entry = { ...entries[idx] };
+    const movements = getEntryUsages(entry);
+    if (!movements.length) return false;
+
+    const confirm = await openIosSwal({
+      title: 'Eliminar movimientos',
+      html: `<div class="text-start"><p>Se van a eliminar todos los movimientos asociados a este ingreso.</p><small class="text-muted">El stock consumido por esos movimientos volverá a quedar disponible en este lote. Esta acción no elimina el ingreso ni sus adjuntos.</small></div>`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Eliminar movimientos',
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        confirmButton: 'ios-btn ios-btn-danger',
+        cancelButton: 'ios-btn ios-btn-secondary'
+      }
+    });
+    if (!confirm.isConfirmed) return false;
+
+    openIosSwal({
+      title: 'Eliminando movimientos...',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Procesando" class="meta-spinner-login"></div>',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false
+    });
+    await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+
+    try {
+      const entryUnit = entry.unit || record.stockUnit || 'kilos';
+      const qtyBase = Number.isFinite(Number(entry.qtyBase))
+        ? Number(entry.qtyBase)
+        : Number(toBase(Number(entry.qty || 0), entryUnit).toFixed(6));
+      const currentAvailableBase = Number.isFinite(Number(entry.availableBase))
+        ? Number(entry.availableBase)
+        : Number(toBase(getAvailableQty(entry), entryUnit).toFixed(6));
+      const restoredBase = movements.reduce((acc, movement) => {
+        const usedQty = Number(movement?.usedQty);
+        const usedUnit = normalizeValue(movement?.usedUnit || entryUnit);
+        if (Number.isFinite(usedQty) && usedQty > 0) {
+          return acc + Number(toBase(usedQty, usedUnit).toFixed(6));
+        }
+        const kilosUsed = Number(movement?.kilosUsed);
+        if (Number.isFinite(kilosUsed) && kilosUsed > 0) {
+          return acc + Number(toBase(kilosUsed, 'kilos').toFixed(6));
+        }
+        return acc;
+      }, currentAvailableBase);
+      const nextAvailableBase = Number(Math.min(qtyBase, Math.max(0, restoredBase)).toFixed(6));
+      const nextAvailableQty = Number(fromBase(nextAvailableBase, entryUnit).toFixed(4));
+
+      entry.productionUsage = [];
+      entry.usoInternoEmpresa = false;
+      entry.availableBase = nextAvailableBase;
+      entry.availableQty = nextAvailableQty;
+      entry.availableKg = Number(convertToKg(nextAvailableQty, entryUnit).toFixed(4));
+      if (nextAvailableQty > 0.0001) entry.lotStatus = 'disponible';
+      entry.lastEditedAt = Date.now();
+
+      entries[idx] = entry;
+      record.entries = entries;
+      recomputeRecordStock(record, record.stockUnit || entryUnit);
+      state.inventario.items[ingredientId] = record;
+      rebuildInventarioIndexes();
+      await persistInventario();
+      return true;
+    } catch (error) {
+      await openIosSwal({ title: 'No se pudo eliminar', html: '<p>Ocurrió un error eliminando los movimientos.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      return false;
+    } finally {
+      if (Swal.isVisible()) Swal.close();
+    }
+  };
+
   const renderEntryTable = (record) => {
     const source = Array.isArray(record.entries) ? [...record.entries] : [];
     const filtered = getFilteredEntries(source);
@@ -3111,6 +3391,7 @@
       const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
       const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(resolutionRow.at)}</div></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td><td></td></tr>` : '';
       const canEditEntry = availableQtyInUnit > 0.0001;
+      const hasMovements = getEntryUsages(entry).length > 0;
       return `
       <tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
         <td>${formatEntryDateTime(entry.entryDate, entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}</td>
@@ -3124,6 +3405,12 @@
             ${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-toggle-entry-collapse="${entry.id}" aria-label="Colapsar desglose"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-print-entry="${entry.id}" aria-label="Imprimir ingreso"><i class="fa-solid fa-print"></i></button>
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn ${canEditEntry ? '' : 'is-disabled'}" data-edit-entry="${entry.id}" aria-label="Editar ingreso" ${canEditEntry ? '' : 'disabled'}><i class="fa-solid fa-pen"></i></button>
+            <div class="inventario-entry-more-wrap">
+              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-entry-more="${entry.id}" aria-label="Más opciones"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+              <div class="inventario-entry-more-menu d-none" data-entry-more-menu="${entry.id}">
+                <button type="button" data-clear-entry-movements="${entry.id}" ${hasMovements ? '' : 'disabled'}><i class="fa-solid fa-rotate-left"></i><span>Eliminar movimientos</span></button>
+              </div>
+            </div>
             <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn inventario-icon-only-btn" data-delete-entry="${entry.id}" aria-label="Eliminar ingreso"><i class="fa-solid fa-trash"></i></button>
           </div>
         </td>
@@ -3353,7 +3640,9 @@
       provider: '',
       invoiceImageFile: null,
       invoiceImageFiles: [],
+      invoiceUploadItems: [],
       invoiceImageCountLabel: 'Sin archivos seleccionados',
+      editingEntryId: '',
       tokens: [...record.lotConfig.tokens],
       customAcronym: normalizeValue(record.lotConfig.customAcronym),
       includeSeparator: Boolean(record.lotConfig.includeSeparator),
@@ -3362,6 +3651,8 @@
       bulkEntries: []
     };
     state.editorDraft = { ...baseDraft, ...(draft || {}) };
+    if (!Array.isArray(state.editorDraft.invoiceUploadItems)) state.editorDraft.invoiceUploadItems = [];
+    state.editorDraft.invoiceImageCountLabel = invoiceUploadSummary(state.editorDraft.invoiceUploadItems);
     state.selectedIngredientId = ingredientId;
     state.editorDirty = false;
     setStateView('editor');
@@ -3369,7 +3660,9 @@
 
     const providers = sortedProviders();
     const providerSearchValue = findProviderById(state.editorDraft?.provider)?.name || '';
-    const bulkEntries = Array.isArray(state.editorDraft?.bulkEntries) ? state.editorDraft.bulkEntries : [];
+    const editingEntryId = normalizeValue(state.editorDraft?.editingEntryId);
+    const isEditingEntry = Boolean(editingEntryId);
+    const bulkEntries = isEditingEntry ? [] : (Array.isArray(state.editorDraft?.bulkEntries) ? state.editorDraft.bulkEntries : []);
     const infiniteStock = isInfiniteStockRecord(record);
     const stockDisabledAttr = infiniteStock ? 'disabled' : '';
     const stockUnit = record.stockUnit || ingredient.measure || state.editorDraft.unit || 'kilos';
@@ -3430,7 +3723,7 @@
             ${expiryRows.length ? `<div class="inventario-stat-card is-alert"><small>Lotes con vencimiento (${expiringDays} días)</small>${editorExpiryHtml}</div>` : ''}
           </div>
           <div class="inventario-head-actions-row">
-            <label class="inventario-check-row inventario-check-row-compact inventario-infinite-toggle"><input type="checkbox" id="inventarioInfiniteStockToggle" ${infiniteStock ? 'checked' : ''}><span>Stock infinito</span></label>
+            <label class="inventario-check-row inventario-check-row-compact inventario-infinite-toggle"><input type="checkbox" id="inventarioInfiniteStockToggle" ${infiniteStock ? 'checked' : ''}><span>Stock infinito</span><img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner d-none" id="inventarioInfiniteStockSpinner"></label>
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-head-action" id="inventarioProductThresholdBtn"><i class="fa-solid fa-sliders"></i><span>Configurar umbrales</span></button>
             <button type="button" class="btn ios-btn ios-btn-secondary inventario-head-action" id="inventarioWeeklySheetBtn"><i class="fa-regular fa-file-lines"></i><span>Planilla Semanal</span></button>
             <button type="button" id="inventarioEditIngredientBtn" class="btn ios-btn ios-btn-success inventario-head-action"><i class="fa-solid fa-pen"></i><span>Editar ingrediente</span></button>
@@ -3462,8 +3755,9 @@
         </div>
       </section>
 
-      <section class="recipe-step-card step-block">
-        <h6 class="step-title"><span class="recipe-step-number">2</span> Ingresar Stock</h6>
+      <section class="recipe-step-card step-block" id="inventarioStockEntrySection">
+        <h6 class="step-title"><span class="recipe-step-number">2</span> ${isEditingEntry ? 'Editar ingreso' : 'Ingresar Stock'}</h6>
+        ${isEditingEntry ? '<div class="inventario-editing-entry-note"><i class="fa-solid fa-pen"></i><span>Estás editando un ingreso existente. Guardá los cambios desde esta misma sección.</span></div>' : ''}
         <div class="step-content recipe-fields-flex inventario-stock-grid">
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryQty"><i class="fa-solid fa-weight-hanging inventario-step-icon"></i> Cantidad a ingresar</label>
@@ -3520,10 +3814,10 @@
               <span>Arrastrá adjuntos o hacé click para seleccionar</span>
             </label>
             <input id="inventoryInvoiceImage" class="form-control image-file-input inventario-hidden-file-input" autocomplete="off" type="file" accept="image/*,application/pdf" multiple ${stockDisabledAttr}>
-            <small id="inventoryInvoiceImageFeedback" class="inventario-file-feedback">${escapeHtml(state.editorDraft.invoiceImageCountLabel || 'Sin archivos seleccionados')}</small>
+            <small id="inventoryInvoiceImageFeedback" class="inventario-file-feedback">${renderInvoiceUploadFeedbackHtml(state.editorDraft)}</small>
           </div>
         </div>
-          <div class="recipe-table-wrap inventario-bulk-table-wrap ${bulkEntries.length ? '' : 'd-none'}" id="inventarioBulkTableWrap">
+          <div class="recipe-table-wrap inventario-bulk-table-wrap ${bulkEntries.length && !isEditingEntry ? '' : 'd-none'}" id="inventarioBulkTableWrap">
             <div class="recipe-table-scroll" aria-label="Tabla de productos en factura">
               <table class="recipe-table inventario-bulk-table">
                 <thead><tr><th style="width:40px">↕</th><th style="min-width:320px">Producto</th><th style="width:180px">Fecha</th><th style="width:170px">Cantidad</th><th style="width:300px">Unidad</th><th style="width:72px">Acción</th></tr></thead>
@@ -3557,11 +3851,12 @@
             </div>
           </div>
           <div class="recipe-table-actions inventario-save-inline">
-            <button type="button" id="addBulkInventoryBtn" class="btn ios-btn ios-btn-success recipe-table-action-btn inventario-add-bulk-btn" ${stockDisabledAttr}><i class="fa-solid fa-plus"></i><span>Productos en factura</span></button>
+            <button type="button" id="addBulkInventoryBtn" class="btn ios-btn ios-btn-success recipe-table-action-btn inventario-add-bulk-btn ${isEditingEntry ? 'd-none' : ''}" ${isEditingEntry ? 'disabled' : stockDisabledAttr}><i class="fa-solid fa-plus"></i><span>Productos en factura</span></button>
+            ${isEditingEntry ? '<button type="button" id="cancelInventoryEditBtn" class="btn ios-btn ios-btn-secondary recipe-table-action-btn"><i class="fa-solid fa-xmark"></i><span>Cancelar edición</span></button>' : ''}
             <button type="submit" id="saveInventoryBtn" class="btn ios-btn ios-btn-success recipe-table-action-btn recipe-table-action-btn-primary" ${stockDisabledAttr}>
               <img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner d-none" id="saveInventorySpinner">
               <i class="fa-solid fa-floppy-disk" id="saveInventoryIcon"></i>
-              <span>Guardar ingreso</span>
+              <span>${isEditingEntry ? 'Guardar cambios' : 'Guardar ingreso'}</span>
             </button>
           </div>
         </div>
@@ -3585,13 +3880,8 @@
       state.editorDraft.customAcronym = nodes.editorForm.querySelector('#lotCustomAcronym')?.value || '';
       state.editorDraft.includeSeparator = Boolean(nodes.editorForm.querySelector('#lotIncludeSeparator')?.checked);
       state.editorDraft.separator = nodes.editorForm.querySelector('#lotSeparator')?.value || '-';
-      const inputFiles = [...(nodes.editorForm.querySelector('#inventoryInvoiceImage')?.files || [])];
-      const files = inputFiles.length ? inputFiles : (Array.isArray(state.editorDraft.invoiceImageFiles) ? state.editorDraft.invoiceImageFiles : []);
-      state.editorDraft.invoiceImageFiles = files;
-      state.editorDraft.invoiceImageCountLabel = files.length
-        ? `${files.length} archivo${files.length === 1 ? '' : 's'} adjunto${files.length === 1 ? '' : 's'} para subir`
-        : 'Sin archivos seleccionados';
-      state.editorDraft.bulkEntries = [...nodes.editorForm.querySelectorAll('[data-bulk-index]')].map((row) => {
+      state.editorDraft.invoiceImageCountLabel = invoiceUploadSummary(getInvoiceUploadItems());
+      state.editorDraft.bulkEntries = isEditingEntry ? [] : [...nodes.editorForm.querySelectorAll('[data-bulk-index]')].map((row) => {
         const idx = row.dataset.bulkIndex;
         const current = Array.isArray(state.editorDraft.bulkEntries) ? state.editorDraft.bulkEntries[idx] : null;
         return {
@@ -3613,7 +3903,7 @@
       const invoice = normalizeLower(nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value);
       if (!invoice) return false;
       const indexed = state.inventario.indexes?.invoiceByIngredient?.[ingredientId]?.[invoice];
-      return Boolean(indexed);
+      return Boolean(indexed && indexed !== editingEntryId);
     };
 
     const renderInvoiceFeedback = () => {
@@ -3710,25 +4000,60 @@
       renderEditor(ingredientId, state.editorDraft);
     });
     nodes.editorForm.querySelector('#inventarioInfiniteStockToggle')?.addEventListener('change', async (event) => {
-      const currentRecord = getRecord(ingredientId);
-      currentRecord.infiniteStock = Boolean(event.target.checked);
-      if (currentRecord.infiniteStock) {
-        state.editorDraft = {
-          ...state.editorDraft,
-          qty: '',
-          invoiceNumber: '',
-          provider: '',
-          invoiceImageFiles: [],
-          invoiceImageFile: null,
-          invoiceImageCountLabel: 'Sin archivos seleccionados',
-          bulkEntries: []
-        };
+      const toggle = event.target;
+      const spinner = nodes.editorForm.querySelector('#inventarioInfiniteStockSpinner');
+      const previousValue = isInfiniteStockRecord(getRecord(ingredientId));
+      toggle.disabled = true;
+      spinner?.classList.remove('d-none');
+      await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+      try {
+        const currentRecord = getRecord(ingredientId);
+        currentRecord.infiniteStock = Boolean(toggle.checked);
+        if (currentRecord.infiniteStock) {
+          state.editorDraft = {
+            ...state.editorDraft,
+            qty: '',
+            invoiceNumber: '',
+            provider: '',
+            invoiceImageFiles: [],
+            invoiceImageFile: null,
+            invoiceUploadItems: [],
+            invoiceImageCountLabel: 'Sin archivos seleccionados',
+            editingEntryId: '',
+            bulkEntries: []
+          };
+        }
+        state.inventario.items[ingredientId] = currentRecord;
+        rebuildInventarioIndexes();
+        await persistInventario();
+        state.editorDirty = false;
+        renderEditor(ingredientId, state.editorDraft);
+      } catch (error) {
+        toggle.checked = previousValue;
+        await openIosSwal({ title: 'No se pudo actualizar', html: '<p>Ocurrió un error guardando el estado de stock infinito.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      } finally {
+        toggle.disabled = false;
+        spinner?.classList.add('d-none');
       }
-      state.inventario.items[ingredientId] = currentRecord;
-      rebuildInventarioIndexes();
-      await persistInventario();
-      state.editorDirty = false;
-      renderEditor(ingredientId, state.editorDraft);
+    });
+
+    nodes.editorForm.querySelector('#cancelInventoryEditBtn')?.addEventListener('click', () => {
+      renderEditor(ingredientId, {
+        ...state.editorDraft,
+        editingEntryId: '',
+        qty: '',
+        invoiceNumber: '',
+        provider: '',
+        invoiceImageFiles: [],
+        invoiceImageFile: null,
+        invoiceUploadItems: [],
+        invoiceImageCountLabel: 'Sin archivos seleccionados',
+        noPerecedero: false,
+        usoInternoEmpresa: false,
+        expiryDate: addDaysToIso(getArgentinaIsoDate(), 5),
+        entryDate: getArgentinaIsoDate(),
+        bulkEntries: []
+      });
     });
 
     nodes.editorForm.querySelectorAll('[data-lot-check]').forEach((input) => {
@@ -4253,21 +4578,20 @@
       });
     });
 
-    nodes.editorForm.querySelector('#inventoryInvoiceImage')?.addEventListener('change', () => {
-      syncDraft();
-      const feedback = nodes.editorForm.querySelector('#inventoryInvoiceImageFeedback');
-      if (feedback) {
-        feedback.textContent = state.editorDraft.invoiceImageCountLabel || 'Sin archivos seleccionados';
-      }
-    });
     const invoiceInput = nodes.editorForm.querySelector('#inventoryInvoiceImage');
     const invoiceDropzone = nodes.editorForm.querySelector('.inventario-upload-dropzone');
-    const assignDroppedFiles = (fileList) => {
+    const handleInvoiceFileSelection = async (fileList) => {
+      if (infiniteStock) return;
+      syncDraft();
+      await uploadInvoiceDraftFiles(fileList);
+      if (invoiceInput) invoiceInput.value = '';
+    };
+    invoiceInput?.addEventListener('change', async () => {
+      await handleInvoiceFileSelection(invoiceInput.files || []);
+    });
+    const assignDroppedFiles = async (fileList) => {
       if (!invoiceInput || !fileList?.length) return;
-      const dt = new DataTransfer();
-      [...fileList].forEach((file) => dt.items.add(file));
-      invoiceInput.files = dt.files;
-      invoiceInput.dispatchEvent(new Event('change', { bubbles: true }));
+      await handleInvoiceFileSelection(fileList);
     };
     invoiceDropzone?.addEventListener('dragover', (event) => {
       event.preventDefault();
@@ -4286,10 +4610,19 @@
       event.preventDefault();
       invoiceInput?.click();
     });
+    nodes.editorForm.querySelector('#inventoryInvoiceImageFeedback')?.addEventListener('click', (event) => {
+      const removeBtn = event.target.closest('[data-invoice-upload-remove]');
+      if (!removeBtn) return;
+      const itemId = normalizeValue(removeBtn.dataset.invoiceUploadRemove);
+      setInvoiceUploadItems(getInvoiceUploadItems().filter((item) => item.id !== itemId));
+      updateInvoiceUploadFeedback();
+      state.editorDirty = true;
+    });
     nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.addEventListener('change', async () => {
       const invoice = normalizeLower(nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value);
       if (!invoice) return;
-      if (state.inventario.indexes?.invoiceByIngredient?.[ingredientId]?.[invoice]) {
+      const indexed = state.inventario.indexes?.invoiceByIngredient?.[ingredientId]?.[invoice];
+      if (indexed && indexed !== editingEntryId) {
         await openIosSwal({
           title: 'Ingreso duplicado',
           html: '<p>Ya existe un ingreso para este producto con ese número de factura/remito.</p>',
@@ -4513,12 +4846,62 @@
 
     nodes.editorForm.querySelectorAll('[data-edit-entry]').forEach((btn) => {
       btn.addEventListener('click', async () => {
-        const edited = await editEntryWithSecurity(ingredientId, btn.dataset.editEntry);
-        if (!edited) return;
+        const icon = btn.querySelector('i');
+        const previousIcon = icon?.className || '';
+        btn.setAttribute('disabled', 'disabled');
+        if (icon) icon.className = 'fa-solid fa-spinner fa-spin';
+        await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+        loadEntryIntoStockForm(ingredientId, btn.dataset.editEntry);
+        if (icon) icon.className = previousIcon;
+        btn.removeAttribute('disabled');
+      });
+    });
+
+    const closeEntryMoreMenus = () => {
+      nodes.editorForm.querySelectorAll('[data-entry-more-menu]').forEach((menu) => {
+        menu.classList.add('d-none');
+        menu.style.left = '';
+        menu.style.top = '';
+      });
+    };
+    const positionEntryMoreMenu = (btn, menu) => {
+      if (!btn || !menu) return;
+      menu.classList.remove('d-none');
+      const rect = btn.getBoundingClientRect();
+      const menuRect = menu.getBoundingClientRect();
+      const gap = 8;
+      const left = Math.min(
+        Math.max(12, rect.right - menuRect.width),
+        window.innerWidth - menuRect.width - 12
+      );
+      const openBelow = rect.bottom + gap + menuRect.height < window.innerHeight - 12;
+      const top = openBelow
+        ? rect.bottom + gap
+        : Math.max(12, rect.top - menuRect.height - gap);
+      menu.style.left = `${left}px`;
+      menu.style.top = `${top}px`;
+    };
+    nodes.editorForm.querySelectorAll('[data-entry-more]').forEach((btn) => {
+      btn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const menu = nodes.editorForm.querySelector(`[data-entry-more-menu="${btn.dataset.entryMore}"]`);
+        const willOpen = menu?.classList.contains('d-none');
+        closeEntryMoreMenus();
+        if (willOpen) positionEntryMoreMenu(btn, menu);
+      });
+    });
+    nodes.editorForm.querySelectorAll('[data-clear-entry-movements]').forEach((btn) => {
+      btn.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        if (btn.disabled) return;
+        closeEntryMoreMenus();
+        const updated = await clearEntryMovements(ingredientId, btn.dataset.clearEntryMovements);
+        if (!updated) return;
         await loadData();
         renderEditor(ingredientId, state.editorDraft);
       });
     });
+    nodes.editorForm.querySelector('.inventario-table-wrap')?.addEventListener('click', closeEntryMoreMenus);
 
     nodes.editorForm.querySelectorAll('[data-delete-entry]').forEach((btn) => {
       btn.addEventListener('click', async () => {
@@ -4762,19 +5145,17 @@
     const providerId = normalizeValue(nodes.editorForm.querySelector('#inventoryProvider')?.value);
     const providerData = findProviderById(providerId);
     const provider = providerLabel(providerId);
-    const currentInputFiles = [...(nodes.editorForm.querySelector('#inventoryInvoiceImage')?.files || [])];
-    const files = currentInputFiles.length
-      ? currentInputFiles
-      : (Array.isArray(state.editorDraft.invoiceImageFiles) ? state.editorDraft.invoiceImageFiles : []);
     const record = getRecord(ingredientId);
-    const bulkEntries = Array.isArray(state.editorDraft.bulkEntries) ? state.editorDraft.bulkEntries : [];
+    const editingEntryId = normalizeValue(state.editorDraft?.editingEntryId);
+    const isEditingEntry = Boolean(editingEntryId);
+    const bulkEntries = isEditingEntry ? [] : (Array.isArray(state.editorDraft.bulkEntries) ? state.editorDraft.bulkEntries : []);
 
     if (isInfiniteStockRecord(record)) {
       await openIosSwal({ title: 'Stock infinito', html: `<p>${escapeHtml(INFINITE_STOCK_NOTICE)}</p>`, icon: 'info', confirmButtonText: 'Entendido' });
       return;
     }
 
-    if (!record.hasEntries && !state.editorDraft.tokens.length) {
+    if (!isEditingEntry && !record.hasEntries && !state.editorDraft.tokens.length) {
       await openIosSwal({
         title: 'Configuración requerida',
         html: '<p>Antes del primer ingreso debés configurar el LOTE.</p>',
@@ -4785,7 +5166,7 @@
     }
 
     const weeklySheet = { ...getDefaultWeeklySheetConfig(), ...safeObject(record.weeklySheetConfig) };
-    if (!record.hasEntries && !weeklySheet.configured) {
+    if (!isEditingEntry && !record.hasEntries && !weeklySheet.configured) {
       const configured = await openWeeklySheetConfig(ingredientId, { force: true });
       if (!configured) return;
     }
@@ -4824,7 +5205,8 @@
       return;
     }
 
-    if (state.inventario.indexes?.invoiceByIngredient?.[ingredientId]?.[normalizeLower(invoiceNumber)]) {
+    const duplicateEntryId = state.inventario.indexes?.invoiceByIngredient?.[ingredientId]?.[normalizeLower(invoiceNumber)];
+    if (duplicateEntryId && duplicateEntryId !== editingEntryId) {
       await openIosSwal({
         title: 'Ingreso duplicado',
         html: '<p>Ya existe un ingreso para este producto con ese número de factura/remito.</p>',
@@ -4863,14 +5245,6 @@
       }
     }
 
-    for (const file of files) {
-      const message = validateInvoiceFile(file);
-      if (message) {
-        await openIosSwal({ title: 'Adjunto inválido', html: `<p>${message}</p>`, icon: 'warning', confirmButtonText: 'Entendido' });
-        return;
-      }
-    }
-
     const saveBtn = nodes.editorForm.querySelector('#saveInventoryBtn');
     const spinner = nodes.editorForm.querySelector('#saveInventorySpinner');
     const icon = nodes.editorForm.querySelector('#saveInventoryIcon');
@@ -4880,10 +5254,97 @@
     await new Promise((resolve) => requestAnimationFrame(() => resolve()));
 
     try {
-      const invoiceImageUrls = [];
-      for (const file of files) {
-        const imageUrl = await uploadImageToStorage(file, 'inventario/facturas');
-        if (imageUrl) invoiceImageUrls.push(imageUrl);
+      const invoiceImageUrls = await waitInvoiceDraftUploads();
+
+      if (isEditingEntry) {
+        const entries = Array.isArray(record.entries) ? [...record.entries] : [];
+        const idx = entries.findIndex((item) => item.id === editingEntryId);
+        if (idx < 0) throw new Error('No se encontró el ingreso a editar.');
+
+        const entry = { ...entries[idx] };
+        const entryUnit = entry.unit || unit;
+        const qtyValue = Number(qty.toFixed(2));
+        const qtyBase = Number(toBase(qtyValue, entryUnit).toFixed(6));
+        const qtyKg = Number(convertToKg(qtyValue, entryUnit).toFixed(4));
+        const previousQty = Number(entry.qty || 0);
+        const previousAvailable = Number(getAvailableQty(entry) || 0);
+        const consumedQty = Math.max(0, previousQty - previousAvailable);
+        const nextAvailableQty = usoInternoEmpresa ? 0 : Number(Math.max(0, qtyValue - consumedQty).toFixed(2));
+        const nextAvailableBase = Number(toBase(nextAvailableQty, entryUnit).toFixed(6));
+        const nextAvailableKg = Number(convertToKg(nextAvailableQty, entryUnit).toFixed(4));
+        const nextPackageQty = Number.isFinite(packageQty) ? packageQty : (record.packageQty || entry.packageQty || null);
+
+        entry.qty = qtyValue;
+        entry.unit = entryUnit;
+        entry.qtyKg = qtyKg;
+        entry.qtyBase = qtyBase;
+        entry.availableQty = nextAvailableQty;
+        entry.availableBase = nextAvailableBase;
+        entry.availableKg = nextAvailableKg;
+        entry.packageQty = nextPackageQty;
+        entry.invoiceNumber = invoiceNumber;
+        entry.entryDate = entryDate;
+        entry.expiryDate = noPerecedero ? '' : expiryDate;
+        entry.noPerecedero = Boolean(noPerecedero);
+        entry.usoInternoEmpresa = Boolean(usoInternoEmpresa);
+        entry.provider = provider;
+        entry.invoiceImageUrls = invoiceImageUrls;
+        entry.invoiceImageUrl = invoiceImageUrls[0] || '';
+        entry.lastEditedAt = Date.now();
+
+        if (usoInternoEmpresa) {
+          const currentUsage = Array.isArray(entry.productionUsage) ? entry.productionUsage : [];
+          const existingInternal = currentUsage.find((usage) => usage?.internalUse);
+          const nonInternalUsage = currentUsage.filter((usage) => !usage?.internalUse);
+          entry.productionUsage = [
+            ...nonInternalUsage,
+            {
+              id: existingInternal?.id || makeId('usage_internal'),
+              createdAt: existingInternal?.createdAt || Date.now(),
+              producedAt: existingInternal?.producedAt || Date.now(),
+              productionDate: entryDate,
+              expiryDateAtProduction: 'Uso interno en empresa',
+              kilosUsed: qtyKg,
+              usedQty: qtyValue,
+              usedUnit: entryUnit,
+              lotNumber: entry.lotNumber || '',
+              ingredientLot: entry.lotNumber || '',
+              productionId: '-',
+              internalUse: true,
+              note: 'Auto egreso · Envases primarios & más'
+            }
+          ];
+          entry.lotStatus = 'sin_trazabilidad';
+        } else if (entry.lotStatus === 'sin_trazabilidad' && nextAvailableQty > 0) {
+          entry.lotStatus = 'disponible';
+        }
+
+        entries[idx] = entry;
+        record.entries = entries;
+        record.stockUnit = record.stockUnit || entryUnit;
+        record.packageQty = record.packageQty || nextPackageQty;
+        record.hasEntries = entries.length > 0;
+        recomputeRecordStock(record, record.stockUnit || entryUnit);
+        state.inventario.items[ingredientId] = record;
+        rebuildInventarioIndexes();
+        await persistInventario();
+        state.editorDirty = false;
+        renderEditor(ingredientId, {
+          ...state.editorDraft,
+          editingEntryId: '',
+          qty: '',
+          invoiceNumber: '',
+          provider: '',
+          invoiceImageCountLabel: 'Sin archivos seleccionados',
+          invoiceImageFiles: [],
+          invoiceUploadItems: [],
+          noPerecedero: false,
+          usoInternoEmpresa: false,
+          expiryDate: addDaysToIso(getArgentinaIsoDate(), 5),
+          entryDate: getArgentinaIsoDate(),
+          bulkEntries: []
+        });
+        return;
       }
 
       const buildEntry = ({ targetIngredientId, targetRecord, qtyValue, unitValue, packageQtyValue, entryDateValue, expiryDateValue, noPerecederoValue, usoInternoValue }) => {
@@ -5014,11 +5475,20 @@
         provider: '',
         invoiceImageCountLabel: 'Sin archivos seleccionados',
         invoiceImageFiles: [],
+        invoiceUploadItems: [],
+        editingEntryId: '',
         noPerecedero: false,
         usoInternoEmpresa: false,
         expiryDate: addDaysToIso(getArgentinaIsoDate(), 5),
         entryDate: getArgentinaIsoDate(),
         bulkEntries: []
+      });
+    } catch (error) {
+      await openIosSwal({
+        title: 'No se pudo guardar',
+        html: `<p>${escapeHtml(error?.message || 'Ocurrió un error guardando el ingreso.')}</p>`,
+        icon: 'error',
+        confirmButtonText: 'Entendido'
       });
     } finally {
       saveBtn.removeAttribute('disabled');
