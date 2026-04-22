@@ -798,9 +798,9 @@
     .recipe-print-full-front-card .recipe-octagons-wrap,
     .recipe-print-full-front-card .recipe-front-rectangles { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
     .recipe-print-full-front-card .recipe-octagon,
-    .recipe-print-full-front-card .recipe-front-rectangle { position: relative; color: #fff; background: #111; display: inline-flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; font-family: Arial, Helvetica, sans-serif; font-weight: 900; page-break-inside: avoid; break-inside: avoid; }
-    .recipe-print-full-front-card .recipe-octagon { width: 96px; min-width: 96px; height: 96px; clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); }
-    .recipe-print-full-front-card .recipe-front-rectangle { width: 190px; min-height: 72px; border: 3px solid #fff; outline: 2px solid #111; }
+    .recipe-print-full-front-card .recipe-front-rectangle { position: relative; color: #fff; display: inline-flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; font-family: Arial, Helvetica, sans-serif; font-weight: 900; page-break-inside: avoid; break-inside: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .recipe-print-full-front-card .recipe-octagon { width: 96px; min-width: 96px; height: 96px; background-color: transparent; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'><polygon points='26,0 74,0 100,26 100,74 74,100 26,100 0,74 0,26' fill='%23111111'/></svg>"); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
+    .recipe-print-full-front-card .recipe-front-rectangle { width: 190px; min-height: 72px; background: #111; border: 3px solid #fff; outline: 2px solid #111; }
     .recipe-print-full-front-card .recipe-octagon-title,
     .recipe-print-full-front-card .recipe-front-rectangle-title { font-size: 12px; line-height: 1; letter-spacing: 0; }
     .recipe-print-full-front-card .recipe-octagon-ministry { margin-top: 5px; font-size: 7px; line-height: 1; font-weight: 800; }
