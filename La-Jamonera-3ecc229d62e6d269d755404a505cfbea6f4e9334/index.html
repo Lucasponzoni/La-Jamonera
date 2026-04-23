@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="es" class="index-protected">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>
+    (function earlyIndexGuard() {
+      const SESSION_KEY = 'laJamoneraSession';
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (!raw) {
+        window.location.replace('./login.html');
+        return;
+      }
+
+      try {
+        const session = JSON.parse(raw);
+        if (Date.now() < Number(session.expiresAt)) {
+          document.documentElement.classList.add('auth-ok');
+          return;
+        }
+      } catch (error) {
+      }
+
+      localStorage.removeItem(SESSION_KEY);
+      window.location.replace('./login.html');
+    })();
+  </script>
+  <title>La Jamonera | Back Office</title>
+  <meta name="description" content="Back Office privado de La Jamonera para gestión interna.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="La Jamonera">
+  <meta property="og:description" content="Back Office privado de La Jamonera para gestión interna.">
+  <meta property="og:image" content="https://lucasponzoni.github.io/La-Jamonera/IMG/La Jamonera Redes.png">
+  <meta property="og:locale" content="es_AR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="La Jamonera">
+  <meta name="twitter:description" content="Back Office privado de La Jamonera para gestión interna.">
+  <meta name="twitter:image" content="./IMG/La Jamonera App.png">
+  <link rel="shortcut icon" href="./IMG/La Jamonera App.png" type="image/x-icon">
+  <link rel="icon" type="image/webp" href="./IMG/La Jamonera Cerdito.webp">
+  <link rel="apple-touch-icon" href="./IMG/La Jamonera App.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="La Jamonera">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Viga&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link rel="stylesheet" href="./CSS/style.css">
+  <link rel="stylesheet" href="./CSS/panel.css">
+</head>
+<body>
+  <main class="app-shell container-fluid px-0">
+    <section id="appView" class="view view-app">
+      <header class="topbar">
+        <nav class="navbar navbar-expand-lg topbar-nav">
+          <div class="container-fluid topbar-container">
+            <a class="navbar-brand topbar-brand" href="./index.html" aria-label="Ir a inicio">
+              <img src="./IMG/La Jamonera Cerdito.webp" alt="Logo La Jamonera" class="topbar-brand-logo">
+              <span class="topbar-brand-text"><span class="brand-light">La</span> <span class="brand-bold">Jamonera</span></span>
+            </a>
+
+            <button class="navbar-toggler topbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topbarMenu" aria-controls="topbarMenu" aria-expanded="false" aria-label="Abrir menú de navegación">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="topbarMenu">
+              <span class="barra-vertical"></span>
+              <ul class="navbar-nav topbar-links me-auto mb-2 mb-lg-0">
+                <li class="nav-item">
+                  </span><a class="nav-link topbar-link active" href="./index.html" aria-current="page"><i class="bi bi-house-gear"></i> Mi Fabrica</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link topbar-link" href="./informes.html"><i class="bi bi-file-check"></i> Informes bromatológicos</a>
+                </li>
+              </ul>
+
+              <div class="topbar-user dropdown">
+                <button class="btn topbar-user-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Abrir menú de usuario">
+                  <i class="fa-solid fa-circle-user"></i>
+                </button>
+                <div class="dropdown-menu dropdown-menu-end topbar-user-menu">
+                  <p class="topbar-user-name">Usuario: <strong>La Jamonera</strong></p>
+                  <button class="btn ios-btn ios-btn-secondary w-100 js-logout" type="button">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span>Cerrar sesión</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </nav>
+      </header>
+
+      <div class="contenido">
+        <div class="header-content">
+          <div class="home-actions-scroll" aria-label="Acciones disponibles">
+            <button
+              id="openIngredientesModal"
+              type="button"
+              class="btn btn-light home-action-btn"
+              data-bs-toggle="modal"
+              data-bs-target="#ingredientesModal"
+            >
+              <i class="fa-solid fa-carrot icon-lila" aria-hidden="true"></i>
+              <span>Ingredientes</span>
+            </button>
+
+            <button
+              id="openInventarioModal"
+              type="button"
+              class="btn btn-light home-action-btn"
+              data-bs-toggle="modal"
+              data-bs-target="#inventarioModal"
+            >
+              <i class="fa-solid fa-boxes-stacked icon-orange" aria-hidden="true"></i>
+              <span>Inventario</span>
+            </button>
+
+            <button
+              id="openRecetasModal"
+              type="button"
+              class="btn btn-light home-action-btn"
+              data-bs-toggle="modal"
+              data-bs-target="#recetasModal"
+            >
+              <i class="fa-solid fa-utensils icon-orangered" aria-hidden="true"></i>
+              <span>Recetas</span>
+            </button>
+
+            <button
+              id="openProduccionModal"
+              type="button"
+              class="btn btn-light home-action-btn home-action-btn-success"
+              data-bs-toggle="modal"
+              data-bs-target="#produccionModal"
+            >
+              <i class="fa-solid fa-industry icon-green" aria-hidden="true"></i>
+              <span>Producir</span>
+            </button>
+            <span class="barra-vertical home-actions-divider" aria-hidden="true"></span>
+            <button
+              id="openUsersManagerModal"
+              type="button"
+              class="btn btn-light home-action-btn"
+              data-bs-toggle="modal"
+              data-bs-target="#usersManagerModal"
+            >
+              <i class="fa-solid fa-users icon-blue" aria-hidden="true"></i>
+              <span>Usuarios</span>
+            </button>
+          </div>
+        </div>
+        <div class="home-content panel-home-content">
+          <section id="panelDashboard" class="panel-grid" aria-live="polite">
+            <article id="panelResumen" class="glass-card panel-card panel-card-wide panel-summary-card">
+              <header class="panel-card-head"><h3><i class="fa-solid fa-gauge-high"></i> Recordatorios y estado general</h3></header>
+              <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando métricas" class="panel-spinner"></div></div>
+            </article>
+
+            <article id="panelProduccion" class="glass-card panel-card panel-card-wide">
+              <header class="panel-card-head">
+                <h3><i class="fa-solid fa-chart-column"></i> Producción en kilos</h3>
+                <input id="panelChartRange" class="form-control ios-input panel-range-input" placeholder="Filtrar rango de fechas">
+              </header>
+              <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando producción" class="panel-spinner"></div></div>
+            </article>
+
+            <article id="panelUltimoInforme" class="glass-card panel-card">
+              <header class="panel-card-head">
+                <h3><i class="fa-solid fa-file-waveform"></i> Último informe</h3>
+                <span id="panelInformeAgo" class="panel-pill d-none"></span>
+              </header>
+              <div class="panel-card-body">
+                <div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando informe" class="panel-spinner"></div>
+              </div>
+            </article>
+
+            <article id="panelRne" class="glass-card panel-card">
+              <header class="panel-card-head"><h3><i class="fa-solid fa-file-shield"></i> Proveedores con RNE pendiente</h3></header>
+              <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando proveedores" class="panel-spinner"></div></div>
+            </article>
+
+            <article id="panelRnpa" class="glass-card panel-card">
+              <header class="panel-card-head"><h3><i class="fa-solid fa-clipboard-check"></i> RNPA de recetas</h3></header>
+              <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando RNPA" class="panel-spinner"></div></div>
+            </article>
+
+            <article id="panelTransporte" class="glass-card panel-card">
+              <header class="panel-card-head"><h3><i class="fa-solid fa-id-card-clip"></i> Transporte habilitado (UTA/URA)</h3></header>
+              <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando transporte" class="panel-spinner"></div></div>
+            </article>
+
+            
+          </section>
+        </div>
+      </div>
+
+      <!-- // MODAL INGREDIENTES -->
+      <div class="modal fade" id="ingredientesModal" tabindex="-1" aria-labelledby="ingredientesModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content ios-modal ingredientes-modal">
+            <div class="modal-header ios-modal-header">
+              <h5 class="modal-title ios-modal-title" id="ingredientesModalLabel">Ingredientes</h5>
+              <button type="button" class="btn-close ios-modal-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body ios-modal-body">
+              <div id="ingredientesLoading" class="ingredientes-loading" aria-live="polite">
+                <img src="./IMG/Meta-ai-logo.webp" alt="Cargando ingredientes" class="meta-spinner-login">
+              </div>
+
+              <div id="ingredientesEmpty" class="ingredientes-empty d-none" aria-live="polite">
+                <p class="ingredientes-empty-text">No hay ingredientes cargados.</p>
+                <button id="emptyCreateIngredientBtn" type="button" class="btn ios-btn ios-btn-success">Cargar un ingrediente</button>
+              </div>
+
+              <div id="ingredientesData" class="ingredientes-data d-none" aria-live="polite">
+                <div class="ingredientes-toolbar">
+                  <div class="input-group ios-input-group ingredientes-search-group">
+                    <span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+                    <input id="ingredientesSearchInput" type="search" class="form-control ios-input ingredientes-search-input" placeholder="Buscar familia o ingrediente">
+                  </div>
+                  <button id="createIngredientBtn" type="button" class="btn ios-btn ios-btn-success">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Ingrediente</span>
+                  </button>
+                </div>
+
+                <div id="familiasCircles" class="familias-circles"></div>
+                <div id="ingredientesList" class="ingredientes-list"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- // FIN MODAL INGREDIENTES -->
+
+      <!-- // MODAL RECETAS -->
+      <div class="modal fade" id="recetasModal" tabindex="-1" aria-labelledby="recetasModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content ios-modal recetas-modal">
+            <div class="modal-header ios-modal-header">
+              <h5 class="modal-title ios-modal-title" id="recetasModalLabel">Recetas</h5>
+              <button type="button" class="btn-close ios-modal-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body ios-modal-body">
+              <div id="recetasLoading" class="ingredientes-loading" aria-live="polite">
+                <img src="./IMG/Meta-ai-logo.webp" alt="Cargando recetas" class="meta-spinner-login">
+              </div>
+
+              <div id="recetasEmpty" class="ingredientes-empty d-none" aria-live="polite">
+                <p class="ingredientes-empty-text">No hay recetas cargadas.</p>
+                <button id="emptyCreateRecipeBtn" type="button" class="btn ios-btn ios-btn-success"><i class="fa-solid fa-plus"></i><span>Crear receta</span></button>
+              </div>
+
+              <div id="recetasData" class="ingredientes-data d-none" aria-live="polite">
+                <div class="ingredientes-toolbar">
+                  <div class="input-group ios-input-group ingredientes-search-group">
+                    <span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+                    <input id="recetasSearchInput" type="search" class="form-control ios-input ingredientes-search-input" placeholder="Buscar receta">
+                  </div>
+                  <button id="createRecipeBtn" type="button" class="btn ios-btn ios-btn-success">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Crear receta</span>
+                  </button>
+                </div>
+
+                <div id="recetasRnpaAlert" class="inventario-rne-alert d-none" aria-live="polite"></div>
+
+                <div class="recetas-rnpa-filters" role="toolbar" aria-label="Filtros de RNPA">
+                  <button type="button" class="inventario-status-btn tone-neutral" data-rnpa-filter="all">
+                    <span>Todos</span>
+                    <strong data-rnpa-filter-count="all">0</strong>
+                  </button>
+                  <button type="button" class="inventario-status-btn tone-info" data-rnpa-filter="none">
+                    <span>Sin RNPA</span>
+                    <strong data-rnpa-filter-count="none">0</strong>
+                  </button>
+                  <button type="button" class="inventario-status-btn tone-warning" data-rnpa-filter="warning">
+                    <span>Vence en menos de 6 meses</span>
+                    <strong data-rnpa-filter-count="warning">0</strong>
+                  </button>
+                  <button type="button" class="inventario-status-btn tone-danger" data-rnpa-filter="danger">
+                    <span>Vence en menos de 60 días</span>
+                    <strong data-rnpa-filter-count="danger">0</strong>
+                  </button>
+                </div>
+
+                <div id="recetasList" class="recetas-list"></div>
+              </div>
+
+              <div id="recetasEditor" class="recetas-editor d-none" aria-live="polite">
+                <div class="recetas-editor-header">
+                  <button id="recipeBackBtn" type="button" class="btn ios-btn ios-btn-secondary recetas-back-btn">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    <span>Volver</span>
+                  </button>
+                  <div>
+                    <p class="recetas-editor-kicker">Recetas</p>
+                    <h6 id="recipeEditorTitle" class="recetas-editor-title mb-0">Nueva receta</h6>
+                  </div>
+                </div>
+                <form id="recipeEditorForm" class="recetas-editor-form" novalidate></form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- // FIN MODAL RECETAS -->
+
+
+      <!-- // MODAL INVENTARIO -->
+      <div class="modal fade" id="inventarioModal" tabindex="-1" aria-labelledby="inventarioModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content ios-modal recetas-modal inventario-modal">
+            <div class="modal-header ios-modal-header">
+              <h5 class="modal-title ios-modal-title" id="inventarioModalLabel">Inventario</h5>
+              <button type="button" class="btn-close ios-modal-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body ios-modal-body">
+              <div id="inventarioLoading" class="ingredientes-loading" aria-live="polite">
+                <img src="./IMG/Meta-ai-logo.webp" alt="Cargando inventario" class="meta-spinner-login">
+              </div>
+
+              <div id="inventarioEmpty" class="ingredientes-empty d-none" aria-live="polite">
+                <p class="ingredientes-empty-text">No hay ingredientes cargados para inventario.</p>
+                <button id="inventarioCreateIngredientBtn" type="button" class="btn ios-btn ios-btn-secondary">Crear ingrediente</button>
+              </div>
+
+              <div id="inventarioData" class="recetas-data d-none" aria-live="polite">
+                <div class="inventario-toolbar">
+                  <div class="input-group ios-input-group ingredientes-search-group">
+                    <span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+                    <input id="inventarioSearchInput" type="search" class="form-control ios-input ingredientes-search-input" placeholder="Buscar ingrediente">
+                  </div>
+                  <div class="inventario-toolbar-actions toolbar-scroll-x">
+                    <button id="inventarioConfigBtn" type="button" class="btn ios-btn ios-btn-secondary" title="Configurar stock bajo">
+                      <i class="fa-solid fa-gear"></i>
+                    </button>
+                    <button id="inventarioWeeklyConfigBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-weekly-config-btn">
+                      <i class="fa-solid fa-sliders"></i>
+                      <span>Planilla semanal</span>
+                    </button>
+                    <button id="inventarioProvidersRneBtn" type="button" class="btn ios-btn ios-btn-secondary">
+                      <i class="fa-solid fa-file-shield"></i>
+                      <span>RNE</span>
+                    </button>
+                    <button id="inventarioToolbarCreateIngredientBtn" type="button" class="btn ios-btn ios-btn-success">
+                      <i class="fa-solid fa-plus"></i>
+                      <span>Ingrediente</span>
+                    </button>
+                    <span class="barra-separadora"></span>
+                    <button id="inventarioOpenPeriodFilterBtn" type="button" class="btn ios-btn ios-btn-secondary produccion-history-btn">
+                      <i class="fa-solid fa-clock-rotate-left"></i>
+                      <span>Historial</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div id="inventarioProvidersRneAlert" class="inventario-rne-alert d-none" aria-live="polite"></div>
+                <div id="inventarioExpiryAlert" class="inventario-expiry-alert-host d-none" aria-live="polite"></div>
+                <div id="inventarioFamilies" class="familias-circles inventario-families"></div>
+                <div id="inventarioStatusFilters" class="inventario-status-filters" aria-label="Filtrar por estado de stock"></div>
+                <div id="inventarioList" class="recetas-list inventario-list"></div>
+
+                <section id="inventarioPeriodView" class="inventario-period-board d-none" aria-live="polite">
+                  <div class="inventario-period-head">
+                    <button id="inventarioPeriodBackBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button>
+                    <h6 class="step-title mb-0">Ingresos por periodo • La Jamonera</h6>
+                  </div>
+                  <div class="inventario-period-filters">
+                    <input id="inventarioGlobalRange" class="form-control ios-input" placeholder="Seleccionar rango de fechas">
+                    <div class="toolbar-scroll-x inventario-period-actions-scroll">
+                      <button id="inventarioGlobalClearBtn" type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn d-none"><i class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></button>
+                      <button id="inventarioGlobalApplyBtn" type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn"><i class="fa-solid fa-filter"></i><span>Aplicar</span></button>
+                      <button id="inventarioGlobalExpandBtn" type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button>
+                      <button id="inventarioGlobalExcelBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="fa-solid fa-file-excel"></i><span>Excel</span></button>
+                      <span class="inventario-period-divider" aria-hidden="true"></span>
+                      <button id="inventarioGlobalPrintBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-print"></i><span>Período <i class="bi bi-plus-lg"></i> Adjuntos <i class="fa-solid fa-paperclip"></i></span></button>
+                      <button id="inventarioGlobalSheetBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-regular fa-file-lines"></i><span>Planilla de ingresos</span></button>
+                    </div>
+                  </div>
+                  <div id="inventarioGlobalLoading" class="ingredientes-loading d-none"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"></div>
+                  <div id="inventarioGlobalTableWrap"></div>
+                </section>
+              </div>
+
+              <div id="inventarioEditor" class="recetas-editor d-none" aria-live="polite">
+                <div class="recetas-editor-header">
+                  <button id="inventarioBackBtn" type="button" class="btn ios-btn ios-btn-secondary recetas-back-btn">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    <span>Volver</span>
+                  </button>
+                  <div>
+                    <p class="recetas-editor-kicker">Inventario</p>
+                    <h6 id="inventarioEditorTitle" class="recetas-editor-title mb-0">Ingresar stock</h6>
+                  </div>
+                </div>
+                <form id="inventarioEditorForm" class="recetas-editor-form" novalidate autocomplete="off"></form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- // FIN MODAL INVENTARIO -->
+
+      <div class="modal fade" id="imageViewerModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
+          <div class="modal-content ios-modal image-viewer-modal">
+            <div class="modal-header ios-modal-header">
+              <h5 class="modal-title ios-modal-title">Vista de imagen</h5>
+              <button type="button" class="btn-close ios-modal-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body ios-modal-body">
+              <div class="image-viewer-controls image-viewer-controls-inventario">
+                <button id="viewerBackBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button>
+                <button id="viewerPrevBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-chevron-left"></i></button>
+                <button id="viewerZoomOutBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                <button id="viewerZoomInBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                <button id="viewerNextBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-chevron-right"></i></button>
+              </div>
+              <div id="viewerStage" class="viewer-stage">
+                <span id="viewerStageSpinner" class="thumb-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"></span>
+                <iframe id="viewerDocument" src="" title="Documento adjunto" class="viewer-document d-none"></iframe>
+                <img id="viewerImage" src="" alt="Imagen adjunta">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- // MODAL PRODUCCIÓN -->
+      <div class="modal fade" id="produccionModal" tabindex="-1" aria-labelledby="produccionModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content ios-modal produccion-modal">
+            <div class="modal-header ios-modal-header">
+              <h5 class="modal-title ios-modal-title" id="produccionModalLabel">Producción</h5>
+              <button type="button" class="btn-close ios-modal-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body ios-modal-body">
+              <div id="produccionLoading" class="ingredientes-loading" aria-live="polite">
+                <img src="./IMG/Meta-ai-logo.webp" alt="Cargando producción" class="meta-spinner-login">
+              </div>
+
+              <div id="produccionEmpty" class="ingredientes-empty d-none" aria-live="polite">
+                <p class="ingredientes-empty-text">No hay recetas disponibles para producir.</p>
+              </div>
+
+              <div id="produccionData" class="produccion-data d-none" aria-live="polite">
+                <div class="ingredientes-toolbar produccion-toolbar">
+                  <div class="input-group ios-input-group ingredientes-search-group">
+                    <span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+                    <input id="produccionSearchInput" type="search" class="form-control ios-input ingredientes-search-input" placeholder="Buscar receta para producir">
+                  </div>
+                  <div class="produccion-toolbar-actions toolbar-scroll-x">
+                    <button id="produccionGlobalMinBtn" type="button" class="btn ios-btn ios-btn-secondary produccion-toolbar-icon-btn" title="Configurar umbral">
+                     <i class="fa-solid fa-file-shield"></i><span>RNE</span>  <span class="barra-vertical"></span> <i class="fa-solid fa-gear"></i>
+                    </button>
+                    <button id="produccionDispatchBtn" type="button" class="btn ios-btn ios-btn-secondary produccion-dispatch-btn"><i class="fa-solid fa-truck-fast"></i><span>Salida de Productos</span></button>
+                    <span class="barra-separadora"></span>
+                    <button id="produccionHistoryBtn" type="button" class="btn ios-btn ios-btn-secondary produccion-history-btn"><i class="fa-solid fa-clock-rotate-left"></i><span>Historial</span></button>
+                  </div>
+                </div>
+                <div id="produccionRneAlert" class="produccion-rne-expiry-alert d-none" aria-live="polite"></div>
+                <div id="produccionList" class="recetas-list produccion-list"></div>
+
+                <section id="produccionPeriodView" class="inventario-period-board produccion-period-board d-none" aria-live="polite">
+                  <div class="inventario-period-head">
+                    <button id="produccionPeriodBackBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button>
+                    <h6 class="step-title mb-0">Producciones guardadas • La Jamonera</h6>
+                  </div>
+                  <div class="inventario-period-filters">
+                    <input id="produccionGlobalSearch" type="search" class="form-control ios-input" placeholder="Buscar por código de producción">
+                    <input id="produccionGlobalRange" class="form-control ios-input" placeholder="Seleccionar rango de fechas">
+                    <div class="toolbar-scroll-x inventario-period-actions-scroll">
+                      <button id="produccionGlobalClearBtn" type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn d-none"><i class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></button>
+                      <button id="produccionGlobalApplyBtn" type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn"><i class="fa-solid fa-filter"></i><span>Aplicar</span></button>
+                      <button id="produccionGlobalExpandBtn" type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button>
+                      <button id="produccionGlobalExcelBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="fa-solid fa-file-excel"></i><span>Excel</span></button>
+                      <span class="inventario-period-divider" aria-hidden="true"></span>
+                      <button id="produccionGlobalPrintBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-print"></i><span>Período <i class="bi bi-plus-lg"></i> Adjuntos <i class="fa-solid fa-paperclip"></i></span></button>
+                      <button id="produccionGlobalMassPlanillasBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-regular fa-file-lines"></i><span>Planillas masivas</span></button>
+                      <button id="produccionGlobalWeeklyPlanillaBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-calendar-week"></i><span>Planilla de Producción Semanal</span></button>
+                    </div>
+                  </div>
+                  <div id="produccionGlobalLoading" class="ingredientes-loading d-none"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"></div>
+                  <div id="produccionGlobalTableWrap"></div>
+                </section>
+
+                <section id="produccionDispatchView" class="inventario-period-board produccion-period-board d-none" aria-live="polite"></section>
+              </div>
+
+              <div id="produccionEditor" class="produccion-editor d-none" aria-live="polite"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- // FIN MODAL PRODUCCIÓN -->
+
+      <div class="modal fade" id="usersManagerModal" tabindex="-1" aria-labelledby="usersManagerModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content ios-modal informes-modal">
+            <div class="modal-header ios-modal-header">
+              <h5 class="modal-title ios-modal-title" id="usersManagerModalLabel">Usuarios</h5>
+              <button type="button" class="btn-close ios-modal-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body ios-modal-body">
+              <div id="usersManagerLoading" class="informes-loading" aria-live="polite">
+                <img src="./IMG/Meta-ai-logo.webp" alt="Cargando usuarios" class="meta-spinner-login">
+              </div>
+              <div id="usersManagerData" class="informes-data d-none" aria-live="polite">
+                <div class="informes-toolbar">
+                  <button id="usersManagerCreateBtn" type="button" class="btn ios-btn ios-btn-success"><i class="fa-solid fa-user-plus"></i><span>Crear usuario</span></button>
+                </div>
+                <div id="usersManagerList" class="informes-users-list"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="app-footer app-footer-white">
+        <div class="footer-main">
+          <div class="footer-brand-block">
+            <img src="./IMG/La Jamonera Cerdito.webp" alt="Logo La Jamonera" class="footer-brand-logo">
+            <div>
+              <h3 class="footer-brand-title">La Jamonera</h3>
+              <p class="footer-brand-text">Back Office</p>
+            </div>
+          </div>
+
+          <div class="footer-actions">
+            <button id="footerLogoutBtn" class="btn ios-btn ios-btn-secondary js-logout" type="button">
+              <i class="fa-solid fa-right-from-bracket"></i>
+              <span>Cerrar sesión</span>
+              <span id="sessionCountdown" class="session-countdown" aria-live="polite">--h --m</span>
+            </button>
+
+            <a class="support-link footer-support" href="https://wa.me/543416292861?text=Nos%20contactamos%20de%20Frigorifico%20la%20Jamonera%20desde%20el%20back%20office." target="_blank" rel="noopener noreferrer">
+              <img src="./IMG/WhatsApp Logo.webp" alt="Soporte" class="support-icon">
+              <span>Contactar soporte</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="footer-divider" aria-hidden="true"></div>
+
+        <p class="footer-legal">
+          El uso de este sitio web implica la aceptación de los términos, condiciones y políticas de privacidad de
+          <a href="https://asesoriabromatologicaros.com.ar/index.html" target="_blank" rel="noopener noreferrer">Asesoria Bromatologica Rosario</a>.
+          Las imagenes son a modo ilustrativo.
+        </p>
+
+        <p class="footer-copy">
+          © Copyright <span id="currentYear"></span> - Back Office para empresas, powered by
+          <a href="https://asesoriabromatologicaros.com.ar/index.html" target="_blank" rel="noopener noreferrer">ABR</a>
+          - Author: Ponzoni Lucas
+          <a class="footer-mail" href="mailto:pablomanuelscalise@gmail.com" target="_blank" rel="noopener noreferrer" aria-label="Enviar email">
+            <i class="fa-regular fa-envelope"></i>
+          </a>
+        </p>
+      </footer>
+    </section>
+  </main>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.10/build/pdfmake.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.10/build/vfs_fonts.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/html-to-pdfmake@2.5.21/browser.js"></script>
+  <script defer src="./JS/swal-a11y-guard.js"></script>
+  <script defer src="./JS/firebase-init.js"></script>
+  <script defer src="./JS/email_sender.js"></script>
+  <script defer src="./JS/panelcontrol.js"></script>
+  <script defer src="./JS/ingredientes.js"></script>
+  <script defer src="./JS/recetas.js"></script>
+  <script defer src="./JS/Notificaciones.js"></script>
+  <script defer src="./JS/inventario.js"></script>
+  <script defer src="./JS/produccion.js"></script>
+  <script defer src="./JS/planilla_produccion.js"></script>
+  <script defer src="./JS/usuarios.js"></script>
+  <script defer src="./JS/app.js"></script>
+</body>
+</html>

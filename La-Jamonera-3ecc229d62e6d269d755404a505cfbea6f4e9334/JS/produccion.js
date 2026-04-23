@@ -5539,40 +5539,6 @@
       row.disabled = meta.disabled;
     });
   };
-  const getDispatchXlsxRowsNeedingDateFix = (draft) => {
-    if (!draft || !Array.isArray(draft.rows)) return [];
-    return draft.rows.filter((row) => {
-      if (!row || row.disabled) return false;
-      if (!normalizeValue(row.mappedTargetId)) return false;
-      if (Array.isArray(row.mappedIngredients) && row.mappedIngredients.length) return false;
-      const mappedQty = Number(row.mappedQty || 0);
-      const availableQty = Number(row.mappedAvailableKg || 0);
-      const futureQty = Number(row.mappedFutureQty || 0);
-      const nextDate = normalizeValue(row.mappedNextAvailableDate);
-      return mappedQty - availableQty > 0.0001 && futureQty > 0.0001 && Boolean(nextDate);
-    });
-  };
-  const applyDispatchXlsxSuggestedDates = (draft, rowIds = []) => {
-    if (!draft || !Array.isArray(draft.rows)) return 0;
-    const allowedIds = new Set((Array.isArray(rowIds) ? rowIds : []).map((item) => normalizeValue(item)).filter(Boolean));
-    let changed = 0;
-    for (let iteration = 0; iteration < 6; iteration += 1) {
-      recomputeDispatchXlsxDraftRows(draft);
-      const pendingRows = getDispatchXlsxRowsNeedingDateFix(draft).filter((row) => !allowedIds.size || allowedIds.has(normalizeValue(row.id)));
-      if (!pendingRows.length) break;
-      let iterationChanged = 0;
-      pendingRows.forEach((row) => {
-        const nextDate = normalizeDispatchDateToken(row.mappedNextAvailableDate);
-        if (!nextDate || normalizeDispatchDateToken(row.invoiceDate) === nextDate) return;
-        row.invoiceDate = nextDate;
-        changed += 1;
-        iterationChanged += 1;
-      });
-      if (!iterationChanged) break;
-    }
-    recomputeDispatchXlsxDraftRows(draft);
-    return changed;
-  };
   const buildDispatchXlsxResolutionPreview = (draft) => {
     const result = {
       ingredient: {},
@@ -5898,7 +5864,6 @@
     recomputeDispatchXlsxDraftRows(draft);
     const resolutionPreview = buildDispatchXlsxResolutionPreview(draft);
     const rows = Array.isArray(draft.rows) ? draft.rows : [];
-    const rowsNeedingDateFix = getDispatchXlsxRowsNeedingDateFix(draft);
     const readyToProcess = rows.length > 0 && rows.every((row) => row.disabled || normalizeValue(row.mappedTargetId));
     const formatMissingDispatchXlsxParts = (parts = []) => {
       const clean = parts.filter(Boolean);
@@ -5944,10 +5909,6 @@
       const expiredQty = Number(row.mappedExpiredQty || 0);
       const futureQty = Number(row.mappedFutureQty || 0);
       const nextAvailableDate = normalizeValue(row.mappedNextAvailableDate);
-      const showFutureDateAlert = !mappedIngredients.length
-        && (Number(row.mappedQty || 0) - Number(row.mappedAvailableKg || 0) > 0.0001)
-        && futureQty > 0.0001
-        && Boolean(nextAvailableDate);
       const multiplierLabel = row.mappingMultiplierFromRule
         ? Number(row.mappingMultiplier || 0).toFixed(2)
         : (Number(row.sourceQty || 0) > 0 ? Number(row.sourceQty || 0).toFixed(2) : '1.00');
@@ -5996,7 +5957,7 @@
             ? (rowHasStock
               ? 'Stock utilizable completo.'
               : '')
-            : `${rowHasStock ? 'Stock utilizable:' : 'Stock utilizable insuficiente:'} <strong class="dispatch-xlsx-stock-ok">${escapeHtml(formatDispatchXlsxQtyWithUnit(availableQty, stockUnit))}</strong>${showFutureDateAlert ? ` <span class="dispatch-xlsx-stock-future">· Desde ${escapeHtml(formatIsoEs(nextAvailableDate || ''))}: ${escapeHtml(formatDispatchXlsxQtyWithUnit(futureQty, stockUnit))}</span>` : ''}${expiredQty > 0 ? ` <span class="dispatch-xlsx-stock-expired">· Vencido: ${escapeHtml(formatDispatchXlsxQtyWithUnit(expiredQty, stockUnit))}</span>` : ''}`;
+            : `${rowHasStock ? 'Stock utilizable:' : 'Stock utilizable insuficiente:'} <strong class="dispatch-xlsx-stock-ok">${escapeHtml(formatDispatchXlsxQtyWithUnit(availableQty, stockUnit))}</strong>${futureQty > 0 ? ` <span class="dispatch-xlsx-stock-future">· Desde ${escapeHtml(formatIsoEs(nextAvailableDate || ''))}: ${escapeHtml(formatDispatchXlsxQtyWithUnit(futureQty, stockUnit))}</span>` : ''}${expiredQty > 0 ? ` <span class="dispatch-xlsx-stock-expired">· Vencido: ${escapeHtml(formatDispatchXlsxQtyWithUnit(expiredQty, stockUnit))}</span>` : ''}`;
           if (rowHasStock) return base;
           const missingParts = mappedIngredients.length
             ? mappedIngredients.map((item) => {
@@ -6020,7 +5981,7 @@
           const productResolveBtn = canResolveProductConflict
             ? ` <button type="button" class="btn ios-btn ${productConflictResolutionType ? 'ios-btn-secondary' : 'ios-btn-danger'} dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="production" data-dispatch-xlsx-row="${escapeHtml(row.id)}">${productConflictResolutionType ? 'Cambiar elección' : 'Resolver conflicto'}</button>`
             : '';
-          const dateHint = showFutureDateAlert
+          const dateHint = futureQty > 0 && nextAvailableDate
             ? `<br><span class="dispatch-xlsx-stock-future">Hay stock, pero se puede repartir desde ${escapeHtml(formatIsoEs(nextAvailableDate))}. Editá la fecha de reparto en esta fila.</span>`
             : '';
           return `${base ? `${base}<br>` : ''}<span class="dispatch-xlsx-stock-missing">↳ Faltan ${formatMissingDispatchXlsxParts(missingParts)}.</span>${dateHint}${createHint ? `<br>${createHint}` : ''}${productResolveBtn}`;
@@ -6041,30 +6002,7 @@
     const vehicleManagersSection = hasImportedFile
       ? `<section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">2</span> Vehículo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Transporte habilitado (UTA/URA)</label><small class="d-block text-muted mb-1">Unidad de Transporte Alimentario / Unidad de Reparto Alimentario.</small><div class="inventario-provider-search-wrap"><input id="dispatchXlsxVehicleInput" class="form-control ios-input" placeholder="Seleccionar unidad habilitada" value="${escapeHtml(draft.vehicleSearch || (draft.vehicleId ? formatDispatchVehicleLabel(getDispatchVehicle(draft.vehicleId)) : ''))}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"><input type="hidden" id="dispatchXlsxVehicleSelect" value="${escapeHtml(draft.vehicleId || '')}"></div><div class="dispatch-vehicle-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchXlsxAddVehicleBtn"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchXlsxManageVehiclesBtn"><i class="fa-solid fa-pen-to-square"></i><span>Gestionar UTA/URA</span></button></div></div><div class="recipe-field recipe-field-half"><label class="form-label">Responsables</label><div class="input-group ios-input-group ingredientes-search-group dispatch-managers-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchXlsxManagersSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar responsable" value="${escapeHtml(draft.managerSearch || '')}"></div><div class="produccion-managers-grid">${usersRows}</div></div></div></section>`
       : '';
-    const fixAllDatesBtn = rowsNeedingDateFix.length
-      ? `<button type="button" id="dispatchXlsxFixAllDatesBtn" class="btn recipe-table-action-btn recipe-table-action-btn-neutral"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Corregir fechas (${rowsNeedingDateFix.length})</span></button>`
-      : "";
-    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Repartos por XLSX</h6><div class="dispatch-xlsx-head-actions">${uploadHint}${fixAllDatesBtn}<button id="dispatchXlsxUploadBtn" type="button" class="btn recipe-table-action-btn recipe-table-action-btn-monography"><i class="fa-solid fa-file-arrow-up"></i><span>Adjuntar XLSX</span></button><button type="button" id="dispatchXlsxHistoryBtn" class="btn recipe-table-action-btn recipe-table-action-btn-neutral"><i class="fa-regular fa-message"></i><span>Historial de Archivos</span></button></div><input id="dispatchXlsxFileInput" class="d-none" type="file" accept=".xlsx,.xls"></div><section class="recipe-step-card step-block produccion-dispatch-create"><h6 class="step-title"><span class="recipe-step-number">1</span> Previsualización importada ${draft.uploadedFileName ? `<small>· ${escapeHtml(draft.uploadedFileName)}</small>` : ''}</h6><div class="table-responsive recipe-table-wrap dispatch-products-table dispatch-xlsx-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0 dispatch-xlsx-table"><thead><tr><th>Cliente</th><th>Factura</th><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div></section>${vehicleManagersSection}<div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchXlsxProcessBtn" ${readyToProcess ? '' : 'disabled'}><i class="fa-solid fa-gears"></i><span>Procesar ingresos</span></button></div>`;
-    nodes.dispatchView.querySelectorAll('.dispatch-xlsx-date-cell small').forEach((node) => node.remove());
-    nodes.dispatchView.querySelectorAll('.dispatch-xlsx-stock-future').forEach((hint) => {
-      const row = hint.closest('tr');
-      if (!row) return;
-      const stockCell = hint.closest('td');
-      if (stockCell) {
-        const separator = hint.previousSibling;
-        if (separator && separator.nodeType === Node.ELEMENT_NODE && separator.tagName === 'BR') separator.remove();
-        hint.remove();
-      }
-      const rowId = normalizeValue(row.querySelector('[data-dispatch-xlsx-date]')?.dataset.dispatchXlsxDate);
-      if (!rowId || row.nextElementSibling?.classList.contains('dispatch-xlsx-date-alert-row')) return;
-      const sourceRow = rows.find((item) => normalizeValue(item.id) === rowId);
-      const nextDate = normalizeValue(sourceRow?.mappedNextAvailableDate);
-      if (!nextDate) return;
-      const alertRow = document.createElement('tr');
-      alertRow.className = 'dispatch-xlsx-date-alert-row';
-      alertRow.innerHTML = `<td colspan="7"><div class="dispatch-xlsx-date-alert"><span class="dispatch-xlsx-date-alert-copy"><i class="fa-solid fa-calendar-days"></i><strong>Hay stock, pero se puede repartir desde ${escapeHtml(formatIsoEs(nextDate))}.</strong><span>Corregi la fecha de reparto para usar este lote.</span></span><button type="button" class="btn ios-btn ios-btn-secondary dispatch-xlsx-fix-date-btn" data-dispatch-xlsx-fix-date="${escapeHtml(rowId)}" data-dispatch-xlsx-next-date="${escapeHtml(nextDate)}"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Corregir fecha</span></button></div></td>`;
-      row.insertAdjacentElement('afterend', alertRow);
-    });
+    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Repartos por XLSX</h6><div class="dispatch-xlsx-head-actions">${uploadHint}<button id="dispatchXlsxUploadBtn" type="button" class="btn recipe-table-action-btn recipe-table-action-btn-monography"><i class="fa-solid fa-file-arrow-up"></i><span>Adjuntar XLSX</span></button><button type="button" id="dispatchXlsxHistoryBtn" class="btn recipe-table-action-btn recipe-table-action-btn-neutral"><i class="fa-regular fa-message"></i><span>Historial de Archivos</span></button></div><input id="dispatchXlsxFileInput" class="d-none" type="file" accept=".xlsx,.xls"></div><section class="recipe-step-card step-block produccion-dispatch-create"><h6 class="step-title"><span class="recipe-step-number">1</span> Previsualización importada ${draft.uploadedFileName ? `<small>· ${escapeHtml(draft.uploadedFileName)}</small>` : ''}</h6><div class="table-responsive recipe-table-wrap dispatch-products-table dispatch-xlsx-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0 dispatch-xlsx-table"><thead><tr><th>Cliente</th><th>Factura</th><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div></section>${vehicleManagersSection}<div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchXlsxProcessBtn" ${readyToProcess ? '' : 'disabled'}><i class="fa-solid fa-gears"></i><span>Procesar ingresos</span></button></div>`;
     if (hasImportedFile) prepareThumbLoaders('.js-produccion-user-photo');
     if (window.flatpickr) {
       nodes.dispatchView.querySelectorAll('[data-dispatch-xlsx-date]').forEach((input) => {
@@ -8775,7 +8713,7 @@
         const total = daily.reduce((acc, value) => acc + value, 0);
         return `<tr><td>${escapeHtml(capitalize(product.category.replaceAll('-', ' ')))}</td><td>${escapeHtml(capitalize(product.subcategory))}</td><td><div class="weekly-product-cell">${product.imageUrl ? `<img class="weekly-product-thumb" src="${escapeHtml(product.imageUrl)}" alt="${escapeHtml(product.title)}">` : ''}<span>${escapeHtml(normalizeUpper(product.title))}</span></div></td>${daily.map((kg) => `<td class="${kg > 0 ? 'is-ok' : 'is-missing'}">${kg > 0 ? `${kg.toFixed(2)}KG` : ''}</td>`).join('')}<td class="weekly-total">${total.toFixed(2)}KG</td></tr>`;
       }).join('');
-        return `<section class="weekly-sheet-block ${idx ? 'page-break' : ''}"><h3>FRIGORIFICO LA JAMONERA • PLANILLA DE PRODUCCION SEMANAL</h3><h4>SEMANA DE ${formatIsoEs(segment.start)} A ${formatIsoEs(segment.end)}</h4><div class="table-responsive"><table class="weekly-sheet-table"><thead><tr><th class="th-cat">CATEGORIA</th><th class="th-cat">SUBCATEGORIA</th><th class="th-cat">PRODUCTO</th>${headers.map((d) => `<th class="th-day">${d.toUpperCase()}</th>`).join('')}<th class="th-total">TOTAL</th></tr></thead><tbody>${rowsHtml || `<tr><td colspan="${4 + headers.length}">Sin datos.</td></tr>`}</tbody></table></div></section>`;
+      return `<section class="weekly-sheet-block ${idx ? 'page-break' : ''}"><h3>FRIGORIFICO LA JAMONERA • PLANILLA DE PRODUCCION SEMANAL</h3><h4>SEMANA DE ${formatIsoEs(segment.start)} A ${formatIsoEs(segment.end)}</h4><div class="table-responsive"><table class="weekly-sheet-table"><thead><tr><th class="th-cat">CATEGORIA</th><th class="th-cat">SUBCATEGORIA</th><th class="th-cat">PRODUCTO</th>${headers.map((d) => `<th class="th-day">${d.toUpperCase()}</th>`).join('')}<th class="th-total">TOTAL</th></tr></thead><tbody>${rowsHtml || `<tr><td colspan="${4 + headers.length}">Sin datos.</td></tr>`}</tbody></table></div></section>`;
     }).join('')}</div>`;
 
     await openIosSwal({
@@ -9030,23 +8968,6 @@
         ingredientId,
         resolutionType: selectedType
       });
-      return;
-    }
-    const xlsxFixAllDatesBtn = event.target.closest('#dispatchXlsxFixAllDatesBtn');
-    if (xlsxFixAllDatesBtn && state.dispatchXlsxDraft) {
-      applyDispatchXlsxSuggestedDates(state.dispatchXlsxDraft);
-      renderDispatchXlsxCreate(state.dispatchXlsxDraft);
-      return;
-    }
-    const xlsxFixDateBtn = event.target.closest('[data-dispatch-xlsx-fix-date]');
-    if (xlsxFixDateBtn && state.dispatchXlsxDraft) {
-      const rowId = normalizeValue(xlsxFixDateBtn.dataset.dispatchXlsxFixDate);
-      const nextDate = normalizeDispatchDateToken(xlsxFixDateBtn.dataset.dispatchXlsxNextDate) || '';
-      const row = (Array.isArray(state.dispatchXlsxDraft.rows) ? state.dispatchXlsxDraft.rows : []).find((item) => normalizeValue(item.id) === rowId);
-      if (!row || !nextDate) return;
-      row.invoiceDate = nextDate;
-      applyDispatchXlsxSuggestedDates(state.dispatchXlsxDraft, [rowId]);
-      renderDispatchXlsxCreate(state.dispatchXlsxDraft);
       return;
     }
     if (event.target.closest('#dispatchXlsxProcessBtn')) {

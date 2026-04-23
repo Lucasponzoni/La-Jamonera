@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Redireccionando...</title>
+</head>
+<body>
+  <script>
+    (function () {
+      const path = window.location.pathname || '';
+      const parts = path.split('/').filter(Boolean);
+      const last = parts[parts.length - 1] || '';
+      const looksLikeProduction = /^PROD[-_A-Z0-9]+$/i.test(last);
+      if (looksLikeProduction) {
+        const base = path.includes('/La-Jamonera/') ? '/La-Jamonera' : '';
+        window.location.replace(`${base}/produccion_publica.html?id=${encodeURIComponent(last)}`);
+        return;
+      }
+      const base = path.includes('/La-Jamonera/') ? '/La-Jamonera' : '';
+      window.location.replace(`${base}/index.html`);
+    })();
+  </script>
+</body>
+</html>
