@@ -707,11 +707,24 @@ const printReport = async (report) => {
     if (!top.length) { nodes.produccion.innerHTML = '<div class="panel-empty">No hay producción en el rango seleccionado.</div>'; return; }
 
     const max = Math.max(...top.map((x) => x.kg));
+    const barColors = [
+      'linear-gradient(90deg, #ff7b54, #ffb26b)',
+      'linear-gradient(90deg, #2a9d8f, #8ab17d)',
+      'linear-gradient(90deg, #3f7eff, #53a7ff)',
+      'linear-gradient(90deg, #9d4edd, #c77dff)',
+      'linear-gradient(90deg, #f4a261, #e9c46a)',
+      'linear-gradient(90deg, #e63946, #ef233c)',
+      'linear-gradient(90deg, #f72585, #ff4d6d)',
+      'linear-gradient(90deg, #4ea8de, #48bfe3)',
+      'linear-gradient(90deg, #80ed99, #52b69a)',
+      'linear-gradient(90deg, #7400b8, #6930c3)'
+    ];
     nodes.produccion.innerHTML = `<div class="panel-chart-wrap">${top.map((item, index) => {
       const avatar = item.imageUrl
         ? `<span class="panel-chart-avatar"><img class="js-panel-thumb is-loaded" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name)}" loading="eager" decoding="async"></span>`
         : `<span class="panel-chart-avatar">${escapeHtml(initials(item.name))}</span>`;
-      return `<div class="panel-chart-row"><div class="panel-chart-rank">${index + 1}</div><div class="panel-chart-label">${avatar}<span>${escapeHtml(item.name)}</span></div><div class="panel-chart-bar"><div class="panel-chart-fill" style="width:${Math.max(10, (item.kg / max) * 100)}%"></div></div><div class="panel-chart-value">${item.kg.toFixed(2)} kg</div></div>`;
+      const bg = barColors[index % barColors.length];
+      return `<div class="panel-chart-row"><div class="panel-chart-rank">${index + 1}</div><div class="panel-chart-label">${avatar}<span>${escapeHtml(item.name)}</span></div><div class="panel-chart-bar"><div class="panel-chart-fill" style="width:${Math.max(10, (item.kg / max) * 100)}%; background: ${bg}"></div></div><div class="panel-chart-value">${item.kg.toFixed(2)} kg</div></div>`;
     }).join('')}</div>`;
   };
 
