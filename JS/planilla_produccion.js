@@ -1,6 +1,7 @@
 (function planillaProduccionModule() {
   const safeObject = (value) => (value && typeof value === 'object' ? value : {});
   const normalizeValue = (value) => String(value || '').trim();
+  const normalizeUpper = (value) => normalizeValue(value).toUpperCase();
   const escapeHtml = (value) => String(value || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -48,7 +49,7 @@
     return `${production} - ${product} - ${date}`;
   };
 
-  const formatQty = (value, unit = '') => `${Number(value || 0).toFixed(3)} ${unit}`.trim();
+  const formatQty = (value, unit = '') => `${Number(value || 0).toFixed(3)} ${normalizeUpper(unit)}`.trim();
   const getUnitFactor = (unitRaw) => {
     const unit = normalizeValue(unitRaw).toLowerCase();
     const massMap = {
@@ -102,8 +103,8 @@
     if (!tokens.length) return 'SIN RESPONSABLE';
     return tokens.map((token) => {
       const user = safeObject(usersMap[token]);
-      const full = normalizeValue(user.fullName || user.name || token);
-      const role = normalizeValue(user.role || user.position || 'RESPONSABLE');
+      const full = normalizeUpper(user.fullName || user.name || token);
+      const role = normalizeUpper(user.role || user.position || 'RESPONSABLE');
       return `${full} (${role})`;
     }).join(', ');
   };
@@ -114,7 +115,7 @@
     const joinUnique = (items = []) => {
       const normalized = items.map((item) => normalizeValue(item)).filter(Boolean);
       const unique = [...new Set(normalized)];
-      return unique.length ? unique.join(' | ') : '-';
+      return unique.length ? unique.map((item) => normalizeUpper(item)).join(' | ') : '-';
     };
     const sourceMeta = plans.reduce((acc, plan, index) => {
       const ingredientId = normalizeValue(plan?.ingredientId || `ing_${index}`);
@@ -122,7 +123,7 @@
       if (!acc[sourceIngredientId]) {
         acc[sourceIngredientId] = {
           sourceIngredientId,
-          sourceIngredientName: normalizeValue(plan?.sourceIngredientName || plan?.ingredientName || 'INGREDIENTE'),
+          sourceIngredientName: normalizeUpper(plan?.sourceIngredientName || plan?.ingredientName || 'INGREDIENTE'),
           requiredQty: 0,
           unit: normalizeValue(plan?.ingredientUnit || plan?.unit || '')
         };
@@ -145,8 +146,8 @@
           ...safeObject(plan),
           ingredientId,
           sourceIngredientId,
-          sourceIngredientName: normalizeValue(plan?.sourceIngredientName),
-          ingredientName: normalizeValue(plan?.ingredientName || 'INGREDIENTE'),
+          sourceIngredientName: normalizeUpper(plan?.sourceIngredientName),
+          ingredientName: normalizeUpper(plan?.ingredientName || 'INGREDIENTE'),
           ingredientImageUrl: normalizeValue(plan?.ingredientImageUrl || ''),
           isSubstitute: Boolean(plan?.isSubstitute),
           neededQty: 0,
@@ -179,7 +180,7 @@
         return {
           index: lotIndex + 1,
           lotNumber: normalizeValue(lot?.lotNumber || lot?.entryId || '-'),
-          provider: normalizeValue(lot?.provider || '-'),
+          provider: normalizeUpper(lot?.provider || '-'),
           qtyLabel: formatQty(usedQty, unit)
         };
       });
@@ -199,11 +200,11 @@
       const qtyRaw = Number(plan?.neededQty ?? plan?.requiredQty ?? 0);
       const qtyUnit = normalizeValue(plan?.ingredientUnit || plan?.unit || '');
       return {
-        ingredientName: plan?.ingredientName || traceIngredient?.ingredientName || 'INGREDIENTE',
-        relation: plan?.isSubstitute && normalizeValue(plan?.sourceIngredientName) ? `Sustituye a ${normalizeValue(plan.sourceIngredientName)}` : '',
+        ingredientName: normalizeUpper(plan?.ingredientName || traceIngredient?.ingredientName || 'INGREDIENTE'),
+        relation: plan?.isSubstitute && normalizeValue(plan?.sourceIngredientName) ? `SUSTITUYE A ${normalizeUpper(plan.sourceIngredientName)}` : '',
         isSubstitute: Boolean(plan?.isSubstitute),
         sourceIngredientId: normalizeValue(plan?.sourceIngredientId || plan?.ingredientId),
-        sourceIngredientName: normalizeValue(meta.sourceIngredientName || plan?.sourceIngredientName || plan?.ingredientName || 'INGREDIENTE'),
+        sourceIngredientName: normalizeUpper(meta.sourceIngredientName || plan?.sourceIngredientName || plan?.ingredientName || 'INGREDIENTE'),
         sourceRequiredQty: Number(meta.requiredQty || qtyRaw || 0),
         sourceUnit: normalizeValue(meta.unit || qtyUnit),
         ingredientImage: normalizeValue(plan?.ingredientImageUrl || traceIngredient?.ingredientImageUrl),
@@ -220,7 +221,7 @@
         invoiceNumber: normalizeValue(firstLot?.invoiceNumber || '-'),
         entryDate: formatIsoEs(firstLot?.entryDate || '-'),
         autoObservation: lots.length > 1
-          ? `${plan?.ingredientName || traceIngredient?.ingredientName || 'Ingrediente'}, se usó ${lotUsageSummary}. ${providersSummary}.`
+          ? `${plan?.ingredientName || traceIngredient?.ingredientName || 'Ingrediente'}, se usÃ³ ${lotUsageSummary}. ${providersSummary}.`
           : ''
       };
     });
@@ -231,7 +232,7 @@
       const key = normalizeValue(row?.sourceIngredientId || row?.ingredientName || `ing_${index}`);
       if (!acc[key]) {
         acc[key] = {
-          sourceIngredientName: normalizeValue(row?.sourceIngredientName || row?.ingredientName || 'INGREDIENTE'),
+          sourceIngredientName: normalizeUpper(row?.sourceIngredientName || row?.ingredientName || 'INGREDIENTE'),
           sourceRequiredQty: Number(row?.sourceRequiredQty || 0),
           sourceUnit: normalizeValue(row?.sourceUnit || row?.qtyUnit || ''),
           rows: []
@@ -262,16 +263,16 @@
       const totalUsed = group.rows.reduce((sum, row) => sum + Number(row.qtyRaw || 0), 0);
       const directUsed = group.rows.filter((row) => !row.isSubstitute).reduce((sum, row) => sum + Number(row.qtyRaw || 0), 0);
       if (!hasSubstitutes) return group.rows.map((row) => renderDataRow(row)).join('');
-      const badge = directUsed > 0.0001 ? 'Combinado con sustitutos' : 'Cubierto con sustitutos';
-      const directText = directUsed > 0.0001 ? `Original usado: ${formatQty(directUsed, group.sourceUnit)}` : 'Ingrediente original sin consumo directo';
+      const badge = directUsed > 0.0001 ? 'COMBINADO CON SUSTITUTOS' : 'CUBIERTO CON SUSTITUTOS';
+      const directText = directUsed > 0.0001 ? `ORIGINAL USADO: ${formatQty(directUsed, group.sourceUnit)}` : 'INGREDIENTE ORIGINAL SIN CONSUMO DIRECTO';
       const sourceRequiredLabel = escapeHtml(formatQty(group.sourceRequiredQty || totalUsed, group.sourceUnit));
       const totalUsedLabel = escapeHtml(formatQty(totalUsed, group.sourceUnit));
       return `<tr class="planilla-source-row"><td colspan="6">
         <div class="planilla-source-head">
-          <strong>${escapeHtml(group.sourceIngredientName)}</strong>
+          <strong>${escapeHtml(normalizeUpper(group.sourceIngredientName))}</strong>
           <span><i class="fa-solid fa-link"></i> ${badge}</span>
         </div>
-        <div class="planilla-source-meta">Requerido: <b>${sourceRequiredLabel}</b> <span aria-hidden="true">|</span> Total usado: <b>${totalUsedLabel}</b> <span aria-hidden="true">|</span> ${escapeHtml(directText)}</div>
+        <div class="planilla-source-meta">REQUERIDO: <b>${sourceRequiredLabel}</b> <span aria-hidden="true">|</span> TOTAL USADO: <b>${totalUsedLabel}</b> <span aria-hidden="true">|</span> ${escapeHtml(directText)}</div>
       </td></tr>${group.rows.map((row) => renderDataRow(row, row.isSubstitute ? 'planilla-substitute-row' : '')).join('')}`;
     }).join('') || '<tr><td colspan="6">SIN INGREDIENTES CARGADOS.</td></tr>';
   };
@@ -289,35 +290,36 @@
       .join(' ');
     const observations = [normalizeValue(registro?.observations), autoObservations]
       .filter(Boolean)
-      .join(' · ') || 'SIN OBSERVACIONES';
+      .join(' Â· ') || 'SIN OBSERVACIONES';
 
-    const observationsLabel = observations.replace(/\u00c2\u00b7/g, '|');
+    const observationsLabel = normalizeUpper(observations.replace(/\u00c2\u00b7/g, '|'));
 
     return `<div class="planilla-card planilla-print-a4" id="planillaProduccionPrintable">
       <header class="planilla-doc-header">
-        <div>
-          <p>Registro de protocolo de producci&oacute;n</p>
-          <h2>${escapeHtml(registro?.recipeTitle || '-')}</h2>
-          <span>${escapeHtml(registro?.id || '-')} &middot; ${escapeHtml(formatDateTime(registro?.createdAt))}</span>
+        <div class="planilla-doc-title">
+          <p>FRIGORIFICO LA JAMONERA &bull; REGISTRO DE PROTOCOLO DE PRODUCCION</p>
+          <h2>${escapeHtml(normalizeUpper(registro?.recipeTitle || '-'))}</h2>
+          <span>${escapeHtml(registro?.id || '-')}</span>
         </div>
         <div class="planilla-doc-brand">
           <strong>FRIGORIFICO LA JAMONERA S.A.</strong>
-          <small>RNE ${escapeHtml(registro?.traceability?.company?.rne?.number || '-')}</small>
+          <small>Emitido: ${escapeHtml(formatDateTime(registro?.createdAt))}</small>
+          <small>RNE EMPRESA ${escapeHtml(registro?.traceability?.company?.rne?.number || '-')}</small>
         </div>
       </header>
       <section class="planilla-summary-grid">
         <div class="planilla-summary-item"><strong>PERIODO</strong><span>${escapeHtml(formatMonthYearEs(registro?.productionDate || ''))}</span></div>
-        <div class="planilla-summary-item"><strong>ELABORACION</strong><span>${escapeHtml(formatIsoEs(registro?.productionDate || ''))}</span></div>
+        <div class="planilla-summary-item"><strong>ELABORACION</strong><span>${escapeHtml(normalizeUpper(formatIsoEs(registro?.productionDate || '')))}</span></div>
         <div class="planilla-summary-item"><strong>ENVASADO</strong><span>${escapeHtml(formatIsoEs(registro?.packagingDate || ''))}</span></div>
-        <div class="planilla-summary-item"><strong>VENCIMIENTO</strong><span>${escapeHtml(formatIsoEs(registro?.productExpiryDate || ''))}</span></div>
-        <div class="planilla-summary-item"><strong>NRO. LOTE</strong><span>${escapeHtml(registro?.id || '-')}</span></div>
-        <div class="planilla-summary-item"><strong>RNPA PRODUCTO</strong><span>${escapeHtml(rnpa.number || '-')}</span></div>
-        <div class="planilla-summary-item"><strong>OBTENIDO</strong><span>${Number(registro?.quantityKg || 0).toFixed(2)} KG</span></div>
-        <div class="planilla-summary-item"><strong>MERMA</strong><span>${merma.toFixed(3)} KG</span></div>
+        <div class="planilla-summary-item"><strong>VENCIMIENTO</strong><span>${escapeHtml(normalizeUpper(formatIsoEs(registro?.productExpiryDate || '')))}</span></div>
+        <div class="planilla-summary-item"><strong>NRO. LOTE</strong><span>${escapeHtml(normalizeUpper(registro?.id || '-'))}</span></div>
+        <div class="planilla-summary-item"><strong>RNPA PRODUCTO</strong><span>${escapeHtml(normalizeUpper(rnpa.number || '-'))}</span></div>
+        <div class="planilla-summary-item"><strong>OBTENIDO</strong><span>${escapeHtml(normalizeUpper(`${Number(registro?.quantityKg || 0).toFixed(2)} KG`))}</span></div>
+        <div class="planilla-summary-item"><strong>MERMA</strong><span>${escapeHtml(normalizeUpper(`${merma.toFixed(3)} KG`))}</span></div>
       </section>
-      <section class="planilla-formula-card"><h3>Formula / Materias primas</h3><div class="planilla-table-scroll"><table class="planilla-table planilla-formula-table"><thead><tr><th>MATERIA PRIMA</th><th>PROVEEDOR</th><th>LOTE</th><th>VENCIMIENTO</th><th>RNE</th><th>CANTIDAD</th></tr></thead><tbody>${formulaRows}</tbody></table></div></section>
+      <section class="planilla-formula-card"><h3>FORMULA / MATERIAS PRIMAS</h3><div class="planilla-table-scroll"><table class="planilla-table planilla-formula-table"><thead><tr><th>MATERIA PRIMA</th><th>PROVEEDOR</th><th>LOTE</th><th>VENCIMIENTO</th><th>RNE</th><th>CANTIDAD</th></tr></thead><tbody>${formulaRows}</tbody></table></div></section>
       <section class="planilla-bottom-grid">
-        <div class="planilla-kpis-grid"><p><strong>RESPONSABLE:</strong> ${escapeHtml(managerLabel)}</p><p><strong>OBSERVACIONES:</strong> ${escapeHtml(observationsLabel)}</p></div>
+        <div class="planilla-kpis-grid"><p><strong>RESPONSABLE:</strong> ${escapeHtml(normalizeUpper(managerLabel))}</p><p><strong>OBSERVACIONES:</strong> ${escapeHtml(observationsLabel)}</p></div>
         <article class="planilla-qr-card"><div id="planillaQrTarget"></div><p class="planilla-qr-note">QR trazabilidad</p></article>
       </section>
     </div>`;
@@ -335,11 +337,18 @@
     new window.QRCode(host, { text: getTraceUrl(registro), width: 130, height: 130, colorDark: '#111827', colorLight: '#ffffff' });
   };
 
+  const buildPlanillaHeadHtml = (title) => `<title>${title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./CSS/style.css">
+    <style>body{font-family:"Inter","Segoe UI",Arial,sans-serif;padding:8px;background:#ffffff;}</style>`;
+
   const printPlanilla = async (root, registro) => {
     const win = window.open('', '_blank', 'width=1240,height=900');
     if (!win) return;
     const documentTitle = escapeHtml(getPlanillaDocumentTitle(registro));
-    win.document.write(`<html><head><title>${documentTitle}</title><link rel="stylesheet" href="./CSS/style.css"></head><body style="padding:8px;background:#ffffff;">${root.outerHTML}</body></html>`);
+    win.document.write(`<html><head>${buildPlanillaHeadHtml(documentTitle)}</head><body>${root.outerHTML}</body></html>`);
     win.document.close();
     await new Promise((resolve) => setTimeout(resolve, 240));
     const printRoot = win.document.querySelector('#planillaProduccionPrintable');
@@ -381,7 +390,7 @@
     }
     const win = window.open('', '_blank', 'width=1240,height=900');
     if (!win) return;
-    win.document.write(`<html><head><title>Planillas masivas</title><link rel="stylesheet" href="./CSS/style.css"></head><body style="padding:8px;background:#ffffff;display:grid;gap:12px;">${printNodes.map((html, index) => `<section style="${index ? 'page-break-before:always;' : ''}">${html}</section>`).join('')}</body></html>`);
+    win.document.write(`<html><head>${buildPlanillaHeadHtml('Planillas masivas')}</head><body style="display:grid;gap:12px;">${printNodes.map((html, index) => `<section style="${index ? 'page-break-before:always;' : ''}">${html}</section>`).join('')}</body></html>`);
     win.document.close();
     await waitImages(win.document.body);
     onProgress?.(100);
@@ -422,7 +431,7 @@
     if (!id) return;
     const registro = await window.laJamoneraProduccionAPI?.getRegistroById?.(id);
     if (!registro) {
-      await Swal.fire({ title: 'Sin datos', html: '<p>No se encontró la producción solicitada.</p>', icon: 'warning' });
+      await Swal.fire({ title: 'Sin datos', html: '<p>No se encontrÃ³ la producciÃ³n solicitada.</p>', icon: 'warning' });
       return;
     }
     await openByRegistro(registro, context);

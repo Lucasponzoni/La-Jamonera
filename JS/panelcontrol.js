@@ -69,13 +69,13 @@
 
   const toneImportance = (value) => {
     const n = Math.max(0, Math.min(100, Number(value || 0)));
-    if (n <= 14) return { tone: 'ok', label: 'Excelente 😄' };
-    if (n <= 28) return { tone: 'ok', label: 'Muy bueno 🙂' };
-    if (n <= 42) return { tone: 'normal', label: 'Bueno 😊' };
-    if (n <= 56) return { tone: 'normal', label: 'Normal 😐' };
-    if (n <= 70) return { tone: 'warn', label: 'Atención 😶' };
-    if (n <= 84) return { tone: 'high', label: 'Importante ⚠️' };
-    return { tone: 'critical', label: 'Muy importante 🚨' };
+    if (n <= 14) return { tone: 'ok', label: 'Excelente ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¹Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾' };
+    if (n <= 28) return { tone: 'ok', label: 'Muy bueno ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡' };
+    if (n <= 42) return { tone: 'normal', label: 'Bueno ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¹Ã…â€œÃƒâ€¦Ã‚Â ' };
+    if (n <= 56) return { tone: 'normal', label: 'Normal ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¹Ã…â€œÃƒâ€šÃ‚Â' };
+    if (n <= 70) return { tone: 'warn', label: 'AtenciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¹Ã…â€œÃƒâ€šÃ‚Â¶' };
+    if (n <= 84) return { tone: 'high', label: 'Importante ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â' };
+    return { tone: 'critical', label: 'Muy importante ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â¨' };
   };
 
   const dayDiff = (iso) => {
@@ -89,17 +89,17 @@
   const ago = (ts) => {
     const days = Math.floor((Date.now() - Number(ts || Date.now())) / 86400000);
     if (days <= 0) return 'HOY';
-    if (days === 1) return 'HACE 1 DÍA';
-    return `HACE ${days} DÍAS`;
+    if (days === 1) return 'HACE 1 DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚ÂA';
+    return `HACE ${days} DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚ÂAS`;
   };
 
   const agoDaysLabel = (ts) => {
     const days = Math.floor((Date.now() - Number(ts || Date.now())) / 86400000);
     if (days === 0) return 'CREADO HOY';
-    if (days === 1) return 'Hace <strong>1 día</strong>';
-    if (days === -1) return 'Hace -<strong>1 día</strong>-';
-    if (days < 0) return `Hace -${Math.abs(days)} días-`;
-    return `Hace ${days} días`;
+    if (days === 1) return 'Hace <strong>1 dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a</strong>';
+    if (days === -1) return 'Hace -<strong>1 dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a</strong>-';
+    if (days < 0) return `Hace -${Math.abs(days)} dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­as-`;
+    return `Hace ${days} dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­as`;
   };
 
   const spinner = (alt) => `<div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="${escapeHtml(alt)}" class="panel-spinner"></div>`;
@@ -134,7 +134,7 @@
     const user = safeObject(state.usersMap[report?.userId]);
     return {
       name: normalize(user.fullName || report?.userName || 'Pablo Scalise'),
-      position: normalize(user.position || report?.userPosition || 'Asesor Bromatológico'),
+      position: normalize(user.position || report?.userPosition || 'Asesor BromatolÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³gico'),
       photoUrl: normalize(user.photoUrl || '')
     };
   };
@@ -251,9 +251,9 @@
     const printWindow = window.open('', '_blank', 'width=1300,height=900');
     if (!printWindow) return;
     const attachmentsHtml = includeAttachments
-      ? `<section style="margin-top:18px;"><h2 style="margin:0 0 10px;font-size:18px;">Imágenes adjuntas</h2>${images.length ? `<div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${images.map((item, idx) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><img src="${escapeHtml(item.url)}" style="width:100%;max-height:320px;object-fit:contain;border-radius:10px;"><figcaption style="font-size:12px;color:#4b5f8e;margin-top:6px;">${escapeHtml(item.name || `Adjunto ${idx + 1}`)}</figcaption></figure>`).join('')}</div>` : '<p style="margin:0;color:#5a6482;">Sin imágenes adjuntas.</p>'}</section><section style="margin-top:16px;"><h2 style="margin:0 0 8px;font-size:18px;">Otros adjuntos</h2>${docs.length ? `<ul style="margin:0;padding-left:18px;">${docs.map((item) => `<li><a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.name || 'Archivo adjunto')}</a></li>`).join('')}</ul>` : '<p style="margin:0;color:#5a6482;">Sin archivos adjuntos.</p>'}</section>`
-      : '<p style="margin-top:14px;color:#5a6482;">Adjuntos no incluidos en esta impresión.</p>';
-    printWindow.document.write(`<html><head><title>Informe ${escapeHtml(report.id || '')}</title><style>body{font-family:Inter,Arial,sans-serif;padding:24px;color:#1f2a44}h1{font-size:24px;margin:0 0 10px}.meta{margin:0 0 16px;color:#55607f;font-size:14px}.content{border:1px solid #d7def2;border-radius:12px;padding:12px;background:#fff}</style></head><body><h1>Informe bromatológico</h1><p class="meta"><strong>Usuario:</strong> ${escapeHtml(report.userName || '-')} · <strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')} · <strong>Fecha:</strong> ${escapeHtml(getDateLabel(report.createdAt))}</p><section class="content">${report.html || '<p>Sin contenido</p>'}</section>${attachmentsHtml}</body></html>`);
+      ? `<section style="margin-top:18px;"><h2 style="margin:0 0 10px;font-size:18px;">ImÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡genes adjuntas</h2>${images.length ? `<div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${images.map((item, idx) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><img src="${escapeHtml(item.url)}" style="width:100%;max-height:320px;object-fit:contain;border-radius:10px;"><figcaption style="font-size:12px;color:#4b5f8e;margin-top:6px;">${escapeHtml(item.name || `Adjunto ${idx + 1}`)}</figcaption></figure>`).join('')}</div>` : '<p style="margin:0;color:#5a6482;">Sin imÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡genes adjuntas.</p>'}</section><section style="margin-top:16px;"><h2 style="margin:0 0 8px;font-size:18px;">Otros adjuntos</h2>${docs.length ? `<ul style="margin:0;padding-left:18px;">${docs.map((item) => `<li><a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.name || 'Archivo adjunto')}</a></li>`).join('')}</ul>` : '<p style="margin:0;color:#5a6482;">Sin archivos adjuntos.</p>'}</section>`
+      : '<p style="margin-top:14px;color:#5a6482;">Adjuntos no incluidos en esta impresiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n.</p>';
+    printWindow.document.write(`<html><head><title>Informe ${escapeHtml(report.id || '')}</title><style>body{font-family:Inter,Arial,sans-serif;padding:24px;color:#1f2a44}h1{font-size:24px;margin:0 0 10px}.meta{margin:0 0 16px;color:#55607f;font-size:14px}.content{border:1px solid #d7def2;border-radius:12px;padding:12px;background:#fff}</style></head><body><h1>Informe bromatolÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³gico</h1><p class="meta"><strong>Usuario:</strong> ${escapeHtml(report.userName || '-')} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· <strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· <strong>Fecha:</strong> ${escapeHtml(getDateLabel(report.createdAt))}</p><section class="content">${report.html || '<p>Sin contenido</p>'}</section>${attachmentsHtml}</body></html>`);
     printWindow.document.close();
     printWindow.focus();
     await waitPrintWindowAssets(printWindow);
@@ -263,7 +263,7 @@
 const printReport = async (report) => {
   const choice = await openIosSwal({
     title: 'Imprimir informe',
-    html: '<p>Elegí cómo querés generar el informe.</p>',
+    html: '<p>ElegÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ cÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³mo querÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©s generar el informe.</p>',
     showDenyButton: true,
     showCancelButton: true,
     confirmButtonText: 'Imprimir directo',
@@ -274,8 +274,8 @@ const printReport = async (report) => {
   if (!choice.isConfirmed && !choice.isDenied) return;
 
   const attachmentsChoice = await openIosSwal({
-    title: 'Imprimir período',
-    html: '<p>¿Querés incluir imágenes adjuntas?</p>',
+    title: 'Imprimir perÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­odo',
+    html: '<p>ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¿QuerÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©s incluir imÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡genes adjuntas?</p>',
     showCancelButton: true,
     showDenyButton: true,
     confirmButtonText: 'Incluir',
@@ -295,7 +295,7 @@ const printReport = async (report) => {
   try {
     openProcessingAlert(
       choice.isConfirmed
-        ? 'Leyendo informe y preparando impresión...'
+        ? 'Leyendo informe y preparando impresiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n...'
         : 'Leyendo informe desde Firebase y generando PDF...'
     );
 
@@ -312,9 +312,9 @@ const printReport = async (report) => {
       const docDefinition = {
         pageMargins: [28, 28, 28, 28],
         content: [
-          { text: 'Informe bromatológico', style: 'header' },
+          { text: 'Informe bromatolÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³gico', style: 'header' },
           {
-            text: `Usuario: ${latestReport.userName || '-'} · Fecha: ${getDateLabel(latestReport.createdAt)}`,
+            text: `Usuario: ${latestReport.userName || '-'} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Fecha: ${getDateLabel(latestReport.createdAt)}`,
             style: 'meta'
           },
           htmlContent
@@ -329,7 +329,7 @@ const printReport = async (report) => {
     } else {
       await openIosSwal({
         title: 'Error al generar PDF',
-        html: '<p>No pudimos cargar la librería PDF (pdfmake/html-to-pdfmake). Reintentá en unos segundos.</p>',
+        html: '<p>No pudimos cargar la librerÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a PDF (pdfmake/html-to-pdfmake). ReintentÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ en unos segundos.</p>',
         icon: 'error',
         confirmButtonText: 'Entendido'
       });
@@ -340,40 +340,40 @@ const printReport = async (report) => {
 };
 
   const buildReportEmailHtml = (report, attachments = []) => {
-    const imageBlocks = attachments.filter((item) => item?.type === 'image' && item?.url).map((item) => `<figure style="margin:0;border:1px solid #d8e3fb;border-radius:12px;overflow:hidden;"><img src="${escapeHtml(item.url)}" style="width:100%;max-height:420px;object-fit:contain;background:#f6f9ff;"><figcaption style="padding:8px 10px;font-size:12px;color:#526a97;">${escapeHtml(item.name || 'Imagen adjunta')}</figcaption></figure>`).join('') || '<p style="margin:0;color:#5f729b;">Sin imágenes adjuntas.</p>';
+    const imageBlocks = attachments.filter((item) => item?.type === 'image' && item?.url).map((item) => `<figure style="margin:0;border:1px solid #d8e3fb;border-radius:12px;overflow:hidden;"><img src="${escapeHtml(item.url)}" style="width:100%;max-height:420px;object-fit:contain;background:#f6f9ff;"><figcaption style="padding:8px 10px;font-size:12px;color:#526a97;">${escapeHtml(item.name || 'Imagen adjunta')}</figcaption></figure>`).join('') || '<p style="margin:0;color:#5f729b;">Sin imÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡genes adjuntas.</p>';
     const attachmentItems = attachments.length ? attachments.map((item) => `<li>${item?.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.name || 'Adjunto')}</a>` : escapeHtml(item?.name || 'Adjunto')}</li>`).join('') : '<li>Sin adjuntos.</li>';
-    return `<div style="font-family:Inter,Arial,sans-serif;background:#f4f7ff;padding:18px;"><div style="max-width:720px;margin:0 auto;background:#fff;border:1px solid #dbe4fb;border-radius:18px;padding:18px;"><h2 style="margin:0 0 6px;color:#2351a0;">Nuevo informe bromatológico</h2><p style="margin:0 0 14px;color:#4f638c;">Creador: <strong>${escapeHtml(report.userName || 'La Jamonera')}</strong> · Fecha: ${getDateLabel(report.createdAt)}</p><div style="border:1px solid #e2e8fb;border-radius:14px;padding:12px;background:#fbfdff;">${report.html || '<p>Sin contenido</p>'}</div><h3 style="margin:14px 0 8px;color:#2d4f91;font-size:15px;">Imágenes adjuntas</h3><div style="display:grid;gap:10px;">${imageBlocks}</div><h3 style="margin:14px 0 6px;color:#2d4f91;font-size:15px;">Documentos y enlaces</h3><ul style="margin:0;padding-left:18px;color:#4b5f89;">${attachmentItems}</ul></div></div>`;
+    return `<div style="font-family:Inter,Arial,sans-serif;background:#f4f7ff;padding:18px;"><div style="max-width:720px;margin:0 auto;background:#fff;border:1px solid #dbe4fb;border-radius:18px;padding:18px;"><h2 style="margin:0 0 6px;color:#2351a0;">Nuevo informe bromatolÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³gico</h2><p style="margin:0 0 14px;color:#4f638c;">Creador: <strong>${escapeHtml(report.userName || 'La Jamonera')}</strong> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Fecha: ${getDateLabel(report.createdAt)}</p><div style="border:1px solid #e2e8fb;border-radius:14px;padding:12px;background:#fbfdff;">${report.html || '<p>Sin contenido</p>'}</div><h3 style="margin:14px 0 8px;color:#2d4f91;font-size:15px;">ImÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡genes adjuntas</h3><div style="display:grid;gap:10px;">${imageBlocks}</div><h3 style="margin:14px 0 6px;color:#2d4f91;font-size:15px;">Documentos y enlaces</h3><ul style="margin:0;padding-left:18px;color:#4b5f89;">${attachmentItems}</ul></div></div>`;
   };
 
   const openResendReportEmailPrompt = async (report) => {
     const usersWithEmail = Object.values(state.usersMap || {}).filter((user) => normalize(user.email)).sort((a, b) => String(a.fullName || '').localeCompare(String(b.fullName || '')));
     const usersHtml = usersWithEmail.length ? usersWithEmail.map((user) => `<label class="notify-user-card"><div class="notify-user-main">${renderUserAvatar(user)}<div class="notify-user-text"><strong>${escapeHtml(user.fullName || 'Usuario')}</strong><small>${escapeHtml(user.email || '')}</small></div></div><input type="checkbox" data-resend-user-email="${escapeHtml(user.email || '')}" data-resend-user-name="${escapeHtml(user.fullName || '')}"></label>`).join('') : '<div class="informes-empty">No hay usuarios con email cargado.</div>';
-    const response = await openIosSwal({ title: 'Reenviar informe por email', width: 760, showCancelButton: true, confirmButtonText: 'Reenviar', cancelButtonText: 'Cancelar', html: `<div class="text-start report-resend-wrap"><p class="mb-2">Seleccioná usuarios del listado o escribí emails nuevos (separados por coma).</p><div id="resendUsersList" class="notify-specific-users-list">${usersHtml}</div><label class="form-label mt-3" for="resendExtraEmails">Emails adicionales</label><textarea id="resendExtraEmails" class="swal2-textarea ios-input" placeholder="ejemplo@dominio.com, otro@dominio.com"></textarea></div>`, didOpen: bindThumbs, preConfirm: () => {
+    const response = await openIosSwal({ title: 'Reenviar informe por email', width: 760, showCancelButton: true, confirmButtonText: 'Reenviar', cancelButtonText: 'Cancelar', html: `<div class="text-start report-resend-wrap"><p class="mb-2">SeleccionÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ usuarios del listado o escribÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ emails nuevos (separados por coma).</p><div id="resendUsersList" class="notify-specific-users-list">${usersHtml}</div><label class="form-label mt-3" for="resendExtraEmails">Emails adicionales</label><textarea id="resendExtraEmails" class="swal2-textarea ios-input" placeholder="ejemplo@dominio.com, otro@dominio.com"></textarea></div>`, didOpen: bindThumbs, preConfirm: () => {
       const selectedNodes = Array.from(document.querySelectorAll('[data-resend-user-email]:checked'));
       const selected = selectedNodes.map((node) => ({ email: normalize(node.dataset.resendUserEmail), name: normalize(node.dataset.resendUserName) || 'Usuario' })).filter((item) => item.email);
       const extraRaw = normalize(document.getElementById('resendExtraEmails')?.value || '');
       const extraEmails = extraRaw ? extraRaw.split(',').map((item) => normalize(item)).filter(Boolean) : [];
       const invalid = extraEmails.find((item) => !/^\S+@\S+\.\S+$/.test(item));
-      if (invalid) { Swal.showValidationMessage(`Email inválido: ${invalid}`); return false; }
+      if (invalid) { Swal.showValidationMessage(`Email invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido: ${invalid}`); return false; }
       const recipientsByEmail = new Map();
       selected.forEach((item) => recipientsByEmail.set(item.email.toLowerCase(), item));
       extraEmails.forEach((email) => { if (!recipientsByEmail.has(email.toLowerCase())) recipientsByEmail.set(email.toLowerCase(), { email, name: email }); });
       const recipients = Array.from(recipientsByEmail.values());
-      if (!recipients.length) { Swal.showValidationMessage('Seleccioná al menos un destinatario o escribí un email.'); return false; }
+      if (!recipients.length) { Swal.showValidationMessage('SeleccionÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ al menos un destinatario o escribÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ un email.'); return false; }
       return recipients;
     } });
     if (!response.isConfirmed) return;
     if (!window.laJamoneraEmailSender) {
-      await openIosSwal({ title: 'Email no disponible', html: '<p>No está cargado el módulo de envío en esta pantalla.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+      await openIosSwal({ title: 'Email no disponible', html: '<p>No estÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ cargado el mÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³dulo de envÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­o en esta pantalla.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
       return;
     }
     await window.laJamoneraEmailSender.ensureConfigLoaded();
     const latestReport = findReportById(report.id) || report;
     const emailHtml = buildReportEmailHtml(latestReport, latestReport.attachments || []);
     for (const target of (response.value || [])) {
-      const sendResponse = await window.laJamoneraEmailSender.sendEmail('La Jamonera', `Reenvío de informe bromatológico · ${latestReport.userName || 'La Jamonera'}`, emailHtml, target.name || target.email, target.email);
+      const sendResponse = await window.laJamoneraEmailSender.sendEmail('La Jamonera', `ReenvÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­o de informe bromatolÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³gico ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${latestReport.userName || 'La Jamonera'}`, emailHtml, target.name || target.email, target.email);
       if (sendResponse?.ok) {
-        window.laJamoneraNotify?.show({ type: 'success', title: 'Email enviado', message: `Se notificó a ${target.name || target.email}.` });
+        window.laJamoneraNotify?.show({ type: 'success', title: 'Email enviado', message: `Se notificÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³ a ${target.name || target.email}.` });
       } else {
         window.laJamoneraNotify?.show({ type: 'error', title: 'Error de email', message: `No se pudo notificar a ${target.name || target.email}.` });
       }
@@ -387,7 +387,7 @@ const printReport = async (report) => {
     if (!user?.pin) return true;
     const result = await openIosSwal({
       title: 'Clave de usuario',
-      html: '<input id="panelCreatorPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos">',
+      html: '<input id="panelCreatorPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­gitos">',
       showCancelButton: true,
       confirmButtonText: 'Validar',
       cancelButtonText: 'Cancelar',
@@ -415,16 +415,16 @@ const printReport = async (report) => {
       }).join('')
       : '<div class="informes-empty">Sin adjuntos</div>';
     const users = Object.values(state.usersMap || {}).sort((a, b) => String(a.fullName || '').localeCompare(String(b.fullName || '')));
-    const commentUserOptions = ['<option value="">Seleccioná un usuario</option>', ...users.map((user) => `<option value="${escapeHtml(user.id || '')}">${escapeHtml(user.fullName || 'Usuario')}</option>`)].join('');
+    const commentUserOptions = ['<option value="">SeleccionÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ un usuario</option>', ...users.map((user) => `<option value="${escapeHtml(user.id || '')}">${escapeHtml(user.fullName || 'Usuario')}</option>`)].join('');
     const comments = getCommentList(report);
     const commentsHtml = comments.length
       ? `<div class="report-comments-thread">${renderCommentTree(comments)}</div>`
-      : '<div class="informes-empty report-comments-empty">Sin comentarios todavía.</div>';
+      : '<div class="informes-empty report-comments-empty">Sin comentarios todavÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a.</div>';
 
     await openIosSwal({
       title: 'Informe completo',
       width: 980,
-      html: `<div class="report-viewer"><div class="report-viewer-meta"><p><strong>Creador:</strong> ${escapeHtml(user.name || '-')}</p><p><strong>Puesto:</strong> ${escapeHtml(user.position || '-')}</p><p><strong>Fecha:</strong> ${escapeHtml(getDateLabel(report.createdAt))}</p><p><strong>Última actualización:</strong> ${escapeHtml(getDateLabel(report.updatedAt || report.createdAt))}</p><div class="report-viewer-meta-actions"><button type="button" class="btn ios-btn ios-btn-warning report-resend-btn" data-resend-report-email="1"><i class="fa-regular fa-paper-plane"></i><span>Reenviar email</span></button></div></div><div class="report-viewer-content-wrap"><div class="report-viewer-content">${report.html || ''}</div></div><div class="attachments-grid">${attachmentHtml}</div><section class="report-comments-wrap"><div class="report-comments-head"><h6><i class="fa-regular fa-comments"></i> <span class="report-comments-title-text">Comentarios</span></h6></div><div class="report-inline-comment-form"><div class="report-inline-comment-reply d-none" id="inlineReplyLabel"></div><select id="inlineCommentUser" class="form-select ios-input mb-2">${commentUserOptions}</select><textarea id="inlineCommentText" class="swal2-textarea ios-input" placeholder="Escribí un comentario"></textarea><input id="inlineCommentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos"><div class="d-flex justify-content-end gap-2"><button type="button" class="btn ios-btn ios-btn-secondary d-none" id="inlineCancelReplyBtn">Cancelar respuesta</button><button type="button" class="btn ios-btn ios-btn-primary" id="inlineSendCommentBtn"><i class="fa-solid fa-paper-plane"></i><span>Enviar comentario</span></button></div></div><div id="reportCommentsBody">${commentsHtml}</div></section></div>`,
+      html: `<div class="report-viewer"><div class="report-viewer-meta"><p><strong>Creador:</strong> ${escapeHtml(user.name || '-')}</p><p><strong>Puesto:</strong> ${escapeHtml(user.position || '-')}</p><p><strong>Fecha:</strong> ${escapeHtml(getDateLabel(report.createdAt))}</p><p><strong>ÃƒÆ’Ã†â€™Ãƒâ€¦Ã‚Â¡ltima actualizaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n:</strong> ${escapeHtml(getDateLabel(report.updatedAt || report.createdAt))}</p><div class="report-viewer-meta-actions"><button type="button" class="btn ios-btn ios-btn-warning report-resend-btn" data-resend-report-email="1"><i class="fa-regular fa-paper-plane"></i><span>Reenviar email</span></button></div></div><div class="report-viewer-content-wrap"><div class="report-viewer-content">${report.html || ''}</div></div><div class="attachments-grid">${attachmentHtml}</div><section class="report-comments-wrap"><div class="report-comments-head"><h6><i class="fa-regular fa-comments"></i> <span class="report-comments-title-text">Comentarios</span></h6></div><div class="report-inline-comment-form"><div class="report-inline-comment-reply d-none" id="inlineReplyLabel"></div><select id="inlineCommentUser" class="form-select ios-input mb-2">${commentUserOptions}</select><textarea id="inlineCommentText" class="swal2-textarea ios-input" placeholder="EscribÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ un comentario"></textarea><input id="inlineCommentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­gitos"><div class="d-flex justify-content-end gap-2"><button type="button" class="btn ios-btn ios-btn-secondary d-none" id="inlineCancelReplyBtn">Cancelar respuesta</button><button type="button" class="btn ios-btn ios-btn-primary" id="inlineSendCommentBtn"><i class="fa-solid fa-paper-plane"></i><span>Enviar comentario</span></button></div></div><div id="reportCommentsBody">${commentsHtml}</div></section></div>`,
       customClass: { popup: 'panel-report-alert' },
       confirmButtonText: 'Cerrar',
       didOpen: (popup) => {
@@ -500,10 +500,10 @@ const printReport = async (report) => {
 
   const promptComment = async (report) => {
     const users = Object.values(state.usersMap || {}).sort((a, b) => String(a.fullName || '').localeCompare(String(b.fullName || '')));
-    const options = ['<option value="">Seleccioná un usuario</option>', ...users.map((user) => `<option value="${escapeHtml(user.id)}">${escapeHtml(user.fullName || 'Usuario')}</option>`)].join('');
+    const options = ['<option value="">SeleccionÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ un usuario</option>', ...users.map((user) => `<option value="${escapeHtml(user.id)}">${escapeHtml(user.fullName || 'Usuario')}</option>`)].join('');
     const result = await openIosSwal({
       title: 'Agregar comentario',
-      html: `<select id="panelCommentUser" class="form-select ios-input mb-2">${options}</select><textarea id="panelCommentText" class="swal2-textarea ios-input" maxlength="500" placeholder="Escribí un comentario"></textarea><input id="panelCommentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos">`,
+      html: `<select id="panelCommentUser" class="form-select ios-input mb-2">${options}</select><textarea id="panelCommentText" class="swal2-textarea ios-input" maxlength="500" placeholder="EscribÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ un comentario"></textarea><input id="panelCommentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­gitos">`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
@@ -567,7 +567,7 @@ const printReport = async (report) => {
 
     const ask = await openIosSwal({
       title: 'Borrar informe',
-      html: '<p>Esta acción eliminará el informe de forma definitiva.</p>',
+      html: '<p>Esta acciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n eliminarÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ el informe de forma definitiva.</p>',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Borrar',
@@ -583,7 +583,7 @@ const printReport = async (report) => {
     const report = state.report;
     if (!report) {
       nodes.informeAgo.classList.add('d-none');
-      nodes.informe.innerHTML = '<div class="panel-empty">Todavía no hay informes cargados.</div>';
+      nodes.informe.innerHTML = '<div class="panel-empty">TodavÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a no hay informes cargados.</div>';
       return;
     }
 
@@ -605,7 +605,7 @@ const printReport = async (report) => {
         <div class="informe-card-meta">
           <span class="informe-attach-chip"><i class="fa-regular fa-image"></i> ${attachments.filter((x) => x?.type === 'image').length}</span>
           <span class="informe-attach-chip"><i class="fa-regular fa-file-lines"></i> ${Math.max(0, attachments.length - attachments.filter((x) => x?.type === 'image').length)}</span>
-          <span class="importance-chip importance-${importance.tone}">${Math.max(0, Math.min(100, Number(report.importance || 0)))}% · ${importance.label}</span>
+          <span class="importance-chip importance-${importance.tone}">${Math.max(0, Math.min(100, Number(report.importance || 0)))}% ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${importance.label}</span>
           <span class="informe-attach-chip panel-report-age-chip"><i class="fa-regular fa-clock"></i> ${agoDaysLabel(report.createdAt)}</span>
           <button class="btn informe-print-chip" type="button" data-print-report="${escapeHtml(report.id)}" title="Imprimir informe"><i class="fa-solid fa-print"></i></button>
         </div>
@@ -644,7 +644,13 @@ const printReport = async (report) => {
   };
 
   const renderSummary = () => {
-    nodes.resumen.innerHTML = `<div class="panel-kpi-row"><div class="panel-metric panel-metric-rne"><strong>${state.providers.length}</strong><span><i class="fa-solid fa-file-shield"></i> RNE pendientes</span></div><div class="panel-metric panel-metric-rnpa"><strong>${state.recipes.length}</strong><span><i class="fa-solid fa-clipboard-check"></i> RNPA críticos</span></div><div class="panel-metric panel-metric-transport"><strong>${state.vehicles.length}</strong><span><i class="fa-solid fa-id-card-clip"></i> UTA/URA con alerta</span></div><div class="panel-metric panel-metric-reports"><strong>${state.reports.length}</strong><span><i class="fa-solid fa-file-waveform"></i> Informes cargados</span></div></div>`;
+    const cards = [
+      { key: 'rne', icon: 'fa-file-shield', value: state.providers.length, title: 'RNE pendientes', note: 'proveedores sin completar' },
+      { key: 'rnpa', icon: 'fa-clipboard-check', value: state.recipes.length, title: 'RNPA criticos', note: 'recetas a revisar' },
+      { key: 'transport', icon: 'fa-id-card-clip', value: state.vehicles.length, title: 'UTA/URA con alerta', note: 'unidades por vencer' },
+      { key: 'reports', icon: 'fa-file-waveform', value: state.reports.length, title: 'Informes cargados', note: 'registros disponibles' }
+    ];
+    nodes.resumen.innerHTML = `<div class="panel-kpi-row">${cards.map((card) => `<article class="panel-metric panel-metric-${card.key}"><div class="panel-metric-top"><span class="panel-metric-icon"><i class="fa-solid ${card.icon}"></i></span><div class="panel-metric-copy"><strong>${escapeHtml(card.title)}</strong><small>${escapeHtml(card.note)}</small></div></div><div class="panel-metric-bottom"><span class="panel-metric-value">${card.value}</span></div></article>`).join('')}</div>`;
   };
 
   const renderProviders = () => {
@@ -667,7 +673,7 @@ const printReport = async (report) => {
       const avatar = photo
         ? `<div class="panel-avatar"><span class="thumb-loading"><img src="./IMG/Meta-ai-logo.webp" class="panel-spinner" alt="cargando"></span><img class="js-panel-thumb" src="${escapeHtml(photo)}" alt="${escapeHtml(recipe.title)}"></div>`
         : `<div class="panel-avatar">${escapeHtml(initials(recipe.title))}</div>`;
-      return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(recipe.title || 'Receta')}</strong><small><i class="fa-regular fa-calendar"></i> Vence: ${escapeHtml(recipe.rnpa?.expiryDate || '-')}</small><p class="panel-status ${expired ? 'is-danger' : 'is-warning'}">${expired ? `Venció hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`}</p></div></article>`;
+      return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(recipe.title || 'Receta')}</strong><small><i class="fa-regular fa-calendar"></i> Vence: ${escapeHtml(recipe.rnpa?.expiryDate || '-')}</small><p class="panel-status ${expired ? 'is-danger' : 'is-warning'}">${expired ? `VenciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³ hace ${Math.abs(days)} dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a(s)` : `Vence en ${days} dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a(s)`}</p></div></article>`;
     });
     if (!rows.length) { nodes.rnpa.innerHTML = '<div class="panel-empty">No hay alertas para mostrar.</div>'; return; }
     nodes.rnpa.innerHTML = makeMarquee(rows, 3, 7);
@@ -676,7 +682,7 @@ const printReport = async (report) => {
   const renderTransport = () => {
     const rows = state.vehicles.map((vehicle) => {
       const days = dayDiff(vehicle.expiryDate);
-      return `<article class="panel-list-card"><div class="panel-avatar"><i class="fa-solid fa-id-card-clip"></i></div><div class="panel-item-text"><strong>${escapeHtml(vehicle.number || '-')} · ${escapeHtml(vehicle.patent || '-')}</strong><small>${escapeHtml(vehicle.brand || vehicle.type || 'Unidad')} · ${escapeHtml(vehicle.expiryDate || '-')}</small><p class="panel-status ${days < 0 ? 'is-danger' : 'is-warning'}">${days < 0 ? `Vencido hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`}</p></div></article>`;
+      return `<article class="panel-list-card"><div class="panel-avatar"><i class="fa-solid fa-id-card-clip"></i></div><div class="panel-item-text"><strong>${escapeHtml(vehicle.number || '-')} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${escapeHtml(vehicle.patent || '-')}</strong><small>${escapeHtml(vehicle.brand || vehicle.type || 'Unidad')} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${escapeHtml(vehicle.expiryDate || '-')}</small><p class="panel-status ${days < 0 ? 'is-danger' : 'is-warning'}">${days < 0 ? `Vencido hace ${Math.abs(days)} dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a(s)` : `Vence en ${days} dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a(s)`}</p></div></article>`;
     });
     if (!rows.length) { nodes.transporte.innerHTML = '<div class="panel-empty">No hay alertas para mostrar.</div>'; return; }
     nodes.transporte.innerHTML = makeMarquee(rows, 3, 7);
@@ -704,7 +710,7 @@ const printReport = async (report) => {
       return item;
     }).sort((a, b) => b.kg - a.kg).slice(0, 10);
 
-    if (!top.length) { nodes.produccion.innerHTML = '<div class="panel-empty">No hay producción en el rango seleccionado.</div>'; return; }
+    if (!top.length) { nodes.produccion.innerHTML = '<div class="panel-empty">No hay produccion en el rango seleccionado.</div>'; return; }
 
     const max = Math.max(...top.map((x) => x.kg));
     const barColors = [
@@ -726,7 +732,8 @@ const printReport = async (report) => {
       const colorSeed = normalize(item.id || item.name || index);
       const colorIndex = [...colorSeed].reduce((acc, ch) => acc + ch.charCodeAt(0), 0) % barColors.length;
       const bg = barColors[colorIndex];
-      return `<div class="panel-chart-row"><div class="panel-chart-rank">${index + 1}</div><div class="panel-chart-label">${avatar}<span>${escapeHtml(item.name)}</span></div><div class="panel-chart-bar"><div class="panel-chart-fill" style="width:${Math.max(10, (item.kg / max) * 100)}%; background: ${bg}"></div></div><div class="panel-chart-value">${item.kg.toFixed(2)} kg</div></div>`;
+      const pct = Math.max(6, (item.kg / max) * 100);
+      return `<article class="panel-chart-row"><div class="panel-chart-main"><div class="panel-chart-rank">${index + 1}</div><div class="panel-chart-label">${avatar}<span>${escapeHtml(item.name)}</span></div><div class="panel-chart-value">${item.kg.toFixed(2)} kg</div></div><div class="panel-chart-meta"><div class="panel-chart-bar"><div class="panel-chart-fill" style="width:${pct}%; background: ${bg}"></div></div><span class="panel-chart-share">${Math.round((item.kg / max) * 100)}% del maximo</span></div></article>`;
     }).join('')}</div>`;
   };
 
@@ -763,11 +770,11 @@ const printReport = async (report) => {
 
   const setLoading = () => {
     nodes.informe.innerHTML = spinner('Cargando informe');
-    nodes.resumen.innerHTML = spinner('Cargando métricas');
+    nodes.resumen.innerHTML = spinner('Cargando mÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©tricas');
     nodes.rne.innerHTML = spinner('Cargando proveedores');
     nodes.rnpa.innerHTML = spinner('Cargando RNPA');
     nodes.transporte.innerHTML = spinner('Cargando transporte');
-    nodes.produccion.innerHTML = spinner('Cargando producción');
+    nodes.produccion.innerHTML = spinner('Cargando producciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n');
   };
 
   const loadOnce = async () => {

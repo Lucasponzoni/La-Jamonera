@@ -9823,16 +9823,18 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 }
 
 .planilla-card {
-  border: 1px solid #d7deef;
-  border-radius: 10px;
+  border: 1px solid #2f2f2f;
+  border-radius: 0;
   background: #fff;
-  padding: 8px;
+  padding: 0;
   display: grid;
-  gap: 6px;
+  gap: 0;
   color: #111827;
   text-transform: none;
   box-shadow: none;
   line-height: 1.18;
+  font-family: "Inter", "Segoe UI", Arial, sans-serif;
+  overflow: hidden;
 }
 
 .planilla-print-a4 {
@@ -9842,75 +9844,102 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 }
 
 .planilla-doc-header {
-  border: 1px solid #13233c;
-  border-radius: 8px;
-  background: #13233c;
-  color: #fff;
+  border-bottom: 1px solid #2f2f2f;
+  background: #ffffff;
+  color: #111827;
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  align-items: center;
-  padding: 7px 10px;
+  align-items: stretch;
+  padding: 0;
 }
 
 .planilla-doc-header p,
 .planilla-doc-header h2,
 .planilla-doc-header span,
+.planilla-doc-title,
 .planilla-doc-brand strong,
 .planilla-doc-brand small {
   margin: 0;
 }
 
+.planilla-doc-title {
+  display: grid;
+  gap: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .planilla-doc-header p {
-  color: #a9b9dc;
-  font-size: 0.62rem;
+  background: #13233c;
+  color: #fff;
+  font-size: 0.7rem;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  padding: 8px 10px;
 }
 
 .planilla-doc-header h2 {
-  font-size: 1.2rem;
-  line-height: 1.05;
+  font-size: 1.1rem;
+  line-height: 1.12;
   font-weight: 900;
+  padding: 9px 10px 2px;
+  word-break: break-word;
 }
 
 .planilla-doc-header span,
 .planilla-doc-brand small {
   display: block;
-  color: #dbe5fb;
-  font-size: 0.66rem;
+  color: #40506d;
+  font-size: 0.72rem;
   font-weight: 700;
 }
 
+.planilla-doc-header span {
+  padding: 0 10px 9px;
+}
+
 .planilla-doc-brand {
+  min-width: 250px;
   text-align: right;
   display: grid;
-  gap: 2px;
+  gap: 6px;
   flex: 0 0 auto;
+  align-self: stretch;
+  padding: 10px;
+  background: transparent;
 }
 
 .planilla-doc-brand strong {
-  font-size: 0.72rem;
+  color: #13233c;
+  font-size: 0.78rem;
   font-weight: 900;
   letter-spacing: 0.03em;
 }
 
 .planilla-summary-grid {
-  border: 0;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
+  gap: 0;
 }
 
 .planilla-summary-item {
-  border: 1px solid #dbe4f5;
-  border-radius: 7px;
-  padding: 4px 6px;
-  min-height: 34px;
+  border-right: 1px solid #2f2f2f;
+  border-bottom: 1px solid #2f2f2f;
+  padding: 8px 10px;
+  min-height: 44px;
   display: grid;
   align-content: center;
-  gap: 1px;
+  gap: 3px;
+}
+
+.planilla-summary-item:nth-child(4n) {
+  border-right: 0;
+}
+
+.planilla-summary-item:nth-last-child(-n + 4) {
+  border-bottom: 0;
 }
 
 .planilla-summary-item strong {
@@ -9922,23 +9951,23 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 
 .planilla-summary-item span {
   color: #18376b;
-  font-size: 0.78rem;
-  line-height: 1.1;
+  font-size: 0.88rem;
+  line-height: 1.18;
   font-weight: 900;
 }
 
 .planilla-formula-card {
-  border: 1px solid #dbe4f5;
-  border-radius: 9px;
-  padding: 5px;
+  padding: 0;
 }
 
 .planilla-formula-card h3 {
-  margin: 0 0 4px;
+  margin: 0;
   text-align: left;
-  color: #18376b;
+  color: #13233c;
   font-size: 0.82rem;
   font-weight: 900;
+  padding: 8px 10px;
+  background: #ffffff;
 }
 
 .planilla-table-scroll {
@@ -9950,22 +9979,31 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   min-width: 0;
   table-layout: fixed;
   border-collapse: collapse;
+  border-top: 1px solid #2f2f2f;
 }
 
 .planilla-table th,
 .planilla-table td {
-  border: 1px solid #d7deef;
-  padding: 3px 4px;
-  font-size: 0.68rem;
+  border-top: 0;
+  border-left: 0;
+  border-right: 1px solid #2f2f2f;
+  border-bottom: 1px solid #2f2f2f;
+  padding: 5px 6px;
+  font-size: 0.72rem;
   line-height: 1.15;
   vertical-align: top;
   background: #fff;
 }
 
+.planilla-table th:last-child,
+.planilla-table td:last-child {
+  border-right: 0;
+}
+
 .planilla-table th {
   background: #13233c;
   color: #fff;
-  font-size: 0.58rem;
+  font-size: 0.62rem;
   font-weight: 900;
   letter-spacing: 0.02em;
 }
@@ -10007,10 +10045,15 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   max-width: 100%;
 }
 
+.planilla-ingredient-main > span:last-child {
+  min-width: 0;
+}
+
 .planilla-ingredient-main strong {
   color: #14233d;
   font-size: 0.7rem;
-  line-height: 1.1;
+  line-height: 1.18;
+  word-break: break-word;
 }
 
 .planilla-avatar {
@@ -10018,7 +10061,7 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   height: 24px;
   min-width: 24px;
   border-radius: 999px;
-  border: 1px solid #d7deef;
+  border: 1px solid #c7cfde;
   background: #f7f9fe;
   display: inline-flex;
   align-items: center;
@@ -10050,8 +10093,9 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 
 .planilla-source-row td {
   background: #fff8ec !important;
-  border-color: #edbd75 !important;
-  padding: 4px 6px;
+  border-bottom-color: #c8892f !important;
+  border-right-color: #c8892f !important;
+  padding: 6px 8px;
 }
 
 .planilla-source-head {
@@ -10059,6 +10103,7 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .planilla-source-head strong {
@@ -10078,18 +10123,19 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   padding: 2px 8px;
   font-size: 0.6rem;
   font-weight: 900;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .planilla-source-meta {
   color: #5f6f94;
   font-size: 0.64rem;
   margin-top: 2px;
+  line-height: 1.35;
 }
 
 .planilla-substitute-row td {
   background: #fffdf8;
-  border-top: 1px dashed #edbd75;
+  border-top: 1px dashed #c8892f;
 }
 
 .planilla-qty-cell {
@@ -10101,24 +10147,23 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 
 .planilla-bottom-grid {
   display: grid;
-  grid-template-columns: 1fr 90px;
-  gap: 6px;
+  grid-template-columns: 1fr 110px;
+  gap: 0;
   align-items: stretch;
+  border-top: 0;
 }
 
 .planilla-kpis-grid {
-  border: 1px solid #dbe4f5;
-  border-radius: 8px;
-  padding: 5px;
+  padding: 10px;
   display: grid;
-  gap: 3px;
+  gap: 10px;
 }
 
 .planilla-kpis-grid p {
   margin: 0;
   color: #26334d;
   font-size: 0.68rem;
-  line-height: 1.2;
+  line-height: 1.35;
 }
 
 .planilla-footer-grid {
@@ -10128,9 +10173,8 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 }
 
 .planilla-qr-card {
-  border: 1px solid #dbe4f5;
-  border-radius: 8px;
-  padding: 4px;
+  border-left: 1px solid #2f2f2f;
+  padding: 8px 6px;
   display: grid;
   place-items: center;
   gap: 3px;
@@ -10194,10 +10238,11 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
     max-width: none !important;
     margin: 0 !important;
     border-radius: 0;
-    padding: 4mm !important;
-    gap: 3mm !important;
+    padding: 0 !important;
+    gap: 0 !important;
     break-inside: avoid;
     page-break-inside: avoid;
+    overflow: hidden;
   }
 
   .planilla-card,
@@ -10207,116 +10252,141 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   }
 
   .planilla-doc-header {
-    padding: 4px 6px;
+    padding: 0 !important;
+    gap: 0 !important;
     break-inside: avoid;
   }
 
+  .planilla-doc-header p {
+    padding: 7px 10px !important;
+    font-size: 9px !important;
+    line-height: 1.1 !important;
+  }
+
   .planilla-doc-header h2 {
-    font-size: 15px;
+    font-size: 18px !important;
+    padding: 9px 10px 2px !important;
+    line-height: 1.1 !important;
   }
 
   .planilla-doc-header p,
   .planilla-doc-header span,
   .planilla-doc-brand strong,
   .planilla-doc-brand small {
-    font-size: 8px;
+    font-size: 8.5px !important;
+    line-height: 1.2 !important;
+  }
+
+  .planilla-doc-brand {
+    min-width: 280px;
+    padding: 10px !important;
+    gap: 4px;
+    border-left: 0 !important;
   }
 
   .planilla-summary-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-    gap: 3px;
+    gap: 0 !important;
   }
 
   .planilla-summary-item {
-    padding: 3px 4px;
-    min-height: 26px;
+    padding: 8px 10px !important;
+    min-height: 44px;
   }
 
   .planilla-summary-item strong {
-    font-size: 7px;
+    font-size: 7.5px !important;
   }
 
   .planilla-summary-item span {
-    font-size: 9px;
+    font-size: 10px !important;
   }
 
   .planilla-formula-card {
-    padding: 4px;
+    padding: 0 !important;
   }
 
   .planilla-formula-card h3 {
-    font-size: 10px;
-    margin-bottom: 3px;
+    font-size: 10px !important;
+    margin: 0 !important;
+    padding: 7px 10px !important;
+    border-bottom: 0 !important;
   }
 
   .planilla-table {
     min-width: 0 !important;
     table-layout: fixed;
+    border-collapse: collapse;
+    border-top: 1px solid #2f2f2f !important;
   }
 
   .planilla-table th,
   .planilla-table td {
-    font-size: 8px !important;
-    padding: 2px 3px !important;
+    font-size: 10px !important;
+    padding: 6px 7px !important;
+    line-height: 1.25 !important;
+    border-top: 0 !important;
+    border-left: 0 !important;
   }
 
   .planilla-table th {
-    font-size: 7px !important;
+    font-size: 8px !important;
   }
 
   .planilla-ingredient-main strong {
-    font-size: 8px;
+    font-size: 10px !important;
   }
 
   .planilla-avatar {
-    width: 20px;
-    height: 20px;
-    min-width: 20px;
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
   }
 
   .planilla-substitute-note {
-    font-size: 7px;
+    font-size: 8px !important;
   }
 
   .planilla-source-row td {
-    padding: 3px 4px !important;
+    padding: 7px 8px !important;
   }
 
   .planilla-source-head strong {
-    font-size: 9px;
+    font-size: 10px !important;
   }
 
   .planilla-source-head span,
   .planilla-source-meta {
-    font-size: 7px;
+    font-size: 8px !important;
   }
 
   .planilla-bottom-grid {
-    grid-template-columns: 1fr 72px;
-    gap: 4px;
+    grid-template-columns: minmax(0, 1fr) 110px !important;
+    gap: 0 !important;
   }
 
   .planilla-kpis-grid {
-    padding: 4px;
+    padding: 10px !important;
+    border-right: 0 !important;
   }
 
   .planilla-kpis-grid p {
-    font-size: 8px;
+    font-size: 10px !important;
   }
 
   .planilla-qr-card {
-    min-height: 58px;
-    padding: 3px;
+    min-height: 110px;
+    padding: 8px 6px !important;
   }
 
   .planilla-qr-card canvas,
   .planilla-qr-card img {
-    width: 54px !important;
-    height: 54px !important;
+    width: 72px !important;
+    height: 72px !important;
   }
 
   .planilla-qr-note {
-    font-size: 7px !important;
+    font-size: 8px !important;
   }
 }
 
@@ -11055,6 +11125,44 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   color: #7c4a12;
 }
 
+.dispatch-xlsx-date-alert-row td {
+  padding: 0 !important;
+  border-top: 0 !important;
+  background: #fff8e8 !important;
+}
+
+.dispatch-xlsx-date-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  color: #8a5416;
+}
+
+.dispatch-xlsx-date-alert-copy {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-weight: 700;
+}
+
+.dispatch-xlsx-date-alert-copy i {
+  margin-top: 2px;
+  color: #b8741b;
+}
+
+.dispatch-xlsx-date-alert-copy strong,
+.dispatch-xlsx-date-alert-copy span {
+  color: inherit;
+}
+
+.dispatch-xlsx-fix-date-btn {
+  flex: 0 0 auto;
+  min-height: 36px;
+}
+
 .dispatch-xlsx-date-input {
   min-width: 132px;
   height: 34px;
@@ -11062,10 +11170,7 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 }
 
 .dispatch-xlsx-date-cell small {
-  display: block;
-  margin-top: 4px;
-  color: #667596;
-  font-weight: 700;
+  display: none;
 }
 
 .dispatch-xlsx-kilos-cell small {
