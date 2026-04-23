@@ -4954,6 +4954,7 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   gap: 8px;
   color: #36507f;
   font-weight: 600;
+  text-align: start;
 }
 
 .inventario-check-row input {
