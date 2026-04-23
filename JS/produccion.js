@@ -3532,7 +3532,7 @@
       return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
         <td><div class="d-flex align-items-center gap-2">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-collapse="${escapeHtml(item.id)}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isCollapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(item.id)}</span></div></td>
         <td>${escapeHtml(formatDateTime(item.createdAt))}</td>
-        <td>${escapeHtml(item.recipeTitle || '-')}</td>
+        <td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td>
         <td>${Number(item.quantityKg || 0).toFixed(2)} kg</td>
         <td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td>
         <td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td>
@@ -4084,6 +4084,12 @@
       .reduce((acc, movement) => acc + Number(movement?.qtyKg || 0), 0);
     return Number(Math.max(0, producedKg - dispatchedKg - directEgressKg).toFixed(3));
   };
+  const getDispatchLotProductionDate = (reg = {}) => {
+    const direct = normalizeDispatchDateToken(reg.productionDate || reg.elaborationDate || reg.fechaElaboracion);
+    if (direct) return direct;
+    const created = Number(reg.createdAt || 0);
+    return created > 0 ? toIsoDate(created) : '';
+  };
   const buildRecipeLotsForDispatch = (recipeId) => getRegistrosList()
     .filter((reg) => normalizeValue(reg.recipeId) === normalizeValue(recipeId) && normalizeValue(reg.status) !== 'anulada')
     .sort((a, b) => {
@@ -4095,22 +4101,65 @@
     .map((reg) => ({
       productionId: reg.id,
       lotNumber: reg.id,
+      productionDate: getDispatchLotProductionDate(reg),
       expiryDate: normalizeValue(reg.productExpiryDate),
       availableKg: getDispatchAvailableByProductionId(reg.id)
     }))
     .filter((row) => row.availableKg > 0.0001);
+  const isDispatchLotFutureForDate = (lot = {}, dispatchDateIso = toIsoDate()) => {
+    const productionIso = normalizeValue(lot.productionDate);
+    return Boolean(productionIso && dispatchDateIso && productionIso > dispatchDateIso);
+  };
   const isDispatchLotExpiredForDate = (lot = {}, dispatchDateIso = toIsoDate()) => {
     const expiryIso = normalizeValue(lot.expiryDate);
     return Boolean(expiryIso && dispatchDateIso && expiryIso < dispatchDateIso);
   };
+  const isDispatchLotUsableForDate = (lot = {}, dispatchDateIso = toIsoDate()) =>
+    !isDispatchLotFutureForDate(lot, dispatchDateIso) && !isDispatchLotExpiredForDate(lot, dispatchDateIso);
+  const getDispatchLotWindowLabel = (lot = {}) => {
+    const from = normalizeValue(lot.productionDate);
+    const to = normalizeValue(lot.expiryDate);
+    if (from && to) return `del ${formatIsoEs(from)} al ${formatIsoEs(to)}`;
+    if (from) return `desde ${formatIsoEs(from)}`;
+    if (to) return `hasta ${formatIsoEs(to)}`;
+    return 'sin rango cargado';
+  };
   const getDispatchExpiredLots = (allocations = [], dispatchDateIso = toIsoDate()) =>
     (Array.isArray(allocations) ? allocations : []).filter((lot) => isDispatchLotExpiredForDate(lot, dispatchDateIso));
-  const allocateDispatchLots = (recipeId, qtyKg) => {
+  const allocateDispatchLots = (recipeId, qtyKg, dispatchDateIso = toIsoDate()) => {
     const needed = Number(qtyKg || 0);
-    if (!Number.isFinite(needed) || needed <= 0) return { allocations: [], fulfilledKg: 0, missingKg: needed, hasStock: false };
+    const allLots = buildRecipeLotsForDispatch(recipeId);
+    const futureLots = allLots.filter((lot) => isDispatchLotFutureForDate(lot, dispatchDateIso));
+    const expiredLots = allLots.filter((lot) => isDispatchLotExpiredForDate(lot, dispatchDateIso));
+    const usableLots = allLots.filter((lot) => isDispatchLotUsableForDate(lot, dispatchDateIso));
+    const totalStockKg = allLots.reduce((acc, lot) => acc + Number(lot.availableKg || 0), 0);
+    const availableKg = usableLots.reduce((acc, lot) => acc + Number(lot.availableKg || 0), 0);
+    const futureKg = futureLots.reduce((acc, lot) => acc + Number(lot.availableKg || 0), 0);
+    const expiredKg = expiredLots.reduce((acc, lot) => acc + Number(lot.availableKg || 0), 0);
+    const nextAvailableDate = futureLots
+      .map((lot) => normalizeValue(lot.productionDate))
+      .filter(Boolean)
+      .sort()[0] || '';
+    if (!Number.isFinite(needed) || needed <= 0) {
+      return {
+        allocations: [],
+        allLots,
+        usableLots,
+        futureLots,
+        expiredLots,
+        fulfilledKg: 0,
+        missingKg: Math.max(0, Number(needed || 0)),
+        hasStock: false,
+        availableKg: Number(availableKg.toFixed(3)),
+        totalStockKg: Number(totalStockKg.toFixed(3)),
+        futureKg: Number(futureKg.toFixed(3)),
+        expiredKg: Number(expiredKg.toFixed(3)),
+        nextAvailableDate
+      };
+    }
     let remaining = needed;
     const allocations = [];
-    buildRecipeLotsForDispatch(recipeId).forEach((lot) => {
+    usableLots.forEach((lot) => {
       if (remaining <= 0.0001) return;
       const takeKg = Math.min(remaining, Number(lot.availableKg || 0));
       if (takeKg <= 0.0001) return;
@@ -4119,9 +4168,18 @@
     });
     return {
       allocations,
+      allLots,
+      usableLots,
+      futureLots,
+      expiredLots,
       fulfilledKg: Number((needed - remaining).toFixed(3)),
       missingKg: Number(remaining.toFixed(3)),
-      hasStock: remaining <= 0.0001
+      hasStock: remaining <= 0.0001,
+      availableKg: Number(availableKg.toFixed(3)),
+      totalStockKg: Number(totalStockKg.toFixed(3)),
+      futureKg: Number(futureKg.toFixed(3)),
+      expiredKg: Number(expiredKg.toFixed(3)),
+      nextAvailableDate
     };
   };
   const registerDispatchExpiredResolution = async ({ recipeId = '', lotNumber = '', productionId = '', qtyKg = 0, expiryDate = '', resolutionType = 'retail_sale', dispatchDate = toIsoDate() } = {}) => {
@@ -4751,8 +4809,7 @@
     const targetMap = isIngredient ? safeObject(state.ingredientes) : safeObject(state.recetas);
     const target = safeObject(targetMap[targetId]);
     const sourceQty = Number(parseDispatchXlsxQty(qtyRaw) || 0);
-    const dispatchDateIso = normalizeDispatchDateToken(options.dispatchDateIso) || toIsoDate();
-    const effectiveDispatchDateIso = [dispatchDateIso, toIsoDate()].filter(Boolean).sort().pop() || toIsoDate();
+    const effectiveDispatchDateIso = normalizeDispatchDateToken(options.dispatchDateIso) || toIsoDate();
     const configuredMultiplier = Number(parseDispatchXlsxQty(rule.customKg) || 0);
     const hasConfiguredMultiplier = Boolean(rule.useCustomKg) && configuredMultiplier > 0;
     const effectiveMultiplier = hasConfiguredMultiplier ? configuredMultiplier : 1;
@@ -4794,12 +4851,18 @@
         multiplierFromRule: hasConfiguredMultiplier,
         availableUnit: ingredientBreakdown[0]?.unit || 'unidades',
         expiredQty: ingredientBreakdown.reduce((acc, item) => acc + Number(item.expired || 0), 0),
+        futureQty: 0,
+        nextAvailableDate: '',
+        stockWindows: [],
         disabled: isDispatchXlsxProductDisabled(sourceName)
       };
     }
     const mappedQty = Number((hasConfiguredMultiplier ? (sourceQty * configuredMultiplier) : sourceQty).toFixed(3));
     let availableKg = 0;
     let expiredQty = 0;
+    let futureQty = 0;
+    let nextAvailableDate = '';
+    let stockWindows = [];
     let availableUnit = 'kg';
     if (targetId) {
       if (isIngredient) {
@@ -4811,6 +4874,9 @@
         const recipeStock = getDispatchXlsxRecipeStockMeta(targetId, effectiveDispatchDateIso);
         availableKg = Number(recipeStock.available || 0);
         expiredQty = Number(recipeStock.expired || 0);
+        futureQty = Number(recipeStock.future || 0);
+        nextAvailableDate = normalizeValue(recipeStock.nextAvailableDate);
+        stockWindows = Array.isArray(recipeStock.windows) ? recipeStock.windows : [];
         availableUnit = recipeStock.unit || 'kg';
       }
     }
@@ -4824,6 +4890,9 @@
       availableKg,
       availableUnit,
       expiredQty,
+      futureQty,
+      nextAvailableDate,
+      stockWindows,
       hasStock,
       ingredientBreakdown: [],
       multiplier: hasConfiguredMultiplier ? configuredMultiplier : sourceQty,
@@ -4844,6 +4913,9 @@
       row.mappedAvailableKg = meta.availableKg;
       row.mappedAvailableUnit = meta.availableUnit || row.mappedAvailableUnit || 'kg';
       row.mappedExpiredQty = Number(meta.expiredQty || 0);
+      row.mappedFutureQty = Number(meta.futureQty || 0);
+      row.mappedNextAvailableDate = normalizeValue(meta.nextAvailableDate);
+      row.mappedStockWindows = Array.isArray(meta.stockWindows) ? meta.stockWindows : [];
       row.mappedType = normalizeValue(meta.rule.targetType) || row.mappedType || '';
       row.useCustomKg = Boolean(meta.rule.useCustomKg);
       row.mappingMultiplier = Number(meta.multiplier || 0);
@@ -4892,6 +4964,9 @@
         mappedAvailableKg: meta.availableKg,
         mappedAvailableUnit: meta.availableUnit || 'kg',
         mappedExpiredQty: Number(meta.expiredQty || 0),
+        mappedFutureQty: Number(meta.futureQty || 0),
+        mappedNextAvailableDate: normalizeValue(meta.nextAvailableDate),
+        mappedStockWindows: Array.isArray(meta.stockWindows) ? meta.stockWindows : [],
         mappedType: normalizeValue(meta.rule.targetType) || 'production',
         useCustomKg: Boolean(meta.rule.useCustomKg),
         mappingMultiplier: Number(meta.multiplier || 0),
@@ -4923,14 +4998,27 @@
     const totals = lots.reduce((acc, lot) => {
       const qty = Number(lot.availableKg || 0);
       if (qty <= 0.0001) return acc;
-      if (isDispatchLotExpiredForDate(lot, dispatchDateIso)) acc.expired += qty;
+      if (isDispatchLotFutureForDate(lot, dispatchDateIso)) {
+        acc.future += qty;
+        const date = normalizeValue(lot.productionDate);
+        if (date && (!acc.nextAvailableDate || date < acc.nextAvailableDate)) acc.nextAvailableDate = date;
+        acc.windows.push({ lotNumber: normalizeValue(lot.lotNumber), qtyKg: qty, window: getDispatchLotWindowLabel(lot) });
+      } else if (isDispatchLotExpiredForDate(lot, dispatchDateIso)) {
+        acc.expired += qty;
+        acc.windows.push({ lotNumber: normalizeValue(lot.lotNumber), qtyKg: qty, window: getDispatchLotWindowLabel(lot), expired: true });
+      }
       else acc.available += qty;
+      acc.total += qty;
       return acc;
-    }, { available: 0, expired: 0 });
+    }, { available: 0, expired: 0, future: 0, total: 0, nextAvailableDate: '', windows: [] });
     return {
       unit: 'kg',
       available: Number(totals.available.toFixed(2)),
-      expired: Number(totals.expired.toFixed(2))
+      expired: Number(totals.expired.toFixed(2)),
+      future: Number(totals.future.toFixed(2)),
+      total: Number(totals.total.toFixed(2)),
+      nextAvailableDate: totals.nextAvailableDate,
+      windows: totals.windows
     };
   };
   const getDispatchXlsxIngredientStockMeta = (ingredientId, dispatchDateIso = toIsoDate()) => {
@@ -5438,6 +5526,9 @@
       row.mappedAvailableKg = meta.availableKg;
       row.mappedAvailableUnit = meta.availableUnit || row.mappedAvailableUnit || 'kg';
       row.mappedExpiredQty = Number(meta.expiredQty || 0);
+      row.mappedFutureQty = Number(meta.futureQty || 0);
+      row.mappedNextAvailableDate = normalizeValue(meta.nextAvailableDate);
+      row.mappedStockWindows = Array.isArray(meta.stockWindows) ? meta.stockWindows : [];
       row.mappedType = normalizeValue(meta.rule.targetType) || row.mappedType || '';
       row.useCustomKg = Boolean(meta.rule.useCustomKg);
       row.mappingMultiplier = Number(meta.multiplier || 0);
@@ -5460,8 +5551,7 @@
 
     draft.rows.forEach((row) => {
       if (row.disabled || !normalizeValue(row.mappedTargetId)) return;
-      const dispatchDateIso = normalizeDispatchDateToken(row.invoiceDate) || toIsoDate();
-      const effectiveDate = [dispatchDateIso, toIsoDate()].filter(Boolean).sort().pop() || toIsoDate();
+      const effectiveDate = normalizeDispatchDateToken(row.invoiceDate) || toIsoDate();
       const mappedIngredients = Array.isArray(row.mappedIngredients) ? row.mappedIngredients : [];
       if (mappedIngredients.length) {
         mappedIngredients.forEach((item) => {
@@ -5623,7 +5713,10 @@
               resolutionType: chosen === 'decommissioned' ? 'decommissioned' : 'retail_sale'
             });
           }
-          const allocated = allocateDispatchLots(recipeId, qtyKg);
+          const allocated = allocateDispatchLots(recipeId, qtyKg, dispatchDate);
+          if (!allocated.hasStock && Array.isArray(allocated.futureLots) && allocated.futureLots.length) {
+            throw new Error(`future_block_product:${row.id}:${recipeId}`);
+          }
           const allocs = [...allocated.allocations];
           if (allocated.missingKg > 0.0001) {
             allocs.push({ lotNumber: normalizeValue(row.invoiceNumber) || 'Sin trazabilidad', qtyKg: Number(allocated.missingKg.toFixed(3)), expiryDate: '', productionId: '', forced: true, traceUrl: '' });
@@ -5672,6 +5765,10 @@
       }
       if (errText.startsWith('conflict_pending_product')) {
         await openIosSwal({ title: 'Conflicto pendiente', html: '<p>Tenés productos con faltantes por vencimiento sin resolver. Usá "Resolver conflicto" antes de procesar.</p>', icon: 'warning' });
+        return;
+      }
+      if (errText.startsWith('future_block_product')) {
+        await openIosSwal({ title: 'Fecha de reparto no válida', html: '<p>Hay stock relacionado, pero la fecha de reparto es anterior a la elaboración de una producción. Cambiá la fecha con el calendario en la fila del XLSX y volvé a procesar.</p>', icon: 'warning' });
         return;
       }
       await openIosSwal({ title: 'No se pudo procesar', html: '<p>Ocurrió un error al procesar el XLSX.</p>', icon: 'error' });
@@ -5810,6 +5907,8 @@
         ? 'is-ok'
         : (!mappedIngredients.length && availableQty > 0.0001 ? 'is-warning' : 'is-danger');
       const expiredQty = Number(row.mappedExpiredQty || 0);
+      const futureQty = Number(row.mappedFutureQty || 0);
+      const nextAvailableDate = normalizeValue(row.mappedNextAvailableDate);
       const multiplierLabel = row.mappingMultiplierFromRule
         ? Number(row.mappingMultiplier || 0).toFixed(2)
         : (Number(row.sourceQty || 0) > 0 ? Number(row.sourceQty || 0).toFixed(2) : '1.00');
@@ -5858,7 +5957,7 @@
             ? (rowHasStock
               ? 'Stock utilizable completo.'
               : '')
-            : `${rowHasStock ? 'Stock utilizable:' : 'Stock utilizable insuficiente:'} <strong class="dispatch-xlsx-stock-ok">${escapeHtml(formatDispatchXlsxQtyWithUnit(availableQty, stockUnit))}</strong>${expiredQty > 0 ? ` <span class="dispatch-xlsx-stock-expired">· Vencido: ${escapeHtml(formatDispatchXlsxQtyWithUnit(expiredQty, stockUnit))}</span>` : ''}`;
+            : `${rowHasStock ? 'Stock utilizable:' : 'Stock utilizable insuficiente:'} <strong class="dispatch-xlsx-stock-ok">${escapeHtml(formatDispatchXlsxQtyWithUnit(availableQty, stockUnit))}</strong>${futureQty > 0 ? ` <span class="dispatch-xlsx-stock-future">· Desde ${escapeHtml(formatIsoEs(nextAvailableDate || ''))}: ${escapeHtml(formatDispatchXlsxQtyWithUnit(futureQty, stockUnit))}</span>` : ''}${expiredQty > 0 ? ` <span class="dispatch-xlsx-stock-expired">· Vencido: ${escapeHtml(formatDispatchXlsxQtyWithUnit(expiredQty, stockUnit))}</span>` : ''}`;
           if (rowHasStock) return base;
           const missingParts = mappedIngredients.length
             ? mappedIngredients.map((item) => {
@@ -5876,13 +5975,16 @@
           const missingCreateQty = mappedIngredients.length
             ? mappedIngredients.reduce((acc, item) => acc + getResolvedMissingQty(item), 0)
             : resolvedProductMissingQty;
-          const createHint = missingCreateQty > 0.0001
+          const createHint = missingCreateQty > 0.0001 && futureQty <= 0.0001
             ? `<span class="dispatch-xlsx-stock-create"> Se creará ${escapeHtml(formatDispatchXlsxQtyWithUnit(missingCreateQty, mappedIngredients.length ? (mappedIngredients[0]?.unit || 'u') : stockUnit))} sin trazabilidad.</span>`
             : '';
           const productResolveBtn = canResolveProductConflict
             ? ` <button type="button" class="btn ios-btn ${productConflictResolutionType ? 'ios-btn-secondary' : 'ios-btn-danger'} dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="production" data-dispatch-xlsx-row="${escapeHtml(row.id)}">${productConflictResolutionType ? 'Cambiar elección' : 'Resolver conflicto'}</button>`
             : '';
-          return `${base ? `${base}<br>` : ''}<span class="dispatch-xlsx-stock-missing">↳ Faltan ${formatMissingDispatchXlsxParts(missingParts)}.</span>${createHint ? `<br>${createHint}` : ''}${productResolveBtn}`;
+          const dateHint = futureQty > 0 && nextAvailableDate
+            ? `<br><span class="dispatch-xlsx-stock-future">Hay stock, pero se puede repartir desde ${escapeHtml(formatIsoEs(nextAvailableDate))}. Editá la fecha de reparto en esta fila.</span>`
+            : '';
+          return `${base ? `${base}<br>` : ''}<span class="dispatch-xlsx-stock-missing">↳ Faltan ${formatMissingDispatchXlsxParts(missingParts)}.</span>${dateHint}${createHint ? `<br>${createHint}` : ''}${productResolveBtn}`;
         })()
         : 'Pendiente de relación';
       const clientBadge = row.clientStatus === 'new'
@@ -5892,7 +5994,7 @@
       const rowStateClass = row.disabled
         ? 'dispatch-xlsx-row-disabled'
         : (row.mappedTargetTitle ? 'dispatch-xlsx-row-related' : 'dispatch-xlsx-row-pending');
-      return `<tr class="${rowStateClass}"><td><div class="dispatch-xlsx-client"><strong class="dispatch-xlsx-client-name" title="${escapeHtml(row.clientName || '-')}">${escapeHtml(row.clientName || '-')}</strong>${clientBadge}</div></td><td class="dispatch-xlsx-invoice-cell">${escapeHtml(row.invoiceNumber || '-')}</td><td class="dispatch-xlsx-date-cell">${escapeHtml(dateLabel)}</td><td><div class="dispatch-xlsx-mapping"><strong>${escapeHtml(row.sourceProduct || '-')}</strong>${relationMeta}${ingredientDetail}<span class="dispatch-xlsx-map-state ${row.mappedTargetTitle ? 'is-related' : 'is-pending'}">${row.mappedTargetTitle ? `<i class="fa-solid fa-circle-check"></i> Relacionado` : `<i class="bi bi-x-circle-fill"></i> Sin relacionado`}</span></div></td><td class="dispatch-xlsx-kilos-cell"><span class="${qtyClass}">${qtyMap}</span><small class="d-block ${qtyClass}">${stockLine}</small></td><td><label class="dispatch-xlsx-toggle"><input type="checkbox" data-dispatch-xlsx-row-enabled="${escapeHtml(row.id)}" ${row.disabled ? '' : 'checked'}><span>${row.disabled ? 'Deshabilitado' : 'Activo'}</span></label></td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-xlsx-map="${escapeHtml(row.id)}"><i class="fa-solid fa-link"></i><span>Relacionar</span></button></td></tr>`;
+      return `<tr class="${rowStateClass}"><td><div class="dispatch-xlsx-client"><strong class="dispatch-xlsx-client-name" title="${escapeHtml(row.clientName || '-')}">${escapeHtml(row.clientName || '-')}</strong>${clientBadge}</div></td><td class="dispatch-xlsx-invoice-cell">${escapeHtml(row.invoiceNumber || '-')}</td><td class="dispatch-xlsx-date-cell"><input class="form-control ios-input dispatch-xlsx-date-input" data-dispatch-xlsx-date="${escapeHtml(row.id)}" value="${escapeHtml(row.invoiceDate || '')}" placeholder="Fecha reparto"><small>${escapeHtml(dateLabel)}</small></td><td><div class="dispatch-xlsx-mapping"><strong>${escapeHtml(row.sourceProduct || '-')}</strong>${relationMeta}${ingredientDetail}<span class="dispatch-xlsx-map-state ${row.mappedTargetTitle ? 'is-related' : 'is-pending'}">${row.mappedTargetTitle ? `<i class="fa-solid fa-circle-check"></i> Relacionado` : `<i class="bi bi-x-circle-fill"></i> Sin relacionado`}</span></div></td><td class="dispatch-xlsx-kilos-cell"><span class="${qtyClass}">${qtyMap}</span><small class="d-block ${qtyClass}">${stockLine}</small></td><td><label class="dispatch-xlsx-toggle"><input type="checkbox" data-dispatch-xlsx-row-enabled="${escapeHtml(row.id)}" ${row.disabled ? '' : 'checked'}><span>${row.disabled ? 'Deshabilitado' : 'Activo'}</span></label></td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-xlsx-map="${escapeHtml(row.id)}"><i class="fa-solid fa-link"></i><span>Relacionar</span></button></td></tr>`;
     }).join('') : '<tr><td colspan="7" class="text-center">Adjuntá un XLS/XLSX para comenzar.</td></tr>';
     const uploadHint = state.dispatchXlsxUploadInProgress ? '<span class="dispatch-xlsx-uploading"><i class="fa-solid fa-spinner fa-spin"></i> Subiendo Excel...</span>' : '';
     const usersRows = Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-check" data-user-search="${escapeHtml(normalizeLower(`${user.fullName || ''} ${user.email || ''} ${getDispatchUserRole(user) || ''}`))}"><input type="checkbox" data-dispatch-xlsx-manager="${escapeHtml(user.id)}" value="${escapeHtml(user.id)}" ${(Array.isArray(draft.managers) && draft.managers.includes(user.id)) ? 'checked' : ''}>${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(getDispatchUserRole(user))}</small></span></label>`).join('');
@@ -5902,19 +6004,54 @@
       : '';
     nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Repartos por XLSX</h6><div class="dispatch-xlsx-head-actions">${uploadHint}<button id="dispatchXlsxUploadBtn" type="button" class="btn recipe-table-action-btn recipe-table-action-btn-monography"><i class="fa-solid fa-file-arrow-up"></i><span>Adjuntar XLSX</span></button><button type="button" id="dispatchXlsxHistoryBtn" class="btn recipe-table-action-btn recipe-table-action-btn-neutral"><i class="fa-regular fa-message"></i><span>Historial de Archivos</span></button></div><input id="dispatchXlsxFileInput" class="d-none" type="file" accept=".xlsx,.xls"></div><section class="recipe-step-card step-block produccion-dispatch-create"><h6 class="step-title"><span class="recipe-step-number">1</span> Previsualización importada ${draft.uploadedFileName ? `<small>· ${escapeHtml(draft.uploadedFileName)}</small>` : ''}</h6><div class="table-responsive recipe-table-wrap dispatch-products-table dispatch-xlsx-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0 dispatch-xlsx-table"><thead><tr><th>Cliente</th><th>Factura</th><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div></section>${vehicleManagersSection}<div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchXlsxProcessBtn" ${readyToProcess ? '' : 'disabled'}><i class="fa-solid fa-gears"></i><span>Procesar ingresos</span></button></div>`;
     if (hasImportedFile) prepareThumbLoaders('.js-produccion-user-photo');
+    if (window.flatpickr) {
+      nodes.dispatchView.querySelectorAll('[data-dispatch-xlsx-date]').forEach((input) => {
+        window.flatpickr(input, {
+          locale: window.flatpickr.l10ns?.es || undefined,
+          dateFormat: 'Y-m-d',
+          altInput: true,
+          altFormat: 'd/m/Y',
+          allowInput: true,
+          disableMobile: true,
+          onChange: (_selected, dateStr) => {
+            const rowId = normalizeValue(input.dataset.dispatchXlsxDate);
+            const row = (Array.isArray(state.dispatchXlsxDraft?.rows) ? state.dispatchXlsxDraft.rows : []).find((item) => normalizeValue(item.id) === rowId);
+            if (!row) return;
+            row.invoiceDate = normalizeDispatchDateToken(dateStr) || toIsoDate();
+            recomputeDispatchXlsxDraftRows(state.dispatchXlsxDraft);
+            renderDispatchXlsxCreate(state.dispatchXlsxDraft);
+          }
+        });
+      });
+    }
     alignScrollActionsToRight(nodes.dispatchView);
   };
   const renderDispatchCreate = (draft) => {
     if (!nodes.dispatchView) return;
     state.dispatchCreateMode = true;
     const lineRows = draft.lines.map((line, idx) => {
-      const alloc = allocateDispatchLots(line.recipeId, Number(line.qtyKg || 0));
-      line.allocations = alloc.allocations;
       const dispatchDateIso = normalizeValue(draft.dispatchDate) || toIsoDate();
-      const expiredLots = getDispatchExpiredLots(alloc.allocations, dispatchDateIso);
+      const alloc = allocateDispatchLots(line.recipeId, Number(line.qtyKg || 0), dispatchDateIso);
+      line.allocations = alloc.allocations;
+      const expiredLots = Array.isArray(alloc.expiredLots) ? alloc.expiredLots : getDispatchExpiredLots(alloc.allocations, dispatchDateIso);
+      const futureLots = Array.isArray(alloc.futureLots) ? alloc.futureLots : [];
       const requestedKg = Number(line.qtyKg || 0);
-      const availableKg = Number(getProducedStockMeta(line.recipeId).available || 0);
-      const stockStatus = normalizeValue(line.recipeId)
+      const availableKg = Number(alloc.availableKg || 0);
+      const totalStockKg = Number(alloc.totalStockKg || 0);
+      const missingKg = Number(alloc.missingKg || 0);
+      const formatDispatchKg = (kg) => {
+        const value = Number(kg || 0);
+        return value > 0 && value < 0.01 ? value.toFixed(3) : value.toFixed(2);
+      };
+      const stockDateHint = [
+        futureLots.length && alloc.nextAvailableDate
+          ? `<small class="dispatch-date-hint">Hay ${formatDispatchKg(alloc.futureKg)} kg elaborados para fecha futura. Se puede repartir desde ${escapeHtml(formatIsoEs(alloc.nextAvailableDate))}.</small>`
+          : '',
+        expiredLots.length
+          ? `<small class="dispatch-date-hint is-expired">Hay ${formatDispatchKg(alloc.expiredKg)} kg vencidos para ${escapeHtml(formatIsoEs(dispatchDateIso))}.</small>`
+          : ''
+      ].filter(Boolean).join('');
+      let stockStatus = normalizeValue(line.recipeId)
         ? (requestedKg <= 0
           ? `<span class="produccion-dispatch-ok"><i class="fa-solid fa-circle-check"></i> <strong>Disponible:</strong> ${availableKg.toFixed(2)} kg</span>`
           : (alloc.hasStock
@@ -5923,21 +6060,39 @@
               ? `<span class="produccion-dispatch-missing dispatch-stock-block"><i class="fa-solid fa-circle-exclamation"></i> <strong>Disponible:</strong> ${availableKg.toFixed(2)} kg</span><span class="produccion-dispatch-missing dispatch-stock-block"><strong>Faltan:</strong> ${alloc.missingKg.toFixed(2)} kg</span>`
               : '<span class="produccion-dispatch-missing"><i class="fa-solid fa-circle-xmark"></i> <strong>Sin stock disponible.</strong></span>')))
         : '<span class="text-muted">Seleccionar producto.</span>';
-      const lotsText = alloc.allocations.map((lot) => `${escapeHtml(lot.lotNumber)} · ${Number(lot.qtyKg || 0).toFixed(2)} kg`).join('<br>') || 'Sin asignar';
+      stockStatus = normalizeValue(line.recipeId)
+        ? (requestedKg <= 0
+          ? `<span class="produccion-dispatch-ok"><i class="fa-solid fa-circle-check"></i> <strong>Disponible utilizable:</strong> ${formatDispatchKg(availableKg)} kg</span>${totalStockKg > availableKg ? `<span class="dispatch-stock-muted">Stock total: ${formatDispatchKg(totalStockKg)} kg</span>` : ''}${stockDateHint}`
+          : (alloc.hasStock
+            ? `<span class="produccion-dispatch-ok dispatch-stock-block"><i class="fa-solid fa-circle-check"></i> <strong>Disponible utilizable:</strong> ${formatDispatchKg(availableKg)} kg</span><span class="produccion-dispatch-ok dispatch-stock-block"><strong class="dispatch-uses-label">Usás:</strong> <span class="dispatch-uses-value">${formatDispatchKg(requestedKg)} kg</span></span>${totalStockKg > availableKg ? `<span class="dispatch-stock-muted">Stock total: ${formatDispatchKg(totalStockKg)} kg</span>` : ''}`
+            : (totalStockKg > 0.0001
+              ? `<span class="produccion-dispatch-missing dispatch-stock-block"><i class="fa-solid fa-circle-exclamation"></i> <strong>Disponible utilizable:</strong> ${formatDispatchKg(availableKg)} kg</span><span class="produccion-dispatch-missing dispatch-stock-block"><strong>Faltan para esta fecha:</strong> ${formatDispatchKg(missingKg)} kg</span><span class="dispatch-stock-muted">Stock total: ${formatDispatchKg(totalStockKg)} kg</span>${stockDateHint}`
+              : '<span class="produccion-dispatch-missing"><i class="fa-solid fa-circle-xmark"></i> <strong>Sin stock disponible.</strong></span>')))
+        : '<span class="text-muted">Seleccionar producto.</span>';
+      const blockedLotsText = [...futureLots, ...expiredLots]
+        .slice(0, 4)
+        .map((lot) => `${escapeHtml(lot.lotNumber)} · ${formatDispatchKg(lot.availableKg)} kg (${escapeHtml(getDispatchLotWindowLabel(lot))})`)
+        .join('<br>');
+      const lotsText = alloc.allocations.map((lot) => `${escapeHtml(lot.lotNumber)} · ${formatDispatchKg(lot.qtyKg)} kg`).join('<br>') || (blockedLotsText || 'Sin asignar');
       const expiries = [...new Set(alloc.allocations.map((lot) => normalizeValue(lot.expiryDate)).filter(Boolean))];
+      const blockedWindows = [...futureLots, ...expiredLots].slice(0, 3).map((lot) => getDispatchLotWindowLabel(lot));
       const expiryText = expiries.length === 1
         ? `<span class="${expiredLots.length ? 'dispatch-expiry-text-danger' : ''}">${escapeHtml(formatIsoEs(expiries[0]))}</span>`
         : (expiries.length
           ? expiries.map((item) => `<span class="${item && item < dispatchDateIso ? 'dispatch-expiry-text-danger' : ''}">${escapeHtml(formatIsoEs(item))}</span>`).join('<br>')
-          : 'Sin fecha');
+          : (blockedWindows.length ? blockedWindows.map((item) => `<span class="dispatch-expiry-text-danger">${escapeHtml(item)}</span>`).join('<br>') : 'Sin fecha'));
       const recipe = safeObject(state.recetas[line.recipeId]);
       const recipeTitle = normalizeValue(line.recipeSearch || recipe.title);
       const recipeImage = sanitizeImageUrl(recipe.imageUrl);
-      const expiredLot = expiredLots[0];
-      const expiredHelpRow = expiredLot
-        ? `<tr class="dispatch-expired-row"><td colspan="6"><p class="dispatch-expired-copy">PODÉS SACAR A REPARTO LA UNIDAD CAMBIANDO LA FECHA HASTA EL DÍA ${escapeHtml(formatIsoEs(expiredLot.expiryDate || ''))}. También podés marcar los kilos disponibles del lote como vendidos en mostrador o decomisados.</p><div class="dispatch-expired-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expired-action="retail_sale" data-dispatch-row="${idx}"><i class="fa-solid fa-store"></i><span>Marcar venta en mostrador</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-dispatch-expired-action="decommissioned" data-dispatch-row="${idx}"><i class="fa-solid fa-trash"></i><span>Marcar decomisado</span></button></div></td></tr>`
+      const futureLot = alloc.hasStock ? null : futureLots[0];
+      const futureHelpRow = futureLot
+        ? `<tr class="dispatch-date-block-row"><td colspan="6"><p class="dispatch-expired-copy"><strong>Hay stock, pero no para esta fecha.</strong> El lote ${escapeHtml(futureLot.lotNumber || '-')} fue elaborado el ${escapeHtml(formatIsoEs(futureLot.productionDate || ''))}; podes repartirlo desde ${escapeHtml(formatIsoEs(futureLot.productionDate || ''))}${futureLot.expiryDate ? ` hasta ${escapeHtml(formatIsoEs(futureLot.expiryDate))}` : ''}. Cambia el dia de reparto con el calendario.</p></td></tr>`
         : '';
-      return `<tr><td><div class="recipe-ing-autocomplete" data-dispatch-product-wrap="${idx}"><div class="recipe-ing-input-wrap dispatch-product-input-wrap"><span class="recipe-inline-avatar-wrap">${recipeImage ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-dispatch-inline-thumb" src="${escapeHtml(recipeImage)}" alt="${escapeHtml(recipeTitle || 'Producto')}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><input type="search" class="form-control ios-input dispatch-product-search-input" data-dispatch-product-search="${idx}" placeholder="Seleccionar producto" value="${escapeHtml(recipeTitle)}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"></div><input type="hidden" data-dispatch-product-id="${idx}" value="${escapeHtml(line.recipeId)}"></div></td><td><input class="form-control ios-input" type="number" step="0.01" min="0" data-dispatch-qty="${idx}" value="${escapeHtml(line.qtyKg || '')}"></td><td class="dispatch-stock-cell">${stockStatus}</td><td class="dispatch-lot-cell">${lotsText}</td><td class="dispatch-expiry-cell ${expiredLots.length ? 'is-danger' : ''}">${expiryText}</td><td><button type="button" class="btn family-manage-btn" data-dispatch-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>${expiredHelpRow}`;
+      const expiredLot = alloc.hasStock ? null : expiredLots[0];
+      const expiredHelpRow = expiredLot
+        ? `<tr class="dispatch-expired-row"><td colspan="6"><p class="dispatch-expired-copy">Podes sacar a reparto la unidad cambiando la fecha hasta el dia ${escapeHtml(formatIsoEs(expiredLot.expiryDate || ''))}. Tambien podes marcar los kilos disponibles del lote como vendidos en mostrador o decomisados.</p><div class="dispatch-expired-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expired-action="retail_sale" data-dispatch-row="${idx}"><i class="fa-solid fa-store"></i><span>Marcar venta en mostrador</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-dispatch-expired-action="decommissioned" data-dispatch-row="${idx}"><i class="fa-solid fa-trash"></i><span>Marcar decomisado</span></button></div></td></tr>`
+        : '';
+      return `<tr><td><div class="recipe-ing-autocomplete" data-dispatch-product-wrap="${idx}"><div class="recipe-ing-input-wrap dispatch-product-input-wrap"><span class="recipe-inline-avatar-wrap">${recipeImage ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-dispatch-inline-thumb" src="${escapeHtml(recipeImage)}" alt="${escapeHtml(recipeTitle || 'Producto')}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><input type="search" class="form-control ios-input dispatch-product-search-input" data-dispatch-product-search="${idx}" placeholder="Seleccionar producto" value="${escapeHtml(recipeTitle)}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"></div><input type="hidden" data-dispatch-product-id="${idx}" value="${escapeHtml(line.recipeId)}"></div></td><td><input class="form-control ios-input" type="number" step="0.01" min="0" data-dispatch-qty="${idx}" value="${escapeHtml(line.qtyKg || '')}"></td><td class="dispatch-stock-cell">${stockStatus}</td><td class="dispatch-lot-cell">${lotsText}</td><td class="dispatch-expiry-cell ${(expiredLots.length || futureLots.length) ? 'is-danger' : ''}">${expiryText}</td><td><button type="button" class="btn family-manage-btn" data-dispatch-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>${futureHelpRow}${expiredHelpRow}`;
     }).join('');
     const commentRows = draft.comments.map((comment, idx) => `<tr class="dispatch-comment-row"><td colspan="5"><textarea class="form-control ios-input dispatch-comment-textarea" data-dispatch-comment="${idx}" placeholder="Agregá comentarios y observaciones">${escapeHtml(comment)}</textarea></td><td><button type="button" class="btn family-manage-btn" data-dispatch-comment-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
     const proofRows = (Array.isArray(draft.proofs) ? draft.proofs : []).map((proof, idx) => `<tr class="dispatch-proof-row"><td colspan="4"><label class="inventario-upload-dropzone dispatch-proof-drop" for="dispatchProofFile_${idx}"><i class="fa-solid fa-paperclip"></i><span>${escapeHtml(proof?.name || 'Adjuntar comprobante (imagen/PDF)')}</span></label><input id="dispatchProofFile_${idx}" class="inventario-hidden-file-input" type="file" accept="image/*,application/pdf" data-dispatch-proof-file="${idx}">${proof?.url ? `<p class="dispatch-proof-name">Cargado: ${escapeHtml(proof.name || 'comprobante')}</p>` : ''}</td><td class="dispatch-proof-expiry-cell">Comprobante</td><td><button type="button" class="btn family-manage-btn" data-dispatch-proof-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
@@ -5953,7 +6108,13 @@
         altInput: true,
         altFormat: 'd/m/Y',
         allowInput: true,
-        disableMobile: true
+        disableMobile: true,
+        onChange: (_selected, dateStr) => {
+          const nextDate = normalizeValue(dateStr) || toIsoDate();
+          if (nextDate === state.dispatchDraft?.dispatchDate) return;
+          state.dispatchDraft.dispatchDate = nextDate;
+          renderDispatchCreate(state.dispatchDraft);
+        }
       });
     }
     prepareThumbLoaders('.js-produccion-user-photo, .js-dispatch-inline-thumb');
@@ -6820,7 +6981,8 @@
       </div>` + plan.ingredientPlans.map((row, index) => {
       const hasSubstituteCoverage = !row.isSubstitute && plan.ingredientPlans.some((item) => item.isSubstitute && normalizeValue(item.sourceIngredientId) === normalizeValue(row.ingredientId) && Number(item.availableQty || 0) > 0.0001);
       const rowInfiniteStock = Boolean(row.infiniteStock || row.noTraceability);
-      const toneClass = rowInfiniteStock ? 'is-infinite' : (row.missingQty > 0 ? (hasSubstituteCoverage ? 'is-substitutable' : 'is-missing') : '');
+      const hasMeaningfulMissing = Number(row.missingQty || 0) > 0.0005;
+      const toneClass = rowInfiniteStock ? 'is-infinite' : (hasMeaningfulMissing ? (hasSubstituteCoverage ? 'is-substitutable' : 'is-missing') : '');
       const availableHtml = rowInfiniteStock
         ? '<span class="produccion-available-value">· Disponible <strong class="produccion-infinite-symbol">&infin;</strong></span>'
         : `<span class="produccion-available-value">· Disponible <strong>${formatCompactQty(row.availableQty, row.ingredientUnit)}</strong></span>`;
@@ -6836,7 +6998,7 @@
                 <span class="produccion-needs-label">Necesita</span>
                 <strong class="produccion-needs-value">${formatCompactQty(row.neededQty, row.ingredientUnit)}</strong>
                 ${availableHtml}
-                ${row.missingQty > 0 ? ` <em>· Faltan ${formatCompactQty(row.missingQty, row.ingredientUnit)}</em>` : ''}
+                ${hasMeaningfulMissing ? ` <em>· Faltan ${formatCompactQty(row.missingQty, row.ingredientUnit)}</em>` : ''}
               </p>
             </div>
           </div>
@@ -6892,7 +7054,6 @@
   const buildManagersHtml = (selected = [], disabled = false) => {
     const users = Object.values(safeObject(state.users))
       .sort((a, b) => String(a.fullName || a.email || '').localeCompare(String(b.fullName || b.email || '')));
-    if (!users.length) return '<p class="produccion-empty-users">No hay usuarios cargados. Podés continuar sin asignar encargados.</p>';
     return users.map((user) => {
       const fullName = normalizeValue(user.fullName || user.name || user.email || 'Usuario');
       const userId = normalizeValue(user.id) || normalizeValue(user.email) || `user_${normalizeLower(fullName).replace(/[^a-z0-9]+/g, '_')}`;
@@ -7080,13 +7241,13 @@
       const bodyRows = rows.flatMap((item) => {
         const manager = getManagerLabel(item);
         const productImage = normalizeValue(item?.traceability?.product?.imageUrl) || normalizeValue(state.recetas?.[item.recipeId]?.imageUrl);
-        const productCell = `<span style="display:inline-flex;align-items:center;gap:8px;">${productImage ? `<img src="${escapeHtml(productImage)}" style="width:28px;height:28px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<strong>${escapeHtml(item.recipeTitle || '-')}</strong></span>`;
+        const productCell = `<span style="display:inline-flex;align-items:center;gap:8px;">${productImage ? `<img src="${escapeHtml(productImage)}" style="width:28px;height:28px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<strong>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</strong></span>`;
         const main = `<tr><td>${escapeHtml(item.id || '-')}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${productCell}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)}<br><small>${escapeHtml(manager.role)}</small></td><td>${escapeHtml(formatProductExpiryLabel(item))} (VTO)</td></tr>`;
         const resolutions = (Array.isArray(item?.lots) ? item.lots : [])
           .flatMap((plan) => (Array.isArray(plan?.lots) ? plan.lots : [])
             .flatMap((lot) => (Array.isArray(lot?.expiryResolutions) ? lot.expiryResolutions : [])
               .filter((res) => isHighlightedResolutionType(res.type))
-              .map((res) => `<tr class="is-resolution-row"><td>↳ RES</td><td>${escapeHtml(formatDateTime(res.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>-${Number(res.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(res.type === 'decommissioned' ? 'Decomisado' : 'Vendido en mostrador')}</td><td>${escapeHtml(formatProductExpiryLabel(item))} (VTO)</td></tr>`)));
+              .map((res) => `<tr class="is-resolution-row"><td>↳ RES</td><td>${escapeHtml(formatDateTime(res.createdAt))}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>-${Number(res.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(res.type === 'decommissioned' ? 'Decomisado' : 'Vendido en mostrador')}</td><td>${escapeHtml(formatProductExpiryLabel(item))} (VTO)</td></tr>`)));
         if (!includeTrace) return [main, ...resolutions];
         const traces = getTraceRowsFromRegistro(item).map((trace) => `<tr class="is-trace-row"><td>↳ ${trace.index}</td><td><span class="print-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td><span style="display:inline-flex;align-items:center;gap:8px;">${trace.ingredientImageUrl ? `<img src="${escapeHtml(trace.ingredientImageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${getTraceIngredientLabelHtml(trace)}</span></span></td><td>-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="print-trace-vto">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td></tr>`);
         return [main, ...resolutions, ...traces];
@@ -7110,7 +7271,6 @@
         if (getTraceRowsFromRegistro(item).length) state.historyTraceCollapse[item.id] = true;
       });
       if (!rows.length) {
-        node.innerHTML = '<p class="produccion-lote-empty">Todavía no hay producciones confirmadas para esta receta.</p>';
         return;
       }
       const traceableRows = rows.filter((item) => getTraceRowsFromRegistro(item).length);
@@ -7123,7 +7283,7 @@
         const planillaDisabled = hasPlanillaDisponible(item) ? '' : 'disabled';
         const traceHtml = (!isCollapsed && traceRows.length)
           ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${getTraceIngredientLabelHtml(trace)}</span></div></td><td></td><td><span class="produccion-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="produccion-trace-expiry">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td><td><span class="produccion-trace-badge">Trazabilidad</span></td><td>-</td><td>${trace.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images="${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td>-</td></tr>`).join('') : '';
-        return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isCollapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(item.id || '-')}</span></div></td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td><div class="produccion-planilla-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></button></div></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-recipe-prod-delete="${escapeHtml(item.id || '')}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${traceHtml}`;
+        return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isCollapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(item.id || '-')}</span></div></td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td><div class="produccion-planilla-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></button></div></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-recipe-prod-delete="${escapeHtml(item.id || '')}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${traceHtml}`;
       }).join('');
       node.innerHTML = `
         <div class="inventario-table-head enhanced">
@@ -7200,9 +7360,9 @@
       if (confirmBtn) confirmBtn.disabled = !canConfirm;
       qtyHelp.textContent = canConfirm
         ? `Escala aplicada: ${qty.toFixed(2)} kg. Reserva temporal activa por 10 min.`
-        : (isViewOnly ? 'Modo visualización: podés revisar el desglose, pero no confirmar ni guardar borradores desde esta vista.' : (qty <= 0 ? 'Ajustá kilos para confirmar producción.' : `Hay conflictos de stock/lotes para ${formatIsoEs(productionDate)}.`));
+        : (isViewOnly ? 'Modo visualizacion: podes revisar el desglose, pero no confirmar ni guardar borradores desde esta vista.' : (qty <= 0 ? 'Ajusta kilos para confirmar produccion.' : `Hay conflictos de stock/lotes para ${formatIsoEs(productionDate)}.`));
       if (expiredLotsCount > 0) {
-        qtyHelp.textContent += ` Detectamos ${expiredLotsCount} lote(s) vencido(s): resolvé su estado o cambiá fecha para continuar. También podés ajustar la fecha para recalcular FEFO.`;
+        qtyHelp.textContent += ` Detectamos ${expiredLotsCount} lote(s) vencido(s): resolve su estado o cambia fecha para continuar. Tambien podes ajustar la fecha para recalcular FEFO.`;
       }
       if (!isViewOnly) await ensureReservationForPlan(state.editorPlan);
     };
@@ -7339,7 +7499,7 @@
             const traceHtml = (!isCollapsed && traceRows.length)
               ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${getTraceIngredientLabelHtml(trace)}</span></div></td><td></td><td><span class="produccion-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="produccion-trace-expiry">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td><td><span class="produccion-trace-badge">Trazabilidad</span></td><td>-</td><td>${trace.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images="${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td></tr>`).join('')
               : '';
-            return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isCollapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(item.id || '-')}</span></div></td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td><div class="produccion-planilla-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></button></div></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-recipe-prod-delete="${escapeHtml(item.id || '')}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${traceHtml}`;
+            return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isCollapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(item.id || '-')}</span></div></td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td><div class="produccion-planilla-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></button></div></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-recipe-prod-delete="${escapeHtml(item.id || '')}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${traceHtml}`;
           }).join('')
           : '<tr><td colspan="10" class="text-center">Sin producciones.</td></tr>';
         const renderExpandedContent = (popup) => {
@@ -7536,7 +7696,6 @@
     });
     nodes.editor.querySelector('#produccionSaveDraftBtn')?.addEventListener('click', async () => {
       await saveEditorDraft();
-      await openIosSwal({ title: 'Borrador guardado', html: '<p>Podés retomarlo cuando quieras.</p>', icon: 'success', confirmButtonText: 'Entendido' });
     });
     prepareThumbLoaders('.js-produccion-head-photo, .js-produccion-user-photo');
     const confirmProduction = async () => {
@@ -7549,7 +7708,6 @@
       if (revalidatedExpiredLots > 0) {
         await openIosSwal({
           title: 'Hay carne vencida pendiente',
-          html: '<p>No podés confirmar hasta resolver el estado de los lotes vencidos o cambiar la fecha de producción a un rango válido.</p>',
           icon: 'warning',
           confirmButtonText: 'Entendido'
         });
@@ -8070,7 +8228,7 @@
         <td>${trace.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}'><i class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td>
         <td>-</td>
       </tr>`).join('') : '';
-      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-expanded-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isCollapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(item.id)}</span></div></td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)} (${escapeHtml(manager.role)})</td><td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td><div class="produccion-planilla-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></button></div></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-prod-cancel="${escapeHtml(item.id || '')}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${traceHtml}`;
+      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-expanded-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isCollapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(item.id)}</span></div></td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)} (${escapeHtml(manager.role)})</td><td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td><div class="produccion-planilla-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></button></div></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-prod-cancel="${escapeHtml(item.id || '')}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${traceHtml}`;
     }).join('') : '<tr><td colspan="10" class="text-center">Sin producciones.</td></tr>';
     const renderExpandedContent = (popup) => {
       const host = popup.querySelector('#produccionExpandedHistoryHost');
@@ -8451,7 +8609,8 @@
   const printWeeklyProductionPlanilla = (html) => {
     const win = window.open('', '_blank', 'width=1400,height=900');
     if (!win) return;
-    win.document.write(`<html><head><title>Planilla de producción semanal</title><style>@page{size:landscape;margin:10mm}body{font-family:Inter,Arial,sans-serif;color:#111827;background:#ffffff;margin:0;padding:8px}.weekly-production-sheet{display:grid;gap:14px}.weekly-sheet-block{border:1px solid #2f2f2f}.weekly-sheet-block h3,.weekly-sheet-block h4{margin:0;text-align:center;font-weight:800;padding:6px 6px}.weekly-sheet-block h4{border-top:1px solid #2f2f2f;font-size:16px}.weekly-sheet-table{width:100%;border-collapse:collapse;table-layout:fixed}.weekly-sheet-table th,.weekly-sheet-table td{border:1px solid #2f2f2f;padding:4px;word-break:break-word;text-align:center;font-size:11px;line-height:1.15}.weekly-sheet-table th.th-cat{background:#1d7a2f;color:#fff}.weekly-sheet-table th.th-day{background:#136fb6;color:#fff}.weekly-sheet-table th.th-total{background:#08266e;color:#fff}.weekly-sheet-table td.is-missing{background:#f4dfe2}.weekly-sheet-table td.is-ok{background:#e9edf2}.weekly-sheet-table td.weekly-total{font-weight:800}.weekly-product-cell{display:inline-flex;align-items:center;gap:8px;justify-content:flex-start;text-align:left}.weekly-product-cell img{width:24px;height:24px;border-radius:999px;object-fit:cover;border:1px solid #c7d3ea}.page-break{page-break-before:always;break-before:page}</style></head><body>${html}</body></html>`);
+    const printStyle = `<style>@page{size:landscape;margin:8mm}*{box-sizing:border-box}body{font-family:Inter,Arial,sans-serif;color:#111827;background:#ffffff;margin:0;padding:8px}.weekly-production-sheet{display:grid;gap:10px}.weekly-sheet-block{border:1px solid #1f2937;border-radius:0;overflow:visible;background:#fff;break-inside:avoid}.weekly-sheet-block h3,.weekly-sheet-block h4{margin:0;text-align:center;font-weight:900;padding:6px 8px;letter-spacing:.02em;text-transform:uppercase}.weekly-sheet-block h3{background:#0f172a;color:#fff;font-size:15px;border-bottom:1px solid #1f2937}.weekly-sheet-block h4{background:#f1f5f9;color:#1e3a5f;border-bottom:1px solid #1f2937;font-size:13px}.weekly-sheet-table{width:100%;border-collapse:collapse;table-layout:fixed;text-transform:uppercase}.weekly-sheet-table th,.weekly-sheet-table td{border:1px solid #334155;padding:5px 4px;word-break:break-word;text-align:center;font-size:10.5px;line-height:1.18;vertical-align:middle}.weekly-sheet-table th{font-weight:900}.weekly-sheet-table th.th-cat{background:#14532d;color:#fff}.weekly-sheet-table th.th-day{background:#1d4ed8;color:#fff}.weekly-sheet-table th.th-total{background:#0f172a;color:#fff}.weekly-sheet-table td{background:#fff}.weekly-sheet-table td.is-missing{background:#fff7ed;color:#9a3412}.weekly-sheet-table td.is-ok{background:#ecfdf5;color:#14532d;font-weight:800}.weekly-sheet-table td.weekly-total{font-weight:900;background:#e0f2fe;color:#0f3f63}.weekly-product-cell{display:flex;align-items:center;gap:7px;justify-content:flex-start;text-align:left;font-weight:900}.weekly-product-cell img{width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #94a3b8;flex:0 0 auto}.page-break{page-break-before:always;break-before:page}</style>`;
+    win.document.write(`<html><head><title>Planilla de producción semanal</title>${printStyle}</head><body>${html}</body></html>`);
     win.document.close();
     const safePrint = () => {
       try {
@@ -8552,7 +8711,7 @@
       const rowsHtml = products.slice().sort((a,b)=> `${a.subcategory}|${a.title}`.localeCompare(`${b.subcategory}|${b.title}`,'es')).map((product) => {
         const daily = displayIsos.map((iso) => rowsInRange.filter((row) => normalizeValue(row.recipeId || row.recipeTitle || row.id) === product.id && normalizeValue(row.productionDate) === iso).reduce((acc, row) => acc + Number(row.quantityKg || 0), 0));
         const total = daily.reduce((acc, value) => acc + value, 0);
-        return `<tr><td>${escapeHtml(capitalize(product.category.replaceAll('-', ' ')))}</td><td>${escapeHtml(capitalize(product.subcategory))}</td><td><div class="weekly-product-cell">${product.imageUrl ? `<img class="weekly-product-thumb" src="${escapeHtml(product.imageUrl)}" alt="${escapeHtml(product.title)}">` : ''}<span>${escapeHtml(product.title)}</span></div></td>${daily.map((kg) => `<td class="${kg > 0 ? 'is-ok' : 'is-missing'}">${kg > 0 ? `${kg.toFixed(2)}KG` : ''}</td>`).join('')}<td class="weekly-total">${total.toFixed(2)}KG</td></tr>`;
+        return `<tr><td>${escapeHtml(capitalize(product.category.replaceAll('-', ' ')))}</td><td>${escapeHtml(capitalize(product.subcategory))}</td><td><div class="weekly-product-cell">${product.imageUrl ? `<img class="weekly-product-thumb" src="${escapeHtml(product.imageUrl)}" alt="${escapeHtml(product.title)}">` : ''}<span>${escapeHtml(normalizeUpper(product.title))}</span></div></td>${daily.map((kg) => `<td class="${kg > 0 ? 'is-ok' : 'is-missing'}">${kg > 0 ? `${kg.toFixed(2)}KG` : ''}</td>`).join('')}<td class="weekly-total">${total.toFixed(2)}KG</td></tr>`;
       }).join('');
       return `<section class="weekly-sheet-block ${idx ? 'page-break' : ''}"><h3>FRIGORIFICO LA JAMONERA • PLANILLA DE PRODUCCION SEMANAL</h3><h4>SEMANA DE ${formatIsoEs(segment.start)} A ${formatIsoEs(segment.end)}</h4><div class="table-responsive"><table class="weekly-sheet-table"><thead><tr><th class="th-cat">CATEGORIA</th><th class="th-cat">SUBCATEGORIA</th><th class="th-cat">PRODUCTO</th>${headers.map((d) => `<th class="th-day">${d.toUpperCase()}</th>`).join('')}<th class="th-total">TOTAL</th></tr></thead><tbody>${rowsHtml || `<tr><td colspan="${4 + headers.length}">Sin datos.</td></tr>`}</tbody></table></div></section>`;
     }).join('')}</div>`;
@@ -8616,13 +8775,13 @@
     const bodyRows = rows.flatMap((item) => {
       const manager = getManagerLabel(item);
       const productImage = normalizeValue(item?.traceability?.product?.imageUrl) || normalizeValue(state.recetas?.[item.recipeId]?.imageUrl);
-      const productCell = `<span style="display:inline-flex;align-items:center;gap:8px;">${productImage ? `<img src="${escapeHtml(productImage)}" style="width:28px;height:28px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<strong>${escapeHtml(item.recipeTitle || '-')}</strong></span>`;
+        const productCell = `<span style="display:inline-flex;align-items:center;gap:8px;">${productImage ? `<img src="${escapeHtml(productImage)}" style="width:28px;height:28px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<strong>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</strong></span>`;
       const main = `<tr><td>${escapeHtml(item.id)}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${productCell}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)}<br><small>${escapeHtml(manager.role)}</small></td><td>${escapeHtml(formatProductExpiryLabel(item))} (VTO)</td></tr>`;
       const resolutions = (Array.isArray(item?.lots) ? item.lots : [])
         .flatMap((plan) => (Array.isArray(plan?.lots) ? plan.lots : [])
           .flatMap((lot) => (Array.isArray(lot?.expiryResolutions) ? lot.expiryResolutions : [])
             .filter((res) => isHighlightedResolutionType(res.type))
-            .map((res) => `<tr class="is-resolution-row"><td>↳ RES</td><td>${escapeHtml(formatDateTime(res.createdAt))}</td><td>${escapeHtml(item.recipeTitle || '-')}</td><td>-${Number(res.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(res.type === 'decommissioned' ? 'Decomisado' : 'Vendido en mostrador')}</td><td>${escapeHtml(formatProductExpiryLabel(item))} (VTO)</td></tr>`)));
+            .map((res) => `<tr class="is-resolution-row"><td>↳ RES</td><td>${escapeHtml(formatDateTime(res.createdAt))}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>-${Number(res.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(res.type === 'decommissioned' ? 'Decomisado' : 'Vendido en mostrador')}</td><td>${escapeHtml(formatProductExpiryLabel(item))} (VTO)</td></tr>`)));
       if (!includeTrace) return [main, ...resolutions];
       const traces = getTraceRowsFromRegistro(item).map((trace) => `<tr class="is-trace-row"><td>↳ ${trace.index}</td><td><span class="print-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td><span style="display:inline-flex;align-items:center;gap:8px;">${trace.ingredientImageUrl ? `<img src="${escapeHtml(trace.ingredientImageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${getTraceIngredientLabelHtml(trace)}</span></span></td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="print-trace-vto">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td></tr>`);
       return [main, ...resolutions, ...traces];
@@ -8902,7 +9061,7 @@
         renderDispatchCreate(state.dispatchDraft);
         return;
       }
-      const upcomingLot = buildRecipeLotsForDispatch(recipeId).find((lot) => !isDispatchLotExpiredForDate(lot, dispatchDate) && Number(lot.availableKg || 0) > 0.0001);
+      const upcomingLot = buildRecipeLotsForDispatch(recipeId).find((lot) => isDispatchLotUsableForDate(lot, dispatchDate) && Number(lot.availableKg || 0) > 0.0001);
       const confirmTitle = actionType === 'decommissioned' ? '¿Marcar lote como decomisado?' : '¿Marcar lote como venta en sucursal?';
       const confirmText = actionType === 'decommissioned'
         ? 'Se descontará todo el disponible del lote vencido y se registrará un egreso como Decomisado, vinculado al número de producción.'
@@ -8930,9 +9089,9 @@
       });
       if (!applied) return;
       const qtyRequested = Number(line.qtyKg || 0);
-      const nextAlloc = allocateDispatchLots(recipeId, qtyRequested);
-      const stillExpired = getDispatchExpiredLots(nextAlloc.allocations, dispatchDate).length > 0;
-      if (!nextAlloc.hasStock || stillExpired) {
+      const nextAlloc = allocateDispatchLots(recipeId, qtyRequested, dispatchDate);
+      const stillExpired = (Array.isArray(nextAlloc.expiredLots) ? nextAlloc.expiredLots : getDispatchExpiredLots(nextAlloc.allocations, dispatchDate)).length > 0;
+      if ((!nextAlloc.hasStock && !nextAlloc.futureLots?.length) || stillExpired) {
         state.dispatchDraft.lines = state.dispatchDraft.lines.filter((_, rowIdx) => rowIdx !== idx);
       }
       if (!state.dispatchDraft.lines.length) {
@@ -8984,12 +9143,22 @@
           return;
         }
         const recipe = safeObject(state.recetas[recipeId]);
-        const allocated = allocateDispatchLots(recipeId, qtyKg);
-        const expiredForDate = getDispatchExpiredLots(allocated.allocations, draft.dispatchDate);
-        if (expiredForDate.length) {
+        const allocated = allocateDispatchLots(recipeId, qtyKg, draft.dispatchDate);
+        const expiredForDate = Array.isArray(allocated.expiredLots) ? allocated.expiredLots : getDispatchExpiredLots(allocated.allocations, draft.dispatchDate);
+        if (!allocated.hasStock && expiredForDate.length) {
           await openIosSwal({
             title: 'Lote vencido detectado',
             html: `<p>${escapeHtml(capitalize(recipe.title || 'Receta'))} tiene lote vencido para la fecha ${escapeHtml(formatIsoEs(draft.dispatchDate || ''))}.</p><small>Resolvé la fila en rojo (Venta en Sucursal/Decomisado) o cambiá la fecha de reparto.</small>`,
+            icon: 'warning'
+          });
+          return;
+        }
+        if (allocated.futureLots?.length && !allocated.hasStock) {
+          const nextDate = normalizeValue(allocated.nextAvailableDate);
+          const windows = allocated.futureLots.slice(0, 4).map((lot) => `<li><strong>${escapeHtml(lot.lotNumber || '-')}</strong>: ${escapeHtml(getDispatchLotWindowLabel(lot))} - ${Number(lot.availableKg || 0).toFixed(2)} kg</li>`).join('');
+          await openIosSwal({
+            title: 'Stock fuera de fecha',
+            html: `<p>${escapeHtml(capitalize(recipe.title || 'Receta'))} tiene stock, pero no se puede repartir el ${escapeHtml(formatIsoEs(draft.dispatchDate || ''))} porque todavia no estaba elaborado.</p>${nextDate ? `<p>Podes repartir desde <strong>${escapeHtml(formatIsoEs(nextDate))}</strong> o cambiar la fecha con el calendario.</p>` : ''}<ul class="text-start">${windows}</ul>`,
             icon: 'warning'
           });
           return;
@@ -9527,6 +9696,16 @@
       state.dispatchXlsxDraft.managers = [...nodes.dispatchView.querySelectorAll('[data-dispatch-xlsx-manager]:checked')]
         .map((n) => normalizeValue(n.dataset.dispatchXlsxManager || n.value))
         .filter(Boolean);
+      return;
+    }
+    const xlsxDateInput = event.target.closest('[data-dispatch-xlsx-date]');
+    if (xlsxDateInput && state.dispatchXlsxDraft) {
+      const rowId = normalizeValue(xlsxDateInput.dataset.dispatchXlsxDate);
+      const row = (Array.isArray(state.dispatchXlsxDraft.rows) ? state.dispatchXlsxDraft.rows : []).find((item) => normalizeValue(item.id) === rowId);
+      if (!row) return;
+      row.invoiceDate = normalizeDispatchDateToken(xlsxDateInput.value) || toIsoDate();
+      recomputeDispatchXlsxDraftRows(state.dispatchXlsxDraft);
+      renderDispatchXlsxCreate(state.dispatchXlsxDraft);
       return;
     }
     if (!state.dispatchCreateMode || !state.dispatchDraft) return;

@@ -723,7 +723,9 @@ const printReport = async (report) => {
       const avatar = item.imageUrl
         ? `<span class="panel-chart-avatar"><img class="js-panel-thumb is-loaded" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name)}" loading="eager" decoding="async"></span>`
         : `<span class="panel-chart-avatar">${escapeHtml(initials(item.name))}</span>`;
-      const bg = barColors[index % barColors.length];
+      const colorSeed = normalize(item.id || item.name || index);
+      const colorIndex = [...colorSeed].reduce((acc, ch) => acc + ch.charCodeAt(0), 0) % barColors.length;
+      const bg = barColors[colorIndex];
       return `<div class="panel-chart-row"><div class="panel-chart-rank">${index + 1}</div><div class="panel-chart-label">${avatar}<span>${escapeHtml(item.name)}</span></div><div class="panel-chart-bar"><div class="panel-chart-fill" style="width:${Math.max(10, (item.kg / max) * 100)}%; background: ${bg}"></div></div><div class="panel-chart-value">${item.kg.toFixed(2)} kg</div></div>`;
     }).join('')}</div>`;
   };

@@ -22,7 +22,16 @@ body {
   margin: 0;
   min-height: 100vh;
   color: #1f2a44;
-  background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);
+  background:
+    linear-gradient(
+      135deg,
+      #f8fbff 0%,
+      #eef7f4 18%,
+      rgba(82, 169, 139, 0.18) 34%,
+      rgba(74, 137, 205, 0.20) 54%,
+      rgba(241, 165, 96, 0.16) 76%,
+      #f4edf7 100%
+    );
   background-attachment: fixed;
   background-repeat: no-repeat;
 }
@@ -10466,8 +10475,8 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 }
 
 .weekly-sheet-block {
-  border: 1px solid #d9e0f3;
-  border-radius: 10px;
+  border: 1px solid #1f2937;
+  border-radius: 0;
   overflow: hidden;
   background: #fff;
 }
@@ -10481,19 +10490,23 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 }
 
 .weekly-sheet-block h3 {
-  border-bottom: 1px solid #d9e0f3;
+  background: #0f172a;
+  color: #fff;
+  border-bottom: 1px solid #1f2937;
 }
 
 .weekly-sheet-block h4 {
-  border-bottom: 1px solid #d9e0f3;
+  background: #f1f5f9;
+  color: #1e3a5f;
+  border-bottom: 1px solid #1f2937;
 }
 
 .weekly-sheet-table { width: 100%; border-collapse: collapse; table-layout: fixed; text-transform: uppercase;}
 
 .weekly-sheet-table th,
 .weekly-sheet-table td {
-  border: 1px solid #2f2f2f;
-  padding: 4px;
+  border: 1px solid #334155;
+  padding: 5px 4px;
   text-align: center;
   vertical-align: middle;
   font-size: 0.9rem;
@@ -10501,12 +10514,12 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   line-height: 1.15;
 }
 
-.weekly-sheet-table th.th-cat { background: #1d7a2f; color: #fff; }
-.weekly-sheet-table th.th-day { background: #136fb6; color: #fff; }
-.weekly-sheet-table th.th-total { background: #08266e; color: #fff; }
-.weekly-sheet-table td.is-missing { background: #f4dfe2; }
-.weekly-sheet-table td.is-ok { background: #e9edf2; }
-.weekly-sheet-table .weekly-total { font-weight: 800; }
+.weekly-sheet-table th.th-cat { background: #14532d; color: #fff; }
+.weekly-sheet-table th.th-day { background: #1d4ed8; color: #fff; }
+.weekly-sheet-table th.th-total { background: #0f172a; color: #fff; }
+.weekly-sheet-table td.is-missing { background: #fff7ed; color: #9a3412; }
+.weekly-sheet-table td.is-ok { background: #ecfdf5; color: #14532d; font-weight: 800; }
+.weekly-sheet-table .weekly-total { font-weight: 900; background: #e0f2fe; color: #0f3f63; }
 
 .weekly-product-cell {
   display: inline-flex;
@@ -11010,6 +11023,48 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 .dispatch-xlsx-stock-expired,
 .dispatch-xlsx-expired-part {
   color: #b23d4d;
+  font-weight: 700;
+}
+
+.dispatch-xlsx-stock-future,
+.dispatch-date-hint {
+  color: #9a5f1b;
+  font-weight: 700;
+}
+
+.dispatch-date-hint {
+  display: block;
+  margin-top: 3px;
+  line-height: 1.35;
+}
+
+.dispatch-date-hint.is-expired {
+  color: #b23d4d;
+}
+
+.dispatch-stock-muted {
+  display: block;
+  color: #6f7b98;
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-top: 3px;
+}
+
+.dispatch-date-block-row td {
+  background: #fff8ed !important;
+  color: #7c4a12;
+}
+
+.dispatch-xlsx-date-input {
+  min-width: 132px;
+  height: 34px;
+  padding: 6px 8px;
+}
+
+.dispatch-xlsx-date-cell small {
+  display: block;
+  margin-top: 4px;
+  color: #667596;
   font-weight: 700;
 }
 
