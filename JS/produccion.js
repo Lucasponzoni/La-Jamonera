@@ -6895,8 +6895,8 @@
       const lastProductionAt = state.config.lastProductionByRecipe?.[recipe.id] || recipe.lastProductionAt || recipe.production?.lastAt || 0;
       return `
         <article class="ingrediente-card receta-card produccion-card ${statusClass}">
-                <small>Últimos egresados <i class="fa-solid fa-arrow-down"></i></small>
-            <p class="produccion-last-line"><i class="fa-regular fa-clock"></i> Última producción: <strong>${formatDate(lastProductionAt)}</strong></p>
+          <div class="ingrediente-avatar receta-thumb-wrap">
+            ${recipe.imageUrl
               ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="receta-thumb js-produccion-thumb" src="${recipe.imageUrl}" alt="${capitalize(recipe.title || 'Receta')}" loading="lazy">`
               : getThumbPlaceholder()}
           </div>
