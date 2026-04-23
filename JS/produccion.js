@@ -1,4 +1,4 @@
-﻿(function produccionModule() {
+(function produccionModule() {
   const produccionModal = document.getElementById('produccionModal');
   if (!produccionModal) return;
   const nodes = {
@@ -47,7 +47,7 @@
     { value: '80x25', label: '8cm x 2.5cm (80 x 25 mm)', widthMm: 80, heightMm: 25 },
     { value: '100x35', label: '10cm x 3.5cm (100 x 35 mm)', widthMm: 100, heightMm: 35 }
   ];
-  const ROSARIO_DEPT_LOCALITIES = ['Rosario', 'Villa Gobernador GÃ¡lvez', 'PÃ©rez', 'Funes', 'RoldÃ¡n', 'Ibarlucea', 'Alvear', 'Pueblo Esther', 'General Lagos', 'Arroyo Seco', 'PiÃ±ero'];
+  const ROSARIO_DEPT_LOCALITIES = ['Rosario', 'Villa Gobernador Gálvez', 'Pérez', 'Funes', 'Roldán', 'Ibarlucea', 'Alvear', 'Pueblo Esther', 'General Lagos', 'Arroyo Seco', 'Piñero'];
   const state = {
     recetas: {},
     ingredientes: {},
@@ -113,7 +113,7 @@
   const TRACE_PENDING_RNPA_CONFIG = 'Pendiente';
   const TRACE_PENDING_RNE_CONFIG = 'Pendiente';
   const isInfiniteStockRecord = (record = {}) => Boolean(record?.infiniteStock || record?.stockInfinito);
-  const ARG_PROVINCIAS = ['Buenos Aires', 'CABA', 'Catamarca', 'Chaco', 'Chubut', 'CÃ³rdoba', 'Corrientes', 'Entre RÃ­os', 'Formosa', 'Jujuy', 'La Pampa', 'La Rioja', 'Mendoza', 'Misiones', 'NeuquÃ©n', 'RÃ­o Negro', 'Salta', 'San Juan', 'San Luis', 'Santa Cruz', 'Santa Fe', 'Santiago del Estero', 'Tierra del Fuego', 'TucumÃ¡n'];
+  const ARG_PROVINCIAS = ['Buenos Aires', 'CABA', 'Catamarca', 'Chaco', 'Chubut', 'Córdoba', 'Corrientes', 'Entre Ríos', 'Formosa', 'Jujuy', 'La Pampa', 'La Rioja', 'Mendoza', 'Misiones', 'Neuquén', 'Río Negro', 'Salta', 'San Juan', 'San Luis', 'Santa Cruz', 'Santa Fe', 'Santiago del Estero', 'Tierra del Fuego', 'Tucumán'];
   const COMPANY_LEGAL_NAME = 'FRIGORIFICO LA JAMONERA SA';
   const normalizeDispatchStore = (source = {}) => ({
     registros: safeObject(source?.registros),
@@ -602,7 +602,7 @@
         }
         const reason = normalizeValue(document.getElementById('produccionSecureReason')?.value);
         if (withReason && !reason) {
-          Swal.showValidationMessage('IngresÃ¡ un motivo.');
+          Swal.showValidationMessage('Ingresá un motivo.');
           return false;
         }
         return { reason };
@@ -725,7 +725,7 @@
           productionDate: safeProductionDate,
           user: getCurrentUserLabel(),
           reference: safeProductionId,
-          observation: mode === 'consume' ? 'Consumo FEFO en producciÃ³n' : 'RestituciÃ³n por anulaciÃ³n/ediciÃ³n'
+          observation: mode === 'consume' ? 'Consumo FEFO en producción' : 'Restitución por anulación/edición'
         });
       });
       const stockBase = nextEntries.reduce((acc, entry) => {
@@ -752,7 +752,7 @@
   const initialsFromPersonName = (value) => {
     const words = normalizeValue(value)
       .split(/\s+/)
-      .map((item) => item.replace(/[^a-zA-ZÃ¡Ã©Ã­Ã³ÃºÃÃ‰ÃÃ“ÃšÃ±Ã‘]/g, ''))
+      .map((item) => item.replace(/[^a-zA-ZáéíóúÁ�0Í��añ�]/g, ''))
       .filter(Boolean);
     if (words.length < 2) return '';
     return words.slice(0, 2).map((item) => item.charAt(0).toUpperCase()).join('');
@@ -809,8 +809,8 @@
     const unique = [...new Set((Array.isArray(urls) ? urls : []).filter(Boolean))];
     if (!unique.length) return;
     Swal.fire({
-      title: 'Preparando impresiÃ³n...',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Preparando impresiÃ³n" class="meta-spinner-login"></div>',
+      title: 'Preparando impresión...',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Preparando impresión" class="meta-spinner-login"></div>',
       allowOutsideClick: false,
       showConfirmButton: false,
       customClass: {
@@ -895,13 +895,13 @@
         } else if (data.__tone === 'group_parent') {
           cell.font = { color: { argb: 'FF334155' }, bold: true };
         } else if (data.__tone === 'movement_in') {
-          if (colHeader === 'Tipo' || colHeader === 'CÃ³digo' || colHeader === 'Cantidad (kg)') {
+          if (colHeader === 'Tipo' || colHeader === 'Código' || colHeader === 'Cantidad (kg)') {
             cell.font = { color: { argb: 'FF17803D' }, bold: true };
           } else {
             cell.font = { color: { argb: 'FF111827' }, bold: false };
           }
         } else if (data.__tone === 'movement_out') {
-          if (colHeader === 'Tipo' || colHeader === 'CÃ³digo' || colHeader === 'Cantidad (kg)') {
+          if (colHeader === 'Tipo' || colHeader === 'Código' || colHeader === 'Cantidad (kg)') {
             cell.font = { color: { argb: 'FFB4232A' }, bold: true };
           } else {
             cell.font = { color: { argb: 'FF111827' }, bold: false };
@@ -1200,7 +1200,7 @@
     const totalEligible = eligible.reduce((sum, item) => sum + item.availableInReqUnit, 0);
 
     availableGroup.forEach((item) => {
-      if (item.isSoon) warnings.push(`${requirement.name}: lote prÃ³ximo a vencer (${item.expiryIso}).`);
+      if (item.isSoon) warnings.push(`${requirement.name}: lote próximo a vencer (${item.expiryIso}).`);
       const lotNumber = normalizeValue(item.entry.lotNumber) || normalizeValue(item.entry.invoiceNumber) || item.entry.id;
       let take = 0;
       if (item.status !== 'expired' && totalEligible > 0 && pending > 0) {
@@ -1254,8 +1254,8 @@
     const minKg = readMinKgForRecipe(recipe.id);
     if (!Number.isFinite(yieldQty) || yieldQty <= 0 || yieldMeta.category !== 'peso') {
       return {
-        status: 'danger', statusText: 'ConfiguraciÃ³n invÃ¡lida', maxKg: 0, progress: 0, canProduce: false,
-        errors: ['La receta debe tener rendimiento en unidad de peso para calcular producciÃ³n.'],
+        status: 'danger', statusText: 'Configuración inválida', maxKg: 0, progress: 0, canProduce: false,
+        errors: ['La receta debe tener rendimiento en unidad de peso para calcular producción.'],
         requirements: [], missingForMin: [], hasExpired: false, minKg
       };
     }
@@ -1280,7 +1280,7 @@
         .reduce((sum, item) => sum + Math.max(0, Number(item.maxShare || 1)), 0);
       const hasFullInfiniteCoverage = Boolean(availability.infiniteStock || infiniteRelatedShare >= 0.9999);
       if (availability.incompatibleUnits.length) {
-        errors.push(`Esta receta contiene unidades incompatibles para cÃ¡lculo automÃ¡tico. RevisÃ¡ ${capitalize(row.ingredientName)}.`);
+        errors.push(`Esta receta contiene unidades incompatibles para cálculo automático. Revisá ${capitalize(row.ingredientName)}.`);
       }
       requirements.push({
         ingredientId: row.ingredientId,
@@ -1308,7 +1308,7 @@
     if (!requirements.length) {
       return {
         status: 'danger', statusText: 'Sin insumos', maxKg: 0, progress: 0, canProduce: false,
-        errors: ['La receta no tiene ingredientes vÃ¡lidos para producciÃ³n.'],
+        errors: ['La receta no tiene ingredientes válidos para producción.'],
         requirements: [], missingForMin: [], hasExpired: false, minKg
       };
     }
@@ -1416,7 +1416,7 @@
           at: Number(registro.createdAt || 0) || nowTs(),
           sourceId: registro.id,
           sourceCode: registro.id,
-          label: 'ProducciÃ³n confirmada',
+          label: 'Producción confirmada',
           date: registro.productionDate
         });
       });
@@ -1596,7 +1596,7 @@
             const status = !expiryIso || expiryIso >= productionDateIso ? 'ok' : 'expired';
             const isSoon = expiryIso && expiryIso >= productionDateIso && expiryIso <= toIsoDate(new Date(productionDateIso).getTime() + 2 * 86400000);
             const availableInReqUnit = fromBase(toBase(available, entryUnit), requirement.unit);
-            if (isSoon) warnings.push(`${related.ingredientName}: lote prÃ³ximo a vencer (${expiryIso}).`);
+            if (isSoon) warnings.push(`${related.ingredientName}: lote próximo a vencer (${expiryIso}).`);
             return { entry, related, entryUnit, available, availableInReqUnit, expiryIso, status, isSoon, takeQty: 0 };
           }).filter((item) => item.availableInReqUnit > 0.0001);
           let groupRemaining = Math.min(remaining, prepared.reduce((sum, item) => sum + (item.status === 'expired' ? 0 : Math.min(item.availableInReqUnit, perRelatedCap[item.related.ingredientId] || 0)), 0));
@@ -1691,9 +1691,9 @@
           .flatMap((item) => item.lots || []);
         const hasExpiredWithStock = lots.some((lot) => lot.status === 'expired' && Number(lot.availableQty || 0) > 0.0001);
         if (hasExpiredWithStock) {
-          conflicts.push(`${requirement.name}: faltan ${formatQty(missing, requirement.unit)} para la fecha ${productionDateIso}. ResolvÃ© vencidos, cambiÃ¡ el rango de fecha o ingresÃ¡ un nuevo lote.`);
+          conflicts.push(`${requirement.name}: faltan ${formatQty(missing, requirement.unit)} para la fecha ${productionDateIso}. Resolvé vencidos, cambiá el rango de fecha o ingresá un nuevo lote.`);
         } else {
-          conflicts.push(`${requirement.name}: faltan ${formatQty(missing, requirement.unit)} para la fecha ${productionDateIso}. IngresÃ¡ un nuevo lote o cambiÃ¡ fecha.`);
+          conflicts.push(`${requirement.name}: faltan ${formatQty(missing, requirement.unit)} para la fecha ${productionDateIso}. Ingresá un nuevo lote o cambiá fecha.`);
         }
       }
     });
@@ -1873,7 +1873,7 @@
         await releaseReservation('expired');
         await openIosSwal({
           title: 'Reserva vencida',
-          html: '<p>La reserva temporal de stock venciÃ³. Recalculamos disponibilidad.</p>',
+          html: '<p>La reserva temporal de stock venció. Recalculamos disponibilidad.</p>',
           icon: 'warning',
           confirmButtonText: 'Entendido'
         });
@@ -1930,10 +1930,10 @@
   const openGlobalMinConfig = async () => {
     const currentRne = safeObject(state.config.rne);
     const rneHistoryHtml = (Array.isArray(currentRne.history) && currentRne.history.length)
-      ? `<div class="produccion-rne-history">${currentRne.history.map((item, index) => `<article class="produccion-rne-history-item" data-rne-history-item="${index}"><div><strong>VersiÃ³n ${index + 1}</strong><p><strong>NÂ° RNE:</strong> ${escapeHtml(item.number || '-')}</p><p><strong>Vigencia:</strong> ${escapeHtml(formatIsoEs(item.validFrom || ''))} â†’ ${item.replacedAt || item.savedAt ? escapeHtml(formatDateTime(item.replacedAt || item.savedAt)) : '-'}</p><p><strong>Vencimiento declarado:</strong> ${escapeHtml(formatIsoEs(item.expiryDate || ''))}</p></div><div class="produccion-rne-history-actions">${item.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-rne-history="${index}"><i class="bi bi-eye"></i><span>Ver</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjunto</button>'}<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-delete-rne-history="${index}" aria-label="Eliminar versiÃ³n de historial"><i class="fa-solid fa-trash"></i></button></div></article>`).join('')}</div>`
-      : '<p class="produccion-rne-history-empty">AÃºn no hay historial de RNE.</p>';
+      ? `<div class="produccion-rne-history">${currentRne.history.map((item, index) => `<article class="produccion-rne-history-item" data-rne-history-item="${index}"><div><strong>Versión ${index + 1}</strong><p><strong>N° RNE:</strong> ${escapeHtml(item.number || '-')}</p><p><strong>Vigencia:</strong> ${escapeHtml(formatIsoEs(item.validFrom || ''))} �  ${item.replacedAt || item.savedAt ? escapeHtml(formatDateTime(item.replacedAt || item.savedAt)) : '-'}</p><p><strong>Vencimiento declarado:</strong> ${escapeHtml(formatIsoEs(item.expiryDate || ''))}</p></div><div class="produccion-rne-history-actions">${item.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-rne-history="${index}"><i class="bi bi-eye"></i><span>Ver</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjunto</button>'}<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-delete-rne-history="${index}" aria-label="Eliminar versión de historial"><i class="fa-solid fa-trash"></i></button></div></article>`).join('')}</div>`
+      : '<p class="produccion-rne-history-empty">Aún no hay historial de RNE.</p>';
     const result = await openIosSwal({
-      title: 'ConfiguraciÃ³n de ProducciÃ³n',
+      title: 'Configuración de Producción',
       html: `<div class="text-center produccion-umbral-form produccion-config-form">
           <label class="form-label" for="produccionGlobalMinInput"><strong>Umbral global de stock bajo (kg)</strong></label>
           <input id="produccionGlobalMinInput" type="number" min="0" step="0.01" class="swal2-input ios-input" value="${Number(state.config.globalMinKg || 1).toFixed(2)}">
@@ -1950,27 +1950,27 @@
                 <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionOpenLogoViewerBtn" ${normalizeValue(state.config.companyLogoUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i><span>Visualizar logo</span></button>
               </div>
               <input id="produccionCompanyLogoFile" class="form-control ios-input image-file-input" type="file" accept="image/*">
-              <small class="text-muted"><strong>Formatos:</strong> JPG, PNG, WEBP o GIF. <strong>MÃ¡x:</strong> 5MB.</small>
+              <small class="text-muted"><strong>Formatos:</strong> JPG, PNG, WEBP o GIF. <strong>Máx:</strong> 5MB.</small>
             </div>
           </section>
           <section class="recipe-step-card step-block inventario-lot-section mt-2 produccion-config-section">
             <button type="button" class="inventario-collapse-head inventario-collapse-head-styled produccion-config-toggle" id="rneToggleBtn" aria-expanded="false">
-              <span><span class="recipe-step-number">3</span> <i class="bi bi-shield-check"></i> <strong>RNE</strong> â€¢ Empresa</span>
+              <span><span class="recipe-step-number">3</span> <i class="bi bi-shield-check"></i> <strong>RNE</strong> ⬢ Empresa</span>
               <span class="inventario-collapse-summary"><strong><i class="bi bi-arrows-fullscreen"></i></strong></span>
             </button>
             <div id="rneBody" class="step-content d-none">
-              <label class="form-label" for="produccionRneNumberInput"><strong>NÃºmero de RNE</strong></label>
+              <label class="form-label" for="produccionRneNumberInput"><strong>Número de RNE</strong></label>
               <input id="produccionRneNumberInput" type="text" class="form-control ios-input" placeholder="Ej: 12-34567" value="${escapeHtml(currentRne.number || '')}">
-              <small class="text-muted">Se permiten nÃºmeros y guion (<strong>-</strong>).</small>
+              <small class="text-muted">Se permiten números y guion (<strong>-</strong>).</small>
               <label class="form-label mt-2" for="produccionRneExpiryInput"><strong>Fecha de caducidad</strong></label>
               <input id="produccionRneExpiryInput" type="text" class="form-control ios-input" placeholder="Seleccionar fecha" value="${escapeHtml(currentRne.expiryDate || '')}">
-              <label class="inventario-check-row inventario-check-row-compact mt-2"><input type="checkbox" id="produccionRneInfiniteInput" ${currentRne.infiniteExpiry ? 'checked' : ''}><span>Vencimiento infinito (âˆž)</span></label>
+              <label class="inventario-check-row inventario-check-row-compact mt-2"><input type="checkbox" id="produccionRneInfiniteInput" ${currentRne.infiniteExpiry ? 'checked' : ''}><span>Vencimiento infinito (��~)</span></label>
               <label class="form-label mt-2" for="produccionRneFile"><strong>Archivo adjunto</strong> (PDF o imagen)</label>
               <div class="produccion-rne-file-row">
                 <input id="produccionRneFile" class="form-control ios-input image-file-input" type="file" accept="image/*,application/pdf">
                 <span id="produccionRneFileLoading" class="produccion-rne-upload-loading d-none"><img src="./IMG/Meta-ai-logo.webp" alt="Subiendo RNE" class="meta-spinner-login produccion-rne-spinner"></span>
               </div>
-              <small class="text-muted">Se guarda la versiÃ³n anterior en el historial.</small>
+              <small class="text-muted">Se guarda la versión anterior en el historial.</small>
               <div class="produccion-config-actions">
                 <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionOpenRneViewerBtn" ${normalizeValue(currentRne.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i><span>Visualizar adjunto actual</span></button>
                 <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionDeleteRneBtn" aria-label="Eliminar RNE actual" ${(normalizeValue(currentRne.number) || normalizeValue(currentRne.attachmentUrl) || (Array.isArray(currentRne.history) && currentRne.history.length)) ? '' : 'disabled'}><i class="fa-solid fa-trash"></i></button>
@@ -2062,8 +2062,8 @@
 
         deleteRneBtn?.addEventListener('click', async () => {
           const confirmDelete = await openIosSwal({
-            title: 'Borrar RNE de ProducciÃ³n',
-            html: '<p><strong>ConfirmaciÃ³n:</strong> se eliminarÃ¡ solo el RNE actual.</p><p><small>El historial se conservarÃ¡ para trazabilidad.</small></p>',
+            title: 'Borrar RNE de Producción',
+            html: '<p><strong>Confirmación:</strong> se eliminará solo el RNE actual.</p><p><small>El historial se conservará para trazabilidad.</small></p>',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'Eliminar',
@@ -2091,8 +2091,8 @@
             const history = Array.isArray(state.config.rne?.history) ? [...state.config.rne.history] : [];
             if (index < 0 || index >= history.length) return;
             const confirmDelete = await openIosSwal({
-              title: 'Borrar versiÃ³n de historial RNE',
-              html: '<p><strong>ConfirmaciÃ³n:</strong> se eliminarÃ¡ solo esta versiÃ³n del historial.</p><p><small>El RNE actual no se modifica.</small></p>',
+              title: 'Borrar versión de historial RNE',
+              html: '<p><strong>Confirmación:</strong> se eliminará solo esta versión del historial.</p><p><small>El RNE actual no se modifica.</small></p>',
               icon: 'warning',
               showCancelButton: true,
               confirmButtonText: 'Eliminar',
@@ -2137,12 +2137,12 @@
         const value = document.getElementById('produccionGlobalMinInput')?.value;
         const n = parseNumber(value);
         if (!Number.isFinite(n) || n <= 0) {
-          Swal.showValidationMessage('IngresÃ¡ un valor mayor a 0.');
+          Swal.showValidationMessage('Ingresá un valor mayor a 0.');
           return false;
         }
         const rneNumber = normalizeValue(document.getElementById('produccionRneNumberInput')?.value);
         if (rneNumber && !/^[0-9-]+$/.test(rneNumber)) {
-          Swal.showValidationMessage('El nÃºmero de RNE solo admite dÃ­gitos y guion (-).');
+          Swal.showValidationMessage('El número de RNE solo admite dígitos y guion (-).');
           return false;
         }
         const rneInfiniteExpiry = Boolean(document.getElementById('produccionRneInfiniteInput')?.checked);
@@ -2180,7 +2180,7 @@
 
         if (rneFile) {
           if (!ALLOWED_RNE_UPLOAD_TYPES.includes(rneFile.type)) {
-            Swal.showValidationMessage('Adjunto RNE invÃ¡lido. Permitido: PDF o imagen.');
+            Swal.showValidationMessage('Adjunto RNE inválido. Permitido: PDF o imagen.');
             return false;
           }
           if (rneFile.size > MAX_UPLOAD_SIZE_BYTES) {
@@ -2242,7 +2242,7 @@
       title: 'Umbral por producto',
       html: `<div class="text-center produccion-umbral-form">
           <label class="form-label" for="produccionRecipeMinInput">Umbral de stock (kg)</label>
-          <input id="produccionRecipeMinInput" type="number" min="0" step="0.01" class="swal2-input ios-input" value="${normalizeValue(currentRaw)}" placeholder="VacÃ­o = usar global">
+          <input id="produccionRecipeMinInput" type="number" min="0" step="0.01" class="swal2-input ios-input" value="${normalizeValue(currentRaw)}" placeholder="Vacío = usar global">
         </div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
@@ -2255,7 +2255,7 @@
         if (!value) return null;
         const n = parseNumber(value);
         if (!Number.isFinite(n) || n <= 0) {
-          Swal.showValidationMessage('IngresÃ¡ un valor mayor a 0 o dejÃ¡ vacÃ­o para usar global.');
+          Swal.showValidationMessage('Ingresá un valor mayor a 0 o dejá vacío para usar global.');
           return false;
         }
         return n;
@@ -2412,7 +2412,7 @@
           <strong>${escapeHtml(group.sourceName)}</strong>
           <span class="produccion-confirm-substitute-badge"><i class="fa-solid fa-link"></i> Cubierto con sustitutos</span>
         </div>
-        <small>Requerido: <strong>${formatCompactQty(requiredQty || totalUsedQty, unit)}</strong> Â· Total usado: <strong>${formatCompactQty(totalUsedQty, unit)}</strong></small>
+        <small>Requerido: <strong>${formatCompactQty(requiredQty || totalUsedQty, unit)}</strong> · Total usado: <strong>${formatCompactQty(totalUsedQty, unit)}</strong></small>
         ${parentUsedHtml}
         <ul class="produccion-confirm-substitute-list">${substituteRows}</ul>
       </li>`;
@@ -2448,9 +2448,9 @@
     `).join('');
     return `
       <div class="report-viewer-content-wrap" style="text-align:left">
-        <h3 style="margin:0 0 6px">Informe de producciÃ³n ${escapeHtml(registro.id)}</h3>
-        <p><strong>Producto:</strong> ${escapeHtml(registro.recipeTitle || '-')} Â· <strong>Fecha:</strong> ${escapeHtml(registro.productionDate || '-')} Â· <strong>Estado:</strong> ${escapeHtml(registro.status || '-')}</p>
-        <p><strong>Cantidad:</strong> ${Number(registro.quantityKg || 0).toFixed(2)} kg Â· <strong>Encargados:</strong> ${escapeHtml((registro.managers || []).join(', ') || 'Sin asignar')}</p>
+        <h3 style="margin:0 0 6px">Informe de producción ${escapeHtml(registro.id)}</h3>
+        <p><strong>Producto:</strong> ${escapeHtml(registro.recipeTitle || '-')} · <strong>Fecha:</strong> ${escapeHtml(registro.productionDate || '-')} · <strong>Estado:</strong> ${escapeHtml(registro.status || '-')}</p>
+        <p><strong>Cantidad:</strong> ${Number(registro.quantityKg || 0).toFixed(2)} kg · <strong>Encargados:</strong> ${escapeHtml((registro.managers || []).join(', ') || 'Sin asignar')}</p>
         <p><strong>Observaciones:</strong> ${escapeHtml(registro.observations || '-')}</p>
         <div style="overflow:auto"><table style="width:100%;border-collapse:collapse" border="1" cellpadding="6">
           <thead><tr><th>Lote</th><th>Ingreso</th><th>Vence</th><th>Cantidad</th><th>Unidad</th><th>Proveedor</th><th>Factura</th><th>Adjuntos</th><th>Estado</th><th>Fecha/Hora</th></tr></thead>
@@ -2461,10 +2461,10 @@
   const printReport = async (registro) => {
     const include = await openIosSwal({
       title: 'Imprimir informe',
-      html: '<p>Â¿Incluir facturas, remitos e imÃ¡genes adjuntas?</p>',
+      html: '<p>¿Incluir facturas, remitos e imágenes adjuntas?</p>',
       showDenyButton: true,
       showCancelButton: true,
-      confirmButtonText: 'SÃ­, incluir',
+      confirmButtonText: 'Sí, incluir',
       denyButtonText: 'No incluir',
       cancelButtonText: 'Cancelar',
       customClass: { denyButton: 'ios-btn ios-btn-danger' }
@@ -2494,7 +2494,7 @@
   const loadImageFromDataUrl = (src) => new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('No se pudo generar el QR para impresiÃ³n.'));
+    img.onerror = () => reject(new Error('No se pudo generar el QR para impresión.'));
     img.src = src;
   });
 
@@ -2601,7 +2601,7 @@
 
     const textX = qrX + qrSize + Math.round(cardW * 0.08);
     const textW = Math.max(80, cardX + cardW - contentPad - textX);
-    const title = 'PRODUCCION â€¢ LA JAMONERA';
+    const title = 'PRODUCCION ⬢ LA JAMONERA';
     const idLines = splitProductionId(registro?.id);
 
     const titleFont = fitFontSizeByWidth(ctx, title, 800, Math.round(cardH * 0.105), Math.max(14, Math.round(cardH * 0.07)), textW);
@@ -2620,9 +2620,9 @@
     });
 
     const noteBase = Math.max(13, Math.round(cardH * 0.075));
-    const noteNormal = fitFontSizeByWidth(ctx, 'EscaneÃ¡ el QR con tu celular para acceder a la', 500, noteBase, 12, textW);
+    const noteNormal = fitFontSizeByWidth(ctx, 'Escaneá el QR con tu celular para acceder a la', 500, noteBase, 12, textW);
     const noteBold = fitFontSizeByWidth(ctx, 'trazabilidad completa del producto.', 800, Math.max(noteNormal, noteBase), 12, textW);
-    const note1 = wrapTextLines(ctx, 'EscaneÃ¡ el QR con tu celular para acceder a la', textW);
+    const note1 = wrapTextLines(ctx, 'Escaneá el QR con tu celular para acceder a la', textW);
     ctx.fillStyle = '#4d628f';
     ctx.font = `500 ${noteNormal}px Inter, Arial, sans-serif`;
     const noteLineH = Math.round(noteNormal * 1.18);
@@ -2641,7 +2641,7 @@
 
   const buildPdfFromQrCanvases = (canvases, sizeConfig) => {
     if (!window.jspdf || !window.jspdf.jsPDF) {
-      throw new Error('No se pudo cargar la librerÃ­a PDF.');
+      throw new Error('No se pudo cargar la librería PDF.');
     }
     const { jsPDF } = window.jspdf;
     const orientation = sizeConfig.widthMm > sizeConfig.heightMm ? 'landscape' : 'portrait';
@@ -2656,14 +2656,14 @@
   const openProductionQrPrintConfigurator = async (registro) => {
     const qrDataUrl = await getQrDataUrl(getProductionTraceUrl(registro));
     if (!qrDataUrl) {
-      await openIosSwal({ title: 'QR no disponible', html: '<p>No pudimos generar el cÃ³digo QR para esta producciÃ³n.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+      await openIosSwal({ title: 'QR no disponible', html: '<p>No pudimos generar el código QR para esta producción.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
       return;
     }
 
     const qrImage = await loadImageFromDataUrl(qrDataUrl);
 
     const result = await openIosSwal({
-      title: `ImpresiÃ³n Â· QR ${escapeHtml(registro.id || '')}`,
+      title: `Impresión · QR ${escapeHtml(registro.id || '')}`,
       width: 820,
       customClass: {
         popup: 'recipe-print-alert produccion-qr-print-alert',
@@ -2673,7 +2673,7 @@
         <div class="recipe-print-panel">
           <div class="recipe-print-controls">
             <label class="recipe-print-field">
-              <span>TamaÃ±o de hoja</span>
+              <span>Tamaño de hoja</span>
               <select id="printQrSheetType" class="form-select ios-input">
                 ${QR_PRINT_SIZES.map((item) => `<option value="${item.value}">${item.label}</option>`).join('')}
               </select>
@@ -2732,13 +2732,13 @@
           if (panelState.sheetCount > previewCount) {
             const extra = document.createElement('p');
             extra.className = 'produccion-qr-preview-extra';
-            extra.textContent = `+${panelState.sheetCount - previewCount} hoja(s) mÃ¡s`;
+            extra.textContent = `+${panelState.sheetCount - previewCount} hoja(s) más`;
             previewPagesNode.appendChild(extra);
           }
           metaNode.innerHTML = `
-            <strong>${escapeHtml(normalizeValue(registro.id) || 'ProducciÃ³n')}</strong>
+            <strong>${escapeHtml(normalizeValue(registro.id) || 'Producción')}</strong>
             <span>Formato: ${sizeConfig.label}</span>
-            <span>DisposiciÃ³n: 1 fila(s) Ã— 1 columna(s)</span>
+            <span>Disposición: 1 fila(s) � 1 columna(s)</span>
             <span>Cantidad por hoja: 1</span>
             <span>Cantidad de hojas: ${panelState.sheetCount}</span>
           `;
@@ -2786,7 +2786,7 @@
 
     if (config.action === 'download') {
       pdf.save(`${safeName}.pdf`);
-      window.laJamoneraNotify?.show({ type: 'success', title: 'Descarga lista', message: 'Se descargÃ³ el PDF de impresiÃ³n.' });
+      window.laJamoneraNotify?.show({ type: 'success', title: 'Descarga lista', message: 'Se descargó el PDF de impresión.' });
       return;
     }
 
@@ -2795,7 +2795,7 @@
     const printWindow = window.open(pdfUrl, '_blank');
     if (!printWindow) {
       URL.revokeObjectURL(pdfUrl);
-      window.laJamoneraNotify?.show({ type: 'error', title: 'Bloqueado', message: 'PermitÃ­ ventanas emergentes para imprimir.' });
+      window.laJamoneraNotify?.show({ type: 'error', title: 'Bloqueado', message: 'Permití ventanas emergentes para imprimir.' });
       return;
     }
 
@@ -2811,9 +2811,9 @@
   const exportProductionExcel = async (registro) => {
     if (!window.ExcelJS) return;
     const wb = new window.ExcelJS.Workbook();
-    const ws = wb.addWorksheet('ProducciÃ³n');
+    const ws = wb.addWorksheet('Producción');
     ws.columns = [
-      { header: 'ProducciÃ³n', key: 'id', width: 22 },
+      { header: 'Producción', key: 'id', width: 22 },
       { header: 'Fecha y hora', key: 'fechaHora', width: 20 },
       { header: 'Producto', key: 'producto', width: 24 },
       { header: 'Cantidad kg', key: 'kg', width: 14 },
@@ -2822,7 +2822,7 @@
       { header: 'Ingrediente', key: 'ingrediente', width: 24 },
       { header: 'Lote', key: 'lote', width: 22 },
       { header: 'Tomado', key: 'cantidad', width: 14 },
-      { header: 'QuedÃ³', key: 'restante', width: 14 },
+      { header: 'Quedó', key: 'restante', width: 14 },
       { header: 'Proveedor', key: 'proveedor', width: 20 }
     ];
     const manager = getManagerLabel(registro);
@@ -2861,7 +2861,7 @@
     if (!window.jspdf?.jsPDF) return;
     const doc = new window.jspdf.jsPDF();
     doc.setFontSize(12);
-    doc.text(`ProducciÃ³n ${registro.id}`, 10, 12);
+    doc.text(`Producción ${registro.id}`, 10, 12);
     doc.text(`Producto: ${registro.recipeTitle || '-'}`, 10, 20);
     doc.text(`Fecha: ${formatDateTime(registro.createdAt)} / Estado: ${registro.status || '-'}`, 10, 28);
     doc.text(`Cantidad: ${Number(registro.quantityKg || 0).toFixed(2)} kg`, 10, 36);
@@ -2967,7 +2967,7 @@
       `CR["<b>RNE EMPRESA</b><br/>${esc(getTraceRneDisplay(companyRne))} "]:::toneRegistry`,
       `P["<b>${esc((registro?.recipeTitle || 'Producto').toUpperCase())}</b>"]:::toneProduct`,
       `RNPA["<b>RNPA</b><br/>${esc(productRnpaNumber)}${productRnpaNodeLabel ? `<br/>${esc(productRnpaNodeLabel)}` : ''}"]:::toneRegistry`,
-      `R["<b>PRODUCCIÃ“N</b> ${Number(registro?.quantityKg || 0).toFixed(2)} KG<br/><b>Fecha:</b> ${esc(formatIsoEs(productionDate))}"]:::toneProduction`,
+      `R["<b>PRODUCCI�N</b> ${Number(registro?.quantityKg || 0).toFixed(2)} KG<br/><b>Fecha:</b> ${esc(formatIsoEs(productionDate))}"]:::toneProduction`,
       `L["<b>LOTE:</b> ${esc(registro?.id || '-')}<br/><b>VTO:</b> ${esc(formatProductExpiryLabel(registro))}"]:::toneLot`,
       `M["<b>ENCARGADO:</b> ${esc(manager)}"]:::toneManager`,
       `I["<b>INGREDIENTES TOTALES</b> ${totalIngredientsKg.toFixed(3)} KG"]:::toneIngredients`,
@@ -2983,7 +2983,7 @@
     ];
 
     if (packaging.agingDays > 0 && packaging.packagingDate) {
-      lines.push(`E["<b>ENVASADO</b><br/><b>+${packaging.agingDays} dÃ­as</b><br/>${esc(formatIsoEs(packaging.packagingDate))}"]:::toneManager`);
+      lines.push(`E["<b>ENVASADO</b><br/><b>+${packaging.agingDays} días</b><br/>${esc(formatIsoEs(packaging.packagingDate))}"]:::toneManager`);
       lines.push('R -.-> E');
     }
 
@@ -3076,18 +3076,18 @@
       const hasSiblingSubstitute = group.plans.some((plan) => plan?.isSubstitute);
       const totalQty = group.plans.reduce((sum, plan) => sum + getIngredientPlanUsedQty(plan, { hasSiblingSubstitute }), 0);
       const substitutionText = group.plans.some((plan) => plan.isSubstitute)
-        ? ` Â· Sustitutos: ${group.plans.filter((plan) => plan.isSubstitute).map((plan) => plan.ingredientName).join(' + ')}`
+        ? ` · Sustitutos: ${group.plans.filter((plan) => plan.isSubstitute).map((plan) => plan.ingredientName).join(' + ')}`
         : '';
-      const infiniteText = group.plans.some((plan) => plan?.infiniteStock || plan?.noTraceability) ? ' Â· Stock infinito sin trazabilidad' : '';
-      return `<li><strong>${index + 1}. ${escapeHtml(group.sourceIngredientName || 'Ingrediente')}</strong><span>${escapeHtml(formatCompactQty(totalQty, firstPlan?.unit || firstPlan?.ingredientUnit || ''))} Â· Lote ${escapeHtml(firstLot?.lotNumber || firstLot?.entryId || '-')}${escapeHtml(substitutionText)}${escapeHtml(infiniteText)}</span></li>`;
+      const infiniteText = group.plans.some((plan) => plan?.infiniteStock || plan?.noTraceability) ? ' · Stock infinito sin trazabilidad' : '';
+      return `<li><strong>${index + 1}. ${escapeHtml(group.sourceIngredientName || 'Ingrediente')}</strong><span>${escapeHtml(formatCompactQty(totalQty, firstPlan?.unit || firstPlan?.ingredientUnit || ''))} · Lote ${escapeHtml(firstLot?.lotNumber || firstLot?.entryId || '-')}${escapeHtml(substitutionText)}${escapeHtml(infiniteText)}</span></li>`;
     }).join('');
     return `<div class="produccion-trace-fallback-diagram" aria-label="Diagrama alternativo de trazabilidad">
       <div class="produccion-trace-fallback-flow">
         <article class="produccion-trace-fallback-node"><small>Empresa</small><strong>${escapeHtml(COMPANY_LEGAL_NAME)}</strong><span>RNE ${escapeHtml(getTraceRneDisplay(companyRne))}</span></article>
-        <span class="produccion-trace-fallback-arrow">â†’</span>
+        <span class="produccion-trace-fallback-arrow">� </span>
         <article class="produccion-trace-fallback-node"><small>Producto</small><strong>${escapeHtml(productLabel)}</strong><span>RNPA ${escapeHtml(getTraceRnpaNumberDisplay(productRnpa))}</span></article>
-        <span class="produccion-trace-fallback-arrow">â†’</span>
-        <article class="produccion-trace-fallback-node"><small>ProducciÃ³n</small><strong>${Number(registro?.quantityKg || 0).toFixed(2)} kg</strong><span>${escapeHtml(formatIsoEs(productionDate))}</span></article>
+        <span class="produccion-trace-fallback-arrow">� </span>
+        <article class="produccion-trace-fallback-node"><small>Producción</small><strong>${Number(registro?.quantityKg || 0).toFixed(2)} kg</strong><span>${escapeHtml(formatIsoEs(productionDate))}</span></article>
       </div>
       <div class="produccion-trace-fallback-meta">
         <p><strong>Encargado:</strong> ${escapeHtml(manager)}</p>
@@ -3198,7 +3198,7 @@
           <div class="produccion-trace-mermaid-wrap">
             <div class="produccion-trace-mermaid" data-trace-mermaid><button type="button" class="produccion-trace-mermaid-overlay" data-trace-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button></div>
           </div>
-          <div class="produccion-trace-ingredients">${ingredients || '<p class="m-0">Sin desglose de lotes para esta producciÃ³n.</p>'}</div>
+          <div class="produccion-trace-ingredients">${ingredients || '<p class="m-0">Sin desglose de lotes para esta producción.</p>'}</div>
         </div>
       </div>
     </section>`;
@@ -3216,7 +3216,7 @@
     try {
       const renderId = `trace_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
       const rendered = await window.mermaid.render(renderId, source);
-      if (!rendered || !rendered.svg) throw new Error('Mermaid render vacÃ­o');
+      if (!rendered || !rendered.svg) throw new Error('Mermaid render vacío');
       host.innerHTML = `${rendered.svg}<button type="button" class="produccion-trace-mermaid-overlay is-ready" data-trace-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button>`;
       host.dataset.traceScale = '1';
       host.style.transformOrigin = 'top left';
@@ -3549,13 +3549,13 @@
       </div>
       <div class="table-responsive inventario-global-table inventario-table-compact-wrap">
         <table class="table recipe-table inventario-table-compact mb-0">
-          <thead><tr><th>ID producciÃ³n</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead>
+          <thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead>
           <tbody>${htmlRows}</tbody>
         </table>
       </div>
       <div class="inventario-pagination enhanced">
         <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-prod-page="prev" ${state.historyPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button>
-        <span>PÃ¡gina ${state.historyPage} de ${pages}</span>
+        <span>Página ${state.historyPage} de ${pages}</span>
         <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-prod-page="next" ${state.historyPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button>
       </div>`;
     prepareThumbLoaders('.js-produccion-thumb');
@@ -3596,7 +3596,7 @@
       openDispatch();
       return;
     }
-    await openIosSwal({ title: 'CÃ³digo no reconocido', html: '<p>El cÃ³digo no corresponde a ProducciÃ³n ni Reparto.</p>', icon: 'info' });
+    await openIosSwal({ title: 'Código no reconocido', html: '<p>El código no corresponde a Producción ni Reparto.</p>', icon: 'info' });
   };
 
   const openRecipeQuickHistory = async (recipeId) => {
@@ -3651,9 +3651,9 @@
         await openIosSwal({ title: 'Sin datos', html: '<p>No hay movimientos para exportar.</p>', icon: 'info' });
         return;
       }
-      const headers = ['Tipo', 'Fecha y hora', 'CÃ³digo', 'Cantidad (kg)'];
+      const headers = ['Tipo', 'Fecha y hora', 'Código', 'Cantidad (kg)'];
       const rowsExcel = filtered.map((item) => ({
-        Tipo: `${item.type === 'egreso' ? 'â†“' : 'â†‘'} ${item.type === 'egreso' ? (normalizeValue(item.label) || 'Egreso') : 'Ingreso'}`,
+        Tipo: `${item.type === 'egreso' ? '� ' : '� '} ${item.type === 'egreso' ? (normalizeValue(item.label) || 'Egreso') : 'Ingreso'}`,
         'Fecha y hora': formatDateTime(item.at || 0),
         'Codigo': (Boolean(item.nonTraceable) || normalizeUpper(item.sourceCode) === 'SIN TRAZABILIDAD') ? 'SIN TRAZABILIDAD' : (item.sourceCode || item.sourceId || '-'),
         'Cantidad (kg)': `${item.type === 'egreso' ? '-' : '+'}${Math.abs(Number(item.qtyKg || 0)).toFixed(2)}`,
@@ -3668,8 +3668,8 @@
     };
     const printRecipeHistory = async () => {
       const ask = await openIosSwal({
-        title: 'Imprimir perÃ­odo',
-        html: '<p>Se imprimirÃ¡ el perÃ­odo filtrado del historial rÃ¡pido.</p>',
+        title: 'Imprimir período',
+        html: '<p>Se imprimirá el período filtrado del historial rápido.</p>',
         showCancelButton: true,
         confirmButtonText: 'Imprimir',
         cancelButtonText: 'Cancelar',
@@ -3684,7 +3684,7 @@
       const bodyRows = buildRowsHtml(filtered) || '<tr><td colspan="4" class="text-center">Sin movimientos para el filtro.</td></tr>';
       const win = window.open('', '_blank', 'width=1300,height=900');
       if (!win) return;
-      win.document.write(`<html><head><title>${escapeHtml(title)}</title><style>body{font-family:Inter,Arial,sans-serif;padding:12px;color:#223457}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d5def2;padding:8px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.03em}.is-movement-in td{background:#ecfdf3;color:#111827;font-weight:400}.is-movement-out td{background:#fff1f2;color:#111827;font-weight:400}.movement-type-in,.movement-code-in{color:#17803d;font-weight:700}.movement-type-out,.movement-code-out{color:#b4232a;font-weight:700}</style></head><body><h2>${escapeHtml(title)}</h2><table><thead><tr><th>Tipo</th><th>Fecha y hora</th><th>CÃ³digo</th><th>Cantidad</th></tr></thead><tbody>${bodyRows}</tbody></table></body></html>`);
+      win.document.write(`<html><head><title>${escapeHtml(title)}</title><style>body{font-family:Inter,Arial,sans-serif;padding:12px;color:#223457}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d5def2;padding:8px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.03em}.is-movement-in td{background:#ecfdf3;color:#111827;font-weight:400}.is-movement-out td{background:#fff1f2;color:#111827;font-weight:400}.movement-type-in,.movement-code-in{color:#17803d;font-weight:700}.movement-type-out,.movement-code-out{color:#b4232a;font-weight:700}</style></head><body><h2>${escapeHtml(title)}</h2><table><thead><tr><th>Tipo</th><th>Fecha y hora</th><th>Código</th><th>Cantidad</th></tr></thead><tbody>${bodyRows}</tbody></table></body></html>`);
       win.document.close();
       await waitPrintAssets(win);
       win.focus();
@@ -3701,21 +3701,21 @@
       const prevBtn = popup.querySelector('[data-recipe-history-prev]');
       const nextBtn = popup.querySelector('[data-recipe-history-next]');
       const expandBtn = popup.querySelector('[data-recipe-history-expand]');
-      if (body) body.innerHTML = `<div class="table-responsive inventario-global-table inventario-table-compact-wrap ${expanded ? 'is-expanded' : ''}"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Tipo</th><th>Fecha y hora</th><th>CÃ³digo</th><th>Cantidad</th></tr></thead><tbody>${buildRowsHtml(pageRows) || '<tr><td colspan="4" class="text-center">Sin movimientos para el filtro.</td></tr>'}</tbody></table></div>`;
+      if (body) body.innerHTML = `<div class="table-responsive inventario-global-table inventario-table-compact-wrap ${expanded ? 'is-expanded' : ''}"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Tipo</th><th>Fecha y hora</th><th>Código</th><th>Cantidad</th></tr></thead><tbody>${buildRowsHtml(pageRows) || '<tr><td colspan="4" class="text-center">Sin movimientos para el filtro.</td></tr>'}</tbody></table></div>`;
       popup.classList.toggle('is-expanded', expanded);
       if (expandBtn) {
         const label = expandBtn.querySelector('span');
         if (label) label.textContent = expanded ? 'Contraer tabla' : 'Ampliar tabla';
       }
-      if (pager) pager.textContent = `PÃ¡gina ${page} de ${pages}`;
+      if (pager) pager.textContent = `Página ${page} de ${pages}`;
       if (prevBtn) prevBtn.disabled = page <= 1;
       if (nextBtn) nextBtn.disabled = page >= pages;
     };
     await openIosSwal({
-      title: `Historial rÃ¡pido Â· ${escapeHtml(capitalize(recipe.title || 'Producto'))}`,
+      title: `Historial rápido · ${escapeHtml(capitalize(recipe.title || 'Producto'))}`,
       width: 'min(720px,96vw)',
       customClass: { popup: 'produccion-recipe-history-alert' },
-      html: `<div class="text-start produccion-recipe-history-modal"><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input type="search" class="form-control ios-input" data-recipe-history-search placeholder="Buscar por cÃ³digo"></div><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-regular fa-calendar"></i></span><input type="text" class="form-control ios-input" data-recipe-history-range placeholder="Filtrar rango (desde - hasta)" autocomplete="off"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-range-clear><i class="fa-solid fa-xmark"></i></button></div><div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn" data-recipe-history-expand><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button><button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" data-recipe-history-excel><i class="fa-solid fa-file-excel"></i><span>Excel</span></button><span class="inventario-period-divider" aria-hidden="true"></span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-print><i class="fa-solid fa-print"></i><span>PerÃ­odo</span></button></div><div data-recipe-history-body class="dispatch-clients-manager-list produccion-recipe-history-table-host"></div><div class="d-flex align-items-center justify-content-between mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-prev><i class="fa-solid fa-chevron-left"></i></button><span data-recipe-history-pager>PÃ¡gina 1 de 1</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-next><i class="fa-solid fa-chevron-right"></i></button></div></div>`,
+      html: `<div class="text-start produccion-recipe-history-modal"><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input type="search" class="form-control ios-input" data-recipe-history-search placeholder="Buscar por código"></div><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-regular fa-calendar"></i></span><input type="text" class="form-control ios-input" data-recipe-history-range placeholder="Filtrar rango (desde - hasta)" autocomplete="off"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-range-clear><i class="fa-solid fa-xmark"></i></button></div><div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn" data-recipe-history-expand><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button><button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" data-recipe-history-excel><i class="fa-solid fa-file-excel"></i><span>Excel</span></button><span class="inventario-period-divider" aria-hidden="true"></span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-print><i class="fa-solid fa-print"></i><span>Período</span></button></div><div data-recipe-history-body class="dispatch-clients-manager-list produccion-recipe-history-table-host"></div><div class="d-flex align-items-center justify-content-between mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-prev><i class="fa-solid fa-chevron-left"></i></button><span data-recipe-history-pager>Página 1 de 1</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-next><i class="fa-solid fa-chevron-right"></i></button></div></div>`,
       confirmButtonText: 'Cerrar',
       didOpen: (popup) => {
         const rangeInput = popup.querySelector('[data-recipe-history-range]');
@@ -3724,7 +3724,7 @@
             renderRows(popup);
           } catch (error) {
             const body = popup.querySelector('[data-recipe-history-body]');
-            if (body) body.innerHTML = '<p class="text-danger mb-0">No se pudo renderizar el historial. IntentÃ¡ nuevamente.</p>';
+            if (body) body.innerHTML = '<p class="text-danger mb-0">No se pudo renderizar el historial. Intentá nuevamente.</p>';
           }
         };
         popup.querySelector('[data-recipe-history-search]')?.addEventListener('input', (event) => {
@@ -3855,9 +3855,9 @@
     const importedInvoice = normalizeValue(dispatchRow.importedInvoice || (Array.isArray(dispatchRow.products) ? dispatchRow.products.find((item) => normalizeValue(item.sourceInvoiceNumber))?.sourceInvoiceNumber : ''));
     const rawAddress = normalizeValue(client.address);
     if (!isDispatchPlaceholderAddress(rawAddress)) {
-      return [rawAddress, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean).join(' â€¢ ');
+      return [rawAddress, client.city, client.province, client.country].map((item) => normalizeValue(item)).filter(Boolean).join(' ⬢ ');
     }
-    return `${clientDoc ? `Cliente ${clientDoc}` : (normalizeValue(client.name) || 'Cliente sin direcciÃ³n')} â€¢ DirecciÃ³n cargada en factura ${importedInvoice || '-'}`;
+    return `${clientDoc ? `Cliente ${clientDoc}` : (normalizeValue(client.name) || 'Cliente sin dirección')} ⬢ Dirección cargada en factura ${importedInvoice || '-'}`;
   };
   const getDispatchGroupedProducts = (dispatchRow = {}) => {
     const products = Array.isArray(dispatchRow.products) ? dispatchRow.products : [];
@@ -3888,13 +3888,13 @@
   };
   const formatDispatchPlanillaExpiry = (value) => {
     const normalized = normalizeValue(value);
-    if (!normalized) return 'âœ—';
+    if (!normalized) return '�S';
     const formatted = escapeHtml(formatIsoEs(normalized) || normalized);
-    return formatted || 'âœ—';
+    return formatted || '�S';
   };
   const isDispatchPlaceholderAddress = (value = '') => {
     const normalized = normalizeLower(value);
-    return !normalized || normalized.includes('sin direcciÃ³n') || normalized.includes('sin direccion') || normalized.includes('xlsx');
+    return !normalized || normalized.includes('sin dirección') || normalized.includes('sin direccion') || normalized.includes('xlsx');
   };
   const renderDispatchPlanillaQr = async (host, dispatchRow) => {
     if (!host || !dispatchRow?.id) return;
@@ -3966,8 +3966,8 @@
       const renderedAllocations = allocations.map((allocation) => {
         const qtyText = getDispatchAllocationDisplay(item, allocation).label;
         const expiryText = formatDispatchPlanillaExpiry(allocation.expiryDate);
-        const lotText = `${escapeHtml(allocation.lotNumber || '-')} Â· ${escapeHtml(qtyText)}`;
-        const markerCell = normalizeValue(item.sourceRowId) ? '<span class="dispatch-planilla-child-label">â†³</span>' : '<span class="dispatch-planilla-parent-marker">â­¬</span>';
+        const lotText = `${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(qtyText)}`;
+        const markerCell = normalizeValue(item.sourceRowId) ? '<span class="dispatch-planilla-child-label">� �</span>' : '<span class="dispatch-planilla-parent-marker">⭬</span>';
         return `<tr class="${normalizeValue(item.sourceRowId) ? 'dispatch-planilla-child-row' : ''}"><td class="dispatch-planilla-marker-cell">${markerCell}</td><td><span style="display:inline-flex;align-items:center;gap:8px;">${sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl) ? `<img src="${escapeHtml(sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl))}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(item.recipeTitle || '-')}</span></span></td><td><strong>${escapeHtml(qtyText)}</strong></td><td>${expiryText}</td><td><strong>${lotText}</strong></td></tr>`;
       }).join('');
       standaloneRows.push(renderedAllocations);
@@ -3981,8 +3981,8 @@
           return allocations.map((allocation) => {
             const qtyText = getDispatchAllocationDisplay(item, allocation).label;
             const expiryText = formatDispatchPlanillaExpiry(allocation.expiryDate);
-            const lotText = `${escapeHtml(allocation.lotNumber || '-')} Â· ${escapeHtml(qtyText)}`;
-            return `<tr class="dispatch-planilla-child-row"><td class="dispatch-planilla-marker-cell"><span class="dispatch-planilla-child-label">â†³</span></td><td><span style="display:inline-flex;align-items:center;gap:8px;">${sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl) ? `<img src="${escapeHtml(sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl))}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(item.recipeTitle || '-')}</span></span></td><td><strong>${escapeHtml(qtyText)}</strong></td><td>${expiryText}</td><td><strong>${lotText}</strong></td></tr>`;
+            const lotText = `${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(qtyText)}`;
+            return `<tr class="dispatch-planilla-child-row"><td class="dispatch-planilla-marker-cell"><span class="dispatch-planilla-child-label">� �</span></td><td><span style="display:inline-flex;align-items:center;gap:8px;">${sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl) ? `<img src="${escapeHtml(sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl))}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(item.recipeTitle || '-')}</span></span></td><td><strong>${escapeHtml(qtyText)}</strong></td><td>${expiryText}</td><td><strong>${lotText}</strong></td></tr>`;
           }).join('');
         }).join('');
         return `<tr class="dispatch-planilla-parent-row"><td colspan="5"><strong>${escapeHtml(group.label)}</strong></td></tr>${groupRows}`;
@@ -3991,15 +3991,15 @@
     ].join('') || '<tr><td colspan="5">Sin productos.</td></tr>';
     const comments = (Array.isArray(dispatchRow.comments) ? dispatchRow.comments : []).map((c) => normalizeValue(c)).filter(Boolean);
     const commentsRows = comments.length
-      ? comments.map((item, idx) => `<tr><td colspan="5"><strong>OBSERVACIÃ“N ${idx + 1}:</strong> ${escapeHtml(item)}</td></tr>`).join('')
-      : '<tr><td colspan="5"><strong>OBSERVACIÃ“N 1:</strong> Sin observaciones</td></tr>';
-    const headerTable = `<table style="width:100%;border-collapse:collapse;table-layout:fixed"><tbody><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">FRIGORIFICO LA JAMONERA â€¢ REGISTRO DE SALIDA DE PRODUCTOS TERMINADOS</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">${escapeHtml(dispatchRow.code || dispatchRow.id)}</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px">FECHA Y HORA:</td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(formatDateTime(dispatchRow.createdAt || dispatchRow.dispatchDate))}</strong></td><td style="border:1px solid #2f2f2f;padding:4px">CLIENTE:</td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(normalizeValue(client.name) || '-')}</strong></td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px" colspan="4">DIRECCION: <strong>${escapeHtml(location)}</strong></td></tr></tbody></table>`;
+      ? comments.map((item, idx) => `<tr><td colspan="5"><strong>OBSERVACI�N ${idx + 1}:</strong> ${escapeHtml(item)}</td></tr>`).join('')
+      : '<tr><td colspan="5"><strong>OBSERVACI�N 1:</strong> Sin observaciones</td></tr>';
+    const headerTable = `<table style="width:100%;border-collapse:collapse;table-layout:fixed"><tbody><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">FRIGORIFICO LA JAMONERA ⬢ REGISTRO DE SALIDA DE PRODUCTOS TERMINADOS</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">${escapeHtml(dispatchRow.code || dispatchRow.id)}</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px">FECHA Y HORA:</td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(formatDateTime(dispatchRow.createdAt || dispatchRow.dispatchDate))}</strong></td><td style="border:1px solid #2f2f2f;padding:4px">CLIENTE:</td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(normalizeValue(client.name) || '-')}</strong></td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px" colspan="4">DIRECCION: <strong>${escapeHtml(location)}</strong></td></tr></tbody></table>`;
     const planillaStyle = '<style>.dispatch-planilla-print{font-family:Inter,Arial,sans-serif;color:#111827;background:#fff}.dispatch-planilla-print table{width:100%;border-collapse:collapse;table-layout:fixed}.dispatch-planilla-print th,.dispatch-planilla-print td{border:1px solid #2f2f2f;padding:6px;word-break:break-word;background:#fff;color:#111827}.dispatch-planilla-parent-row td{background:#eef3ff;font-weight:800;color:#223863}.dispatch-planilla-child-row td{background:#fbfcff}.dispatch-planilla-marker-cell{width:28px;text-align:center;padding:6px 4px}.dispatch-planilla-child-label,.dispatch-planilla-parent-marker{color:#4b78e8;font-weight:800;display:inline-flex;align-items:center;justify-content:center}.dispatch-planilla-parent-marker{color:#94a3b8}.dispatch-planilla-qr-section{margin-top:32px;padding-top:22px;display:grid;gap:14px;border-top:1px solid #d7def2;justify-items:center}.dispatch-planilla-qr-copy{width:100%;text-align:center}.dispatch-planilla-qr-copy p{margin:0 0 6px;font-weight:700;text-align:center}.dispatch-planilla-qr-copy small{color:#556487;display:block;text-align:center}.dispatch-planilla-qr-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:12px}</style>';
     const hasTraceQr = buildDispatchTraceTargets(dispatchRow).length > 0;
     const qrSection = hasTraceQr
-      ? '<div class="dispatch-planilla-qr-section"><div data-dispatch-planilla-qr class="dispatch-planilla-qr-grid"></div><div class="dispatch-planilla-qr-copy"><p>QR de trazabilidad para las facturas y producciones</p><small>EscaneÃ¡ el QR con tu celular para acceder.</small></div></div>'
+      ? '<div class="dispatch-planilla-qr-section"><div data-dispatch-planilla-qr class="dispatch-planilla-qr-grid"></div><div class="dispatch-planilla-qr-copy"><p>QR de trazabilidad para las facturas y producciones</p><small>Escaneá el QR con tu celular para acceder.</small></div></div>'
       : '';
-    const html = `${planillaStyle}<div class="dispatch-planilla-print" id="dispatchPlanillaPrintable">${headerTable}<div class="table-responsive" style="margin-top:8px;"><table><thead><tr><th style="width:28px">â¤®</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>NÃºmero de lote</th></tr></thead><tbody>${detailRows}<tr><td colspan="5"><strong>VEHÃCULO (UTA-URA):</strong> ${escapeHtml(`${vehicle.number || '-'} - ${vehicle.patent || '-'} - ${vehicle.brand || vehicle.type || '-'}`)}</td></tr>${commentsRows}<tr><td colspan="5"><strong>CONTROLO:</strong> ${escapeHtml(managerLabel)}</td></tr><tr><td colspan="3"><strong>TEMPERATURA UNIDAD DE TRANSPORTE:</strong> 3 Â°C</td><td colspan="2"><strong>UNIDAD DE TRANSPORTE ESTADO:</strong> A (ACEPTABLE)</td></tr></tbody></table></div>${qrSection}</div>`;
+    const html = `${planillaStyle}<div class="dispatch-planilla-print" id="dispatchPlanillaPrintable">${headerTable}<div class="table-responsive" style="margin-top:8px;"><table><thead><tr><th style="width:28px">⤮</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de lote</th></tr></thead><tbody>${detailRows}<tr><td colspan="5"><strong>VEHÍCULO (UTA-URA):</strong> ${escapeHtml(`${vehicle.number || '-'} - ${vehicle.patent || '-'} - ${vehicle.brand || vehicle.type || '-'}`)}</td></tr>${commentsRows}<tr><td colspan="5"><strong>CONTROLO:</strong> ${escapeHtml(managerLabel)}</td></tr><tr><td colspan="3"><strong>TEMPERATURA UNIDAD DE TRANSPORTE:</strong> 3 °C</td><td colspan="2"><strong>UNIDAD DE TRANSPORTE ESTADO:</strong> A (ACEPTABLE)</td></tr></tbody></table></div>${qrSection}</div>`;
     return { html };
   };
   const printDispatchPlanillasBatch = async (rows = [], onProgress) => {
@@ -4061,13 +4061,13 @@
     if (!expiry) return { tone: 'neutral', text: 'Sin vencimiento', days: null };
     const days = diffDays(expiry, toIsoDate());
     if (days < 0) return { tone: 'danger', text: 'Vencido', days };
-    if (days <= 30) return { tone: 'danger', text: `Vence en ${days} dÃ­a${days === 1 ? '' : 's'}`, days };
-    if (days <= 90) return { tone: 'warning', text: `Vence en ${days} dÃ­as`, days };
-    return { tone: 'success', text: `Vigente (${days} dÃ­as)`, days };
+    if (days <= 30) return { tone: 'danger', text: `Vence en ${days} día${days === 1 ? '' : 's'}`, days };
+    if (days <= 90) return { tone: 'warning', text: `Vence en ${days} días`, days };
+    return { tone: 'success', text: `Vigente (${days} días)`, days };
   };
   const formatDispatchVehicleLabel = (vehicle = {}) => {
     const meta = getDispatchVehicleExpiryMeta(vehicle);
-    const brand = normalizeValue(vehicle.brand || vehicle.type || 'VehÃ­culo');
+    const brand = normalizeValue(vehicle.brand || vehicle.type || 'Vehículo');
     return `${vehicle.number || '-'} - ${vehicle.patent || '-'} - ${brand} (${meta.text})`;
   };
   const getDispatchAvailableByProductionId = (productionId) => {
@@ -4341,7 +4341,7 @@
     const rowHtml = rows.map((row) => `<div class="produccion-expiry-row ${row.expired ? 'is-expired' : 'is-soon'}">
         <label class="produccion-expiry-select"><input type="checkbox" data-product-expiry-select="${escapeHtml(row.productionId)}" ${row.expired ? '' : 'disabled'}><span class="visually-hidden">Seleccionar lote</span></label>
         <span class="produccion-expiry-thumb">${row.imageUrl ? `<img src="${escapeHtml(row.imageUrl)}" alt="${escapeHtml(row.productName)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span>
-        <span class="produccion-expiry-info"><strong>${escapeHtml(row.productName)}</strong><small>Lote ${escapeHtml(row.lotNumber)} Â· ${escapeHtml(productExpiryWhenLabel(row))} Â· ${escapeHtml(formatIsoEs(row.expiryDate))}</small></span>
+        <span class="produccion-expiry-info"><strong>${escapeHtml(row.productName)}</strong><small>Lote ${escapeHtml(row.lotNumber)} · ${escapeHtml(productExpiryWhenLabel(row))} · ${escapeHtml(formatIsoEs(row.expiryDate))}</small></span>
         <span class="produccion-expiry-qty">${row.availableKg.toFixed(2)} kg</span>
         ${row.expired ? `<button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-product-expiry-resolve-one="${escapeHtml(row.productionId)}"><i class="fa-solid fa-check"></i><span>Resolver</span></button>` : ''}
       </div>`).join('');
@@ -4504,7 +4504,7 @@
                 ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button>`
                 : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
               const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
-              return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} Â· ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
+              return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
             });
           });
           return [parentRow, ...childRows];
@@ -4519,7 +4519,7 @@
               ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button>`
               : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
             const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
-            return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} Â· ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
+            return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
           });
         })
       ].join('') : '';
@@ -4531,14 +4531,14 @@
     }).join('') : '<tr><td colspan="8" class="text-center">Sin repartos para el filtro seleccionado.</td></tr>';
     const tableWrap = nodes.dispatchView.querySelector('#produccionDispatchTableWrap');
     if (!tableWrap) return;
-    tableWrap.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioGlobalCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar todo</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioGlobalExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar todo</span></button></div><div class="table-responsive inventario-global-table inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0 produccion-dispatch-table-center"><thead><tr><th>Fecha de reparto</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>NÃºmero de reparto</th><th>Cliente</th><th>Planilla</th><th>Acciones</th></tr></thead><tbody>${htmlRows}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-page="prev" ${state.dispatchPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>PÃ¡gina ${state.dispatchPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-page="next" ${state.dispatchPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+    tableWrap.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioGlobalCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar todo</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioGlobalExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar todo</span></button></div><div class="table-responsive inventario-global-table inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0 produccion-dispatch-table-center"><thead><tr><th>Fecha de reparto</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th><th>Planilla</th><th>Acciones</th></tr></thead><tbody>${htmlRows}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-page="prev" ${state.dispatchPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${state.dispatchPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-page="next" ${state.dispatchPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
     prepareThumbLoaders('.js-produccion-thumb');
   };
   const renderDispatchMain = () => {
     if (!nodes.dispatchView) return;
     state.dispatchCreateMode = false;
     state.dispatchXlsxMode = false;
-    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Salida de Productos</h6><div class="produccion-dispatch-head-actions"><button id="produccionDispatchNewBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="bi bi-plus-lg"></i><span>Reparto</span></button><button id="produccionDispatchXlsxBtn" type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn"><i class="bi bi-plus-lg"></i><span>Repartos por XLSX</span></button></div></div><div class="inventario-period-filters"><input id="produccionDispatchSearch" type="search" class="form-control ios-input produccion-dispatch-filter" placeholder="Buscar reparto, cliente o producto" value="${escapeHtml(state.dispatchSearch)}"><input id="produccionDispatchRange" class="form-control ios-input produccion-dispatch-filter" placeholder="Seleccionar rango de fechas" value="${escapeHtml(state.dispatchRange)}"><div class="toolbar-scroll-x inventario-period-actions-scroll"><button id="produccionDispatchClearBtn" type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn ${(state.dispatchRange || state.dispatchSearch) ? '' : 'd-none'}"><i class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></button><button id="produccionDispatchApplyBtn" type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn"><i class="fa-solid fa-filter"></i><span>Aplicar</span></button><button id="produccionDispatchExpandBtn" type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button><button id="produccionDispatchExcelBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="fa-solid fa-file-excel"></i><span>Excel</span></button><span class="inventario-period-divider" aria-hidden="true"></span><button id="produccionDispatchPrintBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-print"></i><span>Imprimir perÃ­odo</span></button><button id="produccionDispatchMassBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-regular fa-file-lines"></i><span>Planillas masivas</span></button></div></div><div id="produccionDispatchTableWrap"></div>`;
+    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Salida de Productos</h6><div class="produccion-dispatch-head-actions"><button id="produccionDispatchNewBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="bi bi-plus-lg"></i><span>Reparto</span></button><button id="produccionDispatchXlsxBtn" type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn"><i class="bi bi-plus-lg"></i><span>Repartos por XLSX</span></button></div></div><div class="inventario-period-filters"><input id="produccionDispatchSearch" type="search" class="form-control ios-input produccion-dispatch-filter" placeholder="Buscar reparto, cliente o producto" value="${escapeHtml(state.dispatchSearch)}"><input id="produccionDispatchRange" class="form-control ios-input produccion-dispatch-filter" placeholder="Seleccionar rango de fechas" value="${escapeHtml(state.dispatchRange)}"><div class="toolbar-scroll-x inventario-period-actions-scroll"><button id="produccionDispatchClearBtn" type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn ${(state.dispatchRange || state.dispatchSearch) ? '' : 'd-none'}"><i class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></button><button id="produccionDispatchApplyBtn" type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn"><i class="fa-solid fa-filter"></i><span>Aplicar</span></button><button id="produccionDispatchExpandBtn" type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button><button id="produccionDispatchExcelBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="fa-solid fa-file-excel"></i><span>Excel</span></button><span class="inventario-period-divider" aria-hidden="true"></span><button id="produccionDispatchPrintBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-print"></i><span>Imprimir período</span></button><button id="produccionDispatchMassBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-regular fa-file-lines"></i><span>Planillas masivas</span></button></div></div><div id="produccionDispatchTableWrap"></div>`;
     const rangeInput = nodes.dispatchView.querySelector('#produccionDispatchRange');
     if (window.flatpickr && rangeInput) {
       const locale = window.flatpickr.l10ns?.es || undefined;
@@ -4594,7 +4594,7 @@
       html: '<p>Hay cambios sin guardar en este reparto.</p>',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonText: 'SÃ­, salir',
+      confirmButtonText: 'Sí, salir',
       cancelButtonText: 'Seguir editando'
     });
     return Boolean(result.isConfirmed);
@@ -4607,11 +4607,11 @@
   const confirmLeaveDispatchXlsxCreate = async () => {
     if (!hasDispatchXlsxDraftChanges(state.dispatchXlsxDraft)) return true;
     const result = await openIosSwal({
-      title: 'Abandonar importaciÃ³n XLS/XLSX',
-      html: '<p>TenÃ©s una tabla cargada. Si salÃ­s, vas a abandonar la ediciÃ³n en curso.</p>',
+      title: 'Abandonar importación XLS/XLSX',
+      html: '<p>Tenés una tabla cargada. Si salís, vas a abandonar la edición en curso.</p>',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonText: 'SÃ­, abandonar',
+      confirmButtonText: 'Sí, abandonar',
       cancelButtonText: 'Seguir editando'
     });
     return Boolean(result.isConfirmed);
@@ -4710,7 +4710,7 @@
       id,
       name,
       doc,
-      address: 'Sin direcciÃ³n (XLSX)',
+      address: 'Sin dirección (XLSX)',
       city: 'Sin localidad',
       province: 'Santa Fe',
       country: 'Argentina',
@@ -5064,7 +5064,7 @@
     let selected = '';
     await openIosSwal({
       title: 'Relacionar producto',
-      html: '<p>ElegÃ­ el origen para vincular este producto.</p><div class="dispatch-xlsx-type-actions"><button type="button" class="btn ios-btn ios-btn-primary" data-dispatch-xlsx-type="ingredient">Ingredientes</button><button type="button" class="btn ios-btn ios-btn-primary" data-dispatch-xlsx-type="production">Productos</button><span class="dispatch-xlsx-type-divider"></span><button type="button" class="btn ios-btn ios-btn-secondary" data-dispatch-xlsx-type="cancel">Cancelar</button></div>',
+      html: '<p>Elegí el origen para vincular este producto.</p><div class="dispatch-xlsx-type-actions"><button type="button" class="btn ios-btn ios-btn-primary" data-dispatch-xlsx-type="ingredient">Ingredientes</button><button type="button" class="btn ios-btn ios-btn-primary" data-dispatch-xlsx-type="production">Productos</button><span class="dispatch-xlsx-type-divider"></span><button type="button" class="btn ios-btn ios-btn-secondary" data-dispatch-xlsx-type="cancel">Cancelar</button></div>',
       showConfirmButton: false,
       didOpen: (popup) => {
         popup.addEventListener('click', (event) => {
@@ -5090,7 +5090,7 @@
       if (!host || !isIngredientMode) return;
       const selected = getSelectedIngredientsList();
       host.innerHTML = selected.length
-        ? selected.map((item) => `<label class="dispatch-xlsx-ingredient-qty-row"><span class="dispatch-xlsx-ingredient-qty-label">Producto ${item.idx}: ${escapeHtml(capitalize(item.title || item.id))} (${escapeHtml(item.unit)})</span><input type="number" step="0.01" min="0" class="form-control ios-input dispatch-xlsx-ingredient-qty" data-dispatch-xlsx-ingredient-qty="${escapeHtml(item.id)}" placeholder="Si lo dejÃ¡s vacÃ­o, usa la cantidad del XLSX" value="${escapeHtml(item.qty || '')}"></label>`).join('')
+        ? selected.map((item) => `<label class="dispatch-xlsx-ingredient-qty-row"><span class="dispatch-xlsx-ingredient-qty-label">Producto ${item.idx}: ${escapeHtml(capitalize(item.title || item.id))} (${escapeHtml(item.unit)})</span><input type="number" step="0.01" min="0" class="form-control ios-input dispatch-xlsx-ingredient-qty" data-dispatch-xlsx-ingredient-qty="${escapeHtml(item.id)}" placeholder="Si lo dejás vacío, usa la cantidad del XLSX" value="${escapeHtml(item.qty || '')}"></label>`).join('')
         : '';
     };
     const renderList = (popup) => {
@@ -5104,20 +5104,20 @@
             const stockMeta = getDispatchXlsxIngredientStockMeta(item.id);
             const stockClass = stockMeta.available > 0 ? 'is-ok' : 'is-danger';
             const expiredInline = stockMeta.expired > 0
-              ? ` <span class="dispatch-xlsx-stock-hint is-danger">â†’ ${stockMeta.expired.toFixed(2)} ${escapeHtml(stockMeta.unit)} vencidas</span>`
+              ? ` <span class="dispatch-xlsx-stock-hint is-danger">�  ${stockMeta.expired.toFixed(2)} ${escapeHtml(stockMeta.unit)} vencidas</span>`
               : '';
             return `<label class="inventario-check-row inventario-selector-row dispatch-xlsx-selector-row"><input type="checkbox" data-dispatch-xlsx-ingredient-pick="${escapeHtml(item.id)}" ${checked ? 'checked' : ''}><span class="inventario-print-photo-wrap">${item.imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-dispatch-xlsx-target-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><span><strong>${escapeHtml(capitalize(item.title))}</strong><small class="d-block dispatch-xlsx-stock-hint ${stockClass}">Stock: ${stockMeta.available.toFixed(2)} ${escapeHtml(stockMeta.unit)}${expiredInline}</small></span></label>`;
           }
           return `<label class="inventario-check-row inventario-selector-row dispatch-xlsx-selector-row"><input type="radio" name="dispatchXlsxTargetPick" value="${escapeHtml(item.id)}" ${picked === item.id ? 'checked' : ''}><span class="inventario-print-photo-wrap">${item.imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-dispatch-xlsx-target-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><span>${escapeHtml(capitalize(item.title))}</span></label>`;
         }).join('')
-        : '<p class="text-muted mb-0">Sin resultados para la bÃºsqueda.</p>';
+        : '<p class="text-muted mb-0">Sin resultados para la búsqueda.</p>';
       prepareThumbLoaders('.js-dispatch-xlsx-target-thumb');
       renderIngredientInputs(popup);
     };
     const result = await openIosSwal({
-      title: 'SeleccionÃ¡ destino',
+      title: 'Seleccioná destino',
       width: 'min(760px,96vw)',
-      html: `<div class="dispatch-xlsx-selector-wrap"><div class="input-group ios-input-group ingredientes-search-group dispatch-managers-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchXlsxTargetSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar producto o ingrediente"></div><div id="dispatchXlsxTargetList" class="dispatch-xlsx-target-list"></div>${isIngredientMode ? '<div id="dispatchXlsxIngredientQtyList" class="dispatch-xlsx-ingredient-qty-list"></div>' : '<input id="dispatchXlsxMapQty" type="number" step="0.01" class="swal2-input ios-input" placeholder="Cantidad (multiplicador opcional)"><small class="dispatch-xlsx-multiplier-help">Si lo dejÃ¡s vacÃ­o, se usarÃ¡ la cantidad original del XLSX.</small>'}</div>`,
+      html: `<div class="dispatch-xlsx-selector-wrap"><div class="input-group ios-input-group ingredientes-search-group dispatch-managers-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchXlsxTargetSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar producto o ingrediente"></div><div id="dispatchXlsxTargetList" class="dispatch-xlsx-target-list"></div>${isIngredientMode ? '<div id="dispatchXlsxIngredientQtyList" class="dispatch-xlsx-ingredient-qty-list"></div>' : '<input id="dispatchXlsxMapQty" type="number" step="0.01" class="swal2-input ios-input" placeholder="Cantidad (multiplicador opcional)"><small class="dispatch-xlsx-multiplier-help">Si lo dejás vacío, se usará la cantidad original del XLSX.</small>'}</div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
@@ -5166,11 +5166,11 @@
             })
             .filter((item) => item.id);
           if (!selectedList.length) {
-            Swal.showValidationMessage('SeleccionÃ¡ al menos un ingrediente.');
+            Swal.showValidationMessage('Seleccioná al menos un ingrediente.');
             return false;
           }
           if (selectedList.some((item) => !item.useSourceQty && Number(item.qty || 0) <= 0)) {
-            Swal.showValidationMessage('CompletÃ¡ cantidad mayor a 0 para cada ingrediente seleccionado.');
+            Swal.showValidationMessage('Completá cantidad mayor a 0 para cada ingrediente seleccionado.');
             return false;
           }
           return {
@@ -5180,7 +5180,7 @@
           };
         }
         if (!picked) {
-          Swal.showValidationMessage('SeleccionÃ¡ un destino para continuar.');
+          Swal.showValidationMessage('Seleccioná un destino para continuar.');
           return false;
         }
         return {
@@ -5215,8 +5215,8 @@
       const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
       page = Math.min(Math.max(1, page), pages);
       const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-      const body = pageRows.length ? pageRows.map((row) => `<tr><td>${escapeHtml(row.fileName || '-')}</td><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${escapeHtml((Number(row.sizeBytes || 0) / 1024).toFixed(1))} KB</td><td><div class="dispatch-xlsx-history-actions"><a class="btn ios-btn ios-btn-primary inventario-threshold-btn" href="${escapeHtml(row.fileUrl || '#')}" download="${escapeHtml(row.fileName || 'archivo.xlsx')}"><i class="fa-solid fa-download"></i><span>Descargar</span></a><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn dispatch-xlsx-history-delete" data-dispatch-xlsx-history-delete="${escapeHtml(row.id || '')}"><span>Eliminar</span></button></div></td></tr>`).join('') : '<tr><td colspan="4" class="text-center">Sin archivos en el perÃ­odo seleccionado.</td></tr>';
-      host.innerHTML = `<div class="table-responsive dispatch-xlsx-history-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Archivo</th><th>Fecha / hora</th><th>TamaÃ±o</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-xlsx-history-page="prev" ${page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>PÃ¡gina ${page} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-xlsx-history-page="next" ${page >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+      const body = pageRows.length ? pageRows.map((row) => `<tr><td>${escapeHtml(row.fileName || '-')}</td><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${escapeHtml((Number(row.sizeBytes || 0) / 1024).toFixed(1))} KB</td><td><div class="dispatch-xlsx-history-actions"><a class="btn ios-btn ios-btn-primary inventario-threshold-btn" href="${escapeHtml(row.fileUrl || '#')}" download="${escapeHtml(row.fileName || 'archivo.xlsx')}"><i class="fa-solid fa-download"></i><span>Descargar</span></a><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn dispatch-xlsx-history-delete" data-dispatch-xlsx-history-delete="${escapeHtml(row.id || '')}"><span>Eliminar</span></button></div></td></tr>`).join('') : '<tr><td colspan="4" class="text-center">Sin archivos en el período seleccionado.</td></tr>';
+      host.innerHTML = `<div class="table-responsive dispatch-xlsx-history-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Archivo</th><th>Fecha / hora</th><th>Tamaño</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-xlsx-history-page="prev" ${page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${page} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-xlsx-history-page="next" ${page >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
     };
     await openIosSwal({
       title: 'Historial de Archivos',
@@ -5264,7 +5264,7 @@
           if (!id) return;
           const ask = await openIosSwal({
             title: 'Eliminar archivo del historial',
-            html: '<p>Se quitarÃ¡ el registro del historial, pero no se borrarÃ¡ el archivo fÃ­sico del storage.</p>',
+            html: '<p>Se quitará el registro del historial, pero no se borrará el archivo físico del storage.</p>',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'Eliminar',
@@ -5354,7 +5354,7 @@
         reference: dispatchCode || dispatchId,
         sourceId: dispatchId,
         sourceCode: dispatchCode,
-        observation: `Reparto a domicilio${invoiceNumber ? ` Â· Factura ${invoiceNumber}` : ''}`
+        observation: `Reparto a domicilio${invoiceNumber ? ` · Factura ${invoiceNumber}` : ''}`
       });
       entry.productionUsage = Array.isArray(entry.productionUsage) ? entry.productionUsage : [];
       entry.productionUsage.unshift({
@@ -5651,11 +5651,11 @@
       .map((n) => normalizeValue(n.dataset.dispatchXlsxManager || n.value))
       .filter(Boolean);
     if (!draft.vehicleId) {
-      await openIosSwal({ title: 'VehÃ­culo requerido', html: '<p>SeleccionÃ¡ o creÃ¡ una UTA/URA para continuar.</p>', icon: 'warning' });
+      await openIosSwal({ title: 'Vehículo requerido', html: '<p>Seleccioná o creá una UTA/URA para continuar.</p>', icon: 'warning' });
       return;
     }
     if (!draft.managers.length) {
-      await openIosSwal({ title: 'Responsable requerido', html: '<p>SeleccionÃ¡ al menos un responsable para procesar el XLSX.</p>', icon: 'warning' });
+      await openIosSwal({ title: 'Responsable requerido', html: '<p>Seleccioná al menos un responsable para procesar el XLSX.</p>', icon: 'warning' });
       return;
     }
     const rows = (Array.isArray(draft?.rows) ? draft.rows : []).filter((row) => !row.disabled && normalizeValue(row.mappedTargetId));
@@ -5789,23 +5789,23 @@
       Swal.close();
       state.dispatchXlsxDraft = buildDispatchXlsxDraft();
       renderDispatchMain();
-      await openIosSwal({ title: 'ImportaciÃ³n procesada', html: '<p>Se generaron los repartos con la lÃ³gica de trazabilidad disponible y faltantes forzados sin trazabilidad.</p>', icon: 'success' });
+      await openIosSwal({ title: 'Importación procesada', html: '<p>Se generaron los repartos con la lógica de trazabilidad disponible y faltantes forzados sin trazabilidad.</p>', icon: 'success' });
     } catch (error) {
       Swal.close();
       const errText = normalizeValue(error?.message);
       if (errText.startsWith('conflict_pending_ingredient')) {
-        await openIosSwal({ title: 'Conflicto pendiente', html: '<p>TenÃ©s ingredientes con faltantes por vencimiento sin resolver. UsÃ¡ "Resolver conflicto" antes de procesar.</p>', icon: 'warning' });
+        await openIosSwal({ title: 'Conflicto pendiente', html: '<p>Tenés ingredientes con faltantes por vencimiento sin resolver. Usá "Resolver conflicto" antes de procesar.</p>', icon: 'warning' });
         return;
       }
       if (errText.startsWith('conflict_pending_product')) {
-        await openIosSwal({ title: 'Conflicto pendiente', html: '<p>TenÃ©s productos con faltantes por vencimiento sin resolver. UsÃ¡ "Resolver conflicto" antes de procesar.</p>', icon: 'warning' });
+        await openIosSwal({ title: 'Conflicto pendiente', html: '<p>Tenés productos con faltantes por vencimiento sin resolver. Usá "Resolver conflicto" antes de procesar.</p>', icon: 'warning' });
         return;
       }
       if (errText.startsWith('future_block_product')) {
-        await openIosSwal({ title: 'Fecha de reparto no vÃ¡lida', html: '<p>Hay stock relacionado, pero la fecha de reparto es anterior a la elaboraciÃ³n de una producciÃ³n. CambiÃ¡ la fecha con el calendario en la fila del XLSX y volvÃ© a procesar.</p>', icon: 'warning' });
+        await openIosSwal({ title: 'Fecha de reparto no válida', html: '<p>Hay stock relacionado, pero la fecha de reparto es anterior a la elaboración de una producción. Cambiá la fecha con el calendario en la fila del XLSX y volvé a procesar.</p>', icon: 'warning' });
         return;
       }
-      await openIosSwal({ title: 'No se pudo procesar', html: '<p>OcurriÃ³ un error al procesar el XLSX.</p>', icon: 'error' });
+      await openIosSwal({ title: 'No se pudo procesar', html: '<p>Ocurrió un error al procesar el XLSX.</p>', icon: 'error' });
     }
   };
   const resolveDispatchXlsxConflictsNow = async ({ draft, rowId = '', conflictType = 'ingredient', ingredientId = '', resolutionType = 'sold_counter' } = {}) => {
@@ -5883,12 +5883,12 @@
       Swal.close();
       await openIosSwal({
         title: 'Conflicto resuelto',
-        html: `<p>ResoluciÃ³n aplicada en <strong>${resolvedCount}</strong> fila(s). Recalculamos la previsualizaciÃ³n del XLSX.</p>`,
+        html: `<p>Resolución aplicada en <strong>${resolvedCount}</strong> fila(s). Recalculamos la previsualización del XLSX.</p>`,
         icon: 'success'
       });
     } catch (error) {
       Swal.close();
-      await openIosSwal({ title: 'No se pudo resolver', html: '<p>OcurriÃ³ un error al resolver el conflicto de vencido.</p>', icon: 'error' });
+      await openIosSwal({ title: 'No se pudo resolver', html: '<p>Ocurrió un error al resolver el conflicto de vencido.</p>', icon: 'error' });
     }
   };
   const renderDispatchXlsxCreate = (draft) => {
@@ -5953,7 +5953,7 @@
         : (Number(row.sourceQty || 0) > 0 ? Number(row.sourceQty || 0).toFixed(2) : '1.00');
       const qtyMap = row.mappedTargetTitle
         ? (mappedIngredients.length
-          ? `<span class="dispatch-xlsx-qty-main">${multiplierLabel} â†’ <span class="dispatch-xlsx-mapped-kg ${qtyClass}">${mappedIngredients.map((item) => {
+          ? `<span class="dispatch-xlsx-qty-main">${multiplierLabel} �  <span class="dispatch-xlsx-mapped-kg ${qtyClass}">${mappedIngredients.map((item) => {
             const requested = Number(item.qty || 0);
             const available = Number(item.available || 0);
             const missing = getResolvedMissingQty(item);
@@ -5963,10 +5963,10 @@
               : (hasExpiredConflict ? 'is-danger' : (Number(item.expired || 0) <= 0.0001 && available > 0.0001 ? 'is-warning' : 'is-danger'));
             return `<span class="dispatch-xlsx-mapped-kg ${toneClass}">${escapeHtml(formatDispatchXlsxQtyWithUnit(requested, item.unit || 'u'))}</span>`;
           }).join(' + ')}</span></span>`
-          : `<span class="dispatch-xlsx-qty-main">${multiplierLabel} â†’ <span class="dispatch-xlsx-mapped-kg ${qtyClass}">${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(row.mappedQty || 0), stockUnit))}</span></span>`)
+          : `<span class="dispatch-xlsx-qty-main">${multiplierLabel} �  <span class="dispatch-xlsx-mapped-kg ${qtyClass}">${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(row.mappedQty || 0), stockUnit))}</span></span>`)
         : escapeHtml(formatDispatchXlsxQtyWithUnit(Number(row.sourceQty || 0), stockUnit));
       const relationMeta = row.mappedTargetTitle
-        ? `<small class="dispatch-xlsx-map-link">ðŸ”— ${escapeHtml(capitalize(row.mappedTargetTitle))}</small>`
+        ? `<small class="dispatch-xlsx-map-link">�x ${escapeHtml(capitalize(row.mappedTargetTitle))}</small>`
         : '';
       const ingredientDetail = mappedIngredients.length
         ? `<div class="dispatch-xlsx-ingredient-breakdown">${mappedIngredients.map((item) => {
@@ -5980,14 +5980,14 @@
           const hasExpiredForConflict = (Number.isFinite(Number(itemPreview.expiredAvailable)) ? Number(itemPreview.expiredAvailable) : Number(item.expired || 0)) > 0.0001;
           const showResolveBtn = (hasConflict && hasExpiredForConflict) || Boolean(resolutionType);
           const resolveBtn = showResolveBtn
-            ? `<button type="button" class="btn ios-btn ${resolutionType ? 'ios-btn-secondary' : 'ios-btn-danger'} dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="ingredient" data-dispatch-xlsx-row="${escapeHtml(row.id)}" data-dispatch-xlsx-ingredient="${escapeHtml(item.id)}">${resolutionType ? 'Cambiar elecciÃ³n' : 'Resolver conflicto'}</button>`
+            ? `<button type="button" class="btn ios-btn ${resolutionType ? 'ios-btn-secondary' : 'ios-btn-danger'} dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="ingredient" data-dispatch-xlsx-row="${escapeHtml(row.id)}" data-dispatch-xlsx-ingredient="${escapeHtml(item.id)}">${resolutionType ? 'Cambiar elección' : 'Resolver conflicto'}</button>`
             : '';
           const toneClass = hasConflict
             ? ((Number(item.expired || 0) > 0.0001) ? 'is-danger' : (Number(item.available || 0) > 0.0001 ? 'is-warning' : 'is-danger'))
             : 'is-ok';
           const showExpiredPart = !resolutionType && (Number.isFinite(Number(itemPreview.expiredAvailable)) ? Number(itemPreview.expiredAvailable) : Number(item.expired || 0)) > 0;
           const showMissingPart = !resolutionType && hasConflict;
-          return `<div class="dispatch-xlsx-ingredient-item"><small class="dispatch-xlsx-ingredient-line ${toneClass}">â€¢ ${escapeHtml(item.title)}: <strong>${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.qty || 0), item.unit || 'u'))}</strong> Â· Disp.: <strong>${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.available || 0), item.unit || 'u'))}</strong>${showExpiredPart ? ` Â· <span class="dispatch-xlsx-expired-part">${escapeHtml(formatDispatchXlsxQtyWithUnit((Number.isFinite(Number(itemPreview.expiredAvailable)) ? Number(itemPreview.expiredAvailable) : Number(item.expired || 0)), item.unit || 'u'))} vencidas</span>` : ''}${showMissingPart ? ` Â· <strong>Faltan ${escapeHtml(formatDispatchXlsxQtyWithUnit(missingQty, item.unit || 'u'))}</strong>` : ''}</small>${(resolutionBadge || resolveBtn) ? `<div class="dispatch-xlsx-conflict-actions">${resolutionBadge}${resolveBtn}</div>` : ''}</div>`;
+          return `<div class="dispatch-xlsx-ingredient-item"><small class="dispatch-xlsx-ingredient-line ${toneClass}">⬢ ${escapeHtml(item.title)}: <strong>${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.qty || 0), item.unit || 'u'))}</strong> · Disp.: <strong>${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.available || 0), item.unit || 'u'))}</strong>${showExpiredPart ? ` · <span class="dispatch-xlsx-expired-part">${escapeHtml(formatDispatchXlsxQtyWithUnit((Number.isFinite(Number(itemPreview.expiredAvailable)) ? Number(itemPreview.expiredAvailable) : Number(item.expired || 0)), item.unit || 'u'))} vencidas</span>` : ''}${showMissingPart ? ` · <strong>Faltan ${escapeHtml(formatDispatchXlsxQtyWithUnit(missingQty, item.unit || 'u'))}</strong>` : ''}</small>${(resolutionBadge || resolveBtn) ? `<div class="dispatch-xlsx-conflict-actions">${resolutionBadge}${resolveBtn}</div>` : ''}</div>`;
         }).join('')}</div>`
         : '';
       const stockLine = row.mappedTargetTitle
@@ -5996,7 +5996,7 @@
             ? (rowHasStock
               ? 'Stock utilizable completo.'
               : '')
-            : `${rowHasStock ? 'Stock utilizable:' : 'Stock utilizable insuficiente:'} <strong class="dispatch-xlsx-stock-ok">${escapeHtml(formatDispatchXlsxQtyWithUnit(availableQty, stockUnit))}</strong>${showFutureDateAlert ? ` <span class="dispatch-xlsx-stock-future">Â· Desde ${escapeHtml(formatIsoEs(nextAvailableDate || ''))}: ${escapeHtml(formatDispatchXlsxQtyWithUnit(futureQty, stockUnit))}</span>` : ''}${expiredQty > 0 ? ` <span class="dispatch-xlsx-stock-expired">Â· Vencido: ${escapeHtml(formatDispatchXlsxQtyWithUnit(expiredQty, stockUnit))}</span>` : ''}`;
+            : `${rowHasStock ? 'Stock utilizable:' : 'Stock utilizable insuficiente:'} <strong class="dispatch-xlsx-stock-ok">${escapeHtml(formatDispatchXlsxQtyWithUnit(availableQty, stockUnit))}</strong>${showFutureDateAlert ? ` <span class="dispatch-xlsx-stock-future">· Desde ${escapeHtml(formatIsoEs(nextAvailableDate || ''))}: ${escapeHtml(formatDispatchXlsxQtyWithUnit(futureQty, stockUnit))}</span>` : ''}${expiredQty > 0 ? ` <span class="dispatch-xlsx-stock-expired">· Vencido: ${escapeHtml(formatDispatchXlsxQtyWithUnit(expiredQty, stockUnit))}</span>` : ''}`;
           if (rowHasStock) return base;
           const missingParts = mappedIngredients.length
             ? mappedIngredients.map((item) => {
@@ -6015,36 +6015,36 @@
             ? mappedIngredients.reduce((acc, item) => acc + getResolvedMissingQty(item), 0)
             : resolvedProductMissingQty;
           const createHint = missingCreateQty > 0.0001 && futureQty <= 0.0001
-            ? `<span class="dispatch-xlsx-stock-create"> Se crearÃ¡ ${escapeHtml(formatDispatchXlsxQtyWithUnit(missingCreateQty, mappedIngredients.length ? (mappedIngredients[0]?.unit || 'u') : stockUnit))} sin trazabilidad.</span>`
+            ? `<span class="dispatch-xlsx-stock-create"> Se creará ${escapeHtml(formatDispatchXlsxQtyWithUnit(missingCreateQty, mappedIngredients.length ? (mappedIngredients[0]?.unit || 'u') : stockUnit))} sin trazabilidad.</span>`
             : '';
           const productResolveBtn = canResolveProductConflict
-            ? ` <button type="button" class="btn ios-btn ${productConflictResolutionType ? 'ios-btn-secondary' : 'ios-btn-danger'} dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="production" data-dispatch-xlsx-row="${escapeHtml(row.id)}">${productConflictResolutionType ? 'Cambiar elecciÃ³n' : 'Resolver conflicto'}</button>`
+            ? ` <button type="button" class="btn ios-btn ${productConflictResolutionType ? 'ios-btn-secondary' : 'ios-btn-danger'} dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="production" data-dispatch-xlsx-row="${escapeHtml(row.id)}">${productConflictResolutionType ? 'Cambiar elección' : 'Resolver conflicto'}</button>`
             : '';
           const dateHint = showFutureDateAlert
-            ? `<br><span class="dispatch-xlsx-stock-future">Hay stock, pero se puede repartir desde ${escapeHtml(formatIsoEs(nextAvailableDate))}. EditÃ¡ la fecha de reparto en esta fila.</span>`
+            ? `<br><span class="dispatch-xlsx-stock-future">Hay stock, pero se puede repartir desde ${escapeHtml(formatIsoEs(nextAvailableDate))}. Editá la fecha de reparto en esta fila.</span>`
             : '';
-          return `${base ? `${base}<br>` : ''}<span class="dispatch-xlsx-stock-missing">â†³ Faltan ${formatMissingDispatchXlsxParts(missingParts)}.</span>${dateHint}${createHint ? `<br>${createHint}` : ''}${productResolveBtn}`;
+          return `${base ? `${base}<br>` : ''}<span class="dispatch-xlsx-stock-missing">� � Faltan ${formatMissingDispatchXlsxParts(missingParts)}.</span>${dateHint}${createHint ? `<br>${createHint}` : ''}${productResolveBtn}`;
         })()
-        : 'Pendiente de relaciÃ³n';
+        : 'Pendiente de relación';
       const clientBadge = row.clientStatus === 'new'
-        ? `<span class="produccion-badge is-warning dispatch-xlsx-client-badge">Alta automÃ¡tica Â· DNI ${escapeHtml(row.clientDoc || '-')}</span>`
-        : `<span class="produccion-badge dispatch-xlsx-client-badge">Registrado Â· DNI ${escapeHtml(row.clientDoc || '-')}</span>`;
+        ? `<span class="produccion-badge is-warning dispatch-xlsx-client-badge">Alta automática · DNI ${escapeHtml(row.clientDoc || '-')}</span>`
+        : `<span class="produccion-badge dispatch-xlsx-client-badge">Registrado · DNI ${escapeHtml(row.clientDoc || '-')}</span>`;
       const dateLabel = /^\d{4}-\d{2}-\d{2}$/.test(row.invoiceDate || '') ? formatIsoEs(row.invoiceDate) : (row.invoiceDate || '-');
       const rowStateClass = row.disabled
         ? 'dispatch-xlsx-row-disabled'
         : (row.mappedTargetTitle ? 'dispatch-xlsx-row-related' : 'dispatch-xlsx-row-pending');
       return `<tr class="${rowStateClass}"><td><div class="dispatch-xlsx-client"><strong class="dispatch-xlsx-client-name" title="${escapeHtml(row.clientName || '-')}">${escapeHtml(row.clientName || '-')}</strong>${clientBadge}</div></td><td class="dispatch-xlsx-invoice-cell">${escapeHtml(row.invoiceNumber || '-')}</td><td class="dispatch-xlsx-date-cell"><input class="form-control ios-input dispatch-xlsx-date-input" data-dispatch-xlsx-date="${escapeHtml(row.id)}" value="${escapeHtml(row.invoiceDate || '')}" placeholder="Fecha reparto"><small>${escapeHtml(dateLabel)}</small></td><td><div class="dispatch-xlsx-mapping"><strong>${escapeHtml(row.sourceProduct || '-')}</strong>${relationMeta}${ingredientDetail}<span class="dispatch-xlsx-map-state ${row.mappedTargetTitle ? 'is-related' : 'is-pending'}">${row.mappedTargetTitle ? `<i class="fa-solid fa-circle-check"></i> Relacionado` : `<i class="bi bi-x-circle-fill"></i> Sin relacionado`}</span></div></td><td class="dispatch-xlsx-kilos-cell"><span class="${qtyClass}">${qtyMap}</span><small class="d-block ${qtyClass}">${stockLine}</small></td><td><label class="dispatch-xlsx-toggle"><input type="checkbox" data-dispatch-xlsx-row-enabled="${escapeHtml(row.id)}" ${row.disabled ? '' : 'checked'}><span>${row.disabled ? 'Deshabilitado' : 'Activo'}</span></label></td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-xlsx-map="${escapeHtml(row.id)}"><i class="fa-solid fa-link"></i><span>Relacionar</span></button></td></tr>`;
-    }).join('') : '<tr><td colspan="7" class="text-center">AdjuntÃ¡ un XLS/XLSX para comenzar.</td></tr>';
+    }).join('') : '<tr><td colspan="7" class="text-center">Adjuntá un XLS/XLSX para comenzar.</td></tr>';
     const uploadHint = state.dispatchXlsxUploadInProgress ? '<span class="dispatch-xlsx-uploading"><i class="fa-solid fa-spinner fa-spin"></i> Subiendo Excel...</span>' : '';
     const usersRows = Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-check" data-user-search="${escapeHtml(normalizeLower(`${user.fullName || ''} ${user.email || ''} ${getDispatchUserRole(user) || ''}`))}"><input type="checkbox" data-dispatch-xlsx-manager="${escapeHtml(user.id)}" value="${escapeHtml(user.id)}" ${(Array.isArray(draft.managers) && draft.managers.includes(user.id)) ? 'checked' : ''}>${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(getDispatchUserRole(user))}</small></span></label>`).join('');
     const hasImportedFile = Boolean(normalizeValue(draft.uploadedFileName)) || rows.length > 0;
     const vehicleManagersSection = hasImportedFile
-      ? `<section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">2</span> VehÃ­culo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Transporte habilitado (UTA/URA)</label><small class="d-block text-muted mb-1">Unidad de Transporte Alimentario / Unidad de Reparto Alimentario.</small><div class="inventario-provider-search-wrap"><input id="dispatchXlsxVehicleInput" class="form-control ios-input" placeholder="Seleccionar unidad habilitada" value="${escapeHtml(draft.vehicleSearch || (draft.vehicleId ? formatDispatchVehicleLabel(getDispatchVehicle(draft.vehicleId)) : ''))}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"><input type="hidden" id="dispatchXlsxVehicleSelect" value="${escapeHtml(draft.vehicleId || '')}"></div><div class="dispatch-vehicle-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchXlsxAddVehicleBtn"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchXlsxManageVehiclesBtn"><i class="fa-solid fa-pen-to-square"></i><span>Gestionar UTA/URA</span></button></div></div><div class="recipe-field recipe-field-half"><label class="form-label">Responsables</label><div class="input-group ios-input-group ingredientes-search-group dispatch-managers-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchXlsxManagersSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar responsable" value="${escapeHtml(draft.managerSearch || '')}"></div><div class="produccion-managers-grid">${usersRows}</div></div></div></section>`
+      ? `<section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">2</span> Vehículo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Transporte habilitado (UTA/URA)</label><small class="d-block text-muted mb-1">Unidad de Transporte Alimentario / Unidad de Reparto Alimentario.</small><div class="inventario-provider-search-wrap"><input id="dispatchXlsxVehicleInput" class="form-control ios-input" placeholder="Seleccionar unidad habilitada" value="${escapeHtml(draft.vehicleSearch || (draft.vehicleId ? formatDispatchVehicleLabel(getDispatchVehicle(draft.vehicleId)) : ''))}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"><input type="hidden" id="dispatchXlsxVehicleSelect" value="${escapeHtml(draft.vehicleId || '')}"></div><div class="dispatch-vehicle-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchXlsxAddVehicleBtn"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchXlsxManageVehiclesBtn"><i class="fa-solid fa-pen-to-square"></i><span>Gestionar UTA/URA</span></button></div></div><div class="recipe-field recipe-field-half"><label class="form-label">Responsables</label><div class="input-group ios-input-group ingredientes-search-group dispatch-managers-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchXlsxManagersSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar responsable" value="${escapeHtml(draft.managerSearch || '')}"></div><div class="produccion-managers-grid">${usersRows}</div></div></div></section>`
       : '';
     const fixAllDatesBtn = rowsNeedingDateFix.length
       ? `<button type="button" id="dispatchXlsxFixAllDatesBtn" class="btn recipe-table-action-btn recipe-table-action-btn-neutral"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Corregir fechas (${rowsNeedingDateFix.length})</span></button>`
       : "";
-    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Repartos por XLSX</h6><div class="dispatch-xlsx-head-actions">${uploadHint}${fixAllDatesBtn}<button id="dispatchXlsxUploadBtn" type="button" class="btn recipe-table-action-btn recipe-table-action-btn-monography"><i class="fa-solid fa-file-arrow-up"></i><span>Adjuntar XLSX</span></button><button type="button" id="dispatchXlsxHistoryBtn" class="btn recipe-table-action-btn recipe-table-action-btn-neutral"><i class="fa-regular fa-message"></i><span>Historial de Archivos</span></button></div><input id="dispatchXlsxFileInput" class="d-none" type="file" accept=".xlsx,.xls"></div><section class="recipe-step-card step-block produccion-dispatch-create"><h6 class="step-title"><span class="recipe-step-number">1</span> PrevisualizaciÃ³n importada ${draft.uploadedFileName ? `<small>Â· ${escapeHtml(draft.uploadedFileName)}</small>` : ''}</h6><div class="table-responsive recipe-table-wrap dispatch-products-table dispatch-xlsx-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0 dispatch-xlsx-table"><thead><tr><th>Cliente</th><th>Factura</th><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div></section>${vehicleManagersSection}<div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchXlsxProcessBtn" ${readyToProcess ? '' : 'disabled'}><i class="fa-solid fa-gears"></i><span>Procesar ingresos</span></button></div>`;
+    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Repartos por XLSX</h6><div class="dispatch-xlsx-head-actions">${uploadHint}${fixAllDatesBtn}<button id="dispatchXlsxUploadBtn" type="button" class="btn recipe-table-action-btn recipe-table-action-btn-monography"><i class="fa-solid fa-file-arrow-up"></i><span>Adjuntar XLSX</span></button><button type="button" id="dispatchXlsxHistoryBtn" class="btn recipe-table-action-btn recipe-table-action-btn-neutral"><i class="fa-regular fa-message"></i><span>Historial de Archivos</span></button></div><input id="dispatchXlsxFileInput" class="d-none" type="file" accept=".xlsx,.xls"></div><section class="recipe-step-card step-block produccion-dispatch-create"><h6 class="step-title"><span class="recipe-step-number">1</span> Previsualización importada ${draft.uploadedFileName ? `<small>· ${escapeHtml(draft.uploadedFileName)}</small>` : ''}</h6><div class="table-responsive recipe-table-wrap dispatch-products-table dispatch-xlsx-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0 dispatch-xlsx-table"><thead><tr><th>Cliente</th><th>Factura</th><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div></section>${vehicleManagersSection}<div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchXlsxProcessBtn" ${readyToProcess ? '' : 'disabled'}><i class="fa-solid fa-gears"></i><span>Procesar ingresos</span></button></div>`;
     nodes.dispatchView.querySelectorAll('.dispatch-xlsx-date-cell small').forEach((node) => node.remove());
     nodes.dispatchView.querySelectorAll('.dispatch-xlsx-stock-future').forEach((hint) => {
       const row = hint.closest('tr');
@@ -6117,7 +6117,7 @@
         ? (requestedKg <= 0
           ? `<span class="produccion-dispatch-ok"><i class="fa-solid fa-circle-check"></i> <strong>Disponible:</strong> ${availableKg.toFixed(2)} kg</span>`
           : (alloc.hasStock
-            ? `<span class="produccion-dispatch-ok dispatch-stock-block"><i class="fa-solid fa-circle-check"></i> <strong>Disponible:</strong> ${availableKg.toFixed(2)} kg</span><span class="produccion-dispatch-ok dispatch-stock-block"><strong class="dispatch-uses-label">UsÃ¡s:</strong> <span class="dispatch-uses-value">${requestedKg.toFixed(2)} kg</span></span>`
+            ? `<span class="produccion-dispatch-ok dispatch-stock-block"><i class="fa-solid fa-circle-check"></i> <strong>Disponible:</strong> ${availableKg.toFixed(2)} kg</span><span class="produccion-dispatch-ok dispatch-stock-block"><strong class="dispatch-uses-label">Usás:</strong> <span class="dispatch-uses-value">${requestedKg.toFixed(2)} kg</span></span>`
             : (availableKg > 0.0001
               ? `<span class="produccion-dispatch-missing dispatch-stock-block"><i class="fa-solid fa-circle-exclamation"></i> <strong>Disponible:</strong> ${availableKg.toFixed(2)} kg</span><span class="produccion-dispatch-missing dispatch-stock-block"><strong>Faltan:</strong> ${alloc.missingKg.toFixed(2)} kg</span>`
               : '<span class="produccion-dispatch-missing"><i class="fa-solid fa-circle-xmark"></i> <strong>Sin stock disponible.</strong></span>')))
@@ -6126,16 +6126,16 @@
         ? (requestedKg <= 0
           ? `<span class="produccion-dispatch-ok"><i class="fa-solid fa-circle-check"></i> <strong>Disponible utilizable:</strong> ${formatDispatchKg(availableKg)} kg</span>${totalStockKg > availableKg ? `<span class="dispatch-stock-muted">Stock total: ${formatDispatchKg(totalStockKg)} kg</span>` : ''}${stockDateHint}`
           : (alloc.hasStock
-            ? `<span class="produccion-dispatch-ok dispatch-stock-block"><i class="fa-solid fa-circle-check"></i> <strong>Disponible utilizable:</strong> ${formatDispatchKg(availableKg)} kg</span><span class="produccion-dispatch-ok dispatch-stock-block"><strong class="dispatch-uses-label">UsÃ¡s:</strong> <span class="dispatch-uses-value">${formatDispatchKg(requestedKg)} kg</span></span>${totalStockKg > availableKg ? `<span class="dispatch-stock-muted">Stock total: ${formatDispatchKg(totalStockKg)} kg</span>` : ''}`
+            ? `<span class="produccion-dispatch-ok dispatch-stock-block"><i class="fa-solid fa-circle-check"></i> <strong>Disponible utilizable:</strong> ${formatDispatchKg(availableKg)} kg</span><span class="produccion-dispatch-ok dispatch-stock-block"><strong class="dispatch-uses-label">Usás:</strong> <span class="dispatch-uses-value">${formatDispatchKg(requestedKg)} kg</span></span>${totalStockKg > availableKg ? `<span class="dispatch-stock-muted">Stock total: ${formatDispatchKg(totalStockKg)} kg</span>` : ''}`
             : (totalStockKg > 0.0001
               ? `<span class="produccion-dispatch-missing dispatch-stock-block"><i class="fa-solid fa-circle-exclamation"></i> <strong>Disponible utilizable:</strong> ${formatDispatchKg(availableKg)} kg</span><span class="produccion-dispatch-missing dispatch-stock-block"><strong>Faltan para esta fecha:</strong> ${formatDispatchKg(missingKg)} kg</span><span class="dispatch-stock-muted">Stock total: ${formatDispatchKg(totalStockKg)} kg</span>${stockDateHint}`
               : '<span class="produccion-dispatch-missing"><i class="fa-solid fa-circle-xmark"></i> <strong>Sin stock disponible.</strong></span>')))
         : '<span class="text-muted">Seleccionar producto.</span>';
       const blockedLotsText = [...futureLots, ...expiredLots]
         .slice(0, 4)
-        .map((lot) => `${escapeHtml(lot.lotNumber)} Â· ${formatDispatchKg(lot.availableKg)} kg (${escapeHtml(getDispatchLotWindowLabel(lot))})`)
+        .map((lot) => `${escapeHtml(lot.lotNumber)} · ${formatDispatchKg(lot.availableKg)} kg (${escapeHtml(getDispatchLotWindowLabel(lot))})`)
         .join('<br>');
-      const lotsText = alloc.allocations.map((lot) => `${escapeHtml(lot.lotNumber)} Â· ${formatDispatchKg(lot.qtyKg)} kg`).join('<br>') || (blockedLotsText || 'Sin asignar');
+      const lotsText = alloc.allocations.map((lot) => `${escapeHtml(lot.lotNumber)} · ${formatDispatchKg(lot.qtyKg)} kg`).join('<br>') || (blockedLotsText || 'Sin asignar');
       const expiries = [...new Set(alloc.allocations.map((lot) => normalizeValue(lot.expiryDate)).filter(Boolean))];
       const blockedWindows = [...futureLots, ...expiredLots].slice(0, 3).map((lot) => getDispatchLotWindowLabel(lot));
       const expiryText = expiries.length === 1
@@ -6156,12 +6156,12 @@
         : '';
       return `<tr><td><div class="recipe-ing-autocomplete" data-dispatch-product-wrap="${idx}"><div class="recipe-ing-input-wrap dispatch-product-input-wrap"><span class="recipe-inline-avatar-wrap">${recipeImage ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-dispatch-inline-thumb" src="${escapeHtml(recipeImage)}" alt="${escapeHtml(recipeTitle || 'Producto')}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><input type="search" class="form-control ios-input dispatch-product-search-input" data-dispatch-product-search="${idx}" placeholder="Seleccionar producto" value="${escapeHtml(recipeTitle)}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"></div><input type="hidden" data-dispatch-product-id="${idx}" value="${escapeHtml(line.recipeId)}"></div></td><td><input class="form-control ios-input" type="number" step="0.01" min="0" data-dispatch-qty="${idx}" value="${escapeHtml(line.qtyKg || '')}"></td><td class="dispatch-stock-cell">${stockStatus}</td><td class="dispatch-lot-cell">${lotsText}</td><td class="dispatch-expiry-cell ${(expiredLots.length || futureLots.length) ? 'is-danger' : ''}">${expiryText}</td><td><button type="button" class="btn family-manage-btn" data-dispatch-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>${futureHelpRow}${expiredHelpRow}`;
     }).join('');
-    const commentRows = draft.comments.map((comment, idx) => `<tr class="dispatch-comment-row"><td colspan="5"><textarea class="form-control ios-input dispatch-comment-textarea" data-dispatch-comment="${idx}" placeholder="AgregÃ¡ comentarios y observaciones">${escapeHtml(comment)}</textarea></td><td><button type="button" class="btn family-manage-btn" data-dispatch-comment-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
+    const commentRows = draft.comments.map((comment, idx) => `<tr class="dispatch-comment-row"><td colspan="5"><textarea class="form-control ios-input dispatch-comment-textarea" data-dispatch-comment="${idx}" placeholder="Agregá comentarios y observaciones">${escapeHtml(comment)}</textarea></td><td><button type="button" class="btn family-manage-btn" data-dispatch-comment-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
     const proofRows = (Array.isArray(draft.proofs) ? draft.proofs : []).map((proof, idx) => `<tr class="dispatch-proof-row"><td colspan="4"><label class="inventario-upload-dropzone dispatch-proof-drop" for="dispatchProofFile_${idx}"><i class="fa-solid fa-paperclip"></i><span>${escapeHtml(proof?.name || 'Adjuntar comprobante (imagen/PDF)')}</span></label><input id="dispatchProofFile_${idx}" class="inventario-hidden-file-input" type="file" accept="image/*,application/pdf" data-dispatch-proof-file="${idx}">${proof?.url ? `<p class="dispatch-proof-name">Cargado: ${escapeHtml(proof.name || 'comprobante')}</p>` : ''}</td><td class="dispatch-proof-expiry-cell">Comprobante</td><td><button type="button" class="btn family-manage-btn" data-dispatch-proof-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
     nodes.dispatchView.innerHTML = `<div class="inventario-period-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Nuevo reparto</h6></div>
-    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">1</span> Datos generales</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">DÃ­a de reparto</label><input id="dispatchDateInput" class="form-control ios-input" value="${escapeHtml(draft.dispatchDate)}"></div><div class="recipe-field recipe-field-half"><div class="dispatch-client-head"><label class="form-label mb-0">Cliente <small class="dispatch-client-helper">(si no existe, crealo)</small></label><div class="dispatch-client-head-actions"><button type="button" class="btn ios-btn ios-btn-secondary dispatch-quick-client-btn" id="dispatchQuickCreateClientBtn"><i class="fa-solid fa-plus"></i><span>Nuevo cliente</span></button><button type="button" class="btn ios-btn ios-btn-secondary dispatch-quick-client-btn" id="dispatchQuickEditClientBtn"><i class="fa-solid fa-pen"></i><span>Modificar cliente</span></button></div></div><div class="inventario-provider-search-wrap"><input id="dispatchClientInput" class="form-control ios-input" placeholder="Buscar por nombre, DNI o CUIL" value="${escapeHtml(draft.clientName)}"><input type="hidden" id="dispatchClientId" value="${escapeHtml(draft.clientId)}"></div></div><div class="recipe-field recipe-field-half"><label class="form-label">DirecciÃ³n de reparto</label><input id="dispatchClientAddressInput" class="form-control ios-input" placeholder="DirecciÃ³n" value="${escapeHtml(draft.clientAddress || '')}" ${draft.clientId ? '' : 'disabled'}></div><div class="recipe-field recipe-field-half"><label class="form-label">Localidad</label><input id="dispatchClientCityInput" class="form-control ios-input" list="dispatchLocalitiesList" placeholder="Localidad" value="${escapeHtml(draft.clientCity || '')}" ${draft.clientId ? '' : 'disabled'}><datalist id="dispatchLocalitiesList">${(Array.isArray(state.reparto.localities) ? state.reparto.localities : []).map((loc) => `<option value="${escapeHtml(loc)}"></option>`).join('')}</datalist></div><div class="recipe-field recipe-field-half"><label class="form-label">Provincia</label><select id="dispatchClientProvinceInput" class="form-select ios-input" ${draft.clientId ? '' : 'disabled'}>${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${normalizeValue(draft.clientProvince || 'Santa Fe') === item ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select></div><div class="recipe-field recipe-field-half"><label class="form-label">PaÃ­s</label><input id="dispatchClientCountryInput" class="form-control ios-input" value="${escapeHtml(draft.clientCountry || 'Argentina')}" ${draft.clientId ? '' : 'disabled'}></div></div></section>
+    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">1</span> Datos generales</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Día de reparto</label><input id="dispatchDateInput" class="form-control ios-input" value="${escapeHtml(draft.dispatchDate)}"></div><div class="recipe-field recipe-field-half"><div class="dispatch-client-head"><label class="form-label mb-0">Cliente <small class="dispatch-client-helper">(si no existe, crealo)</small></label><div class="dispatch-client-head-actions"><button type="button" class="btn ios-btn ios-btn-secondary dispatch-quick-client-btn" id="dispatchQuickCreateClientBtn"><i class="fa-solid fa-plus"></i><span>Nuevo cliente</span></button><button type="button" class="btn ios-btn ios-btn-secondary dispatch-quick-client-btn" id="dispatchQuickEditClientBtn"><i class="fa-solid fa-pen"></i><span>Modificar cliente</span></button></div></div><div class="inventario-provider-search-wrap"><input id="dispatchClientInput" class="form-control ios-input" placeholder="Buscar por nombre, DNI o CUIL" value="${escapeHtml(draft.clientName)}"><input type="hidden" id="dispatchClientId" value="${escapeHtml(draft.clientId)}"></div></div><div class="recipe-field recipe-field-half"><label class="form-label">Dirección de reparto</label><input id="dispatchClientAddressInput" class="form-control ios-input" placeholder="Dirección" value="${escapeHtml(draft.clientAddress || '')}" ${draft.clientId ? '' : 'disabled'}></div><div class="recipe-field recipe-field-half"><label class="form-label">Localidad</label><input id="dispatchClientCityInput" class="form-control ios-input" list="dispatchLocalitiesList" placeholder="Localidad" value="${escapeHtml(draft.clientCity || '')}" ${draft.clientId ? '' : 'disabled'}><datalist id="dispatchLocalitiesList">${(Array.isArray(state.reparto.localities) ? state.reparto.localities : []).map((loc) => `<option value="${escapeHtml(loc)}"></option>`).join('')}</datalist></div><div class="recipe-field recipe-field-half"><label class="form-label">Provincia</label><select id="dispatchClientProvinceInput" class="form-select ios-input" ${draft.clientId ? '' : 'disabled'}>${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${normalizeValue(draft.clientProvince || 'Santa Fe') === item ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select></div><div class="recipe-field recipe-field-half"><label class="form-label">País</label><input id="dispatchClientCountryInput" class="form-control ios-input" value="${escapeHtml(draft.clientCountry || 'Argentina')}" ${draft.clientId ? '' : 'disabled'}></div></div></section>
     <section class="recipe-step-card step-block produccion-dispatch-create"><div class="d-flex align-items-center justify-content-between mb-2"><h6 class="step-title mb-0"><span class="recipe-step-number">2</span> Productos a repartir</h6></div><div class="table-responsive recipe-table-wrap dispatch-products-table"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Producto</th><th>Kilos</th><th>Stock</th><th>Lote</th><th>Vencimiento</th><th></th></tr></thead><tbody>${lineRows}${commentRows}${proofRows}</tbody></table></div><div class="toolbar-scroll-x dispatch-actions-row mt-2"><button type="button" class="btn ios-btn ios-btn-success recipe-table-action-btn" id="dispatchAddProductBtn"><i class="fa-solid fa-plus"></i><span>Producto</span></button><button type="button" class="btn recipe-table-action-btn recipe-table-action-btn-neutral" id="dispatchAddCommentBtn"><i class="fa-regular fa-message"></i><span>Comentario</span></button><button type="button" class="btn recipe-table-action-btn recipe-table-action-btn-monography" id="dispatchAddProofBtn"><i class="fa-solid fa-paperclip"></i><span>Adjuntar comprobantes</span></button></div></section>
-    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">3</span> VehÃ­culo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Transporte habilitado (UTA/URA)</label><small class="d-block text-muted mb-1">Unidad de Transporte Alimentario / Unidad de Reparto Alimentario.</small><div class="inventario-provider-search-wrap"><input id="dispatchVehicleInput" class="form-control ios-input" placeholder="Seleccionar unidad habilitada" value="${escapeHtml(draft.vehicleSearch || (draft.vehicleId ? formatDispatchVehicleLabel(getDispatchVehicle(draft.vehicleId)) : ''))}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"><input type="hidden" id="dispatchVehicleSelect" value="${escapeHtml(draft.vehicleId)}"></div><div class="dispatch-vehicle-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchAddVehicleBtn"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchManageVehiclesBtn"><i class="fa-solid fa-pen-to-square"></i><span>Gestionar UTA/URA</span></button></div></div><div class="recipe-field recipe-field-half"><label class="form-label">Responsables</label><div class="input-group ios-input-group ingredientes-search-group dispatch-managers-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchManagersSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar responsable" value="${escapeHtml(draft.managerSearch || '')}"></div><div class="produccion-managers-grid">${Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-check" data-user-search="${escapeHtml(normalizeLower(`${user.fullName || ''} ${user.email || ''} ${getDispatchUserRole(user) || ''}`))}"><input type="checkbox" data-dispatch-manager="${escapeHtml(user.id)}" value="${escapeHtml(user.id)}" ${draft.managers.includes(user.id) ? 'checked' : ''}>${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(getDispatchUserRole(user))}</small></span></label>`).join('')}</div></div></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchSaveBtn"><i class="fa-solid fa-floppy-disk"></i><span>Guardar reparto</span></button></div>`;
+    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">3</span> Vehículo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Transporte habilitado (UTA/URA)</label><small class="d-block text-muted mb-1">Unidad de Transporte Alimentario / Unidad de Reparto Alimentario.</small><div class="inventario-provider-search-wrap"><input id="dispatchVehicleInput" class="form-control ios-input" placeholder="Seleccionar unidad habilitada" value="${escapeHtml(draft.vehicleSearch || (draft.vehicleId ? formatDispatchVehicleLabel(getDispatchVehicle(draft.vehicleId)) : ''))}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"><input type="hidden" id="dispatchVehicleSelect" value="${escapeHtml(draft.vehicleId)}"></div><div class="dispatch-vehicle-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchAddVehicleBtn"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchManageVehiclesBtn"><i class="fa-solid fa-pen-to-square"></i><span>Gestionar UTA/URA</span></button></div></div><div class="recipe-field recipe-field-half"><label class="form-label">Responsables</label><div class="input-group ios-input-group ingredientes-search-group dispatch-managers-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchManagersSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar responsable" value="${escapeHtml(draft.managerSearch || '')}"></div><div class="produccion-managers-grid">${Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-check" data-user-search="${escapeHtml(normalizeLower(`${user.fullName || ''} ${user.email || ''} ${getDispatchUserRole(user) || ''}`))}"><input type="checkbox" data-dispatch-manager="${escapeHtml(user.id)}" value="${escapeHtml(user.id)}" ${draft.managers.includes(user.id) ? 'checked' : ''}>${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(getDispatchUserRole(user))}</small></span></label>`).join('')}</div></div></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchSaveBtn"><i class="fa-solid fa-floppy-disk"></i><span>Guardar reparto</span></button></div>`;
     const dateInput = nodes.dispatchView.querySelector('#dispatchDateInput');
     if (window.flatpickr && dateInput) {
       window.flatpickr(dateInput, {
@@ -6205,7 +6205,7 @@
       preConfirm: (value) => {
         const city = normalizeValue(value);
         if (!city) {
-          Swal.showValidationMessage('IngresÃ¡ una localidad vÃ¡lida.');
+          Swal.showValidationMessage('Ingresá una localidad válida.');
           return false;
         }
         return city;
@@ -6219,7 +6219,7 @@
     const result = await openIosSwal({
       title: 'Nuevo cliente',
       customClass: { popup: 'dispatch-client-alert' },
-      html: `<div class="swal-stack-fields text-start"><div class="dispatch-client-preview"><span id="dispatchClientInitialsPreview" class="user-avatar-thumb dispatch-client-preview-avatar">${initialsFromPersonName(seedName) || '<i class=\"bi bi-person-fill\"></i>'}</span></div><input id="dispatchClientName" class="swal2-input ios-input" placeholder="Nombre y apellido / RazÃ³n social" value=""><input id="dispatchClientDoc" class="swal2-input ios-input" placeholder="DNI o CUIL"><input id="dispatchClientAddress" class="swal2-input ios-input" placeholder="DirecciÃ³n"><select id="dispatchClientCity" class="swal2-select ios-input">${renderDispatchLocalityOptions('')}</select><select id="dispatchClientProvince" class="swal2-select ios-input">${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${item === 'Santa Fe' ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select><input id="dispatchClientCountry" class="swal2-input ios-input" value="Argentina" placeholder="PaÃ­s"></div>`,
+      html: `<div class="swal-stack-fields text-start"><div class="dispatch-client-preview"><span id="dispatchClientInitialsPreview" class="user-avatar-thumb dispatch-client-preview-avatar">${initialsFromPersonName(seedName) || '<i class=\"bi bi-person-fill\"></i>'}</span></div><input id="dispatchClientName" class="swal2-input ios-input" placeholder="Nombre y apellido / Razón social" value=""><input id="dispatchClientDoc" class="swal2-input ios-input" placeholder="DNI o CUIL"><input id="dispatchClientAddress" class="swal2-input ios-input" placeholder="Dirección"><select id="dispatchClientCity" class="swal2-select ios-input">${renderDispatchLocalityOptions('')}</select><select id="dispatchClientProvince" class="swal2-select ios-input">${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${item === 'Santa Fe' ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select><input id="dispatchClientCountry" class="swal2-input ios-input" value="Argentina" placeholder="País"></div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
@@ -6249,12 +6249,12 @@
         const city = normalizeValue(document.getElementById('dispatchClientCity')?.value);
         const province = normalizeValue(document.getElementById('dispatchClientProvince')?.value) || 'Santa Fe';
         const country = normalizeValue(document.getElementById('dispatchClientCountry')?.value) || 'Argentina';
-        if (!name) return Swal.showValidationMessage('CompletÃ¡ nombre o razÃ³n social.');
-        if (!doc) return Swal.showValidationMessage('CompletÃ¡ DNI o CUIL.');
-        if (!address) return Swal.showValidationMessage('CompletÃ¡ direcciÃ³n.');
-        if (!city) return Swal.showValidationMessage('CompletÃ¡ localidad.');
-        if (!province) return Swal.showValidationMessage('CompletÃ¡ provincia.');
-        if (!country) return Swal.showValidationMessage('CompletÃ¡ paÃ­s.');
+        if (!name) return Swal.showValidationMessage('Completá nombre o razón social.');
+        if (!doc) return Swal.showValidationMessage('Completá DNI o CUIL.');
+        if (!address) return Swal.showValidationMessage('Completá dirección.');
+        if (!city) return Swal.showValidationMessage('Completá localidad.');
+        if (!province) return Swal.showValidationMessage('Completá provincia.');
+        if (!country) return Swal.showValidationMessage('Completá país.');
         return {
           name,
           doc,
@@ -6317,7 +6317,7 @@
       const pages = Math.max(1, Math.ceil(rows.length / PAGE));
       page = Math.min(Math.max(1, page), pages);
       const slice = rows.slice((page - 1) * PAGE, page * PAGE);
-      host.innerHTML = `<div class="dispatch-clients-manager-toolbar mb-2"><div class="input-group ios-input-group ingredientes-search-group dispatch-clients-manager-search"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchClientsManagerSearch" type="search" class="form-control ios-input" placeholder="Buscar cliente" value="${escapeHtml(query)}"></div><button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" data-client-create-inline><i class="fa-solid fa-plus"></i><span>Crear cliente</span></button></div><div class="dispatch-clients-manager-list">${slice.map((item) => `<article class="dispatch-client-row"><div class="dispatch-client-row-main"><span class="user-avatar-thumb dispatch-client-suggest-avatar" style="${getDispatchClientAvatarStyle(item)}">${escapeHtml(item.initials || initialsFromPersonName(item.name) || 'U')}</span><div><strong>${escapeHtml(item.name || '-')}</strong><small>${escapeHtml(item.doc || '-')}</small></div></div><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-client-edit="${escapeHtml(item.id)}"><i class="fa-solid fa-pen"></i><span>Editar</span></button></article>`).join('') || '<p class="m-0">Sin clientes para ese filtro.</p>'}</div><div class="inventario-pagination enhanced mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-client-page="prev" ${page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>PÃ¡gina ${page} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-client-page="next" ${page >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+      host.innerHTML = `<div class="dispatch-clients-manager-toolbar mb-2"><div class="input-group ios-input-group ingredientes-search-group dispatch-clients-manager-search"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchClientsManagerSearch" type="search" class="form-control ios-input" placeholder="Buscar cliente" value="${escapeHtml(query)}"></div><button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" data-client-create-inline><i class="fa-solid fa-plus"></i><span>Crear cliente</span></button></div><div class="dispatch-clients-manager-list">${slice.map((item) => `<article class="dispatch-client-row"><div class="dispatch-client-row-main"><span class="user-avatar-thumb dispatch-client-suggest-avatar" style="${getDispatchClientAvatarStyle(item)}">${escapeHtml(item.initials || initialsFromPersonName(item.name) || 'U')}</span><div><strong>${escapeHtml(item.name || '-')}</strong><small>${escapeHtml(item.doc || '-')}</small></div></div><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-client-edit="${escapeHtml(item.id)}"><i class="fa-solid fa-pen"></i><span>Editar</span></button></article>`).join('') || '<p class="m-0">Sin clientes para ese filtro.</p>'}</div><div class="inventario-pagination enhanced mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-client-page="prev" ${page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${page} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-client-page="next" ${page >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
       const searchInput = host.querySelector('#dispatchClientsManagerSearch');
       if (searchInput) {
         searchInput.focus();
@@ -6329,7 +6329,7 @@
       const host = popup.querySelector('[data-dispatch-clients-host]');
       const client = safeObject(state.reparto.clients?.[clientId]);
       if (!host || !client.id) return;
-      host.innerHTML = `<div class=\"dispatch-clients-edit-head mb-2\"><div class=\"inventario-period-head mb-0\"><button type=\"button\" class=\"btn ios-btn ios-btn-secondary inventario-threshold-btn\" data-client-edit-back><i class=\"fa-solid fa-arrow-left\"></i><span>Volver</span></button><h6 class=\"step-title mb-0\">Editar cliente</h6></div><button type=\"button\" class=\"btn ios-btn ios-btn-success inventario-threshold-btn\" data-client-create-inline><i class=\"fa-solid fa-plus\"></i><span>Crear cliente</span></button></div><div class=\"swal-stack-fields text-start\"><div class=\"dispatch-client-preview\"><span id=\"dispatchClientEditInitialsPreview\" class=\"user-avatar-thumb dispatch-client-preview-avatar\" style=\"${getDispatchClientAvatarStyle(client)}\">${escapeHtml(client.initials || initialsFromPersonName(client.name) || 'U')}</span></div><input id=\"dispatchClientEditName\" class=\"swal2-input ios-input\" placeholder=\"Nombre\" value=\"${escapeHtml(client.name || '')}\"><input id=\"dispatchClientEditDoc\" class=\"swal2-input ios-input\" placeholder=\"DNI/CUIL\" value=\"${escapeHtml(client.doc || '')}\"><input id=\"dispatchClientEditAddress\" class=\"swal2-input ios-input\" placeholder=\"DirecciÃ³n\" value=\"${escapeHtml(client.address || '')}\"><select id=\"dispatchClientEditCity\" class=\"swal2-select ios-input\">${renderDispatchLocalityOptions(client.city || '')}</select><select id=\"dispatchClientEditProvince\" class=\"swal2-select ios-input\">${ARG_PROVINCIAS.map((prov) => `<option value=\"${escapeHtml(prov)}\" ${normalizeValue(client.province || 'Santa Fe') === prov ? 'selected' : ''}>${escapeHtml(prov)}</option>`).join('')}</select><input id=\"dispatchClientEditCountry\" class=\"swal2-input ios-input\" placeholder=\"PaÃ­s\" value=\"${escapeHtml(client.country || 'Argentina')}\"></div><div class=\"produccion-config-actions\"><button type=\"button\" class=\"btn ios-btn ios-btn-success\" data-client-edit-save=\"${escapeHtml(client.id)}\"><i class=\"fa-solid fa-floppy-disk\"></i><span>Guardar</span></button></div>`;
+      host.innerHTML = `<div class=\"dispatch-clients-edit-head mb-2\"><div class=\"inventario-period-head mb-0\"><button type=\"button\" class=\"btn ios-btn ios-btn-secondary inventario-threshold-btn\" data-client-edit-back><i class=\"fa-solid fa-arrow-left\"></i><span>Volver</span></button><h6 class=\"step-title mb-0\">Editar cliente</h6></div><button type=\"button\" class=\"btn ios-btn ios-btn-success inventario-threshold-btn\" data-client-create-inline><i class=\"fa-solid fa-plus\"></i><span>Crear cliente</span></button></div><div class=\"swal-stack-fields text-start\"><div class=\"dispatch-client-preview\"><span id=\"dispatchClientEditInitialsPreview\" class=\"user-avatar-thumb dispatch-client-preview-avatar\" style=\"${getDispatchClientAvatarStyle(client)}\">${escapeHtml(client.initials || initialsFromPersonName(client.name) || 'U')}</span></div><input id=\"dispatchClientEditName\" class=\"swal2-input ios-input\" placeholder=\"Nombre\" value=\"${escapeHtml(client.name || '')}\"><input id=\"dispatchClientEditDoc\" class=\"swal2-input ios-input\" placeholder=\"DNI/CUIL\" value=\"${escapeHtml(client.doc || '')}\"><input id=\"dispatchClientEditAddress\" class=\"swal2-input ios-input\" placeholder=\"Dirección\" value=\"${escapeHtml(client.address || '')}\"><select id=\"dispatchClientEditCity\" class=\"swal2-select ios-input\">${renderDispatchLocalityOptions(client.city || '')}</select><select id=\"dispatchClientEditProvince\" class=\"swal2-select ios-input\">${ARG_PROVINCIAS.map((prov) => `<option value=\"${escapeHtml(prov)}\" ${normalizeValue(client.province || 'Santa Fe') === prov ? 'selected' : ''}>${escapeHtml(prov)}</option>`).join('')}</select><input id=\"dispatchClientEditCountry\" class=\"swal2-input ios-input\" placeholder=\"País\" value=\"${escapeHtml(client.country || 'Argentina')}\"></div><div class=\"produccion-config-actions\"><button type=\"button\" class=\"btn ios-btn ios-btn-success\" data-client-edit-save=\"${escapeHtml(client.id)}\"><i class=\"fa-solid fa-floppy-disk\"></i><span>Guardar</span></button></div>`;
       const nameInput = host.querySelector('#dispatchClientEditName');
       const citySelect = host.querySelector('#dispatchClientEditCity');
       const preview = host.querySelector('#dispatchClientEditInitialsPreview');
@@ -6402,7 +6402,7 @@
             const province = normalizeValue(popup.querySelector('#dispatchClientEditProvince')?.value) || 'Santa Fe';
             const country = normalizeValue(popup.querySelector('#dispatchClientEditCountry')?.value) || 'Argentina';
             if (!name || !doc || !address || !city) {
-              await openIosSwal({ title: 'Datos incompletos', html: '<p>CompletÃ¡ nombre, documento, direcciÃ³n y localidad.</p>', icon: 'warning' });
+              await openIosSwal({ title: 'Datos incompletos', html: '<p>Completá nombre, documento, dirección y localidad.</p>', icon: 'warning' });
               return;
             }
             state.reparto.clients[id] = { ...current, name, doc, address, city, province, country, initials: initialsFromPersonName(name) || current.initials || 'U', updatedAt: nowTs() };
@@ -6430,7 +6430,7 @@
     const result = await openIosSwal({
       title: 'Nueva UTA / URA',
       customClass: { popup: 'dispatch-vehicle-alert' },
-      html: '<div class="swal-stack-fields text-start"><input id="dispatchVehicleNumber" class="swal2-input ios-input" placeholder="NÃºmero de URA / UTA"><input id="dispatchVehiclePatent" class="swal2-input ios-input" placeholder="Patente"><input id="dispatchVehicleBrand" class="swal2-input ios-input" placeholder="Marca"><input id="dispatchVehicleType" class="swal2-input ios-input" value="CamiÃ³n" placeholder="Tipo"><input id="dispatchVehicleExpiry" class="swal2-input ios-input" placeholder="Vencimiento"><label for="dispatchVehicleFile" class="inventario-upload-dropzone"><i class="fa-regular fa-file"></i><span id="dispatchVehicleFileLabel">Adjunto: click o arrastrÃ¡</span></label><input id="dispatchVehicleFile" class="form-control image-file-input inventario-hidden-file-input" type="file" accept="image/*,application/pdf"></div>',
+      html: '<div class="swal-stack-fields text-start"><input id="dispatchVehicleNumber" class="swal2-input ios-input" placeholder="Número de URA / UTA"><input id="dispatchVehiclePatent" class="swal2-input ios-input" placeholder="Patente"><input id="dispatchVehicleBrand" class="swal2-input ios-input" placeholder="Marca"><input id="dispatchVehicleType" class="swal2-input ios-input" value="Camión" placeholder="Tipo"><input id="dispatchVehicleExpiry" class="swal2-input ios-input" placeholder="Vencimiento"><label for="dispatchVehicleFile" class="inventario-upload-dropzone"><i class="fa-regular fa-file"></i><span id="dispatchVehicleFileLabel">Adjunto: click o arrastrá</span></label><input id="dispatchVehicleFile" class="form-control image-file-input inventario-hidden-file-input" type="file" accept="image/*,application/pdf"></div>',
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
@@ -6444,7 +6444,7 @@
         }
         fileInput?.addEventListener('change', () => {
           const file = fileInput.files?.[0];
-          if (fileLabel) fileLabel.textContent = file ? `Adjunto: ${file.name}` : 'Adjunto: click o arrastrÃ¡';
+          if (fileLabel) fileLabel.textContent = file ? `Adjunto: ${file.name}` : 'Adjunto: click o arrastrá';
         });
         dropzone?.addEventListener('dragover', (event) => {
           event.preventDefault();
@@ -6465,19 +6465,19 @@
         const number = normalizeValue(document.getElementById('dispatchVehicleNumber')?.value);
         const patent = normalizeValue(document.getElementById('dispatchVehiclePatent')?.value);
         const brand = normalizeValue(document.getElementById('dispatchVehicleBrand')?.value);
-        const type = normalizeValue(document.getElementById('dispatchVehicleType')?.value) || 'CamiÃ³n';
+        const type = normalizeValue(document.getElementById('dispatchVehicleType')?.value) || 'Camión';
         const expiryDate = normalizeValue(document.getElementById('dispatchVehicleExpiry')?.value);
-        if (!number) return Swal.showValidationMessage('CompletÃ¡ el nÃºmero de URA/UTA.');
-        if (!patent) return Swal.showValidationMessage('CompletÃ¡ patente.');
-        if (!brand) return Swal.showValidationMessage('CompletÃ¡ marca.');
-        if (!type) return Swal.showValidationMessage('CompletÃ¡ tipo.');
-        if (!expiryDate) return Swal.showValidationMessage('CompletÃ¡ vencimiento.');
+        if (!number) return Swal.showValidationMessage('Completá el número de URA/UTA.');
+        if (!patent) return Swal.showValidationMessage('Completá patente.');
+        if (!brand) return Swal.showValidationMessage('Completá marca.');
+        if (!type) return Swal.showValidationMessage('Completá tipo.');
+        if (!expiryDate) return Swal.showValidationMessage('Completá vencimiento.');
         const file = document.getElementById('dispatchVehicleFile')?.files?.[0] || null;
-        if (!file) return Swal.showValidationMessage('AdjuntÃ¡ respaldo del vehÃ­culo.');
+        if (!file) return Swal.showValidationMessage('Adjuntá respaldo del vehículo.');
         let attachmentUrl = '';
         if (file) {
           const validType = [...ALLOWED_UPLOAD_TYPES, 'application/pdf'].includes(file.type);
-          if (!validType) return Swal.showValidationMessage('Adjunto invÃ¡lido (imagen o PDF).');
+          if (!validType) return Swal.showValidationMessage('Adjunto inválido (imagen o PDF).');
           if (file.size > MAX_UPLOAD_SIZE_BYTES) return Swal.showValidationMessage('El adjunto supera 5MB.');
           attachmentUrl = await uploadImageToStorage(file, 'reparto/vehiculos');
         }
@@ -6500,9 +6500,9 @@
   const openDispatchVehiclesManager = async () => {
     const rows = Object.values(safeObject(state.reparto.vehicles || {}));
     const html = rows.length
-      ? `<div class="input-group ios-input-group ingredientes-search-group dispatch-vehicles-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchVehiclesSearchInput" type="search" class="form-control ios-input ingredientes-search-input" placeholder="Buscar por nÃºmero, patente o marca" autocomplete="off"></div><div id="dispatchVehiclesManagerList" class="dispatch-vehicles-manager-list">${rows.map((item) => {
+      ? `<div class="input-group ios-input-group ingredientes-search-group dispatch-vehicles-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchVehiclesSearchInput" type="search" class="form-control ios-input ingredientes-search-input" placeholder="Buscar por número, patente o marca" autocomplete="off"></div><div id="dispatchVehiclesManagerList" class="dispatch-vehicles-manager-list">${rows.map((item) => {
         const meta = getDispatchVehicleExpiryMeta(item);
-        return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}" data-vehicle-search="${escapeHtml(normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`))}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} Â· ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i class="fa-regular fa-eye"></i><span>Adjunto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i class="fa-solid fa-upload"></i><span>Reemplazar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i class="fa-solid fa-paperclip"></i><span>Quitar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></div></div>`;
+        return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}" data-vehicle-search="${escapeHtml(normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`))}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i class="fa-regular fa-eye"></i><span>Adjunto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i class="fa-solid fa-upload"></i><span>Reemplazar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i class="fa-solid fa-paperclip"></i><span>Quitar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></div></div>`;
       }).join('')}</div>`
       : '<p>No hay unidades cargadas.</p>';
     const result = await openIosSwal({
@@ -6518,7 +6518,7 @@
           const rowsLive = Object.values(safeObject(state.reparto.vehicles || {}));
           list.innerHTML = rowsLive.map((item) => {
             const meta = getDispatchVehicleExpiryMeta(item);
-            return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}" data-vehicle-search="${escapeHtml(normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`))}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} Â· ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i class="fa-regular fa-eye"></i><span>Adjunto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i class="fa-solid fa-upload"></i><span>Reemplazar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i class="fa-solid fa-paperclip"></i><span>Quitar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></div></div>`;
+            return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}" data-vehicle-search="${escapeHtml(normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`))}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i class="fa-regular fa-eye"></i><span>Adjunto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i class="fa-solid fa-upload"></i><span>Reemplazar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i class="fa-solid fa-paperclip"></i><span>Quitar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></div></div>`;
           }).join('') || '<p>No hay unidades cargadas.</p>';
         };
         const searchInput = box?.querySelector('#dispatchVehiclesSearchInput');
@@ -6550,11 +6550,11 @@
             return;
           }
           if (ev.target.closest('[data-vehicle-upload]')) {
-            const pick = await openIosSwal({ title: 'Reemplazar adjunto', customClass: { popup: 'dispatch-vehicle-replace-alert' }, html: '<div class="dispatch-vehicle-replace-wrap"><label for="vehicleReplaceFile" class="inventario-upload-dropzone"><i class="fa-solid fa-upload"></i><span id="vehicleReplaceLabel">SeleccionÃ¡ un archivo PDF o imagen</span></label><input id="vehicleReplaceFile" type="file" class="inventario-hidden-file-input" accept="image/*,application/pdf"></div>', showCancelButton: true, confirmButtonText: 'Subir', didOpen: () => { const fileInput = document.getElementById('vehicleReplaceFile'); const label = document.getElementById('vehicleReplaceLabel'); fileInput?.addEventListener('change', () => { const file = fileInput.files?.[0]; if (label) label.textContent = file ? file.name : 'SeleccionÃ¡ un archivo PDF o imagen'; }); }, preConfirm: async () => {
+            const pick = await openIosSwal({ title: 'Reemplazar adjunto', customClass: { popup: 'dispatch-vehicle-replace-alert' }, html: '<div class="dispatch-vehicle-replace-wrap"><label for="vehicleReplaceFile" class="inventario-upload-dropzone"><i class="fa-solid fa-upload"></i><span id="vehicleReplaceLabel">Seleccioná un archivo PDF o imagen</span></label><input id="vehicleReplaceFile" type="file" class="inventario-hidden-file-input" accept="image/*,application/pdf"></div>', showCancelButton: true, confirmButtonText: 'Subir', didOpen: () => { const fileInput = document.getElementById('vehicleReplaceFile'); const label = document.getElementById('vehicleReplaceLabel'); fileInput?.addEventListener('change', () => { const file = fileInput.files?.[0]; if (label) label.textContent = file ? file.name : 'Seleccioná un archivo PDF o imagen'; }); }, preConfirm: async () => {
               const file = document.getElementById('vehicleReplaceFile')?.files?.[0];
-              if (!file) return Swal.showValidationMessage('SeleccionÃ¡ un archivo.');
-              if (![...ALLOWED_UPLOAD_TYPES, 'application/pdf'].includes(file.type)) return Swal.showValidationMessage('SÃ³lo imagen o PDF.');
-              if (file.size > MAX_UPLOAD_SIZE_BYTES) return Swal.showValidationMessage('MÃ¡ximo 5MB.');
+              if (!file) return Swal.showValidationMessage('Seleccioná un archivo.');
+              if (![...ALLOWED_UPLOAD_TYPES, 'application/pdf'].includes(file.type)) return Swal.showValidationMessage('Sólo imagen o PDF.');
+              if (file.size > MAX_UPLOAD_SIZE_BYTES) return Swal.showValidationMessage('Máximo 5MB.');
               return uploadImageToStorage(file, 'reparto/vehiculos');
             } });
             if (pick.isConfirmed && pick.value) {
@@ -6608,19 +6608,19 @@
     if (!productionId) return;
     const linkedDispatch = getDispatchRecordsList().filter((row) => (Array.isArray(row?.products) ? row.products : []).some((product) => (Array.isArray(product?.allocations) ? product.allocations : []).some((allocation) => normalizeValue(allocation?.productionId) === productionId)));
     if (linkedDispatch.length) {
-      await openIosSwal({ title: 'EliminaciÃ³n bloqueada', html: '<p>Esta producciÃ³n estÃ¡ asociada a una salida de productos. EliminÃ¡ primero los repartos vinculados.</p>', icon: 'warning' });
+      await openIosSwal({ title: 'Eliminación bloqueada', html: '<p>Esta producción está asociada a una salida de productos. Eliminá primero los repartos vinculados.</p>', icon: 'warning' });
       return;
     }
     const confirmDelete = await openIosSwal({
-      title: 'Eliminar producciÃ³n',
-      html: '<p>Se eliminarÃ¡ la producciÃ³n, se restaurarÃ¡ el stock de insumos usados y se limpiarÃ¡n los movimientos relacionados del historial.</p><small>Esta acciÃ³n no se puede deshacer.</small>',
+      title: 'Eliminar producción',
+      html: '<p>Se eliminará la producción, se restaurará el stock de insumos usados y se limpiarán los movimientos relacionados del historial.</p><small>Esta acción no se puede deshacer.</small>',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Eliminar',
       cancelButtonText: 'Cancelar'
     });
     if (!confirmDelete.isConfirmed) return;
-    const auth = await askSensitivePassword('Clave general requerida', '<p>ConfirmÃ¡ para eliminar la producciÃ³n y revertir su impacto.</p>', true);
+    const auth = await askSensitivePassword('Clave general requerida', '<p>Confirmá para eliminar la producción y revertir su impacto.</p>', true);
     if (!auth.isConfirmed) return;
     showRestoringStockOverlay();
     try {
@@ -6638,10 +6638,10 @@
       state.registros = registros;
       await refreshAfterMutation();
       if (Swal.isVisible()) Swal.close();
-      await openIosSwal({ title: 'ProducciÃ³n eliminada', html: `<p>Se eliminÃ³ ${productionId} y se restaurÃ³ el stock.</p>`, icon: 'success', confirmButtonText: 'Entendido' });
+      await openIosSwal({ title: 'Producción eliminada', html: `<p>Se eliminó ${productionId} y se restauró el stock.</p>`, icon: 'success', confirmButtonText: 'Entendido' });
     } catch (error) {
       if (Swal.isVisible()) Swal.close();
-      await openIosSwal({ title: 'No se pudo eliminar', html: '<p>OcurriÃ³ un error restaurando stock. IntentÃ¡ nuevamente.</p>', icon: 'error' });
+      await openIosSwal({ title: 'No se pudo eliminar', html: '<p>Ocurrió un error restaurando stock. Intentá nuevamente.</p>', icon: 'error' });
     }
   };
 
@@ -6668,14 +6668,14 @@
     if (!dispatchId) return;
     const confirmDelete = await openIosSwal({
       title: 'Eliminar salida de productos',
-      html: '<p>Se eliminarÃ¡ la salida, se restaurarÃ¡ el stock disponible y se limpiarÃ¡n los movimientos relacionados del historial.</p><small>Esta acciÃ³n no se puede deshacer.</small>',
+      html: '<p>Se eliminará la salida, se restaurará el stock disponible y se limpiarán los movimientos relacionados del historial.</p><small>Esta acción no se puede deshacer.</small>',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Eliminar',
       cancelButtonText: 'Cancelar'
     });
     if (!confirmDelete.isConfirmed) return;
-    const auth = await askSensitivePassword('Clave general requerida', '<p>ConfirmÃ¡ para eliminar la salida de productos.</p>', true);
+    const auth = await askSensitivePassword('Clave general requerida', '<p>Confirmá para eliminar la salida de productos.</p>', true);
     if (!auth.isConfirmed) return;
     showRestoringStockOverlay();
     try {
@@ -6690,19 +6690,19 @@
       await appendAudit({ action: 'reparto_eliminado', dispatchId, before: previous, after: null, reason: auth.value.reason });
       await refreshAfterMutation();
       if (Swal.isVisible()) Swal.close();
-      await openIosSwal({ title: 'Salida eliminada', html: `<p>Se eliminÃ³ ${escapeHtml(dispatchRow.code || dispatchId)} y se restaurÃ³ el stock disponible.</p>`, icon: 'success' });
+      await openIosSwal({ title: 'Salida eliminada', html: `<p>Se eliminó ${escapeHtml(dispatchRow.code || dispatchId)} y se restauró el stock disponible.</p>`, icon: 'success' });
     } catch (error) {
       if (Swal.isVisible()) Swal.close();
-      await openIosSwal({ title: 'No se pudo eliminar', html: '<p>OcurriÃ³ un error restaurando stock. IntentÃ¡ nuevamente.</p>', icon: 'error' });
+      await openIosSwal({ title: 'No se pudo eliminar', html: '<p>Ocurrió un error restaurando stock. Intentá nuevamente.</p>', icon: 'error' });
     }
   };
 
   const editProduction = async (registro) => {
     if (registro.status === 'anulada') {
-      await openIosSwal({ title: 'No editable', html: '<p>Una producciÃ³n anulada no puede editarse.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+      await openIosSwal({ title: 'No editable', html: '<p>Una producción anulada no puede editarse.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
       return;
     }
-    const auth = await askSensitivePassword('Editar producciÃ³n', '<p>Se recalcularÃ¡ el consumo FEFO.</p>', true);
+    const auth = await askSensitivePassword('Editar producción', '<p>Se recalculará el consumo FEFO.</p>', true);
     if (!auth.isConfirmed) return;
     const form = await openIosSwal({
       title: `Editar ${registro.id}`,
@@ -6775,13 +6775,13 @@
     state.inventario = consumed;
     state.registros = registros;
     renderHistoryTable();
-    await openIosSwal({ title: 'ProducciÃ³n editada', html: `<p>${registro.id} fue recalculada y guardada.</p>`, icon: 'success', confirmButtonText: 'Entendido' });
+    await openIosSwal({ title: 'Producción editada', html: `<p>${registro.id} fue recalculada y guardada.</p>`, icon: 'success', confirmButtonText: 'Entendido' });
   };
 
   const getRneExpiryMeta = () => {
     const hasAttachment = Boolean(normalizeValue(state.config?.rne?.attachmentUrl));
     if (Boolean(state.config?.rne?.infiniteExpiry)) {
-      return { visible: false, days: null, tone: 'ok', text: 'RNE con vencimiento infinito (âˆž).', hasAttachment, infinite: true };
+      return { visible: false, days: null, tone: 'ok', text: 'RNE con vencimiento infinito (��~).', hasAttachment, infinite: true };
     }
     const expiryIso = normalizeValue(state.config?.rne?.expiryDate);
     if (!expiryIso) return { visible: false, days: null, tone: 'none', text: '', hasAttachment, infinite: false };
@@ -6792,8 +6792,8 @@
     const days = Math.ceil((expiryTs - today.getTime()) / (1000 * 60 * 60 * 24));
     const tone = days < 0 ? 'danger' : days < 60 ? 'danger' : days < 180 ? 'warning' : 'ok';
     const text = days < 0
-      ? `El RNE de la Jamonera venciÃ³ hace ${Math.abs(days)} dÃ­as (${formatIsoEs(expiryIso)}).`
-      : `El RNE de la Jamonera vence en ${days} dÃ­as (${formatIsoEs(expiryIso)}).`;
+      ? `El RNE de la Jamonera venció hace ${Math.abs(days)} días (${formatIsoEs(expiryIso)}).`
+      : `El RNE de la Jamonera vence en ${days} días (${formatIsoEs(expiryIso)}).`;
     const visible = tone === 'warning' || tone === 'danger';
     return { visible, days, tone, text, hasAttachment, infinite: false };
   };
@@ -6817,15 +6817,15 @@
     if (meta.infinite) {
       expiryBadge = '<span class="produccion-modal-rne-badge is-ok"><i class="bi bi-infinity"></i>RNE</span>';
     } else if (meta.days != null) {
-      const expiryLabel = meta.days < 0 ? `Vencido hace ${Math.abs(meta.days)} dÃ­as` : `Vence en ${meta.days} dÃ­as`;
+      const expiryLabel = meta.days < 0 ? `Vencido hace ${Math.abs(meta.days)} días` : `Vence en ${meta.days} días`;
       expiryBadge = `<span class="produccion-modal-rne-badge ${meta.tone === 'danger' ? 'is-danger' : meta.tone === 'warning' ? 'is-warning' : 'is-ok'}"><i class="bi bi-clock-history"></i>${escapeHtml(expiryLabel)}</span>`;
     }
     const attachmentBadge = `<span class="produccion-modal-rne-badge ${meta.hasAttachment ? 'is-ok' : 'is-warning'}"><i class="bi bi-paperclip"></i>${attachmentLabel}</span>`;
     if (!expiryBadge) {
-      nodes.modalTitle.innerHTML = `ProducciÃ³n <span class="produccion-modal-rne-badges">${attachmentBadge}</span>`;
+      nodes.modalTitle.innerHTML = `Producción <span class="produccion-modal-rne-badges">${attachmentBadge}</span>`;
       return;
     }
-    nodes.modalTitle.innerHTML = `ProducciÃ³n <span class="produccion-modal-rne-badges">${attachmentBadge}${expiryBadge}</span>`;
+    nodes.modalTitle.innerHTML = `Producción <span class="produccion-modal-rne-badges">${attachmentBadge}${expiryBadge}</span>`;
   };
 
   const renderList = () => {
@@ -6848,7 +6848,7 @@
         <div class="produccion-checks-list">${analysis.requirements.map((item) => `
           <span class="produccion-check-item ${item.missingForMin <= 0.0001 ? 'is-ok' : (item.missingForMinIncludingExpired <= 0.0001 ? 'is-expired' : 'is-missing')}">
             <i class="fa-solid ${item.missingForMin <= 0.0001 ? 'fa-circle-check' : (item.missingForMinIncludingExpired <= 0.0001 ? 'fa-triangle-exclamation' : 'fa-circle-xmark')}"></i>
-            <span>${item.name}${item.hasRelatedCoverage ? ` Â· sustituto ${item.substitutionCount}` : ''}</span>
+            <span>${item.name}${item.hasRelatedCoverage ? ` · sustituto ${item.substitutionCount}` : ''}</span>
           </span>`).join('')}
         </div>`;
     };
@@ -6887,11 +6887,11 @@
       const missingHtml = analysis.missingForMin.length
         ? `<div class="produccion-missing-list">${missingFresh.map((item) => {
           const substituteHint = item.hasRelatedCoverage
-            ? ` Â· sustituye con ${item.substitutionCount} relacionado(s)`
+            ? ` · sustituye con ${item.substitutionCount} relacionado(s)`
             : '';
           return `<p><strong>${item.name}:</strong> disponible ${formatQty(item.available, item.unit)} / faltan ${formatQty(item.missingForMin, item.unit)}${substituteHint}</p>`;
-        }).join('')}${expiredOnlyIngredients.map((item) => `<p><strong>${item.name}:</strong> sin stock fresco Â· disponible en expirado ${formatQty(item.totalAvailable, item.unit)}</p>`).join('')}</div>`
-        : '<p class="produccion-ok-line">Cobertura suficiente para iniciar producciÃ³n.</p>';
+        }).join('')}${expiredOnlyIngredients.map((item) => `<p><strong>${item.name}:</strong> sin stock fresco · disponible en expirado ${formatQty(item.totalAvailable, item.unit)}</p>`).join('')}</div>`
+        : '<p class="produccion-ok-line">Cobertura suficiente para iniciar producción.</p>';
       const lastProductionAt = state.config.lastProductionByRecipe?.[recipe.id] || recipe.lastProductionAt || recipe.production?.lastAt || 0;
       return `
         <article class="ingrediente-card receta-card produccion-card ${statusClass}">
@@ -6902,12 +6902,12 @@
           </div>
           <div class="ingrediente-main receta-main">
             <div class="produccion-row-head">
-              <h6 class="ingrediente-name receta-name">${capitalize(recipe.title || 'Sin tÃ­tulo')}</h6>
+              <h6 class="ingrediente-name receta-name">${capitalize(recipe.title || 'Sin título')}</h6>
               <span class="produccion-chip ${statusClass}"><span class="produccion-semaforo"></span>${isExpiredOnlyAvailable ? 'Disponible con expirados' : analysis.statusText}</span>
             </div>
             <div class="produccion-stats-line">
               <div class="produccion-stat-block">
-                <small>MÃ¡ximo producible</small>
+                <small>Máximo producible</small>
                 ${isExpiredOnlyAvailable
       ? `<strong class="produccion-max-expired-only">${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg*</strong>`
       : (draftLock?.blockedKg > 0
@@ -6916,7 +6916,7 @@
               </div>
               <div class="produccion-stat-sep" aria-hidden="true"></div>
               <div class="produccion-stat-block">
-                <small>MÃ­nimo</small>
+                <small>Mínimo</small>
                 <strong>${analysis.minKg.toFixed(2)} kg</strong>
               </div>
               <div class="produccion-stat-sep" aria-hidden="true"></div>
@@ -6926,7 +6926,7 @@
               </div>
               <div class="produccion-stat-sep" aria-hidden="true"></div>
               <div class="produccion-stat-block is-stock-down">
-                <small>Ãšltimos egresados <i class="fa-solid fa-arrow-down"></i></small>
+                <small>�altimos egresados <i class="fa-solid fa-arrow-down"></i></small>
                 <strong>${dispatchMeta.lastWeekOut.toFixed(2)} kg</strong>
               </div>
               <div class="produccion-stat-sep" aria-hidden="true"></div>
@@ -6936,11 +6936,11 @@
             </div>
             ${Number(analysis.expiredKg || 0) > 0.0001 ? `<p class="produccion-last-line produccion-last-line-expired"><i class="fa-solid fa-triangle-exclamation"></i> <strong>Kilos expirados:</strong> <strong>${Number(analysis.expiredKg || 0).toFixed(2)} kg</strong></p>` : ''}
             ${(!analysis.canProduce && analysis.canProduceConsideringExpired) ? `<p class="produccion-last-line produccion-last-line-expired"><i class="fa-solid fa-calendar-days"></i> Podes producir con lote vencido ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg, pero en el rango de fecha ${formatDateRangeForRecipe(recipe)}.</p>` : ''}
-            ${draftLock?.blockedKg > 0 ? `<p class="produccion-last-line" data-draft-lock-line="${recipe.id}"><i class="fa-solid fa-lock"></i> Bloqueado por borrador: <strong>${draftLock.blockedKg.toFixed(2)} kg</strong> Â· disponible en <strong data-draft-lock-time="${recipe.id}">${formatCountdown(draftLock.remainingMs)}</strong></p>` : ''}
-            <p class="produccion-last-line"><i class="fa-regular fa-clock"></i> Ãšltima producciÃ³n: <strong>${formatDate(lastProductionAt)}</strong></p>
+            ${draftLock?.blockedKg > 0 ? `<p class="produccion-last-line" data-draft-lock-line="${recipe.id}"><i class="fa-solid fa-lock"></i> Bloqueado por borrador: <strong>${draftLock.blockedKg.toFixed(2)} kg</strong> · disponible en <strong data-draft-lock-time="${recipe.id}">${formatCountdown(draftLock.remainingMs)}</strong></p>` : ''}
+            <p class="produccion-last-line"><i class="fa-regular fa-clock"></i> �altima producción: <strong>${formatDate(lastProductionAt)}</strong></p>
             <div class="produccion-progress-wrap ${isExpiredOnlyAvailable ? 'is-expired-only' : ''}">
               <div class="produccion-progress-bar"><span class="${isExpiredOnlyAvailable ? 'is-expired' : (analysis.status === 'danger' ? 'is-danger' : analysis.progress >= 100 ? 'is-success' : 'is-warning')}" style="width:${(isExpiredOnlyAvailable ? Number(analysis.progressIncludingExpired || 0) : analysis.progress).toFixed(1)}%"></span></div>
-              <small>Cobertura del mÃ­nimo: ${(isExpiredOnlyAvailable ? Number(analysis.progressIncludingExpired || 0) : analysis.progress).toFixed(0)}%${isExpiredOnlyAvailable ? ' (con expirados)' : ''}</small>
+              <small>Cobertura del mínimo: ${(isExpiredOnlyAvailable ? Number(analysis.progressIncludingExpired || 0) : analysis.progress).toFixed(0)}%${isExpiredOnlyAvailable ? ' (con expirados)' : ''}</small>
             </div>
             ${buildCoverageChecksHtml(analysis)}
             <div class="produccion-badges">${badges}</div>
@@ -7046,8 +7046,8 @@
       const hasMeaningfulMissing = Number(row.missingQty || 0) > 0.0005;
       const toneClass = rowInfiniteStock ? 'is-infinite' : (hasMeaningfulMissing ? (hasSubstituteCoverage ? 'is-substitutable' : 'is-missing') : '');
       const availableHtml = rowInfiniteStock
-        ? '<span class="produccion-available-value">Â· Disponible <strong class="produccion-infinite-symbol">&infin;</strong></span>'
-        : `<span class="produccion-available-value">Â· Disponible <strong>${formatCompactQty(row.availableQty, row.ingredientUnit)}</strong></span>`;
+        ? '<span class="produccion-available-value">· Disponible <strong class="produccion-infinite-symbol">&infin;</strong></span>'
+        : `<span class="produccion-available-value">· Disponible <strong>${formatCompactQty(row.availableQty, row.ingredientUnit)}</strong></span>`;
       return `
       <article class="produccion-lote-group ${toneClass}" data-lot-group="${row.ingredientId}_${index}">
         <header class="produccion-lote-head">
@@ -7060,7 +7060,7 @@
                 <span class="produccion-needs-label">Necesita</span>
                 <strong class="produccion-needs-value">${formatCompactQty(row.neededQty, row.ingredientUnit)}</strong>
                 ${availableHtml}
-                ${hasMeaningfulMissing ? ` <em>Â· Faltan ${formatCompactQty(row.missingQty, row.ingredientUnit)}</em>` : ''}
+                ${hasMeaningfulMissing ? ` <em>· Faltan ${formatCompactQty(row.missingQty, row.ingredientUnit)}</em>` : ''}
               </p>
             </div>
           </div>
@@ -7079,7 +7079,7 @@
             <div><strong>Ingreso:</strong> ${formatIsoEs(lot.entryDate || '') || formatDateTime(lot.createdAt)}</div>
             <div><strong>Vence:</strong> ${formatExpiryHuman(lot.expiryDate)} ${normalizeLower(lot.expiryDate) === 'no perecedero' ? '' : getExpiryBadge(lot.expiryDate)}</div>
             <div><strong>Usar:</strong> ${formatCompactQty(lot.takeQty, lot.unit)}</div>
-            ${lot.status === 'expired' ? `<div class="produccion-lote-expired-help"><strong>Lote expirado:</strong> no se usarÃ¡ con fecha ${formatIsoEs(plan.productionDate)}. CambiÃ¡ la fecha o resolvelo manualmente ${formatValidProductionRange(lot.entryDate, lot.expiryDate)}.</div>` : ''}
+            ${lot.status === 'expired' ? `<div class="produccion-lote-expired-help"><strong>Lote expirado:</strong> no se usará con fecha ${formatIsoEs(plan.productionDate)}. Cambiá la fecha o resolvelo manualmente ${formatValidProductionRange(lot.entryDate, lot.expiryDate)}.</div>` : ''}
             <div><strong class="produccion-provider-key">Proveedor:</strong> ${lot.provider || '-'}</div>
             <div><strong>Factura:</strong> ${lot.invoiceNumber || '-'}</div>
             <div class="produccion-lote-adjuntos-row"><strong>Adjuntos:</strong> ${lot.invoiceImageUrls.length
@@ -7173,39 +7173,39 @@
     state.activeDraftId = isViewOnly ? '' : (ownDraft?.id || state.activeDraftId);
     nodes.editor.innerHTML = `
       <div class="recetas-editor-header produccion-editor-header">
-        <button id="produccionBackBtn" type="button" class="btn ios-btn ios-btn-secondary recetas-back-btn"><i class="fa-solid fa-arrow-left"></i><span>AtrÃ¡s</span></button>
+        <button id="produccionBackBtn" type="button" class="btn ios-btn ios-btn-secondary recetas-back-btn"><i class="fa-solid fa-arrow-left"></i><span>Atrás</span></button>
         <div>
-          <p class="recetas-editor-kicker">${isViewOnly ? 'VisualizaciÃ³n' : 'ProducciÃ³n'}</p>
-          <h6 class="recetas-editor-title mb-0">${isViewOnly ? 'Detalle de producciÃ³n (solo lectura)' : 'Detalle de producciÃ³n'}</h6>
+          <p class="recetas-editor-kicker">${isViewOnly ? 'Visualización' : 'Producción'}</p>
+          <h6 class="recetas-editor-title mb-0">${isViewOnly ? 'Detalle de producción (solo lectura)' : 'Detalle de producción'}</h6>
         </div>
       </div>
       <section class="inventario-product-head-v2 produccion-head-box">
         <div class="produccion-hero-wrap">
-          <img src="${FIAMBRES_IMAGE}" class="produccion-hero-bg" alt="ProducciÃ³n">
+          <img src="${FIAMBRES_IMAGE}" class="produccion-hero-bg" alt="Producción">
           <div class="produccion-hero-avatar">
             <span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img id="produccionHeadImage" class="produccion-head-image js-produccion-head-photo" src="${normalizeValue(recipe.imageUrl) || FIAMBRES_IMAGE}" alt="${capitalize(recipe.title || 'Producto')}" loading="lazy">
           </div>
         </div>
         <div class="inventario-product-copy">
-          <p class="inventario-editor-kicker"><img src="./IMG/Octicons-git-branch.svg" class="produccion-head-icon" alt="Flujo"> Flujo de producciÃ³n</p>
-          <h3 class="inventario-editor-name">${capitalize(recipe.title || 'Sin tÃ­tulo')}</h3>
-          <p class="inventario-editor-meta">${capitalize(recipe.description || 'Sin descripciÃ³n.')}</p>
-          <p class="produccion-max-line">MÃ¡ximo segÃºn inventario: <strong>${hasOnlyInfiniteStock ? '&infin;' : `${analysis.maxKg.toFixed(2)} kg`}</strong>${(!hasOnlyInfiniteStock && Number(analysis.maxKgIncludingExpired || 0) > Number(analysis.maxKg || 0)) ? ` <span class="produccion-expired-max-help">(con vencidos: ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg)</span>` : ''}</p>
+          <p class="inventario-editor-kicker"><img src="./IMG/Octicons-git-branch.svg" class="produccion-head-icon" alt="Flujo"> Flujo de producción</p>
+          <h3 class="inventario-editor-name">${capitalize(recipe.title || 'Sin título')}</h3>
+          <p class="inventario-editor-meta">${capitalize(recipe.description || 'Sin descripción.')}</p>
+          <p class="produccion-max-line">Máximo según inventario: <strong>${hasOnlyInfiniteStock ? '&infin;' : `${analysis.maxKg.toFixed(2)} kg`}</strong>${(!hasOnlyInfiniteStock && Number(analysis.maxKgIncludingExpired || 0) > Number(analysis.maxKg || 0)) ? ` <span class="produccion-expired-max-help">(con vencidos: ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg)</span>` : ''}</p>
           <p id="produccionReservaTimer" class="produccion-reserva-timer"></p>
         </div>
       </section>
       <section class="recipe-step-card step-block">
-        <h6 class="step-title"><span class="recipe-step-number">1</span> Â¿QuÃ© cantidad deseÃ¡s producir?</h6>
+        <h6 class="step-title"><span class="recipe-step-number">1</span> ¿Qué cantidad deseás producir?</h6>
         <div class="produccion-qty-grid">
           <input id="produccionQtyInput" type="number" min="0.1" step="0.01" max="${editorMaxKg.toFixed(2)}" value="${initialQty.toFixed(2)}" class="form-control ios-input" ${isViewOnly ? 'disabled' : ''}>
-          <button id="produccionQtyMaxBtn" type="button" class="btn ios-btn ios-btn-secondary" ${(isViewOnly || hasOnlyInfiniteStock) ? 'disabled' : ''}>Usar mÃ¡ximo</button>
+          <button id="produccionQtyMaxBtn" type="button" class="btn ios-btn ios-btn-secondary" ${(isViewOnly || hasOnlyInfiniteStock) ? 'disabled' : ''}>Usar máximo</button>
         </div>
         <p id="produccionQtyHelp" class="produccion-qty-help"></p>
       </section>
       <section class="recipe-step-card step-block">
-        <h6 class="step-title"><span class="recipe-step-number">2</span> Fecha de producciÃ³n</h6>
+        <h6 class="step-title"><span class="recipe-step-number">2</span> Fecha de producción</h6>
         <input id="produccionDateInput" type="text" class="form-control ios-input" value="${initialDate}" ${isViewOnly ? 'disabled' : ''}>
-        <p class="produccion-qty-help">Si cambiÃ¡s la fecha, recalculamos vencimientos y lotes (FEFO).</p>
+        <p class="produccion-qty-help">Si cambiás la fecha, recalculamos vencimientos y lotes (FEFO).</p>
       </section>
       <section class="recipe-step-card step-block">
         <h6 class="step-title"><span class="recipe-step-number">3</span> Encargados</h6>
@@ -7216,22 +7216,22 @@
       </section>
       <section class="recipe-step-card step-block">
         <h6 class="step-title"><span class="recipe-step-number">4</span> Observaciones</h6>
-        <textarea id="produccionObsInput" class="form-control ios-input" rows="3" placeholder="Notas de producciÃ³n, incidentes, reemplazos..." ${isViewOnly ? 'disabled' : ''}>${initialObs}</textarea>
+        <textarea id="produccionObsInput" class="form-control ios-input" rows="3" placeholder="Notas de producción, incidentes, reemplazos..." ${isViewOnly ? 'disabled' : ''}>${initialObs}</textarea>
       </section>
       <section class="recipe-step-card step-block">
         <h6 class="step-title"><span class="recipe-step-number">5</span> Desglose por lotes (FEFO)</h6>
-        <p class="produccion-fefo-note"><strong>FEFO:</strong> <span>First Expired, First Out</span> Â· primero vence, primero se usa.</p>
+        <p class="produccion-fefo-note"><strong>FEFO:</strong> <span>First Expired, First Out</span> · primero vence, primero se usa.</p>
         <div id="produccionLotsBreakdown" class="produccion-lotes-wrap"></div>
       </section>
       <section class="recipe-step-card step-block">
-        <h6 class="step-title"><span class="recipe-step-number">6</span> Historial de producciÃ³n</h6>
+        <h6 class="step-title"><span class="recipe-step-number">6</span> Historial de producción</h6>
         <div id="produccionRecipeHistory" class="produccion-recipe-history"></div>
       </section>
       <section class="recipe-step-card step-block">
         <div class="produccion-final-actions">
           ${isViewOnly
             ? '<span class="produccion-view-only-note"><i class="fa-regular fa-eye"></i><span>Entraste desde Visualizar: no se guardan borradores ni se puede confirmar.</span></span>'
-            : '<button id="produccionSaveDraftBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-floppy-disk"></i><span>Guardar borrador</span></button><button id="produccionConfirmBtn" type="button" class="btn ios-btn ios-btn-success"><i class="fa-solid fa-check"></i><span>Confirmar producciÃ³n</span></button>'}
+            : '<button id="produccionSaveDraftBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-floppy-disk"></i><span>Guardar borrador</span></button><button id="produccionConfirmBtn" type="button" class="btn ios-btn ios-btn-success"><i class="fa-solid fa-check"></i><span>Confirmar producción</span></button>'}
         </div>
       </section>`;
     const qtyInput = nodes.editor.querySelector('#produccionQtyInput');
@@ -7262,8 +7262,8 @@
     const getRecipeCalendarKgMap = () => getProductionKgDayMap(getRegistrosList().filter((item) => normalizeValue(item.recipeId) === normalizeValue(recipe.id)));
     const printRecipeHistoryRows = async (rows) => {
       const ask = await openIosSwal({
-        title: 'Imprimir perÃ­odo',
-        html: '<p>Â¿QuerÃ©s incluir imÃ¡genes adjuntas?</p>',
+        title: 'Imprimir período',
+        html: '<p>¿Querés incluir imágenes adjuntas?</p>',
         showCancelButton: true,
         showDenyButton: true,
         confirmButtonText: 'Incluir',
@@ -7278,7 +7278,7 @@
       if (!ask.isConfirmed && !ask.isDenied) return;
       const askTrace = await openIosSwal({
         title: 'Incluir trazabilidad',
-        html: '<p>Â¿QuerÃ©s incluir los datos colapsados de trazabilidad?</p>',
+        html: '<p>¿Querés incluir los datos colapsados de trazabilidad?</p>',
         showCancelButton: true,
         showDenyButton: true,
         confirmButtonText: 'Incluir',
@@ -7309,16 +7309,16 @@
           .flatMap((plan) => (Array.isArray(plan?.lots) ? plan.lots : [])
             .flatMap((lot) => (Array.isArray(lot?.expiryResolutions) ? lot.expiryResolutions : [])
               .filter((res) => isHighlightedResolutionType(res.type))
-              .map((res) => `<tr class="is-resolution-row"><td>â†³ RES</td><td>${escapeHtml(formatDateTime(res.createdAt))}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>-${Number(res.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(res.type === 'decommissioned' ? 'Decomisado' : 'Vendido en mostrador')}</td><td>${escapeHtml(formatProductExpiryLabel(item))} (VTO)</td></tr>`)));
+              .map((res) => `<tr class="is-resolution-row"><td>� � RES</td><td>${escapeHtml(formatDateTime(res.createdAt))}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>-${Number(res.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(res.type === 'decommissioned' ? 'Decomisado' : 'Vendido en mostrador')}</td><td>${escapeHtml(formatProductExpiryLabel(item))} (VTO)</td></tr>`)));
         if (!includeTrace) return [main, ...resolutions];
-        const traces = getTraceRowsFromRegistro(item).map((trace) => `<tr class="is-trace-row"><td>â†³ ${trace.index}</td><td><span class="print-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td><span style="display:inline-flex;align-items:center;gap:8px;">${trace.ingredientImageUrl ? `<img src="${escapeHtml(trace.ingredientImageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${getTraceIngredientLabelHtml(trace)}</span></span></td><td>-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="print-trace-vto">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td></tr>`);
+        const traces = getTraceRowsFromRegistro(item).map((trace) => `<tr class="is-trace-row"><td>� � ${trace.index}</td><td><span class="print-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td><span style="display:inline-flex;align-items:center;gap:8px;">${trace.ingredientImageUrl ? `<img src="${escapeHtml(trace.ingredientImageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${getTraceIngredientLabelHtml(trace)}</span></span></td><td>-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="print-trace-vto">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td></tr>`);
         return [main, ...resolutions, ...traces];
       }).join('');
       const tracesWithAttachments = rows.flatMap((item) => getTraceRowsFromRegistro(item).filter((trace) => Array.isArray(trace.invoiceImageUrls) && trace.invoiceImageUrls.length));
       const imagesHtml = ask.isConfirmed && tracesWithAttachments.length
-        ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">ImÃ¡genes adjuntas</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));">${tracesWithAttachments.map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><figcaption style="font-size:12px;color:#4b5f8e;font-weight:700;">${escapeHtml(getTraceIngredientLabelText(trace))}</figcaption></div>${(trace.invoiceImageUrls || []).map((url) => `<img src="${url}" style="width:100%;max-height:220px;object-fit:contain;border-radius:10px;margin-top:8px;">`).join('')}</figure>`).join('')}</div></section>`
+        ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));">${tracesWithAttachments.map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><figcaption style="font-size:12px;color:#4b5f8e;font-weight:700;">${escapeHtml(getTraceIngredientLabelText(trace))}</figcaption></div>${(trace.invoiceImageUrls || []).map((url) => `<img src="${url}" style="width:100%;max-height:220px;object-fit:contain;border-radius:10px;margin-top:8px;">`).join('')}</figure>`).join('')}</div></section>`
         : '';
-      win.document.write(`<html><head><title>Historial producciÃ³n ${escapeHtml(capitalize(recipe.title || ''))}</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.is-trace-row td{background:#ffecef}.is-resolution-row td{background:#fff6d9}.print-trace-date{color:#1f6fd6;font-weight:700}.print-trace-vto{color:#b04a09;font-weight:700}</style></head><body><h1>Historial producciÃ³n ${escapeHtml(capitalize(recipe.title || ''))}</h1><table><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>VTO producto</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
+      win.document.write(`<html><head><title>Historial producción ${escapeHtml(capitalize(recipe.title || ''))}</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.is-trace-row td{background:#ffecef}.is-resolution-row td{background:#fff6d9}.print-trace-date{color:#1f6fd6;font-weight:700}.print-trace-vto{color:#b04a09;font-weight:700}</style></head><body><h1>Historial producción ${escapeHtml(capitalize(recipe.title || ''))}</h1><table><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>VTO producto</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
       win.document.close();
       win.focus();
       await waitPrintAssets(win);
@@ -7349,7 +7349,7 @@
       }).join('');
       node.innerHTML = `
         <div class="inventario-table-head enhanced">
-          <input id="produccionRecipeHistorySearch" type="search" class="form-control ios-input" autocomplete="off" placeholder="Buscar por producciÃ³n" value="${escapeHtml(recipeHistoryState.search)}">
+          <input id="produccionRecipeHistorySearch" type="search" class="form-control ios-input" autocomplete="off" placeholder="Buscar por producción" value="${escapeHtml(recipeHistoryState.search)}">
           <div class="inventario-history-toolbar">
             <div class="inventario-table-range">
               <input id="produccionRecipeHistoryRange" class="form-control ios-input" autocomplete="off" placeholder="Rango de fechas" value="${escapeHtml(recipeHistoryState.range)}">
@@ -7370,7 +7370,7 @@
         </div>
         <div class="table-responsive inventario-table-compact-wrap">
           <table class="table recipe-table inventario-table-compact mb-0">
-            <thead><tr><th>ID producciÃ³n</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead>
+            <thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead>
             <tbody>${htmlRows}</tbody>
           </table>
         </div>`;
@@ -7440,8 +7440,8 @@
         if (!resolutionType) return;
         const label = resolutionType === 'decommissioned' ? 'decomisar' : 'vender en mostrador';
         const askConfirm = await openIosSwal({
-          title: 'Confirmar acciÃ³n',
-          html: `<div class="text-center produccion-resolve-qty-wrap"><p>Se aplicarÃ¡ <strong>${label}</strong> sobre el lote completo.</p><p>Cantidad afectada: <strong>${maxQtyKg.toFixed(3)} kg</strong>.</p></div>`,
+          title: 'Confirmar acción',
+          html: `<div class="text-center produccion-resolve-qty-wrap"><p>Se aplicará <strong>${label}</strong> sobre el lote completo.</p><p>Cantidad afectada: <strong>${maxQtyKg.toFixed(3)} kg</strong>.</p></div>`,
           showCancelButton: true,
           confirmButtonText: 'Confirmar',
           cancelButtonText: 'Cancelar',
@@ -7453,7 +7453,7 @@
           qtyKg: Number(maxQtyKg.toFixed(3))
         };
         await updateEditorPlan();
-        await openIosSwal({ title: 'AcciÃ³n preparada', html: '<p>La resoluciÃ³n se aplicarÃ¡ al confirmar la producciÃ³n.</p>', icon: 'success', confirmButtonText: 'Continuar' });
+        await openIosSwal({ title: 'Acción preparada', html: '<p>La resolución se aplicará al confirmar la producción.</p>', icon: 'success', confirmButtonText: 'Continuar' });
         return;
       }
       const toggleBtn = event.target.closest('[data-lot-toggle]');
@@ -7571,11 +7571,11 @@
           const canCollapseRows = traceableRows.some((item) => collapseMap[item.id] !== true);
           const canExpandRows = traceableRows.some((item) => collapseMap[item.id] === true);
           const pages = totalPages();
-          host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeExpandedHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeExpandedHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID producciÃ³n</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead><tbody>${renderRows()}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-recipe-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>PÃ¡gina ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-recipe-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+          host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeExpandedHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeExpandedHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead><tbody>${renderRows()}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-recipe-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-recipe-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
           prepareThumbLoaders('.js-produccion-thumb');
         };
         await openIosSwal({
-          title: 'Historial de producciÃ³n (ampliado)',
+          title: 'Historial de producción (ampliado)',
           html: '<div id="produccionRecipeExpandedHistoryHost" class="inventario-expand-wrap"></div>',
           width: '92vw',
           confirmButtonText: 'Cerrar',
@@ -7651,7 +7651,7 @@
         const payload = rows.flatMap((item) => {
           const manager = getManagerLabel(item);
           const main = {
-            'ID producciÃ³n': item.id || '-',
+            'ID producción': item.id || '-',
             'Fecha y hora': formatDateTime(item.createdAt),
             Producto: item.recipeTitle || '-',
             'Fabricado (KG.)': `${Number(item.quantityKg || 0).toFixed(2)} kg`,
@@ -7663,18 +7663,18 @@
           const resolutions = (Array.isArray(item?.lots) ? item.lots : [])
             .flatMap((plan) => (Array.isArray(plan?.lots) ? plan.lots : [])
               .flatMap((lot) => (Array.isArray(lot?.expiryResolutions) ? lot.expiryResolutions : []).map((res) => ({
-                'ID producciÃ³n': 'â†³ RES',
+                'ID producción': '� � RES',
                 'Fecha y hora': formatDateTime(res.createdAt),
                 Producto: item.recipeTitle || '-',
                 'Fabricado (KG.)': `-${Number(res.qtyKg || 0).toFixed(2)} kg`,
                 Responsable: res.type === 'decommissioned' ? 'Decomisado' : 'Vendido mostrador',
                 'VTO producto': formatProductExpiryLabel(item),
-                Trazabilidad: 'ResoluciÃ³n vencido',
+                Trazabilidad: 'Resolución vencido',
                 Acciones: '-',
                 __tone: isHighlightedResolutionType(res.type) ? 'resolution_yellow' : 'normal'
               }))));
           const traces = getTraceRowsFromRegistro(item).map((trace) => ({
-            'ID producciÃ³n': `â†³ ${trace.index}`,
+            'ID producción': `� � ${trace.index}`,
             'Fecha y hora': formatDateTime(trace.createdAt),
             Producto: getTraceIngredientLabelText(trace),
             'Fabricado (KG.)': `-${trace.amount}`,
@@ -7688,8 +7688,8 @@
         });
         await exportStyledExcel({
           fileName: `produccion_receta_${normalizeLower(recipe.title || 'receta').replace(/\s+/g, '_')}_${Date.now()}.xlsx`,
-          sheetName: 'ProducciÃ³n receta',
-          headers: ['ID producciÃ³n', 'Fecha y hora', 'Producto', 'Fabricado (KG.)', 'Responsable', 'VTO producto', 'Trazabilidad', 'Acciones'],
+          sheetName: 'Producción receta',
+          headers: ['ID producción', 'Fecha y hora', 'Producto', 'Fabricado (KG.)', 'Responsable', 'VTO producto', 'Trazabilidad', 'Acciones'],
           rows: payload
         });
         return;
@@ -7715,7 +7715,7 @@
         if (typeof window.laJamoneraOpenImageViewer === 'function') {
           await window.laJamoneraOpenImageViewer([{ invoiceImageUrls: urls }], 0, 'Adjuntos de lote');
         } else {
-          await openIosSwal({ title: 'Visor no disponible', html: '<p>No se pudo abrir el visor de imÃ¡genes.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+          await openIosSwal({ title: 'Visor no disponible', html: '<p>No se pudo abrir el visor de imágenes.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
         }
       }
     });
@@ -7754,7 +7754,7 @@
         [recipe.id]: selected
       };
       await persistConfig();
-      await openIosSwal({ title: 'Preferencia guardada', html: '<p>Este/estos encargados se preseleccionarÃ¡n en prÃ³ximas producciones.</p>', icon: 'success', confirmButtonText: 'Entendido' });
+      await openIosSwal({ title: 'Preferencia guardada', html: '<p>Este/estos encargados se preseleccionarán en próximas producciones.</p>', icon: 'success', confirmButtonText: 'Entendido' });
     });
     nodes.editor.querySelector('#produccionSaveDraftBtn')?.addEventListener('click', async () => {
       await saveEditorDraft();
@@ -7780,7 +7780,7 @@
       }
       if (!revalidated.isValid) {
         await openIosSwal({
-          title: 'Stock cambiÃ³ durante la ediciÃ³n',
+          title: 'Stock cambió durante la edición',
           html: `<p>Recalculamos y encontramos conflictos:</p><ul>${revalidated.conflicts.map((item) => `<li>${item}</li>`).join('')}</ul>`,
           icon: 'warning',
           confirmButtonText: 'Revisar'
@@ -7794,7 +7794,7 @@
       if (!managers.length) {
         await openIosSwal({
           title: 'Encargado requerido',
-          html: '<p>DebÃ©s seleccionar al menos un encargado para continuar.</p>',
+          html: '<p>Debés seleccionar al menos un encargado para continuar.</p>',
           icon: 'warning',
           confirmButtonText: 'Entendido'
         });
@@ -7814,8 +7814,8 @@
       const summaryRows = buildProductionConfirmSummaryRows(revalidated.ingredientPlans);
       const qtyGrams = Number((qty * 1000).toFixed(3));
       const confirm = await openIosSwal({
-        title: 'Confirmar producciÃ³n final',
-        html: `<div class="text-start produccion-confirm-summary produccion-confirm-card"><div class="produccion-confirm-head"><span class="produccion-confirm-icon"><i class="bi bi-check2-circle"></i></span><div><p class="produccion-confirm-kicker">ValidaciÃ³n final</p><p class="produccion-confirm-note">Se descontarÃ¡ stock real solo de insumos trazables.</p></div></div><p><strong><i class="bi bi-box-seam fa-solid fa-box-open"></i> Producto:</strong> <span>${escapeHtml(recipe.title || '-')}</span></p><p><strong><i class="bi bi-calendar-event"></i> Fecha:</strong> <span class="produccion-trace-date">${escapeHtml(formatIsoEs(date))}</span></p><p><strong><i class="bi bi-hourglass-split"></i> VTO producto:</strong> <span class="produccion-confirm-vto">${escapeHtml(formatIsoEs(productExpiry || ''))} (VTO)</span></p><p><strong><i class="bi bi-speedometer2"></i> Total a producir:</strong> <span class="produccion-confirm-total">${qty.toFixed(3)} kg</span><br><small>${qtyGrams.toFixed(3)} gramos</small></p><p><strong><i class="bi bi-people"></i> Encargado/s:</strong><br>${managerSummary}</p><p><strong><i class="bi bi-list-check"></i> Resumen de insumos:</strong></p><ul class="produccion-confirm-ingredients">${summaryRows}</ul></div>`,
+        title: 'Confirmar producción final',
+        html: `<div class="text-start produccion-confirm-summary produccion-confirm-card"><div class="produccion-confirm-head"><span class="produccion-confirm-icon"><i class="bi bi-check2-circle"></i></span><div><p class="produccion-confirm-kicker">Validación final</p><p class="produccion-confirm-note">Se descontará stock real solo de insumos trazables.</p></div></div><p><strong><i class="bi bi-box-seam fa-solid fa-box-open"></i> Producto:</strong> <span>${escapeHtml(recipe.title || '-')}</span></p><p><strong><i class="bi bi-calendar-event"></i> Fecha:</strong> <span class="produccion-trace-date">${escapeHtml(formatIsoEs(date))}</span></p><p><strong><i class="bi bi-hourglass-split"></i> VTO producto:</strong> <span class="produccion-confirm-vto">${escapeHtml(formatIsoEs(productExpiry || ''))} (VTO)</span></p><p><strong><i class="bi bi-speedometer2"></i> Total a producir:</strong> <span class="produccion-confirm-total">${qty.toFixed(3)} kg</span><br><small>${qtyGrams.toFixed(3)} gramos</small></p><p><strong><i class="bi bi-people"></i> Encargado/s:</strong><br>${managerSummary}</p><p><strong><i class="bi bi-list-check"></i> Resumen de insumos:</strong></p><ul class="produccion-confirm-ingredients">${summaryRows}</ul></div>`,
         showCancelButton: true,
         confirmButtonText: 'Confirmar',
         cancelButtonText: 'Cancelar',
@@ -7823,8 +7823,8 @@
       });
       if (!confirm.isConfirmed) return;
       Swal.fire({
-        title: 'Cargando producciÃ³n...',
-        html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando producciÃ³n" class="meta-spinner-login"></div>',
+        title: 'Cargando producción...',
+        html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando producción" class="meta-spinner-login"></div>',
         allowOutsideClick: false,
         showConfirmButton: false,
         customClass: {
@@ -7927,7 +7927,7 @@
           at: nowTs(),
           sourceId: productionId,
           sourceCode: productionId,
-          label: 'ProducciÃ³n confirmada',
+          label: 'Producción confirmada',
           date
         });
         await persistRepartoStore();
@@ -7940,10 +7940,10 @@
         await refreshData();
         renderList();
         Swal.close();
-        await openIosSwal({ title: 'ProducciÃ³n guardada', html: `<p>ID generado: <strong>${productionId}</strong></p>`, icon: 'success', confirmButtonText: 'Genial' });
+        await openIosSwal({ title: 'Producción guardada', html: `<p>ID generado: <strong>${productionId}</strong></p>`, icon: 'success', confirmButtonText: 'Genial' });
       } catch (error) {
         Swal.close();
-        await openIosSwal({ title: 'No se pudo confirmar', html: '<p>OcurriÃ³ un error al guardar la producciÃ³n.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+        await openIosSwal({ title: 'No se pudo confirmar', html: '<p>Ocurrió un error al guardar la producción.</p>', icon: 'error', confirmButtonText: 'Entendido' });
       }
     };
     let isConfirmingProduction = false;
@@ -7960,8 +7960,8 @@
     });
     nodes.editor.querySelector('#produccionBackBtn').addEventListener('click', async () => {
       const result = await openIosSwal({
-        title: isViewOnly ? 'Â¿DeseÃ¡s salir de esta visualizaciÃ³n?' : 'Â¿DeseÃ¡s abandonar esta producciÃ³n?',
-        html: isViewOnly ? '<p>Se cerrarÃ¡ la visualizaciÃ³n sin guardar borradores.</p>' : '<p>Se guardarÃ¡ borrador para retomarlo luego.</p>',
+        title: isViewOnly ? '¿Deseás salir de esta visualización?' : '¿Deseás abandonar esta producción?',
+        html: isViewOnly ? '<p>Se cerrará la visualización sin guardar borradores.</p>' : '<p>Se guardará borrador para retomarlo luego.</p>',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Abandonar',
@@ -8027,14 +8027,14 @@
       try {
         await window.dbLaJamoneraRest.write(REPARTO_PATH, state.reparto);
       } catch (error) {
-        console.warn('[ProducciÃ³n] No se pudo persistir /Reparto al reconstruir Ã­ndice.', error);
+        console.warn('[Producción] No se pudo persistir /Reparto al reconstruir índice.', error);
       }
     }
     if (!Object.keys(safeObject(repartoStore)).length && Object.keys(safeObject(legacyRepartoStore)).length) {
       try {
         await window.dbLaJamoneraRest.write(REPARTO_PATH, state.reparto);
       } catch (error) {
-        console.warn('[ProducciÃ³n] No se pudo migrar /REPARTO a /Reparto.', error);
+        console.warn('[Producción] No se pudo migrar /REPARTO a /Reparto.', error);
       }
     }
     state.config = {
@@ -8143,10 +8143,10 @@
       const draft = state.drafts[draftId];
       const confirmDelete = await openIosSwal({
         title: 'Descartar borrador',
-        html: '<p>Se liberarÃ¡ el stock reservado y el borrador se eliminarÃ¡.</p><small>Esta acciÃ³n no se puede deshacer.</small>',
+        html: '<p>Se liberará el stock reservado y el borrador se eliminará.</p><small>Esta acción no se puede deshacer.</small>',
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonText: 'SÃ­, descartar',
+        confirmButtonText: 'Sí, descartar',
         cancelButtonText: 'Cancelar'
       });
       if (!confirmDelete.isConfirmed) return;
@@ -8178,8 +8178,8 @@
       state.activeRecipeId = produceBtn.dataset.openProduccion;
       state.editorMode = normalizeValue(produceBtn.dataset.openProduccionMode) === 'view' ? 'view' : 'produce';
       Swal.fire({
-        title: 'Cargando producciÃ³n...',
-        html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando producciÃ³n" class="meta-spinner-login"></div>',
+        title: 'Cargando producción...',
+        html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando producción" class="meta-spinner-login"></div>',
         allowOutsideClick: false,
         showConfirmButton: false,
         customClass: {
@@ -8191,7 +8191,7 @@
       try {
         await renderEditor(state.activeRecipeId, { mode: state.editorMode });
       } catch (error) {
-        await openIosSwal({ title: 'No se pudo abrir producciÃ³n', html: '<p>Hubo un error al preparar el editor. IntentÃ¡ nuevamente.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+        await openIosSwal({ title: 'No se pudo abrir producción', html: '<p>Hubo un error al preparar el editor. Intentá nuevamente.</p>', icon: 'error', confirmButtonText: 'Entendido' });
         state.activeRecipeId = '';
         state.editorMode = 'produce';
         setStateView('list');
@@ -8299,11 +8299,11 @@
       const canCollapseRows = traceableRows.some((item) => collapseMap[item.id] !== true);
       const canExpandRows = traceableRows.some((item) => collapseMap[item.id] === true);
       const pages = totalPages();
-      host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionExpandedHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionExpandedHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead><tbody>${renderRows()}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-prod-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>PÃ¡gina ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-prod-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+      host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionExpandedHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionExpandedHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead><tbody>${renderRows()}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-prod-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-prod-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
       prepareThumbLoaders('.js-produccion-thumb');
     };
     await openIosSwal({
-      title: 'Producciones guardadas â€¢ La Jamonera',
+      title: 'Producciones guardadas ⬢ La Jamonera',
       html: '<div id="produccionExpandedHistoryHost" class="inventario-expand-wrap"></div>',
       width: '92vw',
       confirmButtonText: 'Cerrar',
@@ -8372,7 +8372,7 @@
     const payload = rows.flatMap((item) => {
       const manager = getManagerLabel(item);
       const main = {
-        'ID producciÃ³n': item.id || '-',
+        'ID producción': item.id || '-',
         'Fecha y hora': formatDateTime(item.createdAt),
         Producto: item.recipeTitle || '-',
         'Fabricado (KG.)': `${Number(item.quantityKg || 0).toFixed(2)} kg`,
@@ -8384,18 +8384,18 @@
       const resolutions = (Array.isArray(item?.lots) ? item.lots : [])
         .flatMap((plan) => (Array.isArray(plan?.lots) ? plan.lots : [])
           .flatMap((lot) => (Array.isArray(lot?.expiryResolutions) ? lot.expiryResolutions : []).map((res) => ({
-            'ID producciÃ³n': 'â†³ RES',
+            'ID producción': '� � RES',
             'Fecha y hora': formatDateTime(res.createdAt),
             Producto: item.recipeTitle || '-',
             'Fabricado (KG.)': `-${Number(res.qtyKg || 0).toFixed(2)} kg`,
             Responsable: res.type === 'decommissioned' ? 'Decomisado' : 'Vendido mostrador',
             'VTO producto': formatProductExpiryLabel(item),
-            Trazabilidad: 'ResoluciÃ³n vencido',
+            Trazabilidad: 'Resolución vencido',
             Acciones: '-',
             __tone: isHighlightedResolutionType(res.type) ? 'resolution_yellow' : 'normal'
           }))));
       const traces = getTraceRowsFromRegistro(item).map((trace) => ({
-        'ID producciÃ³n': `â†³ ${trace.index}`,
+        'ID producción': `� � ${trace.index}`,
         'Fecha y hora': formatDateTime(trace.createdAt),
         Producto: getTraceIngredientLabelText(trace),
         'Fabricado (KG.)': `-${trace.amount}`,
@@ -8410,7 +8410,7 @@
     await exportStyledExcel({
       fileName: `producciones_periodo_${Date.now()}.xlsx`,
       sheetName: 'Producciones',
-      headers: ['ID producciÃ³n', 'Fecha y hora', 'Producto', 'Fabricado (KG.)', 'Responsable', 'VTO producto', 'Trazabilidad', 'Acciones'],
+      headers: ['ID producción', 'Fecha y hora', 'Producto', 'Fabricado (KG.)', 'Responsable', 'VTO producto', 'Trazabilidad', 'Acciones'],
       rows: payload
     });
   });
@@ -8418,7 +8418,7 @@
   const openMassPlanillasByPeriod = async () => {
     const rows = getHistoryRows();
     if (!rows.length) {
-      await openIosSwal({ title: 'Sin datos', html: '<p>No hay producciones para el perÃ­odo seleccionado.</p>', icon: 'info' });
+      await openIosSwal({ title: 'Sin datos', html: '<p>No hay producciones para el período seleccionado.</p>', icon: 'info' });
       return;
     }
 
@@ -8451,7 +8451,7 @@
         const selected = [...document.querySelectorAll('[data-dispatch-mass-planilla-recipe]:checked')].map((node) => node.value);
         const qrKind = document.querySelector('input[name="dispatchMassQrKind"]:checked')?.value || 'all';
         if (mode === 'exclude' && !selected.length) {
-          Swal.showValidationMessage('SeleccionÃ¡ al menos un producto o ingrediente para excluir.');
+          Swal.showValidationMessage('Seleccioná al menos un producto o ingrediente para excluir.');
           return false;
         }
         return { mode, selected, qrKind };
@@ -8462,7 +8462,7 @@
     const excluded = new Set(selector.value.mode === 'exclude' ? selector.value.selected : []);
     const filtered = rows.filter((row) => !excluded.has(normalizeValue(row.recipeId || row.recipeTitle || row.id)));
     if (!filtered.length) {
-      await openIosSwal({ title: 'Sin resultados', html: '<p>El filtro dejÃ³ 0 planillas para imprimir.</p>', icon: 'warning' });
+      await openIosSwal({ title: 'Sin resultados', html: '<p>El filtro dejó 0 planillas para imprimir.</p>', icon: 'warning' });
       return;
     }
 
@@ -8529,7 +8529,7 @@
   const buildDispatchMassSelectorHtml = (catalog) => {
     const renderItems = (items, key) => items.length
       ? items.map((item) => `<label class="inventario-check-row inventario-selector-row dispatch-mass-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap dispatch-mass-photo-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-dispatch-mass-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}"></span>` : '<span class="inventario-print-photo-wrap dispatch-mass-photo-wrap"><span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span></span>'}<input type="checkbox" data-dispatch-mass-planilla-recipe="${key}" value="${escapeHtml(item.id)}"><span>${escapeHtml(item.title)}</span></label>`).join('')
-      : '<p class="text-muted mb-0">No hay elementos en esta secciÃ³n.</p>';
+      : '<p class="text-muted mb-0">No hay elementos en esta sección.</p>';
     return `<div class="swal-stack-fields text-start">
       <label class="inventario-check-row"><input type="radio" name="dispatchMassPlanillaScope" value="all" checked><span>Incluir todos los productos</span></label>
       <label class="inventario-check-row"><input type="radio" name="dispatchMassPlanillaScope" value="exclude"><span>Excluir algunos productos</span></label>
@@ -8549,7 +8549,7 @@
   const openMassDispatchPlanillasByPeriod = async () => {
     const rows = getDispatchRows();
     if (!rows.length) {
-      await openIosSwal({ title: 'Sin datos', html: '<p>No hay repartos para el perÃ­odo seleccionado.</p>', icon: 'info' });
+      await openIosSwal({ title: 'Sin datos', html: '<p>No hay repartos para el período seleccionado.</p>', icon: 'info' });
       return;
     }
 
@@ -8582,7 +8582,7 @@
         const selected = [...document.querySelectorAll('[data-dispatch-mass-planilla-recipe]:checked')].map((node) => node.value);
         const qrKind = document.querySelector('input[name="dispatchMassQrKind"]:checked')?.value || 'all';
         if (mode === 'exclude' && !selected.length) {
-          Swal.showValidationMessage('SeleccionÃ¡ al menos un producto o ingrediente para excluir.');
+          Swal.showValidationMessage('Seleccioná al menos un producto o ingrediente para excluir.');
           return false;
         }
         return { mode, selected, qrKind };
@@ -8600,7 +8600,7 @@
       return nextProducts.length ? { ...row, products: nextProducts } : null;
     }).filter(Boolean);
     if (!filtered.length) {
-      await openIosSwal({ title: 'Sin resultados', html: '<p>El filtro dejÃ³ 0 planillas para imprimir.</p>', icon: 'warning' });
+      await openIosSwal({ title: 'Sin resultados', html: '<p>El filtro dejó 0 planillas para imprimir.</p>', icon: 'warning' });
       return;
     }
 
@@ -8646,7 +8646,7 @@
     const picker = await openIosSwal({
       title: 'Rango obligatorio para planilla',
       customClass: { popup: 'weekly-range-alert' },
-      html: '<p>Para evitar procesar datos infinitos, seleccionÃ¡ un rango de fechas antes de continuar.</p><input id="sheetRangeInput" class="swal2-input ios-input w-100" placeholder="Seleccionar rango">',
+      html: '<p>Para evitar procesar datos infinitos, seleccioná un rango de fechas antes de continuar.</p><input id="sheetRangeInput" class="swal2-input ios-input w-100" placeholder="Seleccionar rango">',
       showCancelButton: true,
       confirmButtonText: 'Continuar',
       cancelButtonText: 'Cancelar',
@@ -8660,7 +8660,7 @@
       preConfirm: () => {
         const parsed = parseWeeklyRangeValue(normalizeValue(document.getElementById('sheetRangeInput')?.value));
         if (!parsed.from || !parsed.to) {
-          Swal.showValidationMessage('DebÃ©s seleccionar un rango completo (desde y hasta).');
+          Swal.showValidationMessage('Debés seleccionar un rango completo (desde y hasta).');
           return false;
         }
         return parsed;
@@ -8672,7 +8672,7 @@
     const win = window.open('', '_blank', 'width=1400,height=900');
     if (!win) return;
     const printStyle = `<style>@page{size:landscape;margin:8mm}*{box-sizing:border-box}body{font-family:Inter,Arial,sans-serif;color:#111827;background:#ffffff;margin:0;padding:8px}.weekly-production-sheet{display:grid;gap:10px}.weekly-sheet-block{border:1px solid #1f2937;border-radius:0;overflow:visible;background:#fff;break-inside:avoid}.weekly-sheet-block h3,.weekly-sheet-block h4{margin:0;text-align:center;font-weight:900;padding:6px 8px;letter-spacing:.02em;text-transform:uppercase}.weekly-sheet-block h3{background:#0f172a;color:#fff;font-size:15px;border-bottom:1px solid #1f2937}.weekly-sheet-block h4{background:#f1f5f9;color:#1e3a5f;border-bottom:1px solid #1f2937;font-size:13px}.weekly-sheet-table{width:100%;border-collapse:collapse;table-layout:fixed;text-transform:uppercase}.weekly-sheet-table th,.weekly-sheet-table td{border:1px solid #334155;padding:5px 4px;word-break:break-word;text-align:center;font-size:10.5px;line-height:1.18;vertical-align:middle}.weekly-sheet-table th{font-weight:900}.weekly-sheet-table th.th-cat{background:#14532d;color:#fff}.weekly-sheet-table th.th-day{background:#1d4ed8;color:#fff}.weekly-sheet-table th.th-total{background:#0f172a;color:#fff}.weekly-sheet-table td{background:#fff}.weekly-sheet-table td.is-missing{background:#fff7ed;color:#9a3412}.weekly-sheet-table td.is-ok{background:#ecfdf5;color:#14532d;font-weight:800}.weekly-sheet-table td.weekly-total{font-weight:900;background:#e0f2fe;color:#0f3f63}.weekly-product-cell{display:flex;align-items:center;gap:7px;justify-content:flex-start;text-align:left;font-weight:900}.weekly-product-cell img{width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #94a3b8;flex:0 0 auto}.page-break{page-break-before:always;break-before:page}</style>`;
-    win.document.write(`<html><head><title>Planilla de producciÃ³n semanal</title>${printStyle}</head><body>${html}</body></html>`);
+    win.document.write(`<html><head><title>Planilla de producción semanal</title>${printStyle}</head><body>${html}</body></html>`);
     win.document.close();
     const safePrint = () => {
       try {
@@ -8729,7 +8729,7 @@
         const mode = document.querySelector('input[name="weeklyPlanillaScope"]:checked')?.value || 'all';
         const selected = [...document.querySelectorAll('[data-weekly-planilla-recipe]:checked')].map((node) => node.value);
         if (mode === 'exclude' && !selected.length) {
-          Swal.showValidationMessage('SeleccionÃ¡ al menos un producto para excluir.');
+          Swal.showValidationMessage('Seleccioná al menos un producto para excluir.');
           return false;
         }
         return { mode, selected };
@@ -8751,7 +8751,7 @@
       segments.push({ start: cursor, end: segEnd });
       cursor = addIsoDays(segEnd, 1);
     }
-    const dayLabelByIndex = ['Domingo', 'Lunes', 'Martes', 'MiÃ©rcoles', 'Jueves', 'Viernes', 'SÃ¡bado'];
+    const dayLabelByIndex = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     const html = `<div class="weekly-production-sheet">${segments.map((segment, idx) => {
       const dayIsos = [];
       let d = segment.start;
@@ -8775,11 +8775,11 @@
         const total = daily.reduce((acc, value) => acc + value, 0);
         return `<tr><td>${escapeHtml(capitalize(product.category.replaceAll('-', ' ')))}</td><td>${escapeHtml(capitalize(product.subcategory))}</td><td><div class="weekly-product-cell">${product.imageUrl ? `<img class="weekly-product-thumb" src="${escapeHtml(product.imageUrl)}" alt="${escapeHtml(product.title)}">` : ''}<span>${escapeHtml(normalizeUpper(product.title))}</span></div></td>${daily.map((kg) => `<td class="${kg > 0 ? 'is-ok' : 'is-missing'}">${kg > 0 ? `${kg.toFixed(2)}KG` : ''}</td>`).join('')}<td class="weekly-total">${total.toFixed(2)}KG</td></tr>`;
       }).join('');
-      return `<section class="weekly-sheet-block ${idx ? 'page-break' : ''}"><h3>FRIGORIFICO LA JAMONERA â€¢ PLANILLA DE PRODUCCION SEMANAL</h3><h4>SEMANA DE ${formatIsoEs(segment.start)} A ${formatIsoEs(segment.end)}</h4><div class="table-responsive"><table class="weekly-sheet-table"><thead><tr><th class="th-cat">CATEGORIA</th><th class="th-cat">SUBCATEGORIA</th><th class="th-cat">PRODUCTO</th>${headers.map((d) => `<th class="th-day">${d.toUpperCase()}</th>`).join('')}<th class="th-total">TOTAL</th></tr></thead><tbody>${rowsHtml || `<tr><td colspan="${4 + headers.length}">Sin datos.</td></tr>`}</tbody></table></div></section>`;
+      return `<section class="weekly-sheet-block ${idx ? 'page-break' : ''}"><h3>FRIGORIFICO LA JAMONERA ⬢ PLANILLA DE PRODUCCION SEMANAL</h3><h4>SEMANA DE ${formatIsoEs(segment.start)} A ${formatIsoEs(segment.end)}</h4><div class="table-responsive"><table class="weekly-sheet-table"><thead><tr><th class="th-cat">CATEGORIA</th><th class="th-cat">SUBCATEGORIA</th><th class="th-cat">PRODUCTO</th>${headers.map((d) => `<th class="th-day">${d.toUpperCase()}</th>`).join('')}<th class="th-total">TOTAL</th></tr></thead><tbody>${rowsHtml || `<tr><td colspan="${4 + headers.length}">Sin datos.</td></tr>`}</tbody></table></div></section>`;
     }).join('')}</div>`;
 
     await openIosSwal({
-      title: 'Planilla de ProducciÃ³n Semanal',
+      title: 'Planilla de Producción Semanal',
       width: 'min(1400px,98vw)',
       html: `<div class="planilla-toolbar"><button type="button" class="btn ios-btn ios-btn-secondary" id="weeklyProductionPrintBtn"><i class="fa-solid fa-print"></i><span>Imprimir</span></button></div><div class="planilla-card">${html}</div>`,
       confirmButtonText: 'Cerrar',
@@ -8794,8 +8794,8 @@
 
   nodes.historyPrintBtn?.addEventListener('click', async () => {
     const ask = await openIosSwal({
-      title: 'Imprimir perÃ­odo',
-      html: '<p>Â¿QuerÃ©s incluir imÃ¡genes adjuntas?</p>',
+      title: 'Imprimir período',
+      html: '<p>¿Querés incluir imágenes adjuntas?</p>',
       showCancelButton: true,
       showDenyButton: true,
       confirmButtonText: 'Incluir',
@@ -8811,7 +8811,7 @@
     const includeImages = ask.isConfirmed;
     const askTrace = await openIosSwal({
       title: 'Incluir trazabilidad',
-      html: '<p>Â¿QuerÃ©s incluir los datos colapsados de trazabilidad?</p>',
+      html: '<p>¿Querés incluir los datos colapsados de trazabilidad?</p>',
       showCancelButton: true,
       showDenyButton: true,
       confirmButtonText: 'Incluir',
@@ -8843,16 +8843,16 @@
         .flatMap((plan) => (Array.isArray(plan?.lots) ? plan.lots : [])
           .flatMap((lot) => (Array.isArray(lot?.expiryResolutions) ? lot.expiryResolutions : [])
             .filter((res) => isHighlightedResolutionType(res.type))
-            .map((res) => `<tr class="is-resolution-row"><td>â†³ RES</td><td>${escapeHtml(formatDateTime(res.createdAt))}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>-${Number(res.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(res.type === 'decommissioned' ? 'Decomisado' : 'Vendido en mostrador')}</td><td>${escapeHtml(formatProductExpiryLabel(item))} (VTO)</td></tr>`)));
+            .map((res) => `<tr class="is-resolution-row"><td>� � RES</td><td>${escapeHtml(formatDateTime(res.createdAt))}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>-${Number(res.qtyKg || 0).toFixed(2)} kg</td><td>${escapeHtml(res.type === 'decommissioned' ? 'Decomisado' : 'Vendido en mostrador')}</td><td>${escapeHtml(formatProductExpiryLabel(item))} (VTO)</td></tr>`)));
       if (!includeTrace) return [main, ...resolutions];
-      const traces = getTraceRowsFromRegistro(item).map((trace) => `<tr class="is-trace-row"><td>â†³ ${trace.index}</td><td><span class="print-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td><span style="display:inline-flex;align-items:center;gap:8px;">${trace.ingredientImageUrl ? `<img src="${escapeHtml(trace.ingredientImageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${getTraceIngredientLabelHtml(trace)}</span></span></td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="print-trace-vto">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td></tr>`);
+      const traces = getTraceRowsFromRegistro(item).map((trace) => `<tr class="is-trace-row"><td>� � ${trace.index}</td><td><span class="print-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td><span style="display:inline-flex;align-items:center;gap:8px;">${trace.ingredientImageUrl ? `<img src="${escapeHtml(trace.ingredientImageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${getTraceIngredientLabelHtml(trace)}</span></span></td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="print-trace-vto">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td></tr>`);
       return [main, ...resolutions, ...traces];
     }).join('');
     const tracesWithAttachments = rows.flatMap((item) => getTraceRowsFromRegistro(item).filter((trace) => Array.isArray(trace.invoiceImageUrls) && trace.invoiceImageUrls.length));
     const imagesHtml = includeImages && tracesWithAttachments.length
-      ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">ImÃ¡genes adjuntas del perÃ­odo</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${tracesWithAttachments.map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><figcaption style="font-size:12px;color:#4b5f8e;font-weight:700;">${escapeHtml(getTraceIngredientLabelText(trace))}</figcaption></div>${(trace.invoiceImageUrls || []).map((url, idx) => `<img src="${url}" style="width:100%;max-height:240px;object-fit:contain;border-radius:10px;margin-top:${idx ? '8px' : '0'};">`).join('')}</figure>`).join('')}</div></section>`
+      ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas del período</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${tracesWithAttachments.map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><figcaption style="font-size:12px;color:#4b5f8e;font-weight:700;">${escapeHtml(getTraceIngredientLabelText(trace))}</figcaption></div>${(trace.invoiceImageUrls || []).map((url, idx) => `<img src="${url}" style="width:100%;max-height:240px;object-fit:contain;border-radius:10px;margin-top:${idx ? '8px' : '0'};">`).join('')}</figure>`).join('')}</div></section>`
       : '';
-    win.document.write(`<html><head><title>ProducciÃ³n por perÃ­odo</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.is-trace-row td{background:#ffecef}.is-resolution-row td{background:#fff6d9}.print-trace-date{color:#1f6fd6;font-weight:700}.print-trace-vto{color:#b04a09;font-weight:700}</style></head><body><h1>ProducciÃ³n por perÃ­odo â€¢ La Jamonera</h1><table><thead><tr><th>ID producciÃ³n</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
+    win.document.write(`<html><head><title>Producción por período</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.is-trace-row td{background:#ffecef}.is-resolution-row td{background:#fff6d9}.print-trace-date{color:#1f6fd6;font-weight:700}.print-trace-vto{color:#b04a09;font-weight:700}</style></head><body><h1>Producción por período ⬢ La Jamonera</h1><table><thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
     win.document.close();
     win.focus();
     await waitPrintAssets(win);
@@ -8906,8 +8906,8 @@
       state.dispatchDraft = null;
       if (state.dispatchXlsxPendingResume && hasDispatchXlsxDraftChanges(state.dispatchXlsxDraft)) {
         const askResume = await openIosSwal({
-          title: 'ImportaciÃ³n pendiente',
-          html: '<p>TenÃ©s un archivo XLS/XLSX pendiente de la sesiÃ³n anterior.</p><p>Â¿QuerÃ©s continuar con ese archivo?</p>',
+          title: 'Importación pendiente',
+          html: '<p>Tenés un archivo XLS/XLSX pendiente de la sesión anterior.</p><p>¿Querés continuar con ese archivo?</p>',
           showCancelButton: true,
           confirmButtonText: 'Continuar',
           cancelButtonText: 'Nuevo archivo'
@@ -8967,11 +8967,11 @@
       if (normalizeValue(row.mappedTargetId)) {
         const decide = await openIosSwal({
           title: 'Producto ya relacionado',
-          html: `<p><strong>${escapeHtml(row.sourceProduct || 'Producto')}</strong> estÃ¡ relacionado con <strong>${escapeHtml(row.mappedTargetTitle || '-')}</strong>.</p>`,
+          html: `<p><strong>${escapeHtml(row.sourceProduct || 'Producto')}</strong> está relacionado con <strong>${escapeHtml(row.mappedTargetTitle || '-')}</strong>.</p>`,
           showCancelButton: true,
           showDenyButton: true,
-          confirmButtonText: 'Editar relaciÃ³n',
-          denyButtonText: 'Borrar relaciÃ³n',
+          confirmButtonText: 'Editar relación',
+          denyButtonText: 'Borrar relación',
           cancelButtonText: 'Cancelar'
         });
         if (decide.isDenied) {
@@ -9014,7 +9014,7 @@
       const ingredientId = normalizeValue(xlsxResolveConflictBtn.dataset.dispatchXlsxIngredient);
       const ask = await openIosSwal({
         title: 'Resolver conflicto de vencido',
-        html: '<p>Â¿CÃ³mo querÃ©s resolver este conflicto?</p><p><small>Se resolverÃ¡ esta fila y luego se recalcularÃ¡ la previsualizaciÃ³n del XLSX.</small></p>',
+        html: '<p>¿Cómo querés resolver este conflicto?</p><p><small>Se resolverá esta fila y luego se recalculará la previsualización del XLSX.</small></p>',
         showCancelButton: true,
         showDenyButton: true,
         confirmButtonText: 'Venta en mostrador',
@@ -9131,26 +9131,26 @@
       const recipeId = normalizeValue(line?.recipeId);
       const dispatchDate = normalizeValue(state.dispatchDraft.dispatchDate) || toIsoDate();
       if (!recipeId) {
-        await openIosSwal({ title: 'Producto requerido', html: '<p>SeleccionÃ¡ un producto vÃ¡lido antes de resolver lotes vencidos.</p>', icon: 'warning' });
+        await openIosSwal({ title: 'Producto requerido', html: '<p>Seleccioná un producto válido antes de resolver lotes vencidos.</p>', icon: 'warning' });
         return;
       }
       const expiredLot = buildRecipeLotsForDispatch(recipeId).find((lot) => isDispatchLotExpiredForDate(lot, dispatchDate));
       if (!expiredLot || Number(expiredLot.availableKg || 0) <= 0.0001) {
-        await openIosSwal({ title: 'Sin lotes vencidos', html: '<p>El lote vencido ya no estÃ¡ disponible para resolver.</p>', icon: 'info' });
+        await openIosSwal({ title: 'Sin lotes vencidos', html: '<p>El lote vencido ya no está disponible para resolver.</p>', icon: 'info' });
         renderDispatchCreate(state.dispatchDraft);
         return;
       }
       const upcomingLot = buildRecipeLotsForDispatch(recipeId).find((lot) => isDispatchLotUsableForDate(lot, dispatchDate) && Number(lot.availableKg || 0) > 0.0001);
-      const confirmTitle = actionType === 'decommissioned' ? 'Â¿Marcar lote como decomisado?' : 'Â¿Marcar lote como venta en sucursal?';
+      const confirmTitle = actionType === 'decommissioned' ? '¿Marcar lote como decomisado?' : '¿Marcar lote como venta en sucursal?';
       const confirmText = actionType === 'decommissioned'
-        ? 'Se descontarÃ¡ todo el disponible del lote vencido y se registrarÃ¡ un egreso como Decomisado, vinculado al nÃºmero de producciÃ³n.'
-        : 'Se descontarÃ¡ todo el disponible del lote vencido y se registrarÃ¡ un egreso como Venta en Sucursal, vinculado al nÃºmero de producciÃ³n.';
+        ? 'Se descontará todo el disponible del lote vencido y se registrará un egreso como Decomisado, vinculado al número de producción.'
+        : 'Se descontará todo el disponible del lote vencido y se registrará un egreso como Venta en Sucursal, vinculado al número de producción.';
       const extraLotText = upcomingLot
         ? `<small>Al confirmar cargaremos otro lote disponible: <strong>${escapeHtml(upcomingLot.lotNumber || '-')}</strong> con <strong>${Number(upcomingLot.availableKg || 0).toFixed(2)} kg</strong>.</small>`
-        : '<small>Si no hay otro lote vigente, la fila del producto se quitarÃ¡ para que puedas seguir cargando el reparto.</small>';
+        : '<small>Si no hay otro lote vigente, la fila del producto se quitará para que puedas seguir cargando el reparto.</small>';
       const confirm = await openIosSwal({
         title: confirmTitle,
-        html: `<p>${confirmText}</p><p><strong>Lote:</strong> ${escapeHtml(expiredLot.lotNumber || '-')} Â· <strong>Vence:</strong> ${escapeHtml(formatIsoEs(expiredLot.expiryDate || ''))} Â· <strong>Disponible:</strong> ${Number(expiredLot.availableKg || 0).toFixed(2)} kg</p>${extraLotText}`,
+        html: `<p>${confirmText}</p><p><strong>Lote:</strong> ${escapeHtml(expiredLot.lotNumber || '-')} · <strong>Vence:</strong> ${escapeHtml(formatIsoEs(expiredLot.expiryDate || ''))} · <strong>Disponible:</strong> ${Number(expiredLot.availableKg || 0).toFixed(2)} kg</p>${extraLotText}`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Confirmar',
@@ -9194,19 +9194,19 @@
       draft.comments = [...nodes.dispatchView.querySelectorAll('[data-dispatch-comment]')].map((n) => normalizeValue(n.value)).filter(Boolean);
       draft.proofs = Array.isArray(draft.proofs) ? draft.proofs.filter((item) => normalizeValue(item?.url)) : [];
       if (!draft.clientId) {
-        await openIosSwal({ title: 'Cliente requerido', html: '<p>SeleccionÃ¡ o creÃ¡ un cliente.</p>', icon: 'warning' });
+        await openIosSwal({ title: 'Cliente requerido', html: '<p>Seleccioná o creá un cliente.</p>', icon: 'warning' });
         return;
       }
       if (!draft.vehicleId) {
-        await openIosSwal({ title: 'VehÃ­culo requerido', html: '<p>SeleccionÃ¡ o creÃ¡ una UTA/URA.</p>', icon: 'warning' });
+        await openIosSwal({ title: 'Vehículo requerido', html: '<p>Seleccioná o creá una UTA/URA.</p>', icon: 'warning' });
         return;
       }
       if (!draft.managers.length) {
-        await openIosSwal({ title: 'Responsable requerido', html: '<p>SeleccionÃ¡ al menos un responsable.</p>', icon: 'warning' });
+        await openIosSwal({ title: 'Responsable requerido', html: '<p>Seleccioná al menos un responsable.</p>', icon: 'warning' });
         return;
       }
       if (!draft.lines.some((line) => normalizeValue(line.recipeId) && Number(line.qtyKg || 0) > 0)) {
-        await openIosSwal({ title: 'Sin productos', html: '<p>AgregÃ¡ al menos un producto para repartir.</p>', icon: 'warning' });
+        await openIosSwal({ title: 'Sin productos', html: '<p>Agregá al menos un producto para repartir.</p>', icon: 'warning' });
         return;
       }
       const normalizedProducts = [];
@@ -9214,11 +9214,11 @@
         const recipeId = normalizeValue(line.recipeId);
         const qtyKg = Number(line.qtyKg || 0);
         if (!recipeId) {
-          await openIosSwal({ title: 'Producto incompleto', html: '<p>SeleccionÃ¡ un producto vÃ¡lido en todas las filas cargadas.</p>', icon: 'warning' });
+          await openIosSwal({ title: 'Producto incompleto', html: '<p>Seleccioná un producto válido en todas las filas cargadas.</p>', icon: 'warning' });
           return;
         }
         if (qtyKg <= 0) {
-          await openIosSwal({ title: 'Cantidad invÃ¡lida', html: '<p>CompletÃ¡ kilos mayores a 0 para cada fila.</p>', icon: 'warning' });
+          await openIosSwal({ title: 'Cantidad inválida', html: '<p>Completá kilos mayores a 0 para cada fila.</p>', icon: 'warning' });
           return;
         }
         const recipe = safeObject(state.recetas[recipeId]);
@@ -9227,7 +9227,7 @@
         if (!allocated.hasStock && expiredForDate.length) {
           await openIosSwal({
             title: 'Lote vencido detectado',
-            html: `<p>${escapeHtml(capitalize(recipe.title || 'Receta'))} tiene lote vencido para la fecha ${escapeHtml(formatIsoEs(draft.dispatchDate || ''))}.</p><small>ResolvÃ© la fila en rojo (Venta en Sucursal/Decomisado) o cambiÃ¡ la fecha de reparto.</small>`,
+            html: `<p>${escapeHtml(capitalize(recipe.title || 'Receta'))} tiene lote vencido para la fecha ${escapeHtml(formatIsoEs(draft.dispatchDate || ''))}.</p><small>Resolvé la fila en rojo (Venta en Sucursal/Decomisado) o cambiá la fecha de reparto.</small>`,
             icon: 'warning'
           });
           return;
@@ -9263,7 +9263,7 @@
       const productsSummaryRows = normalizedProducts.map((item) => `<li><strong>${escapeHtml(item.recipeTitle || 'Producto')}</strong>: ${escapeHtml(getDispatchProductSummaryLabel(item))}</li>`).join('');
       const confirmSaveDispatch = await openIosSwal({
         title: 'Confirmar reparto final',
-        html: `<div class="text-start produccion-confirm-summary produccion-confirm-card"><div class="produccion-confirm-head"><span class="produccion-confirm-icon"><i class="bi bi-truck"></i></span><div><p class="produccion-confirm-kicker">ValidaciÃ³n final</p><p class="produccion-confirm-note">Se descontarÃ¡ stock de productos al guardar el reparto.</p></div></div><p><strong><i class="bi bi-calendar-event"></i> Fecha:</strong> <span>${escapeHtml(formatIsoEs(draft.dispatchDate || ''))}</span></p><p><strong><i class="fa-solid fa-user"></i> Cliente:</strong> <span>${escapeHtml(draft.clientName || selectedClient.name || '-')}</span></p><p><strong><i class="fa-solid fa-truck"></i> UTA/URA:</strong> <span>${escapeHtml(formatDispatchVehicleLabel(selectedVehicle))}</span></p><p><strong><i class="bi bi-people"></i> Responsables:</strong><br>${managerSummary || '-'}</p><p><strong><i class="bi bi-box-seam"></i> Productos:</strong></p><ul>${productsSummaryRows}</ul></div>`,
+        html: `<div class="text-start produccion-confirm-summary produccion-confirm-card"><div class="produccion-confirm-head"><span class="produccion-confirm-icon"><i class="bi bi-truck"></i></span><div><p class="produccion-confirm-kicker">Validación final</p><p class="produccion-confirm-note">Se descontará stock de productos al guardar el reparto.</p></div></div><p><strong><i class="bi bi-calendar-event"></i> Fecha:</strong> <span>${escapeHtml(formatIsoEs(draft.dispatchDate || ''))}</span></p><p><strong><i class="fa-solid fa-user"></i> Cliente:</strong> <span>${escapeHtml(draft.clientName || selectedClient.name || '-')}</span></p><p><strong><i class="fa-solid fa-truck"></i> UTA/URA:</strong> <span>${escapeHtml(formatDispatchVehicleLabel(selectedVehicle))}</span></p><p><strong><i class="bi bi-people"></i> Responsables:</strong><br>${managerSummary || '-'}</p><p><strong><i class="bi bi-box-seam"></i> Productos:</strong></p><ul>${productsSummaryRows}</ul></div>`,
         showCancelButton: true,
         confirmButtonText: 'Guardar reparto',
         cancelButtonText: 'Cancelar',
@@ -9340,10 +9340,10 @@
         console.warn('[produccion] refreshData post-dispatch failed', error);
       });
       Swal.close();
-      await openIosSwal({ title: 'Reparto guardado', html: `<p>CÃ³digo generado: <strong>${code}</strong></p>`, icon: 'success' });
+      await openIosSwal({ title: 'Reparto guardado', html: `<p>Código generado: <strong>${code}</strong></p>`, icon: 'success' });
       } catch (error) {
         Swal.close();
-        await openIosSwal({ title: 'No se pudo guardar', html: '<p>OcurriÃ³ un error al guardar el reparto. IntentÃ¡ nuevamente.</p>', icon: 'error' });
+        await openIosSwal({ title: 'No se pudo guardar', html: '<p>Ocurrió un error al guardar el reparto. Intentá nuevamente.</p>', icon: 'error' });
       }
       return;
     }
@@ -9374,7 +9374,7 @@
       }
       const askDetail = await openIosSwal({
         title: 'Incluir Desglose',
-        html: '<p>Â¿QuerÃ©s incluir los datos colapsados de Repartos donde ves el detalle de productos?</p>',
+        html: '<p>¿Querés incluir los datos colapsados de Repartos donde ves el detalle de productos?</p>',
         showCancelButton: true,
         showDenyButton: true,
         confirmButtonText: 'Incluir',
@@ -9390,7 +9390,7 @@
       const includeDetail = askDetail.isConfirmed;
       const win = window.open('', '_blank', 'width=1280,height=920');
       if (!win) return;
-      win.document.write('<html><head><title>Cargando impresiÃ³n...</title></head><body style="font-family:Inter,Arial,sans-serif;padding:16px;color:#223457;">Preparando impresiÃ³n de repartos...</body></html>');
+      win.document.write('<html><head><title>Cargando impresión...</title></head><body style="font-family:Inter,Arial,sans-serif;padding:16px;color:#223457;">Preparando impresión de repartos...</body></html>');
       win.document.close();
       const imageUrls = rows.flatMap((row) => {
         const products = Array.isArray(row.products) ? row.products : [];
@@ -9404,7 +9404,7 @@
         const expiryLabel = expiries.length === 1 ? formatIsoEs(expiries[0]) : (expiries.length ? 'Ver detalle' : '-');
         const locationText = getDispatchLocationLabel(row, client);
         const { groups, standalone } = getDispatchGroupedProducts(row);
-        const repartoHead = `<tr class="is-dispatch-head-row"><td colspan="6"><div class="dispatch-print-head"><span class="dispatch-print-truck">ðŸšš</span><div><h3>${escapeHtml(row.code || '-')}</h3><p>${escapeHtml(locationText)}</p></div></div></td></tr>`;
+        const repartoHead = `<tr class="is-dispatch-head-row"><td colspan="6"><div class="dispatch-print-head"><span class="dispatch-print-truck">�xaa</span><div><h3>${escapeHtml(row.code || '-')}</h3><p>${escapeHtml(locationText)}</p></div></div></td></tr>`;
         const summary = `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${products.length === 1 ? '1 producto' : `${products.length} productos`}</td><td>${products.map((item) => escapeHtml(getDispatchProductSummaryLabel(item))).join('<br>')}</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || '-')}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
         if (!includeDetail) return [repartoHead, summary];
         const groupedRows = groups.flatMap((group) => {
@@ -9416,7 +9416,7 @@
               : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
             return allocations.map((allocation) => {
               const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
-              return `<tr class="is-dispatch-trace-row"><td>â†³ <span style="display:inline-flex;align-items:center;gap:8px;">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(item.recipeTitle || '-')}</span></span></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} Â· ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${(normalizeValue(allocation.productionId) || normalizeValue(allocation.traceUrl)) ? 'Trazabilidad' : 'Sin trazabilidad'}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
+              return `<tr class="is-dispatch-trace-row"><td>� � <span style="display:inline-flex;align-items:center;gap:8px;">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(item.recipeTitle || '-')}</span></span></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${(normalizeValue(allocation.productionId) || normalizeValue(allocation.traceUrl)) ? 'Trazabilidad' : 'Sin trazabilidad'}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
             });
           });
           return [parentRow, ...childRows];
@@ -9428,15 +9428,15 @@
             : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
           return allocations.map((allocation) => {
             const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
-            return `<tr class="is-dispatch-trace-row"><td>â†³ <span style="display:inline-flex;align-items:center;gap:8px;">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(item.recipeTitle || '-')}</span></span></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} Â· ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${(normalizeValue(allocation.productionId) || normalizeValue(allocation.traceUrl)) ? 'Trazabilidad' : 'Sin trazabilidad'}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
+            return `<tr class="is-dispatch-trace-row"><td>� � <span style="display:inline-flex;align-items:center;gap:8px;">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(item.recipeTitle || '-')}</span></span></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${(normalizeValue(allocation.productionId) || normalizeValue(allocation.traceUrl)) ? 'Trazabilidad' : 'Sin trazabilidad'}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
           });
         });
         const locationRow = locationText
-          ? `<tr class="is-dispatch-internal-row"><td colspan="6">ðŸ  ${escapeHtml(locationText)}</td></tr>`
+          ? `<tr class="is-dispatch-internal-row"><td colspan="6">�x�� ${escapeHtml(locationText)}</td></tr>`
           : '';
         return [repartoHead, summary, ...groupedRows, ...detailRows, locationRow].filter(Boolean);
       }).join('');
-      win.document.write(`<html><head><title>Repartos</title><style>body{font-family:Inter,Arial,sans-serif;padding:12px;color:#223457}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #d5def2;padding:8px;font-size:11px;vertical-align:top;word-break:break-word}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.03em}.is-dispatch-head-row td{background:#fff}.dispatch-print-head{display:flex;align-items:center;gap:10px}.dispatch-print-head h3{margin:0;font-size:26px;line-height:1.1;color:#1f2a44}.dispatch-print-head p{margin:2px 0 0;color:#6d7ca3;font-size:18px}.dispatch-print-truck{width:48px;height:48px;border-radius:999px;border:1px solid #d7def2;display:inline-flex;align-items:center;justify-content:center;background:#fff;font-size:24px}.is-dispatch-trace-row td{background:#ffecef;color:#1f2a44}.is-dispatch-internal-row td{background:#fff2e3;color:#1f2a44;font-weight:400;text-align:center}</style></head><body><h2>Salida de Productos</h2><table><thead><tr><th>Fecha</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>NÃºmero de reparto</th><th>Cliente</th></tr></thead><tbody>${body || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table></body></html>`);
+      win.document.write(`<html><head><title>Repartos</title><style>body{font-family:Inter,Arial,sans-serif;padding:12px;color:#223457}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #d5def2;padding:8px;font-size:11px;vertical-align:top;word-break:break-word}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.03em}.is-dispatch-head-row td{background:#fff}.dispatch-print-head{display:flex;align-items:center;gap:10px}.dispatch-print-head h3{margin:0;font-size:26px;line-height:1.1;color:#1f2a44}.dispatch-print-head p{margin:2px 0 0;color:#6d7ca3;font-size:18px}.dispatch-print-truck{width:48px;height:48px;border-radius:999px;border:1px solid #d7def2;display:inline-flex;align-items:center;justify-content:center;background:#fff;font-size:24px}.is-dispatch-trace-row td{background:#ffecef;color:#1f2a44}.is-dispatch-internal-row td{background:#fff2e3;color:#1f2a44;font-weight:400;text-align:center}</style></head><body><h2>Salida de Productos</h2><table><thead><tr><th>Fecha</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th></tr></thead><tbody>${body || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table></body></html>`);
       win.document.close();
       win.focus();
       await waitPrintAssets(win);
@@ -9444,7 +9444,7 @@
       return;
     }
     if (event.target.closest('#produccionDispatchExcelBtn')) {
-      const headers = ['Fecha', 'Productos', 'Cantidad (kg)', 'Vencimiento', 'NÃºmero de reparto', 'Cliente'];
+      const headers = ['Fecha', 'Productos', 'Cantidad (kg)', 'Vencimiento', 'Número de reparto', 'Cliente'];
       const rows = getDispatchRows().flatMap((row) => {
         const products = Array.isArray(row.products) ? row.products : [];
         const expiries = [...new Set(products.flatMap((item) => (Array.isArray(item.allocations) ? item.allocations : []).map((l) => normalizeValue(l.expiryDate)).filter(Boolean)))];
@@ -9457,7 +9457,7 @@
           Productos: `${products.length} ${products.length === 1 ? 'producto' : 'productos'}`,
           'Cantidad (kg)': products.map((item) => getDispatchProductSummaryLabel(item)).join(' | '),
           Vencimiento: expiryLabel,
-          'NÃºmero de reparto': row.code || row.id || '-',
+          'Número de reparto': row.code || row.id || '-',
           Cliente: client.name || '-'
         };
         const groupedRows = groups.flatMap((group) => {
@@ -9466,7 +9466,7 @@
             Productos: 'Relacionado',
             'Cantidad (kg)': group.items.map((item) => getDispatchProductSummaryLabel(item)).join(' | '),
             Vencimiento: '',
-            'NÃºmero de reparto': 'Grupo',
+            'Número de reparto': 'Grupo',
             Cliente: client.name || '-',
             __tone: 'group_parent'
           };
@@ -9477,11 +9477,11 @@
             return allocations.map((allocation) => {
               const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
               return {
-                Fecha: `â†³ ${item.recipeTitle || '-'}`,
+                Fecha: `� � ${item.recipeTitle || '-'}`,
                 Productos: allocationDisplay.label,
-                'Cantidad (kg)': `${allocation.lotNumber || '-'} Â· ${allocationDisplay.label}`,
+                'Cantidad (kg)': `${allocation.lotNumber || '-'} · ${allocationDisplay.label}`,
                 Vencimiento: formatIsoEs(allocation.expiryDate || '') || '-',
-                'NÃºmero de reparto': (normalizeValue(allocation.productionId) || normalizeValue(allocation.traceUrl)) ? 'Trazabilidad' : 'Sin trazabilidad',
+                'Número de reparto': (normalizeValue(allocation.productionId) || normalizeValue(allocation.traceUrl)) ? 'Trazabilidad' : 'Sin trazabilidad',
                 Cliente: client.name || '-',
                 __tone: 'trace'
               };
@@ -9496,11 +9496,11 @@
           return allocations.map((allocation) => {
             const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
             return {
-              Fecha: `â†³ ${item.recipeTitle || '-'}`,
+              Fecha: `� � ${item.recipeTitle || '-'}`,
               Productos: allocationDisplay.label,
-              'Cantidad (kg)': `${allocation.lotNumber || '-'} Â· ${allocationDisplay.label}`,
+              'Cantidad (kg)': `${allocation.lotNumber || '-'} · ${allocationDisplay.label}`,
               Vencimiento: formatIsoEs(allocation.expiryDate || '') || '-',
-              'NÃºmero de reparto': (normalizeValue(allocation.productionId) || normalizeValue(allocation.traceUrl)) ? 'Trazabilidad' : 'Sin trazabilidad',
+              'Número de reparto': (normalizeValue(allocation.productionId) || normalizeValue(allocation.traceUrl)) ? 'Trazabilidad' : 'Sin trazabilidad',
               Cliente: client.name || '-',
               __tone: 'trace'
             };
@@ -9508,11 +9508,11 @@
         });
         const locationRow = locationLabel
           ? [{
-            Fecha: `â†³ ðŸ  ${locationLabel}`,
+            Fecha: `� � �x�� ${locationLabel}`,
             Productos: '',
             'Cantidad (kg)': '',
             Vencimiento: '',
-            'NÃºmero de reparto': '',
+            'Número de reparto': '',
             Cliente: '',
             __tone: 'internal_use',
             __mergeAcross: true
@@ -9534,7 +9534,7 @@
     if (event.target.closest('#produccionDispatchExpandBtn')) {
       const rows = getDispatchRows();
       await openIosSwal({
-        title: 'Salida de Productos Â· Vista ampliada',
+        title: 'Salida de Productos · Vista ampliada',
         width: '92vw',
         html: '<div id="dispatchExpandedWrap"></div>',
         confirmButtonText: 'Cerrar',
@@ -9567,7 +9567,7 @@
                         : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
                       const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
                       const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
-                      return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} Â· ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
+                      return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
                     });
                   });
                   return [parentRow, ...childRows];
@@ -9580,7 +9580,7 @@
                       : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
                     const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
                     const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
-                    return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} Â· ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
+                    return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
                   });
                 })
               ].join('') : '';
@@ -9590,7 +9590,7 @@
                 : '';
               return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${products.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-collapse="${escapeHtml(row.id)}"><i class="fa-solid ${collapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(formatDateTime(row.createdAt))}</span></div></td><td>${products.length === 1 ? '1 producto' : `${products.length} productos`}</td><td>${products.map((item) => escapeHtml(getDispatchProductSummaryLabel(item))).join('<br>')}</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || '-')}</td><td>${escapeHtml(client.name || '-')}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-planilla="${escapeHtml(row.id)}"><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button></td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-dispatch-delete="${escapeHtml(row.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${detail}${locationRow}`;
             }).join('') || '<tr><td colspan="8">Sin datos.</td></tr>';
-            popup.querySelector('#dispatchExpandedWrap').innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-collapse-all ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-expand-all ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0 produccion-dispatch-table-center"><thead><tr><th>Fecha de reparto</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>NÃºmero de reparto</th><th>Cliente</th><th>Planilla</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>PÃ¡gina ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+            popup.querySelector('#dispatchExpandedWrap').innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-collapse-all ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-expand-all ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0 produccion-dispatch-table-center"><thead><tr><th>Fecha de reparto</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th><th>Planilla</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
             prepareThumbLoaders('.js-produccion-thumb');
           };
           renderExpanded();
@@ -9696,7 +9696,7 @@
       if (hasDispatchXlsxDraftChanges(state.dispatchXlsxDraft)) {
         const overwrite = await openIosSwal({
           title: 'Tabla XLS/XLSX ya cargada',
-          html: '<p>Ya tenÃ©s una tabla cargada. Si importÃ¡s otro archivo se sobreescribirÃ¡ la vista actual.</p>',
+          html: '<p>Ya tenés una tabla cargada. Si importás otro archivo se sobreescribirá la vista actual.</p>',
           icon: 'warning',
           showCancelButton: true,
           confirmButtonText: 'Cargar',
@@ -9724,7 +9724,7 @@
           });
           await persistRepartoStore();
         }).catch(async () => {
-          await openIosSwal({ title: 'Carga parcial completada', html: '<p>Se cargÃ³ la tabla, pero fallÃ³ la subida del archivo al historial.</p>', icon: 'warning' });
+          await openIosSwal({ title: 'Carga parcial completada', html: '<p>Se cargó la tabla, pero falló la subida del archivo al historial.</p>', icon: 'warning' });
         }).finally(() => {
           state.dispatchXlsxUploadInProgress = false;
           if (state.dispatchXlsxMode && state.dispatchXlsxDraft) renderDispatchXlsxCreate(state.dispatchXlsxDraft);
@@ -9733,8 +9733,8 @@
         state.dispatchXlsxUploadInProgress = false;
         const code = normalizeValue(error?.message);
         const detail = code === 'headers_missing'
-          ? 'No encontramos encabezados vÃ¡lidos (Nomb.Cli, Nro.Comprob, Fech.Emision, Det.Reng, Cantidad).'
-          : 'No se pudo procesar el archivo. VerificÃ¡ que sea XLS/XLSX vÃ¡lido.';
+          ? 'No encontramos encabezados válidos (Nomb.Cli, Nro.Comprob, Fech.Emision, Det.Reng, Cantidad).'
+          : 'No se pudo procesar el archivo. Verificá que sea XLS/XLSX válido.';
         await openIosSwal({ title: 'Error al procesar Excel', html: `<p>${detail}</p>`, icon: 'error' });
       }
       return;
@@ -9750,7 +9750,7 @@
       if (row.disabled) {
         const ask = await openIosSwal({
           title: 'Deshabilitar producto',
-          html: '<p>Â¿DeseÃ¡s desactivarlo solo en esta fila o guardar la preferencia para este producto y futuras importaciones?</p>',
+          html: '<p>¿Deseás desactivarlo solo en esta fila o guardar la preferencia para este producto y futuras importaciones?</p>',
           showCancelButton: true,
           showDenyButton: true,
           confirmButtonText: 'Solo esta fila',
@@ -9800,11 +9800,11 @@
       if (!file) return;
       const validType = [...ALLOWED_UPLOAD_TYPES, 'application/pdf'].includes(file.type);
       if (!validType) {
-        await openIosSwal({ title: 'Adjunto invÃ¡lido', html: '<p>AdjuntÃ¡ imagen o PDF.</p>', icon: 'warning' });
+        await openIosSwal({ title: 'Adjunto inválido', html: '<p>Adjuntá imagen o PDF.</p>', icon: 'warning' });
         return;
       }
       if (file.size > MAX_UPLOAD_SIZE_BYTES) {
-        await openIosSwal({ title: 'Archivo muy grande', html: '<p>MÃ¡ximo permitido: 5MB.</p>', icon: 'warning' });
+        await openIosSwal({ title: 'Archivo muy grande', html: '<p>Máximo permitido: 5MB.</p>', icon: 'warning' });
         return;
       }
       const uploaded = await uploadImageToStorage(file, 'reparto/comprobantes');
@@ -10189,7 +10189,7 @@
       }
       const reg = state.registros[id];
       if (!reg) {
-        await openIosSwal({ title: 'Sin datos', html: '<p>No se encontrÃ³ la producciÃ³n solicitada.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+        await openIosSwal({ title: 'Sin datos', html: '<p>No se encontró la producción solicitada.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
         return;
       }
       await openTraceability(reg);
@@ -10242,7 +10242,7 @@
         });
       }
     } catch (error) {
-      nodes.empty.querySelector('.ingredientes-empty-text').textContent = 'No se pudo cargar producciÃ³n desde Firebase.';
+      nodes.empty.querySelector('.ingredientes-empty-text').textContent = 'No se pudo cargar producción desde Firebase.';
       setStateView('empty');
     }
   });

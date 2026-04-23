@@ -221,7 +221,7 @@
         invoiceNumber: normalizeValue(firstLot?.invoiceNumber || '-'),
         entryDate: formatIsoEs(firstLot?.entryDate || '-'),
         autoObservation: lots.length > 1
-          ? `${plan?.ingredientName || traceIngredient?.ingredientName || 'Ingrediente'}, se usÃ³ ${lotUsageSummary}. ${providersSummary}.`
+          ? `${plan?.ingredientName || traceIngredient?.ingredientName || 'Ingrediente'}, se usó ${lotUsageSummary}. ${providersSummary}.`
           : ''
       };
     });
@@ -290,7 +290,7 @@
       .join(' ');
     const observations = [normalizeValue(registro?.observations), autoObservations]
       .filter(Boolean)
-      .join(' Â· ') || 'SIN OBSERVACIONES';
+      .join(' · ') || 'SIN OBSERVACIONES';
 
     const observationsLabel = normalizeUpper(observations.replace(/\u00c2\u00b7/g, '|'));
 
@@ -431,7 +431,7 @@
     if (!id) return;
     const registro = await window.laJamoneraProduccionAPI?.getRegistroById?.(id);
     if (!registro) {
-      await Swal.fire({ title: 'Sin datos', html: '<p>No se encontrÃ³ la producciÃ³n solicitada.</p>', icon: 'warning' });
+      await Swal.fire({ title: 'Sin datos', html: '<p>No se encontró la producción solicitada.</p>', icon: 'warning' });
       return;
     }
     await openByRegistro(registro, context);
