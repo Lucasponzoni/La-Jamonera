@@ -1523,6 +1523,8 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 
 .swal2-popup.produccion-confirm-alert .swal2-html-container {
   padding: 0 !important;
+  overflow: hidden;
+  border-radius: 0 0 14px 14px;
 }
 
 .swal2-popup.ios-alert.informes-alert .swal2-html-container {
@@ -6594,6 +6596,14 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   background: #fff8f9;
 }
 
+.produccion-nombre-comercial {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #7b5ea7;
+  margin: 2px 0 0;
+  line-height: 1.3;
+}
+
 .produccion-row-head {
   display: flex;
   align-items: flex-start;
@@ -7347,9 +7357,17 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   font-size: 0.83rem;
 }
 
+/* ── Confirm production dialog ── */
+.produccion-confirm-card {
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid #dce6fb;
+  background: #f8faff;
+}
+
 .produccion-confirm-summary {
   display: grid;
-  gap: 6px;
+  gap: 0;
 }
 
 .produccion-confirm-summary p {
@@ -7361,78 +7379,187 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   color: #273f70;
 }
 
-.produccion-confirm-vto {
-  color: #8a4b12;
-  font-weight: 700;
-}
-
-.produccion-confirm-total {
-  color: #1f7ae8;
-  font-weight: 800;
-  font-size: 1.4rem;
-  line-height: 1.1;
-}
-
-.produccion-confirm-card {
-  background: #f6f9ff;
-  border: 1px solid #dce6fb;
-  border-radius: 14px;
-  padding: 10px;
-}
-
+/* header band */
 .produccion-confirm-head {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 6px;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 12px;
+  background: linear-gradient(135deg, #edf3ff 0%, #e4edff 100%);
+  border-bottom: 1px solid #d4e0fb;
 }
 
 .produccion-confirm-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: #1f7ae8;
-  background: #e8f1ff;
-  border: 1px solid #cfe0ff;
-  font-size: 1.05rem;
+  background: #fff;
+  border: 1.5px solid #c8deff;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(31,122,232,0.12);
 }
 
 .produccion-confirm-kicker {
   margin: 0;
   font-weight: 800;
-  color: #26467d;
-  font-size: 0.85rem;
+  color: #1a3a70;
+  font-size: 0.88rem;
+  line-height: 1.2;
 }
 
 .produccion-confirm-note {
-  margin: 0;
+  margin: 2px 0 0;
   color: #5f6f94;
-  font-size: 0.78rem;
+  font-size: 0.74rem;
 }
 
+/* product band */
+.pc-confirm-product {
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid #e8edf8;
+  background: #fff;
+}
+
+.pc-confirm-product-name {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #1a2b52;
+  line-height: 1.2;
+}
+
+.pc-confirm-product-comercial {
+  margin: 3px 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #7b5ea7;
+}
+
+/* meta grid */
+.pc-confirm-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1px;
+  background: #e4ecf8;
+  border-bottom: 1px solid #e4ecf8;
+}
+
+.pc-confirm-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #f0f5ff;
+}
+
+.pc-confirm-meta-icon {
+  font-size: 1.1rem;
+  color: #5a82c8;
+  flex-shrink: 0;
+}
+
+.pc-confirm-meta-item small {
+  display: block;
+  font-size: 0.68rem;
+  color: #6b82ad;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.pc-confirm-meta-item strong {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #1a3a70;
+  line-height: 1.1;
+}
+
+.pc-confirm-meta-item span {
+  display: block;
+  font-size: 0.7rem;
+  color: #7a92c0;
+  margin-top: 1px;
+}
+
+.pc-confirm-meta-item.is-vto strong { color: #b14f10; }
+.pc-confirm-meta-item.is-qty strong { color: #1264c8; font-size: 1rem; }
+
+/* section wrapper */
+.pc-confirm-section {
+  padding: 10px 16px;
+  border-bottom: 1px solid #e8edf8;
+  background: #fff;
+}
+.pc-confirm-section:last-child { border-bottom: none; }
+
+.pc-confirm-section-label {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #7a90c0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* managers */
+.pc-confirm-managers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pc-confirm-manager-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #edf3ff;
+  border: 1px solid #c8deff;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #1a4080;
+}
+
+.pc-confirm-manager-pill i { color: #3b6fd4; }
+
+/* ingredients list */
 .produccion-confirm-ingredients {
   list-style: none;
   padding: 0;
-  margin: 2px 0 0;
+  margin: 0;
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .produccion-confirm-ingredient {
   border: 1px solid #d9e4f8;
   border-radius: 10px;
-  background: #fff;
+  background: #f7faff;
   padding: 8px 10px;
   display: grid;
-  gap: 4px;
+  gap: 3px;
 }
 
 .produccion-confirm-ingredient.is-substitution-group {
   border-color: #f2c98b;
-  background: #fff8ec;
+  background: #fffbf3;
+}
+
+.produccion-confirm-ingredient.is-no-traceability {
+  border-color: #fde68a;
+  background: #fffdf0;
 }
 
 .produccion-confirm-ingredient-main {
@@ -7442,10 +7569,40 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   gap: 8px;
 }
 
+.produccion-confirm-ingredient-main strong {
+  color: #1a2b52;
+  font-size: 0.85rem;
+}
+
 .produccion-confirm-ingredient-main span {
   font-weight: 800;
   color: #1f7a46;
+  font-size: 0.85rem;
   text-align: right;
+  white-space: nowrap;
+}
+
+.pc-notraz-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  padding: 2px 7px;
+}
+
+.pc-notraz-badge i { color: #d97706; }
+
+.pc-infinite-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: #5f6f94;
 }
 
 .produccion-confirm-substitute-badge {
@@ -7476,6 +7633,7 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   border-top: 1px dashed #edbd75;
   padding-top: 4px;
   color: #4b5d83;
+  font-size: 0.82rem;
 }
 
 .produccion-confirm-substitute-list span {
@@ -7484,20 +7642,12 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   gap: 5px;
 }
 
-.produccion-trace-date {
-  color: #1f6fd6;
-  font-weight: 700;
-}
-
-.produccion-trace-expiry {
-  color: #b14f10;
-  font-weight: 700;
-}
-
-.produccion-trace-badge {
-  color: #8e2f40;
-  font-weight: 700;
-}
+/* legacy helpers kept for dispatch dialog */
+.produccion-confirm-vto  { color: #b14f10; font-weight: 700; }
+.produccion-confirm-total { color: #1f7ae8; font-weight: 800; font-size: 1.3rem; line-height: 1.1; }
+.produccion-trace-date   { color: #1f6fd6; font-weight: 700; }
+.produccion-trace-expiry { color: #b14f10; font-weight: 700; }
+.produccion-trace-badge  { color: #8e2f40; font-weight: 700; }
 
 .swal2-popup.produccion-confirm-alert .swal2-icon.swal2-question {
   display: none !important;
@@ -10833,6 +10983,150 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   color: #a86409;
   background: #fff1df;
   border-color: #f3d2a5;
+}
+
+/* ── three-dots more menu ── */
+.produccion-more-wrap {
+  position: relative;
+}
+
+.produccion-more-btn {
+  width: 36px !important;
+  min-width: 36px !important;
+  height: 36px;
+  min-height: 36px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  color: #64748b;
+  border-color: #dde3ef;
+  background: transparent;
+  transition: background 0.14s, color 0.14s, transform 0.12s;
+}
+.produccion-more-btn:hover {
+  background: #f0f4fb !important;
+  color: #334155;
+  transform: scale(1.08);
+}
+.produccion-more-btn:active { transform: scale(0.93); }
+
+.produccion-more-menu {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: 0;
+  background: #fff;
+  border: 1px solid rgba(99,120,177,0.13);
+  border-radius: 18px;
+  box-shadow: 0 4px 6px -2px rgba(0,0,0,0.06), 0 16px 48px -8px rgba(0,0,0,0.13), inset 0 0 0 1px rgba(255,255,255,0.7);
+  min-width: 246px;
+  z-index: 300;
+  overflow: hidden;
+  transform-origin: bottom right;
+  animation: pmMenuIn 0.2s cubic-bezier(0.34, 1.5, 0.64, 1) both;
+}
+@keyframes pmMenuIn {
+  from { opacity: 0; transform: scale(0.86) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.produccion-more-menu-header {
+  padding: 12px 16px 6px;
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.produccion-more-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 0 12px 4px;
+}
+
+.produccion-more-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px 14px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.produccion-more-item:hover { background: #fffaf3; }
+
+.produccion-more-item-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  color: #b45309;
+  flex-shrink: 0;
+}
+
+.produccion-more-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.produccion-more-item-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #92400e;
+  line-height: 1.2;
+}
+
+.produccion-more-item-desc {
+  font-size: 0.72rem;
+  color: #a16207;
+  line-height: 1.3;
+}
+
+/* --- sin-trazabilidad banner in editor --- */
+.produccion-sin-traz-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff8e1;
+  border: 1px solid #ffe0a0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  color: #8a6000;
+  margin-bottom: 14px;
+}
+
+.produccion-sin-traz-banner i {
+  font-size: 1rem;
+  color: #e07a00;
+  flex-shrink: 0;
+}
+
+.produccion-sin-traz-banner strong {
+  display: block;
+  font-size: 0.85rem;
+  margin-bottom: 2px;
+}
+
+/* --- nombre comercial in editor header --- */
+.produccion-nombre-comercial-editor {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #7b5ea7;
+  margin: 2px 0 0;
 }
 
 .produccion-progress-wrap.is-expired-only small {

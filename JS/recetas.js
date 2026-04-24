@@ -3238,6 +3238,10 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
             <input id="recipeTitle" class="form-control ios-input" value="${escapeHtml(formInitial.title || '')}" placeholder="Ej: Chorizo parrillero">
           </div>
           <div class="recipe-field recipe-field-full">
+            <label class="form-label" for="recipeNombreComercial">Nombre comercial (opcional)</label>
+            <input id="recipeNombreComercial" class="form-control ios-input" value="${escapeHtml(formInitial.nombreComercial || '')}" placeholder="Ej: Jamón cocido artesanal La Jamonera">
+          </div>
+          <div class="recipe-field recipe-field-full">
             <label class="form-label" for="recipeDescription">Descripción (opcional)</label>
             <textarea id="recipeDescription" class="form-control ios-input recipe-description-lg" placeholder="Detalle amplio de la receta">${escapeHtml(formInitial.description || '')}</textarea>
           </div>
@@ -3400,6 +3404,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
 
   const collectEditorPayload = async () => {
     const title = normalizeValue(recipeEditorForm.querySelector('#recipeTitle')?.value);
+    const nombreComercial = normalizeValue(recipeEditorForm.querySelector('#recipeNombreComercial')?.value);
     const description = normalizeValue(recipeEditorForm.querySelector('#recipeDescription')?.value);
     const yieldQuantity = normalizeValue(recipeEditorForm.querySelector('#recipeYieldQty')?.value).replaceAll('.', ',');
     const yieldUnit = normalizeLower(recipeEditorForm.querySelector('#recipeYieldUnit')?.value);
@@ -3516,7 +3521,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
       }
     }
 
-    return { title, description, yieldQuantity, yieldUnit, shelfLifeDays, agingDays, orderMode, rows: sortedRows, nutrition, rnpa: hasSomeRnpa ? rnpa : { number: '', denomination: '', brand: '', businessName: '', city: '', province: '', country: RNPA_COUNTRY, expiryDate: '', attachmentUrl: '', attachmentType: '', attachmentName: '' }, imageUrl };
+    return { title, nombreComercial, description, yieldQuantity, yieldUnit, shelfLifeDays, agingDays, orderMode, rows: sortedRows, nutrition, rnpa: hasSomeRnpa ? rnpa : { number: '', denomination: '', brand: '', businessName: '', city: '', province: '', country: RNPA_COUNTRY, expiryDate: '', attachmentUrl: '', attachmentType: '', attachmentName: '' }, imageUrl };
   };
 
   const buildDuplicateRecipeDraft = (recipe = {}) => {
