@@ -71,21 +71,20 @@
               <span class="barra-vertical"></span>
               <ul class="navbar-nav topbar-links me-auto mb-2 mb-lg-0">
                 <li class="nav-item">
-                  </span><a class="nav-link topbar-link active" href="./index.html" aria-current="page"><i class="bi bi-house-gear"></i> Mi Fabrica</a>
+                  </span><a class="nav-link topbar-link active" href="./index.html" aria-current="page">Mi Fabrica</a>
                 </li>
                 <li class="nav-item">
-                  <a class="nav-link topbar-link" href="./informes.html"><i class="bi bi-file-check"></i> Informes bromatológicos</a>
+                  <a class="nav-link topbar-link" href="./informes.html">Informes bromatológicos</a>
                 </li>
               </ul>
 
               <div class="topbar-user dropdown">
                 <button class="btn topbar-user-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Abrir menú de usuario">
-                  <i class="fa-solid fa-circle-user"></i>
+                  <span id="topbarUserInitials" class="topbar-user-initials">LJ</span>
                 </button>
                 <div class="dropdown-menu dropdown-menu-end topbar-user-menu">
                   <p class="topbar-user-name">Usuario: <strong>La Jamonera</strong></p>
                   <button class="btn ios-btn ios-btn-secondary w-100 js-logout" type="button">
-                    <i class="fa-solid fa-right-from-bracket"></i>
                     <span>Cerrar sesión</span>
                   </button>
                 </div>
@@ -157,21 +156,29 @@
         <div class="home-content panel-home-content">
           <section id="panelDashboard" class="panel-grid" aria-live="polite">
             <article id="panelResumen" class="glass-card panel-card panel-card-wide panel-summary-card">
-              <header class="panel-card-head"><h3><i class="fa-solid fa-gauge-high"></i> Recordatorios y estado general</h3></header>
+              <header class="panel-card-head"><h3><i class="bi bi-speedometer2"></i> Recordatorios y estado general</h3></header>
               <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando métricas" class="panel-spinner"></div></div>
             </article>
 
             <article id="panelProduccion" class="glass-card panel-card panel-card-wide">
-              <header class="panel-card-head">
-                <h3><i class="fa-solid fa-chart-column"></i> Producción en kilos</h3>
-                <input id="panelChartRange" class="form-control ios-input panel-range-input" placeholder="Filtrar rango de fechas">
+              <header class="panel-card-head panel-card-head-chart">
+                <h3><i class="bi bi-bar-chart-line-fill"></i> Producción en kilos</h3>
+                <div class="panel-chart-controls">
+                  <div class="btn-group panel-chart-type-group" role="group" aria-label="Tipo de gráfico">
+                    <button type="button" class="btn panel-chart-type-btn is-active" data-chart-type="horizontalBar" title="Barras horizontales" aria-label="Barras horizontales"><i class="bi bi-list-ol"></i></button>
+                    <button type="button" class="btn panel-chart-type-btn" data-chart-type="bar" title="Barras verticales" aria-label="Barras verticales"><i class="bi bi-bar-chart-fill"></i></button>
+                    <button type="button" class="btn panel-chart-type-btn" data-chart-type="line" title="Línea" aria-label="Línea"><i class="bi bi-graph-up"></i></button>
+                    <button type="button" class="btn panel-chart-type-btn" data-chart-type="doughnut" title="Dona" aria-label="Dona"><i class="bi bi-pie-chart-fill"></i></button>
+                  </div>
+                  <input id="panelChartRange" class="form-control ios-input panel-range-input" placeholder="Filtrar rango de fechas">
+                </div>
               </header>
               <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando producción" class="panel-spinner"></div></div>
             </article>
 
             <article id="panelUltimoInforme" class="glass-card panel-card">
               <header class="panel-card-head">
-                <h3><i class="fa-solid fa-file-waveform"></i> Último informe</h3>
+                <h3><i class="bi bi-file-earmark-medical"></i> Último informe</h3>
                 <span id="panelInformeAgo" class="panel-pill d-none"></span>
               </header>
               <div class="panel-card-body">
@@ -180,17 +187,17 @@
             </article>
 
             <article id="panelRne" class="glass-card panel-card">
-              <header class="panel-card-head"><h3><i class="fa-solid fa-file-shield"></i> Proveedores con RNE pendiente</h3></header>
+              <header class="panel-card-head"><h3><i class="bi bi-shield-check"></i> Proveedores con RNE pendiente</h3></header>
               <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando proveedores" class="panel-spinner"></div></div>
             </article>
 
             <article id="panelRnpa" class="glass-card panel-card">
-              <header class="panel-card-head"><h3><i class="fa-solid fa-clipboard-check"></i> RNPA de recetas</h3></header>
+              <header class="panel-card-head"><h3><i class="bi bi-clipboard2-check"></i> RNPA de recetas</h3></header>
               <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando RNPA" class="panel-spinner"></div></div>
             </article>
 
             <article id="panelTransporte" class="glass-card panel-card">
-              <header class="panel-card-head"><h3><i class="fa-solid fa-id-card-clip"></i> Transporte habilitado (UTA/URA)</h3></header>
+              <header class="panel-card-head"><h3><i class="bi bi-truck-front"></i> Transporte habilitado (UTA/URA)</h3></header>
               <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando transporte" class="panel-spinner"></div></div>
             </article>
 
@@ -531,42 +538,48 @@
         <div class="footer-main">
           <div class="footer-brand-block">
             <img src="./IMG/La Jamonera Cerdito.webp" alt="Logo La Jamonera" class="footer-brand-logo">
-            <div>
+            <div class="footer-brand-info">
               <h3 class="footer-brand-title">La Jamonera</h3>
-              <p class="footer-brand-text">Back Office</p>
+              <p class="footer-brand-text">Back Office · Panel de gestión</p>
+              <div class="footer-session-badge" aria-live="polite">
+                <i class="bi bi-clock-history" aria-hidden="true"></i>
+                <span>Sesión:</span>
+                <strong id="sessionCountdown">--h --m</strong>
+              </div>
             </div>
           </div>
 
           <div class="footer-actions">
-            <button id="footerLogoutBtn" class="btn ios-btn ios-btn-secondary js-logout" type="button">
-              <i class="fa-solid fa-right-from-bracket"></i>
-              <span>Cerrar sesión</span>
-              <span id="sessionCountdown" class="session-countdown" aria-live="polite">--h --m</span>
-            </button>
-
-            <a class="support-link footer-support" href="https://wa.me/543416292861?text=Nos%20contactamos%20de%20Frigorifico%20la%20Jamonera%20desde%20el%20back%20office." target="_blank" rel="noopener noreferrer">
-              <img src="./IMG/WhatsApp Logo.webp" alt="Soporte" class="support-icon">
+            <a class="footer-action-link footer-support" href="https://wa.me/543416292861?text=Nos%20contactamos%20de%20Frigorifico%20la%20Jamonera%20desde%20el%20back%20office." target="_blank" rel="noopener noreferrer">
+              <img src="./IMG/WhatsApp Logo.webp" alt="" class="support-icon" aria-hidden="true">
               <span>Contactar soporte</span>
             </a>
+
+            <button id="footerLogoutBtn" class="btn ios-btn ios-btn-secondary js-logout footer-logout-btn" type="button">
+              <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
+              <span>Cerrar sesión</span>
+            </button>
           </div>
         </div>
 
         <div class="footer-divider" aria-hidden="true"></div>
 
-        <p class="footer-legal">
-          El uso de este sitio web implica la aceptación de los términos, condiciones y políticas de privacidad de
-          <a href="https://asesoriabromatologicaros.com.ar/index.html" target="_blank" rel="noopener noreferrer">Asesoria Bromatologica Rosario</a>.
-          Las imagenes son a modo ilustrativo.
-        </p>
+        <div class="footer-bottom">
+          <p class="footer-legal">
+            El uso de este sitio implica la aceptación de los términos, condiciones y políticas de privacidad de
+            <a href="https://asesoriabromatologicaros.com.ar/index.html" target="_blank" rel="noopener noreferrer">Asesoría Bromatológica Rosario</a>.
+            Las imágenes son a modo ilustrativo.
+          </p>
 
-        <p class="footer-copy">
-          © Copyright <span id="currentYear"></span> - Back Office para empresas, powered by
-          <a href="https://asesoriabromatologicaros.com.ar/index.html" target="_blank" rel="noopener noreferrer">ABR</a>
-          - Author: Ponzoni Lucas
-          <a class="footer-mail" href="mailto:pablomanuelscalise@gmail.com" target="_blank" rel="noopener noreferrer" aria-label="Enviar email">
-            <i class="fa-regular fa-envelope"></i>
-          </a>
-        </p>
+          <p class="footer-copy">
+            © <span id="currentYear"></span> · Back Office para empresas · powered by
+            <a href="https://asesoriabromatologicaros.com.ar/index.html" target="_blank" rel="noopener noreferrer">ABR</a>
+            · Author: Ponzoni Lucas
+            <a class="footer-mail" href="mailto:pablomanuelscalise@gmail.com" target="_blank" rel="noopener noreferrer" aria-label="Enviar email">
+              <i class="bi bi-envelope" aria-hidden="true"></i>
+            </a>
+          </p>
+        </div>
       </footer>
     </section>
   </main>
@@ -584,6 +597,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.10/build/pdfmake.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.10/build/vfs_fonts.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/html-to-pdfmake@2.5.21/browser.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <script defer src="./JS/swal-a11y-guard.js"></script>
   <script defer src="./JS/firebase-init.js"></script>
   <script defer src="./JS/email_sender.js"></script>

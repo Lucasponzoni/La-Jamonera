@@ -72,20 +72,20 @@
       return;
     }
     nodes.list.innerHTML = users.map((user) => `
-      <div>
-        <article class="user-card">
+      <article class="users-manager-card">
+        <div class="users-manager-card-main">
           ${userAvatarHtml(user)}
-          <div class="user-main">
+          <div class="users-manager-card-info">
             <h6>${escapeHtml(user.fullName || 'Sin nombre')}</h6>
-            <p>${escapeHtml(user.position || 'Sin puesto')}</p>
-            <p>${escapeHtml(user.email || '')}</p>
+            <p class="users-manager-card-position">${escapeHtml(user.position || 'Sin puesto')}</p>
+            <p class="users-manager-card-email">${escapeHtml(user.email || '')}</p>
           </div>
-        </article>
-        <div class="family-circle-actions mt-2 justify-content-center">
-          <button class="family-manage-btn" type="button" data-user-edit="${escapeHtml(user.id)}" title="Editar usuario"><i class="fa-solid fa-pen"></i></button>
-          <button class="family-manage-btn" type="button" data-user-delete="${escapeHtml(user.id)}" title="Eliminar usuario"><i class="fa-solid fa-trash"></i></button>
         </div>
-      </div>
+        <div class="users-manager-card-actions">
+          <button class="users-manager-card-btn" type="button" data-user-edit="${escapeHtml(user.id)}" title="Editar usuario" aria-label="Editar usuario"><i class="bi bi-pencil"></i></button>
+          <button class="users-manager-card-btn is-danger" type="button" data-user-delete="${escapeHtml(user.id)}" title="Eliminar usuario" aria-label="Eliminar usuario"><i class="bi bi-trash"></i></button>
+        </div>
+      </article>
     `).join('');
     initThumbs();
   };

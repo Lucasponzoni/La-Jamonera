@@ -645,12 +645,12 @@ const printReport = async (report) => {
 
   const renderSummary = () => {
     const cards = [
-      { key: 'rne', icon: 'fa-file-shield', value: state.providers.length, title: 'RNE pendientes', note: 'proveedores sin completar' },
-      { key: 'rnpa', icon: 'fa-clipboard-check', value: state.recipes.length, title: 'RNPA criticos', note: 'recetas a revisar' },
-      { key: 'transport', icon: 'fa-id-card-clip', value: state.vehicles.length, title: 'UTA/URA con alerta', note: 'unidades por vencer' },
-      { key: 'reports', icon: 'fa-file-waveform', value: state.reports.length, title: 'Informes cargados', note: 'registros disponibles' }
+      { key: 'rne', icon: 'bi-shield-exclamation', value: state.providers.length, title: 'RNE pendientes', note: 'proveedores sin completar', unit: 'proveedores' },
+      { key: 'rnpa', icon: 'bi-clipboard2-check', value: state.recipes.length, title: 'RNPA críticos', note: 'recetas a revisar', unit: 'recetas' },
+      { key: 'transport', icon: 'bi-truck-front', value: state.vehicles.length, title: 'UTA/URA', note: 'unidades por vencer', unit: 'unidades' },
+      { key: 'reports', icon: 'bi-file-earmark-medical', value: state.reports.length, title: 'Informes', note: 'registros disponibles', unit: 'cargados' }
     ];
-    nodes.resumen.innerHTML = `<div class="panel-kpi-row">${cards.map((card) => `<article class="panel-metric panel-metric-${card.key}"><div class="panel-metric-top"><span class="panel-metric-icon"><i class="fa-solid ${card.icon}"></i></span><div class="panel-metric-copy"><strong>${escapeHtml(card.title)}</strong><small>${escapeHtml(card.note)}</small></div></div><div class="panel-metric-bottom"><span class="panel-metric-value">${card.value}</span></div></article>`).join('')}</div>`;
+    nodes.resumen.innerHTML = `<div class="panel-kpi-row">${cards.map((card) => `<article class="panel-metric panel-metric-${card.key}"><div class="panel-metric-top"><span class="panel-metric-icon"><i class="bi ${card.icon}"></i></span><div class="panel-metric-copy"><strong>${escapeHtml(card.title)}</strong><small>${escapeHtml(card.note)}</small></div></div><div class="panel-metric-bottom"><span class="panel-metric-value">${card.value}</span><span class="panel-metric-unit">${escapeHtml(card.unit)}</span></div></article>`).join('')}</div>`;
   };
 
   const renderProviders = () => {
@@ -688,6 +688,124 @@ const printReport = async (report) => {
     nodes.transporte.innerHTML = makeMarquee(rows, 3, 7);
   };
 
+  const chartPalette = [
+    '#ff7b54', '#2a9d8f', '#3f7eff', '#9d4edd', '#f4a261',
+    '#e63946', '#f72585', '#4ea8de', '#52b69a', '#7400b8'
+  ];
+
+  const chartState = { instance: null, type: 'horizontalBar' };
+
+  const ensureChartDom = () => {
+    if (nodes.produccion.querySelector('#produccionChart')) return;
+    nodes.produccion.innerHTML = '<div class="panel-chart-canvas-wrap"><canvas id="produccionChart" aria-label="Producción en kilos"></canvas></div>';
+  };
+
+  const buildChartData = (top, type) => {
+    const labels = top.map((x) => String(x.name || '').toUpperCase());
+    const values = top.map((x) => Number(x.kg.toFixed(2)));
+    const colors = top.map((_, i) => chartPalette[i % chartPalette.length]);
+    if (type === 'doughnut') {
+      return {
+        labels,
+        datasets: [{
+          data: values,
+          backgroundColor: colors,
+          borderColor: '#ffffff',
+          borderWidth: 2,
+          hoverOffset: 8
+        }]
+      };
+    }
+    if (type === 'line') {
+      return {
+        labels,
+        datasets: [{
+          label: 'Kilos',
+          data: values,
+          borderColor: '#4b78e8',
+          backgroundColor: 'rgba(75, 120, 232, 0.14)',
+          fill: true,
+          tension: 0.35,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          pointBackgroundColor: colors,
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 2,
+          borderWidth: 3
+        }]
+      };
+    }
+    return {
+      labels,
+      datasets: [{
+        label: 'Kilos',
+        data: values,
+        backgroundColor: colors,
+        borderRadius: 0,
+        borderSkipped: false,
+        maxBarThickness: 48
+      }]
+    };
+  };
+
+  const buildChartOptions = (type) => {
+    const base = {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 500 },
+      plugins: {
+        legend: { display: type === 'doughnut', position: 'bottom', labels: { color: '#55607f', boxWidth: 12, padding: 12 } },
+        tooltip: {
+          backgroundColor: '#1f2a44',
+          titleColor: '#ffffff',
+          bodyColor: '#e8ecf7',
+          cornerRadius: 10,
+          padding: 10,
+          callbacks: { label: (ctx) => `${ctx.parsed?.y ?? ctx.parsed} kg` }
+        }
+      }
+    };
+    if (type === 'doughnut') {
+      base.cutout = '60%';
+      base.plugins.tooltip.callbacks = { label: (ctx) => `${ctx.label}: ${ctx.parsed} kg` };
+      return base;
+    }
+    const isHorizontal = type === 'horizontalBar';
+    base.indexAxis = isHorizontal ? 'y' : 'x';
+    base.scales = {
+      x: {
+        grid: { color: 'rgba(31, 59, 116, 0.06)', drawBorder: false },
+        ticks: { color: '#55607f', font: { size: 11 }, maxRotation: isHorizontal ? 0 : 30, minRotation: 0, autoSkip: true }
+      },
+      y: {
+        grid: { color: 'rgba(31, 59, 116, 0.06)', drawBorder: false },
+        ticks: { color: '#55607f', font: { size: 11 } },
+        beginAtZero: true
+      }
+    };
+    if (type === 'line') {
+      base.plugins.tooltip.callbacks = { label: (ctx) => `${ctx.label}: ${ctx.parsed.y} kg` };
+    }
+    return base;
+  };
+
+  const drawChart = (top, type) => {
+    if (typeof Chart === 'undefined') {
+      nodes.produccion.innerHTML = '<div class="panel-empty">No se pudo cargar la librería de gráficos.</div>';
+      return;
+    }
+    ensureChartDom();
+    const canvas = nodes.produccion.querySelector('#produccionChart');
+    if (!canvas) return;
+    if (chartState.instance) { chartState.instance.destroy(); chartState.instance = null; }
+    const chartType = type === 'horizontalBar' ? 'bar' : type;
+    chartState.instance = new Chart(canvas.getContext('2d'), {
+      type: chartType,
+      data: buildChartData(top, type),
+      options: buildChartOptions(type)
+    });
+  };
+
   const renderChart = () => {
     const [start, end] = state.range;
     const inRange = state.registros.filter((item) => {
@@ -710,36 +828,35 @@ const printReport = async (report) => {
       return item;
     }).sort((a, b) => b.kg - a.kg).slice(0, 10);
 
-    if (!top.length) { nodes.produccion.innerHTML = '<div class="panel-empty">No hay produccion en el rango seleccionado.</div>'; return; }
+    if (!top.length) {
+      if (chartState.instance) { chartState.instance.destroy(); chartState.instance = null; }
+      nodes.produccion.innerHTML = '<div class="panel-empty">No hay produccion en el rango seleccionado.</div>';
+      return;
+    }
 
-    const max = Math.max(...top.map((x) => x.kg));
-    const barColors = [
-      'linear-gradient(90deg, #ff7b54, #ffb26b)',
-      'linear-gradient(90deg, #2a9d8f, #8ab17d)',
-      'linear-gradient(90deg, #3f7eff, #53a7ff)',
-      'linear-gradient(90deg, #9d4edd, #c77dff)',
-      'linear-gradient(90deg, #f4a261, #e9c46a)',
-      'linear-gradient(90deg, #e63946, #ef233c)',
-      'linear-gradient(90deg, #f72585, #ff4d6d)',
-      'linear-gradient(90deg, #4ea8de, #48bfe3)',
-      'linear-gradient(90deg, #80ed99, #52b69a)',
-      'linear-gradient(90deg, #7400b8, #6930c3)'
-    ];
-    nodes.produccion.innerHTML = `<div class="panel-chart-wrap">${top.map((item, index) => {
-      const avatar = item.imageUrl
-        ? `<span class="panel-chart-avatar"><img class="js-panel-thumb is-loaded" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name)}" loading="eager" decoding="async"></span>`
-        : `<span class="panel-chart-avatar">${escapeHtml(initials(item.name))}</span>`;
-      const colorSeed = normalize(item.id || item.name || index);
-      const colorIndex = [...colorSeed].reduce((acc, ch) => acc + ch.charCodeAt(0), 0) % barColors.length;
-      const bg = barColors[colorIndex];
-      const pct = Math.max(6, (item.kg / max) * 100);
-      return `<article class="panel-chart-row"><div class="panel-chart-main"><div class="panel-chart-rank">${index + 1}</div><div class="panel-chart-label">${avatar}<span>${escapeHtml(item.name)}</span></div><div class="panel-chart-value">${item.kg.toFixed(2)} kg</div></div><div class="panel-chart-meta"><div class="panel-chart-bar"><div class="panel-chart-fill" style="width:${pct}%; background: ${bg}"></div></div><span class="panel-chart-share">${Math.round((item.kg / max) * 100)}% del maximo</span></div></article>`;
-    }).join('')}</div>`;
+    chartState.lastTop = top;
+    drawChart(top, chartState.type);
+  };
+
+  const bindChartTypeToggle = () => {
+    const group = document.querySelector('#panelProduccion .panel-chart-type-group');
+    if (!group || group.dataset.bound === '1') return;
+    group.dataset.bound = '1';
+    group.addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-chart-type]');
+      if (!btn) return;
+      const type = btn.dataset.chartType;
+      if (!type || type === chartState.type) return;
+      chartState.type = type;
+      group.querySelectorAll('[data-chart-type]').forEach((el) => el.classList.toggle('is-active', el === btn));
+      if (chartState.lastTop && chartState.lastTop.length) drawChart(chartState.lastTop, type);
+    });
   };
 
   const renderAll = () => {
     renderSummary();
     renderChart();
+    bindChartTypeToggle();
     renderLastReport();
     renderProviders();
     renderRnpa();
