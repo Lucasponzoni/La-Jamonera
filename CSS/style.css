@@ -6406,6 +6406,21 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   }
 }
 
+/* === SweetAlert2 mobile width fix (global, includes alerts inside Bootstrap modals) === */
+@media (max-width: 768px) {
+  .swal2-container.swal2-center > .swal2-popup,
+  .swal2-popup,
+  .swal2-popup.ios-alert {
+    width: 96vw !important;
+    max-width: 96vw !important;
+    margin: 0 auto !important;
+  }
+
+  .swal2-container {
+    padding: 0 !important;
+  }
+}
+
 .produccion-umbral-global-btn,
 .produccion-umbral-btn {
   width: fit-content;
