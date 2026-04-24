@@ -763,78 +763,81 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; background: #eef2f8; color: #18233a; font-family: Inter, Arial, sans-serif; }
-    .recipe-print-full-page { width: min(210mm, 100%); min-height: 297mm; margin: 0 auto 12mm; background: #fff; padding: 18mm; break-after: page; page-break-after: always; }
+    body { margin: 0; background: #f2f2f2; color: #111; font-family: Inter, Arial, sans-serif; }
+    .recipe-print-full-page { width: min(210mm, 100%); min-height: 297mm; margin: 0 auto 10mm; background: #fff; padding: 14mm; break-after: page; page-break-after: always; }
     .recipe-print-full-page:last-child { margin-bottom: 0; break-after: auto; page-break-after: auto; }
-    .recipe-print-full-hero { display: grid; grid-template-columns: 1fr 110px; gap: 18px; align-items: center; border-bottom: 3px solid #18233a; padding-bottom: 18px; }
-    .recipe-print-full-kicker { margin: 0 0 6px; text-transform: uppercase; letter-spacing: .08em; color: #46649b; font-size: 11px; font-weight: 800; }
-    h1 { margin: 0; font-size: 34px; line-height: 1.05; letter-spacing: 0; }
-    .recipe-print-full-description { margin: 10px 0 0; color: #52627f; font-size: 14px; line-height: 1.55; }
-    .recipe-print-full-photo-wrap { width: 110px; height: 110px; border-radius: 999px; border: 1px solid #dbe3f2; background: #f5f7fb; overflow: hidden; display: grid; place-items: center; padding: 7px; }
+    .recipe-print-full-hero { display: grid; grid-template-columns: 1fr 96px; gap: 14px; align-items: center; border-bottom: 2px solid #111; padding-bottom: 12px; }
+    .recipe-print-full-kicker { margin: 0 0 4px; text-transform: uppercase; letter-spacing: .08em; color: #555; font-size: 10px; font-weight: 800; }
+    h1 { margin: 0; font-size: 28px; line-height: 1.05; letter-spacing: 0; color: #111; }
+    .recipe-print-full-description { margin: 6px 0 0; color: #444; font-size: 12px; line-height: 1.45; }
+    .recipe-print-full-photo-wrap { width: 96px; height: 96px; border-radius: 999px; border: 1px solid #bbb; background: #f5f5f5; overflow: hidden; display: grid; place-items: center; padding: 6px; }
     .recipe-print-full-photo { width: 100%; height: 100%; border-radius: 999px; background: #fff; object-fit: contain; object-position: center; display: block; }
-    .recipe-print-full-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
-    .recipe-print-full-meta div, .recipe-print-full-card { border: 1px solid #dce4f2; border-radius: 12px; background: #f8faff; }
-    .recipe-print-full-meta div { padding: 10px 12px; }
-    dt { margin: 0 0 3px; color: #657491; font-size: 10px; text-transform: uppercase; font-weight: 800; letter-spacing: .06em; }
-    dd { margin: 0; color: #17233b; font-size: 13px; font-weight: 800; }
-    .recipe-print-full-section { margin-top: 18px; break-inside: auto; page-break-inside: auto; }
-    .recipe-print-full-section h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-size: 18px; }
-    .recipe-print-full-section h2 span { width: 26px; height: 26px; border-radius: 8px; display: inline-grid; place-items: center; background: #1d4ed8; color: #fff; font-size: 13px; }
-    .recipe-print-full-table { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid #dce4f2; border-radius: 12px; overflow: visible; background: #fff; }
-    .recipe-print-full-table th { background: #f0f4ff; color: #344466; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; text-align: left; padding: 8px 10px; border-bottom: 1px solid #dce4f2; }
-    .recipe-print-full-table td { padding: 8px 10px; border-bottom: 1px solid #e7edf7; color: #25334d; font-size: 12px; vertical-align: middle; }
+    .recipe-print-full-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
+    .recipe-print-full-meta div, .recipe-print-full-card { border: 1px solid #bbb; background: #fafafa; }
+    .recipe-print-full-meta div { padding: 7px 10px; }
+    dt { margin: 0 0 2px; color: #555; font-size: 9px; text-transform: uppercase; font-weight: 800; letter-spacing: .06em; }
+    dd { margin: 0; color: #111; font-size: 12px; font-weight: 800; }
+    .recipe-print-full-section { margin-top: 12px; break-inside: auto; page-break-inside: auto; }
+    .recipe-print-full-section h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 15px; color: #111; }
+    .recipe-print-full-section h2 span { width: 22px; height: 22px; display: inline-grid; place-items: center; background: #111; color: #fff; font-size: 11px; font-weight: 800; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .recipe-print-full-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+    .recipe-print-full-columns .recipe-print-full-section { margin-top: 0; }
+    .recipe-print-full-table { width: 100%; border-collapse: collapse; border: 1px solid #bbb; background: #fff; }
+    .recipe-print-full-table th { background: #e5e5e5; color: #222; font-size: 9px; letter-spacing: .06em; text-transform: uppercase; text-align: left; padding: 6px 8px; border-bottom: 1px solid #999; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .recipe-print-full-table td { padding: 6px 8px; border-bottom: 1px solid #ddd; color: #111; font-size: 11px; vertical-align: middle; }
     .recipe-print-full-table tbody tr:last-child td { border-bottom: 0; }
-    .recipe-print-full-index { width: 34px; color: #74819a !important; font-weight: 800; text-align: center; }
-    .recipe-print-full-table-item { display: flex; align-items: center; gap: 10px; min-width: 0; }
-    .recipe-print-full-ingredient-thumb { width: 42px; height: 42px; border-radius: 999px; border: 1px solid #d8e0ef; overflow: hidden; background: #eef3ff; display: inline-grid; place-items: center; flex: 0 0 42px; padding: 5px; }
+    .recipe-print-full-index { width: 28px; color: #666 !important; font-weight: 800; text-align: center; }
+    .recipe-print-full-table-item { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .recipe-print-full-ingredient-thumb { width: 34px; height: 34px; border-radius: 999px; border: 1px solid #bbb; overflow: hidden; background: #f0f0f0; display: inline-grid; place-items: center; flex: 0 0 34px; padding: 3px; }
     .recipe-print-full-ingredient-thumb img { width: 100%; height: 100%; object-fit: contain; object-position: center; border-radius: 999px; display: block; background: #fff; }
-    .recipe-print-full-ingredient-thumb span { width: 18px; height: 18px; border-radius: 999px; background: #9fb2d8; display: block; }
-    .recipe-print-full-table-item strong { font-size: 12px; }
-    .recipe-print-full-notes-table td:last-child { line-height: 1.45; }
-    .recipe-print-full-empty-cell { color: #657491 !important; font-weight: 700; text-align: center; }
-    .recipe-print-full-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 12px; }
-    .recipe-print-full-grid div { border-bottom: 1px solid #e5ebf5; padding: 0 0 7px; }
-    .recipe-print-full-grid div:nth-last-child(-n+3) { border-bottom: 0; }
-    .recipe-print-full-front-card { padding: 14px; display: grid; gap: 12px; justify-items: center; break-inside: avoid; page-break-inside: avoid; }
+    .recipe-print-full-ingredient-thumb span { width: 14px; height: 14px; border-radius: 999px; background: #999; display: block; }
+    .recipe-print-full-table-item strong { font-size: 11px; }
+    .recipe-print-full-notes-table td:last-child { line-height: 1.4; }
+    .recipe-print-full-empty-cell { color: #666 !important; font-weight: 700; text-align: center; }
+    .recipe-print-full-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 10px; padding: 10px; }
+    .recipe-print-full-grid div { border-bottom: 1px solid #ddd; padding: 0 0 5px; }
+    .recipe-print-full-grid div:nth-last-child(-n+2) { border-bottom: 0; }
+    .recipe-print-full-front-card { padding: 10px; display: grid; gap: 10px; justify-items: center; break-inside: avoid; page-break-inside: avoid; }
     .recipe-print-full-front-card .recipe-octagons-wrap,
-    .recipe-print-full-front-card .recipe-front-rectangles { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+    .recipe-print-full-front-card .recipe-front-rectangles { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
     .recipe-print-full-front-card .recipe-octagon,
     .recipe-print-full-front-card .recipe-front-rectangle { position: relative; color: #fff; display: inline-flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; font-family: Arial, Helvetica, sans-serif; font-weight: 900; page-break-inside: avoid; break-inside: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .recipe-print-full-front-card .recipe-octagon { width: 96px; min-width: 96px; height: 96px; background-color: transparent; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'><polygon points='26,0 74,0 100,26 100,74 74,100 26,100 0,74 0,26' fill='%23111111'/></svg>"); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
-    .recipe-print-full-front-card .recipe-front-rectangle { width: 190px; min-height: 72px; background: #111; border: 3px solid #fff; outline: 2px solid #111; }
+    .recipe-print-full-front-card .recipe-octagon { width: 84px; min-width: 84px; height: 84px; background-color: transparent; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'><polygon points='26,0 74,0 100,26 100,74 74,100 26,100 0,74 0,26' fill='%23111111'/></svg>"); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
+    .recipe-print-full-front-card .recipe-front-rectangle { width: 170px; min-height: 64px; background: #111; border: 3px solid #fff; outline: 2px solid #111; }
     .recipe-print-full-front-card .recipe-octagon-title,
-    .recipe-print-full-front-card .recipe-front-rectangle-title { font-size: 12px; line-height: 1; letter-spacing: 0; }
-    .recipe-print-full-front-card .recipe-octagon-ministry { margin-top: 5px; font-size: 7px; line-height: 1; font-weight: 800; }
-    .recipe-print-full-front-card .recipe-nutrition-front-empty { margin: 0; color: #657491; font-weight: 700; }
-    .recipe-print-full-nutrition-section { break-before: page; page-break-before: always; break-inside: avoid; page-break-inside: avoid; }
+    .recipe-print-full-front-card .recipe-front-rectangle-title { font-size: 11px; line-height: 1; letter-spacing: 0; }
+    .recipe-print-full-front-card .recipe-octagon-ministry { margin-top: 4px; font-size: 7px; line-height: 1; font-weight: 800; }
+    .recipe-print-full-front-card .recipe-nutrition-front-empty { margin: 0; color: #666; font-weight: 700; }
+    .recipe-print-full-nutrition-section { break-inside: avoid; page-break-inside: avoid; }
     .recipe-print-full-nutrition-card { break-inside: avoid; page-break-inside: avoid; }
-    .recipe-print-full-nutrition-table { display: grid; place-items: start; padding: 12px; overflow: visible; break-inside: avoid; page-break-inside: avoid; }
-    .recipe-nutrition-label-card { width: 100%; max-width: 390px; border: 2px solid #111; padding: 10px; background: #fff; color: #111; font-family: Arial, Helvetica, sans-serif; }
-    .recipe-nutrition-label-card h3 { margin: 0; font-size: 26px; font-weight: 900; color: #111; }
-    .recipe-nutrition-product-name, .recipe-nutrition-serving, .recipe-nutrition-subtitle, .recipe-nutrition-dv, .recipe-nutrition-micros, .recipe-nutrition-footnote { margin: 4px 0; color: #111; }
-    .recipe-nutrition-bar { height: 9px; background: #111; margin: 6px 0; }
-    .recipe-nutrition-rule { border-top: 1px solid #111; margin: 5px 0; }
-    .recipe-nutrition-two-cols { display: flex; justify-content: space-between; gap: 10px; font-weight: 800; }
+    .recipe-print-full-nutrition-table { display: grid; place-items: start; padding: 10px; overflow: visible; break-inside: avoid; page-break-inside: avoid; }
+    .recipe-nutrition-label-card { width: 100%; max-width: 360px; border: 2px solid #111; padding: 9px; background: #fff; color: #111; font-family: Arial, Helvetica, sans-serif; }
+    .recipe-nutrition-label-card h3 { margin: 0; font-size: 22px; font-weight: 900; color: #111; }
+    .recipe-nutrition-product-name, .recipe-nutrition-serving, .recipe-nutrition-subtitle, .recipe-nutrition-dv, .recipe-nutrition-micros, .recipe-nutrition-footnote { margin: 3px 0; color: #111; font-size: 11px; }
+    .recipe-nutrition-bar { height: 7px; background: #111; margin: 5px 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .recipe-nutrition-rule { border-top: 1px solid #111; margin: 4px 0; }
+    .recipe-nutrition-two-cols { display: flex; justify-content: space-between; gap: 8px; font-weight: 800; font-size: 11px; }
     .recipe-nutrition-table-fixed { width: 100%; border-collapse: collapse; color: #111; }
-    .recipe-nutrition-table-fixed td { border-top: 1px solid #111; padding: 4px 0; font-weight: 700; }
+    .recipe-nutrition-table-fixed td { border-top: 1px solid #111; padding: 3px 0; font-weight: 700; font-size: 11px; }
     .recipe-nutrition-table-fixed td:last-child { text-align: right; }
-    .recipe-nutrition-table-fixed .indent { padding-left: 18px; font-weight: 500; }
-    .recipe-print-full-empty { margin: 0; color: #657491; font-weight: 700; }
-    .recipe-print-full-footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid #dce4f2; color: #6b7890; font-size: 11px; display: flex; justify-content: space-between; }
+    .recipe-nutrition-table-fixed .indent { padding-left: 14px; font-weight: 500; }
+    .recipe-print-full-empty { margin: 0; color: #666; font-weight: 700; }
+    .recipe-print-full-footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #bbb; color: #555; font-size: 10px; display: flex; justify-content: space-between; }
     @media print {
       body { background: #fff; }
-      .recipe-print-full-page { width: 210mm; min-height: auto; margin: 0; padding: 14mm; box-shadow: none; }
+      .recipe-print-full-page { width: 210mm; min-height: auto; margin: 0; padding: 12mm; box-shadow: none; }
       .recipe-print-full-hero { break-inside: avoid; page-break-inside: avoid; }
       .recipe-print-full-section { break-inside: auto; page-break-inside: auto; }
       .recipe-print-full-section h2 { break-after: avoid; page-break-after: avoid; }
-      .recipe-print-full-table { border-collapse: collapse; border-radius: 0; overflow: visible; break-inside: auto; page-break-inside: auto; }
+      .recipe-print-full-table { border-collapse: collapse; overflow: visible; break-inside: auto; page-break-inside: auto; }
       .recipe-print-full-table thead { display: table-header-group; }
       .recipe-print-full-table tfoot { display: table-footer-group; }
       .recipe-print-full-table tr { break-inside: avoid; page-break-inside: avoid; }
       .recipe-print-full-table th, .recipe-print-full-table td { break-inside: avoid; page-break-inside: avoid; }
       .recipe-print-full-grid { break-inside: avoid; page-break-inside: avoid; }
       .recipe-print-full-front-card { break-inside: avoid; page-break-inside: avoid; }
-      .recipe-print-full-nutrition-section { break-before: page; page-break-before: always; break-inside: avoid; page-break-inside: avoid; }
+      .recipe-print-full-columns { break-inside: avoid; page-break-inside: avoid; }
+      .recipe-print-full-nutrition-section { break-inside: avoid; page-break-inside: avoid; }
       .recipe-print-full-nutrition-card,
       .recipe-print-full-nutrition-table,
       .recipe-nutrition-label-card { break-inside: avoid; page-break-inside: avoid; overflow: visible; }
@@ -868,14 +871,16 @@
         <tbody>${notesHtml}</tbody>
       </table>
     </section>
-    <section class="recipe-print-full-section">
-      <h2><span>3</span>RNPA</h2>
-      <dl class="recipe-print-full-card recipe-print-full-grid">${keyValueGrid(rnpaItems)}</dl>
-    </section>
-    <section class="recipe-print-full-section">
-      <h2><span>4</span>Datos nutricionales</h2>
-      <dl class="recipe-print-full-card recipe-print-full-grid">${keyValueGrid(nutritionItems)}</dl>
-    </section>
+    <div class="recipe-print-full-columns">
+      <section class="recipe-print-full-section">
+        <h2><span>3</span>RNPA</h2>
+        <dl class="recipe-print-full-card recipe-print-full-grid">${keyValueGrid(rnpaItems)}</dl>
+      </section>
+      <section class="recipe-print-full-section">
+        <h2><span>4</span>Datos nutricionales</h2>
+        <dl class="recipe-print-full-card recipe-print-full-grid">${keyValueGrid(nutritionItems)}</dl>
+      </section>
+    </div>
     <section class="recipe-print-full-section">
       <h2><span>5</span>Etiquetado frontal</h2>
       <div class="recipe-print-full-card">${frontLabelsHtml}</div>
