@@ -34,6 +34,7 @@
     list: $('inventarioList'),
     families: $('inventarioFamilies'),
     statusFilters: $('inventarioStatusFilters'),
+    autoEgresoFilters: $('inventarioAutoEgresoFilters'),
     searchInput: $('inventarioSearchInput'),
     createIngredientBtn: $('inventarioCreateIngredientBtn'),
     toolbarCreateBtn: $('inventarioToolbarCreateIngredientBtn'),
@@ -100,6 +101,7 @@
     pendingProviderDeleteId: '',
     weeklyConfigSearch: '',
     weeklyConfigPage: 1,
+    activeAutoEgresoFilter: 'all',
     searchRenderTimer: null
   };
 
@@ -596,6 +598,7 @@
     lowThresholdMode: 'global',
     packageQty: null,
     expiringSoonDays: null,
+    suggestedExpiryDays: null,
     lotConfig: {
       configured: false,
       collapsed: false,
@@ -891,6 +894,11 @@
           const stockClass = stockStatusFor(record, item.measure || 'kilos').className;
           if (stockClass !== state.activeStockStatus) return false;
         }
+      }
+      if (state.activeAutoEgresoFilter !== 'all') {
+        const egresoEnabled = !!getRecord(item.id).weeklySheetConfig?.egresoEnabled;
+        if (state.activeAutoEgresoFilter === 'enabled' && !egresoEnabled) return false;
+        if (state.activeAutoEgresoFilter === 'disabled' && egresoEnabled) return false;
       }
       if (!state.search) return true;
       const text = [item.name, item.description, item.familyName, item.measure].map(normalizeLower).join(' ');
@@ -1465,6 +1473,31 @@
     nodes.statusFilters.innerHTML = `${dynamicOptions.map(renderOption).join('')}${dynamicOptions.length ? '<span class="barra-vertical inventario-status-divider" aria-hidden="true"></span>' : ''}${statusOptions.map(renderOption).join('')}`;
   };
 
+  const renderAutoEgresoFilters = () => {
+    if (!nodes.autoEgresoFilters) return;
+    const allIngredients = Object.values(state.ingredientes);
+    const counts = {
+      all: allIngredients.length,
+      enabled: allIngredients.filter(item => getRecord(item.id).weeklySheetConfig?.egresoEnabled).length,
+      disabled: allIngredients.filter(item => !getRecord(item.id).weeklySheetConfig?.egresoEnabled).length
+    };
+
+    const options = [
+      { key: 'all', label: 'Todos los productos', tone: 'neutral', count: counts.all },
+      { key: 'enabled', label: 'Con Autoegreso', tone: 'info', count: counts.enabled, icon: 'fa-robot' },
+      { key: 'disabled', label: 'Sin Autoegreso', tone: 'neutral', count: counts.disabled }
+    ];
+
+    const renderOption = (option) => `
+      <button type="button" class="inventario-status-btn tone-${option.tone} ${state.activeAutoEgresoFilter === option.key ? 'is-active' : ''}" data-inv-auto-egreso-filter="${option.key}">
+        ${option.icon ? `<i class="fa-solid ${option.icon} me-1"></i>` : ''}
+        <span>${option.label}</span>
+        <strong>${option.count}</strong>
+      </button>`;
+
+    nodes.autoEgresoFilters.innerHTML = options.map(renderOption).join('');
+  };
+
 
   const getProviderRneCounts = () => {
     const providers = sortedProviders();
@@ -1743,6 +1776,7 @@
 
   const renderList = () => {
     renderStatusFilters();
+    renderAutoEgresoFilters();
     renderProviderRneAlert();
     renderInventoryExpiryAlert();
     const items = filteredIngredients();
@@ -2200,12 +2234,19 @@
     return true;
   };
 
-  const buildWeeklyConfigBulkRows = () => Object.values(state.ingredientes)
+  const buildWeeklyConfigBulkRows = (filterMode = 'all', familyId = 'all') => Object.values(state.ingredientes)
+    .filter((ingredient) => {
+      if (familyId !== 'all' && ingredient.familyId !== familyId) return false;
+      if (filterMode === 'all') return true;
+      const egresoEnabled = !!getRecord(ingredient.id).weeklySheetConfig?.egresoEnabled;
+      return filterMode === 'enabled' ? egresoEnabled : !egresoEnabled;
+    })
     .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'es'))
     .map((ingredient) => {
       const record = getRecord(ingredient.id);
       const cfg = { ...getDefaultWeeklySheetConfig(), ...safeObject(record.weeklySheetConfig) };
       const perishableClass = cfg.perishable ? 'is-perishable' : 'is-non-perishable';
+      const suggestedVal = record.suggestedExpiryDays ?? 5;
       return `<article class="inventario-weekly-row ${perishableClass}" data-weekly-row="${escapeHtml(ingredient.id)}" data-weekly-name="${escapeHtml(normalizeLower(ingredient.name))}">
         <div class="inventario-weekly-product-head">
           <span class="inventario-print-photo-wrap inventario-weekly-thumb-wrap">${ingredient.imageUrl ? `<span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb" src="${escapeHtml(ingredient.imageUrl)}" alt="${escapeHtml(capitalize(ingredient.name))}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span>
@@ -2214,22 +2255,45 @@
             <p>${escapeHtml(sentenceCase(ingredient.description || 'Sin descripción'))}</p>
           </div>
         </div>
-        <div class="inventario-weekly-grid">
-          <label class="inventario-check-row"><input type="checkbox" data-weekly-perishable="${escapeHtml(ingredient.id)}" ${cfg.perishable ? 'checked' : ''}><span>Producto perecedero</span></label>
-          <label class="inventario-check-row"><input type="checkbox" data-weekly-egreso="${escapeHtml(ingredient.id)}" ${cfg.egresoEnabled ? 'checked' : ''}><span><i class="fa-solid fa-robot"></i> Habilitado para egreso</span></label>
-          <label class="inventario-weekly-rotation" for="weeklyRotation_${escapeHtml(ingredient.id)}">Días de rotación
-            <input id="weeklyRotation_${escapeHtml(ingredient.id)}" class="swal2-input ios-input" type="number" min="0" step="1" value="${Number(cfg.rotationDays || 0)}" data-weekly-rotation="${escapeHtml(ingredient.id)}">
-          </label>
+        <div class="inventario-weekly-grid inventario-weekly-grid-v2">
+          <div class="inventario-weekly-checks">
+            <label class="inventario-check-row"><input type="checkbox" data-weekly-perishable="${escapeHtml(ingredient.id)}" ${cfg.perishable ? 'checked' : ''}><span>Producto perecedero</span></label>
+            <label class="inventario-check-row"><input type="checkbox" data-weekly-egreso="${escapeHtml(ingredient.id)}" ${cfg.egresoEnabled ? 'checked' : ''}><span><i class="fa-solid fa-robot"></i> Habilitado para egreso</span></label>
+          </div>
+          <div class="inventario-weekly-inputs">
+            <label class="inventario-weekly-field" for="weeklyRotation_${escapeHtml(ingredient.id)}">
+              <span>Días de rotación</span>
+              <input id="weeklyRotation_${escapeHtml(ingredient.id)}" class="swal2-input ios-input" type="number" min="0" step="1" value="${Number(cfg.rotationDays || 0)}" data-weekly-rotation="${escapeHtml(ingredient.id)}">
+            </label>
+            <label class="inventario-weekly-field" for="weeklySuggested_${escapeHtml(ingredient.id)}">
+              <span>Vencimiento sugerido (días)</span>
+              <input id="weeklySuggested_${escapeHtml(ingredient.id)}" class="swal2-input ios-input" type="number" min="0" step="1" value="${suggestedVal}" data-weekly-suggested="${escapeHtml(ingredient.id)}">
+            </label>
+          </div>
         </div>
       </article>`;
     }).join('');
 
   const openWeeklyConfigManager = async () => {
+    state.activeAutoEgresoFilter = 'all';
     const result = await openIosSwal({
       title: 'Planilla semanal · Productos',
       html: `<div class="inventario-weekly-bulk-wrap">
         <p class="inventario-weekly-bulk-intro">Editá en masa la configuración de todos los productos.</p>
-        <div class="input-group ios-input-group ingredientes-search-group inventario-weekly-search"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="inventarioWeeklySearchInput" type="search" class="form-control ios-input ingredientes-search-input" placeholder="Buscar producto"></div>
+        <div class="inventario-weekly-toolbar-v2">
+          <div class="input-group ios-input-group ingredientes-search-group inventario-weekly-search"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="inventarioWeeklySearchInput" type="search" class="form-control ios-input ingredientes-search-input" placeholder="Buscar producto"></div>
+          <div class="dropdown inventario-weekly-family-dropdown">
+            <button class="btn ios-btn ios-btn-secondary dropdown-toggle" type="button" id="inventarioWeeklyFamilyDropBtn" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="fa-solid fa-layer-group me-1"></i> <span id="inventarioWeeklyFamilyDropLabel">Todas las familias</span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-dark shadow" aria-labelledby="inventarioWeeklyFamilyDropBtn">
+              <li><button class="dropdown-item active" type="button" data-bulk-family-pick="all">Todas las familias</button></li>
+              <li><hr class="dropdown-divider"></li>
+              ${Object.values(state.familias).sort((a, b) => a.name.localeCompare(b.name)).map(f => `<li><button class="dropdown-item" type="button" data-bulk-family-pick="${f.id}">${escapeHtml(capitalize(f.name))}</button></li>`).join('')}
+            </ul>
+          </div>
+          <div id="inventarioWeeklyEgresoFilters" class="inventario-status-filters inventario-weekly-filters-row"></div>
+        </div>
         <div class="inventario-weekly-bulk-list" id="inventarioWeeklyBulkList">${buildWeeklyConfigBulkRows()}</div>
         <div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" id="inventarioWeeklyPrevBtn"><i class="fa-solid fa-chevron-left"></i></button><span id="inventarioWeeklyPageText">Página 1</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" id="inventarioWeeklyNextBtn"><i class="fa-solid fa-chevron-right"></i></button></div>
       </div>`,
@@ -2244,23 +2308,79 @@
       },
       didOpen: (popup) => {
         initThumbLoading(popup);
-        const rows = [...popup.querySelectorAll('[data-weekly-row]')];
+        const listNode = popup.querySelector('#inventarioWeeklyBulkList');
         const pageText = popup.querySelector('#inventarioWeeklyPageText');
         const prevBtn = popup.querySelector('#inventarioWeeklyPrevBtn');
         const nextBtn = popup.querySelector('#inventarioWeeklyNextBtn');
         const searchInput = popup.querySelector('#inventarioWeeklySearchInput');
+        const filterHost = popup.querySelector('#inventarioWeeklyEgresoFilters');
+
+        const renderEgresoFilters = () => {
+          if (!filterHost) return;
+          const allIngredients = Object.values(state.ingredientes);
+          const counts = {
+            all: allIngredients.length,
+            enabled: allIngredients.filter(item => getRecord(item.id).weeklySheetConfig?.egresoEnabled).length,
+            disabled: allIngredients.filter(item => !getRecord(item.id).weeklySheetConfig?.egresoEnabled).length
+          };
+          const options = [
+            { key: 'all', label: 'Todos', tone: 'neutral', count: counts.all },
+            { key: 'enabled', label: 'Con Autoegreso', tone: 'success', count: counts.enabled, icon: 'fa-robot' },
+            { key: 'disabled', label: 'Sin Autoegreso', tone: 'danger', count: counts.disabled }
+          ];
+          filterHost.innerHTML = options.map(opt => `<button type="button" class="inventario-status-btn tone-${opt.tone} ${state.activeAutoEgresoFilter === opt.key ? 'is-active' : ''}" data-bulk-auto-egreso-filter="${opt.key}">${opt.icon ? `<i class="fa-solid ${opt.icon} me-1"></i>` : ''}<span>${opt.label}</span><strong>${opt.count}</strong></button>`).join('');
+        };
+
         const syncPage = () => {
           const query = normalizeLower(searchInput?.value || '');
-          const filtered = rows.filter((row) => String(row.dataset.weeklyName || '').includes(query));
+          const currentRows = [...listNode.querySelectorAll('[data-weekly-row]')];
+          const filtered = currentRows.filter((row) => String(row.dataset.weeklyName || '').includes(query));
           const pager = getPagedRows(filtered, state.weeklyConfigPage, PAGE_SIZE);
           state.weeklyConfigPage = pager.page;
-          rows.forEach((row) => {
+          currentRows.forEach((row) => {
             row.classList.toggle('d-none', !pager.rows.includes(row));
           });
           if (pageText) pageText.textContent = `Página ${pager.page} de ${pager.pages}`;
           if (prevBtn) prevBtn.disabled = pager.page <= 1;
           if (nextBtn) nextBtn.disabled = pager.page >= pager.pages;
         };
+
+        const refreshList = () => {
+          const activeFamilyBtn = popup.querySelector('[data-bulk-family-pick].active');
+          const familyId = activeFamilyBtn?.dataset.bulkFamilyPick || 'all';
+          listNode.innerHTML = buildWeeklyConfigBulkRows(state.activeAutoEgresoFilter, familyId);
+          state.weeklyConfigPage = 1;
+          syncPage();
+          initThumbLoading(listNode);
+          renderEgresoFilters();
+        };
+
+        popup.querySelector('#inventarioWeeklyFamilyFilter')?.addEventListener('change', refreshList);
+
+        popup.querySelector('.inventario-weekly-family-dropdown')?.addEventListener('click', (e) => {
+          const pick = e.target.closest('[data-bulk-family-pick]');
+          if (pick) {
+            const familyId = pick.dataset.bulkFamilyPick;
+            const labelNode = popup.querySelector('#inventarioWeeklyFamilyDropLabel');
+            const dropdownBtn = popup.querySelector('#inventarioWeeklyFamilyDropBtn');
+            
+            // Update UI
+            popup.querySelectorAll('[data-bulk-family-pick]').forEach(btn => btn.classList.remove('active'));
+            pick.classList.add('active');
+            if (labelNode) labelNode.textContent = pick.textContent;
+            
+            refreshList();
+          }
+        });
+
+        filterHost.addEventListener('click', (e) => {
+          const btn = e.target.closest('[data-bulk-auto-egreso-filter]');
+          if (btn) {
+            state.activeAutoEgresoFilter = btn.dataset.bulkAutoEgresoFilter;
+            refreshList();
+          }
+        });
+
         searchInput?.addEventListener('input', () => {
           state.weeklyConfigPage = 1;
           syncPage();
@@ -2273,35 +2393,38 @@
           state.weeklyConfigPage += 1;
           syncPage();
         });
-        popup.querySelectorAll('[data-weekly-perishable]').forEach((checkbox) => {
-          checkbox.addEventListener('change', (event) => {
+        listNode.addEventListener('change', (event) => {
+          if (event.target.matches('[data-weekly-perishable]')) {
             const ingredientId = event.target.dataset.weeklyPerishable;
-            popup.querySelector(`[data-weekly-row="${ingredientId}"]`)?.classList.toggle('is-perishable', event.target.checked);
-            popup.querySelector(`[data-weekly-row="${ingredientId}"]`)?.classList.toggle('is-non-perishable', !event.target.checked);
-          });
-        });
-        popup.querySelectorAll('[data-weekly-egreso]').forEach((checkbox) => {
-          checkbox.addEventListener('change', (event) => {
+            listNode.querySelector(`[data-weekly-row="${ingredientId}"]`)?.classList.toggle('is-perishable', event.target.checked);
+            listNode.querySelector(`[data-weekly-row="${ingredientId}"]`)?.classList.toggle('is-non-perishable', !event.target.checked);
+          }
+          if (event.target.matches('[data-weekly-egreso]')) {
             const ingredientId = event.target.dataset.weeklyEgreso;
-            const input = popup.querySelector(`[data-weekly-rotation="${ingredientId}"]`);
+            const input = listNode.querySelector(`[data-weekly-rotation="${ingredientId}"]`);
             if (input) input.disabled = !event.target.checked;
-          });
-          const ingredientId = checkbox.dataset.weeklyEgreso;
-          const input = popup.querySelector(`[data-weekly-rotation="${ingredientId}"]`);
-          if (input) input.disabled = !checkbox.checked;
+          }
         });
+        renderEgresoFilters();
         syncPage();
       },
       preConfirm: () => {
         const payload = {};
         const errors = [];
+        const container = Swal.getHtmlContainer();
         popupLoop: for (const ingredient of Object.values(state.ingredientes)) {
           const ingredientId = ingredient.id;
-          const perishable = Boolean(document.querySelector(`[data-weekly-perishable="${ingredientId}"]`)?.checked);
+          const perishableInput = container.querySelector(`[data-weekly-perishable="${ingredientId}"]`);
+          // Si el input no está en el DOM actual (por paginación), usamos los datos previos o del record
+          const perishable = perishableInput ? Boolean(perishableInput.checked) : !!getRecord(ingredientId).weeklySheetConfig?.perishable;
           const counterOnly = Boolean(getRecord(ingredientId).weeklySheetConfig?.counterOnly);
-          const egresoEnabled = Boolean(document.querySelector(`[data-weekly-egreso="${ingredientId}"]`)?.checked);
-          const rotationRaw = document.querySelector(`[data-weekly-rotation="${ingredientId}"]`)?.value;
-          const rotationDays = Number(rotationRaw || 0);
+          const egresoInput = container.querySelector(`[data-weekly-egreso="${ingredientId}"]`);
+          const egresoEnabled = egresoInput ? Boolean(egresoInput.checked) : !!getRecord(ingredientId).weeklySheetConfig?.egresoEnabled;
+          const rotationInput = container.querySelector(`[data-weekly-rotation="${ingredientId}"]`);
+          const rotationDays = rotationInput ? Number(rotationInput.value || 0) : Number(getRecord(ingredientId).weeklySheetConfig?.rotationDays || 0);
+          const suggestedInput = container.querySelector(`[data-weekly-suggested="${ingredientId}"]`);
+          const suggestedExpiryDays = suggestedInput ? (suggestedInput.value === '' ? null : parseInt(suggestedInput.value, 10)) : getRecord(ingredientId).suggestedExpiryDays;
+
           if (!Number.isFinite(rotationDays) || rotationDays < 0) {
             errors.push(capitalize(ingredient.name));
             if (errors.length > 2) break popupLoop;
@@ -2311,7 +2434,8 @@
             perishable,
             counterOnly,
             egresoEnabled,
-            rotationDays: Math.round(rotationDays)
+            rotationDays: Math.round(rotationDays),
+            suggestedExpiryDays
           };
         }
         if (errors.length) {
@@ -2325,10 +2449,12 @@
     if (!result.isConfirmed) return;
     Object.entries(result.value || {}).forEach(([ingredientId, cfg]) => {
       const record = getRecord(ingredientId);
+      const { suggestedExpiryDays, ...weeklyCfg } = cfg;
+      record.suggestedExpiryDays = suggestedExpiryDays;
       record.weeklySheetConfig = {
         ...getDefaultWeeklySheetConfig(),
         ...safeObject(record.weeklySheetConfig),
-        ...cfg,
+        ...weeklyCfg,
         configured: true,
         updatedAt: Date.now()
       };
@@ -3926,8 +4052,39 @@
         </div>
       </section>
 
+      <section class="recipe-step-card step-block">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          <button type="button" class="inventario-collapse-head inventario-collapse-head-styled" id="suggestedExpiryToggleBtn" aria-expanded="${!record.suggestedExpiryDays}">
+            <span><span class="recipe-step-number">2</span> Días de vencimiento sugeridos</span>
+            <span class="inventario-collapse-summary" id="suggestedExpirySummary">
+              ${record.suggestedExpiryDays ? `<span class="badge rounded-pill bg-warning text-dark" style="font-size: 10px; font-weight: 600;"><i class="fa-solid fa-calendar-check me-1"></i> ${record.suggestedExpiryDays} días</span>` : ''}
+            </span>
+          </button>
+        </div>
+        <div id="suggestedExpiryBody" class="step-content ${record.suggestedExpiryDays ? 'd-none' : ''}">
+          <div class="recipe-fields-flex">
+            <div class="recipe-field recipe-field-half">
+              <label class="form-label" for="inventarioSuggestedExpiryDays"><i class="fa-solid fa-hourglass-half inventario-step-icon"></i> Días sugeridos</label>
+              <input id="inventarioSuggestedExpiryDays" class="form-control ios-input" type="number" min="0" step="1" value="${record.suggestedExpiryDays || ''}" placeholder="Ej: 5">
+              ${record.suggestedExpiryDays ? `<div class="mt-2"><span class="badge rounded-pill bg-warning text-dark" style="font-weight: 600; padding: 0.6em 1.2em; border: 1px solid #eab308;"><i class="fa-solid fa-calendar-check me-1"></i> Sugerencia: ${record.suggestedExpiryDays} días</span></div>` : '<div class="mt-2"><span class="badge rounded-pill bg-light text-muted" style="font-weight: 400; padding: 0.5em 1em;">Sin sugerencia (default: 5)</span></div>'}
+            </div>
+            <div class="recipe-field recipe-field-half d-flex align-items-start pt-2">
+               <div class="recipe-table-actions inventario-save-inline w-100 mt-4">
+                <button type="button" id="saveSuggestedExpiryDaysBtn" class="btn ios-btn ios-btn-secondary recipe-table-action-btn w-100">
+                  <img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner d-none" id="saveSuggestedExpiryDaysSpinner">
+                  <i class="fa-solid fa-floppy-disk"></i> <span>Guardar vencimiento</span>
+                </button>
+              </div>
+            </div>
+            <div class="recipe-field recipe-field-full">
+              <small class="text-muted">Al ingresar stock, se sumarán estos días a la fecha de ingreso para calcular el vencimiento automáticamente.</small>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="recipe-step-card step-block" id="inventarioStockEntrySection">
-        <h6 class="step-title"><span class="recipe-step-number">2</span> ${isEditingEntry ? 'Editar ingreso' : 'Ingresar Stock'}</h6>
+        <h6 class="step-title"><span class="recipe-step-number">3</span> ${isEditingEntry ? 'Editar ingreso' : 'Ingresar Stock'}</h6>
         ${isEditingEntry ? '<div class="inventario-editing-entry-note"><i class="fa-solid fa-pen"></i><span>Estás editando un ingreso existente. Guardá los cambios desde esta misma sección.</span></div>' : ''}
         <div class="step-content recipe-fields-flex inventario-stock-grid">
           <div class="recipe-field recipe-field-half">
@@ -4158,6 +4315,56 @@
       state.editorDraft.showLotConfig = !hidden;
       nodes.editorForm.querySelector('#lotConfigToggleBtn').setAttribute('aria-expanded', String(!hidden));
     });
+
+    nodes.editorForm.querySelector('#suggestedExpiryToggleBtn')?.addEventListener('click', () => {
+      const body = nodes.editorForm.querySelector('#suggestedExpiryBody');
+      const hidden = body.classList.toggle('d-none');
+      nodes.editorForm.querySelector('#suggestedExpiryToggleBtn').setAttribute('aria-expanded', String(!hidden));
+    });
+
+    nodes.editorForm.querySelector('#saveSuggestedExpiryDaysBtn')?.addEventListener('click', async () => {
+      const suggestedInput = nodes.editorForm.querySelector('#inventarioSuggestedExpiryDays');
+      const spinner = nodes.editorForm.querySelector('#saveSuggestedExpiryDaysSpinner');
+      const btn = nodes.editorForm.querySelector('#saveSuggestedExpiryDaysBtn');
+      const val = parseInt(suggestedInput?.value || '', 10);
+      if (Number.isNaN(val) || val < 0) {
+        await openIosSwal({ title: 'Valor inválido', html: '<p>Ingresá un número de días válido.</p>', icon: 'warning' });
+        return;
+      }
+      btn.disabled = true;
+      spinner.classList.remove('d-none');
+      try {
+        const currentRecord = getRecord(ingredientId);
+        currentRecord.suggestedExpiryDays = val || null;
+        state.inventario.items[ingredientId] = currentRecord;
+        await persistInventario();
+        // Update UI immediately without alert
+        renderEditor(ingredientId, state.editorDraft);
+      } catch (error) {
+        await openIosSwal({ title: 'Error', html: '<p>No se pudo guardar el valor.</p>', icon: 'error' });
+      } finally {
+        btn.disabled = false;
+        spinner.classList.add('d-none');
+      }
+    });
+
+    const syncExpiryFromSuggested = () => {
+      const entryInput = nodes.editorForm.querySelector('#inventoryEntryDate');
+      const suggestedInput = nodes.editorForm.querySelector('#inventarioSuggestedExpiryDays');
+      const expiryInput = nodes.editorForm.querySelector('#inventoryExpiryDate');
+      const entryDate = entryInput?.value;
+      const suggestedDays = parseInt(suggestedInput?.value || '0', 10);
+      if (entryDate && suggestedDays > 0 && expiryInput && !expiryInput.disabled) {
+        expiryInput.value = addDaysToIso(entryDate, suggestedDays);
+        if (expiryInput._flatpickr) {
+          expiryInput._flatpickr.setDate(expiryInput.value, false);
+        }
+        state.editorDraft.expiryDate = expiryInput.value;
+      }
+    };
+
+    nodes.editorForm.querySelector('#inventoryEntryDate')?.addEventListener('change', syncExpiryFromSuggested);
+    nodes.editorForm.querySelector('#inventarioSuggestedExpiryDays')?.addEventListener('input', syncExpiryFromSuggested);
 
     nodes.editorForm.querySelector('#inventarioProductThresholdBtn')?.addEventListener('click', async () => {
       await openProductThresholdConfig(ingredientId);
@@ -5314,6 +5521,13 @@
     const ingredientId = state.selectedIngredientId;
     if (!ingredientId) return;
 
+    const record = getRecord(ingredientId);
+    const suggestedInput = nodes.editorForm.querySelector('#inventarioSuggestedExpiryDays');
+    if (suggestedInput) {
+      const sVal = parseInt(suggestedInput.value || '', 10);
+      record.suggestedExpiryDays = Number.isNaN(sVal) || sVal < 0 ? null : sVal;
+    }
+
     const qty = parseNumber(nodes.editorForm.querySelector('#inventoryQty')?.value);
     const ingredient = state.ingredientes[ingredientId] || {};
     const unit = normalizeValue(nodes.editorForm.querySelector('#inventoryUnit')?.value || ingredient.measure || 'kilos');
@@ -5327,7 +5541,6 @@
     const providerId = normalizeValue(nodes.editorForm.querySelector('#inventoryProvider')?.value);
     const providerData = findProviderById(providerId);
     const provider = providerLabel(providerId);
-    const record = getRecord(ingredientId);
     const editingEntryId = normalizeValue(state.editorDraft?.editingEntryId);
     const isEditingEntry = Boolean(editingEntryId);
     const bulkEntries = isEditingEntry ? [] : (Array.isArray(state.editorDraft.bulkEntries) ? state.editorDraft.bulkEntries : []);
@@ -6364,6 +6577,14 @@
       state.search = '';
       if (nodes.searchInput) nodes.searchInput.value = '';
       renderStatusFilters();
+      renderList();
+      return;
+    }
+
+    const autoEgresoBtn = event.target.closest('[data-inv-auto-egreso-filter]');
+    if (autoEgresoBtn) {
+      state.activeAutoEgresoFilter = autoEgresoBtn.dataset.invAutoEgresoFilter;
+      renderAutoEgresoFilters();
       renderList();
       return;
     }
