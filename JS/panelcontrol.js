@@ -783,7 +783,9 @@ const printReport = async (report) => {
         beginAtZero: true
       }
     };
-    if (type === 'line') {
+    if (isHorizontal) {
+      base.plugins.tooltip.callbacks = { label: (ctx) => `${ctx.parsed?.x ?? ctx.parsed} kg` };
+    } else if (type === 'line') {
       base.plugins.tooltip.callbacks = { label: (ctx) => `${ctx.label}: ${ctx.parsed.y} kg` };
     }
     return base;
