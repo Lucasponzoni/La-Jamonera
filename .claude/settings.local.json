@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(node --check \"C:\\\\Users\\\\Lucas\\\\Documents\\\\GitHub\\\\La-Jamonera\\\\JS\\\\recetas.js\")",
-      "Bash(node --check \"C:\\\\Users\\\\Lucas\\\\Documents\\\\GitHub\\\\La-Jamonera\\\\JS\\\\produccion.js\")"
-    ]
-  }
-}

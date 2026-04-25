@@ -1593,6 +1593,29 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   max-width: 210px;
 }
 
+.swal2-popup.ios-alert.dispatch-xlsx-disable-alert .swal2-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.swal2-popup.ios-alert.dispatch-xlsx-disable-alert .swal2-actions .ios-btn {
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+  padding-inline: 14px;
+  white-space: normal;
+  line-height: 1.15;
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  .swal2-popup.ios-alert.dispatch-xlsx-disable-alert .swal2-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 640px) {
   .swal2-popup.ios-alert.expiry-resolution-alert .swal2-actions {
     grid-template-columns: minmax(0, 1fr);

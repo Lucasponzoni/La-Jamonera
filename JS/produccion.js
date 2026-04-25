@@ -8846,18 +8846,40 @@
     repartosInRange.forEach((reparto) => {
       const client = { ...getDispatchClient(reparto.clientId), ...safeObject(reparto.clientSnapshot) };
       const dateIso = getDispatchRowDateMeta(reparto).token || toIsoDate(reparto.createdAt || nowTs());
+      const vehicle = getDispatchVehicle(reparto.vehicleId);
+      const vehicleLabel = `${vehicle.number || '-'} - ${vehicle.patent || '-'} - ${vehicle.brand || vehicle.type || '-'}`;
+      const managerTokens = Array.isArray(reparto.managers) ? reparto.managers : [];
+      const managerProfiles = Array.isArray(reparto.managerProfiles) ? reparto.managerProfiles : [];
+      const managerLabel = managerTokens.length
+        ? managerTokens.map((token) => {
+          const manager = getManagerDisplay(token);
+          return `${manager.name} (${manager.role})`;
+        }).join(', ')
+        : (managerProfiles.length
+          ? managerProfiles.map((m) => `${normalizeValue(m.name) || 'Sin responsable'} (${normalizeValue(m.role) || 'Encargado'})`).join(', ')
+          : 'Sin responsable (Encargado)');
+
       const products = filterDispatchProductsForMassPrint(reparto.products, {
         excluded,
         qrMode: selector.value.mode === 'with_qr' ? 'with_qr' : 'all',
         qrKind: selector.value.qrKind || 'all'
       });
       products.forEach((p) => {
-        flat.push({
-          producto: normalizeValue(p.recipeTitle) || '-',
-          fechaIso: dateIso,
-          fecha: formatIsoEs(dateIso) || dateIso,
-          cantidad: Number(p.qtyKg || 0),
-          cliente: normalizeValue(client.name) || '-'
+        const allocations = Array.isArray(p.allocations) && p.allocations.length
+          ? p.allocations
+          : [{ lotNumber: '-', qtyKg: p.qtyKg }];
+
+        allocations.forEach((a) => {
+          flat.push({
+            producto: (normalizeValue(p.recipeTitle) || '-').toUpperCase(),
+            fechaIso: dateIso,
+            fecha: (formatIsoEs(dateIso) || dateIso).toUpperCase(),
+            cantidad: Number(a.qtyKg || 0),
+            lote: (normalizeValue(a.lotNumber) || '-').toUpperCase(),
+            cliente: (normalizeValue(client.name) || '-').toUpperCase(),
+            vehiculo: vehicleLabel.toUpperCase(),
+            controlo: managerLabel.toUpperCase()
+          });
         });
       });
     });
@@ -8867,24 +8889,31 @@
     }
     flat.sort((a, b) =>
       a.producto.localeCompare(b.producto, 'es', { sensitivity: 'base' })
+      || a.lote.localeCompare(b.lote, 'es', { sensitivity: 'base' })
       || a.fechaIso.localeCompare(b.fechaIso));
-    const headers = ['Fecha de reparto', 'Cantidad (kg)', 'Producto', 'Cliente'];
+    const headers = ['FECHA', 'CANTIDAD', 'LOTE', 'PRODUCTO', 'CLIENTE', 'VEHÍCULO (UTA-URA)', 'CONTROLO'];
     const xlsxRows = [];
     let bucket = [];
     const flushBucket = () => {
       if (!bucket.length) return;
       const total = bucket.reduce((acc, r) => acc + r.cantidad, 0);
       bucket.forEach((r) => xlsxRows.push({
-        'Fecha de reparto': r.fecha,
-        'Cantidad (kg)': Number(r.cantidad.toFixed(3)),
-        'Producto': r.producto,
-        'Cliente': r.cliente
+        FECHA: r.fecha,
+        CANTIDAD: Number(r.cantidad.toFixed(3)),
+        LOTE: r.lote,
+        PRODUCTO: r.producto,
+        CLIENTE: r.cliente,
+        'VEHÍCULO (UTA-URA)': r.vehiculo,
+        CONTROLO: r.controlo
       }));
       xlsxRows.push({
-        'Fecha de reparto': 'TOTAL',
-        'Cantidad (kg)': Number(total.toFixed(3)),
-        'Producto': bucket[0].producto,
-        'Cliente': '',
+        FECHA: 'TOTAL',
+        CANTIDAD: Number(total.toFixed(3)),
+        LOTE: '',
+        PRODUCTO: bucket[0].producto,
+        CLIENTE: '',
+        'VEHÍCULO (UTA-URA)': '',
+        CONTROLO: '',
         __tone: 'assal_total'
       });
       bucket = [];
@@ -9766,30 +9795,48 @@
       return;
     }
     if (event.target.closest('#produccionDispatchExcelBtn')) {
-      const headers = ['Fecha', 'Productos', 'Cantidad (kg)', 'Vencimiento', 'Número de reparto', 'Cliente'];
+      const headers = ['FECHA', 'PRODUCTOS', 'CANTIDAD (KG)', 'LOTE', 'VENCIMIENTO', 'NÚMERO DE REPARTO', 'CLIENTE', 'VEHÍCULO (UTA-URA)', 'CONTROLO'];
       const rows = getDispatchRows().flatMap((row) => {
         const products = Array.isArray(row.products) ? row.products : [];
         const expiries = [...new Set(products.flatMap((item) => (Array.isArray(item.allocations) ? item.allocations : []).map((l) => normalizeValue(l.expiryDate)).filter(Boolean)))];
         const expiryLabel = expiries.length === 1 ? formatIsoEs(expiries[0]) : (expiries.length ? 'Ver detalle' : '-');
         const client = { ...getDispatchClient(row.clientId), ...safeObject(row.clientSnapshot) };
-        const locationLabel = getDispatchLocationLabel(row, client);
-        const { groups, standalone } = getDispatchGroupedProducts(row);
+        const vehicle = getDispatchVehicle(row.vehicleId);
+        const vehicleLabel = `${vehicle.number || '-'} - ${vehicle.patent || '-'} - ${vehicle.brand || vehicle.type || '-'}`;
+        const managerTokens = Array.isArray(row.managers) ? row.managers : [];
+        const managerProfiles = Array.isArray(row.managerProfiles) ? row.managerProfiles : [];
+        const managerLabel = managerTokens.length
+          ? managerTokens.map((token) => {
+            const manager = getManagerDisplay(token);
+            return `${manager.name} (${manager.role})`;
+          }).join(', ')
+          : (managerProfiles.length
+            ? managerProfiles.map((m) => `${normalizeValue(m.name) || 'Sin responsable'} (${normalizeValue(m.role) || 'Encargado'})`).join(', ')
+            : 'Sin responsable (Encargado)');
+
         const summary = {
-          Fecha: formatDateTime(row.createdAt),
-          Productos: `${products.length} ${products.length === 1 ? 'producto' : 'productos'}`,
-          'Cantidad (kg)': products.map((item) => getDispatchProductSummaryLabel(item)).join(' | '),
-          Vencimiento: expiryLabel,
-          'Número de reparto': row.code || row.id || '-',
-          Cliente: client.name || '-'
+          FECHA: formatDateTime(row.createdAt).toUpperCase(),
+          PRODUCTOS: `${products.length} ${products.length === 1 ? 'PRODUCTO' : 'PRODUCTOS'}`,
+          'CANTIDAD (KG)': products.map((item) => getDispatchProductSummaryLabel(item)).join(' | ').toUpperCase(),
+          LOTE: '-',
+          VENCIMIENTO: expiryLabel.toUpperCase(),
+          'NÚMERO DE REPARTO': (row.code || row.id || '-').toUpperCase(),
+          CLIENTE: (client.name || '-').toUpperCase(),
+          'VEHÍCULO (UTA-URA)': vehicleLabel.toUpperCase(),
+          CONTROLO: managerLabel.toUpperCase()
         };
+        const { groups, standalone } = getDispatchGroupedProducts(row);
         const groupedRows = groups.flatMap((group) => {
           const parentRow = {
-            Fecha: group.label || 'Producto relacionado',
-            Productos: 'Relacionado',
-            'Cantidad (kg)': group.items.map((item) => getDispatchProductSummaryLabel(item)).join(' | '),
-            Vencimiento: '',
-            'Número de reparto': 'Grupo',
-            Cliente: client.name || '-',
+            FECHA: (group.label || 'PRODUCTO RELACIONADO').toUpperCase(),
+            PRODUCTOS: 'RELACIONADO',
+            'CANTIDAD (KG)': group.items.map((item) => getDispatchProductSummaryLabel(item)).join(' | ').toUpperCase(),
+            LOTE: '-',
+            VENCIMIENTO: '',
+            'NÚMERO DE REPARTO': 'GRUPO',
+            CLIENTE: (client.name || '-').toUpperCase(),
+            'VEHÍCULO (UTA-URA)': vehicleLabel.toUpperCase(),
+            CONTROLO: managerLabel.toUpperCase(),
             __tone: 'group_parent'
           };
           const children = group.items.flatMap((item) => {
@@ -9799,12 +9846,15 @@
             return allocations.map((allocation) => {
               const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
               return {
-                Fecha: `↳ ${item.recipeTitle || '-'}`,
-                Productos: allocationDisplay.label,
-                'Cantidad (kg)': `${allocation.lotNumber || '-'} · ${allocationDisplay.label}`,
-                Vencimiento: formatIsoEs(allocation.expiryDate || '') || '-',
-                'Número de reparto': (normalizeValue(allocation.productionId) || normalizeValue(allocation.traceUrl)) ? 'Trazabilidad' : 'Sin trazabilidad',
-                Cliente: client.name || '-',
+                FECHA: `↳ ${(item.recipeTitle || '-').toUpperCase()}`,
+                PRODUCTOS: (allocationDisplay.label).toUpperCase(),
+                'CANTIDAD (KG)': (allocationDisplay.label).toUpperCase(),
+                LOTE: (allocation.lotNumber || '-').toUpperCase(),
+                VENCIMIENTO: (formatIsoEs(allocation.expiryDate || '') || '-').toUpperCase(),
+                'NÚMERO DE REPARTO': ((normalizeValue(allocation.productionId) || normalizeValue(allocation.traceUrl)) ? 'TRAZABILIDAD' : 'SIN TRAZABILIDAD'),
+                CLIENTE: (client.name || '-').toUpperCase(),
+                'VEHÍCULO (UTA-URA)': vehicleLabel.toUpperCase(),
+                CONTROLO: managerLabel.toUpperCase(),
                 __tone: 'trace'
               };
             });
@@ -9818,24 +9868,31 @@
           return allocations.map((allocation) => {
             const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
             return {
-              Fecha: `↳ ${item.recipeTitle || '-'}`,
-              Productos: allocationDisplay.label,
-              'Cantidad (kg)': `${allocation.lotNumber || '-'} · ${allocationDisplay.label}`,
-              Vencimiento: formatIsoEs(allocation.expiryDate || '') || '-',
-              'Número de reparto': (normalizeValue(allocation.productionId) || normalizeValue(allocation.traceUrl)) ? 'Trazabilidad' : 'Sin trazabilidad',
-              Cliente: client.name || '-',
+              FECHA: `↳ ${(item.recipeTitle || '-').toUpperCase()}`,
+              PRODUCTOS: (allocationDisplay.label).toUpperCase(),
+              'CANTIDAD (KG)': (allocationDisplay.label).toUpperCase(),
+              LOTE: (allocation.lotNumber || '-').toUpperCase(),
+              VENCIMIENTO: (formatIsoEs(allocation.expiryDate || '') || '-').toUpperCase(),
+              'NÚMERO DE REPARTO': ((normalizeValue(allocation.productionId) || normalizeValue(allocation.traceUrl)) ? 'TRAZABILIDAD' : 'SIN TRAZABILIDAD'),
+              CLIENTE: (client.name || '-').toUpperCase(),
+              'VEHÍCULO (UTA-URA)': vehicleLabel.toUpperCase(),
+              CONTROLO: managerLabel.toUpperCase(),
               __tone: 'trace'
             };
           });
         });
+        const locationLabel = getDispatchLocationLabel(row, client);
         const locationRow = locationLabel
           ? [{
-            Fecha: `↳ 🏠 ${locationLabel}`,
-            Productos: '',
-            'Cantidad (kg)': '',
-            Vencimiento: '',
-            'Número de reparto': '',
-            Cliente: '',
+            FECHA: `↳ 🏠 ${locationLabel.toUpperCase()}`,
+            PRODUCTOS: '',
+            'CANTIDAD (KG)': '',
+            LOTE: '',
+            VENCIMIENTO: '',
+            'NÚMERO DE REPARTO': '',
+            CLIENTE: '',
+            'VEHÍCULO (UTA-URA)': '',
+            CONTROLO: '',
             __tone: 'internal_use',
             __mergeAcross: true
           }]
@@ -10083,7 +10140,8 @@
           showDenyButton: true,
           confirmButtonText: 'Solo esta fila',
           denyButtonText: 'Guardar preferencia',
-          cancelButtonText: 'Cancelar'
+          cancelButtonText: 'Cancelar',
+          customClass: { popup: 'dispatch-xlsx-disable-alert' }
         });
         if (!ask.isConfirmed && !ask.isDenied) {
           row.disabled = false;
