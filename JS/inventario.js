@@ -3910,6 +3910,32 @@
     }
   };
 
+  const parseExcelDateToIso = (value) => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+      excelEpoch.setUTCDate(excelEpoch.getUTCDate() + Math.floor(value));
+      return toIsoDate({
+        year: excelEpoch.getUTCFullYear(),
+        month: excelEpoch.getUTCMonth() + 1,
+        day: excelEpoch.getUTCDate()
+      });
+    }
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      return toIsoDate({
+        year: value.getUTCFullYear(),
+        month: value.getUTCMonth() + 1,
+        day: value.getUTCDate()
+      });
+    }
+    const text = normalizeValue(value);
+    if (!text) return '';
+    const normalized = normalizeIsoDate(text);
+    if (normalized) return normalized;
+    const esMatch = /^([0-9]{2})\/([0-9]{2})\/([0-9]{4})$/.exec(text);
+    if (esMatch) return normalizeIsoDate(`${esMatch[3]}-${esMatch[2]}-${esMatch[1]}`);
+    return '';
+  };
+
   const alignScrollActionsToRight = (scope = document) => {
     const nodesToAlign = scope.querySelectorAll('.toolbar-scroll-x, .inventario-toolbar-actions, .produccion-toolbar-actions');
     requestAnimationFrame(() => {
@@ -6138,7 +6164,12 @@
               <p class="inventario-provider-manager-kicker">Proveedores</p>
               <p class="inventario-provider-manager-copy">RNE, vencimientos y adjuntos.</p>
             </div>
-            <button type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn inventario-provider-create-fab" id="inventarioProviderCreateBtn" aria-label="Nuevo proveedor"><i class="fa-solid fa-plus"></i><span>Proveedor</span></button>
+            <div class="produccion-config-actions">
+              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioProviderExportExcelBtn"><i class="fa-solid fa-file-excel"></i><span>Descargar Excel</span></button>
+              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioProviderImportExcelBtn"><i class="fa-solid fa-file-arrow-up"></i><span>Subir Excel</span></button>
+              <input id="inventarioProviderImportExcelInput" class="d-none" type="file" accept=".xlsx,.xlsm,.xls">
+              <button type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn inventario-provider-create-fab" id="inventarioProviderCreateBtn" aria-label="Nuevo proveedor"><i class="fa-solid fa-plus"></i><span>Proveedor</span></button>
+            </div>
           </div>
           <div class="input-group ios-input-group ingredientes-search-group inventario-provider-search"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="inventarioProviderSearchInput" type="search" class="form-control ios-input ingredientes-search-input" value="${escapeHtml(state.providerRneSearch)}" placeholder="Buscar proveedor"></div>
           <div id="inventarioProviderRneFilters" class="inventario-status-filters">${options.map((option) => `<button type="button" class="inventario-status-btn tone-${option.tone} ${state.providerRneFilter === option.key ? 'is-active' : ''}" data-provider-rne-filter="${option.key}" ${option.count === 0 ? "disabled" : ""}><span>${option.label}</span><strong>${option.count}</strong></button>`).join('')}</div>
@@ -6291,6 +6322,117 @@
         };
 
         root.addEventListener('click', async (event) => {
+          const withButtonSpinner = async (button, task) => {
+            if (!button) return;
+            const icon = button.querySelector('i');
+            const label = button.querySelector('span');
+            const prevIcon = icon ? icon.className : '';
+            const prevLabel = label ? label.textContent : '';
+            button.disabled = true;
+            if (icon) icon.className = 'fa-solid fa-spinner fa-spin';
+            try {
+              await task();
+            } finally {
+              if (icon) icon.className = prevIcon;
+              if (label) label.textContent = prevLabel;
+              button.disabled = false;
+            }
+          };
+
+          const exportExcelBtn = event.target.closest('#inventarioProviderExportExcelBtn');
+          if (exportExcelBtn) {
+            await withButtonSpinner(exportExcelBtn, async () => {
+              if (!window.ExcelJS) {
+                await openIosSwal({ title: 'Excel no disponible', html: '<p>No se pudo cargar la librería ExcelJS.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+                return;
+              }
+              const wb = new window.ExcelJS.Workbook();
+              const ws = wb.addWorksheet('RNE proveedores');
+              ws.mergeCells('A1:C1');
+              ws.getCell('A1').value = 'Si la fecha de vencimiento está vacía, se considera INFINITO (∞).';
+              ws.getCell('A1').font = { bold: true, color: { argb: 'FF1F3D7A' } };
+              ws.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F0FF' } };
+              ws.getCell('A1').alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+              ws.getRow(1).height = 24;
+              ws.getRow(3).values = ['Proveedor', 'RNE', 'Vencimiento'];
+              ws.getRow(3).height = 22;
+              ws.columns = [
+                { key: 'provider', width: 38 },
+                { key: 'rne', width: 24 },
+                { key: 'expiry', width: 20 }
+              ];
+              ws.views = [{ state: 'frozen', ySplit: 3 }];
+              ws.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3, column: 3 } };
+              ws.getRow(3).eachCell((cell) => {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F7AE8' } };
+                cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                cell.border = {
+                  top: { style: 'thin', color: { argb: 'FFCED8EE' } },
+                  left: { style: 'thin', color: { argb: 'FFCED8EE' } },
+                  bottom: { style: 'thin', color: { argb: 'FFCED8EE' } },
+                  right: { style: 'thin', color: { argb: 'FFCED8EE' } }
+                };
+              });
+              sortedProviders().forEach((provider, index) => {
+                const rowNumber = 4 + index;
+                const row = ws.getRow(rowNumber);
+                const isNonFood = Boolean(provider.nonFoodCategory);
+                const rne = safeObject(provider.rne);
+                row.getCell(1).value = provider.name || '';
+                row.getCell(2).value = isNonFood ? 'NO REQUIERE' : normalizeValue(rne.number || '');
+                row.getCell(3).value = isNonFood
+                  ? 'NO REQUIERE'
+                  : (normalizeValue(rne.expiryDate) ? new Date(`${normalizeValue(rne.expiryDate)}T00:00:00`) : '');
+                row.eachCell((cell) => {
+                  cell.border = {
+                    top: { style: 'thin', color: { argb: 'FFD8E2F5' } },
+                    left: { style: 'thin', color: { argb: 'FFD8E2F5' } },
+                    bottom: { style: 'thin', color: { argb: 'FFD8E2F5' } },
+                    right: { style: 'thin', color: { argb: 'FFD8E2F5' } }
+                  };
+                  cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                  cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: isNonFood ? 'FFEDEFF5' : (index % 2 === 0 ? 'FFF5F8FF' : 'FFEAF1FF') }
+                  };
+                });
+                if (!isNonFood) {
+                  const expiryCell = row.getCell(3);
+                  expiryCell.numFmt = 'yyyy-mm-dd';
+                  expiryCell.dataValidation = {
+                    type: 'date',
+                    operator: 'greaterThan',
+                    formulae: [new Date(1900, 0, 1)],
+                    allowBlank: true,
+                    showErrorMessage: true,
+                    errorStyle: 'warning',
+                    errorTitle: 'Fecha inválida',
+                    error: 'Ingresá una fecha válida en formato fecha.'
+                  };
+                }
+              });
+              const buffer = await wb.xlsx.writeBuffer();
+              const blob = new Blob([new Uint8Array(buffer)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+              const url = URL.createObjectURL(blob);
+              const anchor = document.createElement('a');
+              anchor.href = url;
+              anchor.download = `proveedores_rne_${Date.now()}.xlsx`;
+              document.body.appendChild(anchor);
+              anchor.click();
+              anchor.remove();
+              setTimeout(() => URL.revokeObjectURL(url), 2000);
+            });
+            return;
+          }
+
+          const importExcelBtn = event.target.closest('#inventarioProviderImportExcelBtn');
+          if (importExcelBtn) {
+            root.querySelector('#inventarioProviderImportExcelInput')?.click();
+            return;
+          }
+
           const createBtn = event.target.closest('#inventarioProviderCreateBtn');
           if (createBtn) {
             ui.setMode('editor', '');
@@ -6548,6 +6690,101 @@
             await persistInventario();
             rerender();
           }
+        });
+
+        root.addEventListener('change', async (event) => {
+          const input = event.target.closest('#inventarioProviderImportExcelInput');
+          if (!input) return;
+          const file = input.files?.[0];
+          input.value = '';
+          if (!file) return;
+          const importBtn = root.querySelector('#inventarioProviderImportExcelBtn');
+          const withSpinner = async () => {
+            if (!importBtn) return;
+            const icon = importBtn.querySelector('i');
+            importBtn.disabled = true;
+            if (icon) icon.className = 'fa-solid fa-spinner fa-spin';
+            try {
+              if (!window.ExcelJS) {
+                await openIosSwal({ title: 'Excel no disponible', html: '<p>No se pudo cargar la librería ExcelJS.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+                return;
+              }
+              const wb = new window.ExcelJS.Workbook();
+              const buffer = await file.arrayBuffer();
+              await wb.xlsx.load(buffer);
+              const ws = wb.worksheets[0];
+              if (!ws) {
+                await openIosSwal({ title: 'Archivo inválido', html: '<p>El Excel no contiene hojas.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+                return;
+              }
+              const errors = [];
+              const providersByName = new Map(sortedProviders().map((provider) => [normalizeUpper(provider.name), provider]));
+              const firstRow = ws.getRow(3);
+              const headerTokens = [normalizeUpper(firstRow.getCell(1).text), normalizeUpper(firstRow.getCell(2).text), normalizeUpper(firstRow.getCell(3).text)];
+              if (!headerTokens[0].includes('PROVEEDOR') || !headerTokens[1].includes('RNE') || !headerTokens[2].includes('VENC')) {
+                await openIosSwal({ title: 'Formato incorrecto', html: '<p>Usá la plantilla descargada desde "Descargar Excel".</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+                return;
+              }
+              let updated = 0;
+              for (let rowIndex = 4; rowIndex <= ws.rowCount; rowIndex += 1) {
+                const row = ws.getRow(rowIndex);
+                const name = normalizeUpper(row.getCell(1).text);
+                const rneToken = normalizeValue(row.getCell(2).text);
+                const expiryCell = row.getCell(3).value;
+                if (!name && !rneToken && !normalizeValue(row.getCell(3).text)) continue;
+                const provider = providersByName.get(name);
+                if (!provider) {
+                  errors.push(`Fila ${rowIndex}: proveedor "${name || '(vacío)'}" no existe.`);
+                  continue;
+                }
+                if (provider.nonFoodCategory) continue;
+                const normalizedRne = normalizeUpper(rneToken) === 'NO REQUIERE' ? '' : normalizeValue(rneToken);
+                if (normalizedRne && !/^[0-9-]+$/.test(normalizedRne)) {
+                  errors.push(`Fila ${rowIndex} (${provider.name}): RNE inválido. Solo números y guiones.`);
+                  continue;
+                }
+                const expiryIso = parseExcelDateToIso(expiryCell);
+                const expiryText = normalizeValue(row.getCell(3).text);
+                if (expiryText && normalizeUpper(expiryText) !== 'NO REQUIERE' && !expiryIso) {
+                  errors.push(`Fila ${rowIndex} (${provider.name}): vencimiento inválido.`);
+                  continue;
+                }
+                provider.rne = {
+                  ...getDefaultProviderRne(),
+                  ...safeObject(provider.rne),
+                  number: normalizedRne,
+                  expiryDate: expiryIso,
+                  infiniteExpiry: !expiryIso,
+                  updatedAt: Date.now()
+                };
+                saveProviderInConfig(provider);
+                updated += 1;
+              }
+              if (updated > 0) {
+                await persistInventario();
+                rerenderPreservingScroll();
+                renderProviderRneAlert();
+              }
+              if (errors.length) {
+                const details = errors.slice(0, 30).map((error) => `<li>${escapeHtml(error)}</li>`).join('');
+                await openIosSwal({
+                  title: updated ? 'Importación parcial' : 'No se pudo importar',
+                  html: `<p>Se actualizaron <strong>${updated}</strong> proveedor(es).</p><p>Errores detectados: <strong>${errors.length}</strong>.</p><ul style="text-align:left;max-height:240px;overflow:auto;">${details}</ul>`,
+                  icon: updated ? 'warning' : 'error',
+                  confirmButtonText: 'Entendido'
+                });
+                return;
+              }
+              await openIosSwal({ title: 'Importación completada', html: `<p>Se actualizaron <strong>${updated}</strong> proveedor(es).</p>`, icon: 'success', confirmButtonText: 'Entendido' });
+            } catch (error) {
+              await openIosSwal({ title: 'No se pudo importar', html: '<p>El archivo Excel tiene errores o está dañado.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+            } finally {
+              importBtn.disabled = false;
+              const icon = importBtn.querySelector('i');
+              if (icon) icon.className = 'fa-solid fa-file-arrow-up';
+            }
+          };
+          await withSpinner();
         });
 
         rerender();
