@@ -1139,11 +1139,13 @@
     requirementRows.forEach((requirement) => {
       const missingFresh = Number(requirement?.missingForMin || 0) > 0.0001;
       const coveredWithExpired = Number(requirement?.missingForMinIncludingExpired || 0) <= 0.0001;
-      if (!missingFresh || !coveredWithExpired) return;
-      ingredientIds.add(normalizeValue(requirement.ingredientId));
+      const includeByCoverage = missingFresh && coveredWithExpired;
+      const includeByExpiredPresence = Boolean(requirement?.hasExpired);
+      if (!includeByCoverage && !includeByExpiredPresence) return;
+      if (includeByCoverage || includeByExpiredPresence) ingredientIds.add(normalizeValue(requirement.ingredientId));
       (Array.isArray(requirement.relatedOptions) ? requirement.relatedOptions : []).forEach((option) => {
         const hasExpiredCoverage = Number(option?.totalCoverageKg || 0) > Number(option?.coverageKg || 0);
-        if (hasExpiredCoverage) ingredientIds.add(normalizeValue(option.ingredientId));
+        if (hasExpiredCoverage || option?.hasExpired) ingredientIds.add(normalizeValue(option.ingredientId));
       });
     });
     return [...ingredientIds].map((ingredientId) => {
@@ -7118,12 +7120,16 @@
             </div>
             ${Number(analysis.expiredKg || 0) > 0.0001 ? `<p class="produccion-last-line produccion-last-line-expired"><i class="fa-solid fa-triangle-exclamation"></i> <strong>Kilos expirados:</strong> <strong>${Number(analysis.expiredKg || 0).toFixed(2)} kg</strong></p>` : ''}
             ${(() => {
-              if (analysis.canProduce || !analysis.canProduceConsideringExpired) return '';
+              if (!analysis.hasExpired) return '';
               const windows = getRecipeExpiredDateWindows(recipe, analysis, toIsoDate());
+              if (!windows.length) return '';
               const detail = windows.length
                 ? windows.map((item) => `<span><strong>${escapeHtml(item.ingredientName)}:</strong> ${escapeHtml(formatIsoEs(item.from || ''))} a ${escapeHtml(formatIsoEs(item.to || ''))}</span>`).join('<br>')
                 : `<span>${escapeHtml(formatIsoEs(normalizeValue(formatDateRangeForRecipe(recipe).split(' a ')[0] || '')))} a ${escapeHtml(formatIsoEs(normalizeValue(formatDateRangeForRecipe(recipe).split(' a ')[1] || '')))}</span>`;
-              return `<p class="produccion-last-line produccion-last-line-expired"><i class="fa-solid fa-calendar-days"></i> Podes producir con lote vencido ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg, pero en este rango por producto:<br>${detail}</p>`;
+              const headline = (!analysis.canProduce && analysis.canProduceConsideringExpired)
+                ? `Podes producir con lote vencido ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg, pero en este rango por producto:`
+                : 'Lotes vencidos detectados en este rango por producto:';
+              return `<p class="produccion-last-line produccion-last-line-expired"><i class="fa-solid fa-calendar-days"></i> ${headline}<br>${detail}</p>`;
             })()}
             ${draftLock?.blockedKg > 0 ? `<p class="produccion-last-line" data-draft-lock-line="${recipe.id}"><i class="fa-solid fa-lock"></i> Bloqueado por borrador: <strong>${draftLock.blockedKg.toFixed(2)} kg</strong> · disponible en <strong data-draft-lock-time="${recipe.id}">${formatCountdown(draftLock.remainingMs)}</strong></p>` : ''}
             <p class="produccion-last-line"><i class="fa-regular fa-clock"></i> Última producción: <strong>${formatDate(lastProductionAt)}</strong></p>
