@@ -1133,11 +1133,22 @@
     return `${minEntry || '-'} a ${maxExpiry || '-'}`;
   };
 
-  const getRecipeExpiredDateWindows = (recipe) => {
-    const ingredientRows = (Array.isArray(recipe?.rows) ? recipe.rows : [])
-      .filter((row) => row.type === 'ingredient' && row.ingredientId);
-    return ingredientRows.map((row) => {
-      const record = safeObject(state.inventario.items?.[row.ingredientId]);
+  const getRecipeExpiredDateWindows = (recipe, analysis, todayIso = toIsoDate()) => {
+    const requirementRows = Array.isArray(analysis?.requirements) ? analysis.requirements : [];
+    const ingredientIds = new Set();
+    requirementRows.forEach((requirement) => {
+      const missingFresh = Number(requirement?.missingForMin || 0) > 0.0001;
+      const coveredWithExpired = Number(requirement?.missingForMinIncludingExpired || 0) <= 0.0001;
+      if (!missingFresh || !coveredWithExpired) return;
+      ingredientIds.add(normalizeValue(requirement.ingredientId));
+      (Array.isArray(requirement.relatedOptions) ? requirement.relatedOptions : []).forEach((option) => {
+        const hasExpiredCoverage = Number(option?.totalCoverageKg || 0) > Number(option?.coverageKg || 0);
+        if (hasExpiredCoverage) ingredientIds.add(normalizeValue(option.ingredientId));
+      });
+    });
+    return [...ingredientIds].map((ingredientId) => {
+      if (!ingredientId) return null;
+      const record = safeObject(state.inventario.items?.[ingredientId]);
       const entries = Array.isArray(record.entries) ? record.entries : [];
       let from = '';
       let to = '';
@@ -1147,13 +1158,13 @@
         if (isEntryNoPerecedero(entry)) return;
         const entryDate = normalizeValue(entry.entryDate);
         const expiryDate = normalizeValue(entry.expiryDate);
-        if (!expiryDate) return;
+        if (!expiryDate || expiryDate >= todayIso) return;
         if (entryDate && (!from || entryDate < from)) from = entryDate;
         if (!to || expiryDate > to) to = expiryDate;
       });
       if (!from && !to) return null;
       return {
-        ingredientName: capitalize(state.ingredientes?.[row.ingredientId]?.name || row.label || row.ingredientId || 'Ingrediente'),
+        ingredientName: capitalize(state.ingredientes?.[ingredientId]?.name || ingredientId || 'Ingrediente'),
         from,
         to
       };
@@ -7108,7 +7119,7 @@
             ${Number(analysis.expiredKg || 0) > 0.0001 ? `<p class="produccion-last-line produccion-last-line-expired"><i class="fa-solid fa-triangle-exclamation"></i> <strong>Kilos expirados:</strong> <strong>${Number(analysis.expiredKg || 0).toFixed(2)} kg</strong></p>` : ''}
             ${(() => {
               if (analysis.canProduce || !analysis.canProduceConsideringExpired) return '';
-              const windows = getRecipeExpiredDateWindows(recipe);
+              const windows = getRecipeExpiredDateWindows(recipe, analysis, toIsoDate());
               const detail = windows.length
                 ? windows.map((item) => `<span><strong>${escapeHtml(item.ingredientName)}:</strong> ${escapeHtml(formatIsoEs(item.from || ''))} a ${escapeHtml(formatIsoEs(item.to || ''))}</span>`).join('<br>')
                 : `<span>${escapeHtml(formatIsoEs(normalizeValue(formatDateRangeForRecipe(recipe).split(' a ')[0] || '')))} a ${escapeHtml(formatIsoEs(normalizeValue(formatDateRangeForRecipe(recipe).split(' a ')[1] || '')))}</span>`;
@@ -8207,7 +8218,7 @@
           icon: 'warning',
           showCancelButton: true,
           showDenyButton: true,
-          confirmButtonText: 'Guardar borrador',
+          confirmButtonText: 'Guardar',
           denyButtonText: 'No guardar',
           cancelButtonText: 'Seguir'
         });
