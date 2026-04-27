@@ -419,7 +419,7 @@
   const toIsoDate = (value = nowTs()) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '';
-    return date.toISOString().slice(0, 10);
+    return getArgentinaIsoDate(date) || date.toISOString().slice(0, 10);
   };
   const mergeIsoDateWithCurrentTimeTs = (isoDate, fallbackTs = nowTs()) => {
     const safeIso = normalizeValue(isoDate);
@@ -1131,6 +1131,33 @@
     });
     if (!minEntry && !maxExpiry) return 'sin rango disponible';
     return `${minEntry || '-'} a ${maxExpiry || '-'}`;
+  };
+
+  const getRecipeExpiredDateWindows = (recipe) => {
+    const ingredientRows = (Array.isArray(recipe?.rows) ? recipe.rows : [])
+      .filter((row) => row.type === 'ingredient' && row.ingredientId);
+    return ingredientRows.map((row) => {
+      const record = safeObject(state.inventario.items?.[row.ingredientId]);
+      const entries = Array.isArray(record.entries) ? record.entries : [];
+      let from = '';
+      let to = '';
+      entries.forEach((entry) => {
+        const availableQty = getEntryAvailableQty(entry);
+        if (!Number.isFinite(availableQty) || availableQty <= 0.0001) return;
+        if (isEntryNoPerecedero(entry)) return;
+        const entryDate = normalizeValue(entry.entryDate);
+        const expiryDate = normalizeValue(entry.expiryDate);
+        if (!expiryDate) return;
+        if (entryDate && (!from || entryDate < from)) from = entryDate;
+        if (!to || expiryDate > to) to = expiryDate;
+      });
+      if (!from && !to) return null;
+      return {
+        ingredientName: capitalize(state.ingredientes?.[row.ingredientId]?.name || row.label || row.ingredientId || 'Ingrediente'),
+        from,
+        to
+      };
+    }).filter(Boolean);
   };
 
   const getRecipeExpiredKg = (recipe, productionDateIso = toIsoDate()) => {
@@ -7079,7 +7106,14 @@
               </div>
             </div>
             ${Number(analysis.expiredKg || 0) > 0.0001 ? `<p class="produccion-last-line produccion-last-line-expired"><i class="fa-solid fa-triangle-exclamation"></i> <strong>Kilos expirados:</strong> <strong>${Number(analysis.expiredKg || 0).toFixed(2)} kg</strong></p>` : ''}
-            ${(!analysis.canProduce && analysis.canProduceConsideringExpired) ? `<p class="produccion-last-line produccion-last-line-expired"><i class="fa-solid fa-calendar-days"></i> Podes producir con lote vencido ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg, pero en el rango de fecha ${formatDateRangeForRecipe(recipe)}.</p>` : ''}
+            ${(() => {
+              if (analysis.canProduce || !analysis.canProduceConsideringExpired) return '';
+              const windows = getRecipeExpiredDateWindows(recipe);
+              const detail = windows.length
+                ? windows.map((item) => `<span><strong>${escapeHtml(item.ingredientName)}:</strong> ${escapeHtml(formatIsoEs(item.from || ''))} a ${escapeHtml(formatIsoEs(item.to || ''))}</span>`).join('<br>')
+                : `<span>${escapeHtml(formatIsoEs(normalizeValue(formatDateRangeForRecipe(recipe).split(' a ')[0] || '')))} a ${escapeHtml(formatIsoEs(normalizeValue(formatDateRangeForRecipe(recipe).split(' a ')[1] || '')))}</span>`;
+              return `<p class="produccion-last-line produccion-last-line-expired"><i class="fa-solid fa-calendar-days"></i> Podes producir con lote vencido ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg, pero en este rango por producto:<br>${detail}</p>`;
+            })()}
             ${draftLock?.blockedKg > 0 ? `<p class="produccion-last-line" data-draft-lock-line="${recipe.id}"><i class="fa-solid fa-lock"></i> Bloqueado por borrador: <strong>${draftLock.blockedKg.toFixed(2)} kg</strong> · disponible en <strong data-draft-lock-time="${recipe.id}">${formatCountdown(draftLock.remainingMs)}</strong></p>` : ''}
             <p class="produccion-last-line"><i class="fa-regular fa-clock"></i> Última producción: <strong>${formatDate(lastProductionAt)}</strong></p>
             <div class="produccion-progress-wrap ${isExpiredOnlyAvailable ? 'is-expired-only' : ''}">
@@ -8166,16 +8200,31 @@
       }
     });
     nodes.editor.querySelector('#produccionBackBtn').addEventListener('click', async () => {
-      const result = await openIosSwal({
-        title: isViewOnly ? '¿Deseás salir de esta visualización?' : '¿Deseás abandonar esta producción?',
-        html: isViewOnly ? '<p>Se cerrará la visualización sin guardar borradores.</p>' : '<p>Se guardará borrador para retomarlo luego.</p>',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Abandonar',
-        cancelButtonText: 'Seguir'
-      });
-      if (!result.isConfirmed) return;
-      if (!isViewOnly) await saveEditorDraft();
+      if (!isViewOnly) {
+        const result = await openIosSwal({
+          title: '¿Deseás salir de esta producción?',
+          html: '<p>Podés guardar el borrador para retomarlo más tarde o descartarlo.</p>',
+          icon: 'warning',
+          showCancelButton: true,
+          showDenyButton: true,
+          confirmButtonText: 'Guardar borrador',
+          denyButtonText: 'No guardar',
+          cancelButtonText: 'Seguir'
+        });
+        if (result.isDismissed) return;
+        if (result.isConfirmed) await saveEditorDraft();
+        if (!result.isConfirmed && !result.isDenied) return;
+      } else {
+        const result = await openIosSwal({
+          title: '¿Deseás salir de esta visualización?',
+          html: '<p>Se cerrará la visualización.</p>',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: 'Salir',
+          cancelButtonText: 'Seguir'
+        });
+        if (!result.isConfirmed) return;
+      }
       state.activeRecipeId = '';
       state.editorMode = 'produce';
       state.sinTrazabilidad = false;
