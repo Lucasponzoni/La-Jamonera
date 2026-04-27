@@ -4036,7 +4036,6 @@
       return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 9, 0, 0).getTime();
     })();
     const dispatchHeaderDateTime = dispatchAtNine ? formatDateTime(dispatchAtNine) : '-';
-    const backofficeLoadedAt = '';
     const headerTable = `<table style="width:100%;border-collapse:collapse;table-layout:fixed"><tbody><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">FRIGORIFICO LA JAMONERA • REGISTRO DE SALIDA DE PRODUCTOS TERMINADOS</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">${escapeHtml(dispatchRow.code || dispatchRow.id)}</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px">FECHA Y HORA:</td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(dispatchHeaderDateTime)}</strong></td><td style="border:1px solid #2f2f2f;padding:4px">CLIENTE:</td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(normalizeValue(client.name) || '-')}</strong></td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px" colspan="4">DIRECCION: <strong>${escapeHtml(location)}</strong></td></tr></tbody></table>`;
     const planillaStyle = '<style>.dispatch-planilla-print{font-family:Inter,Arial,sans-serif;color:#111827;background:#fff}.dispatch-planilla-print table{width:100%;border-collapse:collapse;table-layout:fixed}.dispatch-planilla-print th,.dispatch-planilla-print td{border:1px solid #2f2f2f;padding:6px;word-break:break-word;background:#fff;color:#111827}.dispatch-planilla-parent-row td{background:#eef3ff;font-weight:800;color:#223863}.dispatch-planilla-child-row td{background:#fbfcff}.dispatch-planilla-marker-cell{width:28px;text-align:center;padding:6px 4px}.dispatch-planilla-child-label,.dispatch-planilla-parent-marker{color:#4b78e8;font-weight:800;display:inline-flex;align-items:center;justify-content:center}.dispatch-planilla-parent-marker{color:#94a3b8}.dispatch-planilla-qr-section{margin-top:32px;padding-top:22px;display:grid;gap:14px;border-top:1px solid #d7def2;justify-items:center}.dispatch-planilla-qr-copy{width:100%;text-align:center}.dispatch-planilla-qr-copy p{margin:0 0 6px;font-weight:700;text-align:center}.dispatch-planilla-qr-copy small{color:#556487;display:block;text-align:center}.dispatch-planilla-qr-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:12px}</style>';
     const hasTraceQr = buildDispatchTraceTargets(dispatchRow).length > 0;
@@ -4057,7 +4056,7 @@
       const row = list[index];
       const section = win.document.createElement('section');
       section.className = index > 0 ? 'page-break' : '';
-      section.innerHTML = buildDispatchPlanillaHtml(row).html;
+      section.innerHTML = buildDispatchPlanillaHtml(row).html.replace(/Fecha y hora de carga en BackOffice:[^<]*/gi, '');
       win.document.body.appendChild(section);
       const printable = section.querySelector('#dispatchPlanillaPrintable');
       if (printable) {
@@ -4075,7 +4074,7 @@
   };
   const openDispatchPlanilla = async (dispatchRow) => {
     if (!dispatchRow?.id) return;
-    const html = buildDispatchPlanillaHtml(dispatchRow).html;
+    const html = buildDispatchPlanillaHtml(dispatchRow).html.replace(/Fecha y hora de carga en BackOffice:[^<]*/gi, '');
     Swal.fire({
       title: 'Generando planilla...',
       html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando planilla" class="meta-spinner-login"></div>',
