@@ -419,7 +419,7 @@
   const toIsoDate = (value = nowTs()) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '';
-    return date.toISOString().slice(0, 10);
+    return getArgentinaIsoDate(date) || date.toISOString().slice(0, 10);
   };
   const mergeIsoDateWithCurrentTimeTs = (isoDate, fallbackTs = nowTs()) => {
     const safeIso = normalizeValue(isoDate);
@@ -1131,6 +1131,44 @@
     });
     if (!minEntry && !maxExpiry) return 'sin rango disponible';
     return `${minEntry || '-'} a ${maxExpiry || '-'}`;
+  };
+
+  const getRecipeExpiredDateWindows = (recipe, analysis, todayIso = toIsoDate()) => {
+    const requirementRows = Array.isArray(analysis?.requirements) ? analysis.requirements : [];
+    const ingredientIds = new Set();
+    requirementRows.forEach((requirement) => {
+      const missingFresh = Number(requirement?.missingForMin || 0) > 0.0001;
+      const coveredWithExpired = Number(requirement?.missingForMinIncludingExpired || 0) <= 0.0001;
+      if (!missingFresh || !coveredWithExpired) return;
+      ingredientIds.add(normalizeValue(requirement.ingredientId));
+      (Array.isArray(requirement.relatedOptions) ? requirement.relatedOptions : []).forEach((option) => {
+        const hasExpiredCoverage = Number(option?.totalCoverageKg || 0) > Number(option?.coverageKg || 0);
+        if (hasExpiredCoverage) ingredientIds.add(normalizeValue(option.ingredientId));
+      });
+    });
+    return [...ingredientIds].map((ingredientId) => {
+      if (!ingredientId) return null;
+      const record = safeObject(state.inventario.items?.[ingredientId]);
+      const entries = Array.isArray(record.entries) ? record.entries : [];
+      let from = '';
+      let to = '';
+      entries.forEach((entry) => {
+        const availableQty = getEntryAvailableQty(entry);
+        if (!Number.isFinite(availableQty) || availableQty <= 0.0001) return;
+        if (isEntryNoPerecedero(entry)) return;
+        const entryDate = normalizeValue(entry.entryDate);
+        const expiryDate = normalizeValue(entry.expiryDate);
+        if (!expiryDate || expiryDate >= todayIso) return;
+        if (entryDate && (!from || entryDate < from)) from = entryDate;
+        if (!to || expiryDate > to) to = expiryDate;
+      });
+      if (!from && !to) return null;
+      return {
+        ingredientName: capitalize(state.ingredientes?.[ingredientId]?.name || ingredientId || 'Ingrediente'),
+        from,
+        to
+      };
+    }).filter(Boolean);
   };
 
   const getRecipeExpiredKg = (recipe, productionDateIso = toIsoDate()) => {
@@ -4029,7 +4067,15 @@
     const commentsRows = comments.length
       ? comments.map((item, idx) => `<tr><td colspan="5"><strong>OBSERVACIÓN ${idx + 1}:</strong> ${escapeHtml(item)}</td></tr>`).join('')
       : '<tr><td colspan="5"><strong>OBSERVACIÓN 1:</strong> Sin observaciones</td></tr>';
-    const headerTable = `<table style="width:100%;border-collapse:collapse;table-layout:fixed"><tbody><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">FRIGORIFICO LA JAMONERA • REGISTRO DE SALIDA DE PRODUCTOS TERMINADOS</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">${escapeHtml(dispatchRow.code || dispatchRow.id)}</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px">FECHA Y HORA:</td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(formatDateTime(dispatchRow.createdAt || dispatchRow.dispatchDate))}</strong></td><td style="border:1px solid #2f2f2f;padding:4px">CLIENTE:</td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(normalizeValue(client.name) || '-')}</strong></td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px" colspan="4">DIRECCION: <strong>${escapeHtml(location)}</strong></td></tr></tbody></table>`;
+    const dispatchIso = normalizeDispatchDateToken(dispatchRow.dispatchDate) || toIsoDate(dispatchRow.createdAt || nowTs());
+    const dispatchAtNine = (() => {
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dispatchIso);
+      if (!match) return '';
+      return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 9, 0, 0).getTime();
+    })();
+    const dispatchHeaderDateTime = dispatchAtNine ? formatDateTime(dispatchAtNine) : '-';
+    const backofficeLoadedAt = '';
+    const headerTable = `<table style="width:100%;border-collapse:collapse;table-layout:fixed"><tbody><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">FRIGORIFICO LA JAMONERA • REGISTRO DE SALIDA DE PRODUCTOS TERMINADOS</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">${escapeHtml(dispatchRow.code || dispatchRow.id)}</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px">FECHA Y HORA:</td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(dispatchHeaderDateTime)}</strong></td><td style="border:1px solid #2f2f2f;padding:4px">CLIENTE:</td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(normalizeValue(client.name) || '-')}</strong></td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px" colspan="4">DIRECCION: <strong>${escapeHtml(location)}</strong></td></tr></tbody></table>`;
     const planillaStyle = '<style>.dispatch-planilla-print{font-family:Inter,Arial,sans-serif;color:#111827;background:#fff}.dispatch-planilla-print table{width:100%;border-collapse:collapse;table-layout:fixed}.dispatch-planilla-print th,.dispatch-planilla-print td{border:1px solid #2f2f2f;padding:6px;word-break:break-word;background:#fff;color:#111827}.dispatch-planilla-parent-row td{background:#eef3ff;font-weight:800;color:#223863}.dispatch-planilla-child-row td{background:#fbfcff}.dispatch-planilla-marker-cell{width:28px;text-align:center;padding:6px 4px}.dispatch-planilla-child-label,.dispatch-planilla-parent-marker{color:#4b78e8;font-weight:800;display:inline-flex;align-items:center;justify-content:center}.dispatch-planilla-parent-marker{color:#94a3b8}.dispatch-planilla-qr-section{margin-top:32px;padding-top:22px;display:grid;gap:14px;border-top:1px solid #d7def2;justify-items:center}.dispatch-planilla-qr-copy{width:100%;text-align:center}.dispatch-planilla-qr-copy p{margin:0 0 6px;font-weight:700;text-align:center}.dispatch-planilla-qr-copy small{color:#556487;display:block;text-align:center}.dispatch-planilla-qr-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:12px}</style>';
     const hasTraceQr = buildDispatchTraceTargets(dispatchRow).length > 0;
     const qrSection = hasTraceQr
@@ -4049,7 +4095,7 @@
       const row = list[index];
       const section = win.document.createElement('section');
       section.className = index > 0 ? 'page-break' : '';
-      section.innerHTML = buildDispatchPlanillaHtml(row).html;
+      section.innerHTML = buildDispatchPlanillaHtml(row).html.replace(/Fecha y hora de carga en BackOffice:[^<]*/gi, '');
       win.document.body.appendChild(section);
       const printable = section.querySelector('#dispatchPlanillaPrintable');
       if (printable) {
@@ -4067,7 +4113,7 @@
   };
   const openDispatchPlanilla = async (dispatchRow) => {
     if (!dispatchRow?.id) return;
-    const html = buildDispatchPlanillaHtml(dispatchRow).html;
+    const html = buildDispatchPlanillaHtml(dispatchRow).html.replace(/Fecha y hora de carga en BackOffice:[^<]*/gi, '');
     Swal.fire({
       title: 'Generando planilla...',
       html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando planilla" class="meta-spinner-login"></div>',
@@ -6553,12 +6599,83 @@
     await persistRepartoStore();
     return state.reparto.vehicles[id];
   };
+
+  const openEditDispatchVehicle = async (vehicleId) => {
+    const current = safeObject(state.reparto.vehicles?.[vehicleId]);
+    if (!current.id) return null;
+    const result = await openIosSwal({
+      title: 'Editar UTA / URA',
+      customClass: { popup: 'dispatch-vehicle-alert' },
+      html: `<div class="swal-stack-fields text-start"><input id="dispatchVehicleEditNumber" class="swal2-input ios-input" placeholder="Número de URA / UTA" value="${escapeHtml(current.number || '')}"><input id="dispatchVehicleEditPatent" class="swal2-input ios-input" placeholder="Patente" value="${escapeHtml(current.patent || '')}"><input id="dispatchVehicleEditBrand" class="swal2-input ios-input" placeholder="Marca" value="${escapeHtml(current.brand || '')}"><input id="dispatchVehicleEditType" class="swal2-input ios-input" placeholder="Tipo" value="${escapeHtml(current.type || 'Camión')}"><input id="dispatchVehicleEditExpiry" class="swal2-input ios-input" placeholder="Vencimiento" value="${escapeHtml(current.expiryDate || '')}"><label for="dispatchVehicleEditFile" class="inventario-upload-dropzone"><i class="fa-regular fa-file"></i><span id="dispatchVehicleEditFileLabel">${normalizeValue(current.attachmentUrl) ? 'Adjunto actual cargado (opcional reemplazar)' : 'Adjunto: click o arrastrá'}</span></label><input id="dispatchVehicleEditFile" class="form-control image-file-input inventario-hidden-file-input" type="file" accept="image/*,application/pdf"></div>`,
+      showCancelButton: true,
+      confirmButtonText: 'Guardar cambios',
+      cancelButtonText: 'Cancelar',
+      didOpen: () => {
+        const expiryInput = document.getElementById('dispatchVehicleEditExpiry');
+        const fileInput = document.getElementById('dispatchVehicleEditFile');
+        const dropzone = document.querySelector('label[for="dispatchVehicleEditFile"]');
+        const fileLabel = document.getElementById('dispatchVehicleEditFileLabel');
+        if (window.flatpickr && expiryInput) {
+          window.flatpickr(expiryInput, { locale: window.flatpickr.l10ns?.es || undefined, dateFormat: 'Y-m-d', altInput: true, altFormat: 'd/m/Y', allowInput: true, disableMobile: true, defaultDate: normalizeValue(current.expiryDate) || undefined });
+        }
+        fileInput?.addEventListener('change', () => {
+          const file = fileInput.files?.[0];
+          if (fileLabel) fileLabel.textContent = file ? `Adjunto: ${file.name}` : (normalizeValue(current.attachmentUrl) ? 'Adjunto actual cargado (opcional reemplazar)' : 'Adjunto: click o arrastrá');
+        });
+        dropzone?.addEventListener('dragover', (event) => {
+          event.preventDefault();
+          dropzone.classList.add('is-dragging');
+        });
+        dropzone?.addEventListener('dragleave', () => dropzone.classList.remove('is-dragging'));
+        dropzone?.addEventListener('drop', (event) => {
+          event.preventDefault();
+          dropzone.classList.remove('is-dragging');
+          const file = event.dataTransfer?.files?.[0];
+          if (!file || !fileInput) return;
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          fileInput.files = dt.files;
+        });
+      },
+      preConfirm: async () => {
+        const number = normalizeValue(document.getElementById('dispatchVehicleEditNumber')?.value);
+        const patent = normalizeValue(document.getElementById('dispatchVehicleEditPatent')?.value);
+        const brand = normalizeValue(document.getElementById('dispatchVehicleEditBrand')?.value);
+        const type = normalizeValue(document.getElementById('dispatchVehicleEditType')?.value) || 'Camión';
+        const expiryDate = normalizeValue(document.getElementById('dispatchVehicleEditExpiry')?.value);
+        if (!number) return Swal.showValidationMessage('Completá el número de URA/UTA.');
+        if (!patent) return Swal.showValidationMessage('Completá patente.');
+        if (!brand) return Swal.showValidationMessage('Completá marca.');
+        if (!type) return Swal.showValidationMessage('Completá tipo.');
+        if (!expiryDate) return Swal.showValidationMessage('Completá vencimiento.');
+        const file = document.getElementById('dispatchVehicleEditFile')?.files?.[0] || null;
+        let attachmentUrl = normalizeValue(current.attachmentUrl);
+        if (file) {
+          const validType = [...ALLOWED_UPLOAD_TYPES, 'application/pdf'].includes(file.type);
+          if (!validType) return Swal.showValidationMessage('Adjunto inválido (imagen o PDF).');
+          if (file.size > MAX_UPLOAD_SIZE_BYTES) return Swal.showValidationMessage('El adjunto supera 5MB.');
+          attachmentUrl = await uploadImageToStorage(file, 'reparto/vehiculos');
+        }
+        return { number, patent, brand, type, expiryDate, attachmentUrl };
+      }
+    });
+    if (!result.isConfirmed) return null;
+    state.reparto.vehicles[vehicleId] = { ...current, ...result.value, id: vehicleId, updatedAt: nowTs() };
+    await persistRepartoStore();
+    const label = formatDispatchVehicleLabel(state.reparto.vehicles[vehicleId]);
+    if (state.dispatchDraft?.vehicleId === vehicleId) state.dispatchDraft.vehicleSearch = label;
+    if (state.dispatchXlsxDraft?.vehicleId === vehicleId) state.dispatchXlsxDraft.vehicleSearch = label;
+    if (state.dispatchMode && state.dispatchCreateMode && state.dispatchDraft) renderDispatchCreate(state.dispatchDraft);
+    if (state.dispatchMode && state.dispatchXlsxMode && state.dispatchXlsxDraft) renderDispatchXlsxCreate(state.dispatchXlsxDraft);
+    return state.reparto.vehicles[vehicleId];
+  };
+
   const openDispatchVehiclesManager = async () => {
     const rows = Object.values(safeObject(state.reparto.vehicles || {}));
     const html = rows.length
       ? `<div class="input-group ios-input-group ingredientes-search-group dispatch-vehicles-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchVehiclesSearchInput" type="search" class="form-control ios-input ingredientes-search-input" placeholder="Buscar por número, patente o marca" autocomplete="off"></div><div id="dispatchVehiclesManagerList" class="dispatch-vehicles-manager-list">${rows.map((item) => {
         const meta = getDispatchVehicleExpiryMeta(item);
-        return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}" data-vehicle-search="${escapeHtml(normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`))}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i class="fa-regular fa-eye"></i><span>Adjunto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i class="fa-solid fa-upload"></i><span>Reemplazar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i class="fa-solid fa-paperclip"></i><span>Quitar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></div></div>`;
+        return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}" data-vehicle-search="${escapeHtml(normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`))}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-edit="${escapeHtml(item.id)}"><i class="fa-solid fa-pen"></i><span>Editar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i class="fa-regular fa-eye"></i><span>Adjunto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i class="fa-solid fa-upload"></i><span>Reemplazar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i class="fa-solid fa-paperclip"></i><span>Quitar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></div></div>`;
       }).join('')}</div>`
       : '<p>No hay unidades cargadas.</p>';
     const result = await openIosSwal({
@@ -6574,7 +6691,7 @@
           const rowsLive = Object.values(safeObject(state.reparto.vehicles || {}));
           list.innerHTML = rowsLive.map((item) => {
             const meta = getDispatchVehicleExpiryMeta(item);
-            return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}" data-vehicle-search="${escapeHtml(normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`))}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i class="fa-regular fa-eye"></i><span>Adjunto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i class="fa-solid fa-upload"></i><span>Reemplazar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i class="fa-solid fa-paperclip"></i><span>Quitar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></div></div>`;
+            return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}" data-vehicle-search="${escapeHtml(normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`))}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-edit="${escapeHtml(item.id)}"><i class="fa-solid fa-pen"></i><span>Editar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i class="fa-regular fa-eye"></i><span>Adjunto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i class="fa-solid fa-upload"></i><span>Reemplazar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i class="fa-solid fa-paperclip"></i><span>Quitar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></div></div>`;
           }).join('') || '<p>No hay unidades cargadas.</p>';
         };
         const searchInput = box?.querySelector('#dispatchVehiclesSearchInput');
@@ -6587,7 +6704,8 @@
         });
         
         box?.addEventListener('click', async (ev) => {
-          const id = ev.target.closest('[data-vehicle-view],[data-vehicle-upload],[data-vehicle-clear],[data-vehicle-toggle],[data-vehicle-delete]')?.dataset.vehicleView
+          const id = ev.target.closest('[data-vehicle-edit],[data-vehicle-view],[data-vehicle-upload],[data-vehicle-clear],[data-vehicle-toggle],[data-vehicle-delete]')?.dataset.vehicleEdit
+            || ev.target.closest('[data-vehicle-view]')?.dataset.vehicleView
             || ev.target.closest('[data-vehicle-upload]')?.dataset.vehicleUpload
             || ev.target.closest('[data-vehicle-clear]')?.dataset.vehicleClear
             || ev.target.closest('[data-vehicle-toggle]')?.dataset.vehicleToggle
@@ -6595,6 +6713,11 @@
           if (!id) return;
           const vehicle = safeObject(state.reparto.vehicles[id]);
           if (!vehicle.id) return;
+          if (ev.target.closest('[data-vehicle-edit]')) {
+            await openEditDispatchVehicle(id);
+            refreshVehiclesManagerList();
+            return;
+          }
           if (ev.target.closest('[data-vehicle-view]')) {
             if (!vehicle.attachmentUrl) {
               await openIosSwal({ title: 'Sin adjunto', html: '<p>No hay adjunto cargado.</p>', icon: 'info' });
@@ -6994,7 +7117,14 @@
               </div>
             </div>
             ${Number(analysis.expiredKg || 0) > 0.0001 ? `<p class="produccion-last-line produccion-last-line-expired"><i class="fa-solid fa-triangle-exclamation"></i> <strong>Kilos expirados:</strong> <strong>${Number(analysis.expiredKg || 0).toFixed(2)} kg</strong></p>` : ''}
-            ${(!analysis.canProduce && analysis.canProduceConsideringExpired) ? `<p class="produccion-last-line produccion-last-line-expired"><i class="fa-solid fa-calendar-days"></i> Podes producir con lote vencido ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg, pero en el rango de fecha ${formatDateRangeForRecipe(recipe)}.</p>` : ''}
+            ${(() => {
+              if (analysis.canProduce || !analysis.canProduceConsideringExpired) return '';
+              const windows = getRecipeExpiredDateWindows(recipe, analysis, toIsoDate());
+              const detail = windows.length
+                ? windows.map((item) => `<span><strong>${escapeHtml(item.ingredientName)}:</strong> ${escapeHtml(formatIsoEs(item.from || ''))} a ${escapeHtml(formatIsoEs(item.to || ''))}</span>`).join('<br>')
+                : `<span>${escapeHtml(formatIsoEs(normalizeValue(formatDateRangeForRecipe(recipe).split(' a ')[0] || '')))} a ${escapeHtml(formatIsoEs(normalizeValue(formatDateRangeForRecipe(recipe).split(' a ')[1] || '')))}</span>`;
+              return `<p class="produccion-last-line produccion-last-line-expired"><i class="fa-solid fa-calendar-days"></i> Podes producir con lote vencido ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg, pero en este rango por producto:<br>${detail}</p>`;
+            })()}
             ${draftLock?.blockedKg > 0 ? `<p class="produccion-last-line" data-draft-lock-line="${recipe.id}"><i class="fa-solid fa-lock"></i> Bloqueado por borrador: <strong>${draftLock.blockedKg.toFixed(2)} kg</strong> · disponible en <strong data-draft-lock-time="${recipe.id}">${formatCountdown(draftLock.remainingMs)}</strong></p>` : ''}
             <p class="produccion-last-line"><i class="fa-regular fa-clock"></i> Última producción: <strong>${formatDate(lastProductionAt)}</strong></p>
             <div class="produccion-progress-wrap ${isExpiredOnlyAvailable ? 'is-expired-only' : ''}">
@@ -8081,16 +8211,31 @@
       }
     });
     nodes.editor.querySelector('#produccionBackBtn').addEventListener('click', async () => {
-      const result = await openIosSwal({
-        title: isViewOnly ? '¿Deseás salir de esta visualización?' : '¿Deseás abandonar esta producción?',
-        html: isViewOnly ? '<p>Se cerrará la visualización sin guardar borradores.</p>' : '<p>Se guardará borrador para retomarlo luego.</p>',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Abandonar',
-        cancelButtonText: 'Seguir'
-      });
-      if (!result.isConfirmed) return;
-      if (!isViewOnly) await saveEditorDraft();
+      if (!isViewOnly) {
+        const result = await openIosSwal({
+          title: '¿Deseás salir de esta producción?',
+          html: '<p>Podés guardar el borrador para retomarlo más tarde o descartarlo.</p>',
+          icon: 'warning',
+          showCancelButton: true,
+          showDenyButton: true,
+          confirmButtonText: 'Guardar',
+          denyButtonText: 'No guardar',
+          cancelButtonText: 'Seguir'
+        });
+        if (result.isDismissed) return;
+        if (result.isConfirmed) await saveEditorDraft();
+        if (!result.isConfirmed && !result.isDenied) return;
+      } else {
+        const result = await openIosSwal({
+          title: '¿Deseás salir de esta visualización?',
+          html: '<p>Se cerrará la visualización.</p>',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: 'Salir',
+          cancelButtonText: 'Seguir'
+        });
+        if (!result.isConfirmed) return;
+      }
       state.activeRecipeId = '';
       state.editorMode = 'produce';
       state.sinTrazabilidad = false;
