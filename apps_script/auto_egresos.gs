@@ -454,19 +454,74 @@ function workerRead(path) {
   return txt ? JSON.parse(txt) : null;
 }
 
+// Worker nuevo: el path va por query string y el body es el value tal cual.
+// Para objetos planos grandes se rutea automáticamente a /rtdb/update en tandas
+// para no quemar CPU del Worker parseando JSONs gigantes.
 function workerWrite(path, value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const keys = Object.keys(value);
+    if (keys.length > 50) {
+      return workerBulkUpdate(path, value, 100);
+    }
+  }
+  return workerRawWrite_(path, value);
+}
+
+function workerRawWrite_(path, value) {
   const base = workerBaseUrl_();
-  const url = `${base}/rtdb/write`;
+  const url = `${base}/rtdb/write?path=${encodeURIComponent(path || '')}`;
   const resp = UrlFetchApp.fetch(url, {
     method: 'post',
-    contentType: 'application/json',
-    payload: JSON.stringify({ path, value }),
+    contentType: 'application/json; charset=utf-8',
+    payload: JSON.stringify(value === undefined ? null : value),
     muteHttpExceptions: true
   });
   const code = resp.getResponseCode();
   if (code < 200 || code >= 300) throw new Error(`workerWrite ${code}: ${resp.getContentText()}`);
   const txt = resp.getContentText();
   return txt ? JSON.parse(txt) : null;
+}
+
+function workerRawUpdate_(path, value) {
+  const base = workerBaseUrl_();
+  const url = `${base}/rtdb/update?path=${encodeURIComponent(path || '')}`;
+  const resp = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json; charset=utf-8',
+    payload: JSON.stringify(value === undefined ? null : value),
+    muteHttpExceptions: true
+  });
+  const code = resp.getResponseCode();
+  if (code < 200 || code >= 300) throw new Error(`workerUpdate ${code}: ${resp.getContentText()}`);
+  const txt = resp.getContentText();
+  return txt ? JSON.parse(txt) : null;
+}
+
+function workerBulkUpdate(path, value, batchSize) {
+  const size = Number(batchSize) > 0 ? Number(batchSize) : 100;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return workerRawUpdate_(path, value);
+  }
+  const keys = Object.keys(value);
+  let batches = 0;
+  for (let i = 0; i < keys.length; i += size) {
+    const slice = keys.slice(i, i + size);
+    const chunk = {};
+    for (let j = 0; j < slice.length; j += 1) chunk[slice[j]] = value[slice[j]];
+    workerRawUpdate_(path, chunk);
+    batches += 1;
+  }
+  return { ok: true, batches: batches, keys: keys.length };
+}
+
+function workerUpdate(path, value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const keys = Object.keys(value);
+    if (keys.length > 50) {
+      return workerBulkUpdate(path, value, 100);
+    }
+  }
+  return workerRawUpdate_(path, value);
 }
 
 function workerBaseUrl_() {
