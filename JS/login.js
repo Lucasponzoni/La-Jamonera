@@ -104,7 +104,9 @@
 
       showError('Datos inválidos', 'Revisá usuario y contraseña para continuar.');
     } catch (error) {
-      showError('Error de Firebase', 'No se pudo leer user/pass para validar el ingreso.');
+      console.error('[login] readCredentialsFromFirebase falló:', error);
+      const detail = (error && error.message) ? error.message : 'desconocido';
+      showError('Error de Firebase', `No se pudo leer user/pass para validar el ingreso.<br><small style="opacity:.7">${detail}</small>`);
     } finally {
       setLoading(false);
     }

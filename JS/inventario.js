@@ -200,6 +200,134 @@
 
   const isEntryNoPerecedero = (entry) => Boolean(entry?.noPerecedero);
   const isEntryUsoInterno = (entry) => Boolean(entry?.usoInternoEmpresa);
+  const isEntryFrozen = (entry) => Boolean(entry?.isFrozen || entry?.frozen);
+
+  // === Frozen product (CAA/SENASA) ===
+  // Cuando un ingreso se marca como "congelado", el vencimiento se fija a 60 días
+  // desde la fecha de ingreso, independientemente de los días sugeridos.
+  const FROZEN_EXPIRY_DAYS = 60;
+
+  const FROZEN_INFO_HTML = `
+    <div class="frozen-info-content">
+      <header class="frozen-info-hero">
+        <div class="frozen-info-hero-icon"><i class="bi bi-snow2"></i></div>
+        <div>
+          <p class="frozen-info-kicker">Guía orientativa</p>
+          <h3 class="frozen-info-hero-title">Manejo de carne refrigerada y congelada</h3>
+          <p class="frozen-info-hero-sub">Según criterios del CAA / SENASA · Uso interno en frigoríficos y elaboradores cárnicos</p>
+        </div>
+      </header>
+
+      <article class="frozen-info-card frozen-info-card--blue">
+        <header class="frozen-info-card-head">
+          <span class="frozen-info-step">1</span>
+          <h4><i class="bi bi-thermometer-snow"></i> Recepción del producto refrigerado</h4>
+        </header>
+        <ul class="frozen-info-list">
+          <li><i class="bi bi-check-circle-fill"></i> Verificar temperatura de recepción (ideal entre <strong>0&nbsp;°C y 5&nbsp;°C</strong>).</li>
+          <li><i class="bi bi-check-circle-fill"></i> Controlar fecha de vencimiento y estado del envase.</li>
+          <li><i class="bi bi-check-circle-fill"></i> Registrar lote, proveedor y fecha de ingreso.</li>
+          <li><i class="bi bi-check-circle-fill"></i> Si se congela, hacerlo <strong>antes del vencimiento</strong> del producto refrigerado.</li>
+        </ul>
+      </article>
+
+      <article class="frozen-info-card frozen-info-card--ice">
+        <header class="frozen-info-card-head">
+          <span class="frozen-info-step">2</span>
+          <h4><i class="bi bi-snow"></i> Congelación del producto</h4>
+        </header>
+        <div class="frozen-info-callout frozen-info-callout--warn">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <p><strong>Importante:</strong> la congelación <em>no reinicia</em> automáticamente la fecha de vencimiento original. Debe existir trazabilidad y procedimiento interno documentado.</p>
+        </div>
+        <div class="frozen-info-temp-grid">
+          <div class="frozen-info-temp">
+            <strong>-18&nbsp;°C</strong>
+            <span>o menor — almacenamiento recomendado</span>
+          </div>
+          <div class="frozen-info-temp frozen-info-temp--alt">
+            <strong>-12&nbsp;°C</strong>
+            <span>aceptable, reduce vida útil · 1 a 3 meses según corte</span>
+          </div>
+        </div>
+        <ul class="frozen-info-list">
+          <li><i class="bi bi-x-circle-fill"></i> Evitar fluctuaciones de temperatura.</li>
+          <li><i class="bi bi-x-circle-fill"></i> Evitar descongelamientos parciales.</li>
+        </ul>
+      </article>
+
+      <article class="frozen-info-card frozen-info-card--mint">
+        <header class="frozen-info-card-head">
+          <span class="frozen-info-step">3</span>
+          <h4><i class="bi bi-droplet-half"></i> Descongelado</h4>
+        </header>
+        <ul class="frozen-info-list">
+          <li><i class="bi bi-check-circle-fill"></i> Descongelar únicamente entre <strong>0&nbsp;°C y 5&nbsp;°C</strong>.</li>
+          <li><i class="bi bi-x-circle-fill"></i> Nunca a temperatura ambiente.</li>
+          <li><i class="bi bi-clock-fill"></i> Usar el producto dentro de <strong>24 a 48 horas</strong> post-descongelado.</li>
+          <li><i class="bi bi-x-circle-fill"></i> No volver a congelar salvo proceso habilitado y documentado.</li>
+        </ul>
+      </article>
+
+      <article class="frozen-info-card frozen-info-card--rose">
+        <header class="frozen-info-card-head">
+          <span class="frozen-info-step">4</span>
+          <h4><i class="bi bi-basket3-fill"></i> Uso en elaboración (ej. chorizo)</h4>
+        </header>
+        <p class="frozen-info-text">Si la carne descongelada correctamente entre 0&nbsp;°C y 5&nbsp;°C se usa como materia prima, el producto elaborado puede recibir una nueva vida útil refrigerada <strong>sólo si</strong>:</p>
+        <ul class="frozen-info-list">
+          <li><i class="bi bi-check-circle-fill"></i> La materia prima estaba apta y dentro de parámetros sanitarios.</li>
+          <li><i class="bi bi-check-circle-fill"></i> Se mantuvo la cadena de frío durante todo el proceso.</li>
+          <li><i class="bi bi-check-circle-fill"></i> La elaboración se hizo bajo condiciones higiénico-sanitarias controladas.</li>
+          <li><i class="bi bi-check-circle-fill"></i> Existe procedimiento documentado y trazabilidad.</li>
+          <li><i class="bi bi-check-circle-fill"></i> El producto final cumple parámetros microbiológicos.</li>
+        </ul>
+        <div class="frozen-info-callout frozen-info-callout--info">
+          <i class="bi bi-info-circle-fill"></i>
+          <p><strong>Sobre los 6 días refrigerados:</strong> en la industria puede establecerse una nueva vida útil (ej. 6 días entre 0–5&nbsp;°C), respaldada por validación técnica, controles microbiológicos y HACCP/BPM. El CAA no fija "6 días" automáticamente para todos los casos.</p>
+        </div>
+      </article>
+
+      <article class="frozen-info-card frozen-info-card--violet">
+        <header class="frozen-info-card-head">
+          <span class="frozen-info-step">5</span>
+          <h4><i class="bi bi-clipboard2-check-fill"></i> Recomendaciones para inspecciones</h4>
+        </header>
+        <ul class="frozen-info-list frozen-info-list--two-col">
+          <li><i class="bi bi-check2-square"></i> Registrar fecha y hora de congelado.</li>
+          <li><i class="bi bi-check2-square"></i> Identificar lotes claramente.</li>
+          <li><i class="bi bi-check2-square"></i> Documentar temperatura de cámaras.</li>
+          <li><i class="bi bi-check2-square"></i> Mantener registros de descongelado.</li>
+          <li><i class="bi bi-check2-square"></i> Tener procedimientos BPM y POES escritos.</li>
+          <li><i class="bi bi-check2-square"></i> Conservar evidencia microbiológica.</li>
+        </ul>
+      </article>
+
+      <footer class="frozen-info-conclusion">
+        <i class="bi bi-patch-check-fill"></i>
+        <p>El uso de carne previamente congelada en productos elaborados <strong>es habitual</strong>, pero requiere <strong>control documental, cadena de frío y validación sanitaria</strong>. La nueva fecha de vencimiento debe sustentarse técnicamente y no depende sólo de la fecha original de la materia prima.</p>
+      </footer>
+    </div>`;
+
+  const openFrozenInfoSwal = () => openIosSwal({
+    title: 'Producto congelado · Guía CAA/SENASA',
+    html: FROZEN_INFO_HTML,
+    icon: 'info',
+    confirmButtonText: 'Entendido',
+    width: 720,
+    customClass: { popup: 'ios-alert frozen-info-alert' }
+  });
+
+  const frozenInfoIconHtml = (extraClass = '') =>
+    `<button type="button" class="frozen-info-icon ${extraClass}" data-frozen-info aria-label="Información sobre producto congelado" title="¿Qué significa congelado?"><i class="bi bi-info-circle-fill"></i></button>`;
+
+  const frozenBadgeHtml = (entry) => {
+    if (!isEntryFrozen(entry)) return '';
+    return '<span class="inventario-frozen-badge" title="Producto congelado al ingreso (vto. 60 días)"><i class="bi bi-snow2"></i> Congelado</span>';
+  };
+
+  const recordHasFrozenEntries = (record) =>
+    Array.isArray(record?.entries) && record.entries.some(isEntryFrozen);
 
   const getExpiryBadgeTone = (days) => {
     if (!Number.isFinite(days)) return '';
@@ -1853,6 +1981,7 @@
               <h6 class="ingrediente-name">${capitalize(item.name)}</h6>
               <span class="inventario-status-badge">${status.label}</span>
             </div>
+            ${recordHasFrozenEntries(record) ? '<span class="inventario-frozen-pill" title="Tiene lotes congelados (vto. 60 días desde el ingreso)"><i class="bi bi-snow2"></i><span>Congelado</span></span>' : ''}
             <p class="ingrediente-meta">${capitalize(item.familyName)} · ${getMeasureLabel(item.measure || 'kilos')}</p>
             ${item.description ? `<p class="ingrediente-description">${sentenceCase(item.description)}</p>` : ''}
             ${stockLineHtml}
@@ -1907,6 +2036,8 @@
           expiryDate: entry.expiryDate || '',
           noPerecedero: Boolean(entry.noPerecedero),
           usoInternoEmpresa: Boolean(entry.usoInternoEmpresa),
+          isFrozen: Boolean(entry.isFrozen || entry.frozen),
+          frozenAt: normalizeValue(entry.frozenAt) || '',
           qtyKg: Number(entry.qtyKg || 0),
           qty: Number(entry.qty || 0),
           availableKg: getAvailableKg(entry),
@@ -2001,7 +2132,7 @@
       const availableClass = Number(row.availableQty || 0) <= 0 ? 'is-zero' : '';
       const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(resolutionRow.at))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td></tr>` : '';
       return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
-        <td>${escapeHtml(row.entryDateTime)}${getExpiryBadgeHtml(row) ? `<br><small>${getExpiryBadgeHtml(row)}</small>` : ''}</td>
+        <td>${escapeHtml(row.entryDateTime)}${getExpiryBadgeHtml(row) ? `<br><small>${getExpiryBadgeHtml(row)}</small>` : ''}${isEntryFrozen(row) ? `<br><small>${frozenBadgeHtml(row)}${row.frozenAt ? ` <span class="text-muted">desde ${escapeHtml(formatIsoDateEs(row.frozenAt))}</span>` : ''}</small>` : ''}</td>
         <td>${escapeHtml(row.ingredientName)}</td>
         <td><strong class="${expiredQtyClass}">${Number(row.qty || 0).toFixed(2)} ${escapeHtml(row.unit || '')}</strong><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${Number(row.availableQty || 0).toFixed(2)} ${escapeHtml(getMeasureAbbr(row.unit || ''))}${row.packageQty ? ` x${row.packageQty}` : ''}</span></td>
         <td>${escapeHtml(formatExpiryForUi(row))} </td>
@@ -3543,6 +3674,12 @@
       expiryDate: entry.noPerecedero ? '' : (entry.expiryDate || ''),
       noPerecedero: Boolean(entry.noPerecedero),
       usoInternoEmpresa: Boolean(entry.usoInternoEmpresa),
+      // Cargar el flag de congelado desde el entry persistido para que el tile
+      // se muestre correctamente al editar un ingreso ya cargado.
+      isFrozen: Boolean(entry.isFrozen || entry.frozen),
+      // Marcamos los flags como "no vienen de preferencia" porque vienen del
+      // entry real que se está editando — no queremos mostrar el badge ámbar.
+      flagsFromPreferences: { noPerecedero: false, isFrozen: false, usoInternoEmpresa: false },
       invoiceNumber: entry.invoiceNumber || '',
       provider: providerId,
       invoiceImageFile: null,
@@ -3690,8 +3827,8 @@
       const canEditEntry = availableQtyInUnit > 0.0001;
       const hasMovements = getEntryUsages(entry).length > 0;
       return `
-      <tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
-        <td>${formatEntryDateTime(entry.entryDate, entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}</td>
+      <tr class="inventario-row-tone ${isEntryFrozen(entry) ? 'inventario-row-frozen' : ''} ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
+        <td>${formatEntryDateTime(entry.entryDate, entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}${isEntryFrozen(entry) ? `<br><small>${frozenBadgeHtml(entry)}${entry.frozenAt ? ` <span class="text-muted">desde ${escapeHtml(formatIsoDateEs(entry.frozenAt))}</span>` : ''}</small>` : ''}</td>
         <td>${escapeHtml(formatExpiryForUi(entry))} </td>
         <td><strong class="${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</strong><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td>
         <td>${escapeHtml(entry.invoiceNumber || '-')}</td>
@@ -3951,14 +4088,30 @@
     const record = getRecord(ingredientId);
     const expiringDays = currentExpiringDaysFor(record);
 
+    // Aplicar preferencias guardadas de cargas anteriores (por ingrediente).
+    // Si el usuario marcó congelado/no perecedero/autoegreso en la última carga,
+    // se pre-tildan acá. La UI muestra una pista visual junto al tile.
+    const flagPrefs = safeObject(record.flagPreferences);
+    const hasFlagPrefs = Object.keys(flagPrefs).length > 0;
+    const prefIsFrozen = Boolean(flagPrefs.isFrozen);
+    const prefNoPerecedero = Boolean(flagPrefs.noPerecedero);
+    const prefAutoEgreso = Boolean(flagPrefs.usoInternoEmpresa);
+
     const baseDraft = {
       qty: '',
       unit: record.stockUnit || ingredient.measure || 'kilos',
       packageQty: record.packageQty ?? '',
       entryDate: getArgentinaIsoDate(),
-      expiryDate: addDaysToIso(getArgentinaIsoDate(), 5),
-      noPerecedero: false,
-      usoInternoEmpresa: false,
+      expiryDate: prefIsFrozen
+        ? addDaysToIso(getArgentinaIsoDate(), FROZEN_EXPIRY_DAYS)
+        : addDaysToIso(getArgentinaIsoDate(), 5),
+      noPerecedero: prefNoPerecedero,
+      isFrozen: prefIsFrozen,
+      usoInternoEmpresa: prefAutoEgreso,
+      // Flags que vinieron pre-tildados desde preferencias (para mostrar el aviso).
+      flagsFromPreferences: hasFlagPrefs
+        ? { noPerecedero: prefNoPerecedero, isFrozen: prefIsFrozen, usoInternoEmpresa: prefAutoEgreso }
+        : { noPerecedero: false, isFrozen: false, usoInternoEmpresa: false },
       invoiceNumber: '',
       provider: '',
       invoiceImageFile: null,
@@ -4073,7 +4226,11 @@
           <div class="inventario-lot-order" id="lotTokenOrder">${tokensHtml || '<div class="inventario-token-placeholder">Tildá opciones para generar badges.</div>'}</div>
           <code id="lotPatternPreview" class="inventario-lot-preview"></code>
           <div class="recipe-table-actions inventario-save-inline mt-2">
-            <button type="button" id="saveLotConfigBtn" class="btn ios-btn ios-btn-secondary recipe-table-action-btn"><i class="fa-solid fa-floppy-disk"></i><span>Guardar configuración de lote</span></button>
+            <button type="button" id="saveLotConfigBtn" class="btn ios-btn ios-btn-secondary recipe-table-action-btn">
+              <img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner d-none" id="saveLotConfigSpinner">
+              <i class="fa-solid fa-floppy-disk"></i>
+              <span>Guardar configuración de lote</span>
+            </button>
           </div>
         </div>
       </section>
@@ -4123,7 +4280,7 @@
               ${state.measures.map((m) => `<option value="${escapeHtml(m.name)}" ${measureKey(m.name) === measureKey(state.editorDraft.unit) ? 'selected' : ''}>${escapeHtml(getMeasureLabel(m.name))}</option>`).join('')}
               <option value="add_measure">+ Agregar medida</option>
             </select>
-            ${infiniteStock ? '<small class="text-muted">Unidad bloqueada por stock infinito.</small>' : (record.stockUnit ? '<small class="text-muted">Unidad bloqueada según ingresos previos.</small>' : '')}
+            ${infiniteStock ? '<small class="text-muted">Unidad bloqueada por stock infinito.</small>' : (record.stockUnit ? `<small class="text-muted d-block">Unidad bloqueada según ingresos previos.</small><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn mt-1" data-mass-unit-change><i class="fa-solid fa-right-left"></i><span>Cambiar unidad masivamente</span></button>` : '')}
           </div>
           <div class="recipe-field recipe-field-half ${shouldShowPackageQty ? '' : 'd-none'}" id="inventoryPackageQtyWrap">
             <label class="form-label" for="inventoryPackageQty"><i class="fa-solid fa-box inventario-step-icon"></i> Cantidad por paquete (opcional)</label>
@@ -4136,8 +4293,8 @@
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryExpiryDate"><i class="fa-regular fa-calendar-check inventario-step-icon"></i> Fecha de caducidad</label>
-            <input id="inventoryExpiryDate" class="form-control ios-input" autocomplete="off" value="${escapeHtml(state.editorDraft.expiryDate)}" placeholder="Seleccionar fecha" ${(state.editorDraft.noPerecedero || infiniteStock) ? 'disabled' : ''}>
-            <label class="inventario-check-row inventario-check-row-compact mt-2"><input type="checkbox" id="inventoryNoPerecedero" ${state.editorDraft.noPerecedero ? 'checked' : ''} ${stockDisabledAttr}><span>No perecedero</span></label>
+            <input id="inventoryExpiryDate" class="form-control ios-input" autocomplete="off" value="${escapeHtml(state.editorDraft.expiryDate)}" placeholder="Seleccionar fecha" ${(state.editorDraft.noPerecedero || state.editorDraft.isFrozen || infiniteStock) ? 'disabled' : ''}>
+            ${state.editorDraft.isFrozen ? `<small class="text-muted d-block mt-1"><i class="bi bi-info-circle me-1"></i>Vencimiento fijo a <strong>${FROZEN_EXPIRY_DAYS} días</strong> desde la fecha de ingreso.</small>` : ''}
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryInvoiceNumber"><i class="fa-solid fa-file-invoice inventario-step-icon"></i> Número de factura/remito</label>
@@ -4157,9 +4314,60 @@
               <option value="add_provider">nuevo proveedor</option>
             </select>
           </div>
-          <div class="recipe-field recipe-field-full inventario-internal-switch-wrap">
-            <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="inventoryUsoInternoEmpresa" ${state.editorDraft.usoInternoEmpresa ? 'checked' : ''} ${stockDisabledAttr}><span>Envases primarios & más</span></label>
-            <small class="text-muted">Auto egreso</small>
+          <div class="recipe-field recipe-field-full inventario-flags-block">
+            <div class="inventario-flags-head">
+              <i class="bi bi-tags-fill"></i>
+              <span>Tipo de producto</span>
+              <small class="text-muted">Marcá las opciones que correspondan</small>
+            </div>
+            <div class="inventario-flags-grid">
+              ${[
+                {
+                  flag: 'noperecedero',
+                  inputId: 'inventoryNoPerecedero',
+                  checked: state.editorDraft.noPerecedero,
+                  fromPref: Boolean(state.editorDraft.flagsFromPreferences?.noPerecedero),
+                  icon: 'bi-infinity',
+                  title: 'No perecedero',
+                  desc: 'Sin fecha de vencimiento',
+                  hasInfo: false
+                },
+                {
+                  flag: 'frozen',
+                  inputId: 'inventoryIsFrozen',
+                  checked: state.editorDraft.isFrozen,
+                  fromPref: Boolean(state.editorDraft.flagsFromPreferences?.isFrozen),
+                  icon: 'bi-snow2',
+                  title: 'Congelado al ingreso',
+                  desc: `Vto. forzado a ${FROZEN_EXPIRY_DAYS} días`,
+                  hasInfo: true
+                },
+                {
+                  flag: 'autoegreso',
+                  inputId: 'inventoryUsoInternoEmpresa',
+                  checked: state.editorDraft.usoInternoEmpresa,
+                  fromPref: Boolean(state.editorDraft.flagsFromPreferences?.usoInternoEmpresa),
+                  icon: 'bi-box-arrow-right',
+                  title: 'Autoegreso',
+                  desc: 'Envases primarios & uso interno',
+                  hasInfo: false
+                }
+              ].map((tile) => `
+                <div class="inventario-flag-tile-wrap ${tile.hasInfo ? 'has-info' : ''}">
+                  <label class="inventario-flag-tile ${tile.checked ? 'is-checked' : ''} ${tile.fromPref && tile.checked ? 'is-from-pref' : ''} ${tile.hasInfo ? 'has-info' : ''}" data-flag="${tile.flag}">
+                    <span class="inventario-flag-tile-icon"><i class="bi ${tile.icon}"></i></span>
+                    <div class="inventario-flag-tile-body">
+                      <span class="inventario-flag-tile-title">${tile.title}</span>
+                      <span class="inventario-flag-tile-desc">${tile.desc}</span>
+                      ${tile.fromPref && tile.checked ? '<span class="inventario-flag-tile-pref"><i class="bi bi-bookmark-star-fill"></i> Tildado por preferencia guardada</span>' : ''}
+                    </div>
+                    <input type="checkbox" id="${tile.inputId}" ${tile.checked ? 'checked' : ''} ${stockDisabledAttr}>
+                    <span class="inventario-flag-tile-check" aria-hidden="true"><i class="bi bi-check2"></i></span>
+                  </label>
+                  ${tile.hasInfo ? `<button type="button" class="frozen-info-icon inventario-flag-tile-info-btn" data-frozen-info aria-label="Información sobre producto congelado" title="¿Qué significa congelado?"><i class="bi bi-info-circle-fill"></i></button>` : ''}
+                </div>
+              `).join('')}
+            </div>
           </div>
           <div class="recipe-field recipe-field-full">
             <label class="form-label" for="inventoryInvoiceImage"><i class="fa-regular fa-images inventario-step-icon"></i> Adjuntar archivos (imagen o PDF)</label>
@@ -4198,7 +4406,7 @@
             </tr>
             <tr class="inventario-bulk-secondary-row">
               <td></td>
-              <td colspan="5"><div class="inventario-bulk-row-extras"><label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" data-bulk-no-perecedero="${idx}" ${extra.noPerecedero ? 'checked' : ''} ${stockDisabledAttr}><span>No perecedero</span></label><label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" data-bulk-auto-egreso="${idx}" ${extra.usoInternoEmpresa ? 'checked' : ''} ${stockDisabledAttr}><span>Autoegreso</span></label></div></td>
+              <td colspan="5"><div class="inventario-bulk-row-extras"><label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" data-bulk-no-perecedero="${idx}" ${extra.noPerecedero ? 'checked' : ''} ${stockDisabledAttr}><span>No perecedero</span></label><label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" data-bulk-auto-egreso="${idx}" ${extra.usoInternoEmpresa ? 'checked' : ''} ${stockDisabledAttr}><span>Autoegreso</span></label><label class="inventario-check-row inventario-check-row-compact inventario-frozen-row"><input type="checkbox" data-bulk-frozen="${idx}" ${extra.isFrozen ? 'checked' : ''} ${stockDisabledAttr}><span><i class="bi bi-snow2 me-1"></i>Congelado</span>${frozenInfoIconHtml()}</label></div></td>
             </tr>`;
           }).join('')}</tbody>
               </table>
@@ -4229,6 +4437,14 @@
       state.editorDraft.expiryDate = nodes.editorForm.querySelector('#inventoryExpiryDate')?.value || '';
       state.editorDraft.noPerecedero = Boolean(nodes.editorForm.querySelector('#inventoryNoPerecedero')?.checked);
       state.editorDraft.usoInternoEmpresa = Boolean(nodes.editorForm.querySelector('#inventoryUsoInternoEmpresa')?.checked);
+      state.editorDraft.isFrozen = Boolean(nodes.editorForm.querySelector('#inventoryIsFrozen')?.checked);
+      // Si el producto se marca como congelado al ingreso, el vencimiento queda
+      // forzado a 60 días desde la fecha de ingreso (CAA/SENASA orientativo).
+      if (state.editorDraft.isFrozen && !state.editorDraft.noPerecedero) {
+        const baseEntry = state.editorDraft.entryDate || getArgentinaIsoDate();
+        const frozenExpiry = addDaysToIso(baseEntry, FROZEN_EXPIRY_DAYS);
+        if (frozenExpiry) state.editorDraft.expiryDate = frozenExpiry;
+      }
       state.editorDraft.invoiceNumber = nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value || '';
       state.editorDraft.provider = nodes.editorForm.querySelector('#inventoryProvider')?.value || '';
       state.editorDraft.customAcronym = nodes.editorForm.querySelector('#lotCustomAcronym')?.value || '';
@@ -4246,8 +4462,17 @@
           packageQty: normalizeValue(nodes.editorForm.querySelector(`[data-bulk-package="${idx}"]`)?.value),
           noPerecedero: Boolean(nodes.editorForm.querySelector(`[data-bulk-no-perecedero="${idx}"]`)?.checked),
           usoInternoEmpresa: Boolean(nodes.editorForm.querySelector(`[data-bulk-auto-egreso="${idx}"]`)?.checked),
+          isFrozen: Boolean(nodes.editorForm.querySelector(`[data-bulk-frozen="${idx}"]`)?.checked),
           entryDate: state.editorDraft.entryDate,
-          expiryDate: normalizeValue(nodes.editorForm.querySelector(`[data-bulk-expiry-date="${idx}"]`)?.value) || normalizeValue(current?.expiryDate || state.editorDraft.expiryDate)
+          expiryDate: (() => {
+            const isFrozen = Boolean(nodes.editorForm.querySelector(`[data-bulk-frozen="${idx}"]`)?.checked);
+            const noPere = Boolean(nodes.editorForm.querySelector(`[data-bulk-no-perecedero="${idx}"]`)?.checked);
+            if (isFrozen && !noPere) {
+              const base = state.editorDraft.entryDate || getArgentinaIsoDate();
+              return addDaysToIso(base, FROZEN_EXPIRY_DAYS) || normalizeValue(nodes.editorForm.querySelector(`[data-bulk-expiry-date="${idx}"]`)?.value);
+            }
+            return normalizeValue(nodes.editorForm.querySelector(`[data-bulk-expiry-date="${idx}"]`)?.value) || normalizeValue(current?.expiryDate || state.editorDraft.expiryDate);
+          })()
         };
       });
       state.editorDirty = true;
@@ -4454,6 +4679,7 @@
         invoiceImageCountLabel: 'Sin archivos seleccionados',
         noPerecedero: false,
         usoInternoEmpresa: false,
+        isFrozen: false,
         expiryDate: addDaysToIso(getArgentinaIsoDate(), 5),
         entryDate: getArgentinaIsoDate(),
         bulkEntries: []
@@ -4798,12 +5024,17 @@
     nodes.editorForm.querySelector('#addBulkInventoryBtn')?.addEventListener('click', () => {
       const currentBulk = Array.isArray(state.editorDraft.bulkEntries) ? state.editorDraft.bulkEntries : [];
       const nextIndex = currentBulk.length;
+      // Heredamos los flags del form principal (no perecedero / congelado / autoegreso)
+      // para que la fila nueva arranque con el mismo "tipo de producto" que el principal.
+      // Cuando el usuario seleccione un ingrediente, las preferencias guardadas de ESE
+      // ingrediente sobreescriben estos defaults (ver el listener de [data-bulk-ingredient]).
       state.editorDraft.bulkEntries = [...currentBulk, {
         ...getDefaultBulkEntryDraft(''),
         entryDate: state.editorDraft.entryDate,
         expiryDate: state.editorDraft.expiryDate,
         noPerecedero: Boolean(state.editorDraft.noPerecedero),
-        usoInternoEmpresa: Boolean(state.editorDraft.usoInternoEmpresa)
+        usoInternoEmpresa: Boolean(state.editorDraft.usoInternoEmpresa),
+        isFrozen: Boolean(state.editorDraft.isFrozen)
       }];
       state.editorDraft.focusBulkSearchIndex = nextIndex;
       renderEditor(ingredientId, state.editorDraft);
@@ -4920,7 +5151,96 @@
       if (!event.target.closest('#inventoryProviderSearch')) {
         closeProviderSuggestions();
       }
+      if (event.target.closest('[data-frozen-info]')) {
+        event.preventDefault();
+        event.stopPropagation();
+        openFrozenInfoSwal();
+      }
+      if (event.target.closest('[data-mass-unit-change]')) {
+        event.preventDefault();
+        openMassUnitChangeDialog(ingredientId);
+      }
     });
+
+    // === Cambio masivo de unidad ===
+    // Permite cambiar la unidad de un ingrediente que ya tiene stock cargado.
+    // Sólo se admite el cambio dentro de la misma categoría (peso↔peso, vol↔vol).
+    // Recorre todas las entries y reescribe qty/qtyKg/qtyBase/availableQty/etc.
+    // a la nueva unidad usando toBase/fromBase. Persiste y re-renderiza.
+    async function openMassUnitChangeDialog(itemId) {
+      const targetRecord = getRecord(itemId);
+      const currentUnit = targetRecord.stockUnit || (state.ingredientes[itemId]?.measure || 'kilos');
+      const currentMeta = getUnitMeta(currentUnit);
+      const compatibleMeasures = state.measures.filter((m) => {
+        const meta = getUnitMeta(m.name);
+        return meta.category === currentMeta.category && measureKey(m.name) !== measureKey(currentUnit);
+      });
+      if (!compatibleMeasures.length) {
+        await openIosSwal({
+          title: 'Sin unidades compatibles',
+          html: `<p>No hay otras unidades de la categoría <strong>${escapeHtml(currentMeta.category)}</strong> para cambiar.</p>`,
+          icon: 'warning',
+          confirmButtonText: 'Entendido'
+        });
+        return;
+      }
+      const result = await openIosSwal({
+        title: 'Cambiar unidad masivamente',
+        html: `
+          <div class="text-start">
+            <p>Vas a cambiar la unidad de <strong>${escapeHtml(capitalize(state.ingredientes[itemId]?.name || ''))}</strong> y todos sus ingresos al nuevo formato. Esta operación es <strong>reversible</strong> repitiendo el proceso, pero conviene revisarlo.</p>
+            <label class="form-label mt-2">Unidad actual</label>
+            <input class="swal2-input ios-input" value="${escapeHtml(getMeasureLabel(currentUnit))}" readonly>
+            <label class="form-label mt-2" for="massUnitChangeNewUnit">Nueva unidad</label>
+            <select id="massUnitChangeNewUnit" class="swal2-input ios-input">
+              ${compatibleMeasures.map((m) => `<option value="${escapeHtml(m.name)}">${escapeHtml(getMeasureLabel(m.name))}</option>`).join('')}
+            </select>
+            <small class="text-muted d-block mt-2">Sólo se permiten cambios dentro de la misma categoría (${escapeHtml(currentMeta.category)}).</small>
+          </div>`,
+        showCancelButton: true,
+        confirmButtonText: 'Aplicar cambio',
+        cancelButtonText: 'Cancelar',
+        preConfirm: () => {
+          const v = document.getElementById('massUnitChangeNewUnit')?.value || '';
+          if (!v) { Swal.showValidationMessage('Seleccioná una unidad'); return false; }
+          return v;
+        }
+      });
+      if (!result.isConfirmed) return;
+      const newUnit = normalizeValue(result.value);
+      const fromFactor = getUnitMeta(currentUnit).factor || 1;
+      const toFactor = getUnitMeta(newUnit).factor || 1;
+      const ratio = fromFactor / toFactor; // multiplicar qty por esto convierte de currentUnit a newUnit
+      const entries = Array.isArray(targetRecord.entries) ? targetRecord.entries : [];
+      entries.forEach((entry) => {
+        if (!entry) return;
+        const oldQty = Number(entry.qty || 0);
+        const oldAvail = Number(entry.availableQty || 0);
+        const newQty = Number((oldQty * ratio).toFixed(4));
+        const newAvail = Number((oldAvail * ratio).toFixed(4));
+        entry.qty = newQty;
+        entry.availableQty = newAvail;
+        entry.unit = newUnit;
+        entry.qtyBase = Number(toBase(newQty, newUnit).toFixed(6));
+        entry.availableBase = Number(toBase(newAvail, newUnit).toFixed(6));
+        // qtyKg / availableKg se recalculan via convertToKg
+        entry.qtyKg = Number(convertToKg(newQty, newUnit).toFixed(4));
+        entry.availableKg = Number(convertToKg(newAvail, newUnit).toFixed(4));
+      });
+      targetRecord.entries = entries;
+      targetRecord.stockUnit = newUnit;
+      recomputeRecordStock(targetRecord, newUnit);
+      state.inventario.items[itemId] = targetRecord;
+      rebuildInventarioIndexes();
+      await persistInventario();
+      await openIosSwal({
+        title: 'Unidad actualizada',
+        html: `<p>Se cambiaron <strong>${entries.length}</strong> ingreso(s) a <strong>${escapeHtml(getMeasureLabel(newUnit))}</strong>.</p>`,
+        icon: 'success',
+        confirmButtonText: 'Listo'
+      });
+      renderEditor(itemId, { ...state.editorDraft, unit: newUnit });
+    }
 
     nodes.editorForm.querySelectorAll('[data-bulk-ingredient]').forEach((select) => {
       select.addEventListener('change', () => {
@@ -4948,6 +5268,28 @@
           if (!isUnit) packageInput.value = '';
         }
         syncDraft();
+        // Aplicar las preferencias de flags guardadas en el ingrediente
+        // seleccionado (no perecedero / congelado / autoegreso) al bulk row.
+        // IMPORTANTE: esto va DESPUÉS de syncDraft (que lee el DOM y reconstruye
+        // bulkEntries), si no las preferencias se sobrescriben con los valores
+        // del DOM (que todavía tiene los checkboxes apagados).
+        const prefs = safeObject(extraRecord.flagPreferences);
+        const bulkArr = Array.isArray(state.editorDraft.bulkEntries) ? [...state.editorDraft.bulkEntries] : [];
+        if (bulkArr[idx] && Object.keys(prefs).length > 0) {
+          bulkArr[idx] = {
+            ...bulkArr[idx],
+            noPerecedero: Boolean(prefs.noPerecedero),
+            isFrozen: Boolean(prefs.isFrozen),
+            usoInternoEmpresa: Boolean(prefs.usoInternoEmpresa)
+          };
+          // Si quedó marcado como congelado, fijamos el vto a +60 días.
+          if (prefs.isFrozen && !prefs.noPerecedero) {
+            const baseEntry = bulkArr[idx].entryDate || state.editorDraft.entryDate || getArgentinaIsoDate();
+            const forced = addDaysToIso(baseEntry, FROZEN_EXPIRY_DAYS);
+            if (forced) bulkArr[idx].expiryDate = forced;
+          }
+          state.editorDraft.bulkEntries = bulkArr;
+        }
         renderEditor(ingredientId, state.editorDraft);
       });
     });
@@ -5504,22 +5846,16 @@
   };
 
   const saveLotConfigOnly = async (ingredientId) => {
+    // Mismo patrón que saveSuggestedExpiryDays: spinner dentro del botón,
+    // sin alert de éxito. Sólo muestra alert si hay error.
     const record = getRecord(ingredientId);
     const draft = safeObject(state.editorDraft);
-    Swal.fire({
-      title: 'Actualizando lote...',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Actualizando lote" class="meta-spinner-login"></div>',
-      allowOutsideClick: false,
-      allowEscapeKey: false,
-      showConfirmButton: false,
-      customClass: {
-        popup: 'ios-alert ingredientes-alert ingredientes-saving-alert',
-        title: 'ios-alert-title',
-        htmlContainer: 'ios-alert-text ingredientes-saving-html'
-      },
-      buttonsStyling: false,
-      returnFocus: false
-    });
+    const btn = nodes.editorForm?.querySelector('#saveLotConfigBtn');
+    const spinner = nodes.editorForm?.querySelector('#saveLotConfigSpinner');
+    const iconEl = btn?.querySelector('.fa-floppy-disk');
+    if (btn) btn.disabled = true;
+    spinner?.classList.remove('d-none');
+    iconEl?.classList.add('d-none');
     try {
       record.lotConfig = {
         configured: Array.isArray(draft.tokens) && draft.tokens.length > 0,
@@ -5533,12 +5869,14 @@
       rebuildInventarioIndexes();
       await persistInventario();
       state.editorDirty = false;
-      if (Swal.isVisible()) Swal.close();
-      await openIosSwal({ title: 'Configuración guardada', html: '<p>Se guardó la configuración de lote sin cargar stock.</p>', icon: 'success', confirmButtonText: 'Continuar' });
+      // Re-render para reflejar el estado guardado, sin alert de éxito.
       renderEditor(ingredientId, state.editorDraft);
     } catch (error) {
-      if (Swal.isVisible()) Swal.close();
       await openIosSwal({ title: 'No se pudo actualizar lote', html: '<p>Ocurrió un error guardando la configuración de lote.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+    } finally {
+      if (btn) btn.disabled = false;
+      spinner?.classList.add('d-none');
+      iconEl?.classList.remove('d-none');
     }
   };
 
@@ -5560,8 +5898,12 @@
     const packageQtyRaw = normalizeValue(nodes.editorForm.querySelector('#inventoryPackageQty')?.value);
     const packageQty = packageQtyRaw ? Number.parseInt(packageQtyRaw, 10) : null;
     const entryDate = normalizeValue(nodes.editorForm.querySelector('#inventoryEntryDate')?.value);
-    const expiryDate = normalizeValue(nodes.editorForm.querySelector('#inventoryExpiryDate')?.value);
     const noPerecedero = Boolean(nodes.editorForm.querySelector('#inventoryNoPerecedero')?.checked);
+    const isFrozenMain = Boolean(nodes.editorForm.querySelector('#inventoryIsFrozen')?.checked);
+    // Si es congelado y no es no-perecedero, forzamos vto = entryDate + 60 días.
+    const expiryDate = (isFrozenMain && !noPerecedero && entryDate)
+      ? (addDaysToIso(entryDate, FROZEN_EXPIRY_DAYS) || normalizeValue(nodes.editorForm.querySelector('#inventoryExpiryDate')?.value))
+      : normalizeValue(nodes.editorForm.querySelector('#inventoryExpiryDate')?.value);
     const usoInternoEmpresa = Boolean(nodes.editorForm.querySelector('#inventoryUsoInternoEmpresa')?.checked);
     const invoiceNumber = normalizeValue(nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value);
     const providerId = normalizeValue(nodes.editorForm.querySelector('#inventoryProvider')?.value);
@@ -5708,6 +6050,13 @@
         entry.expiryDate = noPerecedero ? '' : expiryDate;
         entry.noPerecedero = Boolean(noPerecedero);
         entry.usoInternoEmpresa = Boolean(usoInternoEmpresa);
+        // Propagar flag de congelado y registrar fecha de congelación.
+        entry.isFrozen = Boolean(isFrozenMain);
+        if (isFrozenMain) {
+          entry.frozenAt = entry.frozenAt || entryDate || getArgentinaIsoDate();
+        } else {
+          entry.frozenAt = '';
+        }
         entry.provider = provider;
         entry.invoiceImageUrls = invoiceImageUrls;
         entry.invoiceImageUrl = invoiceImageUrls[0] || '';
@@ -5768,7 +6117,12 @@
         return;
       }
 
-      const buildEntry = ({ targetIngredientId, targetRecord, qtyValue, unitValue, packageQtyValue, entryDateValue, expiryDateValue, noPerecederoValue, usoInternoValue }) => {
+      const buildEntry = ({ targetIngredientId, targetRecord, qtyValue, unitValue, packageQtyValue, entryDateValue, expiryDateValue, noPerecederoValue, usoInternoValue, isFrozenValue }) => {
+        // Si es congelado y NO es no-perecedero, forzamos el vto a 60 días.
+        if (isFrozenValue && !noPerecederoValue && entryDateValue) {
+          const forced = addDaysToIso(entryDateValue, FROZEN_EXPIRY_DAYS);
+          if (forced) expiryDateValue = forced;
+        }
         const qtyBase = Number(toBase(qtyValue, unitValue).toFixed(6));
         const qtyKg = Number(convertToKg(qtyValue, unitValue).toFixed(4));
         const lotNumber = buildLotNumber({
@@ -5796,6 +6150,8 @@
           productionUsage: [],
           noPerecedero: noPerecederoValue,
           usoInternoEmpresa: usoInternoValue,
+          isFrozen: Boolean(isFrozenValue),
+          frozenAt: isFrozenValue ? entryDateValue : '',
           entryDate: entryDateValue,
           expiryDate: noPerecederoValue ? '' : expiryDateValue,
           invoiceNumber,
@@ -5847,7 +6203,8 @@
         entryDateValue: entryDate,
         expiryDateValue: expiryDate,
         noPerecederoValue: noPerecedero,
-        usoInternoValue: usoInternoEmpresa
+        usoInternoValue: usoInternoEmpresa,
+        isFrozenValue: isFrozenMain
       });
 
       for (const extra of bulkEntries) {
@@ -5872,7 +6229,8 @@
           entryDateValue: extraEntryDate,
           expiryDateValue: extraExpiryDate,
           noPerecederoValue: extraNoPerecedero,
-          usoInternoValue: Boolean(extra.usoInternoEmpresa)
+          usoInternoValue: Boolean(extra.usoInternoEmpresa),
+          isFrozenValue: Boolean(extra.isFrozen)
         });
       }
       record.lotConfig = {
@@ -5882,6 +6240,15 @@
         customAcronym: normalizeValue(state.editorDraft.customAcronym),
         includeSeparator: Boolean(state.editorDraft.includeSeparator),
         separator: normalizeValue(state.editorDraft.separator) || '-'
+      };
+
+      // Guardar las preferencias de flags usadas en esta carga para
+      // pre-tildarlas en la próxima vez que el usuario abra el editor.
+      record.flagPreferences = {
+        noPerecedero: Boolean(noPerecedero),
+        isFrozen: Boolean(isFrozenMain),
+        usoInternoEmpresa: Boolean(usoInternoEmpresa),
+        savedAt: Date.now()
       };
 
       state.inventario.items[ingredientId] = record;
@@ -5900,6 +6267,7 @@
         editingEntryId: '',
         noPerecedero: false,
         usoInternoEmpresa: false,
+        isFrozen: false,
         expiryDate: addDaysToIso(getArgentinaIsoDate(), 5),
         entryDate: getArgentinaIsoDate(),
         bulkEntries: []

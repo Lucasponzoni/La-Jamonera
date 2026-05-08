@@ -181,7 +181,11 @@
           index: lotIndex + 1,
           lotNumber: normalizeValue(lot?.lotNumber || lot?.entryId || '-'),
           provider: normalizeUpper(lot?.provider || '-'),
-          qtyLabel: formatQty(usedQty, unit)
+          qtyLabel: formatQty(usedQty, unit),
+          isFrozen: Boolean(lot?.isFrozen || lot?.frozen),
+          frozenAt: normalizeValue(lot?.frozenAt || ''),
+          entryDate: normalizeValue(lot?.entryDate || ''),
+          expiryDate: normalizeValue(lot?.expiryDate || '')
         };
       });
       const firstLot = lots[0] || {};
@@ -222,7 +226,21 @@
         entryDate: formatIsoEs(firstLot?.entryDate || '-'),
         autoObservation: lots.length > 1
           ? `${plan?.ingredientName || traceIngredient?.ingredientName || 'Ingrediente'}, se usó ${lotUsageSummary}. ${providersSummary}.`
-          : ''
+          : '',
+        // Observación específica para lotes congelados: detalla por lote la fecha
+        // de ingreso/congelado y el vto. forzado a 60 días, requerido para
+        // trazabilidad sanitaria CAA/SENASA cuando se descongela en producción.
+        frozenObservation: (() => {
+          const frozenLots = observationLots.filter((lot) => lot.isFrozen);
+          if (!frozenLots.length) return '';
+          const ingName = (plan?.ingredientName || traceIngredient?.ingredientName || 'INGREDIENTE').toString().toUpperCase();
+          const parts = frozenLots.map((lot) => {
+            const ingreso = lot.entryDate ? formatIsoEs(lot.entryDate) : '-';
+            const vto = lot.expiryDate ? formatIsoEs(lot.expiryDate) : '-';
+            return `lote ${lot.index} (${lot.lotNumber}) ingresó congelado el ${ingreso} (vto. forzado a 60 días: ${vto})`;
+          }).join('; ');
+          return `${ingName}: ${parts}. Producto descongelado para uso en esta producción según procedimiento BPM/HACCP (rango 0–5 °C).`;
+        })()
       };
     });
   };
@@ -288,9 +306,15 @@
       .map((row) => normalizeValue(row.autoObservation))
       .filter(Boolean)
       .join(' ');
-    const observations = [normalizeValue(registro?.observations), autoObservations]
+    const frozenObservations = ingredientRows
+      .map((row) => normalizeValue(row.frozenObservation))
       .filter(Boolean)
-      .join(' · ') || 'SIN OBSERVACIONES';
+      .join(' ');
+    const observations = [
+      normalizeValue(registro?.observations),
+      frozenObservations,
+      autoObservations
+    ].filter(Boolean).join(' · ') || 'SIN OBSERVACIONES';
 
     const observationsLabel = normalizeUpper(observations.replace(/\u00c2\u00b7/g, '|'));
 

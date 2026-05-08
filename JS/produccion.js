@@ -1264,6 +1264,8 @@
         createdAt: Number(item.entry.createdAt || 0),
         expiryDate: item.expiryIso || (isEntryNoPerecedero(item.entry) ? 'No perecedero' : ''),
         noPerecedero: isEntryNoPerecedero(item.entry),
+        isFrozen: Boolean(item.entry.isFrozen || item.entry.frozen),
+        frozenAt: normalizeValue(item.entry.frozenAt) || '',
         provider: normalizeValue(item.entry.provider) || '-',
         invoiceNumber: normalizeValue(item.entry.invoiceNumber) || '-',
         invoiceImageUrls: Array.isArray(item.entry.invoiceImageUrls) ? item.entry.invoiceImageUrls : (item.entry.invoiceImageUrl ? [item.entry.invoiceImageUrl] : []),
@@ -1690,6 +1692,8 @@
               createdAt: Number(item.entry.createdAt || 0),
               expiryDate: item.expiryIso || (isEntryNoPerecedero(item.entry) ? 'No perecedero' : ''),
               noPerecedero: isEntryNoPerecedero(item.entry),
+              isFrozen: Boolean(item.entry.isFrozen || item.entry.frozen),
+              frozenAt: normalizeValue(item.entry.frozenAt) || '',
               provider: normalizeValue(item.entry.provider) || '-',
               invoiceNumber: normalizeValue(item.entry.invoiceNumber) || '-',
               invoiceImageUrls: Array.isArray(item.entry.invoiceImageUrls) ? item.entry.invoiceImageUrls : (item.entry.invoiceImageUrl ? [item.entry.invoiceImageUrl] : []),
@@ -3097,9 +3101,22 @@
         const rneId = `${lotNodeId}_RNE`;
         const providerRne = resolveProviderRneFromLot(lot);
         const lotQty = Number(lot?.takeQty || 0);
-        lines.push(`${lotNodeId}["<b>LOTE ${lotIndex + 1}</b><br/>${esc(lot?.lotNumber || lot?.entryId || '-')}<br/><b>Usado:</b> ${esc(formatCompactQty(lotQty, lot?.unit || item?.unit || item?.ingredientUnit || ''))}<br/><b>Ingreso:</b> ${esc(formatIsoEs(lot?.entryDate || ''))}<br/><b>VTO:</b> ${esc(formatIsoEs(lot?.expiryDate || ''))}<br/><b>Proveedor:</b> ${esc(lot?.provider || '-')}"]:::toneLot`);
+        const lotIsFrozen = Boolean(lot?.isFrozen || lot?.frozen);
+        const lotEntryDate = normalizeValue(lot?.entryDate || '');
+        // Mostrar el nodo "DESCONGELADO DE PRODUCTO" sólo si el lote estaba congelado
+        // y la fecha de ingreso es distinta a la fecha de producción.
+        const showThaw = lotIsFrozen && lotEntryDate && productionDate && lotEntryDate !== productionDate;
+        lines.push(`${lotNodeId}["<b>LOTE ${lotIndex + 1}</b>${lotIsFrozen ? ' ❄' : ''}<br/>${esc(lot?.lotNumber || lot?.entryId || '-')}<br/><b>Usado:</b> ${esc(formatCompactQty(lotQty, lot?.unit || item?.unit || item?.ingredientUnit || ''))}<br/><b>Ingreso:</b> ${esc(formatIsoEs(lot?.entryDate || ''))}${lotIsFrozen ? '<br/><b>Congelado al ingreso</b>' : ''}<br/><b>VTO:</b> ${esc(formatIsoEs(lot?.expiryDate || ''))}<br/><b>Proveedor:</b> ${esc(lot?.provider || '-')}"]:::toneLot`);
         lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${esc(getTraceRneDisplay(providerRne))}"]:::toneRegistry`);
-        lines.push(`${planNodeId} -.->|LOTE ${lotIndex + 1}| ${lotNodeId}`);
+        // El nodo de DESCONGELADO va ANTES del LOTE: ingrediente -> DESCONGELADO -> LOTE -> RNE.
+        if (showThaw) {
+          const thawNodeId = `${lotNodeId}_THAW`;
+          lines.push(`${thawNodeId}["<b>❄ DESCONGELADO DE PRODUCTO</b><br/>${esc(formatIsoEs(productionDate))}"]:::toneThaw`);
+          lines.push(`${planNodeId} -.->|DESCONGELADO| ${thawNodeId}`);
+          lines.push(`${thawNodeId} -.->|LOTE ${lotIndex + 1}| ${lotNodeId}`);
+        } else {
+          lines.push(`${planNodeId} -.->|LOTE ${lotIndex + 1}| ${lotNodeId}`);
+        }
         lines.push(`${lotNodeId} -.->|RNE| ${rneId}`);
         if (previousLotNodeId) lines.push(`${previousLotNodeId} -.-> ${lotNodeId}`);
         previousLotNodeId = lotNodeId;
@@ -3117,6 +3134,7 @@
     lines.push('classDef toneWaste fill:#ffd8de,stroke:#e994a4,color:#7d2233,stroke-width:1.4px;');
     lines.push('classDef toneIngredient fill:#eaf1ff,stroke:#9fb9e6,color:#173f78,stroke-width:1.35px;');
     lines.push('classDef toneRegistry fill:#e7efff,stroke:#8eaedf,color:#173d73,stroke-width:1.35px;');
+    lines.push('classDef toneThaw fill:#d9ecff,stroke:#5b9bd5,color:#0c3a66,stroke-width:1.5px;');
     return lines.join('\n');
   };
 

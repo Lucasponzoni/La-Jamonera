@@ -11895,3 +11895,677 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 #usersManagerModal .informes-toolbar {
   justify-content: flex-end;
 }
+
+/* === Frozen product (CAA/SENASA) ============================================
+   Estilos para el flag "producto congelado" en Inventario y Producción.
+   - Icono ❄ junto al nombre del producto cuando tiene lotes congelados.
+   - Badge "Congelado" en historial de ingresos.
+   - Botón circular de info que abre el alert con la guía CAA/SENASA.
+   - Popup ampliado con tipografía legible y secciones bien separadas.
+============================================================================ */
+.inventario-frozen-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #d9ecff;
+  color: #0c3a66;
+  font-size: 0.85rem;
+  margin-left: 6px;
+  vertical-align: middle;
+  border: 1px solid #5b9bd5;
+}
+
+/* Pill badge "Congelado" en la card del catálogo: visible, claro, no invasivo */
+.inventario-frozen-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 8px;
+  margin: 4px 0 0;
+  border-radius: 999px;
+  background: #eaf4ff;
+  color: #0c3a66;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid #5b9bd5;
+  width: fit-content;
+  line-height: 1;
+}
+
+.inventario-frozen-pill i {
+  font-size: 0.9rem;
+  color: #2c6fb0;
+}
+
+.inventario-frozen-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #d9ecff;
+  color: #0c3a66;
+  font-weight: 600;
+  font-size: 0.72rem;
+  border: 1px solid #5b9bd5;
+}
+
+/* Fila completa de un ingreso congelado: tinte celeste sutil + accent izquierdo. */
+tr.inventario-row-frozen > td {
+  background: #f3f9ff !important;
+}
+
+tr.inventario-row-frozen.is-even-row > td {
+  background: #ecf4fc !important;
+}
+
+tr.inventario-row-frozen > td:first-child {
+  position: relative;
+}
+
+tr.inventario-row-frozen > td:first-child::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  background: #5b9bd5;
+  border-radius: 0 3px 3px 0;
+}
+
+.inventario-frozen-row {
+  position: relative;
+  align-items: center;
+}
+
+.inventario-frozen-row > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.frozen-info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid #5b9bd5;
+  background: #eaf4ff;
+  color: #0c3a66;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 50%;
+  transition: transform 0.15s ease, background 0.15s ease;
+  vertical-align: middle;
+}
+
+.frozen-info-icon:hover {
+  background: #d6e7f7;
+  transform: scale(1.1);
+}
+
+.frozen-info-icon i {
+  font-size: 0.85rem;
+}
+
+/* === Bloque "Tipo de producto" en form de ingreso ============================
+   Reemplaza los checkboxes sueltos por tarjetas seleccionables.
+============================================================================ */
+.inventario-flags-block {
+  background: #f8fafe;
+  border: 1px solid #e4ebf7;
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-top: 6px;
+}
+
+.inventario-flags-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #e1e8f4;
+  font-weight: 600;
+  color: #173d73;
+  font-size: 0.92rem;
+}
+
+.inventario-flags-head i {
+  color: #5b9bd5;
+}
+
+.inventario-flags-head small {
+  margin-left: auto;
+  font-weight: 400;
+  font-size: 0.75rem;
+}
+
+.inventario-flags-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+/* Wrap relativo que contiene el tile + el botón de info posicionado afuera del label.
+   Al sacar el botón del <label>, evitamos que el browser togglee el checkbox cuando
+   el usuario clickea sobre el ícono de info. */
+.inventario-flag-tile-wrap {
+  position: relative;
+}
+
+.inventario-flag-tile {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  margin: 0;
+  background: #ffffff;
+  border: 1.5px solid #e3ebf6;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  min-height: 70px;
+}
+
+/* Cuando el tile tiene botón de info, empujamos el check 36px a la izquierda
+   y posicionamos el botón de info en el espacio liberado, pegado al borde
+   derecho. Así NUNCA pueden solaparse: check está a la izquierda, info a la
+   derecha, separados por 14px. */
+.inventario-flag-tile.has-info .inventario-flag-tile-check {
+  margin-right: 36px;
+}
+
+.inventario-flag-tile-info-btn {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  z-index: 2;
+}
+
+/* Override del hover global de .frozen-info-icon que aplicaba scale(1.1)
+   y nos rompía el translateY(-50%) (porque transform se reemplaza, no
+   se acumula). Acá combinamos ambas transformaciones. */
+.inventario-flag-tile-info-btn:hover {
+  transform: translateY(-50%) scale(1.12);
+}
+
+.inventario-flag-tile:hover {
+  border-color: #b6d8ff;
+  background: #f7fbff;
+}
+
+/* Checkbox real oculto, lo reemplazamos por el círculo .inventario-flag-tile-check */
+.inventario-flag-tile input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
+
+.inventario-flag-tile-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid #c4d2e4;
+  border-radius: 50%;
+  background: #ffffff;
+  color: transparent;
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.inventario-flag-tile-check i {
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+/* Estado tildado */
+.inventario-flag-tile.is-checked,
+.inventario-flag-tile:has(input:checked) {
+  border-color: #2c6fb0;
+  background: #eaf4ff;
+}
+
+.inventario-flag-tile.is-checked .inventario-flag-tile-check,
+.inventario-flag-tile:has(input:checked) .inventario-flag-tile-check {
+  background: #2c6fb0;
+  border-color: #2c6fb0;
+  color: #ffffff;
+}
+
+/* Variantes por tipo */
+.inventario-flag-tile[data-flag="frozen"].is-checked,
+.inventario-flag-tile[data-flag="frozen"]:has(input:checked) {
+  border-color: #5b9bd5;
+  background: #eaf4ff;
+}
+
+.inventario-flag-tile[data-flag="frozen"].is-checked .inventario-flag-tile-icon,
+.inventario-flag-tile[data-flag="frozen"]:has(input:checked) .inventario-flag-tile-icon {
+  background: #2c6fb0;
+  color: #ffffff;
+}
+
+.inventario-flag-tile[data-flag="autoegreso"].is-checked,
+.inventario-flag-tile[data-flag="autoegreso"]:has(input:checked) {
+  border-color: #b893d9;
+  background: #f3ecff;
+}
+
+.inventario-flag-tile[data-flag="autoegreso"].is-checked .inventario-flag-tile-check,
+.inventario-flag-tile[data-flag="autoegreso"]:has(input:checked) .inventario-flag-tile-check {
+  background: #7e5dbb;
+  border-color: #7e5dbb;
+}
+
+.inventario-flag-tile[data-flag="autoegreso"].is-checked .inventario-flag-tile-icon,
+.inventario-flag-tile[data-flag="autoegreso"]:has(input:checked) .inventario-flag-tile-icon {
+  background: #7e5dbb;
+  color: #ffffff;
+}
+
+.inventario-flag-tile[data-flag="noperecedero"].is-checked .inventario-flag-tile-check,
+.inventario-flag-tile[data-flag="noperecedero"]:has(input:checked) .inventario-flag-tile-check {
+  background: #2f8865;
+  border-color: #2f8865;
+}
+
+.inventario-flag-tile[data-flag="noperecedero"].is-checked .inventario-flag-tile-icon,
+.inventario-flag-tile[data-flag="noperecedero"]:has(input:checked) .inventario-flag-tile-icon {
+  background: #2f8865;
+  color: #ffffff;
+}
+
+/* Aviso "tildado por preferencia": franja inferior fina, no compite con el body. */
+.inventario-flag-tile.is-from-pref {
+  /* el padding extra evita que la franja tape la descripción */
+  padding-bottom: 26px;
+}
+
+.inventario-flag-tile-pref {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #8a6500;
+  background: #fff8e1;
+  border-top: 1px solid #f0d692;
+  border-radius: 0 0 11px 11px; /* sigue el border-radius del tile (12px - 1px del border) */
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inventario-flag-tile-pref i {
+  color: #d39c2b;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+}
+
+.inventario-flag-tile-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #eef3fb;
+  color: #5b9bd5;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.inventario-flag-tile-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.inventario-flag-tile-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: #173d73;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.2;
+}
+
+.inventario-flag-tile-desc {
+  font-size: 0.76rem;
+  color: #6b7689;
+  line-height: 1.3;
+}
+
+.inventario-flag-tile-info {
+  margin-left: 4px;
+}
+
+@media (max-width: 600px) {
+  .inventario-flags-grid {
+    grid-template-columns: 1fr;
+  }
+  .inventario-flags-head small {
+    display: none;
+  }
+  .inventario-flag-tile {
+    grid-template-columns: 40px 1fr auto;
+    padding: 10px 12px;
+    min-height: 64px;
+  }
+  .inventario-flag-tile-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 1rem;
+  }
+}
+
+/* === Popup CAA/SENASA: tarjetas con color, jerarquía clara, lectura cómoda === */
+.frozen-info-alert.swal2-popup {
+  padding: 18px 18px 12px !important;
+  border-radius: 22px !important;
+  background: #ffffff;
+}
+
+.frozen-info-alert .swal2-title {
+  display: none;
+}
+
+.frozen-info-alert .swal2-icon {
+  display: none !important;
+}
+
+.frozen-info-alert .swal2-html-container {
+  text-align: left !important;
+  max-height: 72vh;
+  overflow-y: auto;
+  margin: 0 !important;
+  padding: 4px !important;
+}
+
+.frozen-info-content {
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: #1f2a44;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* Hero */
+.frozen-info-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  margin: 0 0 14px;
+  border-radius: 16px;
+  background: #eaf4ff;
+  border: 1px solid #b6dcff;
+}
+
+.frozen-info-hero-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  background: #2c6fb0;
+  color: #ffffff;
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+
+.frozen-info-kicker {
+  margin: 0 0 2px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  color: #2c6fb0;
+}
+
+.frozen-info-hero-title {
+  margin: 0;
+  font-size: 1.18rem;
+  font-weight: 800;
+  color: #0c3a66;
+  letter-spacing: -0.01em;
+}
+
+.frozen-info-hero-sub {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  color: #4a5b78;
+}
+
+/* Tarjetas */
+.frozen-info-card {
+  background: #ffffff;
+  border: 1px solid #e6eef9;
+  border-radius: 14px;
+  padding: 12px 14px 10px;
+  margin: 0 0 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.frozen-info-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--frozen-card-accent, #5b9bd5);
+}
+
+.frozen-info-card--blue   { --frozen-card-accent: #5b9bd5; background: #f5fbff; border-color: #d6e7f7; }
+.frozen-info-card--ice    { --frozen-card-accent: #4ea7d9; background: #eef8ff; border-color: #cfe6f7; }
+.frozen-info-card--mint   { --frozen-card-accent: #4cb38a; background: #effaf4; border-color: #cce8da; }
+.frozen-info-card--rose   { --frozen-card-accent: #d97a92; background: #fff0f4; border-color: #f3d0db; }
+.frozen-info-card--violet { --frozen-card-accent: #8a78c8; background: #f3f0fa; border-color: #ddd5ee; }
+
+.frozen-info-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #e3ebf6;
+}
+
+.frozen-info-card-head h4 {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #173d73;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.frozen-info-card-head h4 i {
+  color: var(--frozen-card-accent, #5b9bd5);
+  font-size: 1.05rem;
+}
+
+.frozen-info-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--frozen-card-accent, #5b9bd5);
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+}
+
+/* Listas */
+.frozen-info-list {
+  margin: 4px 0 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.frozen-info-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 0.9rem;
+  color: #2d3a52;
+}
+
+.frozen-info-list li i {
+  color: var(--frozen-card-accent, #5b9bd5);
+  font-size: 0.95rem;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.frozen-info-list li i.bi-x-circle-fill { color: #d76478; }
+.frozen-info-list li i.bi-clock-fill { color: #d39c2b; }
+
+.frozen-info-list--two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 14px;
+}
+
+.frozen-info-text {
+  margin: 4px 0 6px;
+  font-size: 0.9rem;
+  color: #2d3a52;
+}
+
+/* Callouts */
+.frozen-info-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  margin: 6px 0;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.frozen-info-callout i {
+  font-size: 1.05rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.frozen-info-callout p {
+  margin: 0;
+}
+
+.frozen-info-callout--warn {
+  background: #fff5e0;
+  color: #6b4f16;
+  border: 1px solid #f0d692;
+}
+
+.frozen-info-callout--warn i { color: #d39c2b; }
+
+.frozen-info-callout--info {
+  background: #eaf4ff;
+  color: #173d73;
+  border: 1px solid #c4dcf7;
+}
+
+.frozen-info-callout--info i { color: #2c6fb0; }
+
+/* Bloque de temperaturas */
+.frozen-info-temp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.frozen-info-temp {
+  background: #2c6fb0;
+  color: #ffffff;
+  padding: 10px 12px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.frozen-info-temp strong {
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.frozen-info-temp span {
+  font-size: 0.78rem;
+  opacity: 0.92;
+  line-height: 1.3;
+}
+
+.frozen-info-temp--alt {
+  background: #d39c2b;
+}
+
+/* Conclusión */
+.frozen-info-conclusion {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  margin: 8px 0 0;
+  border-radius: 14px;
+  background: #fff8e6;
+  border: 1px solid #f0d692;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.frozen-info-conclusion i {
+  color: #d39c2b;
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.frozen-info-conclusion p {
+  margin: 0;
+  color: #5b4413;
+}
+
+@media (max-width: 768px) {
+  .frozen-info-content { font-size: 0.9rem; }
+  .frozen-info-hero { padding: 12px; gap: 10px; }
+  .frozen-info-hero-icon { width: 44px; height: 44px; font-size: 1.3rem; }
+  .frozen-info-hero-title { font-size: 1.02rem; }
+  .frozen-info-card { padding: 10px 12px; }
+  .frozen-info-list--two-col { grid-template-columns: 1fr; }
+  .frozen-info-temp-grid { grid-template-columns: 1fr; }
+}

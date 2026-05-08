@@ -5,12 +5,16 @@
 
   const WORKER_BASE_URL = 'https://jamonera.lucasponzoninovogar.workers.dev';
 
-  // Tamaño de tanda para escrituras grandes (PATCH /rtdb/update).
-  // Mantener bajo evita que Cloudflare gaste CPU parseando JSON gigantes.
-  const BULK_BATCH_SIZE = 100;
-  // Umbral de claves a partir del cual un objeto plano se considera "grande"
-  // y se rutea automáticamente al endpoint /rtdb/update en tandas.
-  const BULK_THRESHOLD = 50;
+  // El Worker corta payloads > 800_000 bytes (MAX_BODY_BYTES) con 413.
+  // Apuntamos a tandas de ~600 KB para tener margen de overhead JSON.
+  const BULK_MAX_BYTES = 600_000;
+  // Si una sola entrada supera este tamaño, igual la mandamos sola
+  // (rompe el worker, pero al menos no perdemos toda la operación silenciosamente).
+  // Hard cap del worker:
+  const HARD_LIMIT_BYTES = 780_000;
+  // Umbral para decidir si vale la pena batchear: por debajo de esto,
+  // un solo PUT/PATCH es más eficiente que partir.
+  const SINGLE_SHOT_BYTES = 400_000;
 
   const fetchJson = async (url, options) => {
     const response = await fetch(url, options);
@@ -18,7 +22,6 @@
       const message = await response.text();
       throw new Error(`Worker ${response.status}: ${message}`);
     }
-    // Algunas escrituras devuelven cuerpo vacío.
     const text = await response.text();
     if (!text) return null;
     try {
@@ -48,12 +51,10 @@
       body: JSON.stringify(value === undefined ? null : value)
     });
 
-  // Parte un objeto plano en tandas y las envía como PATCH al endpoint /rtdb/update.
-  // Esto reemplaza el viejo PUT a /rtdb/write con el árbol entero, que reventaba
-  // la CPU del Worker al parsear JSONs de varios MB.
-  const bulkUpdate = async (path, value, batchSize) => {
-    const size = Number(batchSize) > 0 ? Number(batchSize) : BULK_BATCH_SIZE;
-
+  // Pre-serializa cada entrada y arma tandas dinámicas que respetan
+  // el límite de bytes del Worker. Mucho más confiable que batchear
+  // por cantidad fija de claves cuando los valores tienen tamaños desparejos.
+  const bulkUpdate = async (path, value) => {
     if (!isPlainObject(value)) {
       return rawUpdate(path, value);
     }
@@ -63,20 +64,74 @@
       return { ok: true, batches: 0, keys: 0 };
     }
 
+    // Pre-serializar una sola vez por clave.
+    const entries = keys.map((k) => {
+      const v = value[k];
+      const serialized = JSON.stringify(v === undefined ? null : v);
+      // overhead aproximado: "key":value,
+      const bytes = k.length + serialized.length + 4;
+      return { key: k, value: v, bytes };
+    });
+
     let batches = 0;
-    for (let i = 0; i < keys.length; i += size) {
-      const slice = keys.slice(i, i + size);
-      const chunk = {};
-      for (const k of slice) chunk[k] = value[k];
-      // Las tandas se mandan secuencialmente para no saturar el Worker
-      // ni romper invariantes de orden. Si en el futuro hace falta más
-      // velocidad, usar Promise.all con un pool de concurrencia chico.
+    let chunk = {};
+    let chunkBytes = 2; // {}
+
+    const flush = async () => {
+      if (chunkBytes <= 2) return;
       // eslint-disable-next-line no-await-in-loop
       await rawUpdate(path, chunk);
       batches += 1;
+      chunk = {};
+      chunkBytes = 2;
+    };
+
+    for (const entry of entries) {
+      if (entry.bytes >= HARD_LIMIT_BYTES) {
+        // Una entrada sola excede el límite del Worker. Flushear lo acumulado
+        // e intentar mandarla igual: probablemente devuelva 413 y propague el error
+        // al llamador, pero por lo menos no envenenamos el resto del batch.
+        // eslint-disable-next-line no-await-in-loop
+        await flush();
+        // eslint-disable-next-line no-await-in-loop
+        await rawUpdate(path, { [entry.key]: entry.value });
+        batches += 1;
+        continue;
+      }
+
+      if (chunkBytes + entry.bytes > BULK_MAX_BYTES) {
+        // eslint-disable-next-line no-await-in-loop
+        await flush();
+      }
+
+      chunk[entry.key] = entry.value;
+      chunkBytes += entry.bytes;
     }
 
-    return { ok: true, batches, keys: keys.length };
+    await flush();
+
+    return { ok: true, batches, keys: entries.length };
+  };
+
+  // Heurística: si el JSON serializado completo cabe holgado en una sola request,
+  // mandamos PUT/PATCH directo. Si excede, batcheamos vía bulkUpdate.
+  const writeOrBulk = async (path, value, fallbackRaw) => {
+    if (!isPlainObject(value)) {
+      return fallbackRaw(path, value);
+    }
+
+    let serialized;
+    try {
+      serialized = JSON.stringify(value);
+    } catch (err) {
+      return fallbackRaw(path, value);
+    }
+
+    if (serialized.length <= SINGLE_SHOT_BYTES) {
+      return fallbackRaw(path, value);
+    }
+
+    return bulkUpdate(path, value);
   };
 
   const init = async () => {
@@ -102,37 +157,26 @@
 
       // Escritura "inteligente":
       // - null/undefined => PUT real (para borrar nodos).
-      // - objeto plano grande => PATCH en tandas (bulkUpdate).
-      // - cualquier otra cosa (string/number/array/objeto chico) => PUT directo.
-      // El comportamiento de "reemplazar todo el árbol" se preserva sólo
-      // cuando el llamador ya cargó y reescribió el árbol completo (caso típico
-      // en este proyecto), porque cada clave se sobrescribe vía PATCH.
-      // OJO: si necesitás *eliminar* claves remotas que ya no están en `value`,
-      // hacelo explícito con `write(path, null)` antes y volvé a escribir.
+      // - objeto plano serializado <= SINGLE_SHOT_BYTES => PUT directo (/rtdb/write).
+      // - objeto plano más grande => PATCH en tandas dinámicas por bytes (/rtdb/update).
+      // - cualquier otra cosa (string/number/array) => PUT directo.
+      //
+      // OJO: el modo "tandas" usa PATCH, así que NO borra claves remotas que
+      // no estén en `value`. Si necesitás un reemplazo total, hacé primero
+      // `write(path, null)` o usá `rawWrite(path, value)` explícito.
       write: async (path, value) => {
         if (value === null || value === undefined) {
           return rawWrite(path, value);
         }
-
-        if (isPlainObject(value)) {
-          const keyCount = Object.keys(value).length;
-          if (keyCount > BULK_THRESHOLD) {
-            return bulkUpdate(path, value, BULK_BATCH_SIZE);
-          }
-        }
-
-        return rawWrite(path, value);
+        return writeOrBulk(path, value, rawWrite);
       },
 
-      // PATCH /rtdb/update?path=... (con tandas automáticas si el objeto es grande).
+      // PATCH /rtdb/update?path=... con tandas dinámicas si supera el umbral.
       update: async (path, value) => {
-        if (isPlainObject(value)) {
-          const keyCount = Object.keys(value).length;
-          if (keyCount > BULK_THRESHOLD) {
-            return bulkUpdate(path, value, BULK_BATCH_SIZE);
-          }
+        if (value === null || value === undefined) {
+          return rawUpdate(path, value);
         }
-        return rawUpdate(path, value);
+        return writeOrBulk(path, value, rawUpdate);
       },
 
       // API de bajo nivel para casos puntuales en los que querés saltearte
