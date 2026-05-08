@@ -11988,7 +11988,8 @@ tr.inventario-row-frozen > td:first-child::before {
    una .family-circle-section, para que el header colapsable se renderice
    en bloque y la fila de círculos viva dentro de su propio body. */
 .familias-circles:has(.family-circle-section),
-.produccion-recipe-groups {
+.produccion-recipe-groups,
+#familiasCircles:has(.family-circle-section) {
   display: block !important;
   overflow: visible !important;
   padding-bottom: 0 !important;

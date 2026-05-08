@@ -23,6 +23,7 @@
   const state = {
     activeFamilyId: 'all',
     search: '',
+    familiesCollapsed: (() => { try { return localStorage.getItem('ingredientes_families_collapsed') === '1'; } catch (_) { return false; } })(),
     ingredientes: { familias: {}, items: {}, config: { measures: [] } }
   };
 
@@ -242,7 +243,24 @@
       </div>
     `).join('');
 
-    familiasCircles.innerHTML = allButton + familyButtons;
+    const collapsed = Boolean(state.familiesCollapsed);
+    const activeName = state.activeFamilyId !== 'all'
+      ? capitalizeLabel(safeObject(state.ingredientes.familias)[state.activeFamilyId]?.name || '')
+      : '';
+
+    familiasCircles.innerHTML = `
+      <div class="family-circle-section ${collapsed ? 'is-collapsed' : ''}">
+        <div class="family-circle-section-head">
+          <button type="button" class="family-circle-toggle" data-ing-families-toggle aria-expanded="${!collapsed}">
+            <i class="fa-solid ${collapsed ? 'fa-chevron-right' : 'fa-chevron-down'}"></i>
+            <span>Familias</span>
+            <small>${families.length} ${families.length === 1 ? 'familia' : 'familias'}${activeName ? ` · filtrando: ${activeName}` : ''}</small>
+          </button>
+        </div>
+        <div class="family-circle-section-body ${collapsed ? 'd-none' : ''}">
+          <div class="family-circles-row">${allButton}${familyButtons}</div>
+        </div>
+      </div>`;
     prepareThumbLoaders('.js-family-thumb');
   };
 
@@ -1029,6 +1047,13 @@
       state.activeFamilyId = 'all';
       renderFamilies();
       renderIngredientes();
+      return;
+    }
+
+    if (event.target.closest('[data-ing-families-toggle]')) {
+      state.familiesCollapsed = !state.familiesCollapsed;
+      try { localStorage.setItem('ingredientes_families_collapsed', state.familiesCollapsed ? '1' : '0'); } catch (_) {}
+      renderFamilies();
       return;
     }
 
