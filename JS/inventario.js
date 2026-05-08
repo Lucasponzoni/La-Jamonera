@@ -78,6 +78,7 @@
     inventario: { config: { globalLowThresholdKg: DEFAULT_LOW_THRESHOLD, expiringSoonDays: DEFAULT_EXPIRING_SOON_DAYS }, items: {} },
     search: '',
     activeFamilyId: 'all',
+    familiesCollapsed: (() => { try { return localStorage.getItem('inventario_families_collapsed') === '1'; } catch (_) { return false; } })(),
     view: 'list',
     selectedIngredientId: '',
     editorDraft: null,
@@ -1892,13 +1893,30 @@
           <span class="family-circle-name">Todas</span>
         </button>
       </div>`;
-    nodes.families.innerHTML = allBtn + families.map((family) => `
+    const familyCircles = families.map((family) => `
       <div class="family-circle-wrap">
         <button type="button" class="family-circle-item ${state.activeFamilyId === family.id ? 'is-active' : ''}" data-inv-family-filter="${family.id}">
           <span class="family-circle-thumb ${family.imageUrl ? '' : 'family-circle-thumb-placeholder'}">${family.imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb" src="${family.imageUrl}" alt="${capitalize(family.name)}">` : '<i class="fa-solid fa-carrot"></i>'}${ingredientCounts[family.id] > 0 ? `<span class="family-circle-count">${Math.min(99, ingredientCounts[family.id])}</span>` : ''}</span>
           <span class="family-circle-name">${capitalize(family.name)}</span>
         </button>
       </div>`).join('');
+    const collapsed = Boolean(state.familiesCollapsed);
+    const activeName = state.activeFamilyId !== 'all'
+      ? capitalize(state.familias?.[state.activeFamilyId]?.name || '')
+      : '';
+    nodes.families.innerHTML = `
+      <div class="family-circle-section ${collapsed ? 'is-collapsed' : ''}">
+        <div class="family-circle-section-head">
+          <button type="button" class="family-circle-toggle" data-inv-families-toggle aria-expanded="${!collapsed}">
+            <i class="fa-solid ${collapsed ? 'fa-chevron-right' : 'fa-chevron-down'}"></i>
+            <span>Familias</span>
+            <small>${families.length} ${families.length === 1 ? 'familia' : 'familias'}${activeName ? ` · filtrando: ${escapeHtml(activeName)}` : ''}</small>
+          </button>
+        </div>
+        <div class="family-circle-section-body ${collapsed ? 'd-none' : ''}">
+          <div class="family-circles-row">${allBtn}${familyCircles}</div>
+        </div>
+      </div>`;
     initThumbLoading(nodes.families);
   };
 
@@ -7191,6 +7209,13 @@
       state.activeAutoEgresoFilter = autoEgresoBtn.dataset.invAutoEgresoFilter;
       renderAutoEgresoFilters();
       renderList();
+      return;
+    }
+
+    if (event.target.closest('[data-inv-families-toggle]')) {
+      state.familiesCollapsed = !state.familiesCollapsed;
+      try { localStorage.setItem('inventario_families_collapsed', state.familiesCollapsed ? '1' : '0'); } catch (_) {}
+      renderFamilies();
       return;
     }
 

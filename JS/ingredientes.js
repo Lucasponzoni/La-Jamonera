@@ -594,7 +594,14 @@
     </section>
   `;
 
-  const attachImageStepEvents = (prefix) => {
+  const attachImageStepEvents = (prefix, options = {}) => {
+    // options.uploadFolder: carpeta para los uploads manuales (default 'ingredientes/uploads').
+    // options.aiFolder: carpeta para imágenes generadas por IA (default 'ingredientes/ia').
+    // options.optional: si true, no es obligatorio agregar imagen — devuelve ''
+    //   en lugar de tirar error cuando el usuario no genera/sube nada.
+    const uploadFolder = options.uploadFolder || 'ingredientes/uploads';
+    const aiFolder = options.aiFolder || 'ingredientes/ia';
+    const optional = Boolean(options.optional);
     const methodInput = document.getElementById(`${prefix}_method`);
     const methodButtons = Array.from(document.querySelectorAll(`#${prefix}_methodButtons [data-image-method]`));
     const urlWrap = document.getElementById(`${prefix}_urlWrap`);
@@ -709,12 +716,16 @@
       }
       if (method === 'upload') {
         const file = imageFileInput.files && imageFileInput.files[0];
+        // Si es opcional y no eligió archivo, dejamos que se guarde sin imagen.
+        if (!file && optional) return '';
         const message = validateImageFile(file);
         if (message) {
+          // Si es opcional, en vez de tirar error guardamos sin imagen.
+          if (optional) return '';
           throw new Error(`Archivo no admitido: ${message}`);
         }
         preview.innerHTML = `<span class="image-preview-overlay"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Subiendo"></span>`;
-        return uploadImageToStorage(file, 'ingredientes/uploads');
+        return uploadImageToStorage(file, uploadFolder);
       }
       if (method === 'ai') {
         if (!imageState.generatedBlob) {
@@ -722,10 +733,12 @@
           if (existingUrl) {
             return existingUrl;
           }
+          // Si es opcional, no es obligatorio generar IA → guardamos sin imagen.
+          if (optional) return '';
           throw new Error('Generá una imagen IA antes de guardar.');
         }
         const aiFile = new File([imageState.generatedBlob], `ia_${Date.now()}.png`, { type: imageState.generatedBlob.type || 'image/png' });
-        return uploadImageToStorage(aiFile, 'ingredientes/ia');
+        return uploadImageToStorage(aiFile, aiFolder);
       }
       return '';
     };
@@ -1153,6 +1166,13 @@
         items: safeObject(state.ingredientes.items),
         measures: getMeasures()
       };
+    },
+    // Expone el step de imagen (Link / Subir / IA) para que otros módulos
+    // (ej. Producción → grupos de recetas) reutilicen el mismo flujo y look.
+    // El segundo parámetro `uploadFolder` define la carpeta del Storage.
+    imageStep: {
+      buildHtml: (prefix, initialImage = '') => buildImageStepHtml(prefix, initialImage),
+      attach: (prefix, options = {}) => attachImageStepEvents(prefix, options)
     }
   };
 

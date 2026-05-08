@@ -6,6 +6,7 @@
     empty: document.getElementById('produccionEmpty'),
     data: document.getElementById('produccionData'),
     list: document.getElementById('produccionList'),
+    recipeGroups: document.getElementById('produccionRecipeGroups'),
     editor: document.getElementById('produccionEditor'),
     search: document.getElementById('produccionSearchInput'),
     historyView: document.getElementById('produccionPeriodView'),
@@ -32,6 +33,10 @@
   const RESERVAS_PATH = '/produccion/reservas';
   const DRAFTS_PATH = '/produccion/drafts';
   const REGISTROS_PATH = '/produccion/registros';
+  // Agrupaciones de recetas (carpetas tipo "Embutidos", "Salsas").
+  // Schema: { [groupId]: { id, name, imageUrl, order, createdAt } }
+  // El groupId se referencia desde recipe.recipeGroupId.
+  const RECIPE_GROUPS_PATH = '/recetas_groups';
   const SEQUENCE_PATH = '/produccion/sequence';
   const REPARTO_PATH = '/Reparto';
   const LEGACY_REPARTO_PATH = '/REPARTO';
@@ -50,6 +55,9 @@
   const ROSARIO_DEPT_LOCALITIES = ['Rosario', 'Villa Gobernador Gálvez', 'Pérez', 'Funes', 'Roldán', 'Ibarlucea', 'Alvear', 'Pueblo Esther', 'General Lagos', 'Arroyo Seco', 'Piñero'];
   const state = {
     recetas: {},
+    recipeGroups: {},
+    activeRecipeGroupId: 'all',
+    recipeGroupsCollapsed: (() => { try { return localStorage.getItem('produccion_recipe_groups_collapsed') === '1'; } catch (_) { return false; } })(),
     ingredientes: {},
     inventario: {},
     users: {},
@@ -7027,11 +7035,269 @@
     nodes.modalTitle.innerHTML = `Producción <span class="produccion-modal-rne-badges">${attachmentBadge}${expiryBadge}</span>`;
   };
 
+  // === Agrupaciones de recetas =================================================
+  // Las "recipeGroups" son carpetas con imagen para clasificar recetas (ej.
+  // "Embutidos", "Salsas"). Cada receta puede tener `recipeGroupId` que apunta
+  // a un grupo. La barra superior se renderiza con `renderRecipeGroups()` y
+  // se filtra el listado por `state.activeRecipeGroupId`.
+  // -----------------------------------------------------------------------------
+  const getRecipeGroupsList = () =>
+    Object.values(safeObject(state.recipeGroups))
+      .filter((g) => g && g.id)
+      .sort((a, b) => {
+        const oa = Number(a.order || 0);
+        const ob = Number(b.order || 0);
+        if (oa !== ob) return oa - ob;
+        return String(a.name || '').localeCompare(String(b.name || ''), 'es');
+      });
+
+  const getRecipesByGroupCount = () => {
+    const counts = {};
+    Object.values(safeObject(state.recetas)).forEach((r) => {
+      const gid = normalizeValue(r?.recipeGroupId);
+      if (!gid) return;
+      counts[gid] = Number(counts[gid] || 0) + 1;
+    });
+    return counts;
+  };
+
+  const persistRecipeGroups = async () =>
+    window.dbLaJamoneraRest.write(RECIPE_GROUPS_PATH, state.recipeGroups);
+
+  const persistRecetas = async () =>
+    window.dbLaJamoneraRest.write('/recetas', state.recetas);
+
+  // Sube imagen a Firebase Storage usando el mismo patrón que usuarios/recetas.
+  const uploadRecipeGroupImage = async (file) => {
+    if (!file || !window.storageLaJamonera) return '';
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const refPath = `recetas/grupos/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const ref = window.storageLaJamonera.ref().child(refPath);
+    await ref.put(file);
+    return ref.getDownloadURL();
+  };
+
+  const renderRecipeGroups = () => {
+    if (!nodes.recipeGroups) return;
+    const groups = getRecipeGroupsList();
+    const counts = getRecipesByGroupCount();
+    const active = state.activeRecipeGroupId || 'all';
+    const collapsed = Boolean(state.recipeGroupsCollapsed);
+
+    // Reusa exactamente las clases de inventario para mantener idéntico look.
+    const renderThumb = (url, alt, count) => {
+      const countBadge = Number(count) > 0 ? `<span class="family-circle-count">${Math.min(99, Number(count))}</span>` : '';
+      if (url) {
+        // onload: marcamos como is-loaded (la clase .thumb-image arranca con opacity:0).
+        // onerror: si la URL falla, mutamos el span al placeholder con folder.
+        const onLoad = "this.classList.add('is-loaded');";
+        const onError = "this.parentNode.classList.add('family-circle-thumb-placeholder');this.outerHTML='&lt;i class=\\'fa-solid fa-folder\\'&gt;&lt;/i&gt;';";
+        return `<span class="family-circle-thumb"><img class="thumb-image" src="${escapeHtml(url)}" alt="${escapeHtml(alt)}" loading="lazy" onload="${onLoad}" onerror="${onError}">${countBadge}</span>`;
+      }
+      return `<span class="family-circle-thumb family-circle-thumb-placeholder"><i class="fa-solid fa-folder"></i>${countBadge}</span>`;
+    };
+
+    const totalRecipes = Object.keys(safeObject(state.recetas)).length;
+    const allButton = `
+      <div class="family-circle-wrap">
+        <button type="button" class="family-circle-item ${active === 'all' ? 'is-active' : ''}" data-recipe-group-filter="all">
+          <span class="family-circle-thumb family-circle-thumb-placeholder"><i class="fa-solid fa-table-cells-large"></i>${totalRecipes > 0 ? `<span class="family-circle-count">${Math.min(99, totalRecipes)}</span>` : ''}</span>
+          <span class="family-circle-name">Todas</span>
+        </button>
+      </div>`;
+
+    const groupButtons = groups.map((g) => `
+      <div class="family-circle-wrap">
+        <button type="button" class="family-circle-item ${active === g.id ? 'is-active' : ''}" data-recipe-group-filter="${escapeHtml(g.id)}">
+          ${renderThumb(g.imageUrl, g.name || 'Grupo', counts[g.id] || 0)}
+          <span class="family-circle-name">${escapeHtml(g.name || 'Grupo')}</span>
+        </button>
+        <div class="family-circle-actions">
+          <button class="family-manage-btn" data-recipe-group-manage="${escapeHtml(g.id)}" type="button" title="Administrar recetas del grupo"><i class="fa-solid fa-list-check"></i></button>
+          <button class="family-manage-btn" data-recipe-group-edit="${escapeHtml(g.id)}" type="button" title="Editar grupo"><i class="fa-solid fa-pen"></i></button>
+          <button class="family-manage-btn" data-recipe-group-delete="${escapeHtml(g.id)}" type="button" title="Eliminar grupo"><i class="fa-solid fa-trash"></i></button>
+        </div>
+      </div>`).join('');
+
+    const createButton = `
+      <div class="family-circle-wrap">
+        <button type="button" class="family-circle-item family-circle-create" data-recipe-group-create>
+          <span class="family-circle-thumb family-circle-thumb-placeholder family-circle-thumb-create"><i class="fa-solid fa-plus"></i></span>
+          <span class="family-circle-name">Nuevo grupo</span>
+        </button>
+      </div>`;
+
+    nodes.recipeGroups.innerHTML = `
+      <div class="family-circle-section ${collapsed ? 'is-collapsed' : ''}">
+        <div class="family-circle-section-head">
+          <button type="button" class="family-circle-toggle" data-recipe-groups-toggle aria-expanded="${!collapsed}" aria-controls="produccionRecipeGroupsBody">
+            <i class="fa-solid ${collapsed ? 'fa-chevron-right' : 'fa-chevron-down'}"></i>
+            <span>Grupos de recetas</span>
+            <small>${groups.length} ${groups.length === 1 ? 'grupo' : 'grupos'}${active !== 'all' ? ` · filtrando: ${escapeHtml(safeObject(state.recipeGroups[active]).name || '')}` : ''}</small>
+          </button>
+        </div>
+        <div id="produccionRecipeGroupsBody" class="family-circle-section-body ${collapsed ? 'd-none' : ''}">
+          <div class="family-circles-row">${allButton}${groupButtons}${createButton}</div>
+        </div>
+      </div>`;
+  };
+
+  const openRecipeGroupForm = async (existingId = '') => {
+    const existing = existingId ? safeObject(state.recipeGroups[existingId]) : null;
+    // Usa el mismo image step que ingredientes/familias (Link / Subir / IA).
+    const imageStep = window.laJamoneraIngredientesAPI?.imageStep;
+    if (!imageStep) {
+      // Fallback mínimo si la API no está cargada todavía.
+      await Swal.fire({ title: 'Cargando...', text: 'Esperá unos segundos y volvé a intentar.', icon: 'info' });
+      return;
+    }
+    let resolveImage;
+    const result = await Swal.fire({
+      title: existing ? 'Editar grupo de recetas' : 'Nuevo grupo de recetas',
+      html: `
+        <div class="ingrediente-form-grid text-start recipe-group-form">
+          <section class="step-block">
+            <h6 class="step-title">1) Datos del grupo</h6>
+            <div class="step-content">
+              <label for="recipeGroupNameInput">Nombre del grupo *</label>
+              <input id="recipeGroupNameInput" class="swal2-input ios-input" placeholder="Ej: Embutidos" value="${escapeHtml(existing?.name || '')}">
+            </div>
+          </section>
+          ${imageStep.buildHtml('recipeGroupImage', existing?.imageUrl || '')}
+        </div>`,
+      showCancelButton: true,
+      confirmButtonText: existing ? 'Guardar cambios' : 'Crear grupo',
+      cancelButtonText: 'Cancelar',
+      buttonsStyling: false,
+      customClass: { popup: 'ios-alert', confirmButton: 'ios-btn ios-btn-primary', cancelButton: 'ios-btn ios-btn-secondary' },
+      didOpen: () => {
+        // Carpetas de Storage propias para grupos de recetas.
+        resolveImage = imageStep.attach('recipeGroupImage', {
+          uploadFolder: 'recetas/grupos/uploads',
+          aiFolder: 'recetas/grupos/ia',
+          optional: true
+        });
+      },
+      preConfirm: async () => {
+        const name = normalizeValue(document.getElementById('recipeGroupNameInput')?.value);
+        if (!name) { Swal.showValidationMessage('Ingresá un nombre'); return false; }
+        try {
+          const imageUrl = await resolveImage();
+          return { name, imageUrl: imageUrl || existing?.imageUrl || '' };
+        } catch (error) {
+          Swal.showValidationMessage(error?.message || 'No se pudo procesar la imagen');
+          return false;
+        }
+      }
+    });
+    if (!result.isConfirmed || !result.value) return;
+    const id = existing?.id || `rg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    state.recipeGroups[id] = {
+      id,
+      name: result.value.name,
+      imageUrl: result.value.imageUrl || '',
+      order: existing?.order ?? Object.keys(state.recipeGroups).length,
+      createdAt: existing?.createdAt || Date.now(),
+      updatedAt: Date.now()
+    };
+    await persistRecipeGroups();
+    state.activeRecipeGroupId = id;
+    renderRecipeGroups();
+    renderList();
+  };
+
+  const deleteRecipeGroup = async (groupId) => {
+    const group = safeObject(state.recipeGroups[groupId]);
+    if (!group?.id) return;
+    const recipesInGroup = Object.values(safeObject(state.recetas)).filter((r) => normalizeValue(r?.recipeGroupId) === groupId);
+    const ok = await Swal.fire({
+      title: '¿Eliminar grupo?',
+      html: `<p>Vas a eliminar el grupo <strong>${escapeHtml(group.name)}</strong>.</p>${recipesInGroup.length ? `<p class="text-warning">Hay <strong>${recipesInGroup.length}</strong> receta(s) asociadas — quedarán sin grupo.</p>` : ''}`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Eliminar',
+      cancelButtonText: 'Cancelar',
+      buttonsStyling: false,
+      customClass: { popup: 'ios-alert', confirmButton: 'ios-btn ios-btn-danger', cancelButton: 'ios-btn ios-btn-secondary' }
+    });
+    if (!ok.isConfirmed) return;
+    delete state.recipeGroups[groupId];
+    // Quitar groupId de las recetas asociadas.
+    let recetasChanged = false;
+    Object.values(state.recetas).forEach((r) => {
+      if (r && normalizeValue(r.recipeGroupId) === groupId) {
+        r.recipeGroupId = '';
+        recetasChanged = true;
+      }
+    });
+    await persistRecipeGroups();
+    if (recetasChanged) await persistRecetas();
+    state.activeRecipeGroupId = 'all';
+    renderRecipeGroups();
+    renderList();
+  };
+
+  const openRecipeGroupAssign = async (groupId) => {
+    const group = safeObject(state.recipeGroups[groupId]);
+    if (!group?.id) return;
+    const allRecipes = Object.values(safeObject(state.recetas))
+      .filter((r) => r && r.id)
+      .sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'es'));
+    if (!allRecipes.length) {
+      await Swal.fire({ title: 'Sin recetas', html: '<p>No hay recetas creadas todavía.</p>', icon: 'info', buttonsStyling: false, customClass: { popup: 'ios-alert', confirmButton: 'ios-btn ios-btn-primary' } });
+      return;
+    }
+    const html = `
+      <div class="text-start produccion-group-assign-list">
+        <p class="mb-2"><small>Marcá las recetas que pertenecen a <strong>${escapeHtml(group.name)}</strong>.</small></p>
+        ${allRecipes.map((r) => {
+          const inThis = normalizeValue(r.recipeGroupId) === groupId;
+          const otherGroup = !inThis && r.recipeGroupId ? safeObject(state.recipeGroups[r.recipeGroupId])?.name : '';
+          return `<label class="produccion-group-assign-row">
+            <input type="checkbox" data-assign-recipe="${escapeHtml(r.id)}" ${inThis ? 'checked' : ''}>
+            <span class="produccion-group-assign-thumb">${r.imageUrl ? `<img src="${escapeHtml(r.imageUrl)}" alt="">` : '<i class="bi bi-egg-fried"></i>'}</span>
+            <span class="produccion-group-assign-name"><strong>${escapeHtml(capitalize(r.title || '-'))}</strong>${otherGroup ? `<small> · actualmente en <em>${escapeHtml(capitalize(otherGroup))}</em></small>` : ''}</span>
+          </label>`;
+        }).join('')}
+      </div>`;
+    const result = await Swal.fire({
+      title: `Recetas en "${group.name}"`,
+      html,
+      width: 640,
+      showCancelButton: true,
+      confirmButtonText: 'Guardar',
+      cancelButtonText: 'Cancelar',
+      buttonsStyling: false,
+      customClass: { popup: 'ios-alert produccion-group-assign-alert', confirmButton: 'ios-btn ios-btn-primary', cancelButton: 'ios-btn ios-btn-secondary' },
+      preConfirm: () => {
+        const checked = Array.from(document.querySelectorAll('[data-assign-recipe]'))
+          .filter((el) => el.checked)
+          .map((el) => normalizeValue(el.dataset.assignRecipe));
+        return checked;
+      }
+    });
+    if (!result.isConfirmed) return;
+    const targetIds = new Set(result.value || []);
+    Object.values(state.recetas).forEach((r) => {
+      if (!r) return;
+      const isInTarget = targetIds.has(normalizeValue(r.id));
+      const wasInThisGroup = normalizeValue(r.recipeGroupId) === groupId;
+      if (isInTarget) r.recipeGroupId = groupId;
+      else if (wasInThisGroup) r.recipeGroupId = '';
+    });
+    await persistRecetas();
+    renderRecipeGroups();
+    renderList();
+  };
+
   const renderList = () => {
     renderRneExpiryAlert();
     renderModalRneBadge();
+    renderRecipeGroups();
     const query = normalizeLower(state.search);
+    const activeGroup = state.activeRecipeGroupId || 'all';
     const list = getRecipes()
+      .filter((item) => activeGroup === 'all' || normalizeValue(item?.recipeGroupId) === activeGroup)
       .filter((item) => !query || normalizeLower(item.title).includes(query) || normalizeLower(item.description).includes(query) || normalizeLower(item.nombreComercial).includes(query))
       .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
     if (!list.length) {
@@ -8291,7 +8557,7 @@
         return fallback;
       }
     };
-    const [recetas, ingredientes, inventario, config, reservas, drafts, registros, users, repartoStore, legacyRepartoStore] = await Promise.all([
+    const [recetas, ingredientes, inventario, config, reservas, drafts, registros, users, repartoStore, legacyRepartoStore, recipeGroups] = await Promise.all([
       safeRead('/recetas', {}),
       safeRead('/ingredientes/items', {}),
       safeRead('/inventario', {}),
@@ -8301,9 +8567,11 @@
       safeRead(REGISTROS_PATH, {}),
       safeRead('/informes/users', {}),
       safeRead(REPARTO_PATH, {}),
-      safeRead(LEGACY_REPARTO_PATH, {})
+      safeRead(LEGACY_REPARTO_PATH, {}),
+      safeRead(RECIPE_GROUPS_PATH, {})
     ]);
     state.recetas = safeObject(recetas);
+    state.recipeGroups = safeObject(recipeGroups);
     state.ingredientes = safeObject(ingredientes);
     state.inventario = safeObject(inventario);
     state.reservas = safeObject(reservas);
@@ -8371,6 +8639,45 @@
     state.search = event.target.value;
     renderList();
   });
+
+  // Listener delegado del strip de grupos: filtrar, crear, editar, eliminar,
+  // administrar recetas asignadas. Es delegado porque el HTML se reescribe
+  // en cada renderRecipeGroups().
+  nodes.recipeGroups?.addEventListener('click', async (event) => {
+    if (event.target.closest('[data-recipe-groups-toggle]')) {
+      state.recipeGroupsCollapsed = !state.recipeGroupsCollapsed;
+      try { localStorage.setItem('produccion_recipe_groups_collapsed', state.recipeGroupsCollapsed ? '1' : '0'); } catch (_) {}
+      renderRecipeGroups();
+      return;
+    }
+    const filterBtn = event.target.closest('[data-recipe-group-filter]');
+    if (filterBtn) {
+      state.activeRecipeGroupId = normalizeValue(filterBtn.dataset.recipeGroupFilter) || 'all';
+      renderRecipeGroups();
+      renderList();
+      return;
+    }
+    if (event.target.closest('[data-recipe-group-create]')) {
+      await openRecipeGroupForm('');
+      return;
+    }
+    const editBtn = event.target.closest('[data-recipe-group-edit]');
+    if (editBtn) {
+      await openRecipeGroupForm(normalizeValue(editBtn.dataset.recipeGroupEdit));
+      return;
+    }
+    const deleteBtn = event.target.closest('[data-recipe-group-delete]');
+    if (deleteBtn) {
+      await deleteRecipeGroup(normalizeValue(deleteBtn.dataset.recipeGroupDelete));
+      return;
+    }
+    const manageBtn = event.target.closest('[data-recipe-group-manage]');
+    if (manageBtn) {
+      await openRecipeGroupAssign(normalizeValue(manageBtn.dataset.recipeGroupManage));
+      return;
+    }
+  });
+
   nodes.list.addEventListener('scroll', updateProduccionListScrollHint);
   nodes.list.addEventListener('click', async (event) => {
     const expiryToggle = event.target.closest('[data-product-expiry-toggle]');
