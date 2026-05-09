@@ -325,6 +325,18 @@
     return Number.isFinite(parsed) ? parsed : Number.NaN;
   };
   const isEntryNoPerecedero = (entry) => Boolean(entry?.noPerecedero);
+  const isIsoDateToken = (value) => /^\d{4}-\d{2}-\d{2}$/.test(normalizeValue(value));
+  const getEntryDateIso = (entry) => {
+    const entryDate = normalizeValue(entry?.entryDate);
+    return isIsoDateToken(entryDate) ? entryDate : '';
+  };
+  const isEntryFutureForProductionDate = (entry, productionDateIso) => {
+    const entryDate = getEntryDateIso(entry);
+    const productionDate = normalizeValue(productionDateIso);
+    return Boolean(entryDate && productionDate && entryDate > productionDate);
+  };
+  const minIsoDate = (dates = []) => dates.filter(isIsoDateToken).sort()[0] || '';
+  const maxIsoDate = (dates = []) => dates.filter(isIsoDateToken).sort().slice(-1)[0] || '';
   const disableCalendarSuggestions = (input) => {
     if (!input) return;
     input.setAttribute('autocomplete', 'new-password');
@@ -539,7 +551,7 @@
     const recipe = state.recetas?.[registro?.recipeId] || {};
     const agingDays = Number(registro?.agingDaysAtProduction ?? recipe?.agingDays);
     if (!Number.isFinite(agingDays) || agingDays <= 0) return { agingDays: 0, packagingDate: '' };
-    const baseDate = toIsoDate(registro?.createdAt || nowTs());
+    const baseDate = normalizeValue(registro?.productionDate) || toIsoDate(registro?.createdAt || nowTs());
     if (!baseDate) return { agingDays, packagingDate: '' };
     const computed = addDaysToIso(baseDate, agingDays);
     return { agingDays, packagingDate: moveIsoFromSunday(computed) };
@@ -1068,9 +1080,12 @@
       return {
         available: INFINITE_STOCK_AVAILABLE_QTY,
         total: INFINITE_STOCK_AVAILABLE_QTY,
+        futureAvailable: 0,
         hasExpired: false,
+        hasFuture: false,
         incompatibleUnits: [],
         nextToExpire: null,
+        nextEntryDate: '',
         infiniteStock: true
       };
     }
@@ -1084,9 +1099,12 @@
       return {
         available: fromBase(net, targetUnit),
         total: fromBase(base, targetUnit),
+        futureAvailable: 0,
         hasExpired: false,
+        hasFuture: false,
         incompatibleUnits: [],
-        nextToExpire: null
+        nextToExpire: null,
+        nextEntryDate: ''
       };
     }
     const aggregate = entries.reduce((acc, entry) => {
@@ -1100,6 +1118,14 @@
       const expiryIso = isEntryNoPerecedero(entry) ? '' : normalizeValue(entry.expiryDate);
       const expiredForDate = expiryIso && expiryIso < productionDateIso;
       if (entryMeta.category === targetMeta.category) {
+        const entryDate = getEntryDateIso(entry);
+        const futureForDate = isEntryFutureForProductionDate(entry, productionDateIso);
+        if (futureForDate) {
+          acc.futureBase += netBase;
+          acc.hasFuture = true;
+          if (entryDate && (!acc.nextEntryDate || entryDate < acc.nextEntryDate)) acc.nextEntryDate = entryDate;
+          return acc;
+        }
         acc.totalBase += netBase;
         if (!expiredForDate) acc.usableBase += netBase;
       } else {
@@ -1108,13 +1134,16 @@
       if (expiredForDate) acc.hasExpired = true;
       if (!acc.nextToExpire && expiryIso) acc.nextToExpire = expiryIso;
       return acc;
-    }, { totalBase: 0, usableBase: 0, incompatible: [], hasExpired: false, nextToExpire: null });
+    }, { totalBase: 0, usableBase: 0, futureBase: 0, incompatible: [], hasExpired: false, hasFuture: false, nextToExpire: null, nextEntryDate: '' });
     return {
       available: fromBase(aggregate.usableBase, targetUnit),
       total: fromBase(aggregate.totalBase, targetUnit),
+      futureAvailable: fromBase(aggregate.futureBase, targetUnit),
       hasExpired: aggregate.hasExpired,
+      hasFuture: aggregate.hasFuture,
       incompatibleUnits: aggregate.incompatible,
-      nextToExpire: aggregate.nextToExpire
+      nextToExpire: aggregate.nextToExpire,
+      nextEntryDate: aggregate.nextEntryDate
     };
   };
   const getExpiredKgForIngredient = (ingredientId, productionDateIso = toIsoDate()) => {
@@ -1209,6 +1238,7 @@
       const maxShare = Number.isFinite(percentValue) && percentValue > 0 ? Math.max(0, Math.min(1, percentValue / 100)) : 1;
       const maxCoverageKg = neededPerKg > 0 ? (availability.available / neededPerKg) : 0;
       const totalCoverageKg = neededPerKg > 0 ? (availability.total / neededPerKg) : 0;
+      const futureCoverageKg = neededPerKg > 0 ? (availability.futureAvailable / neededPerKg) : 0;
       return {
         ingredientId: item.ingredientId,
         ingredientName: capitalize(item.ingredientName || ingredient?.name || 'Ingrediente relacionado'),
@@ -1217,9 +1247,13 @@
         unit,
         available: availability.available,
         totalAvailable: availability.total,
+        futureAvailable: availability.futureAvailable,
         coverageKg: Math.max(0, maxCoverageKg),
         totalCoverageKg: Math.max(0, totalCoverageKg),
+        futureCoverageKg: Math.max(0, futureCoverageKg),
         hasExpired: availability.hasExpired,
+        hasFuture: availability.hasFuture,
+        nextEntryDate: normalizeValue(availability.nextEntryDate),
         infiniteStock: Boolean(availability.infiniteStock)
       };
     })
@@ -1254,19 +1288,20 @@
       const reservedByOther = reservedByOthersForEntry(requirement.ingredientId, entry.id, entryUnit);
       const available = Math.max(0, entryQty - reservedByOther);
       const expiryIso = isEntryNoPerecedero(entry) ? '' : normalizeValue(entry.expiryDate);
-      const status = !expiryIso || expiryIso >= productionDateIso ? 'ok' : 'expired';
-      const isSoon = expiryIso && expiryIso >= productionDateIso && expiryIso <= toIsoDate(new Date(productionDateIso).getTime() + 2 * 86400000);
+      const futureForDate = isEntryFutureForProductionDate(entry, productionDateIso);
+      const status = futureForDate ? 'future' : (!expiryIso || expiryIso >= productionDateIso ? 'ok' : 'expired');
+      const isSoon = status === 'ok' && expiryIso && expiryIso >= productionDateIso && expiryIso <= toIsoDate(new Date(productionDateIso).getTime() + 2 * 86400000);
       const availableInReqUnit = fromBase(toBase(available, entryUnit), requirement.unit);
       return { entry, entryUnit, available, availableInReqUnit, expiryIso, status, isSoon };
     }).filter((item) => item.availableInReqUnit > 0.0001);
-    const eligible = availableGroup.filter((item) => item.status !== 'expired');
+    const eligible = availableGroup.filter((item) => item.status === 'ok');
     const totalEligible = eligible.reduce((sum, item) => sum + item.availableInReqUnit, 0);
 
     availableGroup.forEach((item) => {
       if (item.isSoon) warnings.push(`${requirement.name}: lote próximo a vencer (${item.expiryIso}).`);
       const lotNumber = normalizeValue(item.entry.lotNumber) || normalizeValue(item.entry.invoiceNumber) || item.entry.id;
       let take = 0;
-      if (item.status !== 'expired' && totalEligible > 0 && pending > 0) {
+      if (item.status === 'ok' && totalEligible > 0 && pending > 0) {
         const proportional = pending * (item.availableInReqUnit / totalEligible);
         take = Math.min(item.availableInReqUnit, proportional);
       }
@@ -1286,19 +1321,19 @@
         invoiceNumber: normalizeValue(item.entry.invoiceNumber) || '-',
         invoiceImageUrls: Array.isArray(item.entry.invoiceImageUrls) ? item.entry.invoiceImageUrls : (item.entry.invoiceImageUrl ? [item.entry.invoiceImageUrl] : []),
         unit: requirement.unit,
-        takeQty: item.status === 'expired' ? 0 : Number(take.toFixed(4)),
-        takeBaseQty: item.status === 'expired' ? 0 : Number(toBase(take, requirement.unit).toFixed(6)),
+        takeQty: item.status !== 'ok' ? 0 : Number(take.toFixed(4)),
+        takeBaseQty: item.status !== 'ok' ? 0 : Number(toBase(take, requirement.unit).toFixed(6)),
         availableQty: Number(item.available.toFixed(4)),
         availableKg: getEntryAvailableKg(item.entry),
         entryAvailableQty: Number(item.available.toFixed(4)),
-        status: item.status === 'expired' ? 'expired' : (item.isSoon ? 'soon' : 'ok')
+        status: item.status === 'future' ? 'future' : (item.status === 'expired' ? 'expired' : (item.isSoon ? 'soon' : 'ok'))
       });
     });
 
     let extraRemaining = pending - lots.reduce((sum, lot) => sum + Number(lot.takeQty || 0), 0);
     if (extraRemaining > 0.0001) {
       lots.forEach((lot) => {
-        if (extraRemaining <= 0.0001 || lot.status === 'expired') return;
+        if (extraRemaining <= 0.0001 || lot.status !== 'ok') return;
         const remainingCapacity = Math.max(0, Number(((fromBase(toBase(lot.availableQty, requirement.unit), requirement.unit)) - Number(lot.takeQty || 0)).toFixed(4)));
         if (remainingCapacity <= 0.0001) return;
         const extraTake = Math.min(extraRemaining, remainingCapacity);
@@ -1336,10 +1371,16 @@
       const relatedOptions = getRequirementRelatedOptions(row, neededPerKg, unit, productionDateIso);
       const coverage = neededPerKg > 0 ? Math.max(0, availability.available) / neededPerKg : 0;
       const totalCoverage = neededPerKg > 0 ? Math.max(0, availability.total) / neededPerKg : 0;
+      const futureCoverage = neededPerKg > 0 ? Math.max(0, availability.futureAvailable) / neededPerKg : 0;
       const effectiveCoverage = computeMaxKgWithCaps([{ coverageKg: coverage, maxShare: 1 }, ...relatedOptions.map((item) => ({ coverageKg: item.coverageKg, maxShare: item.maxShare }))]);
       const effectiveTotalCoverage = computeMaxKgWithCaps([{ coverageKg: totalCoverage, maxShare: 1 }, ...relatedOptions.map((item) => ({ coverageKg: item.totalCoverageKg, maxShare: item.maxShare }))]);
+      const effectiveFutureCoverage = computeMaxKgWithCaps([{ coverageKg: coverage + futureCoverage, maxShare: 1 }, ...relatedOptions.map((item) => ({ coverageKg: Number(item.coverageKg || 0) + Number(item.futureCoverageKg || 0), maxShare: item.maxShare }))]);
       const substituteCoverage = Math.max(0, effectiveCoverage - coverage);
       const substituteCoverageIncludingExpired = Math.max(0, effectiveTotalCoverage - totalCoverage);
+      const nextEntryDate = minIsoDate([
+        normalizeValue(availability.nextEntryDate),
+        ...relatedOptions.map((item) => normalizeValue(item.nextEntryDate))
+      ]);
       const infiniteRelatedShare = relatedOptions
         .filter((item) => item.infiniteStock)
         .reduce((sum, item) => sum + Math.max(0, Number(item.maxShare || 1)), 0);
@@ -1354,10 +1395,13 @@
         neededPerKg,
         available: availability.available,
         totalAvailable: availability.total,
+        futureAvailable: availability.futureAvailable,
         directCoverage: coverage,
         directTotalCoverage: totalCoverage,
+        directFutureCoverage: futureCoverage,
         coverage: effectiveCoverage,
         totalCoverage: effectiveTotalCoverage,
+        futureCoverage: Math.max(0, effectiveFutureCoverage - effectiveCoverage),
         relatedOptions,
         hasRelatedCoverage: relatedOptions.some((item) => item.coverageKg > 0.0001 || item.totalCoverageKg > 0.0001),
         substitutionCount: relatedOptions.length,
@@ -1366,6 +1410,8 @@
         missingForMin: Math.max(0, (neededPerKg * minKg) - (availability.available + (substituteCoverage * neededPerKg))),
         missingForMinIncludingExpired: Math.max(0, (neededPerKg * minKg) - (availability.total + (substituteCoverageIncludingExpired * neededPerKg))),
         hasExpired: availability.hasExpired || relatedOptions.some((item) => item.hasExpired),
+        hasFuture: availability.hasFuture || relatedOptions.some((item) => item.hasFuture),
+        nextEntryDate,
         infiniteStock: hasFullInfiniteCoverage,
         hasInfiniteStockSource: Boolean(availability.infiniteStock || relatedOptions.some((item) => item.infiniteStock))
       });
@@ -1390,6 +1436,9 @@
     const missingForMin = requirements.filter((item) => item.missingForMin > 0.0001);
     const missingForMinIncludingExpired = requirements.filter((item) => item.missingForMinIncludingExpired > 0.0001);
     const hasExpired = requirements.some((item) => item.hasExpired);
+    const futureRequirements = requirements.filter((item) => item.hasFuture && item.missingForMin > 0.0001);
+    const nextAvailableDate = maxIsoDate(futureRequirements.map((item) => item.nextEntryDate));
+    const futureKg = futureRequirements.reduce((sum, item) => sum + Number(item.futureAvailable || 0), 0);
     const hasInfiniteStock = requirements.some((item) => item.infiniteStock);
     let status = 'danger';
     let statusText = 'Faltan insumos';
@@ -1418,6 +1467,10 @@
       missingForMin,
       missingForMinIncludingExpired,
       hasExpired,
+      hasFuture: requirements.some((item) => item.hasFuture),
+      futureRequirements,
+      nextAvailableDate,
+      futureKg: Number(futureKg.toFixed(4)),
       hasInfiniteStock,
       minKg,
       expiredKg
@@ -1570,7 +1623,9 @@
         });
         const plannedUsed = Math.max(0, Number((plannedNeed - localRemaining).toFixed(4)));
         remaining = Math.max(0, Number((remaining - plannedUsed).toFixed(6)));
-        const availableQty = lots.reduce((sum, lot) => sum + Number(lot.availableQty || 0), 0);
+        const availableQty = lots
+          .filter((lot) => lot.status !== 'expired' && lot.status !== 'future')
+          .reduce((sum, lot) => sum + Number(lot.availableQty || 0), 0);
         ingredientPlans.push({
           ingredientId,
           ingredientName,
@@ -1658,15 +1713,16 @@
             const reservedByOther = reservedByOthersForEntry(related.ingredientId, entry.id, entryUnit);
             const available = Math.max(0, entryQty - reservedByOther);
             const expiryIso = isEntryNoPerecedero(entry) ? '' : normalizeValue(entry.expiryDate);
-            const status = !expiryIso || expiryIso >= productionDateIso ? 'ok' : 'expired';
-            const isSoon = expiryIso && expiryIso >= productionDateIso && expiryIso <= toIsoDate(new Date(productionDateIso).getTime() + 2 * 86400000);
+            const futureForDate = isEntryFutureForProductionDate(entry, productionDateIso);
+            const status = futureForDate ? 'future' : (!expiryIso || expiryIso >= productionDateIso ? 'ok' : 'expired');
+            const isSoon = status === 'ok' && expiryIso && expiryIso >= productionDateIso && expiryIso <= toIsoDate(new Date(productionDateIso).getTime() + 2 * 86400000);
             const availableInReqUnit = fromBase(toBase(available, entryUnit), requirement.unit);
             if (isSoon) warnings.push(`${related.ingredientName}: lote próximo a vencer (${expiryIso}).`);
             return { entry, related, entryUnit, available, availableInReqUnit, expiryIso, status, isSoon, takeQty: 0 };
           }).filter((item) => item.availableInReqUnit > 0.0001);
-          let groupRemaining = Math.min(remaining, prepared.reduce((sum, item) => sum + (item.status === 'expired' ? 0 : Math.min(item.availableInReqUnit, perRelatedCap[item.related.ingredientId] || 0)), 0));
+          let groupRemaining = Math.min(remaining, prepared.reduce((sum, item) => sum + (item.status !== 'ok' ? 0 : Math.min(item.availableInReqUnit, perRelatedCap[item.related.ingredientId] || 0)), 0));
           for (let pass = 0; pass < 6 && groupRemaining > 0.0001; pass += 1) {
-            const eligible = prepared.filter((item) => item.status !== 'expired' && item.availableInReqUnit - item.takeQty > 0.0001 && (perRelatedCap[item.related.ingredientId] || 0) > 0.0001);
+            const eligible = prepared.filter((item) => item.status === 'ok' && item.availableInReqUnit - item.takeQty > 0.0001 && (perRelatedCap[item.related.ingredientId] || 0) > 0.0001);
             if (!eligible.length) break;
             const totalWeight = eligible.reduce((sum, item) => sum + Math.max(0, item.availableInReqUnit - item.takeQty), 0);
             if (totalWeight <= 0.0001) break;
@@ -1684,7 +1740,7 @@
           }
           if (groupRemaining > 0.0001) {
             prepared
-              .filter((item) => item.status !== 'expired')
+              .filter((item) => item.status === 'ok')
               .forEach((item) => {
                 if (groupRemaining <= 0.0001) return;
                 const remainingEntry = Math.max(0, item.availableInReqUnit - item.takeQty);
@@ -1714,12 +1770,12 @@
               invoiceNumber: normalizeValue(item.entry.invoiceNumber) || '-',
               invoiceImageUrls: Array.isArray(item.entry.invoiceImageUrls) ? item.entry.invoiceImageUrls : (item.entry.invoiceImageUrl ? [item.entry.invoiceImageUrl] : []),
               unit: requirement.unit,
-              takeQty: item.status === 'expired' ? 0 : Number(item.takeQty.toFixed(4)),
-              takeBaseQty: item.status === 'expired' ? 0 : Number(toBase(item.takeQty, requirement.unit).toFixed(6)),
+              takeQty: item.status !== 'ok' ? 0 : Number(item.takeQty.toFixed(4)),
+              takeBaseQty: item.status !== 'ok' ? 0 : Number(toBase(item.takeQty, requirement.unit).toFixed(6)),
               availableQty: Number(item.available.toFixed(4)),
               availableKg: getEntryAvailableKg(item.entry),
               entryAvailableQty: Number(item.available.toFixed(4)),
-              status: item.status === 'expired' ? 'expired' : (item.isSoon ? 'soon' : 'ok')
+              status: item.status === 'future' ? 'future' : (item.status === 'expired' ? 'expired' : (item.isSoon ? 'soon' : 'ok'))
             };
             const plannedUsed = Number(lot.takeQty || 0);
             if (!plannedUsed && lot.status !== 'expired') return;
@@ -1781,10 +1837,15 @@
             .filter((item) => normalizeValue(item.sourceIngredientId || item.ingredientId) === normalizeValue(requirement.ingredientId))
             .flatMap((item) => item.lots || []);
           const hasExpiredWithStock = lots.some((lot) => lot.status === 'expired' && Number(lot.availableQty || 0) > 0.0001);
+          const futureLots = lots.filter((lot) => lot.status === 'future' && Number(lot.availableQty || 0) > 0.0001);
+          const nextFutureDate = minIsoDate(futureLots.map((lot) => lot.entryDate));
+          const futureConflict = nextFutureDate
+            ? `${requirement.name}: faltan ${formatQty(missing, requirement.unit)} para la fecha ${productionDateIso}. Hay stock con ingreso posterior (${formatIsoEs(nextFutureDate)}); cambiá la fecha de producción a esa fecha o producí sin trazabilidad para el faltante.`
+            : '';
           if (hasExpiredWithStock) {
             conflicts.push(`${requirement.name}: faltan ${formatQty(missing, requirement.unit)} para la fecha ${productionDateIso}. Resolvé vencidos, cambiá el rango de fecha o ingresá un nuevo lote.`);
           } else {
-            conflicts.push(`${requirement.name}: faltan ${formatQty(missing, requirement.unit)} para la fecha ${productionDateIso}. Ingresá un nuevo lote o cambiá fecha.`);
+            conflicts.push(futureConflict || `${requirement.name}: faltan ${formatQty(missing, requirement.unit)} para la fecha ${productionDateIso}. Ingresá un nuevo lote o cambiá fecha.`);
           }
         }
       }
@@ -1796,7 +1857,7 @@
       reservedBaseQty: lot.takeBaseQty,
       unit: lot.unit,
       lotNumber: lot.lotNumber
-    })));
+    }))).filter((lock) => Number(lock.reservedQty || 0) > 0.0001);
     return {
       recipeId: recipe.id,
       qtyKg: Number(qtyKg.toFixed(2)),
@@ -2523,7 +2584,7 @@
     reg.auditTrail = Array.isArray(reg.auditTrail) ? reg.auditTrail : [];
     reg.auditTrail.unshift({ action: `export_${type}`, user: getCurrentUserLabel(), at: nowTs() });
     registros[productionId] = reg;
-    await window.dbLaJamoneraRest.write(REGISTROS_PATH, registros);
+    await window.dbLaJamoneraRest.write(`${REGISTROS_PATH}/${productionId}`, reg);
     state.registros = registros;
   };
   const reportHtml = (registro, withAttachments = true) => {
@@ -3541,9 +3602,7 @@
     };
     state.registros[registro.id] = updated;
     try {
-      const remote = safeObject(await window.dbLaJamoneraRest.read(REGISTROS_PATH));
-      remote[registro.id] = updated;
-      await window.dbLaJamoneraRest.write(REGISTROS_PATH, remote);
+      await window.dbLaJamoneraRest.write(`${REGISTROS_PATH}/${registro.id}`, updated);
     } catch (error) {
     }
     return updated;
@@ -3670,12 +3729,15 @@
       </div>`;
     prepareThumbLoaders('.js-produccion-thumb');
   };
+  const syncRecipeGroupsVisibility = () => {
+    nodes.recipeGroups?.classList.toggle('d-none', Boolean(state.historyMode || state.dispatchMode));
+  };
   const setHistoryMode = (enabled) => {
     state.historyMode = enabled;
     if (enabled) state.dispatchMode = false;
     nodes.search?.closest('.produccion-toolbar')?.classList.toggle('d-none', enabled);
     nodes.rneAlert?.classList.toggle('d-none', enabled || !getRneExpiryMeta().visible);
-    nodes.recipeGroups?.classList.toggle('d-none', enabled);
+    syncRecipeGroupsVisibility();
     nodes.list?.classList.toggle('d-none', enabled);
     nodes.historyView?.classList.toggle('d-none', !enabled);
     nodes.dispatchView?.classList.toggle('d-none', true);
@@ -4485,6 +4547,7 @@
     if (enabled) state.historyMode = false;
     nodes.search?.closest('.produccion-toolbar')?.classList.toggle('d-none', enabled);
     nodes.rneAlert?.classList.toggle('d-none', enabled || !getRneExpiryMeta().visible);
+    syncRecipeGroupsVisibility();
     nodes.list?.classList.toggle('d-none', enabled);
     nodes.historyView?.classList.toggle('d-none', true);
     nodes.dispatchView?.classList.toggle('d-none', !enabled);
@@ -6847,8 +6910,11 @@
       delete registros[productionId];
       removeRecipeMovementsBySource({ recipeId: registro.recipeId, sourceId: productionId, sourceCode: productionId });
       await window.dbLaJamoneraRest.write('/inventario', stripUndefinedDeep(restored));
-      await window.dbLaJamoneraRest.write(REGISTROS_PATH, stripUndefinedDeep(registros));
-      await persistRepartoStore();
+      await window.dbLaJamoneraRest.write(`${REGISTROS_PATH}/${productionId}`, null);
+      const recipeIndexPath = `${REPARTO_PATH}/productIndex/${normalizeValue(registro.recipeId)}`;
+      if (normalizeValue(registro.recipeId)) {
+        await window.dbLaJamoneraRest.write(recipeIndexPath, stripUndefinedDeep(safeObject(state.reparto?.productIndex?.[registro.recipeId])));
+      }
       await appendAudit({ action: 'produccion_eliminada', productionId, before: previous, after: null, reason: auth.value.reason });
       state.inventario = restored;
       state.registros = registros;
@@ -6904,7 +6970,12 @@
       (Array.isArray(dispatchRow?.products) ? dispatchRow.products : []).forEach((product) => {
         removeRecipeMovementsBySource({ recipeId: product.recipeId, sourceId: dispatchId, sourceCode: dispatchRow.code });
       });
-      await persistRepartoStore();
+      await window.dbLaJamoneraRest.write(`${REPARTO_PATH}/registros/${dispatchId}`, null);
+      const affectedRecipeIds = [...new Set((Array.isArray(dispatchRow?.products) ? dispatchRow.products : [])
+        .map((product) => normalizeValue(product.recipeId))
+        .filter(Boolean))];
+      await Promise.all(affectedRecipeIds.map((recipeId) =>
+        window.dbLaJamoneraRest.write(`${REPARTO_PATH}/productIndex/${recipeId}`, stripUndefinedDeep(safeObject(state.reparto?.productIndex?.[recipeId])))));
       await appendAudit({ action: 'reparto_eliminado', dispatchId, before: previous, after: null, reason: auth.value.reason });
       await refreshAfterMutation();
       if (Swal.isVisible()) Swal.close();
@@ -6946,7 +7017,7 @@
     const consumed = applyPlanOnInventory(restored, plan, registro.id, form.value.date || toIsoDate(), 'consume');
     const agingDaysAtProduction = Number(recipe.agingDays || 0);
     const packagingDate = agingDaysAtProduction > 0
-      ? moveIsoFromSunday(addDaysToIso(toIsoDate(nowTs()), agingDaysAtProduction))
+      ? moveIsoFromSunday(addDaysToIso(form.value.date || toIsoDate(), agingDaysAtProduction))
       : '';
     const registros = deepClone(state.registros);
     const prev = deepClone(registros[registro.id]);
@@ -6988,7 +7059,7 @@
       }
     };
     await window.dbLaJamoneraRest.write('/inventario', consumed);
-    await window.dbLaJamoneraRest.write(REGISTROS_PATH, registros);
+    await window.dbLaJamoneraRest.write(`${REGISTROS_PATH}/${registro.id}`, registros[registro.id]);
     await appendAudit({ action: 'produccion_editada', productionId: registro.id, before: prev, after: registros[registro.id], reason: auth.value.reason });
     state.inventario = consumed;
     state.registros = registros;
@@ -7356,6 +7427,7 @@
           : '',
         (!isExpiredOnlyAvailable && analysis.status === 'warning') ? '<span class="produccion-badge is-warning">Stock parcial</span>' : '',
         analysis.hasExpired ? '<span class="produccion-badge is-danger">Posee lotes expirados</span>' : '',
+        analysis.nextAvailableDate ? `<span class="produccion-badge is-warning">Stock desde ${formatIsoEs(analysis.nextAvailableDate)}</span>` : '',
         foreignDraft ? '<span class="produccion-badge is-warning">Borrador en uso</span>' : ''
       ].filter(Boolean).join('');
       const missingFresh = analysis.missingForMin.filter((item) => Number(item.missingForMinIncludingExpired || 0) > 0.0001);
@@ -7365,7 +7437,8 @@
           const substituteHint = item.hasRelatedCoverage
             ? ` · sustituye con ${item.substitutionCount} relacionado(s)`
             : '';
-          return `<p><strong>${item.name}:</strong> disponible ${formatQty(item.available, item.unit)} / faltan ${formatQty(item.missingForMin, item.unit)}${substituteHint}</p>`;
+          const futureHint = item.nextEntryDate ? ` · ingresa ${formatIsoEs(item.nextEntryDate)}` : '';
+          return `<p><strong>${item.name}:</strong> disponible ${formatQty(item.available, item.unit)} / faltan ${formatQty(item.missingForMin, item.unit)}${substituteHint}${futureHint}</p>`;
         }).join('')}${expiredOnlyIngredients.map((item) => `<p><strong>${item.name}:</strong> sin stock fresco · disponible en expirado ${formatQty(item.totalAvailable, item.unit)}</p>`).join('')}</div>`
         : '<p class="produccion-ok-line">Cobertura suficiente para iniciar producción.</p>';
       const lastProductionAt = state.config.lastProductionByRecipe?.[recipe.id] || recipe.lastProductionAt || recipe.production?.lastAt || 0;
@@ -7584,6 +7657,7 @@
             <div><strong>Vence:</strong> ${formatExpiryHuman(lot.expiryDate)} ${normalizeLower(lot.expiryDate) === 'no perecedero' ? '' : getExpiryBadge(lot.expiryDate)}</div>
             <div><strong>Usar:</strong> ${formatCompactQty(lot.takeQty, lot.unit)}</div>
             ${lot.status === 'expired' ? `<div class="produccion-lote-expired-help"><strong>Lote expirado:</strong> no se usará con fecha ${formatIsoEs(plan.productionDate)}. Cambiá la fecha o resolvelo manualmente ${formatValidProductionRange(lot.entryDate, lot.expiryDate)}.</div>` : ''}
+            ${lot.status === 'future' ? `<div class="produccion-lote-expired-help"><strong>Lote posterior a la fecha:</strong> ingresó el ${formatIsoEs(lot.entryDate || '')}. No se usará con fecha ${formatIsoEs(plan.productionDate)}; cambiá la producción a ${formatIsoEs(lot.entryDate || '')} o producí sin trazabilidad para el faltante.</div>` : ''}
             <div><strong class="produccion-provider-key">Proveedor:</strong> ${lot.provider || '-'}</div>
             <div><strong>Factura:</strong> ${lot.invoiceNumber || '-'}</div>
             <div class="produccion-lote-adjuntos-row"><strong>Adjuntos:</strong> ${lot.invoiceImageUrls.length
@@ -7637,7 +7711,7 @@
     state.editorMode = mode;
     state.sinTrazabilidad = !isViewOnly && Boolean(options.sinTrazabilidad);
     const recipe = state.recetas[recipeId];
-    const analysis = state.analysis[recipeId];
+    let analysis = state.analysis[recipeId] || (recipe ? analyzeRecipe(recipe) : null);
     if (!recipe || !analysis) return;
     const foreignDraft = !isViewOnly ? getForeignDraftConflict(recipe.id) : null;
     if (foreignDraft) {
@@ -7664,11 +7738,12 @@
     const preferredManagers = Array.isArray(state.config.preferredManagersByRecipe?.[recipe.id])
       ? state.config.preferredManagersByRecipe[recipe.id]
       : (Array.isArray(state.config.preferredManagers) ? state.config.preferredManagers : []);
+    const initialDate = ownDraft?.productionDate || toIsoDate();
+    analysis = analyzeRecipe(recipe, initialDate);
     const hasOnlyInfiniteStock = Array.isArray(analysis.requirements) && analysis.requirements.length && analysis.requirements.every((item) => item.infiniteStock);
     const editorMaxKg = (hasOnlyInfiniteStock || state.sinTrazabilidad) ? 999999 : Math.max(0.1, Number(analysis.maxKg || 0), Number(analysis.maxKgIncludingExpired || 0));
     const requestedInitialQty = ownDraft ? parsePositive(ownDraft.quantityKg, analysis.minKg) : Math.max(analysis.minKg, 0.1);
     const initialQty = Math.min(editorMaxKg, Math.max(0.1, requestedInitialQty));
-    const initialDate = ownDraft?.productionDate || toIsoDate();
     const initialObs = ownDraft?.observations || '';
     const initialManagers = Array.isArray(ownDraft?.managers) ? ownDraft.managers : preferredManagers;
     state.pendingExpiryActions = isViewOnly ? {} : safeObject(ownDraft?.pendingExpiryActions);
@@ -7696,7 +7771,7 @@
           <h3 class="inventario-editor-name">${capitalize(recipe.title || 'Sin título')}</h3>
           ${recipe.nombreComercial ? `<p class="produccion-nombre-comercial-editor">${escapeHtml(capitalize(recipe.nombreComercial))}</p>` : ''}
           <p class="inventario-editor-meta">${capitalize(recipe.description || 'Sin descripción.')}</p>
-          <p class="produccion-max-line">Máximo según inventario: <strong>${hasOnlyInfiniteStock ? '&infin;' : `${analysis.maxKg.toFixed(2)} kg`}</strong>${(!hasOnlyInfiniteStock && Number(analysis.maxKgIncludingExpired || 0) > Number(analysis.maxKg || 0)) ? ` <span class="produccion-expired-max-help">(con vencidos: ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg)</span>` : ''}</p>
+          <p class="produccion-max-line">Máximo para la fecha: <strong id="produccionDateMaxValue">${hasOnlyInfiniteStock ? '&infin;' : `${analysis.maxKg.toFixed(2)} kg`}</strong><span id="produccionDateMaxHelp">${(!hasOnlyInfiniteStock && Number(analysis.maxKgIncludingExpired || 0) > Number(analysis.maxKg || 0)) ? ` <span class="produccion-expired-max-help">(con vencidos: ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg)</span>` : ''}</span></p>
           <p id="produccionReservaTimer" class="produccion-reserva-timer"></p>
         </div>
       </section>
@@ -7912,7 +7987,24 @@
       }
     };
     const updateEditorPlan = async (formatInput = false) => {
-      const editorMaxKg = state.sinTrazabilidad ? 999999 : Math.max(analysis.maxKg, analysis.maxKgIncludingExpired || 0);
+      const productionDate = normalizeValue(dateInput.value) || toIsoDate();
+      analysis = analyzeRecipe(recipe, productionDate);
+      const hasOnlyInfiniteStockForDate = Array.isArray(analysis.requirements) && analysis.requirements.length && analysis.requirements.every((item) => item.infiniteStock);
+      const traceableMaxKg = hasOnlyInfiniteStockForDate ? 999999 : Math.max(0, Number(analysis.maxKg || 0));
+      const editorMaxKg = state.sinTrazabilidad ? 999999 : Math.max(0, Number(analysis.maxKg || 0), Number(analysis.maxKgIncludingExpired || 0));
+      const maxValueNode = nodes.editor.querySelector('#produccionDateMaxValue');
+      const maxHelpNode = nodes.editor.querySelector('#produccionDateMaxHelp');
+      if (maxValueNode) maxValueNode.innerHTML = hasOnlyInfiniteStockForDate ? '&infin;' : `${traceableMaxKg.toFixed(2)} kg`;
+      if (maxHelpNode) {
+        const expiredExtra = !hasOnlyInfiniteStockForDate && Number(analysis.maxKgIncludingExpired || 0) > Number(analysis.maxKg || 0)
+          ? ` <span class="produccion-expired-max-help">(con vencidos: ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg)</span>`
+          : '';
+        const futureExtra = !state.sinTrazabilidad && analysis.nextAvailableDate
+          ? ` <span class="produccion-expired-max-help">(hay stock desde ${formatIsoEs(analysis.nextAvailableDate)})</span>`
+          : '';
+        maxHelpNode.innerHTML = `${expiredExtra}${futureExtra}`;
+      }
+      if (!state.sinTrazabilidad) qtyInput.max = editorMaxKg.toFixed(2);
       let qty = parsePositive(qtyInput.value, 0.1);
       if (!state.sinTrazabilidad && qty > editorMaxKg) {
         qty = editorMaxKg;
@@ -7920,18 +8012,31 @@
       } else if (formatInput) {
         qtyInput.value = qty.toFixed(2);
       }
-      const productionDate = normalizeValue(dateInput.value) || toIsoDate();
       state.editorPlan = buildPlanForRecipe(recipe, qty, productionDate, { sinTrazabilidad: state.sinTrazabilidad });
       lotsWrap.innerHTML = buildLotsBreakdownHtml(state.editorPlan);
       renderRecipeHistory();
       const expiredLotsCount = state.editorPlan.ingredientPlans.reduce((acc, row) => acc + row.lots.filter((lot) => lot.status === 'expired' && Number(lot.takeQty || 0) > 0.0001).length, 0);
       const canConfirm = !isViewOnly && (state.editorPlan.isValid || state.sinTrazabilidad) && qty > 0 && expiredLotsCount === 0;
       if (confirmBtn) confirmBtn.disabled = !canConfirm;
-      qtyHelp.textContent = canConfirm
-        ? (state.sinTrazabilidad ? `Escala: ${qty.toFixed(2)} kg · Modo sin trazabilidad: los insumos faltantes no serán trazados.` : `Escala aplicada: ${qty.toFixed(2)} kg. Reserva temporal activa por 10 min.`)
-        : (isViewOnly ? 'Modo visualizacion: podes revisar el desglose, pero no confirmar ni guardar borradores desde esta vista.' : (qty <= 0 ? 'Ajusta kilos para confirmar produccion.' : `Hay conflictos de stock/lotes para ${formatIsoEs(productionDate)}.`));
+      if (canConfirm) {
+        qtyHelp.textContent = state.sinTrazabilidad
+          ? `Escala: ${qty.toFixed(2)} kg. Modo sin trazabilidad: los insumos faltantes no serán trazados.`
+          : `Podés producir ${traceableMaxKg === 999999 ? 'sin límite trazable' : `hasta ${traceableMaxKg.toFixed(2)} kg trazables`} para ${formatIsoEs(productionDate)}. Escala aplicada: ${qty.toFixed(2)} kg.`;
+      } else if (isViewOnly) {
+        qtyHelp.textContent = 'Modo visualización: podés revisar el desglose, pero no confirmar ni guardar borradores desde esta vista.';
+      } else if (qty <= 0) {
+        qtyHelp.textContent = analysis.nextAvailableDate
+          ? `Para ${formatIsoEs(productionDate)} no hay stock trazable. Hay stock desde ${formatIsoEs(analysis.nextAvailableDate)}: cambiá la fecha o producí sin trazabilidad.`
+          : 'Ajustá kilos para confirmar producción.';
+      } else {
+        const conflictText = state.editorPlan.conflicts.slice(0, 2).join(' ');
+        const futureHint = analysis.nextAvailableDate
+          ? ` Hay stock que ingresa desde ${formatIsoEs(analysis.nextAvailableDate)}; cambiá la fecha o producí sin trazabilidad para el faltante.`
+          : '';
+        qtyHelp.textContent = `Para ${formatIsoEs(productionDate)} podés producir con trazabilidad hasta ${traceableMaxKg.toFixed(2)} kg.${futureHint}${conflictText ? ` ${conflictText}` : ''}`;
+      }
       if (expiredLotsCount > 0) {
-        qtyHelp.textContent += ` Detectamos ${expiredLotsCount} lote(s) vencido(s): resolve su estado o cambia fecha para continuar. Tambien podes ajustar la fecha para recalcular FEFO.`;
+        qtyHelp.textContent += ` Detectamos ${expiredLotsCount} lote(s) vencido(s): resolvé su estado o cambiá la fecha para continuar.`;
       }
       if (!isViewOnly) await ensureReservationForPlan(state.editorPlan);
     };
@@ -8045,14 +8150,25 @@
       const recipeDeleteBtn = event.target.closest('[data-recipe-prod-delete]');
       if (recipeDeleteBtn) {
         const reg = state.registros[recipeDeleteBtn.dataset.recipeProdDelete];
-        if (reg) await cancelProduction(reg);
+        if (reg) {
+          const deleted = await cancelProduction(reg);
+          if (deleted) renderRecipeHistory();
+        }
         return;
       }
       if (event.target.closest('#produccionRecipeHistoryExpandBtn')) {
-        const rows = getRecipeHistoryRows();
+        let rows = getRecipeHistoryRows();
         const collapseMap = { ...state.historyTraceCollapse };
         let expandedPage = 1;
         const EXPANDED_PAGE_SIZE = 12;
+        const refreshExpandedRows = () => {
+          rows = getRecipeHistoryRows();
+          const liveIds = new Set(rows.map((item) => normalizeValue(item.id)));
+          Object.keys(collapseMap).forEach((id) => {
+            if (!liveIds.has(normalizeValue(id))) delete collapseMap[id];
+          });
+          expandedPage = Math.min(Math.max(1, expandedPage), Math.max(1, Math.ceil(rows.length / EXPANDED_PAGE_SIZE)));
+        };
         const totalPages = () => Math.max(1, Math.ceil(rows.length / EXPANDED_PAGE_SIZE));
         const getPageRows = () => {
           expandedPage = Math.min(Math.max(1, expandedPage), totalPages());
@@ -8146,7 +8262,14 @@
               const deleteBtn = clickEvent.target.closest('[data-recipe-prod-delete]');
               if (deleteBtn) {
                 const reg = state.registros[deleteBtn.dataset.recipeProdDelete];
-                if (reg) await cancelProduction(reg);
+                if (reg) {
+                  const deleted = await cancelProduction(reg);
+                  if (deleted) {
+                    refreshExpandedRows();
+                    renderExpandedContent(popup);
+                    renderRecipeHistory();
+                  }
+                }
               }
             });
           }
@@ -8250,7 +8373,9 @@
     qtyInput.addEventListener('change', async () => { await updateEditorPlan(); });
     qtyInput.addEventListener('blur', async () => { await updateEditorPlan(); });
     nodes.editor.querySelector('#produccionQtyMaxBtn').addEventListener('click', async () => {
-      qtyInput.value = Math.max(analysis.maxKg, analysis.maxKgIncludingExpired || 0).toFixed(2);
+      const productionDate = normalizeValue(dateInput.value) || toIsoDate();
+      analysis = analyzeRecipe(recipe, productionDate);
+      qtyInput.value = Math.max(Number(analysis.maxKg || 0), Number(analysis.maxKgIncludingExpired || 0)).toFixed(2);
       await updateEditorPlan();
     });
     nodes.editor.querySelector('#produccionSaveManagersPrefBtn')?.addEventListener('click', async () => {
@@ -8384,7 +8509,6 @@
         }
       });
       try {
-        const registros = safeObject(await window.dbLaJamoneraRest.read(REGISTROS_PATH));
         const sequence = Number(await window.dbLaJamoneraRest.read(SEQUENCE_PATH)) || 0;
         const nextSequence = sequence + 1;
         const dateToken = formatIsoToDmyCompact(date);
@@ -8397,7 +8521,7 @@
         const recipeRnpa = safeObject(recipe.rnpa);
         const companyRne = safeObject(state.config.rne);
         const packagingDate = agingDaysAtProduction > 0
-          ? moveIsoFromSunday(addDaysToIso(toIsoDate(nowTs()), agingDaysAtProduction))
+          ? moveIsoFromSunday(addDaysToIso(date, agingDaysAtProduction))
           : '';
         const snapshotIngredientPlans = enrichIngredientPlansWithSnapshots(revalidated.ingredientPlans);
         const registro = {
@@ -8469,10 +8593,10 @@
         publicTraceUrl: getPublicTraceUrlForProduction(productionId),
         exports: {},
         auditTrail: [{ action: 'creada', at: nowTs(), user: getCurrentUserLabel() }]
-      };
+        };
         await window.dbLaJamoneraRest.write('/inventario', inventarioNext);
         await window.dbLaJamoneraRest.write(SEQUENCE_PATH, nextSequence);
-        await window.dbLaJamoneraRest.write(REGISTROS_PATH, { ...registros, [productionId]: registro });
+        await window.dbLaJamoneraRest.write(`${REGISTROS_PATH}/${productionId}`, registro);
         appendRecipeMovement(recipe.id, {
           id: `ing_${productionId}`,
           type: 'ingreso',
@@ -8483,7 +8607,7 @@
           label: 'Producción confirmada',
           date
         });
-        await persistRepartoStore();
+        await window.dbLaJamoneraRest.write(`${REPARTO_PATH}/productIndex/${recipe.id}`, stripUndefinedDeep(safeObject(state.reparto?.productIndex?.[recipe.id])));
         await appendAudit({ action: 'produccion_confirmada', productionId, before: null, after: registro, reason: 'confirmacion final' });
         state.config.lastProductionByRecipe[recipe.id] = nowTs();
         await persistConfig();
@@ -8910,10 +9034,18 @@
     renderHistoryTable();
   });
   nodes.historyExpandBtn?.addEventListener('click', async () => {
-    const rows = getHistoryRows();
+    let rows = getHistoryRows();
     const collapseMap = { ...state.historyTraceCollapse };
     let expandedPage = 1;
     const EXPANDED_PAGE_SIZE = 12;
+    const refreshExpandedRows = () => {
+      rows = getHistoryRows();
+      const liveIds = new Set(rows.map((item) => normalizeValue(item.id)));
+      Object.keys(collapseMap).forEach((id) => {
+        if (!liveIds.has(normalizeValue(id))) delete collapseMap[id];
+      });
+      expandedPage = Math.min(Math.max(1, expandedPage), Math.max(1, Math.ceil(rows.length / EXPANDED_PAGE_SIZE)));
+    };
     rows.forEach((item) => {
       if (collapseMap[item.id] !== undefined) return;
       if (getTraceRowsFromRegistro(item).length) collapseMap[item.id] = true;
@@ -8953,15 +9085,14 @@
       host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionExpandedHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionExpandedHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead><tbody>${renderRows()}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-prod-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-prod-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
       prepareThumbLoaders('.js-produccion-thumb');
     };
-    const familyCirclesRow = document.querySelector('.family-circles-row');
-    if (familyCirclesRow) familyCirclesRow.classList.add('d-none');
+    nodes.recipeGroups?.classList.add('d-none');
     await openIosSwal({
       title: 'Producciones guardadas • La Jamonera',
       html: '<div id="produccionExpandedHistoryHost" class="inventario-expand-wrap"></div>',
       width: '92vw',
       confirmButtonText: 'Cerrar',
       willClose: () => {
-        if (familyCirclesRow) familyCirclesRow.classList.remove('d-none');
+        syncRecipeGroupsVisibility();
       },
       didOpen: (popup) => {
         renderExpandedContent(popup);
@@ -9018,7 +9149,10 @@
             const reg = state.registros[deleteBtn.dataset.prodCancel];
             if (reg) {
               const deleted = await cancelProduction(reg);
-              if (deleted) renderExpandedContent(popup);
+              if (deleted) {
+                refreshExpandedRows();
+                renderExpandedContent(popup);
+              }
             }
           }
         });

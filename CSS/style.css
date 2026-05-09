@@ -8145,6 +8145,11 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   background: #fff9ef;
 }
 
+.produccion-lote-row.tone-future {
+  border-color: #c7d7fb;
+  background: #f4f7ff;
+}
+
 .produccion-lote-empty {
   margin: 0;
   color: #7c8db2;
