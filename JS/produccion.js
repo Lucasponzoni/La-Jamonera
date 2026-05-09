@@ -3675,6 +3675,7 @@
     if (enabled) state.dispatchMode = false;
     nodes.search?.closest('.produccion-toolbar')?.classList.toggle('d-none', enabled);
     nodes.rneAlert?.classList.toggle('d-none', enabled || !getRneExpiryMeta().visible);
+    nodes.recipeGroups?.classList.toggle('d-none', enabled);
     nodes.list?.classList.toggle('d-none', enabled);
     nodes.historyView?.classList.toggle('d-none', !enabled);
     nodes.dispatchView?.classList.toggle('d-none', true);
@@ -11051,7 +11052,10 @@
     const cancelBtn = event.target.closest('[data-prod-cancel]');
     if (cancelBtn) {
       const reg = getRegistro(cancelBtn.dataset.prodCancel);
-      if (reg) await cancelProduction(reg);
+      if (reg) {
+        const deleted = await cancelProduction(reg);
+        if (deleted) renderHistoryTable();
+      }
     }
   });
   window.laJamoneraProduccionAPI = {
