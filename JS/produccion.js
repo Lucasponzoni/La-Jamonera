@@ -590,7 +590,7 @@
   const askSensitivePassword = async (title, html, withReason = false) => {
     const result = await openIosSwal({
       title,
-      html: `<div class="swal-stack-fields"><input id="produccionSecurePass" type="password" class="swal2-input ios-input" placeholder="Clave general" autocomplete="new-password" name="produccion-secure-pass" autocapitalize="off" autocorrect="off" spellcheck="false">${withReason ? '<textarea id="produccionSecureReason" class="swal2-textarea ios-input" placeholder="Motivo"></textarea>' : ''}${html || ''}</div>`,
+      html: `<div class="swal-stack-fields"><input id="produccionSecurePass" type="password" class="swal2-input ios-input" placeholder="Clave general" autocomplete="new-password" name="produccion-secure-pass" autocapitalize="off" autocorrect="off" spellcheck="false">${withReason ? '<textarea id="produccionSecureReason" class="swal2-textarea ios-input" placeholder="Motivo"></textarea><div class="d-flex flex-wrap gap-2 mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-quick-reason="error de produccion">Error de producción</button></div>' : ''}${html || ''}</div>`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Validar',
@@ -604,6 +604,14 @@
           setTimeout(() => passNode.removeAttribute('readonly'), 60);
           passNode.focus({ preventScroll: true });
         }
+        document.querySelectorAll('[data-quick-reason]').forEach((button) => {
+          button.addEventListener('click', () => {
+            const reasonNode = document.getElementById('produccionSecureReason');
+            if (!reasonNode) return;
+            reasonNode.value = normalizeValue(button.dataset.quickReason);
+            reasonNode.focus({ preventScroll: true });
+          });
+        });
       },
       preConfirm: async () => {
         const entered = normalizeValue(document.getElementById('produccionSecurePass')?.value);
@@ -3667,6 +3675,7 @@
     if (enabled) state.dispatchMode = false;
     nodes.search?.closest('.produccion-toolbar')?.classList.toggle('d-none', enabled);
     nodes.rneAlert?.classList.toggle('d-none', enabled || !getRneExpiryMeta().visible);
+    nodes.recipeGroups?.classList.toggle('d-none', enabled);
     nodes.list?.classList.toggle('d-none', enabled);
     nodes.historyView?.classList.toggle('d-none', !enabled);
     nodes.dispatchView?.classList.toggle('d-none', true);
@@ -6846,9 +6855,11 @@
       await refreshAfterMutation();
       if (Swal.isVisible()) Swal.close();
       await openIosSwal({ title: 'Producción eliminada', html: `<p>Se eliminó ${productionId} y se restauró el stock.</p>`, icon: 'success', confirmButtonText: 'Entendido' });
+      return true;
     } catch (error) {
       if (Swal.isVisible()) Swal.close();
       await openIosSwal({ title: 'No se pudo eliminar', html: '<p>Ocurrió un error restaurando stock. Intentá nuevamente.</p>', icon: 'error' });
+      return false;
     }
   };
 
@@ -8942,11 +8953,16 @@
       host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionExpandedHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionExpandedHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead><tbody>${renderRows()}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-prod-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-prod-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
       prepareThumbLoaders('.js-produccion-thumb');
     };
+    const familyCirclesRow = document.querySelector('.family-circles-row');
+    if (familyCirclesRow) familyCirclesRow.classList.add('d-none');
     await openIosSwal({
       title: 'Producciones guardadas • La Jamonera',
       html: '<div id="produccionExpandedHistoryHost" class="inventario-expand-wrap"></div>',
       width: '92vw',
       confirmButtonText: 'Cerrar',
+      willClose: () => {
+        if (familyCirclesRow) familyCirclesRow.classList.remove('d-none');
+      },
       didOpen: (popup) => {
         renderExpandedContent(popup);
         popup.addEventListener('click', async (event) => {
@@ -9000,7 +9016,10 @@
           const deleteBtn = event.target.closest('[data-prod-cancel]');
           if (deleteBtn) {
             const reg = state.registros[deleteBtn.dataset.prodCancel];
-            if (reg) await cancelProduction(reg);
+            if (reg) {
+              const deleted = await cancelProduction(reg);
+              if (deleted) renderExpandedContent(popup);
+            }
           }
         });
       },
@@ -11033,7 +11052,10 @@
     const cancelBtn = event.target.closest('[data-prod-cancel]');
     if (cancelBtn) {
       const reg = getRegistro(cancelBtn.dataset.prodCancel);
-      if (reg) await cancelProduction(reg);
+      if (reg) {
+        const deleted = await cancelProduction(reg);
+        if (deleted) renderHistoryTable();
+      }
     }
   });
   window.laJamoneraProduccionAPI = {
