@@ -10355,6 +10355,16 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   word-break: break-word;
 }
 
+.planilla-commercial-name {
+  display: block;
+  padding: 0 10px 2px;
+  color: #1f2937;
+  font-size: 0.86rem;
+  font-weight: 500;
+  line-height: 1.15;
+  word-break: break-word;
+}
+
 .planilla-doc-header span,
 .planilla-doc-brand small {
   display: block;

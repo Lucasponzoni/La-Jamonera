@@ -25,6 +25,14 @@
     const month = date.toLocaleDateString('es-AR', { month: 'long' }).toUpperCase();
     return `${month} ${date.getFullYear()}`;
   };
+  const addDaysToIso = (isoDate, days) => {
+    const text = normalizeValue(isoDate);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return '';
+    const date = new Date(`${text}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return '';
+    date.setDate(date.getDate() + Number(days || 0));
+    return date.toISOString().slice(0, 10);
+  };
 
   const formatDateTime = (value) => {
     const d = new Date(Number(value));
@@ -100,6 +108,98 @@
   const getPackagingLabel = (registro = {}) => {
     const type = normalizeValue(registro?.packagingDelayTypeAtProduction || registro?.packagingDelayType || registro?.traceability?.product?.packagingDelayType);
     return type === 'freeze_before_packaging' ? 'CONGELADO PREVIO A ENVASADO' : 'ENVASADO';
+  };
+  const getPackagingDateDisplay = (registro = {}) => normalizeValue(registro?.packagingDate)
+    ? formatIsoEs(registro.packagingDate)
+    : 'Al producir';
+  const getInitialsToken = (value = '') => {
+    const words = normalizeUpper(value)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^A-Z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean);
+    return words.map((word) => word[0]).join('') || 'PROD';
+  };
+  const getProductionLotDisplay = (registro = {}) => {
+    const explicit = normalizeValue(registro?.lotNumber || registro?.productLotNumber);
+    if (explicit) return normalizeUpper(explicit);
+    const dateToken = normalizeValue(registro?.productionDate || '').replaceAll('-', '');
+    const productToken = getInitialsToken(registro?.recipeTitle || registro?.traceability?.product?.title || 'Producto');
+    return `LJ-${dateToken || 'SFECHA'}-${productToken}`;
+  };
+  const isMissingPlanillaValue = (value = '') => {
+    const text = normalizeValue(value);
+    return !text || text === '-';
+  };
+  const getFallbackLotDisplay = (registro = {}, name = '') => {
+    const dateToken = normalizeValue(registro?.productionDate || '').replaceAll('-', '');
+    return `LJ-${dateToken || 'SFECHA'}-${getInitialsToken(name || registro?.recipeTitle || 'Producto')}`;
+  };
+  const getIngredientExpiryValue = (registro = {}, expiry = '') => {
+    const text = normalizeValue(expiry);
+    if (text && text !== '-') return text;
+    return addDaysToIso(registro?.productionDate, 5) || '-';
+  };
+  const getProductExpiryDisplay = (registro = {}) => {
+    const explicit = normalizeValue(registro?.productExpiryDate);
+    if (explicit) return formatIsoEs(explicit);
+    const fallback = addDaysToIso(registro?.productionDate, 5);
+    return fallback ? formatIsoEs(fallback) : '-';
+  };
+
+  let recipesSnapshotCache = null;
+  const getRecipesSnapshot = async (context = {}) => {
+    const provided = safeObject(context.recetas || context.recipes);
+    if (Object.keys(provided).length) return provided;
+    if (recipesSnapshotCache) return recipesSnapshotCache;
+    try {
+      await window.laJamoneraReady;
+      recipesSnapshotCache = safeObject(await window.dbLaJamoneraRest?.read?.('/recetas'));
+    } catch (error) {
+      recipesSnapshotCache = {};
+    }
+    return recipesSnapshotCache;
+  };
+
+  const findRecipeForRegistro = async (registro = {}, context = {}) => {
+    const recipes = await getRecipesSnapshot(context);
+    const recipeId = normalizeValue(registro?.recipeId || registro?.traceability?.product?.id);
+    if (recipeId && recipes[recipeId]) return safeObject(recipes[recipeId]);
+    const title = normalizeUpper(registro?.recipeTitle || registro?.traceability?.product?.title);
+    return safeObject(Object.values(recipes).find((recipe) => normalizeUpper(recipe?.title) === title));
+  };
+  const formatRnpaExemptReason = (value = '') => {
+    const reason = normalizeValue(value);
+    return reason === 'solo_mostrador' ? 'Venta mostrador' : reason;
+  };
+
+  const enrichRegistroForPlanilla = async (registro = {}, context = {}) => {
+    const recipe = await findRecipeForRegistro(registro, context);
+    if (!Object.keys(recipe).length) return registro;
+    const recipeRnpa = safeObject(recipe.rnpa);
+    const existingProduct = safeObject(registro?.traceability?.product);
+    const existingRnpa = safeObject(existingProduct.rnpa);
+    const rnpaExempt = Boolean(recipe?.rnpaNotRequired || recipe?.rnpaExempt || recipe?.subproductNoRnpa || existingRnpa.exempt);
+    const rnpaNumber = normalizeValue(existingRnpa.number) || normalizeValue(recipeRnpa.number);
+    const currentCommercialName = normalizeValue(recipe.nombreComercial);
+    return {
+      ...registro,
+      recipeNombreComercial: currentCommercialName,
+      traceability: {
+        ...safeObject(registro.traceability),
+        product: {
+          ...existingProduct,
+          nombreComercial: currentCommercialName,
+          rnpa: {
+            ...existingRnpa,
+            number: rnpaNumber,
+            exempt: rnpaExempt,
+            exemptReason: rnpaExempt ? formatRnpaExemptReason(recipe.rnpaExemptReason || existingRnpa.exemptReason) || 'Venta mostrador' : normalizeValue(existingRnpa.exemptReason)
+          }
+        }
+      }
+    };
   };
 
   const resolveManagerNames = (registro, usersMap = {}) => {
@@ -193,6 +293,9 @@
         };
       });
       const firstLot = lots[0] || {};
+      const displayName = normalizeUpper(plan?.ingredientName || traceIngredient?.ingredientName || 'INGREDIENTE');
+      const lotNumberDisplay = joinUnique(lotNumbers);
+      const expiryValue = getIngredientExpiryValue(registro, firstLot?.expiryDate || '');
       const takeQty = Number(firstLot?.takeQty || 0);
       const availableQty = Number(firstLot?.availableQty || 0);
       const remainingQty = Math.max(0, availableQty - takeQty);
@@ -208,7 +311,7 @@
       const qtyRaw = Number(plan?.neededQty ?? plan?.requiredQty ?? 0);
       const qtyUnit = normalizeValue(plan?.ingredientUnit || plan?.unit || '');
       return {
-        ingredientName: normalizeUpper(plan?.ingredientName || traceIngredient?.ingredientName || 'INGREDIENTE'),
+        ingredientName: displayName,
         relation: plan?.isSubstitute && normalizeValue(plan?.sourceIngredientName) ? `SUSTITUYE A ${normalizeUpper(plan.sourceIngredientName)}` : '',
         isSubstitute: Boolean(plan?.isSubstitute),
         sourceIngredientId: normalizeValue(plan?.sourceIngredientId || plan?.ingredientId),
@@ -217,8 +320,8 @@
         sourceUnit: normalizeValue(meta.unit || qtyUnit),
         ingredientImage: normalizeValue(plan?.ingredientImageUrl || traceIngredient?.ingredientImageUrl),
         provider: joinUnique(providers),
-        lotNumber: joinUnique(lotNumbers),
-        expiryDate: firstLot?.expiryDate || '-',
+        lotNumber: isMissingPlanillaValue(lotNumberDisplay) ? getFallbackLotDisplay(registro, displayName) : lotNumberDisplay,
+        expiryDate: expiryValue,
         rne: joinUnique(rnes),
         qtyRaw,
         qtyUnit,
@@ -287,6 +390,10 @@
 
   const buildPlanillaHtml = (registro, context = {}) => {
     const rnpa = safeObject(registro?.traceability?.product?.rnpa);
+    const rnpaDisplay = rnpa.exempt
+      ? `NO REQUIERE RNPA${normalizeValue(rnpa.exemptReason) ? ` - ${normalizeUpper(rnpa.exemptReason)}` : ''}`
+      : normalizeUpper(rnpa.number || '-');
+    const commercialName = normalizeValue(registro?.recipeNombreComercial || registro?.traceability?.product?.nombreComercial);
     const ingredientRows = resolveIngredientRows(registro);
     const formulaRows = buildFormulaRows(ingredientRows);
     const managerLabel = resolveManagerNames(registro, context.usersMap);
@@ -308,7 +415,7 @@
         <div class="planilla-doc-title">
           <p>FRIGORIFICO LA JAMONERA &bull; REGISTRO DE PROTOCOLO DE PRODUCCION</p>
           <h2>${escapeHtml(normalizeUpper(registro?.recipeTitle || '-'))}</h2>
-          ${normalizeValue(registro?.recipeNombreComercial || registro?.traceability?.product?.nombreComercial) ? `<small>NOMBRE COMERCIAL: ${escapeHtml(normalizeUpper(registro?.recipeNombreComercial || registro?.traceability?.product?.nombreComercial))}</small>` : ''}
+          ${commercialName ? `<small class="planilla-commercial-name">NOMBRE COMERCIAL: ${escapeHtml(normalizeUpper(commercialName))}</small>` : ''}
           <span>${escapeHtml(registro?.id || '-')}</span>
         </div>
         <div class="planilla-doc-brand">
@@ -320,10 +427,10 @@
       <section class="planilla-summary-grid">
         <div class="planilla-summary-item"><strong>PERIODO</strong><span>${escapeHtml(formatMonthYearEs(registro?.productionDate || ''))}</span></div>
         <div class="planilla-summary-item"><strong>ELABORACION</strong><span>${escapeHtml(normalizeUpper(formatIsoEs(registro?.productionDate || '')))}</span></div>
-        <div class="planilla-summary-item"><strong>${escapeHtml(getPackagingLabel(registro))}</strong><span>${escapeHtml(formatIsoEs(registro?.packagingDate || ''))}</span></div>
-        <div class="planilla-summary-item"><strong>VENCIMIENTO</strong><span>${escapeHtml(normalizeUpper(formatIsoEs(registro?.productExpiryDate || '')))}</span></div>
-        <div class="planilla-summary-item"><strong>NRO. LOTE</strong><span>${escapeHtml(normalizeUpper(registro?.id || '-'))}</span></div>
-        <div class="planilla-summary-item"><strong>RNPA PRODUCTO</strong><span>${escapeHtml(normalizeUpper(rnpa.number || '-'))}</span></div>
+        <div class="planilla-summary-item"><strong>${escapeHtml(getPackagingLabel(registro))}</strong><span>${escapeHtml(getPackagingDateDisplay(registro))}</span></div>
+        <div class="planilla-summary-item"><strong>VENCIMIENTO</strong><span>${escapeHtml(normalizeUpper(getProductExpiryDisplay(registro)))}</span></div>
+        <div class="planilla-summary-item"><strong>NRO. LOTE</strong><span>${escapeHtml(getProductionLotDisplay(registro))}</span></div>
+        <div class="planilla-summary-item"><strong>RNPA PRODUCTO</strong><span>${escapeHtml(rnpaDisplay)}</span></div>
         <div class="planilla-summary-item"><strong>OBTENIDO</strong><span>${escapeHtml(normalizeUpper(`${Number(registro?.quantityKg || 0).toFixed(2)} KG`))}</span></div>
         <div class="planilla-summary-item"><strong>MERMA</strong><span>${escapeHtml(normalizeUpper(`${merma.toFixed(3)} KG`))}</span></div>
       </section>
@@ -374,14 +481,15 @@
 
   const createPrintableNode = async (registro, context = {}) => {
     await ensureQrLib();
+    const enrichedRegistro = await enrichRegistroForPlanilla(registro, context);
     const wrapper = document.createElement('div');
     wrapper.style.position = 'fixed';
     wrapper.style.left = '-99999px';
     wrapper.style.top = '0';
-    wrapper.innerHTML = buildPlanillaHtml(registro, context);
+    wrapper.innerHTML = buildPlanillaHtml(enrichedRegistro, context);
     document.body.appendChild(wrapper);
     const printable = wrapper.querySelector('#planillaProduccionPrintable');
-    renderQr(printable?.querySelector('#planillaQrTarget'), registro);
+    renderQr(printable?.querySelector('#planillaQrTarget'), enrichedRegistro);
     await new Promise((resolve) => setTimeout(resolve, 60));
     const clone = printable ? printable.cloneNode(true) : null;
     wrapper.remove();
