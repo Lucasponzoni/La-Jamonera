@@ -77,6 +77,7 @@
   let reportsFilterPicker = null;
   const REPORTS_PER_PAGE = 9;
   let initialLoadPromise = null;
+  let boardRenderSeq = 0;
 
   const ensureImageViewerModal = () => {
     if (!imageViewerModal && window.bootstrap && imageViewerModalEl) {
@@ -202,6 +203,36 @@
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const getReportDateIso = (report = {}) => {
+    const direct = normalizeValue(report.reportDate);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(direct)) return direct;
+    const year = normalizeValue(report.year);
+    const month = normalizeValue(report.month).padStart(2, '0');
+    const day = normalizeValue(report.day).padStart(2, '0');
+    if (/^\d{4}$/.test(year) && /^\d{2}$/.test(month) && /^\d{2}$/.test(day)) {
+      return `${year}-${month}-${day}`;
+    }
+    const createdAt = Number(report.createdAt || 0);
+    if (Number.isFinite(createdAt) && createdAt > 0) {
+      const date = new Date(createdAt);
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+    return '';
+  };
+
+  const getReportCardDateLabel = (report = {}) => {
+    const createdAt = Number(report.createdAt || 0);
+    if (Number.isFinite(createdAt) && createdAt > 0) {
+      const d = new Date(createdAt);
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      const time = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+      return `${day}/${month}/${year}, ${time}`;
+    }
+    return getDateLabel(report.createdAt);
   };
 
   const countCommentEntries = (comment) => {
@@ -337,11 +368,19 @@
       ? await buildPdfEmbeddedImageBlocks(images)
       : [{ text: 'No incluidas en esta impresión.', color: '#5a6482' }];
 
+    let abrLogoDataUrl = null;
+    try {
+      abrLogoDataUrl = await imageUrlToDataUrl('./IMG/ABR LOGO.png');
+    } catch (error) {
+      abrLogoDataUrl = null;
+    }
+
     return {
       pageSize: 'A4',
       pageMargins: [28, 24, 28, 24],
       defaultStyle: { fontSize: 11 },
       content: [
+        ...(abrLogoDataUrl ? [{ image: abrLogoDataUrl, fit: [90, 45], alignment: 'center', margin: [0, 0, 0, 8] }] : []),
         { text: 'Informe bromatológico', style: 'title' },
         { text: `Usuario: ${report.userName || '-'}`, margin: [0, 2, 0, 0] },
         { text: `Puesto: ${report.userPosition || '-'}`, margin: [0, 2, 0, 0] },
@@ -496,9 +535,11 @@
             h1{font-size:24px;margin:0 0 10px}
             .meta{margin:0 0 16px;color:#55607f;font-size:14px}
             .content{border:1px solid #d7def2;border-radius:12px;padding:12px;background:#fff}
+            .print-logo{display:block;margin:0 auto 10px;max-height:50px;width:auto}
           </style>
         </head>
         <body>
+          <img src="${escapeHtml(new URL('./IMG/ABR LOGO.png', window.location.href).href)}" alt="ABR" class="print-logo">
           <h1>Informe bromatológico</h1>
           <p class="meta"><strong>Usuario:</strong> ${escapeHtml(report.userName || '-')} · <strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')} · <strong>Fecha:</strong> ${escapeHtml(getDateLabel(report.createdAt))}</p>
           <section class="content">${report.html || '<p>Sin contenido</p>'}</section>
@@ -518,9 +559,15 @@
       html: '<p>Elegí cómo querés generar el informe.</p>',
       showDenyButton: true,
       showCancelButton: true,
-      confirmButtonText: 'Imprimir directo',
+      confirmButtonText: 'Imprimir',
       denyButtonText: 'Descargar PDF',
-      cancelButtonText: 'Cancelar'
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        popup: 'informes-print-choice-alert',
+        confirmButton: 'ios-btn ios-btn-primary',
+        denyButton: 'ios-btn ios-btn-success',
+        cancelButton: 'ios-btn ios-btn-secondary'
+      }
     });
 
     if (!choice.isConfirmed && !choice.isDenied) {
@@ -1068,7 +1115,25 @@
     informesPagination.innerHTML = html;
   };
 
-  const renderReportsBoard = () => {
+  const needsReportDetailForCard = (report = {}) => Boolean(
+    report.__indexLite
+    || !normalizeValue(report.html)
+    || (Number(report.attachmentsCount || 0) > 0 && !Array.isArray(report.attachments))
+    || (Number(report.commentsCount || 0) > 0 && !report.comments)
+  );
+
+  const hydrateReportsForCards = async (reports = []) => Promise.all(reports.map((report) =>
+    needsReportDetailForCard(report) ? ensureReportDetail(report) : report));
+
+  const getReportCardAttachments = (report = {}) => Array.isArray(report.attachments) ? report.attachments : [];
+
+  const getReportCardCommentsCount = (report = {}) => {
+    const hydratedCount = getCommentsCount(report);
+    return hydratedCount || Number(report.commentsCount || 0) || 0;
+  };
+
+  const renderReportsBoard = async () => {
+    const renderSeq = ++boardRenderSeq;
     const source = state.filteredReports.length || state.activeRange ? state.filteredReports : state.reports;
     if (!source.length) {
       setBoardState('empty');
@@ -1080,14 +1145,15 @@
     const totalPages = Math.max(1, Math.ceil(source.length / REPORTS_PER_PAGE));
     state.currentPage = Math.min(state.currentPage, totalPages);
     const startAt = (state.currentPage - 1) * REPORTS_PER_PAGE;
-    const pageItems = source.slice(startAt, startAt + REPORTS_PER_PAGE);
+    const pageItems = await hydrateReportsForCards(source.slice(startAt, startAt + REPORTS_PER_PAGE));
+    if (renderSeq !== boardRenderSeq) return;
 
     informesCardsGrid.innerHTML = pageItems.map((report) => {
       const user = state.users[report.userId] || {};
-      const attachments = Array.isArray(report.attachments) ? report.attachments : [];
+      const attachments = getReportCardAttachments(report);
       const imageCount = attachments.filter((item) => item.type === 'image').length;
       const docCount = Math.max(0, attachments.length - imageCount);
-      const commentsCount = getCommentsCount(report);
+      const commentsCount = getReportCardCommentsCount(report);
       const importance = getImportanceMeta(report.importance);
       const displayName = user.fullName || report.userName || 'Usuario';
       const displayUser = user.fullName ? user : { fullName: displayName, photoUrl: '' };
@@ -1095,7 +1161,7 @@
       return `
         <article class="informe-card" data-report-id="${report.id}" data-year="${report.year}" data-month="${report.month}" data-day="${report.day}">
           <div class="informe-card-head">
-            <span class="informe-card-date"><i class="fa-regular fa-calendar"></i> ${getDateLabel(report.createdAt)}</span>
+            <span class="informe-card-date"><i class="fa-regular fa-calendar"></i> ${getReportCardDateLabel(report)}</span>
             <span class="informe-card-comments ${commentsCount ? 'has-comments' : 'no-comments'}"><i class="fa-solid ${commentsCount ? 'fa-comment-dots' : 'fa-comment-slash'}"></i> ${commentsCount ? `${commentsCount} comentario(s)` : 'Sin comentarios'}</span>
           </div>
 
@@ -1138,8 +1204,15 @@
       Object.keys(index).forEach((year) => {
         Object.keys(index[year] || {}).forEach((month) => {
           Object.keys(index[year][month] || {}).forEach((day) => {
-            const key = `${year}-${month}-${day}`;
-            dayCount[key] = Object.keys(index[year][month][day] || {}).length;
+            const reports = index[year][month][day] || {};
+            Object.keys(reports).forEach((id) => {
+              const entry = reports[id];
+              const createdAt = Number(entry?.createdAt || 0);
+              if (!Number.isFinite(createdAt) || createdAt <= 0) return;
+              const d = new Date(createdAt);
+              const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+              dayCount[key] = (dayCount[key] || 0) + 1;
+            });
           });
         });
       });
@@ -1156,7 +1229,7 @@
       if (!state.activeRange) {
         state.filteredReports = [];
       }
-      renderReportsBoard();
+      await renderReportsBoard();
       if (reportsFilterPicker) {
         reportsFilterPicker.redraw();
       }
@@ -1172,7 +1245,7 @@
       state.filteredReports = [];
       state.currentPage = 1;
       clearFilterInformesBtn.classList.add('d-none');
-      renderReportsBoard();
+      void renderReportsBoard();
       return;
     }
 
@@ -1181,13 +1254,16 @@
     start.setHours(0, 0, 0, 0);
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
+    const startTs = start.getTime();
+    const endTs = end.getTime();
     state.filteredReports = state.reports.filter((report) => {
-      const created = new Date(Number(report.createdAt || Date.now()));
-      return created >= start && created <= end;
+      const createdAt = Number(report.createdAt || 0);
+      if (!Number.isFinite(createdAt) || createdAt <= 0) return false;
+      return createdAt >= startTs && createdAt <= endTs;
     });
     state.currentPage = 1;
     clearFilterInformesBtn.classList.remove('d-none');
-    renderReportsBoard();
+    void renderReportsBoard();
   };
 
   const loadData = async () => {
@@ -2910,7 +2986,7 @@
       const button = event.target.closest('[data-page]');
       if (!button) return;
       state.currentPage = Number(button.dataset.page || 1);
-      renderReportsBoard();
+      void renderReportsBoard();
     });
   }
 
@@ -2918,7 +2994,9 @@
     informesCardsGrid.addEventListener('click', async (event) => {
       const article = event.target.closest('.informe-card');
       if (!article) return;
-      const report = findReportById(article.dataset.reportId);
+      const sourceReport = findReportById(article.dataset.reportId);
+      if (!sourceReport) return;
+      const report = await ensureReportDetail(sourceReport);
       if (!report) return;
 
       if (event.target.closest('[data-print-report]')) {
@@ -2971,6 +3049,10 @@
       onClose: (selectedDates) => {
         if (selectedDates.length === 2) {
           applyDateFilter(selectedDates[0], selectedDates[1]);
+          return;
+        }
+        if (selectedDates.length === 1) {
+          applyDateFilter(selectedDates[0], selectedDates[0]);
         }
       }
     });

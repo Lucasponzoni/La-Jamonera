@@ -10169,9 +10169,6 @@
       const canLeave = state.dispatchXlsxMode ? await confirmLeaveDispatchXlsxCreate() : await confirmLeaveDispatchCreate();
       if (!canLeave) return;
       renderDispatchMain();
-      refreshData({ silent: true }).catch((error) => {
-        console.warn('[produccion] refreshData back xlsx failed', error);
-      });
       return;
     }
     if (event.target.closest('#dispatchXlsxUploadBtn')) {
