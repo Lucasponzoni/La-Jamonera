@@ -97,6 +97,10 @@
 
   const ensureQrLib = async () => (window.QRCode ? true : loadScript('https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js', 'la-jamonera-qrcode'));
   const getTraceUrl = (registro) => normalizeValue(registro?.publicTraceUrl) || `${TRACE_BASE_URL}${encodeURIComponent(normalizeValue(registro?.id))}`;
+  const getPackagingLabel = (registro = {}) => {
+    const type = normalizeValue(registro?.packagingDelayTypeAtProduction || registro?.packagingDelayType || registro?.traceability?.product?.packagingDelayType);
+    return type === 'freeze_before_packaging' ? 'CONGELADO PREVIO A ENVASADO' : 'ENVASADO';
+  };
 
   const resolveManagerNames = (registro, usersMap = {}) => {
     const tokens = Array.isArray(registro?.managers) ? registro.managers : [];
@@ -304,6 +308,7 @@
         <div class="planilla-doc-title">
           <p>FRIGORIFICO LA JAMONERA &bull; REGISTRO DE PROTOCOLO DE PRODUCCION</p>
           <h2>${escapeHtml(normalizeUpper(registro?.recipeTitle || '-'))}</h2>
+          ${normalizeValue(registro?.recipeNombreComercial || registro?.traceability?.product?.nombreComercial) ? `<small>NOMBRE COMERCIAL: ${escapeHtml(normalizeUpper(registro?.recipeNombreComercial || registro?.traceability?.product?.nombreComercial))}</small>` : ''}
           <span>${escapeHtml(registro?.id || '-')}</span>
         </div>
         <div class="planilla-doc-brand">
@@ -315,7 +320,7 @@
       <section class="planilla-summary-grid">
         <div class="planilla-summary-item"><strong>PERIODO</strong><span>${escapeHtml(formatMonthYearEs(registro?.productionDate || ''))}</span></div>
         <div class="planilla-summary-item"><strong>ELABORACION</strong><span>${escapeHtml(normalizeUpper(formatIsoEs(registro?.productionDate || '')))}</span></div>
-        <div class="planilla-summary-item"><strong>ENVASADO</strong><span>${escapeHtml(formatIsoEs(registro?.packagingDate || ''))}</span></div>
+        <div class="planilla-summary-item"><strong>${escapeHtml(getPackagingLabel(registro))}</strong><span>${escapeHtml(formatIsoEs(registro?.packagingDate || ''))}</span></div>
         <div class="planilla-summary-item"><strong>VENCIMIENTO</strong><span>${escapeHtml(normalizeUpper(formatIsoEs(registro?.productExpiryDate || '')))}</span></div>
         <div class="planilla-summary-item"><strong>NRO. LOTE</strong><span>${escapeHtml(normalizeUpper(registro?.id || '-'))}</span></div>
         <div class="planilla-summary-item"><strong>RNPA PRODUCTO</strong><span>${escapeHtml(normalizeUpper(rnpa.number || '-'))}</span></div>

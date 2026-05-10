@@ -66,6 +66,8 @@
   const NEW_MEASURE_VALUE = '__new_measure__';
 
   const MONOGRAPHY_ROW_TYPE = 'monography';
+  const PACKAGING_DELAY_FREEZE = 'freeze_before_packaging';
+  const PACKAGING_DELAY_AGING = 'aging';
   const FOOD_CATEGORIES_AR = {
     'carnes-y-derivados': ['Carnes frescas', 'Chacinados embutidos', 'Fiambres y cocidos', 'Menudencias y vísceras', 'Elaboraciones propias'],
     lacteos: ['Leche fluida', 'Leche en polvo', 'Quesos', 'Yogures y fermentados'],
@@ -100,6 +102,8 @@
 
   const RNPA_COUNTRY = 'Argentina';
   const RNPA_NUMBER_REGEX = /^[0-9-]+$/;
+  const RNPA_EXEMPT_REASON = 'solo_mostrador';
+  const RNPA_EXEMPT_BADGE_LABEL = 'No requiere RNPA - Venta mostrador';
   const ARGENTINA_PROVINCES = ['Buenos Aires','CABA','Catamarca','Chaco','Chubut','Córdoba','Corrientes','Entre Ríos','Formosa','Jujuy','La Pampa','La Rioja','Mendoza','Misiones','Neuquén','Río Negro','Salta','San Juan','San Luis','Santa Cruz','Santa Fe','Santiago del Estero','Tierra del Fuego','Tucumán'];
 
   const FRONT_LABELS_ALLOWED = [
@@ -457,8 +461,27 @@
     await window.dbLaJamoneraRest.write('/recetas', state.recetas);
   };
 
+  const isRecipeRnpaExempt = (recipe = {}) =>
+    Boolean(recipe?.rnpaNotRequired || recipe?.rnpaExempt || recipe?.subproductNoRnpa);
+
+  const getEmptyRnpaRecord = () => ({
+    number: '',
+    denomination: '',
+    brand: '',
+    businessName: '',
+    city: '',
+    province: '',
+    country: RNPA_COUNTRY,
+    expiryDate: '',
+    attachmentUrl: '',
+    attachmentType: '',
+    attachmentName: ''
+  });
 
   const getRnpaStatus = (recipe) => {
+    if (isRecipeRnpaExempt(recipe)) {
+      return { label: RNPA_EXEMPT_BADGE_LABEL, className: 'is-exempt', days: null, icon: 'fa-store', filterBucket: 'exempt' };
+    }
     const rnpa = safeObject(recipe?.rnpa);
     const attachmentUrl = normalizeValue(rnpa.attachmentUrl);
     if (!attachmentUrl) return { label: 'RNPA pendiente', className: 'is-pending', days: null, icon: 'fa-triangle-exclamation', filterBucket: 'none' };
@@ -480,6 +503,7 @@
   const updateRnpaFilterButtons = (recipes = []) => {
     const counts = recipes.reduce((acc, recipe) => {
       const bucket = getRecipeRnpaFilterBucket(recipe);
+      if (bucket === 'exempt') return acc;
       acc.all += 1;
       if (bucket === 'none') acc.none += 1;
       if (bucket === 'warning') acc.warning += 1;
@@ -493,7 +517,7 @@
       if (!button || !badge) return;
       const count = counts[key] || 0;
       button.classList.toggle('is-active', state.rnpaFilter === key);
-      button.disabled = count === 0;
+      button.disabled = key !== 'all' && count === 0;
       badge.textContent = String(count);
     });
   };
@@ -595,6 +619,19 @@
     });
     return counts;
   };
+
+  const getRecipeGroupLabel = (recipe = {}) => {
+    const groupId = normalizeValue(recipe?.recipeGroupId);
+    return groupId ? normalizeValue(state.recipeGroups?.[groupId]?.name) : '';
+  };
+
+  const getRecipePackagingDelayType = (recipe = {}) =>
+    normalizeValue(recipe?.packagingDelayType) || (recipe?.prePackagingFreeze ? PACKAGING_DELAY_FREEZE : PACKAGING_DELAY_AGING);
+
+  const getRecipePackagingDelayLabel = (recipe = {}) =>
+    getRecipePackagingDelayType(recipe) === PACKAGING_DELAY_FREEZE
+      ? 'Días de congelado previo a envasado'
+      : 'Días de estacionado';
 
   const renderRecipeGroups = () => {
     if (!recetasGroups) return;
@@ -834,7 +871,7 @@
     const activeGroup = state.activeRecipeGroupId || 'all';
     const baseSource = getRecetasArray()
       .filter((item) => activeGroup === 'all' || normalizeValue(item?.recipeGroupId) === activeGroup)
-      .filter((item) => !query || normalizeLower(item.title).includes(query) || normalizeLower(item.description).includes(query))
+      .filter((item) => !query || normalizeLower(item.title).includes(query) || normalizeLower(item.nombreComercial).includes(query) || normalizeLower(item.description).includes(query) || normalizeLower(getRecipeGroupLabel(item)).includes(query))
       .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
     updateRnpaFilterButtons(baseSource);
     renderRnpaAlert(baseSource);
@@ -862,6 +899,7 @@
       const frontLabels = Array.isArray(item.nutrition?.ai?.frontLabels) ? item.nutrition.ai.frontLabels : [];
       const hasNutritionLabel = Boolean(normalizeValue(item.nutrition?.ai?.tableHtml));
       const hasFrontLabels = frontLabels.length > 0;
+      const groupLabel = getRecipeGroupLabel(item);
       return `
         <article class="ingrediente-card receta-card" data-receta-id="${item.id}">
           <div class="ingrediente-avatar receta-thumb-wrap">
@@ -871,6 +909,8 @@
           </div>
           <div class="ingrediente-main receta-main">
             <h6 class="ingrediente-name receta-name">${capitalize(item.title || 'Sin título')}</h6>
+            ${item.nombreComercial ? `<p class="receta-card-commercial"><i class="bi bi-tag"></i>${escapeHtml(capitalize(item.nombreComercial))}</p>` : ''}
+            <p class="receta-card-folder"><span aria-hidden="true">📁</span>${escapeHtml(groupLabel ? capitalize(groupLabel) : 'Sin carpeta')}</p>
             <div class="receta-print-actions">
               <button type="button" class="btn ios-btn ios-btn-secondary receta-print-btn" data-receta-print="nutrition" data-receta-id="${item.id}" ${hasNutritionLabel ? '' : 'disabled'}>
                 <i class="fa-solid fa-print"></i>
@@ -892,6 +932,7 @@
             </p>
           </div>
           <div class="ingrediente-actions recipe-row-actions">
+            <button type="button" class="btn family-manage-btn" data-receta-image-view="${item.id}" title="Ver imagen" ${normalizeValue(item.imageUrl) ? '' : 'disabled'}><i class="fa-regular fa-image"></i></button>
             <button type="button" class="btn family-manage-btn" data-receta-rnpa-view="${item.id}" title="Ver RNPA" ${normalizeValue(item?.rnpa?.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i></button>
             <button type="button" class="btn family-manage-btn receta-card-print-action" data-receta-full-print="${item.id}" title="Imprimir receta" aria-label="Imprimir receta"><i class="fa-solid fa-print"></i></button>
             <button type="button" class="btn family-manage-btn" data-receta-manual-view="${item.id}" title="Ver manual" ${Array.isArray(item?.rows) && item.rows.some((row) => row.type === MONOGRAPHY_ROW_TYPE && normalizeValue(row.manualUrl)) ? '' : 'disabled'}><i class="fa-solid fa-book-open"></i></button>
@@ -963,27 +1004,38 @@
     const ingredientRows = rows.filter((row) => row.type === 'ingredient' && normalizeValue(row.ingredientName));
     const noteRows = rows.filter((row) => row.type === 'comment' && normalizeValue(row.comment));
     const rnpa = safeObject(recipe?.rnpa);
+    const rnpaExempt = isRecipeRnpaExempt(recipe);
     const nutrition = safeObject(recipe?.nutrition);
     const nutritionAi = safeObject(nutrition?.ai);
     const title = capitalize(recipe?.title || 'Receta');
+    const commercialName = normalizeValue(recipe?.nombreComercial);
+    const groupLabel = getRecipeGroupLabel(recipe);
+    const delayLabel = getRecipePackagingDelayLabel(recipe);
     const documentTitle = getRecipePrintDocumentTitle(title);
     const yieldLabel = [normalizeValue(recipe?.yieldQuantity), getPrintMeasureLabel(recipe?.yieldUnit)].filter(Boolean).join(' ');
     const metaItems = [
+      ['Nombre comercial', commercialName || '-'],
+      ['Carpeta', groupLabel ? `📁 ${capitalize(groupLabel)}` : '📁 Sin carpeta'],
       ['Rinde', yieldLabel || '-'],
       ['Vida util', normalizeValue(recipe?.shelfLifeDays) ? `${recipe.shelfLifeDays} dias` : '-'],
-      ['Estacionamiento', normalizeValue(recipe?.agingDays) ? `${recipe.agingDays} dias` : 'No posee']
+      [delayLabel, normalizeValue(recipe?.agingDays) ? `${recipe.agingDays} dias` : 'No posee']
     ];
-    const rnpaItems = [
-      ['Numero RNPA', rnpa.number],
-      ['Denominacion', rnpa.denomination],
-      ['Marca', rnpa.brand],
-      ['Razon social', rnpa.businessName],
-      ['Localidad', rnpa.city],
-      ['Provincia', rnpa.province],
-      ['Pais', rnpa.country || RNPA_COUNTRY],
-      ['Vencimiento', rnpa.expiryDate],
-      ['Adjunto', rnpa.attachmentUrl ? 'Documentacion Adjunta' : 'No Posee']
-    ];
+    const rnpaItems = rnpaExempt
+      ? [
+        ['Estado', 'Subproducto - No requiere RNPA'],
+        ['Motivo', 'Venta en mostrador']
+      ]
+      : [
+        ['Numero RNPA', rnpa.number],
+        ['Denominacion', rnpa.denomination],
+        ['Marca', rnpa.brand],
+        ['Razon social', rnpa.businessName],
+        ['Localidad', rnpa.city],
+        ['Provincia', rnpa.province],
+        ['Pais', rnpa.country || RNPA_COUNTRY],
+        ['Vencimiento', rnpa.expiryDate],
+        ['Adjunto', rnpa.attachmentUrl ? 'Documentacion Adjunta' : 'No Posee']
+      ];
     const nutritionItems = [
       ['Tipo de producto', nutrition.productType ? capitalize(nutrition.productType) : ''],
       ['Categoria', nutrition.category ? capitalize(String(nutrition.category).replaceAll('-', ' ')) : ''],
@@ -1039,6 +1091,7 @@
     .recipe-print-full-hero { display: grid; grid-template-columns: 1fr 96px; gap: 14px; align-items: center; border-bottom: 2px solid #111; padding-bottom: 12px; }
     .recipe-print-full-kicker { margin: 0 0 4px; text-transform: uppercase; letter-spacing: .08em; color: #555; font-size: 10px; font-weight: 800; }
     h1 { margin: 0; font-size: 28px; line-height: 1.05; letter-spacing: 0; color: #111; }
+    .recipe-print-full-commercial { margin: 3px 0 0; color: #555; font-size: 14px; font-weight: 800; }
     .recipe-print-full-description { margin: 6px 0 0; color: #444; font-size: 12px; line-height: 1.45; }
     .recipe-print-full-photo-wrap { width: 96px; height: 96px; border-radius: 999px; border: 1px solid #bbb; background: #f5f5f5; overflow: hidden; display: grid; place-items: center; padding: 6px; }
     .recipe-print-full-photo { width: 100%; height: 100%; border-radius: 999px; background: #fff; object-fit: contain; object-position: center; display: block; }
@@ -1122,6 +1175,7 @@
       <div>
         <p class="recipe-print-full-kicker">Receta / La Jamonera</p>
         <h1>${escapeHtml(title)}</h1>
+        ${commercialName ? `<p class="recipe-print-full-commercial">${escapeHtml(capitalize(commercialName))}</p>` : ''}
         <p class="recipe-print-full-description">${escapeHtml(recipe?.description || 'Sin descripcion cargada.')}</p>
         <dl class="recipe-print-full-meta">${keyValueGrid(metaItems)}</dl>
       </div>
@@ -3203,6 +3257,13 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
           renderRows();
           return;
         }
+        if (select.id === 'recipeFreezeBeforePackaging') {
+          state.editor.packagingDelayType = select.checked ? PACKAGING_DELAY_FREEZE : PACKAGING_DELAY_AGING;
+          const label = recipeEditorForm.querySelector('#recipeAgingDaysLabel');
+          if (label) label.textContent = select.checked ? 'Días de congelado previo a envasado' : 'Días de estacionado';
+          markEditorDirty();
+          return;
+        }
         if (select.id === 'recipeNutritionCategory') {
           state.editor.nutrition = state.editor.nutrition || {};
           state.editor.nutrition.category = normalizeLower(select.value);
@@ -3249,7 +3310,6 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
         if (input.id === 'recipeAgingDays') {
           state.editor.agingDays = normalizeValue(input.value);
           markEditorDirty();
-          markNutritionAiAsStaleIfNeeded();
           return;
         }
         if (input.id === 'recipeNutritionDeclarationAmount') {
@@ -3444,6 +3504,8 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
         : [{ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: getMeasureOptions()[0]?.value || '', relatedIngredients: [] }],
       orderMode: initial?.orderMode || 'desc',
       agingDays: normalizeValue(initial?.agingDays),
+      packagingDelayType: normalizeValue(initial?.packagingDelayType) || (initial?.prePackagingFreeze ? PACKAGING_DELAY_FREEZE : PACKAGING_DELAY_AGING),
+      rnpaExempt: isRecipeRnpaExempt(initial),
       rnpa: {
         number: normalizeValue(initial?.rnpa?.number),
         denomination: normalizeValue(initial?.rnpa?.denomination),
@@ -3494,6 +3556,8 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
       attachmentName: normalizeValue(state.editor.rnpa?.attachmentName)
     };
     state.editor.agingDays = normalizeValue(state.editor.agingDays);
+    state.editor.packagingDelayType = normalizeValue(state.editor.packagingDelayType) || PACKAGING_DELAY_AGING;
+    state.editor.rnpaExempt = isRecipeRnpaExempt({ ...formInitial, ...state.editor });
     ensureMonographyAtEnd();
     state.editorDirty = false;
 
@@ -3516,7 +3580,11 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
             <textarea id="recipeDescription" class="form-control ios-input recipe-description-lg" placeholder="Detalle amplio de la receta">${escapeHtml(formInitial.description || '')}</textarea>
           </div>
           <div class="recipe-field recipe-field-full recipe-rnpa-block"><p class="recipe-subsection-title">RNPA (opcional)</p>
-            <div class="recipe-rnpa-grid">
+            <label class="inventario-check-row inventario-check-row-compact recipe-rnpa-exempt-row">
+              <input type="checkbox" id="recipeRnpaExempt" ${state.editor.rnpaExempt ? 'checked' : ''}>
+              <span>Subproducto - No requiere RNPA (Solo mostrador)</span>
+            </label>
+            <div class="recipe-rnpa-grid" id="recipeRnpaFields">
               <input id="recipeRnpaNumber" class="form-control ios-input" placeholder="Número RNPA (ej: 02-123456)" value="${escapeHtml(state.editor.rnpa?.number || '')}">
               <input id="recipeRnpaDenomination" class="form-control ios-input" placeholder="Denominación" value="${escapeHtml(state.editor.rnpa?.denomination || '')}">
               <select id="recipeRnpaBrand" class="form-select ios-input">${getRnpaSelectOptions(state.recipeBrands, state.editor.rnpa?.brand, 'Marca')}</select>
@@ -3543,8 +3611,9 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
             <input id="recipeShelfLifeDays" type="number" min="1" step="1" class="form-control ios-input" value="${escapeHtml(formInitial.shelfLifeDays || '')}" placeholder="Ej: 3">
           </div>
           <div class="recipe-field recipe-field-half recipe-highlight-field">
-            <label class="form-label" for="recipeAgingDays"><i class="fa-solid fa-hourglass-half"></i> Días de estacionado</label>
+            <label class="form-label" for="recipeAgingDays"><i class="fa-solid fa-hourglass-half"></i> <span id="recipeAgingDaysLabel">${escapeHtml(state.editor.packagingDelayType === PACKAGING_DELAY_FREEZE ? 'Días de congelado previo a envasado' : 'Días de estacionado')}</span></label>
             <input id="recipeAgingDays" type="number" min="0" step="1" class="form-control ios-input" value="${state.editor.agingDays || ''}" placeholder="Ej: 15">
+            <label class="inventario-check-row inventario-check-row-compact mt-2"><input type="checkbox" id="recipeFreezeBeforePackaging" ${state.editor.packagingDelayType === PACKAGING_DELAY_FREEZE ? 'checked' : ''}><span>Usar como días de congelado previo a envasado</span></label>
           </div>
           <div class="recipe-field recipe-field-half recipe-highlight-field">
             <label class="form-label" for="recipeOrderModeEditor"><i class="fa-solid fa-arrow-down-short-wide"></i> Orden de ingredientes</label>
@@ -3663,6 +3732,20 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
         defaultDate: normalizeValue(state.editor?.rnpa?.expiryDate) || undefined
       });
     }
+    const syncRnpaExemptUi = () => {
+      const checked = Boolean(recipeEditorForm.querySelector('#recipeRnpaExempt')?.checked);
+      state.editor.rnpaExempt = checked;
+      const fields = recipeEditorForm.querySelector('#recipeRnpaFields');
+      fields?.classList.toggle('is-disabled', checked);
+      fields?.querySelectorAll('input, select, button').forEach((control) => {
+        control.disabled = checked;
+      });
+    };
+    recipeEditorForm.querySelector('#recipeRnpaExempt')?.addEventListener('change', () => {
+      syncRnpaExemptUi();
+      markEditorDirty();
+    });
+    syncRnpaExemptUi();
     recipeEditorForm.querySelector('#recipeRnpaViewAttachmentBtn')?.addEventListener('click', async () => {
       const currentUrl = normalizeValue(state.editor?.rnpa?.attachmentUrl);
       if (!currentUrl) return;
@@ -3681,13 +3764,16 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     const shelfLifeDays = Number(normalizeValue(recipeEditorForm.querySelector('#recipeShelfLifeDays')?.value));
     const agingDaysRaw = normalizeValue(recipeEditorForm.querySelector('#recipeAgingDays')?.value);
     const agingDays = agingDaysRaw ? Number(agingDaysRaw) : 0;
+    const packagingDelayType = recipeEditorForm.querySelector('#recipeFreezeBeforePackaging')?.checked ? PACKAGING_DELAY_FREEZE : PACKAGING_DELAY_AGING;
+    const prePackagingFreeze = packagingDelayType === PACKAGING_DELAY_FREEZE;
     const orderMode = normalizeLower(recipeEditorForm.querySelector('#recipeOrderModeEditor')?.value);
+    const rnpaExempt = Boolean(recipeEditorForm.querySelector('#recipeRnpaExempt')?.checked);
 
     if (!title) throw new Error('El título es obligatorio.');
     if (!yieldQuantity) throw new Error('Completá la cantidad obtenida.');
     if (!yieldUnit || yieldUnit === NEW_MEASURE_VALUE) throw new Error('Seleccioná una unidad de medida válida.');
     if (!Number.isFinite(shelfLifeDays) || shelfLifeDays <= 0) throw new Error('Ingresá la caducidad en días con un número mayor a 0.');
-    if (!Number.isFinite(agingDays) || agingDays < 0) throw new Error('Ingresá los días de estacionado con un número válido (0 o mayor).');
+    if (!Number.isFinite(agingDays) || agingDays < 0) throw new Error(`Ingresá ${prePackagingFreeze ? 'los días de congelado previo a envasado' : 'los días de estacionado'} con un número válido (0 o mayor).`);
     if (isNutritionAiStale()) throw new Error('Se modificaron datos nutricionales. Rehacé la tabla nutricional con IA antes de guardar.');
 
     const rows = state.editor.rows
@@ -3722,8 +3808,9 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     if (invalidIngredientRow) throw new Error('Todas las filas de ingredientes deben tener ingrediente, cantidad y medida.');
 
     const sortedRows = sortRowsByOrderMode(rows, orderMode);
+    state.editor.rows = sortedRows;
 
-    const rnpa = {
+    let rnpa = {
       number: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaNumber')?.value),
       denomination: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaDenomination')?.value),
       brand: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaBrand')?.value) === '__new_value__' ? '' : normalizeValue(recipeEditorForm.querySelector('#recipeRnpaBrand')?.value),
@@ -3737,9 +3824,13 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
       attachmentName: normalizeValue(state.editor?.rnpa?.attachmentName)
     };
 
-    if (rnpa.number && !RNPA_NUMBER_REGEX.test(rnpa.number)) throw new Error('RNPA inválido: solo se permiten números y guion (-).');
+    if (rnpaExempt) {
+      rnpa = getEmptyRnpaRecord();
+    } else if (rnpa.number && !RNPA_NUMBER_REGEX.test(rnpa.number)) {
+      throw new Error('RNPA inválido: solo se permiten números y guion (-).');
+    }
 
-    const rnpaFile = recipeEditorForm.querySelector('#recipeRnpaAttachment')?.files?.[0];
+    const rnpaFile = rnpaExempt ? null : recipeEditorForm.querySelector('#recipeRnpaAttachment')?.files?.[0];
     const rnpaFileValidation = validateRnpaFile(rnpaFile);
     if (rnpaFileValidation) throw new Error(rnpaFileValidation);
     if (rnpaFile) {
@@ -3748,7 +3839,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
       rnpa.attachmentName = normalizeValue(rnpaFile.name);
     }
     const rnpaValues = [rnpa.number, rnpa.denomination, rnpa.brand, rnpa.businessName, rnpa.city, rnpa.province, rnpa.expiryDate, rnpa.attachmentUrl];
-    const hasSomeRnpa = rnpaValues.some(Boolean);
+    const hasSomeRnpa = !rnpaExempt && rnpaValues.some(Boolean);
     if (hasSomeRnpa) {
       const cityExists = (state.recipeCities || []).some((item) => normalizeLower(item) === normalizeLower(rnpa.city));
       if (rnpa.city && !cityExists) {
@@ -3774,6 +3865,9 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
       householdAmount: normalizeValue(recipeEditorForm.querySelector('#recipeNutritionHouseholdAmount')?.value),
       ai: safeObject(state.editor?.nutrition?.ai)
     };
+    if (nutrition.ai?.tableHtml) {
+      nutrition.ai = { ...nutrition.ai, inputHash: getNutritionGenerationHash() };
+    }
 
     let imageUrl = normalizeValue(state.editor.image.url || '');
     const method = normalizeLower(document.getElementById('recipeImage_method')?.value || state.editor.image.method || 'ai');
@@ -3791,7 +3885,25 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
       }
     }
 
-    return { title, nombreComercial, description, yieldQuantity, yieldUnit, shelfLifeDays, agingDays, orderMode, rows: sortedRows, nutrition, rnpa: hasSomeRnpa ? rnpa : { number: '', denomination: '', brand: '', businessName: '', city: '', province: '', country: RNPA_COUNTRY, expiryDate: '', attachmentUrl: '', attachmentType: '', attachmentName: '' }, imageUrl };
+    return {
+      title,
+      nombreComercial,
+      description,
+      yieldQuantity,
+      yieldUnit,
+      shelfLifeDays,
+      agingDays,
+      packagingDelayType,
+      prePackagingFreeze,
+      orderMode,
+      rows: sortedRows,
+      nutrition,
+      rnpa: hasSomeRnpa ? rnpa : getEmptyRnpaRecord(),
+      rnpaNotRequired: rnpaExempt,
+      rnpaExempt,
+      rnpaExemptReason: rnpaExempt ? RNPA_EXEMPT_REASON : '',
+      imageUrl
+    };
   };
 
   const buildDuplicateRecipeDraft = (recipe = {}) => {
@@ -3899,7 +4011,9 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
       const payload = await collectEditorPayload();
       const id = state.activeRecipeId || makeId('rec');
       const prev = state.recetas[id] || {};
-      state.recetas[id] = { id, ...payload, createdAt: prev.createdAt || Date.now(), updatedAt: Date.now() };
+      const activeGroupId = normalizeValue(state.activeRecipeGroupId) && state.activeRecipeGroupId !== 'all' ? state.activeRecipeGroupId : '';
+      const recipeGroupId = normalizeValue(prev.recipeGroupId || activeGroupId);
+      state.recetas[id] = { ...prev, id, ...payload, recipeGroupId, createdAt: prev.createdAt || Date.now(), updatedAt: Date.now() };
       await persistRecetas();
       state.resumeEditor = null;
       state.editorDirty = false;
@@ -4003,6 +4117,13 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
       const recipe = state.recetas[rnpaViewBtn.dataset.recetaRnpaView];
       const attachment = normalizeValue(recipe?.rnpa?.attachmentUrl);
       if (attachment) await window.laJamoneraOpenImageViewer?.([{ invoiceImageUrls: [attachment] }], 0, 'Adjunto RNPA');
+      return;
+    }
+    const imageViewBtn = event.target.closest('[data-receta-image-view]');
+    if (imageViewBtn) {
+      const recipe = state.recetas[imageViewBtn.dataset.recetaImageView];
+      const imageUrl = normalizeValue(recipe?.imageUrl);
+      if (imageUrl) await window.laJamoneraOpenImageViewer?.([{ invoiceImageUrls: [imageUrl] }], 0, `Imagen · ${capitalize(recipe?.title || 'Receta')}`);
       return;
     }
     const manualViewBtn = event.target.closest('[data-receta-manual-view]');

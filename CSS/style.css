@@ -3253,6 +3253,29 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   margin-bottom: 2px;
 }
 
+.receta-card-commercial,
+.receta-card-folder {
+  margin: 2px 0 0;
+  line-height: 1.25;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.receta-card-commercial {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #5b6f9a;
+}
+
+.receta-card-folder {
+  color: #6a7895;
+}
+
+.receta-card-folder span {
+  margin-right: 5px;
+}
+
 .recetas-editor-header {
   margin-bottom: 10px;
   display: grid;
@@ -6727,6 +6750,18 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   line-height: 1.3;
 }
 
+.produccion-recipe-folder {
+  margin: 2px 0 0;
+  color: #687895;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.produccion-recipe-folder span {
+  margin-right: 5px;
+}
+
 .produccion-row-head {
   display: flex;
   align-items: flex-start;
@@ -9260,6 +9295,7 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 .receta-rnpa-badge.is-pending,.receta-rnpa-badge.is-danger{background:#ffecef;border-color:#f2b4c0;color:#a6324a;}
 .receta-rnpa-badge.is-warning{background:#fff4e7;border-color:#f3d4ad;color:#9a621d;}
 .receta-rnpa-badge.is-ok{background:#e9f8ef;border-color:#b6e4c4;color:#1f8a48;}
+.receta-rnpa-badge.is-exempt{background:#f1f5f9;border-color:#d4dce8;color:#49617f;}
 .receta-rnpa-days{font-size:.75rem;color:#5f6a89;display:inline-flex;align-items:center;gap:4px;}
 .receta-rnpa-days.is-warning{color:#9a621d;font-weight:700;}
 .receta-rnpa-days.is-danger{color:#a6324a;font-weight:700;}
@@ -9267,7 +9303,9 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 .recetas-rnpa-filters{display:flex;gap:8px;overflow-x:auto;flex-wrap:nowrap;padding:4px 2px 12px;scrollbar-width:thin;}
 .recetas-rnpa-filters .inventario-status-btn:disabled{opacity:.45;cursor:not-allowed;}
 .recipe-rnpa-block{border:1px solid #dbe3f6;border-radius:14px;padding:10px;background:#f8faff;}
+.recipe-rnpa-exempt-row{margin:4px 0 10px;color:#33476a;font-weight:700;}
 .recipe-rnpa-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+.recipe-rnpa-grid.is-disabled{opacity:.52;filter:saturate(.75);}
 .recipe-rnpa-actions{grid-column:1 / -1;display:flex;justify-content:flex-start;}
 @media (max-width:768px){.recipe-rnpa-grid{grid-template-columns:1fr;}}
 

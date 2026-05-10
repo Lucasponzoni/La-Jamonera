@@ -56,6 +56,34 @@
     if (item?.isSubstitute || hasSiblingSubstitute) return 0;
     return Number(((item?.neededQty ?? item?.requiredQty) || 0).toFixed(4));
   };
+  const addDaysToIso = (isoDate, days) => {
+    const text = normalize(isoDate);
+    if (!text) return '';
+    const date = new Date(`${text}T00:00:00Z`);
+    if (Number.isNaN(date.getTime())) return '';
+    date.setUTCDate(date.getUTCDate() + Number(days || 0));
+    return date.toISOString().slice(0, 10);
+  };
+  const moveIsoFromSunday = (isoDate) => {
+    const text = normalize(isoDate);
+    if (!text) return '';
+    const cursor = new Date(`${text}T00:00:00Z`);
+    if (Number.isNaN(cursor.getTime())) return '';
+    while (cursor.getUTCDay() === 0) cursor.setUTCDate(cursor.getUTCDate() + 1);
+    return cursor.toISOString().slice(0, 10);
+  };
+  const resolvePackaging = (registro = {}) => {
+    const type = normalize(registro?.packagingDelayTypeAtProduction || registro?.packagingDelayType || registro?.traceability?.product?.packagingDelayType);
+    const isFreeze = type === 'freeze_before_packaging';
+    const agingDays = Number(registro?.agingDaysAtProduction || 0);
+    const packagingDate = normalize(registro?.packagingDate) || (agingDays > 0 ? moveIsoFromSunday(addDaysToIso(registro?.productionDate, agingDays)) : '');
+    return {
+      agingDays,
+      packagingDate,
+      label: isFreeze ? 'CONGELADO PREVIO A ENVASADO' : 'ENVASADO',
+      daysLabel: isFreeze ? 'días de congelado previo a envasado' : 'días de estacionado'
+    };
+  };
   const hasSubstituteSibling = (plans = [], plan = {}) => {
     const sourceId = normalize(plan?.sourceIngredientId || plan?.ingredientId);
     return (Array.isArray(plans) ? plans : []).some((candidate) => candidate?.isSubstitute && normalize(candidate?.sourceIngredientId || candidate?.ingredientId) === sourceId);
@@ -118,6 +146,7 @@
     const manager = normalize(managerUser.fullName || managerUser.name || managerToken || 'Responsable');
     const companyRne = normalize(registro?.traceability?.company?.rne?.number || '-');
     const productRnpa = normalize(registro?.traceability?.product?.rnpa?.number || '-');
+    const packaging = resolvePackaging(registro);
     const lines = [
       'flowchart LR',
       `C["<b>FRIGORIFICO LA JAMONERA SA</b>"]:::toneCompany`,
@@ -138,6 +167,10 @@
       'R --> I',
       'I --> W'
     ];
+    if (packaging.agingDays > 0 && packaging.packagingDate) {
+      lines.push(`E["<b>${escapeHtml(packaging.label)}</b><br/><b>+${packaging.agingDays} ${escapeHtml(packaging.daysLabel)}</b><br/>${escapeHtml(formatIsoEs(packaging.packagingDate))}"]:::toneManager`);
+      lines.push('R -.-> E');
+    }
     ingredients.forEach((plan, idx) => {
       const lots = Array.isArray(plan?.lots) && plan.lots.length ? plan.lots.filter((lot) => Number(lot?.takeQty || 0) > 0.0001) : [{}];
       const nodeId = `ING_${idx + 1}`;
@@ -352,6 +385,8 @@
     const rnpaAttachment = normalize(registro?.traceability?.product?.rnpa?.attachmentUrl);
     const ingredients = Array.isArray(registro?.lots) ? registro.lots : [];
     const traceIngredients = Array.isArray(registro?.traceability?.ingredients) ? registro.traceability.ingredients : [];
+    const commercialName = normalize(registro?.recipeNombreComercial || registro?.traceability?.product?.nombreComercial);
+    const packaging = resolvePackaging(registro);
 
     dataNode.innerHTML = `<section class="produccion-trace-v2 produccion-trace-apple-viewer">
       <article class="produccion-trace-summary">
@@ -360,8 +395,10 @@
           <p><strong>Empresa</strong><span>FRIGORIFICO LA JAMONERA SA</span></p>
           <p><strong>RNE empresa</strong><span>${escapeHtml(companyRne)}</span></p>
           <p><strong>Producto</strong><span>${escapeHtml(registro.recipeTitle || '-')}</span></p>
+          ${commercialName ? `<p><strong>Nombre comercial</strong><span>${escapeHtml(commercialName)}</span></p>` : ''}
           <p><strong>RNPA</strong><span>${escapeHtml(rnpa)}</span></p>
           <p><strong>Cantidad final</strong><span>${Number(registro.quantityKg || 0).toFixed(2)} kg</span></p>
+          ${packaging.agingDays > 0 && packaging.packagingDate ? `<p><strong>${escapeHtml(packaging.label)}</strong><span>${escapeHtml(formatIsoEs(packaging.packagingDate))} (+${packaging.agingDays})</span></p>` : ''}
           <p><strong>Fecha</strong><span>${escapeHtml(formatDateTime(registro.createdAt))}</span></p>
           <p><strong>Estado</strong><span>${escapeHtml(registro.status || '-')}</span></p>
         </div>

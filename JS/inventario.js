@@ -68,7 +68,8 @@
     viewerNextBtn: $('viewerNextBtn'),
     viewerZoomInBtn: $('viewerZoomInBtn'),
     viewerZoomOutBtn: $('viewerZoomOutBtn'),
-    viewerBackBtn: $('viewerBackBtn')
+    viewerBackBtn: $('viewerBackBtn'),
+    viewerDownloadBtn: $('viewerDownloadBtn')
   };
 
   const state = {
@@ -2977,6 +2978,11 @@
     const item = state.viewerImages[state.viewerIndex];
     if (!item || !nodes.viewerImage) return;
     const isPdf = /\.pdf($|\?)/i.test(String(item.src || ''));
+    if (nodes.viewerDownloadBtn) {
+      nodes.viewerDownloadBtn.href = item.src || '#';
+      const rawName = String(item.src || '').split('/').pop()?.split('?')[0] || 'adjunto';
+      nodes.viewerDownloadBtn.download = decodeURIComponent(rawName) || 'adjunto';
+    }
     nodes.viewerStage?.classList.toggle('is-document', isPdf);
     nodes.viewerStage?.classList.toggle('is-image', !isPdf);
     if (nodes.viewerDocument) {

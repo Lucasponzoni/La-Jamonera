@@ -43,6 +43,8 @@
   const AUDIT_PATH = '/produccion/auditoria';
   const RESERVE_TTL_MS = 10 * 60 * 1000;
   const DEFAULT_PRODUCT_EXPIRY_ALERT_DAYS = 2;
+  const PACKAGING_DELAY_FREEZE = 'freeze_before_packaging';
+  const PACKAGING_DELAY_AGING = 'aging';
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const ALLOWED_RNE_UPLOAD_TYPES = [...ALLOWED_UPLOAD_TYPES, 'application/pdf'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
@@ -547,16 +549,39 @@
   const resolvePackagingFromRegistro = (registro) => {
     const persisted = normalizeValue(registro?.packagingDate);
     const persistedAging = Number(registro?.agingDaysAtProduction);
-    if (persisted && Number.isFinite(persistedAging) && persistedAging > 0) {
-      return { agingDays: persistedAging, packagingDate: persisted };
-    }
+    const persistedType = normalizeValue(registro?.packagingDelayTypeAtProduction || registro?.packagingDelayType);
     const recipe = state.recetas?.[registro?.recipeId] || {};
+    const recipeType = normalizeValue(recipe?.packagingDelayType) || (recipe?.prePackagingFreeze ? PACKAGING_DELAY_FREEZE : PACKAGING_DELAY_AGING);
+    const type = persistedType || recipeType || PACKAGING_DELAY_AGING;
+    const label = type === PACKAGING_DELAY_FREEZE ? 'CONGELADO PREVIO A ENVASADO' : 'ENVASADO';
+    const daysLabel = type === PACKAGING_DELAY_FREEZE ? 'días de congelado previo a envasado' : 'días de estacionado';
+    if (persisted && Number.isFinite(persistedAging) && persistedAging > 0) {
+      return { agingDays: persistedAging, packagingDate: persisted, type, label, daysLabel };
+    }
     const agingDays = Number(registro?.agingDaysAtProduction ?? recipe?.agingDays);
-    if (!Number.isFinite(agingDays) || agingDays <= 0) return { agingDays: 0, packagingDate: '' };
+    if (!Number.isFinite(agingDays) || agingDays <= 0) return { agingDays: 0, packagingDate: '', type, label, daysLabel };
     const baseDate = normalizeValue(registro?.productionDate) || toIsoDate(registro?.createdAt || nowTs());
-    if (!baseDate) return { agingDays, packagingDate: '' };
+    if (!baseDate) return { agingDays, packagingDate: '', type, label, daysLabel };
     const computed = addDaysToIso(baseDate, agingDays);
-    return { agingDays, packagingDate: moveIsoFromSunday(computed) };
+    return { agingDays, packagingDate: moveIsoFromSunday(computed), type, label, daysLabel };
+  };
+  const getRecipePackagingDelayType = (recipe = {}) =>
+    normalizeValue(recipe?.packagingDelayType) || (recipe?.prePackagingFreeze ? PACKAGING_DELAY_FREEZE : PACKAGING_DELAY_AGING);
+  const getRecipePackagingLabel = (recipe = {}) =>
+    getRecipePackagingDelayType(recipe) === PACKAGING_DELAY_FREEZE ? 'Congelado previo a envasado' : 'Estacionado';
+  const getRecipePackagingMeta = (recipe = {}, productionDate = '') => {
+    const agingDays = Number(recipe?.agingDays || 0);
+    const type = getRecipePackagingDelayType(recipe);
+    const label = type === PACKAGING_DELAY_FREEZE ? 'CONGELADO PREVIO A ENVASADO' : 'ENVASADO';
+    const daysLabel = type === PACKAGING_DELAY_FREEZE ? 'días de congelado previo a envasado' : 'días de estacionado';
+    const packagingDate = agingDays > 0 && normalizeValue(productionDate)
+      ? moveIsoFromSunday(addDaysToIso(productionDate, agingDays))
+      : '';
+    return { agingDays, packagingDate, type, label, daysLabel };
+  };
+  const getRecipeGroupLabel = (recipe = {}) => {
+    const groupId = normalizeValue(recipe?.recipeGroupId);
+    return groupId ? normalizeValue(state.recipeGroups?.[groupId]?.name) : '';
   };
   const resolveProductExpiryIso = (registro) => {
     const persisted = normalizeValue(registro?.productExpiryDate);
@@ -3137,7 +3162,7 @@
     ];
 
     if (packaging.agingDays > 0 && packaging.packagingDate) {
-      lines.push(`E["<b>ENVASADO</b><br/><b>+${packaging.agingDays} días</b><br/>${esc(formatIsoEs(packaging.packagingDate))}"]:::toneManager`);
+      lines.push(`E["<b>${esc(packaging.label || 'ENVASADO')}</b><br/><b>+${packaging.agingDays} ${esc(packaging.daysLabel || 'días')}</b><br/>${esc(formatIsoEs(packaging.packagingDate))}"]:::toneManager`);
       lines.push('R -.-> E');
     }
 
@@ -3372,9 +3397,11 @@
               <p><strong>Empresa</strong><span>${escapeHtml(COMPANY_LEGAL_NAME)}</span></p>
               <p><strong>RNE empresa</strong><span>${escapeHtml(getTraceRneDisplay(companyRne))}</span></p>
               <p><strong>Producto</strong><span>${escapeHtml(registro.recipeTitle || '-')}</span></p>
+              ${normalizeValue(registro.recipeNombreComercial || registro?.traceability?.product?.nombreComercial) ? `<p><strong>Nombre comercial</strong><span>${escapeHtml(registro.recipeNombreComercial || registro.traceability.product.nombreComercial)}</span></p>` : ''}
               <p><strong>RNPA</strong><span>${escapeHtml(productRnpaNumber)}</span></p>
               <p><strong>Detalle RNPA</strong><span>${escapeHtml(productRnpaLabel)}</span></p>
               <p><strong>Cantidad final</strong><span>${Number(registro.quantityKg || 0).toFixed(2)} kg</span></p>
+              ${packaging.agingDays > 0 && packaging.packagingDate ? `<p><strong>${escapeHtml(capitalize(packaging.label || 'envasado'))}</strong><span>${escapeHtml(formatIsoEs(packaging.packagingDate))} (+${packaging.agingDays})</span></p>` : ''}
               <p><strong>Fecha</strong><span>${escapeHtml(formatDateTime(registro.createdAt))}</span></p>
               <p><strong>Estado</strong><span>${escapeHtml(registro.status || '-')}</span></p>
             </div>
@@ -3608,12 +3635,15 @@
     const packaging = resolvePackagingFromRegistro(registro);
     const needsPersist = packaging.agingDays > 0 && packaging.packagingDate
       && (normalizeValue(registro.packagingDate) !== packaging.packagingDate
-        || Number(registro.agingDaysAtProduction || 0) !== Number(packaging.agingDays || 0));
+        || Number(registro.agingDaysAtProduction || 0) !== Number(packaging.agingDays || 0)
+        || normalizeValue(registro.packagingDelayTypeAtProduction) !== normalizeValue(packaging.type));
     if (!needsPersist) return registro;
     const updated = {
       ...registro,
       packagingDate: packaging.packagingDate,
-      agingDaysAtProduction: Number(packaging.agingDays || 0)
+      agingDaysAtProduction: Number(packaging.agingDays || 0),
+      packagingDelayTypeAtProduction: packaging.type,
+      packagingDelayLabelAtProduction: packaging.label
     };
     state.registros[registro.id] = updated;
     try {
@@ -7046,10 +7076,9 @@
       return;
     }
     const consumed = applyPlanOnInventory(restored, plan, registro.id, form.value.date || toIsoDate(), 'consume');
-    const agingDaysAtProduction = Number(recipe.agingDays || 0);
-    const packagingDate = agingDaysAtProduction > 0
-      ? moveIsoFromSunday(addDaysToIso(form.value.date || toIsoDate(), agingDaysAtProduction))
-      : '';
+    const packagingMeta = getRecipePackagingMeta(recipe, form.value.date || toIsoDate());
+    const agingDaysAtProduction = Number(packagingMeta.agingDays || 0);
+    const packagingDate = packagingMeta.packagingDate;
     const registros = deepClone(state.registros);
     const prev = deepClone(registros[registro.id]);
     const snapshotIngredientPlans = enrichIngredientPlansWithSnapshots(plan.ingredientPlans);
@@ -7061,11 +7090,18 @@
       lots: snapshotIngredientPlans,
       agingDaysAtProduction,
       packagingDate,
+      packagingDelayTypeAtProduction: packagingMeta.type,
+      packagingDelayLabelAtProduction: packagingMeta.label,
       editedAt: nowTs(),
       editedBy: getCurrentUserLabel(),
       editReason: auth.value.reason,
       traceability: {
         ...safeObject(registro.traceability),
+        product: {
+          ...safeObject(registro.traceability?.product),
+          packagingDelayType: packagingMeta.type,
+          packagingDelayLabel: packagingMeta.label
+        },
         ingredients: snapshotIngredientPlans.map((ingredientPlan) => {
           const hasSiblingSubstitute = hasSubstituteSibling(snapshotIngredientPlans, ingredientPlan);
           return {
@@ -7416,7 +7452,7 @@
     const activeGroup = state.activeRecipeGroupId || 'all';
     const list = getRecipes()
       .filter((item) => activeGroup === 'all' || normalizeValue(item?.recipeGroupId) === activeGroup)
-      .filter((item) => !query || normalizeLower(item.title).includes(query) || normalizeLower(item.description).includes(query) || normalizeLower(item.nombreComercial).includes(query))
+      .filter((item) => !query || normalizeLower(item.title).includes(query) || normalizeLower(item.description).includes(query) || normalizeLower(item.nombreComercial).includes(query) || normalizeLower(getRecipeGroupLabel(item)).includes(query))
       .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
     if (!list.length) {
       nodes.list.innerHTML = '<div class="ingrediente-empty-list">No hay recetas para ese filtro.</div>';
@@ -7439,6 +7475,7 @@
       const analysis = state.analysis[recipe.id] || analyzeRecipe(recipe);
       const dispatchMeta = getProducedStockMeta(recipe.id);
       const draftLock = getRecipeDraftLockInfo(recipe.id);
+      const groupLabel = getRecipeGroupLabel(recipe);
       const isExpiredOnlyAvailable = Boolean(!analysis.canProduce && analysis.canProduceConsideringExpired);
       const showInfiniteMax = Array.isArray(analysis.requirements) && analysis.requirements.length && analysis.requirements.every((item) => item.infiniteStock);
       const statusClass = isExpiredOnlyAvailable
@@ -7490,6 +7527,7 @@
               <div>
                 <h6 class="ingrediente-name receta-name">${capitalize(recipe.title || 'Sin título')}</h6>
                 ${recipe.nombreComercial ? `<p class="produccion-nombre-comercial">${escapeHtml(capitalize(recipe.nombreComercial))}</p>` : ''}
+                <p class="produccion-recipe-folder"><span aria-hidden="true">📁</span>${escapeHtml(groupLabel ? capitalize(groupLabel) : 'Sin carpeta')}</p>
               </div>
               <span class="produccion-chip ${statusClass}"><span class="produccion-semaforo"></span>${isExpiredOnlyAvailable ? 'Disponible con expirados' : analysis.statusText}</span>
             </div>
@@ -7549,6 +7587,7 @@
               <span class="barra-vertical produccion-actions-divider" aria-hidden="true"></span>
               ${inventoryAction}
               ${viewAction.replace('produccion-visualizar-btn', 'produccion-visualizar-btn inventory-production-action-btn is-view')}
+              <button type="button" class="btn ios-btn ios-btn-secondary inventory-production-action-btn is-view" data-recipe-image-view="${recipe.id}" ${normalizeValue(recipe.imageUrl) ? '' : 'disabled'}><i class="fa-regular fa-image"></i><span>Ver imagen</span></button>
               <button type="button" class="btn ios-btn inventory-production-action-btn is-threshold" data-set-recipe-min="${recipe.id}"><i class="fa-solid fa-sliders"></i><span>Umbral</span></button>
               <div class="produccion-more-wrap">
                 <button type="button" class="btn ios-btn ios-btn-secondary produccion-more-btn" data-recipe-more="${recipe.id}" aria-label="Más opciones"><i class="bi bi-three-dots-vertical"></i></button>
@@ -8553,12 +8592,11 @@
         const observations = normalizeValue(nodes.editor.querySelector('#produccionObsInput')?.value);
         const inventoryWithResolutions = applyPendingExpiryActionsOnInventory(state.inventario);
         const inventarioNext = applyPlanOnInventory(inventoryWithResolutions, revalidated, productionId, date, 'consume');
-        const agingDaysAtProduction = Number(recipe.agingDays || 0);
+        const packagingMeta = getRecipePackagingMeta(recipe, date);
+        const agingDaysAtProduction = Number(packagingMeta.agingDays || 0);
         const recipeRnpa = safeObject(recipe.rnpa);
         const companyRne = safeObject(state.config.rne);
-        const packagingDate = agingDaysAtProduction > 0
-          ? moveIsoFromSunday(addDaysToIso(date, agingDaysAtProduction))
-          : '';
+        const packagingDate = packagingMeta.packagingDate;
         const snapshotIngredientPlans = enrichIngredientPlansWithSnapshots(revalidated.ingredientPlans);
         const registro = {
         id: productionId,
@@ -8570,6 +8608,8 @@
         shelfLifeDaysAtProduction: Number(recipe.shelfLifeDays || 0),
         agingDaysAtProduction,
         packagingDate,
+        packagingDelayTypeAtProduction: packagingMeta.type,
+        packagingDelayLabelAtProduction: packagingMeta.label,
         quantityKg: qty,
         managers,
         observations,
@@ -8584,6 +8624,8 @@
             id: recipe.id,
             title: recipe.title,
             nombreComercial: normalizeValue(recipe.nombreComercial),
+            packagingDelayType: packagingMeta.type,
+            packagingDelayLabel: packagingMeta.label,
             imageUrl: normalizeValue(recipe.imageUrl),
             rnpa: {
               number: normalizeValue(recipeRnpa.number),
@@ -8955,6 +8997,14 @@
 
     if (!event.target.closest('.produccion-more-wrap')) {
       nodes.list?.querySelectorAll('.produccion-more-menu').forEach((m) => m.classList.add('d-none'));
+    }
+
+    const recipeImageBtn = event.target.closest('[data-recipe-image-view]');
+    if (recipeImageBtn) {
+      const recipe = state.recetas[recipeImageBtn.dataset.recipeImageView];
+      const imageUrl = normalizeValue(recipe?.imageUrl);
+      if (imageUrl) await window.laJamoneraOpenImageViewer?.([{ invoiceImageUrls: [imageUrl] }], 0, `Imagen · ${capitalize(recipe?.title || 'Receta')}`);
+      return;
     }
 
     const sinTrazBtn = event.target.closest('[data-produce-sin-trazabilidad]');
