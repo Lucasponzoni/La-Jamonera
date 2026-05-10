@@ -104,6 +104,50 @@
   const RNPA_NUMBER_REGEX = /^[0-9-]+$/;
   const RNPA_EXEMPT_REASON = 'solo_mostrador';
   const RNPA_EXEMPT_BADGE_LABEL = 'No requiere RNPA - Venta mostrador';
+  const FROZEN_INFO_HTML = `
+    <div class="frozen-info-content">
+      <header class="frozen-info-hero">
+        <div class="frozen-info-hero-icon"><i class="bi bi-snow2"></i></div>
+        <div>
+          <p class="frozen-info-kicker">Procedimiento interno</p>
+          <h3 class="frozen-info-hero-title">Congelamiento y descongelado seguro de alimentos</h3>
+          <p class="frozen-info-hero-sub">Basado en CAA, BPM/POES y recomendaciones oficiales de inocuidad alimentaria</p>
+        </div>
+      </header>
+      <article class="frozen-info-card frozen-info-card--blue">
+        <header class="frozen-info-card-head"><span class="frozen-info-step">1</span><h4><i class="bi bi-clipboard2-check-fill"></i> Condición previa</h4></header>
+        <ul class="frozen-info-list">
+          <li><i class="bi bi-check-circle-fill"></i> Congelar solamente alimentos aptos, identificados, dentro de vida útil y con trazabilidad de lote/proveedor.</li>
+          <li><i class="bi bi-check-circle-fill"></i> Registrar fecha/hora de ingreso, fecha/hora de congelamiento, responsable, lote y temperatura de cámara.</li>
+          <li><i class="bi bi-check-circle-fill"></i> Mantener separación entre crudos/listos para consumir y evitar contaminación cruzada.</li>
+        </ul>
+      </article>
+      <article class="frozen-info-card frozen-info-card--ice">
+        <header class="frozen-info-card-head"><span class="frozen-info-step">2</span><h4><i class="bi bi-snow"></i> Congelamiento en cámara a -18&nbsp;°C</h4></header>
+        <div class="frozen-info-temp-grid"><div class="frozen-info-temp"><strong>-18&nbsp;°C</strong><span>temperatura objetivo de cámara/freezer</span></div></div>
+        <ul class="frozen-info-list">
+          <li><i class="bi bi-check-circle-fill"></i> Colocar el alimento protegido, rotulado y en envase apto para freezer.</li>
+          <li><i class="bi bi-check-circle-fill"></i> Controlar y documentar la temperatura de cámara durante el almacenamiento.</li>
+          <li><i class="bi bi-x-circle-fill"></i> Evitar aperturas prolongadas, fluctuaciones de temperatura y descongelamientos parciales.</li>
+        </ul>
+        <div class="frozen-info-callout frozen-info-callout--warn"><i class="bi bi-exclamation-triangle-fill"></i><p><strong>Importante:</strong> congelar no elimina peligros microbiológicos ni vuelve indefinida la vida útil. La fecha extendida debe estar definida por procedimiento, rotulado/trazabilidad y respaldo técnico del establecimiento.</p></div>
+      </article>
+      <article class="frozen-info-card frozen-info-card--mint">
+        <header class="frozen-info-card-head"><span class="frozen-info-step">3</span><h4><i class="bi bi-droplet-half"></i> Descongelado en cámara de 0 a 5&nbsp;°C</h4></header>
+        <ul class="frozen-info-list">
+          <li><i class="bi bi-check-circle-fill"></i> Pasar el alimento a cámara refrigerada entre <strong>0&nbsp;°C y 5&nbsp;°C</strong>, protegido e identificado.</li>
+          <li><i class="bi bi-check-circle-fill"></i> Registrar inicio/fin de descongelado, lote, responsable y temperatura de cámara.</li>
+          <li><i class="bi bi-x-circle-fill"></i> No descongelar a temperatura ambiente, cerca de fuentes de calor ni bajo canilla.</li>
+          <li><i class="bi bi-x-circle-fill"></i> No volver a congelar un alimento descongelado salvo que exista proceso validado y documentado.</li>
+        </ul>
+      </article>
+      <article class="frozen-info-card frozen-info-card--rose">
+        <header class="frozen-info-card-head"><span class="frozen-info-step">4</span><h4><i class="bi bi-calendar2-check"></i> Vencimiento extendido</h4></header>
+        <p class="frozen-info-text">El vencimiento extendido por congelamiento a -18&nbsp;°C debe usarse como criterio interno documentado. No es automático: depende del producto, proceso, envase, cadena de frío, rotulado y validación sanitaria.</p>
+        <div class="frozen-info-callout frozen-info-callout--info"><i class="bi bi-info-circle-fill"></i><p><strong>CAA:</strong> para alimentos cuya duración varía por temperatura, debe indicarse la condición de conservación, por ejemplo duración a -18&nbsp;°C, y las instrucciones necesarias de uso/descongelación cuando correspondan.</p></div>
+      </article>
+      <footer class="frozen-info-conclusion"><i class="bi bi-patch-check-fill"></i><p>El criterio correcto es: congelar en cámara a <strong>-18&nbsp;°C</strong>, conservar cadena de frío, documentar todo el proceso y descongelar en cámara de <strong>0 a 5&nbsp;°C</strong>. La vida útil extendida debe estar respaldada por el procedimiento y los controles del establecimiento.</p></footer>
+    </div>`;
   const ARGENTINA_PROVINCES = ['Buenos Aires','CABA','Catamarca','Chaco','Chubut','Córdoba','Corrientes','Entre Ríos','Formosa','Jujuy','La Pampa','La Rioja','Mendoza','Misiones','Neuquén','Río Negro','Salta','San Juan','San Luis','Santa Cruz','Santa Fe','Santiago del Estero','Tierra del Fuego','Tucumán'];
 
   const FRONT_LABELS_ALLOWED = [
@@ -150,6 +194,109 @@
     buttonsStyling: false
   });
   };
+
+  const FROZEN_INFO_PDF_SECTIONS = [
+    { title: '1. Condicion previa', lines: ['Congelar solamente alimentos aptos, identificados, dentro de vida util y con trazabilidad de lote/proveedor.', 'Registrar fecha/hora de ingreso, fecha/hora de congelamiento, responsable, lote y temperatura de camara.', 'Mantener separacion entre crudos/listos para consumir y evitar contaminacion cruzada.'] },
+    { title: '2. Congelamiento en camara a -18 C', lines: ['La temperatura objetivo de camara/freezer es -18 C.', 'Colocar el alimento protegido, rotulado y en envase apto para freezer.', 'Controlar y documentar la temperatura de camara durante el almacenamiento.', 'Evitar aperturas prolongadas, fluctuaciones de temperatura y descongelamientos parciales.', 'Congelar no elimina peligros microbiologicos ni vuelve indefinida la vida util.'] },
+    { title: '3. Descongelado en camara de 0 a 5 C', lines: ['Pasar el alimento a camara refrigerada entre 0 C y 5 C, protegido e identificado.', 'Registrar inicio/fin de descongelado, lote, responsable y temperatura de camara.', 'No descongelar a temperatura ambiente, cerca de fuentes de calor ni bajo canilla.', 'No volver a congelar un alimento descongelado salvo que exista proceso validado y documentado.'] },
+    { title: '4. Vencimiento extendido', lines: ['El vencimiento extendido por congelamiento a -18 C debe usarse como criterio interno documentado.', 'No es automatico: depende del producto, proceso, envase, cadena de frio, rotulado y validacion sanitaria.', 'Para alimentos cuya duracion varia por temperatura, debe indicarse la condicion de conservacion y las instrucciones necesarias de uso/descongelacion cuando correspondan.'] }
+  ];
+
+  const getFrozenInfoLogoDataUrl = () => new Promise((resolve) => {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 96;
+      canvas.height = 96;
+      const context = canvas.getContext('2d');
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    image.onerror = () => resolve('');
+    image.src = './IMG/La Jamonera App.png';
+  });
+
+  const downloadFrozenInfoPdf = async () => {
+    if (!window.jspdf?.jsPDF) {
+      openIosSwal({ title: 'No se pudo generar', html: '<p>No se pudo cargar la libreria PDF. Reintenta en unos segundos.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      return;
+    }
+    const logoDataUrl = await getFrozenInfoLogoDataUrl();
+    const doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+    const margin = 14;
+    const maxWidth = 182;
+    let y = 38;
+    const drawHeader = () => {
+      if (logoDataUrl) doc.addImage(logoDataUrl, 'PNG', margin, 9, 20, 20);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(17);
+      doc.text('La Jamonera', logoDataUrl ? 39 : margin, 17);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text('Procedimiento interno de inocuidad alimentaria', logoDataUrl ? 39 : margin, 23);
+      doc.setDrawColor(210, 222, 242);
+      doc.line(margin, 32, 196, 32);
+    };
+    const drawFooters = () => {
+      const pageCount = doc.getNumberOfPages();
+      for (let page = 1; page <= pageCount; page += 1) {
+        doc.setPage(page);
+        doc.setDrawColor(210, 222, 242);
+        doc.line(margin, 284, 196, 284);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.text('Back Office para empresas · powered by Asesoria Bromatologica Rosario', 105, 290, { align: 'center' });
+        doc.text(String(page), 196, 290, { align: 'right' });
+      }
+    };
+    drawHeader();
+    const addLines = (lines, size = 10, gap = 5) => {
+      doc.setFontSize(size);
+      lines.forEach((line) => {
+        const wrapped = doc.splitTextToSize(line, maxWidth);
+        if (y + wrapped.length * gap > 272) {
+          doc.addPage();
+          drawHeader();
+          y = 38;
+        }
+        doc.text(wrapped, margin, y);
+        y += wrapped.length * gap;
+      });
+    };
+    doc.setFont('helvetica', 'bold');
+    addLines(['Congelamiento y descongelado seguro de alimentos'], 15, 7);
+    doc.setFont('helvetica', 'normal');
+    addLines(['Basado en CAA, BPM/POES y recomendaciones oficiales de inocuidad alimentaria.'], 10, 6);
+    y += 2;
+    FROZEN_INFO_PDF_SECTIONS.forEach((section) => {
+      doc.setFont('helvetica', 'bold');
+      addLines([section.title], 12, 6);
+      doc.setFont('helvetica', 'normal');
+      addLines(section.lines.map((line) => `- ${line}`), 10, 5);
+      y += 2;
+    });
+    doc.setFont('helvetica', 'bold');
+    addLines(['Criterio operativo'], 12, 6);
+    doc.setFont('helvetica', 'normal');
+    addLines(['Congelar en camara a -18 C, conservar cadena de frio, documentar todo el proceso y descongelar en camara de 0 a 5 C. La vida util extendida debe estar respaldada por el procedimiento y los controles del establecimiento.'], 10, 5);
+    drawFooters();
+    doc.save('procedimiento-congelamiento-descongelado.pdf');
+  };
+
+  const openFrozenInfoSwal = () => openIosSwal({
+    title: 'Congelamiento a -18°C',
+    html: FROZEN_INFO_HTML,
+    icon: 'info',
+    showDenyButton: true,
+    confirmButtonText: 'Entendido',
+    denyButtonText: 'Descargar PDF',
+    width: 720,
+    customClass: { popup: 'ios-alert frozen-info-alert' }
+  }).then((result) => {
+    if (result.isDenied) downloadFrozenInfoPdf();
+  });
 
   const runWithModalSpinner = async (task) => {
     const modalContent = recetasModal?.querySelector('.modal-content');
@@ -498,6 +645,93 @@
   const getRecipeRnpaFilterBucket = (recipe) => {
     const status = getRnpaStatus(recipe);
     return status.filterBucket || 'none';
+  };
+
+  const getRnpaReportSource = () => {
+    const query = normalizeLower(state.search);
+    const activeGroup = state.activeRecipeGroupId || 'all';
+    return getRecetasArray()
+      .filter((item) => activeGroup === 'all' || normalizeValue(item?.recipeGroupId) === activeGroup)
+      .filter((item) => !query || normalizeLower(item.title).includes(query) || normalizeLower(item.nombreComercial).includes(query) || normalizeLower(item.description).includes(query) || normalizeLower(getRecipeGroupLabel(item)).includes(query))
+      .sort((a, b) => normalizeLower(a.title || '').localeCompare(normalizeLower(b.title || ''), 'es'));
+  };
+
+  const formatRnpaIsoDate = (value = '') => {
+    const normalized = normalizeValue(value);
+    if (!normalized) return 'Sin vencimiento';
+    const date = new Date(`${normalized}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return normalized;
+    return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  const formatRnpaDaysText = (days) => {
+    if (days == null) return 'sin días calculables';
+    if (days < 0) return `vencido hace ${Math.abs(days)} día(s)`;
+    if (days === 0) return 'vence hoy';
+    return `faltan ${days} día(s)`;
+  };
+
+  const getRnpaRecipeLine = (recipe, status = getRnpaStatus(recipe)) => {
+    const rnpa = safeObject(recipe?.rnpa);
+    const rnpaNumber = normalizeValue(rnpa.number) || 'S/N';
+    const expiryDate = normalizeValue(rnpa.expiryDate);
+    return `- ${capitalize(recipe?.title || 'Receta')} | RNPA: ${rnpaNumber} | Vto: ${formatRnpaIsoDate(expiryDate)} | ${formatRnpaDaysText(status.days)}`;
+  };
+
+  const buildRnpaReportText = (recipes = getRnpaReportSource()) => {
+    const pendingRows = [];
+    const nearExpiryRows = [];
+    const loadedRows = [];
+
+    recipes.forEach((recipe) => {
+      if (isRecipeRnpaExempt(recipe)) return;
+      const status = getRnpaStatus(recipe);
+      const rnpa = safeObject(recipe?.rnpa);
+      const hasAttachment = Boolean(normalizeValue(rnpa.attachmentUrl));
+      if (!hasAttachment) {
+        pendingRows.push(`- ${capitalize(recipe?.title || 'Receta')} | RNPA pendiente`);
+        return;
+      }
+      if (status.days != null && status.days < 180) nearExpiryRows.push(getRnpaRecipeLine(recipe, status));
+      loadedRows.push(getRnpaRecipeLine(recipe, status));
+    });
+
+    const today = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const section = (title, rows, emptyText) => [`${title} (${rows.length})`, rows.length ? rows.join('\n') : emptyText].join('\n');
+    return [
+      `Informe de RNPA - ${today}`,
+      '',
+      section('RNPA PENDIENTES', pendingRows, 'Sin RNPA pendientes.'),
+      '',
+      section('RNPA próximos a vencer (menos de 6 meses)', nearExpiryRows, 'Sin RNPA próximos a vencer.'),
+      '',
+      section('RNPA cargados', loadedRows, 'Sin RNPA cargados.')
+    ].join('\n');
+  };
+
+  const copyTextToClipboard = async (text) => {
+    if (navigator.clipboard?.writeText && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return;
+      } catch (error) {
+      }
+    }
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    textarea.remove();
+  };
+
+  const copyRnpaReport = async () => {
+    const report = buildRnpaReportText();
+    await copyTextToClipboard(report);
+    await openIosSwal({ title: 'Informe copiado', html: '<p>Se copió el informe de RNPA al portapapeles.</p>', icon: 'success', confirmButtonText: 'Entendido' });
   };
 
   const updateRnpaFilterButtons = (recipes = []) => {
@@ -922,6 +1156,7 @@
               </button>
             </div>
             <p class="ingrediente-meta receta-card-meta">Rinde: ${item.yieldQuantity || '0'} ${label || ''}</p>
+            ${item.frozenShelfLifeExtension ? '<div class="receta-rnpa-inline"><span class="receta-rnpa-badge is-exempt"><i class="bi bi-snow2"></i>Vencimiento extendido por congelamiento a -18°C</span></div>' : ''}
             ${(() => { const rnpaStatus = getRnpaStatus(item); const daysText = rnpaStatus.days == null ? '' : `<span class="receta-rnpa-days ${rnpaStatus.daysTone || 'is-neutral'}"><i class="bi bi-clock-history"></i>${rnpaStatus.days} días</span>`; return `<div class="receta-rnpa-inline"><span class="receta-rnpa-badge ${rnpaStatus.className}"><i class="fa-solid ${rnpaStatus.icon}"></i>${rnpaStatus.label}</span>${daysText}</div>`; })()} 
             <p class="ingrediente-meta receta-card-ingredients">Ingredientes: ${recipeIngredients.length ? recipeIngredients.join(' · ') : 'Sin ingredientes vinculados.'}</p>
             ${item.description ? `<p class="ingrediente-description">${capitalize(item.description)}</p>` : '<p class="ingrediente-description"><em>Sin descripción</em></p>'}
@@ -1018,6 +1253,7 @@
       ['Carpeta', groupLabel ? `📁 ${capitalize(groupLabel)}` : '📁 Sin carpeta'],
       ['Rinde', yieldLabel || '-'],
       ['Vida util', normalizeValue(recipe?.shelfLifeDays) ? `${recipe.shelfLifeDays} dias` : '-'],
+      ['Vencimiento extendido', recipe?.frozenShelfLifeExtension ? 'Por congelamiento a -18 grados' : 'No'],
       [delayLabel, normalizeValue(recipe?.agingDays) ? `${recipe.agingDays} dias` : 'No posee']
     ];
     const rnpaItems = rnpaExempt
@@ -2953,6 +3189,13 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
   const bindEditorEvents = () => {
     if (!state.editorEventsBound) {
       recipeEditorForm.addEventListener('click', async (event) => {
+        const frozenInfoBtn = event.target.closest('[data-frozen-info]');
+        if (frozenInfoBtn) {
+          event.preventDefault();
+          event.stopPropagation();
+          await openFrozenInfoSwal();
+          return;
+        }
         const generateNutritionBtn = event.target.closest('#generateNutritionAiBtn');
         if (generateNutritionBtn) {
           await generateNutritionTableWithIA();
@@ -3264,6 +3507,11 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
           markEditorDirty();
           return;
         }
+        if (select.id === 'recipeFrozenShelfLifeExtension') {
+          state.editor.frozenShelfLifeExtension = Boolean(select.checked);
+          markEditorDirty();
+          return;
+        }
         if (select.id === 'recipeNutritionCategory') {
           state.editor.nutrition = state.editor.nutrition || {};
           state.editor.nutrition.category = normalizeLower(select.value);
@@ -3504,6 +3752,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
         : [{ id: makeId('row'), type: 'ingredient', ingredientId: '', ingredientName: '', quantity: '', unit: getMeasureOptions()[0]?.value || '', relatedIngredients: [] }],
       orderMode: initial?.orderMode || 'desc',
       agingDays: normalizeValue(initial?.agingDays),
+      frozenShelfLifeExtension: Boolean(initial?.frozenShelfLifeExtension || initial?.freezingShelfLifeExtension || initial?.extendedByFreezing),
       packagingDelayType: normalizeValue(initial?.packagingDelayType) || (initial?.prePackagingFreeze ? PACKAGING_DELAY_FREEZE : PACKAGING_DELAY_AGING),
       rnpaExempt: isRecipeRnpaExempt(initial),
       rnpa: {
@@ -3556,6 +3805,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
       attachmentName: normalizeValue(state.editor.rnpa?.attachmentName)
     };
     state.editor.agingDays = normalizeValue(state.editor.agingDays);
+    state.editor.frozenShelfLifeExtension = Boolean(state.editor.frozenShelfLifeExtension);
     state.editor.packagingDelayType = normalizeValue(state.editor.packagingDelayType) || PACKAGING_DELAY_AGING;
     state.editor.rnpaExempt = isRecipeRnpaExempt({ ...formInitial, ...state.editor });
     ensureMonographyAtEnd();
@@ -3609,6 +3859,8 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
           <div class="recipe-field recipe-field-half recipe-highlight-field">
             <label class="form-label" for="recipeShelfLifeDays"><i class="fa-regular fa-calendar-days"></i> Caducidad (días) *</label>
             <input id="recipeShelfLifeDays" type="number" min="1" step="1" class="form-control ios-input" value="${escapeHtml(formInitial.shelfLifeDays || '')}" placeholder="Ej: 3">
+            <label class="inventario-check-row inventario-check-row-compact mt-2"><input type="checkbox" id="recipeFrozenShelfLifeExtension" ${state.editor.frozenShelfLifeExtension ? 'checked' : ''}><span>Vencimiento extendido por congelamiento a -18°C</span></label>
+            <button type="button" class="frozen-info-icon mt-1" data-frozen-info aria-label="Información sobre vencimiento extendido por congelamiento" title="¿Qué significa vencimiento extendido por congelamiento?"><i class="bi bi-info-circle-fill"></i></button>
           </div>
           <div class="recipe-field recipe-field-half recipe-highlight-field">
             <label class="form-label" for="recipeAgingDays"><i class="fa-solid fa-hourglass-half"></i> <span id="recipeAgingDaysLabel">${escapeHtml(state.editor.packagingDelayType === PACKAGING_DELAY_FREEZE ? 'Días de congelado previo a envasado' : 'Días de estacionado')}</span></label>
@@ -3762,6 +4014,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     const yieldQuantity = normalizeValue(recipeEditorForm.querySelector('#recipeYieldQty')?.value).replaceAll('.', ',');
     const yieldUnit = normalizeLower(recipeEditorForm.querySelector('#recipeYieldUnit')?.value);
     const shelfLifeDays = Number(normalizeValue(recipeEditorForm.querySelector('#recipeShelfLifeDays')?.value));
+    const frozenShelfLifeExtension = Boolean(recipeEditorForm.querySelector('#recipeFrozenShelfLifeExtension')?.checked);
     const agingDaysRaw = normalizeValue(recipeEditorForm.querySelector('#recipeAgingDays')?.value);
     const agingDays = agingDaysRaw ? Number(agingDaysRaw) : 0;
     const packagingDelayType = recipeEditorForm.querySelector('#recipeFreezeBeforePackaging')?.checked ? PACKAGING_DELAY_FREEZE : PACKAGING_DELAY_AGING;
@@ -3892,6 +4145,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
       yieldQuantity,
       yieldUnit,
       shelfLifeDays,
+      frozenShelfLifeExtension,
       agingDays,
       packagingDelayType,
       prePackagingFreeze,
@@ -4077,6 +4331,12 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     const printRecipesModalBtn = event.target.closest('#printRecipesBtn');
     if (printRecipesModalBtn) {
       await printRecipesCatalog();
+      return;
+    }
+
+    const copyRnpaReportBtn = event.target.closest('[data-copy-rnpa-report]');
+    if (copyRnpaReportBtn) {
+      await copyRnpaReport();
       return;
     }
 

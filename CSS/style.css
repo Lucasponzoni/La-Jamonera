@@ -11227,6 +11227,8 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   transition: background 0.12s;
 }
 .produccion-more-item:hover { background: #fffaf3; }
+.produccion-more-item:disabled{opacity:.48;cursor:not-allowed;}
+.produccion-more-item:disabled:hover{background:none;}
 
 .produccion-more-item-icon {
   width: 34px;

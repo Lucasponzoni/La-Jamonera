@@ -239,6 +239,8 @@
     denomination: normalizeValue(source?.denomination),
     brand: normalizeValue(source?.brand),
     businessName: normalizeValue(source?.businessName),
+    exempt: Boolean(source?.exempt || source?.rnpaExempt || source?.rnpaNotRequired || source?.subproductNoRnpa),
+    exemptReason: normalizeValue(source?.exemptReason || source?.rnpaExemptReason),
     expiryDate: normalizeValue(source?.expiryDate),
     attachmentUrl: normalizeValue(source?.attachmentUrl),
     attachmentType: normalizeValue(source?.attachmentType),
@@ -264,6 +266,8 @@
       denomination: acc.denomination || current.denomination,
       brand: acc.brand || current.brand,
       businessName: acc.businessName || current.businessName,
+      exempt: Boolean(acc.exempt || current.exempt),
+      exemptReason: acc.exemptReason || current.exemptReason,
       expiryDate: acc.expiryDate || current.expiryDate,
       attachmentUrl: acc.attachmentUrl || current.attachmentUrl,
       attachmentType: acc.attachmentType || current.attachmentType,
@@ -273,14 +277,22 @@
   const hasTraceRneNumber = (source = {}) => Boolean(normalizeValue(source?.number));
   const hasTraceRnpaInfo = (source = {}) => {
     const rnpa = safeObject(source);
-    return Boolean(normalizeValue(rnpa.number)
+    return Boolean(rnpa.exempt
+      || normalizeValue(rnpa.number)
       || normalizeValue(rnpa.denomination)
       || normalizeValue(rnpa.brand)
       || normalizeValue(rnpa.businessName));
   };
   const getTraceRneDisplay = (source = {}) => normalizeValue(source?.number) || TRACE_PENDING_RNE_CONFIG;
-  const getTraceRnpaNumberDisplay = (source = {}) => normalizeValue(source?.number) || TRACE_PENDING_RNPA_CONFIG;
+  const getTraceRnpaNumberDisplay = (source = {}) => {
+    if (source?.exempt) {
+      const reason = normalizeValue(source?.exemptReason) || 'Venta mostrador';
+      return `No requiere RNPA - ${reason}`;
+    }
+    return normalizeValue(source?.number) || TRACE_PENDING_RNPA_CONFIG;
+  };
   const getTraceRnpaDetailDisplay = (source = {}) => {
+    if (source?.exempt) return '';
     const detail = normalizeValue(source?.denomination || source?.brand || source?.businessName);
     if (detail) return detail;
     return normalizeValue(source?.number) ? '' : TRACE_PENDING_RNPA_CONFIG;
@@ -310,7 +322,12 @@
   const resolveRecipeRnpaFromRegistro = (registro = {}) => {
     const persisted = normalizeRnpaRecord(safeObject(registro?.traceability?.product?.rnpa));
     const recipe = findRecipeFromTraceRegistro(registro);
-    return mergeRnpaRecords(persisted, safeObject(recipe?.rnpa));
+    const recipeRnpa = {
+      ...safeObject(recipe?.rnpa),
+      exempt: Boolean(recipe?.rnpaNotRequired || recipe?.rnpaExempt || recipe?.subproductNoRnpa),
+      exemptReason: normalizeValue(recipe?.rnpaExemptReason) || 'Venta mostrador'
+    };
+    return mergeRnpaRecords(persisted, recipeRnpa);
   };
   const resolveCompanyRneFromRegistro = (registro = {}) => {
     const persisted = normalizeRneRecord(safeObject(registro?.traceability?.company?.rne));
@@ -597,6 +614,12 @@
     if (!expiryIso) return 'Sin VTO';
     return formatIsoEs(expiryIso);
   };
+  const hasFrozenShelfLifeExtension = (registro = {}) => {
+    if (Boolean(registro?.frozenShelfLifeExtensionAtProduction || registro?.traceability?.product?.frozenShelfLifeExtension)) return true;
+    const recipe = state.recetas?.[registro?.recipeId] || {};
+    return Boolean(recipe?.frozenShelfLifeExtension || recipe?.freezingShelfLifeExtension || recipe?.extendedByFreezing);
+  };
+  const getFrozenShelfLifeExtensionLabel = () => 'Vencimiento extendido por congelamiento a -18°C';
   const escapeHtml = (value) => String(value || '')
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
@@ -3139,6 +3162,8 @@
     const productRnpaNumber = getTraceRnpaNumberDisplay(productRnpa);
     const productRnpaLabel = getTraceRnpaDetailDisplay(productRnpa);
     const productRnpaNodeLabel = normalizeLower(productRnpaLabel) === normalizeLower(productRnpaNumber) ? '' : productRnpaLabel;
+    const frozenShelfLifeExtension = hasFrozenShelfLifeExtension(registro);
+    const frozenShelfLifeExtensionNodeLabel = frozenShelfLifeExtension ? `<br/><b>${esc(getFrozenShelfLifeExtensionLabel())}</b>` : '';
 
     const lines = [
       `flowchart ${isMobileTrace ? 'TB' : 'LR'}`,
@@ -3147,7 +3172,7 @@
       `P["<b>${esc((registro?.recipeTitle || 'Producto').toUpperCase())}</b>"]:::toneProduct`,
       `RNPA["<b>RNPA</b><br/>${esc(productRnpaNumber)}${productRnpaNodeLabel ? `<br/>${esc(productRnpaNodeLabel)}` : ''}"]:::toneRegistry`,
       `R["<b>PRODUCCIÓN</b> ${Number(registro?.quantityKg || 0).toFixed(2)} KG<br/><b>Fecha:</b> ${esc(formatIsoEs(productionDate))}"]:::toneProduction`,
-      `L["<b>LOTE:</b> ${esc(registro?.id || '-')}<br/><b>VTO:</b> ${esc(formatProductExpiryLabel(registro))}"]:::toneLot`,
+      `L["<b>LOTE:</b> ${esc(registro?.id || '-')}<br/><b>VTO:</b> ${esc(formatProductExpiryLabel(registro))}${frozenShelfLifeExtensionNodeLabel}"]:::toneLot`,
       `M["<b>ENCARGADO:</b> ${esc(manager)}"]:::toneManager`,
       `I["<b>INGREDIENTES TOTALES</b> ${totalIngredientsKg.toFixed(3)} KG"]:::toneIngredients`,
       `W["<b>MERMA</b> ${mermaKg.toFixed(3)} KG"]:::toneWaste`,
@@ -3212,11 +3237,9 @@
         const providerRne = resolveProviderRneFromLot(lot);
         const lotQty = Number(lot?.takeQty || 0);
         const lotIsFrozen = Boolean(lot?.isFrozen || lot?.frozen);
-        const lotEntryDate = normalizeValue(lot?.entryDate || '');
         const providerRneObservation = normalizeValue(providerRne.observations);
-        // Mostrar el nodo "DESCONGELADO DE PRODUCTO" sólo si el lote estaba congelado
-        // y la fecha de ingreso es distinta a la fecha de producción.
-        const showThaw = lotIsFrozen && lotEntryDate && productionDate && lotEntryDate !== productionDate;
+        // Mostrar el paso de descongelado para todo lote marcado como congelado.
+        const showThaw = lotIsFrozen;
         lines.push(`${lotNodeId}["<b>LOTE ${lotIndex + 1}</b>${lotIsFrozen ? ' ❄' : ''}<br/>${esc(lot?.lotNumber || lot?.entryId || '-')}<br/><b>Usado:</b> ${esc(formatCompactQty(lotQty, lot?.unit || item?.unit || item?.ingredientUnit || ''))}<br/><b>Ingreso:</b> ${esc(formatIsoEs(lot?.entryDate || ''))}<br/><b>VTO:</b> ${esc(formatIsoEs(lot?.expiryDate || ''))}<br/><b>Proveedor:</b> ${esc(lot?.provider || '-')}"]:::toneLot`);
         lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${esc(getTraceRneDisplay(providerRne))}${providerRneObservation ? `<br/><b>Obs:</b> ${esc(providerRneObservation)}` : ''}"]:::toneRegistry`);
         // El nodo de DESCONGELADO va ANTES del LOTE: ingrediente -> DESCONGELADO -> LOTE -> RNE.
@@ -3309,6 +3332,8 @@
     const productRnpa = resolveRecipeRnpaFromRegistro(registro);
     const productRnpaNumber = getTraceRnpaNumberDisplay(productRnpa);
     const productRnpaLabel = getTraceRnpaDetailDisplay(productRnpa);
+    const packaging = resolvePackagingFromRegistro(registro);
+    const frozenShelfLifeExtension = hasFrozenShelfLifeExtension(registro);
     const groupedIngredients = Object.values((Array.isArray(registro.lots) ? registro.lots : []).reduce((acc, item, index) => {
       const key = normalizeValue(item?.sourceIngredientId || item?.ingredientId || `trace_${index}`);
       if (!acc[key]) {
@@ -3399,13 +3424,14 @@
               <p><strong>Producto</strong><span>${escapeHtml(registro.recipeTitle || '-')}</span></p>
               ${normalizeValue(registro.recipeNombreComercial || registro?.traceability?.product?.nombreComercial) ? `<p><strong>Nombre comercial</strong><span>${escapeHtml(registro.recipeNombreComercial || registro.traceability.product.nombreComercial)}</span></p>` : ''}
               <p><strong>RNPA</strong><span>${escapeHtml(productRnpaNumber)}</span></p>
-              <p><strong>Detalle RNPA</strong><span>${escapeHtml(productRnpaLabel)}</span></p>
+              ${productRnpaLabel ? `<p><strong>Detalle RNPA</strong><span>${escapeHtml(productRnpaLabel)}</span></p>` : ''}
               <p><strong>Cantidad final</strong><span>${Number(registro.quantityKg || 0).toFixed(2)} kg</span></p>
+              ${frozenShelfLifeExtension ? `<p><strong>Vencimiento</strong><span>${escapeHtml(getFrozenShelfLifeExtensionLabel())}</span></p>` : ''}
               ${packaging.agingDays > 0 && packaging.packagingDate ? `<p><strong>${escapeHtml(capitalize(packaging.label || 'envasado'))}</strong><span>${escapeHtml(formatIsoEs(packaging.packagingDate))} (+${packaging.agingDays})</span></p>` : ''}
               <p><strong>Fecha</strong><span>${escapeHtml(formatDateTime(registro.createdAt))}</span></p>
               <p><strong>Estado</strong><span>${escapeHtml(registro.status || '-')}</span></p>
             </div>
-            <div class="produccion-trace-card-actions">${companyRne.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify([companyRne.attachmentUrl]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE empresa</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE empresa sin adjunto</button>'}${productRnpa.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify([productRnpa.attachmentUrl]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNPA</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNPA sin adjunto</button>'}</div>
+            <div class="produccion-trace-card-actions">${companyRne.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify([companyRne.attachmentUrl]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE empresa</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE empresa sin adjunto</button>'}${productRnpa.exempt ? '<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" disabled><i class="fa-solid fa-store"></i><span>RNPA no requerido</span></button>' : (productRnpa.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify([productRnpa.attachmentUrl]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNPA</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNPA sin adjunto</button>')}</div>
             <div class="produccion-trace-managers">${(Array.isArray(registro.managers) ? registro.managers : []).map((token) => { const manager = getManagerDisplay(token); return `<span class="produccion-trace-chip"><i class="bi bi-person-badge fa-solid fa-user-tie"></i><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span>`; }).join('') || '<span class="produccion-trace-chip"><i class="bi bi-person-x fa-solid fa-user-xmark"></i><strong>Sin responsable</strong><small>Encargado</small></span>'}</div>
           </article>
           <div class="produccion-trace-mermaid-wrap">
@@ -7090,6 +7116,7 @@
       lots: snapshotIngredientPlans,
       agingDaysAtProduction,
       packagingDate,
+      frozenShelfLifeExtensionAtProduction: Boolean(recipe.frozenShelfLifeExtension || recipe.freezingShelfLifeExtension || recipe.extendedByFreezing),
       packagingDelayTypeAtProduction: packagingMeta.type,
       packagingDelayLabelAtProduction: packagingMeta.label,
       editedAt: nowTs(),
@@ -7100,7 +7127,8 @@
         product: {
           ...safeObject(registro.traceability?.product),
           packagingDelayType: packagingMeta.type,
-          packagingDelayLabel: packagingMeta.label
+          packagingDelayLabel: packagingMeta.label,
+          frozenShelfLifeExtension: Boolean(recipe.frozenShelfLifeExtension || recipe.freezingShelfLifeExtension || recipe.extendedByFreezing)
         },
         ingredients: snapshotIngredientPlans.map((ingredientPlan) => {
           const hasSiblingSubstitute = hasSubstituteSibling(snapshotIngredientPlans, ingredientPlan);
@@ -7587,7 +7615,6 @@
               <span class="barra-vertical produccion-actions-divider" aria-hidden="true"></span>
               ${inventoryAction}
               ${viewAction.replace('produccion-visualizar-btn', 'produccion-visualizar-btn inventory-production-action-btn is-view')}
-              <button type="button" class="btn ios-btn ios-btn-secondary inventory-production-action-btn is-view" data-recipe-image-view="${recipe.id}" ${normalizeValue(recipe.imageUrl) ? '' : 'disabled'}><i class="fa-regular fa-image"></i><span>Ver imagen</span></button>
               <button type="button" class="btn ios-btn inventory-production-action-btn is-threshold" data-set-recipe-min="${recipe.id}"><i class="fa-solid fa-sliders"></i><span>Umbral</span></button>
               <div class="produccion-more-wrap">
                 <button type="button" class="btn ios-btn ios-btn-secondary produccion-more-btn" data-recipe-more="${recipe.id}" aria-label="Más opciones"><i class="bi bi-three-dots-vertical"></i></button>
@@ -7599,6 +7626,13 @@
                     <span class="produccion-more-item-body">
                       <span class="produccion-more-item-label">Producir sin trazabilidad</span>
                       <span class="produccion-more-item-desc">Insumos sin stock no serán trazados</span>
+                    </span>
+                  </button>
+                  <button type="button" class="produccion-more-item" data-recipe-image-view="${recipe.id}" ${normalizeValue(recipe.imageUrl) ? '' : 'disabled'}>
+                    <span class="produccion-more-item-icon"><i class="fa-regular fa-image"></i></span>
+                    <span class="produccion-more-item-body">
+                      <span class="produccion-more-item-label">Ver imagen</span>
+                      <span class="produccion-more-item-desc">Imagen de la receta</span>
                     </span>
                   </button>
                 </div>
@@ -8595,6 +8629,7 @@
         const packagingMeta = getRecipePackagingMeta(recipe, date);
         const agingDaysAtProduction = Number(packagingMeta.agingDays || 0);
         const recipeRnpa = safeObject(recipe.rnpa);
+        const recipeRnpaExempt = Boolean(recipe.rnpaNotRequired || recipe.rnpaExempt || recipe.subproductNoRnpa);
         const companyRne = safeObject(state.config.rne);
         const packagingDate = packagingMeta.packagingDate;
         const snapshotIngredientPlans = enrichIngredientPlansWithSnapshots(revalidated.ingredientPlans);
@@ -8606,6 +8641,7 @@
         productionDate: date,
         productExpiryDate: productExpiry,
         shelfLifeDaysAtProduction: Number(recipe.shelfLifeDays || 0),
+        frozenShelfLifeExtensionAtProduction: Boolean(recipe.frozenShelfLifeExtension || recipe.freezingShelfLifeExtension || recipe.extendedByFreezing),
         agingDaysAtProduction,
         packagingDate,
         packagingDelayTypeAtProduction: packagingMeta.type,
@@ -8626,12 +8662,15 @@
             nombreComercial: normalizeValue(recipe.nombreComercial),
             packagingDelayType: packagingMeta.type,
             packagingDelayLabel: packagingMeta.label,
+            frozenShelfLifeExtension: Boolean(recipe.frozenShelfLifeExtension || recipe.freezingShelfLifeExtension || recipe.extendedByFreezing),
             imageUrl: normalizeValue(recipe.imageUrl),
             rnpa: {
               number: normalizeValue(recipeRnpa.number),
               denomination: normalizeValue(recipeRnpa.denomination),
               brand: normalizeValue(recipeRnpa.brand),
               businessName: normalizeValue(recipeRnpa.businessName),
+              exempt: recipeRnpaExempt,
+              exemptReason: recipeRnpaExempt ? normalizeValue(recipe.rnpaExemptReason) || 'Venta mostrador' : '',
               expiryDate: normalizeValue(recipeRnpa.expiryDate),
               attachmentUrl: normalizeValue(recipeRnpa.attachmentUrl),
               attachmentType: normalizeValue(recipeRnpa.attachmentType),

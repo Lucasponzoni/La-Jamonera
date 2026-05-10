@@ -214,110 +214,202 @@
       <header class="frozen-info-hero">
         <div class="frozen-info-hero-icon"><i class="bi bi-snow2"></i></div>
         <div>
-          <p class="frozen-info-kicker">Guía orientativa</p>
-          <h3 class="frozen-info-hero-title">Manejo de carne refrigerada y congelada</h3>
-          <p class="frozen-info-hero-sub">Según criterios del CAA / SENASA · Uso interno en frigoríficos y elaboradores cárnicos</p>
+          <p class="frozen-info-kicker">Procedimiento interno</p>
+          <h3 class="frozen-info-hero-title">Congelamiento y descongelado seguro de alimentos</h3>
+          <p class="frozen-info-hero-sub">Basado en CAA, BPM/POES y recomendaciones oficiales de inocuidad alimentaria</p>
         </div>
       </header>
 
       <article class="frozen-info-card frozen-info-card--blue">
         <header class="frozen-info-card-head">
           <span class="frozen-info-step">1</span>
-          <h4><i class="bi bi-thermometer-snow"></i> Recepción del producto refrigerado</h4>
+          <h4><i class="bi bi-clipboard2-check-fill"></i> Condición previa</h4>
         </header>
         <ul class="frozen-info-list">
-          <li><i class="bi bi-check-circle-fill"></i> Verificar temperatura de recepción (ideal entre <strong>0&nbsp;°C y 5&nbsp;°C</strong>).</li>
-          <li><i class="bi bi-check-circle-fill"></i> Controlar fecha de vencimiento y estado del envase.</li>
-          <li><i class="bi bi-check-circle-fill"></i> Registrar lote, proveedor y fecha de ingreso.</li>
-          <li><i class="bi bi-check-circle-fill"></i> Si se congela, hacerlo <strong>antes del vencimiento</strong> del producto refrigerado.</li>
+          <li><i class="bi bi-check-circle-fill"></i> Congelar solamente alimentos aptos, identificados, dentro de vida útil y con trazabilidad de lote/proveedor.</li>
+          <li><i class="bi bi-check-circle-fill"></i> Verificar integridad del envase, condiciones higiénico-sanitarias y ausencia de signos de alteración.</li>
+          <li><i class="bi bi-check-circle-fill"></i> Registrar fecha/hora de ingreso, fecha/hora de congelamiento, responsable, lote y temperatura de cámara.</li>
+          <li><i class="bi bi-check-circle-fill"></i> Mantener separación entre crudos/listos para consumir y evitar contaminación cruzada.</li>
         </ul>
       </article>
 
       <article class="frozen-info-card frozen-info-card--ice">
         <header class="frozen-info-card-head">
           <span class="frozen-info-step">2</span>
-          <h4><i class="bi bi-snow"></i> Congelación del producto</h4>
+          <h4><i class="bi bi-snow"></i> Congelamiento en cámara a -18&nbsp;°C</h4>
         </header>
-        <div class="frozen-info-callout frozen-info-callout--warn">
-          <i class="bi bi-exclamation-triangle-fill"></i>
-          <p><strong>Importante:</strong> la congelación <em>no reinicia</em> automáticamente la fecha de vencimiento original. Debe existir trazabilidad y procedimiento interno documentado.</p>
-        </div>
         <div class="frozen-info-temp-grid">
           <div class="frozen-info-temp">
             <strong>-18&nbsp;°C</strong>
-            <span>o menor — almacenamiento recomendado</span>
-          </div>
-          <div class="frozen-info-temp frozen-info-temp--alt">
-            <strong>-12&nbsp;°C</strong>
-            <span>aceptable, reduce vida útil · 1 a 3 meses según corte</span>
+            <span>temperatura objetivo de cámara/freezer</span>
           </div>
         </div>
         <ul class="frozen-info-list">
-          <li><i class="bi bi-x-circle-fill"></i> Evitar fluctuaciones de temperatura.</li>
-          <li><i class="bi bi-x-circle-fill"></i> Evitar descongelamientos parciales.</li>
+          <li><i class="bi bi-check-circle-fill"></i> Colocar el alimento protegido, rotulado y en envase apto para freezer.</li>
+          <li><i class="bi bi-check-circle-fill"></i> Disponerlo de forma que el frío circule y el descenso de temperatura sea uniforme.</li>
+          <li><i class="bi bi-check-circle-fill"></i> Controlar y documentar la temperatura de cámara durante el almacenamiento.</li>
+          <li><i class="bi bi-x-circle-fill"></i> Evitar aperturas prolongadas, fluctuaciones de temperatura y descongelamientos parciales.</li>
         </ul>
+        <div class="frozen-info-callout frozen-info-callout--warn">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <p><strong>Importante:</strong> congelar no elimina peligros microbiológicos ni vuelve indefinida la vida útil. La fecha extendida debe estar definida por procedimiento, rotulado/trazabilidad y respaldo técnico del establecimiento.</p>
+        </div>
       </article>
 
       <article class="frozen-info-card frozen-info-card--mint">
         <header class="frozen-info-card-head">
           <span class="frozen-info-step">3</span>
-          <h4><i class="bi bi-droplet-half"></i> Descongelado</h4>
+          <h4><i class="bi bi-droplet-half"></i> Descongelado en cámara de 0 a 5&nbsp;°C</h4>
         </header>
         <ul class="frozen-info-list">
-          <li><i class="bi bi-check-circle-fill"></i> Descongelar únicamente entre <strong>0&nbsp;°C y 5&nbsp;°C</strong>.</li>
-          <li><i class="bi bi-x-circle-fill"></i> Nunca a temperatura ambiente.</li>
-          <li><i class="bi bi-clock-fill"></i> Usar el producto dentro de <strong>24 a 48 horas</strong> post-descongelado.</li>
-          <li><i class="bi bi-x-circle-fill"></i> No volver a congelar salvo proceso habilitado y documentado.</li>
+          <li><i class="bi bi-check-circle-fill"></i> Pasar el alimento a cámara refrigerada entre <strong>0&nbsp;°C y 5&nbsp;°C</strong>, protegido e identificado.</li>
+          <li><i class="bi bi-check-circle-fill"></i> Registrar inicio/fin de descongelado, lote, responsable y temperatura de cámara.</li>
+          <li><i class="bi bi-check-circle-fill"></i> Mantenerlo separado de alimentos listos para consumir y contener posibles exudados.</li>
+          <li><i class="bi bi-x-circle-fill"></i> No descongelar a temperatura ambiente, cerca de fuentes de calor ni bajo canilla.</li>
+          <li><i class="bi bi-x-circle-fill"></i> No volver a congelar un alimento descongelado salvo que exista proceso validado y documentado.</li>
         </ul>
       </article>
 
       <article class="frozen-info-card frozen-info-card--rose">
         <header class="frozen-info-card-head">
           <span class="frozen-info-step">4</span>
-          <h4><i class="bi bi-basket3-fill"></i> Uso en elaboración (ej. chorizo)</h4>
+          <h4><i class="bi bi-calendar2-check"></i> Vencimiento extendido</h4>
         </header>
-        <p class="frozen-info-text">Si la carne descongelada correctamente entre 0&nbsp;°C y 5&nbsp;°C se usa como materia prima, el producto elaborado puede recibir una nueva vida útil refrigerada <strong>sólo si</strong>:</p>
+        <p class="frozen-info-text">El vencimiento extendido por congelamiento a -18&nbsp;°C debe usarse como criterio interno documentado. No es automático: depende del producto, proceso, envase, cadena de frío, rotulado y validación sanitaria.</p>
         <ul class="frozen-info-list">
-          <li><i class="bi bi-check-circle-fill"></i> La materia prima estaba apta y dentro de parámetros sanitarios.</li>
-          <li><i class="bi bi-check-circle-fill"></i> Se mantuvo la cadena de frío durante todo el proceso.</li>
-          <li><i class="bi bi-check-circle-fill"></i> La elaboración se hizo bajo condiciones higiénico-sanitarias controladas.</li>
-          <li><i class="bi bi-check-circle-fill"></i> Existe procedimiento documentado y trazabilidad.</li>
-          <li><i class="bi bi-check-circle-fill"></i> El producto final cumple parámetros microbiológicos.</li>
+          <li><i class="bi bi-check-circle-fill"></i> Definir la duración a -18&nbsp;°C y las instrucciones de conservación/descongelado cuando correspondan.</li>
+          <li><i class="bi bi-check-circle-fill"></i> Mantener registros de temperaturas, lotes, fechas y responsables.</li>
+          <li><i class="bi bi-check-circle-fill"></i> Respaldar la vida útil con procedimiento BPM/POES, evaluación de riesgo y controles aplicables.</li>
         </ul>
         <div class="frozen-info-callout frozen-info-callout--info">
           <i class="bi bi-info-circle-fill"></i>
-          <p><strong>Sobre los 6 días refrigerados:</strong> en la industria puede establecerse una nueva vida útil (ej. 6 días entre 0–5&nbsp;°C), respaldada por validación técnica, controles microbiológicos y HACCP/BPM. El CAA no fija "6 días" automáticamente para todos los casos.</p>
+          <p><strong>CAA:</strong> para alimentos cuya duración varía por temperatura, debe indicarse la condición de conservación, por ejemplo duración a -18&nbsp;°C, y las instrucciones necesarias de uso/descongelación cuando correspondan.</p>
         </div>
       </article>
 
       <article class="frozen-info-card frozen-info-card--violet">
         <header class="frozen-info-card-head">
           <span class="frozen-info-step">5</span>
-          <h4><i class="bi bi-clipboard2-check-fill"></i> Recomendaciones para inspecciones</h4>
+          <h4><i class="bi bi-folder-check"></i> Documentación mínima</h4>
         </header>
         <ul class="frozen-info-list frozen-info-list--two-col">
-          <li><i class="bi bi-check2-square"></i> Registrar fecha y hora de congelado.</li>
-          <li><i class="bi bi-check2-square"></i> Identificar lotes claramente.</li>
-          <li><i class="bi bi-check2-square"></i> Documentar temperatura de cámaras.</li>
-          <li><i class="bi bi-check2-square"></i> Mantener registros de descongelado.</li>
-          <li><i class="bi bi-check2-square"></i> Tener procedimientos BPM y POES escritos.</li>
-          <li><i class="bi bi-check2-square"></i> Conservar evidencia microbiológica.</li>
+          <li><i class="bi bi-check2-square"></i> Procedimiento escrito de congelamiento y descongelado.</li>
+          <li><i class="bi bi-check2-square"></i> Registros de temperatura de cámara/freezer.</li>
+          <li><i class="bi bi-check2-square"></i> Identificación de lote y fecha de congelamiento.</li>
+          <li><i class="bi bi-check2-square"></i> Registro de descongelado en cámara 0 a 5&nbsp;°C.</li>
+          <li><i class="bi bi-check2-square"></i> Trazabilidad de proveedor, ingreso, elaboración y egreso.</li>
+          <li><i class="bi bi-check2-square"></i> Verificación sanitaria según el producto y proceso.</li>
         </ul>
       </article>
 
       <footer class="frozen-info-conclusion">
         <i class="bi bi-patch-check-fill"></i>
-        <p>El uso de carne previamente congelada en productos elaborados <strong>es habitual</strong>, pero requiere <strong>control documental, cadena de frío y validación sanitaria</strong>. La nueva fecha de vencimiento debe sustentarse técnicamente y no depende sólo de la fecha original de la materia prima.</p>
+        <p>El criterio correcto es: congelar en cámara a <strong>-18&nbsp;°C</strong>, conservar cadena de frío, documentar todo el proceso y descongelar en cámara de <strong>0 a 5&nbsp;°C</strong>. La vida útil extendida debe estar respaldada por el procedimiento y los controles del establecimiento.</p>
       </footer>
     </div>`;
 
+  const FROZEN_INFO_PDF_SECTIONS = [
+    { title: '1. Condicion previa', lines: ['Congelar solamente alimentos aptos, identificados, dentro de vida util y con trazabilidad de lote/proveedor.', 'Verificar integridad del envase, condiciones higienico-sanitarias y ausencia de signos de alteracion.', 'Registrar fecha/hora de ingreso, fecha/hora de congelamiento, responsable, lote y temperatura de camara.', 'Mantener separacion entre crudos/listos para consumir y evitar contaminacion cruzada.'] },
+    { title: '2. Congelamiento en camara a -18 C', lines: ['La temperatura objetivo de camara/freezer es -18 C.', 'Colocar el alimento protegido, rotulado y en envase apto para freezer.', 'Disponerlo de forma que el frio circule y el descenso de temperatura sea uniforme.', 'Controlar y documentar la temperatura de camara durante el almacenamiento.', 'Evitar aperturas prolongadas, fluctuaciones de temperatura y descongelamientos parciales.', 'Congelar no elimina peligros microbiologicos ni vuelve indefinida la vida util.'] },
+    { title: '3. Descongelado en camara de 0 a 5 C', lines: ['Pasar el alimento a camara refrigerada entre 0 C y 5 C, protegido e identificado.', 'Registrar inicio/fin de descongelado, lote, responsable y temperatura de camara.', 'Mantenerlo separado de alimentos listos para consumir y contener posibles exudados.', 'No descongelar a temperatura ambiente, cerca de fuentes de calor ni bajo canilla.', 'No volver a congelar un alimento descongelado salvo que exista proceso validado y documentado.'] },
+    { title: '4. Vencimiento extendido', lines: ['El vencimiento extendido por congelamiento a -18 C debe usarse como criterio interno documentado.', 'No es automatico: depende del producto, proceso, envase, cadena de frio, rotulado y validacion sanitaria.', 'Para alimentos cuya duracion varia por temperatura, debe indicarse la condicion de conservacion y las instrucciones necesarias de uso/descongelacion cuando correspondan.'] },
+    { title: '5. Documentacion minima', lines: ['Procedimiento escrito de congelamiento y descongelado.', 'Registros de temperatura de camara/freezer.', 'Identificacion de lote y fecha de congelamiento.', 'Registro de descongelado en camara 0 a 5 C.', 'Trazabilidad de proveedor, ingreso, elaboracion y egreso.', 'Verificacion sanitaria segun el producto y proceso.'] }
+  ];
+
+  const getFrozenInfoLogoDataUrl = () => new Promise((resolve) => {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 96;
+      canvas.height = 96;
+      const context = canvas.getContext('2d');
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    image.onerror = () => resolve('');
+    image.src = './IMG/La Jamonera App.png';
+  });
+
+  const downloadFrozenInfoPdf = async () => {
+    if (!window.jspdf?.jsPDF) {
+      openIosSwal({ title: 'No se pudo generar', html: '<p>No se pudo cargar la libreria PDF. Reintenta en unos segundos.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+      return;
+    }
+    const logoDataUrl = await getFrozenInfoLogoDataUrl();
+    const doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+    const margin = 14;
+    const maxWidth = 182;
+    let y = 38;
+    const drawHeader = () => {
+      if (logoDataUrl) doc.addImage(logoDataUrl, 'PNG', margin, 9, 20, 20);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(17);
+      doc.text('La Jamonera', logoDataUrl ? 39 : margin, 17);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text('Procedimiento interno de inocuidad alimentaria', logoDataUrl ? 39 : margin, 23);
+      doc.setDrawColor(210, 222, 242);
+      doc.line(margin, 32, 196, 32);
+    };
+    const drawFooters = () => {
+      const pageCount = doc.getNumberOfPages();
+      for (let page = 1; page <= pageCount; page += 1) {
+        doc.setPage(page);
+        doc.setDrawColor(210, 222, 242);
+        doc.line(margin, 284, 196, 284);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.text('Back Office para empresas · powered by Asesoria Bromatologica Rosario', 105, 290, { align: 'center' });
+        doc.text(String(page), 196, 290, { align: 'right' });
+      }
+    };
+    drawHeader();
+    const addLines = (lines, size = 10, gap = 5) => {
+      doc.setFontSize(size);
+      lines.forEach((line) => {
+        const wrapped = doc.splitTextToSize(line, maxWidth);
+        if (y + wrapped.length * gap > 272) {
+          doc.addPage();
+          drawHeader();
+          y = 38;
+        }
+        doc.text(wrapped, margin, y);
+        y += wrapped.length * gap;
+      });
+    };
+    doc.setFont('helvetica', 'bold');
+    addLines(['Congelamiento y descongelado seguro de alimentos'], 15, 7);
+    doc.setFont('helvetica', 'normal');
+    addLines(['Basado en CAA, BPM/POES y recomendaciones oficiales de inocuidad alimentaria.'], 10, 6);
+    y += 2;
+    FROZEN_INFO_PDF_SECTIONS.forEach((section) => {
+      doc.setFont('helvetica', 'bold');
+      addLines([section.title], 12, 6);
+      doc.setFont('helvetica', 'normal');
+      addLines(section.lines.map((line) => `- ${line}`), 10, 5);
+      y += 2;
+    });
+    doc.setFont('helvetica', 'bold');
+    addLines(['Criterio operativo'], 12, 6);
+    doc.setFont('helvetica', 'normal');
+    addLines(['Congelar en camara a -18 C, conservar cadena de frio, documentar todo el proceso y descongelar en camara de 0 a 5 C. La vida util extendida debe estar respaldada por el procedimiento y los controles del establecimiento.'], 10, 5);
+    drawFooters();
+    doc.save('procedimiento-congelamiento-descongelado.pdf');
+  };
+
   const openFrozenInfoSwal = () => openIosSwal({
-    title: 'Producto congelado · Guía CAA/SENASA',
+    title: 'Congelamiento a -18°C',
     html: FROZEN_INFO_HTML,
     icon: 'info',
+    showDenyButton: true,
     confirmButtonText: 'Entendido',
+    denyButtonText: 'Descargar PDF',
     width: 720,
     customClass: { popup: 'ios-alert frozen-info-alert' }
+  }).then((result) => {
+    if (result.isDenied) downloadFrozenInfoPdf();
   });
 
   const frozenInfoIconHtml = (extraClass = '') =>

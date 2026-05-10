@@ -134,6 +134,9 @@
     });
     return true;
   };
+  const hasFrozenShelfLifeExtension = (registro = {}) =>
+    Boolean(registro?.frozenShelfLifeExtensionAtProduction || registro?.traceability?.product?.frozenShelfLifeExtension);
+  const getFrozenShelfLifeExtensionLabel = () => 'Vencimiento extendido por congelamiento a -18°C';
 
   const buildDefinition = (registro, config = {}) => {
     const allPlans = Array.isArray(registro?.lots) ? registro.lots : [];
@@ -147,6 +150,8 @@
     const companyRne = normalize(registro?.traceability?.company?.rne?.number || '-');
     const productRnpa = normalize(registro?.traceability?.product?.rnpa?.number || '-');
     const packaging = resolvePackaging(registro);
+    const frozenShelfLifeExtension = hasFrozenShelfLifeExtension(registro);
+    const frozenShelfLifeExtensionNodeLabel = frozenShelfLifeExtension ? `<br/><b>${escapeHtml(getFrozenShelfLifeExtensionLabel())}</b>` : '';
     const lines = [
       'flowchart LR',
       `C["<b>FRIGORIFICO LA JAMONERA SA</b>"]:::toneCompany`,
@@ -154,7 +159,7 @@
       `P["<b>${escapeHtml((registro?.recipeTitle || 'Producto').toUpperCase())}</b>"]:::toneProduct`,
       `RNPA["<b>RNPA</b><br/>${escapeHtml(productRnpa)}"]:::toneRegistry`,
       `R["<b>PRODUCCIÓN</b> ${Number(registro?.quantityKg || 0).toFixed(2)} KG<br/><b>Fecha:</b> ${escapeHtml(formatIsoEs(registro?.productionDate || ''))}"]:::toneProduction`,
-      `L["<b>LOTE:</b> ${escapeHtml(registro?.id || '-')}<br/><b>VTO:</b> ${escapeHtml(formatIsoEs(registro?.productExpiryDate || ''))}"]:::toneLot`,
+      `L["<b>LOTE:</b> ${escapeHtml(registro?.id || '-')}<br/><b>VTO:</b> ${escapeHtml(formatIsoEs(registro?.productExpiryDate || ''))}${frozenShelfLifeExtensionNodeLabel}"]:::toneLot`,
       `M["<b>ENCARGADO:</b> ${escapeHtml(manager)}"]:::toneManager`,
       `I["<b>INGREDIENTES TOTALES</b> ${totalIngredientsKg.toFixed(3)} KG"]:::toneIngredients`,
       `W["<b>MERMA</b> ${mermaKg.toFixed(3)} KG"]:::toneWaste`,
@@ -387,6 +392,7 @@
     const traceIngredients = Array.isArray(registro?.traceability?.ingredients) ? registro.traceability.ingredients : [];
     const commercialName = normalize(registro?.recipeNombreComercial || registro?.traceability?.product?.nombreComercial);
     const packaging = resolvePackaging(registro);
+    const frozenShelfLifeExtension = hasFrozenShelfLifeExtension(registro);
 
     dataNode.innerHTML = `<section class="produccion-trace-v2 produccion-trace-apple-viewer">
       <article class="produccion-trace-summary">
@@ -398,6 +404,7 @@
           ${commercialName ? `<p><strong>Nombre comercial</strong><span>${escapeHtml(commercialName)}</span></p>` : ''}
           <p><strong>RNPA</strong><span>${escapeHtml(rnpa)}</span></p>
           <p><strong>Cantidad final</strong><span>${Number(registro.quantityKg || 0).toFixed(2)} kg</span></p>
+          ${frozenShelfLifeExtension ? `<p><strong>Vencimiento</strong><span>${escapeHtml(getFrozenShelfLifeExtensionLabel())}</span></p>` : ''}
           ${packaging.agingDays > 0 && packaging.packagingDate ? `<p><strong>${escapeHtml(packaging.label)}</strong><span>${escapeHtml(formatIsoEs(packaging.packagingDate))} (+${packaging.agingDays})</span></p>` : ''}
           <p><strong>Fecha</strong><span>${escapeHtml(formatDateTime(registro.createdAt))}</span></p>
           <p><strong>Estado</strong><span>${escapeHtml(registro.status || '-')}</span></p>
