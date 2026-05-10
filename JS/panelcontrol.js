@@ -919,6 +919,16 @@ const printReport = async (report) => {
       applyData({ reportsTree, inventario, recetas, reparto, registros, informesUsers });
       renderAll();
       state.initialized = true;
+      if (state.report && !normalize(state.report.html)) {
+        try {
+          const hydrated = await fetchLatestReportData(state.report);
+          state.report = hydrated;
+          const idx = (state.reports || []).findIndex((r) => r.id === hydrated.id);
+          if (idx >= 0) state.reports[idx] = hydrated;
+          renderLastReport();
+        } catch (error) {
+        }
+      }
     } catch {
       const fallback = '<div class="panel-empty">No se pudieron cargar los datos del panel.</div>';
       [nodes.informe, nodes.resumen, nodes.rne, nodes.rnpa, nodes.transporte, nodes.produccion].forEach((n) => { if (n) n.innerHTML = fallback; });
