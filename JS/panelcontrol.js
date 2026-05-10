@@ -903,12 +903,17 @@ const printReport = async (report) => {
     if (!state.initialized) setLoading();
     try {
       await window.laJamoneraReady;
+      const readPreferred = async (primaryPath, fallbackPath, fallback = {}) => {
+        const primary = await window.dbLaJamoneraRest.read(primaryPath).catch(() => null);
+        if (primary != null) return primary;
+        return window.dbLaJamoneraRest.read(fallbackPath).catch(() => fallback);
+      };
       const [reportsTree, inventario, recetas, reparto, registros, informesUsers] = await Promise.all([
-        window.dbLaJamoneraRest.read('/informes'),
-        window.dbLaJamoneraRest.read('/inventario'),
-        window.dbLaJamoneraRest.read('/recetas'),
-        window.dbLaJamoneraRest.read('/Reparto'),
-        window.dbLaJamoneraRest.read('/produccion/registros'),
+        readPreferred('/informes_index', '/informes', {}),
+        readPreferred('/inventario_index', '/inventario', {}),
+        readPreferred('/recetas_index/items', '/recetas', {}),
+        readPreferred('/reparto_index', '/Reparto', {}),
+        readPreferred('/produccion_index/registros', '/produccion/registros', {}),
         window.dbLaJamoneraRest.read('/informes/users')
       ]);
       applyData({ reportsTree, inventario, recetas, reparto, registros, informesUsers });
@@ -923,7 +928,7 @@ const printReport = async (report) => {
   const attachRealtimeListeners = () => {
     const db = window.dbLaJamonera;
     if (!db?.ref) return;
-    const paths = ['/informes', '/inventario', '/recetas', '/Reparto', '/produccion/registros', '/informes/users'];
+    const paths = ['/informes_index', '/inventario_index', '/recetas_index', '/reparto_index', '/produccion_index/registros', '/informes/users'];
     const seenInitialEvent = new Set();
     let refreshTimer = null;
     const scheduleRefresh = () => {

@@ -104,7 +104,10 @@
     weeklyConfigSearch: '',
     weeklyConfigPage: 1,
     activeAutoEgresoFilter: 'all',
-    searchRenderTimer: null
+    searchRenderTimer: null,
+    inventoryLoadedFromIndex: false,
+    fullInventoryLoaded: false,
+    inventoryDetailLoaded: {}
   };
 
   const safeObject = (value) => (value && typeof value === 'object' ? value : {});
@@ -1018,10 +1021,47 @@
     state.inventario.config.providers = providers;
   };
 
-  const persistInventario = async () => {
+  const persistInventario = async (options = {}) => {
     normalizeProvidersConfig();
     await window.laJamoneraReady;
-    await window.dbLaJamoneraRest.write('/inventario', state.inventario);
+    const itemIds = [...new Set((Array.isArray(options.itemIds) ? options.itemIds : []).map(normalizeValue).filter(Boolean))];
+    if (itemIds.length) {
+      await window.dbLaJamoneraRest.write('/inventario/config', state.inventario.config || {});
+      for (const itemId of itemIds) {
+        const record = { ...safeObject(state.inventario.items?.[itemId]) };
+        delete record.__indexLite;
+        await window.dbLaJamoneraRest.write(`/inventario/items/${itemId}`, record);
+      }
+      return;
+    }
+    const hasLiteRecords = Object.values(safeObject(state.inventario.items)).some((item) => item?.__indexLite);
+    let payload = state.inventario;
+    if (hasLiteRecords) {
+      const full = safeObject(await window.dbLaJamoneraRest.read('/inventario'));
+      const mergedItems = {};
+      Object.entries(safeObject(state.inventario.items)).forEach(([id, record]) => {
+        const base = record?.__indexLite && full.items?.[id] ? safeObject(full.items[id]) : {};
+        const cleanRecord = { ...safeObject(record) };
+        if (cleanRecord.__indexLite) {
+          delete cleanRecord.__indexLite;
+          delete cleanRecord.entries;
+          delete cleanRecord.entriesCount;
+          delete cleanRecord.expiredEntries;
+          delete cleanRecord.expiringEntries;
+          delete cleanRecord.hasFrozenEntries;
+        }
+        mergedItems[id] = { ...base, ...cleanRecord };
+      });
+      payload = {
+        ...safeObject(full),
+        config: safeObject(state.inventario.config),
+        items: mergedItems
+      };
+      state.inventario = payload;
+      state.fullInventoryLoaded = true;
+      state.inventoryLoadedFromIndex = false;
+    }
+    await window.dbLaJamoneraRest.write('/inventario', payload);
   };
 
   const persistMeasuresIfNeeded = async (measureName, measureAbbr) => {
@@ -1032,7 +1072,50 @@
     await window.dbLaJamoneraRest.write('/ingredientes/config/measures', state.measures);
   };
 
-  const loadData = async () => {
+  const normalizeInventoryRecordForIngredient = (ingredient) => {
+    const current = getRecord(ingredient.id);
+    current.infiniteStock = isInfiniteStockRecord(current);
+    const entries = Array.isArray(current.entries) ? current.entries : [];
+    if (!entries.length) {
+      if (current.__indexLite) {
+        current.hasEntries = Boolean(current.hasEntries);
+        current.packageQty = Number.isFinite(Number(current.packageQty)) ? Number(current.packageQty) : null;
+        current.stockUnit = current.stockUnit || '';
+        current.stockBase = Number(current.stockBase || 0);
+        current.stockKg = Number(current.stockKg || 0);
+      } else {
+        current.hasEntries = false;
+        current.packageQty = null;
+        current.stockUnit = '';
+        current.stockBase = 0;
+        current.stockKg = 0;
+      }
+      current.lowThresholdMode = current.lowThresholdMode || 'global';
+    } else {
+      current.hasEntries = true;
+      const firstUnit = current.stockUnit || entries[0]?.unit || ingredient.measure || 'kilos';
+      current.stockUnit = firstUnit;
+      if (!Number.isFinite(Number(current.packageQty))) {
+        const pkgEntry = entries.find((entry) => Number.isFinite(Number(entry?.packageQty)) && Number(entry.packageQty) > 0);
+        current.packageQty = pkgEntry ? Number(pkgEntry.packageQty) : null;
+      }
+      recomputeRecordStock(current, firstUnit);
+      if (!normalizeValue(current.lowThresholdMode)) {
+        const hasLegacyCustom = Number.isFinite(Number(current.lowThresholdBase))
+          ? Number(current.lowThresholdBase) > 0
+          : Number.isFinite(Number(current.lowThresholdKg)) && Number(current.lowThresholdKg) > 0;
+        current.lowThresholdMode = hasLegacyCustom ? 'custom' : 'global';
+        if (!hasLegacyCustom) {
+          current.lowThresholdBase = null;
+          current.lowThresholdKg = null;
+        }
+      }
+    }
+    state.inventario.items[ingredient.id] = current;
+    return current;
+  };
+
+  const loadData = async (options = {}) => {
     try {
       await window.laJamoneraReady;
     } catch (error) {
@@ -1049,10 +1132,23 @@
     }
 
     try {
-      inv = safeObject(await window.dbLaJamoneraRest.read('/inventario'));
+      const forceFull = Boolean(options.forceFull);
+      if (!forceFull) {
+        inv = safeObject(await window.dbLaJamoneraRest.read('/inventario_index'));
+        state.inventoryLoadedFromIndex = Boolean(inv?.items);
+        state.fullInventoryLoaded = !state.inventoryLoadedFromIndex;
+      }
+      if (forceFull || !inv?.items) {
+        inv = safeObject(await window.dbLaJamoneraRest.read('/inventario'));
+        state.inventoryLoadedFromIndex = false;
+        state.fullInventoryLoaded = true;
+      }
+      state.inventoryDetailLoaded = state.fullInventoryLoaded ? { __all: true } : {};
     } catch (error) {
       console.error('[Inventario] No se pudo leer /inventario desde Firebase.', error);
       inv = {};
+      state.inventoryLoadedFromIndex = false;
+      state.fullInventoryLoaded = false;
     }
 
     state.ingredientes = safeObject(ing?.items);
@@ -1069,41 +1165,30 @@
       },
       items: safeObject(inv?.items)
     };
-    Object.values(state.ingredientes).forEach((ingredient) => {
-      const current = getRecord(ingredient.id);
-      current.infiniteStock = isInfiniteStockRecord(current);
-      const entries = Array.isArray(current.entries) ? current.entries : [];
-      if (!entries.length) {
-        current.hasEntries = false;
-        current.packageQty = null;
-        current.stockUnit = '';
-        current.stockBase = 0;
-        current.stockKg = 0;
-        current.lowThresholdMode = current.lowThresholdMode || 'global';
-      } else {
-        current.hasEntries = true;
-        const firstUnit = current.stockUnit || entries[0]?.unit || ingredient.measure || 'kilos';
-        current.stockUnit = firstUnit;
-        if (!Number.isFinite(Number(current.packageQty))) {
-          const pkgEntry = entries.find((entry) => Number.isFinite(Number(entry?.packageQty)) && Number(entry.packageQty) > 0);
-          current.packageQty = pkgEntry ? Number(pkgEntry.packageQty) : null;
-        }
-        recomputeRecordStock(current, firstUnit);
-        if (!normalizeValue(current.lowThresholdMode)) {
-          const hasLegacyCustom = Number.isFinite(Number(current.lowThresholdBase))
-            ? Number(current.lowThresholdBase) > 0
-            : Number.isFinite(Number(current.lowThresholdKg)) && Number(current.lowThresholdKg) > 0;
-          current.lowThresholdMode = hasLegacyCustom ? 'custom' : 'global';
-          if (!hasLegacyCustom) {
-            current.lowThresholdBase = null;
-            current.lowThresholdKg = null;
-          }
-        }
-      }
-      state.inventario.items[ingredient.id] = current;
-    });
+    Object.values(state.ingredientes).forEach((ingredient) => normalizeInventoryRecordForIngredient(ingredient));
     normalizeProvidersConfig();
     rebuildInventarioIndexes();
+  };
+
+  const ensureInventoryRecordDetail = async (ingredientId) => {
+    const id = normalizeValue(ingredientId);
+    if (!id || state.fullInventoryLoaded || state.inventoryDetailLoaded[id]) return;
+    try {
+      const detail = safeObject(await window.dbLaJamoneraRest.read(`/inventario/items/${id}`));
+      if (Object.keys(detail).length) {
+        state.inventario.items[id] = detail;
+        const ingredient = state.ingredientes[id];
+        if (ingredient) normalizeInventoryRecordForIngredient(ingredient);
+        state.inventoryDetailLoaded[id] = true;
+      }
+    } catch (error) {
+      console.warn('[Inventario] No se pudo leer detalle exacto de inventario.', id, error);
+    }
+  };
+
+  const ensureFullInventoryLoaded = async () => {
+    if (state.fullInventoryLoaded) return;
+    await loadData({ forceFull: true });
   };
 
   const filteredIngredients = () => Object.values(state.ingredientes)
@@ -2112,7 +2197,7 @@
 
     updateListScrollHint();
     initThumbLoading(nodes.list);
-    renderGlobalPeriodTable();
+    if (state.periodMode) renderGlobalPeriodTable();
   };
 
   const parseRangeValue = (value) => {
@@ -5296,21 +5381,18 @@
 
     // === Cambio masivo de unidad ===
     // Permite cambiar la unidad de un ingrediente que ya tiene stock cargado.
-    // Sólo se admite el cambio dentro de la misma categoría (peso↔peso, vol↔vol).
+    // Permite cambiar a cualquier unidad registrada.
     // Recorre todas las entries y reescribe qty/qtyKg/qtyBase/availableQty/etc.
     // a la nueva unidad usando toBase/fromBase. Persiste y re-renderiza.
     async function openMassUnitChangeDialog(itemId) {
       const targetRecord = getRecord(itemId);
       const currentUnit = targetRecord.stockUnit || (state.ingredientes[itemId]?.measure || 'kilos');
       const currentMeta = getUnitMeta(currentUnit);
-      const compatibleMeasures = state.measures.filter((m) => {
-        const meta = getUnitMeta(m.name);
-        return meta.category === currentMeta.category && measureKey(m.name) !== measureKey(currentUnit);
-      });
-      if (!compatibleMeasures.length) {
+      const availableMeasures = state.measures.filter((m) => measureKey(m.name) !== measureKey(currentUnit));
+      if (!availableMeasures.length) {
         await openIosSwal({
-          title: 'Sin unidades compatibles',
-          html: `<p>No hay otras unidades de la categoría <strong>${escapeHtml(currentMeta.category)}</strong> para cambiar.</p>`,
+          title: 'Sin unidades disponibles',
+          html: '<p>No hay otras unidades cargadas para cambiar.</p>',
           icon: 'warning',
           confirmButtonText: 'Entendido'
         });
@@ -5325,9 +5407,9 @@
             <input class="swal2-input ios-input" value="${escapeHtml(getMeasureLabel(currentUnit))}" readonly>
             <label class="form-label mt-2" for="massUnitChangeNewUnit">Nueva unidad</label>
             <select id="massUnitChangeNewUnit" class="swal2-input ios-input">
-              ${compatibleMeasures.map((m) => `<option value="${escapeHtml(m.name)}">${escapeHtml(getMeasureLabel(m.name))}</option>`).join('')}
+              ${availableMeasures.map((m) => `<option value="${escapeHtml(m.name)}">${escapeHtml(getMeasureLabel(m.name))}</option>`).join('')}
             </select>
-            <small class="text-muted d-block mt-2">Sólo se permiten cambios dentro de la misma categoría (${escapeHtml(currentMeta.category)}).</small>
+            <small class="text-muted d-block mt-2">Podés elegir cualquier unidad cargada. Categoría actual: ${escapeHtml(currentMeta.category)}.</small>
           </div>`,
         showCancelButton: true,
         confirmButtonText: 'Aplicar cambio',
@@ -5364,7 +5446,7 @@
       recomputeRecordStock(targetRecord, newUnit);
       state.inventario.items[itemId] = targetRecord;
       rebuildInventarioIndexes();
-      await persistInventario();
+      await persistInventario({ itemIds: [itemId] });
       await openIosSwal({
         title: 'Unidad actualizada',
         html: `<p>Se cambiaron <strong>${entries.length}</strong> ingreso(s) a <strong>${escapeHtml(getMeasureLabel(newUnit))}</strong>.</p>`,
@@ -6017,6 +6099,7 @@
     const ingredientId = state.selectedIngredientId;
     if (!ingredientId) return;
 
+    await ensureInventoryRecordDetail(ingredientId);
     const record = getRecord(ingredientId);
     const suggestedInput = nodes.editorForm.querySelector('#inventarioSuggestedExpiryDays');
     if (suggestedInput) {
@@ -6108,6 +6191,14 @@
         icon: 'warning',
         confirmButtonText: 'Entendido'
       });
+      return;
+    }
+
+    const bulkIngredientIds = [...new Set(bulkEntries.map((extra) => normalizeValue(extra.ingredientId)).filter(Boolean))];
+    await Promise.all(bulkIngredientIds.map((id) => ensureInventoryRecordDetail(id)));
+    const unresolvedInventory = [ingredientId, ...bulkIngredientIds].filter((id) => getRecord(id).__indexLite);
+    if (unresolvedInventory.length) {
+      await openIosSwal({ title: 'No se pudo guardar', html: '<p>No pudimos cargar el detalle exacto de inventario. Reintentá en unos segundos.</p>', icon: 'error', confirmButtonText: 'Entendido' });
       return;
     }
 
@@ -6229,7 +6320,7 @@
         recomputeRecordStock(record, record.stockUnit || entryUnit);
         state.inventario.items[ingredientId] = record;
         rebuildInventarioIndexes();
-        await persistInventario();
+        await persistInventario({ itemIds: [ingredientId] });
         state.editorDirty = false;
         renderEditor(ingredientId, {
           ...state.editorDraft,
@@ -6385,7 +6476,7 @@
 
       state.inventario.items[ingredientId] = record;
       rebuildInventarioIndexes();
-      await persistInventario();
+      await persistInventario({ itemIds: [ingredientId, ...bulkIngredientIds] });
       state.editorDirty = false;
       state.tablePage = 1;
       renderEditor(ingredientId, {
@@ -7359,6 +7450,7 @@
     if (editorBtn) {
       state.tablePage = 1;
       state.tableSearch = '';
+      await ensureInventoryRecordDetail(editorBtn.dataset.inventarioOpenEditor);
       renderEditor(editorBtn.dataset.inventarioOpenEditor);
       return;
     }
@@ -7399,6 +7491,7 @@
       setStateView('list');
       setPeriodMode(false);
       if (state.resumeEditor?.ingredientId && state.ingredientes[state.resumeEditor.ingredientId]) {
+        await ensureInventoryRecordDetail(state.resumeEditor.ingredientId);
         renderEditor(state.resumeEditor.ingredientId, state.resumeEditor.draft || null);
       } else {
         renderFamilies();
@@ -7483,8 +7576,11 @@
   });
   nodes.editorForm?.addEventListener('submit', saveEntry);
 
-  nodes.openPeriodFilterBtn?.addEventListener('click', () => {
+  nodes.openPeriodFilterBtn?.addEventListener('click', async () => {
     state.globalTablePage = 1;
+    nodes.globalLoading?.classList.remove('d-none');
+    await ensureFullInventoryLoaded();
+    nodes.globalLoading?.classList.add('d-none');
     renderGlobalPeriodTable();
     setPeriodMode(true);
   });
@@ -7503,6 +7599,7 @@
     state.globalTablePage = 1;
     nodes.globalLoading?.classList.remove('d-none');
     nodes.globalTableWrap?.classList.add('d-none');
+    await ensureFullInventoryLoaded();
     await new Promise((resolve) => setTimeout(resolve, 450));
     renderGlobalPeriodTable();
     nodes.globalLoading?.classList.add('d-none');
@@ -7517,6 +7614,7 @@
   });
 
   nodes.globalExpandBtn?.addEventListener('click', async () => {
+    await ensureFullInventoryLoaded();
     const rows = getGlobalFilteredEntries();
     const collapseMap = { ...state.globalEntryCollapse };
     let expandedPage = 1;
@@ -7607,12 +7705,15 @@
   });
 
   nodes.globalPrintBtn?.addEventListener('click', async () => {
+    await ensureFullInventoryLoaded();
     await openPrintGlobalPeriod(getGlobalFilteredEntries());
   });
   nodes.globalSheetBtn?.addEventListener('click', async () => {
+    await ensureFullInventoryLoaded();
     await openIngresosWeeklySheet(getGlobalFilteredEntries());
   });
   nodes.globalExcelBtn?.addEventListener('click', async () => {
+    await ensureFullInventoryLoaded();
     const rows = getGlobalFilteredEntries();
     const payload = rows.flatMap((row) => {
       const resolutionRow = getEntryResolutionRowData(row);

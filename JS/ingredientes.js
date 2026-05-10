@@ -186,7 +186,15 @@
 
   const fetchIngredientes = async () => {
     await window.laJamoneraReady;
-    const data = await window.dbLaJamoneraRest.read('/ingredientes');
+    let data = null;
+    try {
+      data = await window.dbLaJamoneraRest.read('/ingredientes_index');
+    } catch (error) {
+      data = null;
+    }
+    if (!data || (!data.items && !data.familias)) {
+      data = await window.dbLaJamoneraRest.read('/ingredientes');
+    }
     const safeData = safeObject(data);
     state.ingredientes = {
       familias: safeObject(safeData.familias),
@@ -199,7 +207,36 @@
   const persistIngredientes = async () => {
     ensureMeasures();
     await window.laJamoneraReady;
-    await window.dbLaJamoneraRest.write('/ingredientes', state.ingredientes);
+    const hasLiteItems = Object.values(safeObject(state.ingredientes.items)).some((item) => item?.__indexLite);
+    let payload = state.ingredientes;
+    if (hasLiteItems) {
+      const full = safeObject(await window.dbLaJamoneraRest.read('/ingredientes'));
+      const mergedItems = {};
+      Object.entries(safeObject(state.ingredientes.items)).forEach(([id, item]) => {
+        const base = item?.__indexLite && full.items?.[id] ? safeObject(full.items[id]) : {};
+        const { __indexLite, ...cleanItem } = safeObject(item);
+        mergedItems[id] = { ...base, ...cleanItem };
+      });
+      payload = {
+        familias: safeObject(state.ingredientes.familias),
+        items: mergedItems,
+        config: safeObject(state.ingredientes.config)
+      };
+      state.ingredientes = payload;
+    }
+    await window.dbLaJamoneraRest.write('/ingredientes', payload);
+  };
+
+  const ensureIngredientDetail = async (itemId) => {
+    const id = normalizeValue(itemId);
+    const current = safeObject(state.ingredientes.items?.[id]);
+    if (!id || !current.id || !current.__indexLite) return current;
+    const detail = safeObject(await window.dbLaJamoneraRest.read(`/ingredientes/items/${id}`));
+    if (detail.id) {
+      state.ingredientes.items[id] = { ...current, ...detail, __indexLite: false };
+      return state.ingredientes.items[id];
+    }
+    return current;
   };
 
   const getFamiliasArray = () => Object.values(safeObject(state.ingredientes.familias));
@@ -1091,6 +1128,8 @@
       delete state.ingredientes.familias[familyId];
       linkedItems.forEach((item) => delete state.ingredientes.items[item.id]);
       state.activeFamilyId = 'all';
+      await window.dbLaJamoneraRest.write(`/ingredientes/familias/${familyId}`, null);
+      await Promise.all(linkedItems.map((item) => window.dbLaJamoneraRest.write(`/ingredientes/items/${item.id}`, null)));
       await persistIngredientes();
       refreshView();
       return;
@@ -1098,7 +1137,7 @@
 
     const editIngredientButton = event.target.closest('[data-ingrediente-edit]');
     if (editIngredientButton) {
-      const item = state.ingredientes.items[editIngredientButton.dataset.ingredienteEdit];
+      const item = await ensureIngredientDetail(editIngredientButton.dataset.ingredienteEdit);
       if (item) {
         await openIngredientForm(item);
       }
@@ -1117,6 +1156,7 @@
         return;
       }
       delete state.ingredientes.items[itemId];
+      await window.dbLaJamoneraRest.write(`/ingredientes/items/${itemId}`, null);
       await persistIngredientes();
       refreshView();
     }
@@ -1181,6 +1221,9 @@
     openIngredientForm: async (initial = null, draft = null) => {
       await window.laJamoneraReady;
       await fetchIngredientes();
+      if (initial?.id) {
+        initial = await ensureIngredientDetail(initial.id);
+      }
       return openIngredientForm(initial, draft);
     },
     getIngredientesSnapshot: async () => {

@@ -1025,7 +1025,15 @@
 
   const collectReports = async () => {
     await window.laJamoneraReady;
-    const tree = await window.dbLaJamoneraRest.read('/informes');
+    let tree = null;
+    try {
+      tree = await window.dbLaJamoneraRest.read('/informes_index');
+    } catch (error) {
+      tree = null;
+    }
+    if (!tree) {
+      tree = await window.dbLaJamoneraRest.read('/informes');
+    }
     const output = [];
     const years = tree && typeof tree === 'object' ? Object.keys(tree) : [];
     years.forEach((year) => {
@@ -1525,6 +1533,29 @@
     return source.find((item) => item.id === reportId) || null;
   };
 
+  const ensureReportDetail = async (report) => {
+    const id = normalizeValue(report?.id);
+    const year = normalizeValue(report?.year);
+    const month = normalizeValue(report?.month);
+    const day = normalizeValue(report?.day);
+    if (!id || !year || !month || !day) return report || null;
+    if (report && !report.__indexLite && (report.html || Array.isArray(report.comments) || Array.isArray(report.attachments))) {
+      return report;
+    }
+    try {
+      const detail = await window.dbLaJamoneraRest.read(`/informes/${year}/${month}/${day}/${id}`);
+      if (!detail || typeof detail !== 'object') return report || null;
+      const merged = { ...report, ...detail, id: detail.id || id, year, month, day, __indexLite: false };
+      const idx = (state.reports || []).findIndex((item) => item.id === id);
+      if (idx >= 0) state.reports[idx] = merged;
+      const filteredIdx = (state.filteredReports || []).findIndex((item) => item.id === id);
+      if (filteredIdx >= 0) state.filteredReports[filteredIdx] = merged;
+      return merged;
+    } catch (error) {
+      return report || null;
+    }
+  };
+
   const ensureUsersAvailableForComment = async () => {
     const users = Object.values(state.users || {});
     if (users.length) return true;
@@ -1591,6 +1622,7 @@
   };
 
   const openReportViewer = async (report) => {
+    report = await ensureReportDetail(report) || report;
     const attachments = Array.isArray(report.attachments) ? report.attachments : [];
     const imageAttachments = attachments.filter((item) => item.type === 'image');
     const lastUpdatedAt = Number(report.updatedAt || 0);
@@ -1811,6 +1843,7 @@
 
 
   const editReport = async (report) => {
+    report = await ensureReportDetail(report) || report;
     const allowed = await verifyReportCreatorPin(report);
     if (!allowed) return;
 
@@ -2043,6 +2076,7 @@
   };
 
   const deleteReport = async (report) => {
+    report = await ensureReportDetail(report) || report;
     const allowed = await verifyReportCreatorPin(report);
     if (!allowed) return;
     const confirmation = await openIosSwal({
@@ -2205,6 +2239,7 @@
   };
 
   const addCommentToReport = async (report, parentCommentId = null, options = {}) => {
+    report = await ensureReportDetail(report) || report;
     const sourceReport = options.sourceReport || report;
 
     let userId = '';

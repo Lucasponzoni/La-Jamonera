@@ -99,6 +99,7 @@
     dispatchXlsxPage: 1,
     dispatchXlsxPageSize: 25,
     dispatchXlsxFilter: 'all',
+    repartoRecordsLoaded: false,
     reparto: {
       registros: {},
       sequenceByDate: {},
@@ -645,6 +646,21 @@
   };
   const getRegistrosList = () => Object.values(safeObject(state.registros));
   const getRegistroById = (key) => safeObject(state.registros?.[key]);
+  const ensureRegistroDetail = async (key) => {
+    const id = normalizeValue(key);
+    if (!id) return null;
+    const current = safeObject(state.registros?.[id]);
+    if (current.id && !current.__indexLite) return current;
+    try {
+      const detail = safeObject(await window.dbLaJamoneraRest.read(`${REGISTROS_PATH}/${id}`));
+      if (detail.id || Object.keys(detail).length) {
+        state.registros[id] = { ...current, ...detail, id, __indexLite: false };
+        return state.registros[id];
+      }
+    } catch (error) {
+    }
+    return current.id ? current : null;
+  };
   const getGeneralPassword = async () => {
     await window.laJamoneraReady;
     const value = await window.dbLaJamoneraRest.read('/passGeneral/pass');
@@ -825,6 +841,53 @@
       };
     });
     return inventoryNext;
+  };
+  const getRecipeIngredientIds = (recipe = {}) => {
+    const ids = new Set();
+    (Array.isArray(recipe.rows) ? recipe.rows : []).forEach((row) => {
+      if (normalizeValue(row?.type) !== 'ingredient') return;
+      const ingredientId = normalizeValue(row.ingredientId);
+      if (ingredientId) ids.add(ingredientId);
+      normalizeRelatedIngredients(row.relatedIngredients).forEach((item) => {
+        if (item.ingredientId) ids.add(item.ingredientId);
+      });
+    });
+    return [...ids];
+  };
+  const ensureInventoryDetailsForIds = async (ids = [], options = {}) => {
+    const force = Boolean(options.force);
+    const uniqueIds = [...new Set((Array.isArray(ids) ? ids : []).map(normalizeValue).filter(Boolean))];
+    if (!uniqueIds.length) return;
+    await window.laJamoneraReady;
+    await Promise.all(uniqueIds.map(async (ingredientId) => {
+      const current = safeObject(state.inventario.items?.[ingredientId]);
+      const hasEntries = Array.isArray(current.entries);
+      if (!force && hasEntries && !current.__indexLite) return;
+      try {
+        const detail = safeObject(await window.dbLaJamoneraRest.read(`/inventario/items/${ingredientId}`));
+        if (Object.keys(detail).length) {
+          state.inventario.items = safeObject(state.inventario.items);
+          state.inventario.items[ingredientId] = { ...current, ...detail, __indexLite: false };
+        }
+      } catch (error) {
+      }
+    }));
+  };
+  const ensureInventoryDetailsForRecipe = async (recipe = {}, options = {}) => {
+    await ensureInventoryDetailsForIds(getRecipeIngredientIds(recipe), options);
+  };
+  const getInventoryIdsFromPlans = (...plans) => [...new Set(plans.flatMap((plan) =>
+    (Array.isArray(plan?.ingredientPlans) ? plan.ingredientPlans : [])
+      .map((item) => normalizeValue(item?.ingredientId))
+      .filter(Boolean)))];
+  const writeInventoryRecords = async (inventory, ids = []) => {
+    const uniqueIds = [...new Set((Array.isArray(ids) ? ids : []).map(normalizeValue).filter(Boolean))];
+    for (const ingredientId of uniqueIds) {
+      await window.dbLaJamoneraRest.write(`/inventario/items/${ingredientId}`, stripUndefinedDeep(safeObject(inventory?.items?.[ingredientId])));
+    }
+  };
+  const writeInventoryRecordsForPlans = async (inventory, ...plans) => {
+    await writeInventoryRecords(inventory, getInventoryIdsFromPlans(...plans));
   };
   const initialsFromName = (value) => normalizeValue(value)
     .split(/\s+/)
@@ -1142,11 +1205,20 @@
     }
     const entries = Array.isArray(record.entries) ? record.entries : [];
     const targetMeta = getUnitMeta(targetUnit);
-    if (!entries.length && targetMeta.category === 'peso') {
-      const stockKg = Number(record.stockKg || 0);
-      const base = Number.isFinite(stockKg) ? stockKg * 1000 : 0;
-      const reserved = reservedByOthersForEntry(ingredientId, '', 'kg') * 1000;
-      const net = Math.max(0, base - reserved);
+    if (!entries.length) {
+      const stockUnit = normalizeValue(record.stockUnit || targetUnit || 'kilos');
+      const stockMeta = getUnitMeta(stockUnit);
+      let base = Number(record.stockBase);
+      if ((!Number.isFinite(base) || base <= 0) && targetMeta.category === 'peso') {
+        const stockKg = Number(record.stockKg || 0);
+        base = Number.isFinite(stockKg) ? stockKg * 1000 : 0;
+      }
+      if (stockMeta.category !== targetMeta.category || !Number.isFinite(base)) {
+        base = 0;
+      }
+      const reserved = reservedByOthersForEntry(ingredientId, '', stockUnit);
+      const reservedBase = toBase(reserved, stockUnit);
+      const net = Math.max(0, base - (Number.isFinite(reservedBase) ? reservedBase : 0));
       return {
         available: fromBase(net, targetUnit),
         total: fromBase(base, targetUnit),
@@ -1534,6 +1606,25 @@
     return Number(a.createdAt || 0) - Number(b.createdAt || 0);
   });
   const getDispatchRecordsList = () => Object.values(safeObject(state.reparto?.registros));
+  const ensureRepartoRecordsLoaded = async () => {
+    if (state.repartoRecordsLoaded) return;
+    await window.laJamoneraReady;
+    let registros = null;
+    try {
+      registros = await window.dbLaJamoneraRest.read(`${REPARTO_PATH}/registros`);
+    } catch (error) {
+      registros = null;
+    }
+    if (!registros) {
+      try {
+        registros = await window.dbLaJamoneraRest.read(`${LEGACY_REPARTO_PATH}/registros`);
+      } catch (error) {
+        registros = {};
+      }
+    }
+    state.reparto.registros = safeObject(registros);
+    state.repartoRecordsLoaded = true;
+  };
   const getProducedStockMeta = (recipeId) => {
     const indexed = safeObject(state.reparto?.productIndex?.[recipeId]);
     if (Object.keys(indexed).length) {
@@ -3712,6 +3803,9 @@
     return updated;
   };
   const openTraceability = async (registro) => {
+    if (registro?.__indexLite && registro.id) {
+      registro = await ensureRegistroDetail(registro.id) || registro;
+    }
     Swal.fire({
       title: 'Cargando trazabilidad...',
       html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando trazabilidad" class="meta-spinner-login"></div>',
@@ -3891,7 +3985,7 @@
       state.dispatchSearch = code;
       state.dispatchRange = '';
       state.dispatchPage = 1;
-      openDispatch();
+      await openDispatch();
       return;
     }
     await openIosSwal({ title: 'Código no reconocido', html: '<p>El código no corresponde a Producción ni Reparto.</p>', icon: 'info' });
@@ -4949,9 +5043,13 @@
     });
   };
 
-  const openDispatch = () => {
+  const openDispatch = async () => {
     state.dispatchPage = 1;
     setDispatchMode(true);
+    if (nodes.dispatchView) {
+      nodes.dispatchView.innerHTML = '<div class="informes-empty">Cargando repartos...</div>';
+    }
+    await ensureRepartoRecordsLoaded();
     renderDispatchMain();
   };
   const buildDispatchXlsxDraft = () => ({
@@ -5972,6 +6070,12 @@
     }
     Swal.fire({ title: 'Procesando ingresos...', html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Procesando" class="meta-spinner-login"></div>', allowOutsideClick: false, showConfirmButton: false, customClass: { popup: 'ios-alert produccion-loading-alert' } });
     try {
+      const touchedInventoryIds = new Set();
+      const ingredientRowsToLoad = [...new Set(rows.flatMap((row) =>
+        (Array.isArray(row.mappedIngredients) ? row.mappedIngredients : [])
+          .map((item) => normalizeValue(item.id))
+          .filter(Boolean)))];
+      await ensureInventoryDetailsForIds(ingredientRowsToLoad, { force: true });
       const byDispatch = {};
       rows.forEach((row) => {
         const key = `${normalizeValue(row.invoiceDate || toIsoDate())}__${normalizeValue(row.invoiceNumber)}__${normalizeValue(row.clientId || row.clientName)}`;
@@ -5997,6 +6101,7 @@
             row.mappedIngredients.forEach((mappedItem) => {
               const ingredientId = normalizeValue(mappedItem.id);
               if (!ingredientId) return;
+              touchedInventoryIds.add(ingredientId);
               const rowPreview = safeObject(resolutionPreview.ingredient?.[normalizeValue(row.id)]?.[ingredientId]);
               const requestedQty = Number(mappedItem.qty || 0);
               const availableQty = Number(mappedItem.available || 0);
@@ -6090,7 +6195,7 @@
           createdBy: getCurrentUserLabel()
         };
       }
-      await window.dbLaJamoneraRest.write('/inventario', state.inventario);
+      await writeInventoryRecords(state.inventario, [...touchedInventoryIds]);
       await persistRepartoStore();
       await refreshData({ silent: true });
       Swal.close();
@@ -6127,8 +6232,13 @@
     });
     try {
       let resolvedCount = 0;
+      const touchedInventoryIds = new Set();
       const safeRowId = normalizeValue(rowId);
       const rows = draft.rows.filter((row) => normalizeValue(row.id) === safeRowId && !row.disabled && normalizeValue(row.mappedTargetId));
+      await ensureInventoryDetailsForIds(rows.flatMap((row) =>
+        (Array.isArray(row.mappedIngredients) ? row.mappedIngredients : [])
+          .map((item) => normalizeValue(item.id))
+          .filter(Boolean)), { force: true });
       for (const row of rows) {
         const dispatchDate = normalizeDispatchDateToken(row.invoiceDate) || toIsoDate();
         const mappedIngredients = Array.isArray(row.mappedIngredients) ? row.mappedIngredients : [];
@@ -6137,6 +6247,7 @@
           for (const item of mappedIngredients) {
             const currentIngredientId = normalizeValue(item.id);
             if (!currentIngredientId || (normalizeValue(ingredientId) && currentIngredientId !== normalizeValue(ingredientId))) continue;
+            touchedInventoryIds.add(currentIngredientId);
             const requestedQty = Number(item.qty || 0);
             const stockMeta = getDispatchXlsxIngredientStockMeta(currentIngredientId, dispatchDate);
             const availableQty = Number(stockMeta.available || 0);
@@ -6182,7 +6293,7 @@
       }
 
       if (resolvedCount > 0) {
-        await window.dbLaJamoneraRest.write('/inventario', state.inventario);
+        await writeInventoryRecords(state.inventario, [...touchedInventoryIds]);
         await persistRepartoStore();
       }
       recomputeDispatchXlsxDraftRows(draft);
@@ -6509,6 +6620,9 @@
     prepareThumbLoaders('.js-produccion-user-photo, .js-dispatch-inline-thumb');
   };
   const persistRepartoStore = async () => {
+    if (!state.repartoRecordsLoaded) {
+      await ensureRepartoRecordsLoaded();
+    }
     await window.dbLaJamoneraRest.write(REPARTO_PATH, stripUndefinedDeep(state.reparto));
   };
   const DISPATCH_NEW_LOCALITY_VALUE = '__new_locality__';
@@ -7010,6 +7124,7 @@
   const cancelProduction = async (registro) => {
     const productionId = normalizeValue(registro?.id);
     if (!productionId) return;
+    await ensureRepartoRecordsLoaded();
     const linkedDispatch = getDispatchRecordsList().filter((row) => (Array.isArray(row?.products) ? row.products : []).some((product) => (Array.isArray(product?.allocations) ? product.allocations : []).some((allocation) => normalizeValue(allocation?.productionId) === productionId)));
     if (linkedDispatch.length) {
       await openIosSwal({ title: 'Eliminación bloqueada', html: '<p>Esta producción está asociada a una salida de productos. Eliminá primero los repartos vinculados.</p>', icon: 'warning' });
@@ -7028,13 +7143,14 @@
     if (!auth.isConfirmed) return;
     showRestoringStockOverlay();
     try {
-      const latestInventory = safeObject(await window.dbLaJamoneraRest.read('/inventario'));
+      await ensureInventoryDetailsForIds(getInventoryIdsFromPlans({ ingredientPlans: registro.lots || [] }), { force: true });
+      const latestInventory = safeObject(state.inventario);
       const restored = applyPlanOnInventory(latestInventory, { ingredientPlans: registro.lots || [] }, productionId, registro.productionDate, 'restore');
       const registros = deepClone(state.registros);
       const previous = deepClone(registros[productionId]);
       delete registros[productionId];
       removeRecipeMovementsBySource({ recipeId: registro.recipeId, sourceId: productionId, sourceCode: productionId });
-      await window.dbLaJamoneraRest.write('/inventario', stripUndefinedDeep(restored));
+      await writeInventoryRecordsForPlans(restored, { ingredientPlans: registro.lots || [] });
       await window.dbLaJamoneraRest.write(`${REGISTROS_PATH}/${productionId}`, null);
       await removePublicTrace(productionId);
       const recipeIndexPath = `${REPARTO_PATH}/productIndex/${normalizeValue(registro.recipeId)}`;
@@ -7130,7 +7246,8 @@
     if (!form.isConfirmed) return;
     const recipe = state.recetas[registro.recipeId];
     if (!recipe) return;
-    const currentInventory = safeObject(await window.dbLaJamoneraRest.read('/inventario'));
+    await ensureInventoryDetailsForRecipe(recipe, { force: true });
+    const currentInventory = safeObject(state.inventario);
     const restored = applyPlanOnInventory(currentInventory, { ingredientPlans: registro.lots || [] }, registro.id, registro.productionDate, 'restore');
     const backup = state.inventario;
     state.inventario = restored;
@@ -7192,7 +7309,7 @@
         })
       }
     };
-    await window.dbLaJamoneraRest.write('/inventario', consumed);
+    await writeInventoryRecordsForPlans(consumed, { ingredientPlans: registro.lots || [] }, plan);
     await window.dbLaJamoneraRest.write(`${REGISTROS_PATH}/${registro.id}`, registros[registro.id]);
     await appendAudit({ action: 'produccion_editada', productionId: registro.id, before: prev, after: registros[registro.id], reason: auth.value.reason });
     state.inventario = consumed;
@@ -7280,8 +7397,14 @@
   const persistRecipeGroups = async () =>
     window.dbLaJamoneraRest.write(RECIPE_GROUPS_PATH, state.recipeGroups);
 
-  const persistRecetas = async () =>
-    window.dbLaJamoneraRest.write('/recetas', state.recetas);
+  const persistRecetas = async () => {
+    const rows = Object.values(safeObject(state.recetas)).filter((recipe) => recipe?.id);
+    for (const recipe of rows) {
+      const recipeGroupId = normalizeValue(recipe.recipeGroupId);
+      await window.dbLaJamoneraRest.update(`/recetas/${recipe.id}`, { recipeGroupId });
+      await window.dbLaJamoneraRest.update(`/recetas_index/items/${recipe.id}`, { recipeGroupId });
+    }
+  };
 
   // Sube imagen a Firebase Storage usando el mismo patrón que usuarios/recetas.
   const uploadRecipeGroupImage = async (file) => {
@@ -7859,8 +7982,12 @@
     state.editorMode = mode;
     state.sinTrazabilidad = !isViewOnly && Boolean(options.sinTrazabilidad);
     const recipe = state.recetas[recipeId];
-    let analysis = state.analysis[recipeId] || (recipe ? analyzeRecipe(recipe) : null);
-    if (!recipe || !analysis) return;
+    if (!recipe) return;
+    if (!isViewOnly) {
+      await ensureInventoryDetailsForRecipe(recipe);
+    }
+    let analysis = state.analysis[recipeId] || analyzeRecipe(recipe);
+    if (!analysis) return;
     const foreignDraft = !isViewOnly ? getForeignDraftConflict(recipe.id) : null;
     if (foreignDraft) {
       const action = await openIosSwal({
@@ -8258,19 +8385,19 @@
       }
       const recipePlanillaBtn = event.target.closest('[data-recipe-prod-planilla]');
       if (recipePlanillaBtn) {
-        const reg = state.registros[recipePlanillaBtn.dataset.recipeProdPlanilla];
+        const reg = await ensureRegistroDetail(recipePlanillaBtn.dataset.recipeProdPlanilla);
         if (reg) await window.laJamoneraPlanillaProduccion?.openByRegistro?.(reg, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users) });
         return;
       }
       const recipeQrPrintBtn = event.target.closest('[data-recipe-prod-qr-print]');
       if (recipeQrPrintBtn) {
-        const reg = state.registros[recipeQrPrintBtn.dataset.recipeProdQrPrint];
+        const reg = await ensureRegistroDetail(recipeQrPrintBtn.dataset.recipeProdQrPrint);
         if (reg) await openProductionQrPrintConfigurator(reg);
         return;
       }
       const recipeTraceBtn = event.target.closest('[data-recipe-prod-trace]');
       if (recipeTraceBtn) {
-        const reg = state.registros[recipeTraceBtn.dataset.recipeProdTrace];
+        const reg = await ensureRegistroDetail(recipeTraceBtn.dataset.recipeProdTrace);
         if (reg) await openTraceability(reg);
         return;
       }
@@ -8291,13 +8418,13 @@
       }
       const recipePrintBtn = event.target.closest('[data-recipe-prod-print]');
       if (recipePrintBtn) {
-        const reg = state.registros[recipePrintBtn.dataset.recipeProdPrint];
+        const reg = await ensureRegistroDetail(recipePrintBtn.dataset.recipeProdPrint);
         if (reg) await printReport(reg);
         return;
       }
       const recipeDeleteBtn = event.target.closest('[data-recipe-prod-delete]');
       if (recipeDeleteBtn) {
-        const reg = state.registros[recipeDeleteBtn.dataset.recipeProdDelete];
+        const reg = await ensureRegistroDetail(recipeDeleteBtn.dataset.recipeProdDelete);
         if (reg) {
           const deleted = await cancelProduction(reg);
           if (deleted) renderRecipeHistory();
@@ -8383,19 +8510,19 @@
               }
               const planillaBtn = clickEvent.target.closest('[data-recipe-prod-planilla]');
               if (planillaBtn) {
-                const reg = state.registros[planillaBtn.dataset.recipeProdPlanilla];
+                const reg = await ensureRegistroDetail(planillaBtn.dataset.recipeProdPlanilla);
                 if (reg) await window.laJamoneraPlanillaProduccion?.openByRegistro?.(reg, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users) });
                 return;
               }
               const qrPrintBtn = clickEvent.target.closest('[data-recipe-prod-qr-print]');
               if (qrPrintBtn) {
-                const reg = state.registros[qrPrintBtn.dataset.recipeProdQrPrint];
+                const reg = await ensureRegistroDetail(qrPrintBtn.dataset.recipeProdQrPrint);
                 if (reg) await openProductionQrPrintConfigurator(reg);
                 return;
               }
               const traceBtn = clickEvent.target.closest('[data-recipe-prod-trace]');
               if (traceBtn) {
-                const reg = state.registros[traceBtn.dataset.recipeProdTrace];
+                const reg = await ensureRegistroDetail(traceBtn.dataset.recipeProdTrace);
                 if (reg) await openTraceability(reg);
                 return;
               }
@@ -8409,7 +8536,7 @@
               }
               const deleteBtn = clickEvent.target.closest('[data-recipe-prod-delete]');
               if (deleteBtn) {
-                const reg = state.registros[deleteBtn.dataset.recipeProdDelete];
+                const reg = await ensureRegistroDetail(deleteBtn.dataset.recipeProdDelete);
                 if (reg) {
                   const deleted = await cancelProduction(reg);
                   if (deleted) {
@@ -8541,8 +8668,7 @@
     });
     prepareThumbLoaders('.js-produccion-head-photo, .js-produccion-user-photo');
     const confirmProduction = async () => {
-      const refreshBefore = await window.dbLaJamoneraRest.read('/inventario');
-      state.inventario = safeObject(refreshBefore);
+      await ensureInventoryDetailsForRecipe(recipe, { force: true });
       const qty = parsePositive(qtyInput.value, 0.1);
       const date = normalizeValue(dateInput.value) || toIsoDate();
       const revalidated = buildPlanForRecipe(recipe, qty, date, { sinTrazabilidad: state.sinTrazabilidad });
@@ -8750,7 +8876,7 @@
         exports: {},
         auditTrail: [{ action: 'creada', at: nowTs(), user: getCurrentUserLabel() }]
         };
-        await window.dbLaJamoneraRest.write('/inventario', inventarioNext);
+        await writeInventoryRecordsForPlans(inventarioNext, plan);
         await window.dbLaJamoneraRest.write(SEQUENCE_PATH, nextSequence);
         await window.dbLaJamoneraRest.write(`${REGISTROS_PATH}/${productionId}`, registro);
         await publishPublicTrace(registro);
@@ -8849,18 +8975,28 @@
         return fallback;
       }
     };
+    const safeReadFirst = async (paths = [], fallback = {}) => {
+      for (const path of paths) {
+        try {
+          const value = await window.dbLaJamoneraRest.read(path);
+          if (value != null) return value;
+        } catch (error) {
+        }
+      }
+      return fallback;
+    };
     const [recetas, ingredientes, inventario, config, reservas, drafts, registros, users, repartoStore, legacyRepartoStore, recipeGroups] = await Promise.all([
-      safeRead('/recetas', {}),
-      safeRead('/ingredientes/items', {}),
-      safeRead('/inventario', {}),
+      safeReadFirst(['/recetas_index/items', '/recetas'], {}),
+      safeReadFirst(['/ingredientes_index/items', '/ingredientes/items'], {}),
+      safeReadFirst(['/inventario_index', '/inventario'], {}),
       safeRead(CONFIG_PATH, {}),
       safeRead(RESERVAS_PATH, {}),
       safeRead(DRAFTS_PATH, {}),
-      safeRead(REGISTROS_PATH, {}),
+      safeReadFirst(['/produccion_index/registros', REGISTROS_PATH], {}),
       safeRead('/informes/users', {}),
-      safeRead(REPARTO_PATH, {}),
+      safeReadFirst(['/reparto_index', REPARTO_PATH], {}),
       safeRead(LEGACY_REPARTO_PATH, {}),
-      safeRead(RECIPE_GROUPS_PATH, {})
+      safeReadFirst(['/recetas_index/groups', RECIPE_GROUPS_PATH], {})
     ]);
     state.recetas = safeObject(recetas);
     state.recipeGroups = safeObject(recipeGroups);
@@ -8874,7 +9010,11 @@
       ? repartoStore
       : legacyRepartoStore;
     state.reparto = normalizeDispatchStore(nextRepartoStore);
+    state.repartoRecordsLoaded = Object.prototype.hasOwnProperty.call(safeObject(nextRepartoStore), 'registros');
     if (!Object.keys(safeObject(state.reparto.productIndex)).length) {
+      if (!state.repartoRecordsLoaded) {
+        await ensureRepartoRecordsLoaded();
+      }
       rebuildProductIndexFromHistory();
       try {
         await window.dbLaJamoneraRest.write(REPARTO_PATH, state.reparto);
@@ -9164,7 +9304,7 @@
       return;
     }
     if (event.target.closest('#produccionDispatchBtn')) {
-      openDispatch();
+      await openDispatch();
     }
   });
   nodes.historyBackBtn?.addEventListener('click', async () => {
@@ -9291,13 +9431,13 @@
           }
           const qrPrintBtn = event.target.closest('[data-recipe-prod-qr-print]');
           if (qrPrintBtn) {
-            const reg = state.registros[qrPrintBtn.dataset.recipeProdQrPrint];
+            const reg = await ensureRegistroDetail(qrPrintBtn.dataset.recipeProdQrPrint);
             if (reg) await openProductionQrPrintConfigurator(reg);
             return;
           }
           const traceBtn = event.target.closest('[data-recipe-prod-trace]');
           if (traceBtn) {
-            const reg = state.registros[traceBtn.dataset.recipeProdTrace];
+            const reg = await ensureRegistroDetail(traceBtn.dataset.recipeProdTrace);
             if (reg) await openTraceability(reg);
             return;
           }
@@ -9311,7 +9451,7 @@
           }
           const deleteBtn = event.target.closest('[data-prod-cancel]');
           if (deleteBtn) {
-            const reg = state.registros[deleteBtn.dataset.prodCancel];
+            const reg = await ensureRegistroDetail(deleteBtn.dataset.prodCancel);
             if (reg) {
               const deleted = await cancelProduction(reg);
               if (deleted) {
@@ -10801,7 +10941,7 @@
             }
             const traceBtn = expandedEvent.target.closest('[data-prod-trace]');
             if (traceBtn) {
-              const reg = getRegistroById(traceBtn.dataset.prodTrace);
+              const reg = await ensureRegistroDetail(traceBtn.dataset.prodTrace);
               if (reg) await openTraceability(reg);
               return;
             }
@@ -10847,7 +10987,7 @@
     }
     const traceBtn = event.target.closest('[data-prod-trace]');
     if (traceBtn) {
-      const reg = getRegistroById(traceBtn.dataset.prodTrace);
+      const reg = await ensureRegistroDetail(traceBtn.dataset.prodTrace);
       if (reg) await openTraceability(reg);
       return;
     }
@@ -11296,22 +11436,21 @@
       renderHistoryTable();
       return;
     }
-    const getRegistro = (key) => state.registros[key];
     const planillaBtn = event.target.closest('[data-prod-planilla]');
     if (planillaBtn) {
-      const reg = getRegistro(planillaBtn.dataset.prodPlanilla);
+      const reg = await ensureRegistroDetail(planillaBtn.dataset.prodPlanilla);
       if (reg) await window.laJamoneraPlanillaProduccion?.openByRegistro?.(reg, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users) });
       return;
     }
     const qrPrintBtn = event.target.closest('[data-prod-qr-print]');
     if (qrPrintBtn) {
-      const reg = getRegistro(qrPrintBtn.dataset.prodQrPrint);
+      const reg = await ensureRegistroDetail(qrPrintBtn.dataset.prodQrPrint);
       if (reg) await openProductionQrPrintConfigurator(reg);
       return;
     }
     const traceBtn = event.target.closest('[data-prod-trace]');
     if (traceBtn) {
-      const reg = getRegistroById(traceBtn.dataset.prodTrace);
+      const reg = await ensureRegistroDetail(traceBtn.dataset.prodTrace);
       if (reg) await openTraceability(reg);
       return;
     }
@@ -11344,13 +11483,13 @@
     }
     const printBtn = event.target.closest('[data-prod-print]');
     if (printBtn) {
-      const reg = getRegistro(printBtn.dataset.prodPrint);
+      const reg = await ensureRegistroDetail(printBtn.dataset.prodPrint);
       if (reg) await printReport(reg);
       return;
     }
     const cancelBtn = event.target.closest('[data-prod-cancel]');
     if (cancelBtn) {
-      const reg = getRegistro(cancelBtn.dataset.prodCancel);
+      const reg = await ensureRegistroDetail(cancelBtn.dataset.prodCancel);
       if (reg) {
         const deleted = await cancelProduction(reg);
         if (deleted) renderHistoryTable();
@@ -11362,7 +11501,7 @@
       const id = normalizeValue(productionId);
       if (!id) return null;
       if (!state.registros[id]) await refreshData();
-      return state.registros[id] || null;
+      return ensureRegistroDetail(id);
     },
     openTraceabilityById: async (productionId) => {
       const id = normalizeValue(productionId);
@@ -11370,7 +11509,7 @@
       if (!state.registros[id]) {
         await refreshData();
       }
-      const reg = state.registros[id];
+      const reg = await ensureRegistroDetail(id);
       if (!reg) {
         await openIosSwal({ title: 'Sin datos', html: '<p>No se encontró la producción solicitada.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
         return;

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="es" class="index-protected">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>
+    (function earlyIndexGuard() {
+      const SESSION_KEY = 'laJamoneraSession';
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (!raw) {
+        window.location.replace('./login.html');
+        return;
+      }
+
+      try {
+        const session = JSON.parse(raw);
+        if (Date.now() < Number(session.expiresAt)) {
+          document.documentElement.classList.add('auth-ok');
+          return;
+        }
+      } catch (error) {
+      }
+
+      localStorage.removeItem(SESSION_KEY);
+      window.location.replace('./login.html');
+    })();
+  </script>
+  <title>La Jamonera | Optimizador Firebase</title>
+  <meta name="description" content="Herramienta privada para reconstruir indices livianos de Firebase.">
+  <link rel="shortcut icon" href="./IMG/La Jamonera App.png" type="image/x-icon">
+  <link rel="icon" type="image/webp" href="./IMG/La Jamonera Cerdito.webp">
+  <link rel="apple-touch-icon" href="./IMG/La Jamonera App.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="La Jamonera">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Viga&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
+  <link rel="stylesheet" href="./CSS/style.css">
+  <style>
+    .optimizer-page {
+      min-height: 100vh;
+      background: #f4f7fb;
+      color: #1f2937;
+    }
+    .optimizer-header {
+      border-bottom: 1px solid rgba(31, 41, 55, 0.1);
+      background: #ffffff;
+    }
+    .optimizer-header-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 16px clamp(16px, 4vw, 32px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .optimizer-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      color: #1f2937;
+      text-decoration: none;
+      min-width: 0;
+    }
+    .optimizer-brand img {
+      width: 42px;
+      height: 42px;
+      object-fit: contain;
+      flex: 0 0 auto;
+    }
+    .optimizer-brand span {
+      font-family: "Viga", "Inter", sans-serif;
+      font-size: 1.25rem;
+      white-space: nowrap;
+    }
+    .optimizer-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .optimizer-main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: clamp(18px, 4vw, 36px);
+    }
+    .optimizer-tool {
+      display: grid;
+      grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+    .optimizer-panel,
+    .optimizer-console-panel {
+      background: #ffffff;
+      border: 1px solid rgba(31, 41, 55, 0.1);
+      border-radius: 8px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+    }
+    .optimizer-panel {
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .optimizer-kicker {
+      margin: 0;
+      color: #64748b;
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+    .optimizer-title {
+      margin: 0;
+      font-size: clamp(1.6rem, 4vw, 2.25rem);
+      line-height: 1.05;
+      letter-spacing: 0;
+      color: #111827;
+    }
+    .optimizer-status {
+      margin: 0;
+      color: #475569;
+      line-height: 1.45;
+    }
+    .optimizer-meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .optimizer-meta-item {
+      border: 1px solid rgba(31, 41, 55, 0.1);
+      border-radius: 8px;
+      padding: 12px;
+      background: #f8fafc;
+    }
+    .optimizer-meta-item small {
+      display: block;
+      color: #64748b;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0;
+      font-size: 0.72rem;
+    }
+    .optimizer-meta-item strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 1rem;
+      color: #0f172a;
+    }
+    .optimizer-run-btn {
+      min-height: 46px;
+      justify-content: center;
+    }
+    .optimizer-console-panel {
+      min-height: 560px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .optimizer-console-head {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(31, 41, 55, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: #f8fafc;
+    }
+    .optimizer-console-head strong {
+      color: #0f172a;
+    }
+    .optimizer-console {
+      flex: 1 1 auto;
+      margin: 0;
+      padding: 16px;
+      overflow: auto;
+      background: #0f172a;
+      color: #dbeafe;
+      font-family: Consolas, "SFMono-Regular", "Liberation Mono", monospace;
+      font-size: 0.9rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .optimizer-console-line {
+      display: block;
+      margin-bottom: 5px;
+    }
+    .optimizer-console-line.is-error {
+      color: #fecaca;
+    }
+    .optimizer-console-line.is-ok {
+      color: #bbf7d0;
+    }
+    @media (max-width: 860px) {
+      .optimizer-header-inner {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .optimizer-actions {
+        width: 100%;
+        justify-content: flex-start;
+      }
+      .optimizer-tool {
+        grid-template-columns: 1fr;
+      }
+      .optimizer-console-panel {
+        min-height: 420px;
+      }
+    }
+  </style>
+</head>
+<body class="optimizer-page">
+  <header class="optimizer-header">
+    <div class="optimizer-header-inner">
+      <a class="optimizer-brand" href="./index.html" aria-label="Volver al panel">
+        <img src="./IMG/La Jamonera Cerdito.webp" alt="La Jamonera">
+        <span>La Jamonera</span>
+      </a>
+      <div class="optimizer-actions">
+        <a class="btn ios-btn ios-btn-secondary" href="./index.html">
+          <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+          <span>Panel</span>
+        </a>
+        <button class="btn ios-btn ios-btn-secondary js-logout" type="button">
+          <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+          <span>Cerrar sesion</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="optimizer-main">
+    <section class="optimizer-tool" aria-label="Optimizador Firebase">
+      <div class="optimizer-panel">
+        <p class="optimizer-kicker">Firebase</p>
+        <h1 class="optimizer-title">Optimizador de indices</h1>
+        <p id="optimizerStatus" class="optimizer-status">Listo para reconstruir indices livianos.</p>
+
+        <div class="optimizer-meta" aria-live="polite">
+          <div class="optimizer-meta-item">
+            <small>Version</small>
+            <strong id="optimizerVersion">--</strong>
+          </div>
+          <div class="optimizer-meta-item">
+            <small>Ultima corrida</small>
+            <strong id="optimizerLastRun">Sin datos</strong>
+          </div>
+        </div>
+
+        <button id="optimizerRunBtn" class="btn ios-btn ios-btn-primary optimizer-run-btn" type="button">
+          <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+          <span>Ejecutar optimizacion</span>
+        </button>
+      </div>
+
+      <div class="optimizer-console-panel">
+        <div class="optimizer-console-head">
+          <strong>Consola</strong>
+          <button id="optimizerClearBtn" class="btn ios-btn ios-btn-secondary btn-sm" type="button">
+            <i class="fa-solid fa-eraser" aria-hidden="true"></i>
+            <span>Limpiar</span>
+          </button>
+        </div>
+        <div id="optimizerConsole" class="optimizer-console" role="log" aria-live="polite" aria-atomic="false"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="./JS/firebase-init.js"></script>
+  <script src="./JS/firebase-indexes.js"></script>
+  <script src="./JS/app.js"></script>
+  <script src="./JS/firebase-optimizador.js"></script>
+</body>
+</html>

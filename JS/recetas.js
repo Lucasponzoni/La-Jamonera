@@ -569,7 +569,15 @@
       return;
     }
     await window.laJamoneraReady;
-    const data = await window.dbLaJamoneraRest.read('/ingredientes');
+    let data = null;
+    try {
+      data = await window.dbLaJamoneraRest.read('/ingredientes_index');
+    } catch (error) {
+      data = null;
+    }
+    if (!data?.items) {
+      data = await window.dbLaJamoneraRest.read('/ingredientes');
+    }
     state.ingredientes = safeObject(data?.items);
     state.familias = safeObject(data?.familias);
     state.measures = Array.isArray(data?.config?.measures) ? data.config.measures : [];
@@ -577,9 +585,19 @@
 
   const fetchRecetas = async () => {
     await window.laJamoneraReady;
-    state.recetas = safeObject(await window.dbLaJamoneraRest.read('/recetas'));
+    let indexed = null;
+    try {
+      indexed = await window.dbLaJamoneraRest.read('/recetas_index');
+    } catch (error) {
+      indexed = null;
+    }
+    state.recetas = indexed?.items
+      ? safeObject(indexed.items)
+      : safeObject(await window.dbLaJamoneraRest.read('/recetas'));
     // Mismos grupos que comparte el modal Producción (Embutidos, Picadas, etc.).
-    state.recipeGroups = safeObject(await window.dbLaJamoneraRest.read('/recetas_groups'));
+    state.recipeGroups = indexed?.groups
+      ? safeObject(indexed.groups)
+      : safeObject(await window.dbLaJamoneraRest.read('/recetas_groups'));
     const cfg = safeObject(await window.dbLaJamoneraRest.read('/recetas_config'));
     const cities = Array.isArray(cfg.cities) ? cfg.cities.map((item) => normalizeValue(item)).filter(Boolean) : [];
     const brands = Array.isArray(cfg.brands) ? cfg.brands.map((item) => normalizeValue(item)).filter(Boolean) : [];
@@ -605,7 +623,31 @@
 
   const persistRecetas = async () => {
     await window.laJamoneraReady;
-    await window.dbLaJamoneraRest.write('/recetas', state.recetas);
+    const hasLiteRecipes = Object.values(safeObject(state.recetas)).some((item) => item?.__indexLite);
+    let payload = state.recetas;
+    if (hasLiteRecipes) {
+      const full = safeObject(await window.dbLaJamoneraRest.read('/recetas'));
+      payload = {};
+      Object.entries(safeObject(state.recetas)).forEach(([id, recipe]) => {
+        const base = recipe?.__indexLite && full[id] ? safeObject(full[id]) : {};
+        const { __indexLite, ...cleanRecipe } = safeObject(recipe);
+        payload[id] = { ...base, ...cleanRecipe };
+      });
+      state.recetas = payload;
+    }
+    await window.dbLaJamoneraRest.write('/recetas', payload);
+  };
+
+  const ensureRecipeDetail = async (recipeId) => {
+    const id = normalizeValue(recipeId);
+    const current = safeObject(state.recetas?.[id]);
+    if (!id || !current.id || !current.__indexLite) return current;
+    const detail = safeObject(await window.dbLaJamoneraRest.read(`/recetas/${id}`));
+    if (detail.id || Object.keys(detail).length) {
+      state.recetas[id] = { ...current, ...detail, id, __indexLite: false };
+      return state.recetas[id];
+    }
+    return current;
   };
 
   const isRecipeRnpaExempt = (recipe = {}) =>
@@ -4191,7 +4233,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
   };
 
   const duplicateRecipe = async (recipeId) => {
-    const item = state.recetas[recipeId];
+    const item = await ensureRecipeDetail(recipeId);
     if (!item) return;
     const result = await openIosSwal({
       title: 'Duplicar receta',
@@ -4222,7 +4264,8 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     });
     if (!ok.isConfirmed) return;
     delete state.recetas[recipeId];
-    await persistRecetas();
+    await window.dbLaJamoneraRest.write(`/recetas/${recipeId}`, null);
+    await window.dbLaJamoneraRest.write(`/recetas_index/items/${recipeId}`, null);
     renderRecetas();
   };
 
@@ -4237,7 +4280,8 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
       await fetchRecetas();
       renderRecetas();
       if (state.resumeEditor?.data) {
-        const recipe = state.resumeEditor.activeRecipeId ? state.recetas[state.resumeEditor.activeRecipeId] : null;
+        let recipe = state.resumeEditor.activeRecipeId ? state.recetas[state.resumeEditor.activeRecipeId] : null;
+        if (recipe?.__indexLite) recipe = await ensureRecipeDetail(recipe.id);
         await renderEditor(recipe || null, state.resumeEditor.data);
         recipeEditorTitle.textContent = state.resumeEditor.title || (recipe ? 'Editar receta' : 'Nueva receta');
       } else {
@@ -4349,7 +4393,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     }
     const printBtn = event.target.closest('[data-receta-print]');
     if (printBtn) {
-      const recipe = state.recetas[printBtn.dataset.recetaId];
+      const recipe = await ensureRecipeDetail(printBtn.dataset.recetaId);
       if (!recipe) return;
       try {
         await openPrintConfigurator(recipe, printBtn.dataset.recetaPrint);
@@ -4366,7 +4410,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
 
     const fullPrintBtn = event.target.closest('[data-receta-full-print]');
     if (fullPrintBtn) {
-      const recipe = state.recetas[fullPrintBtn.dataset.recetaFullPrint];
+      const recipe = await ensureRecipeDetail(fullPrintBtn.dataset.recetaFullPrint);
       if (!recipe) return;
       await openRecipeFullPrint(recipe);
       return;
@@ -4374,21 +4418,21 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
 
     const rnpaViewBtn = event.target.closest('[data-receta-rnpa-view]');
     if (rnpaViewBtn) {
-      const recipe = state.recetas[rnpaViewBtn.dataset.recetaRnpaView];
+      const recipe = await ensureRecipeDetail(rnpaViewBtn.dataset.recetaRnpaView);
       const attachment = normalizeValue(recipe?.rnpa?.attachmentUrl);
       if (attachment) await window.laJamoneraOpenImageViewer?.([{ invoiceImageUrls: [attachment] }], 0, 'Adjunto RNPA');
       return;
     }
     const imageViewBtn = event.target.closest('[data-receta-image-view]');
     if (imageViewBtn) {
-      const recipe = state.recetas[imageViewBtn.dataset.recetaImageView];
+      const recipe = await ensureRecipeDetail(imageViewBtn.dataset.recetaImageView);
       const imageUrl = normalizeValue(recipe?.imageUrl);
       if (imageUrl) await window.laJamoneraOpenImageViewer?.([{ invoiceImageUrls: [imageUrl] }], 0, `Imagen · ${capitalize(recipe?.title || 'Receta')}`);
       return;
     }
     const manualViewBtn = event.target.closest('[data-receta-manual-view]');
     if (manualViewBtn) {
-      const recipe = state.recetas[manualViewBtn.dataset.recetaManualView];
+      const recipe = await ensureRecipeDetail(manualViewBtn.dataset.recetaManualView);
       const manualUrl = normalizeValue((Array.isArray(recipe?.rows) ? recipe.rows : []).find((row) => row.type === MONOGRAPHY_ROW_TYPE && normalizeValue(row.manualUrl))?.manualUrl);
       if (manualUrl) window.open(manualUrl, '_blank', 'noopener,noreferrer');
       return;
@@ -4396,7 +4440,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     const duplicateBtn = event.target.closest('[data-receta-duplicate]');
     if (duplicateBtn) return duplicateRecipe(duplicateBtn.dataset.recetaDuplicate);
     const editBtn = event.target.closest('[data-receta-edit]');
-    if (editBtn) return renderEditor(state.recetas[editBtn.dataset.recetaEdit]);
+    if (editBtn) return renderEditor(await ensureRecipeDetail(editBtn.dataset.recetaEdit));
     const deleteBtn = event.target.closest('[data-receta-delete]');
     if (deleteBtn) return removeRecipe(deleteBtn.dataset.recetaDelete);
   });
