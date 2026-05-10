@@ -33,6 +33,7 @@
   const RESERVAS_PATH = '/produccion/reservas';
   const DRAFTS_PATH = '/produccion/drafts';
   const REGISTROS_PATH = '/produccion/registros';
+  const PUBLIC_TRACES_PATH = '/public_traces';
   // Agrupaciones de recetas (carpetas tipo "Embutidos", "Salsas").
   // Schema: { [groupId]: { id, name, imageUrl, order, createdAt } }
   // El groupId se referencia desde recipe.recipeGroupId.
@@ -2685,6 +2686,37 @@
     return `https://www.lajamonera.online/produccion_publica.html?id=${encodeURIComponent(normalizeValue(registro?.id))}`;
   };
 
+  const buildPublicTracePayload = (registro = {}) => {
+    const managerIds = Array.isArray(registro?.managers) ? registro.managers.map((id) => normalizeValue(id)).filter(Boolean) : [];
+    const usersMap = managerIds.reduce((acc, id) => {
+      const user = safeObject(state.users?.[id]);
+      acc[id] = {
+        fullName: normalizeValue(user.fullName || user.name || id),
+        name: normalizeValue(user.name || user.fullName || id)
+      };
+      return acc;
+    }, {});
+
+    return stripUndefinedDeep({
+      version: 1,
+      updatedAt: nowTs(),
+      registro,
+      config: { usersMap }
+    });
+  };
+
+  const publishPublicTrace = async (registro = {}) => {
+    const id = normalizeValue(registro?.id);
+    if (!id) return;
+    await window.dbLaJamoneraRest.write(`${PUBLIC_TRACES_PATH}/${id}`, buildPublicTracePayload(registro));
+  };
+
+  const removePublicTrace = async (productionId) => {
+    const id = normalizeValue(productionId);
+    if (!id) return;
+    await window.dbLaJamoneraRest.write(`${PUBLIC_TRACES_PATH}/${id}`, null);
+  };
+
   const getQrPrintSizeConfig = (value) => {
     const item = QR_PRINT_SIZES.find((size) => size.value === value);
     return item || QR_PRINT_SIZES[0];
@@ -3674,6 +3706,7 @@
     state.registros[registro.id] = updated;
     try {
       await window.dbLaJamoneraRest.write(`${REGISTROS_PATH}/${registro.id}`, updated);
+      await publishPublicTrace(updated);
     } catch (error) {
     }
     return updated;
@@ -3692,6 +3725,11 @@
     });
     await new Promise((resolve) => setTimeout(resolve, 220));
     const traceRegistro = await ensureTraceabilityDerivedData(registro);
+    try {
+      await publishPublicTrace(traceRegistro);
+    } catch (error) {
+      console.warn('[Produccion] No se pudo publicar la trazabilidad publica.', error);
+    }
     Swal.close();
     await openIosSwal({
       title: `Trazabilidad ${traceRegistro.id}`,
@@ -6998,6 +7036,7 @@
       removeRecipeMovementsBySource({ recipeId: registro.recipeId, sourceId: productionId, sourceCode: productionId });
       await window.dbLaJamoneraRest.write('/inventario', stripUndefinedDeep(restored));
       await window.dbLaJamoneraRest.write(`${REGISTROS_PATH}/${productionId}`, null);
+      await removePublicTrace(productionId);
       const recipeIndexPath = `${REPARTO_PATH}/productIndex/${normalizeValue(registro.recipeId)}`;
       if (normalizeValue(registro.recipeId)) {
         await window.dbLaJamoneraRest.write(recipeIndexPath, stripUndefinedDeep(safeObject(state.reparto?.productIndex?.[registro.recipeId])));
@@ -8714,6 +8753,7 @@
         await window.dbLaJamoneraRest.write('/inventario', inventarioNext);
         await window.dbLaJamoneraRest.write(SEQUENCE_PATH, nextSequence);
         await window.dbLaJamoneraRest.write(`${REGISTROS_PATH}/${productionId}`, registro);
+        await publishPublicTrace(registro);
         appendRecipeMovement(recipe.id, {
           id: `ing_${productionId}`,
           type: 'ingreso',

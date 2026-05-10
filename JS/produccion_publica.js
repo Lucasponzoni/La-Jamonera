@@ -481,14 +481,18 @@
     }
     try {
       await window.laJamoneraReady;
-      const [registros, config, users] = await Promise.all([
-        window.dbLaJamoneraRest.read('/produccion/registros'),
-        window.dbLaJamoneraRest.read('/produccion/config'),
-        window.dbLaJamoneraRest.read('/informes/users')
-      ]);
-      const registro = safeObject(registros)[id];
+      const publicSnapshot = await window.dbLaJamonera.ref(`/public_traces/${id}`).once('value');
+      let publicTrace = safeObject(publicSnapshot.val());
+      if (!Object.keys(publicTrace).length) {
+        const legacySnapshot = await window.dbLaJamonera.ref(`/produccion/registros/${id}`).once('value');
+        const legacyRegistro = safeObject(legacySnapshot.val());
+        publicTrace = Object.keys(legacyRegistro).length
+          ? { registro: legacyRegistro, config: {} }
+          : {};
+      }
+      const registro = safeObject(publicTrace.registro);
       if (!registro) throw new Error('No encontrado');
-      const cfg = { ...safeObject(config), usersMap: safeObject(users) };
+      const cfg = safeObject(publicTrace.config);
       await renderPublicTrace(registro, cfg);
     } catch (error) {
       dataNode.innerHTML = '<div class="ingrediente-empty-list">No se pudo cargar la trazabilidad pública solicitada.</div>';

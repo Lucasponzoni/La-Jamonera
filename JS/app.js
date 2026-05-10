@@ -58,7 +58,16 @@
 
   setHomeActionsDisabled(true);
   Promise.resolve(window.laJamoneraReady)
-    .catch(() => null)
+    .then((user) => {
+      if (!user) {
+        localStorage.removeItem(SESSION_KEY);
+        window.location.replace('./login.html');
+      }
+    })
+    .catch(() => {
+      localStorage.removeItem(SESSION_KEY);
+      window.location.replace('./login.html');
+    })
     .finally(() => setHomeActionsDisabled(false));
 
   const closeSession = async () => {
@@ -83,6 +92,14 @@
 
     if (result.isConfirmed) {
       localStorage.removeItem(SESSION_KEY);
+      if (window.dbLaJamoneraRest?.clearCache) {
+        window.dbLaJamoneraRest.clearCache();
+      }
+      try {
+        await window.authLaJamonera?.signOut?.();
+      } catch (error) {
+        console.warn('[auth] No se pudo cerrar Firebase Auth:', error);
+      }
       window.location.replace('./login.html');
     }
   };

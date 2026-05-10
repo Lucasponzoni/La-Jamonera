@@ -1,11 +1,15 @@
-(function loginModule() {
+(function () {
   const SESSION_KEY = 'laJamoneraSession';
   const SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
 
+  // Firebase Auth requiere email + password. Si en pantalla escribis "Lajamonera",
+  // se usa este email interno. Cambialo por el email exacto que creaste en Firebase.
+  const USERNAME_EMAIL_ALIASES = {
+    lajamonera: 'lajamonera@lajamonera.local'
+  };
+
   const loginForm = document.getElementById('loginForm');
-  if (!loginForm) {
-    return;
-  }
+  if (!loginForm) return;
 
   const usernameInput = document.getElementById('usernameInput');
   const passwordInput = document.getElementById('passwordInput');
@@ -13,11 +17,20 @@
   const loginButton = document.getElementById('loginButton');
   const loginCard = document.getElementById('loginCard');
 
-  const normalizeValue = (value) => String(value || '').trim().toLowerCase();
+  const normalizeUser = (value) => String(value || '').trim().toLowerCase();
+  const normalizeEmail = (value) => {
+    const user = normalizeUser(value);
+    if (user.includes('@')) return user;
+    return USERNAME_EMAIL_ALIASES[user] || `${user}@lajamonera.local`;
+  };
 
-  const saveSession = () => {
+  const saveSession = (user) => {
     const expiresAt = Date.now() + SESSION_DURATION_MS;
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ expiresAt }));
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      expiresAt,
+      uid: user?.uid || '',
+      email: user?.email || ''
+    }));
   };
 
   const setLoading = (loading) => {
@@ -26,38 +39,8 @@
       loginCard.classList.add('is-loading');
       return;
     }
-
     loginButton.removeAttribute('disabled');
     loginCard.classList.remove('is-loading');
-  };
-
-  const extractCredentials = (value) => {
-    if (!value || typeof value !== 'object') {
-      return null;
-    }
-
-    if (typeof value.user === 'string' && typeof value.pass === 'string') {
-      return value;
-    }
-
-    return null;
-  };
-
-  const readCredentialsFromFirebase = async () => {
-    const paths = ['user', 'auth', '/'];
-
-    for (const path of paths) {
-      const value = await window.dbLaJamoneraRest.read(path);
-      const credentials = extractCredentials(value);
-      if (credentials) {
-        return {
-          user: normalizeValue(credentials.user),
-          pass: normalizeValue(credentials.pass)
-        };
-      }
-    }
-
-    throw new Error('Credenciales no encontradas en Firebase');
   };
 
   const showError = (title, text) => {
@@ -88,32 +71,24 @@
     event.preventDefault();
     setLoading(true);
 
-    const enteredUser = normalizeValue(usernameInput.value);
-    const enteredPass = normalizeValue(passwordInput.value);
+    const email = normalizeEmail(usernameInput.value);
+    const password = String(passwordInput.value || '');
 
     try {
       await window.laJamoneraReady;
-      const credentials = await readCredentialsFromFirebase();
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      if (enteredUser === credentials.user && enteredPass === credentials.pass) {
-        saveSession();
-        window.location.replace('./index.html');
-        return;
-      }
-
-      showError('Datos inválidos', 'Revisá usuario y contraseña para continuar.');
+      const credential = await window.authLaJamonera.signInWithEmailAndPassword(email, password);
+      saveSession(credential.user);
+      window.location.replace('./index.html');
     } catch (error) {
-      console.error('[login] readCredentialsFromFirebase falló:', error);
-      const detail = (error && error.message) ? error.message : 'desconocido';
-      showError('Error de Firebase', `No se pudo leer user/pass para validar el ingreso.<br><small style="opacity:.7">${detail}</small>`);
+      console.error('[login] Firebase Auth fallo:', error);
+      showError('Datos invalidos', 'Revisa usuario y contrasena para continuar.');
     } finally {
       setLoading(false);
     }
   });
 })();
 
-//CORS FALLBACK CONFIG
+// CORS FALLBACK CONFIG
 const TRACE_BASE_URL = 'https://lucasponzoni.github.io/La-Jamonera/';
 const CORS_PROXY_URL = 'https://proxy.cors.sh/';
 const CORS_PROXY_KEY = 'live_36d58f4c13cb7d838833506e8f6450623bf2605859ac089fa008cfeddd29d8dd';

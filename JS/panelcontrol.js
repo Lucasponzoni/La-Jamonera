@@ -693,7 +693,7 @@ const printReport = async (report) => {
     '#e63946', '#f72585', '#4ea8de', '#52b69a', '#7400b8'
   ];
 
-  const chartState = { instance: null, type: 'horizontalBar' };
+  const chartState = { instance: null, type: 'horizontalBar', lastSignature: '' };
 
   const ensureChartDom = () => {
     if (nodes.produccion.querySelector('#produccionChart')) return;
@@ -799,6 +799,9 @@ const printReport = async (report) => {
     ensureChartDom();
     const canvas = nodes.produccion.querySelector('#produccionChart');
     if (!canvas) return;
+    const signature = JSON.stringify({ type, top: top.map((item) => [item.id, item.name, item.kg]) });
+    if (chartState.instance && chartState.lastSignature === signature) return;
+    chartState.lastSignature = signature;
     if (chartState.instance) { chartState.instance.destroy(); chartState.instance = null; }
     const chartType = type === 'horizontalBar' ? 'bar' : type;
     chartState.instance = new Chart(canvas.getContext('2d'), {
@@ -920,7 +923,22 @@ const printReport = async (report) => {
   const attachRealtimeListeners = () => {
     const db = window.dbLaJamonera;
     if (!db?.ref) return;
-    ['/informes', '/inventario', '/recetas', '/Reparto', '/produccion/registros', '/informes/users'].forEach((path) => db.ref(path).on('value', () => loadOnce()));
+    const paths = ['/informes', '/inventario', '/recetas', '/Reparto', '/produccion/registros', '/informes/users'];
+    const seenInitialEvent = new Set();
+    let refreshTimer = null;
+    const scheduleRefresh = () => {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => loadOnce(), 350);
+    };
+    paths.forEach((path) => {
+      db.ref(path).on('value', () => {
+        if (!seenInitialEvent.has(path)) {
+          seenInitialEvent.add(path);
+          return;
+        }
+        scheduleRefresh();
+      });
+    });
   };
 
   const initRange = () => {
