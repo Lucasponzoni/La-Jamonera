@@ -631,6 +631,7 @@
   const sanitizeImageUrl = (value) => {
     const url = normalizeValue(value);
     if (!url) return '';
+    if (window.LaJamoneraImageGuard?.isBroken?.(url)) return '';
     if (/^(https?:)?\/\//i.test(url) || /^data:image\//i.test(url)) return url;
     return '';
   };
@@ -6197,7 +6198,6 @@
       }
       await writeInventoryRecords(state.inventario, [...touchedInventoryIds]);
       await persistRepartoStore();
-      await refreshData({ silent: true });
       Swal.close();
       state.dispatchXlsxDraft = buildDispatchXlsxDraft();
       renderDispatchMain();
@@ -7219,7 +7219,9 @@
       await Promise.all(affectedRecipeIds.map((recipeId) =>
         window.dbLaJamoneraRest.write(`${REPARTO_PATH}/productIndex/${recipeId}`, stripUndefinedDeep(safeObject(state.reparto?.productIndex?.[recipeId])))));
       await appendAudit({ action: 'reparto_eliminado', dispatchId, before: previous, after: null, reason: auth.value.reason });
-      await refreshAfterMutation();
+      if (state.dispatchMode && !state.dispatchCreateMode && !state.dispatchXlsxMode) {
+        renderDispatchHistoryTable();
+      }
       if (Swal.isVisible()) Swal.close();
       await openIosSwal({ title: 'Salida eliminada', html: `<p>Se eliminó ${escapeHtml(dispatchRow.code || dispatchId)} y se restauró el stock disponible.</p>`, icon: 'success' });
     } catch (error) {
@@ -9128,7 +9130,8 @@
       return;
     }
     if (event.target.closest('[data-product-expiry-select-all]')) {
-      nodes.list.querySelectorAll('[data-product-expiry-select]:not(:disabled)').forEach((checkbox) => {
+      const card = event.target.closest('[data-production-expiry-alert]') || nodes.list;
+      card.querySelectorAll('[data-product-expiry-select]:not(:disabled)').forEach((checkbox) => {
         checkbox.checked = true;
       });
       return;
@@ -9147,7 +9150,8 @@
     const resolveAllProductExpiry = event.target.closest('[data-product-expiry-resolve-all]');
     if (resolveSelectedProductExpiry || resolveAllProductExpiry) {
       const allRows = getProductExpiryAlertRows().filter((row) => row.expired);
-      const selectedIds = new Set([...nodes.list.querySelectorAll('[data-product-expiry-select]:checked')].map((node) => normalizeValue(node.dataset.productExpirySelect)));
+      const scope = event.target.closest('[data-production-expiry-alert]') || nodes.list;
+      const selectedIds = new Set([...scope.querySelectorAll('[data-product-expiry-select]:checked')].map((node) => normalizeValue(node.dataset.productExpirySelect)));
       const rows = resolveAllProductExpiry ? allRows : allRows.filter((row) => selectedIds.has(row.productionId));
       if (!rows.length) {
         await openIosSwal({ title: 'Sin seleccion', html: '<p>Selecciona al menos un lote vencido para resolver.</p>', icon: 'info' });
@@ -10619,11 +10623,6 @@
       }
       state.dispatchDraft = null;
       renderDispatchMain();
-      refreshData({ silent: true }).then(() => {
-        if (state.dispatchMode && !state.dispatchCreateMode) renderDispatchMain();
-      }).catch((error) => {
-        console.warn('[produccion] refreshData post-dispatch failed', error);
-      });
       Swal.close();
       await openIosSwal({ title: 'Reparto guardado', html: `<p>Código generado: <strong>${code}</strong></p>`, icon: 'success' });
       } catch (error) {

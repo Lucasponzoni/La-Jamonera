@@ -598,6 +598,7 @@
     if (!raw) return '';
     const lower = raw.toLowerCase();
     if (['null', 'undefined', 'nan', '[object object]'].includes(lower)) return '';
+    if (window.LaJamoneraImageGuard?.isBroken?.(raw)) return '';
     return raw;
   };
 
@@ -1526,10 +1527,12 @@
     return fallback;
   };
 
-  const askRequiredRangeForIngresosSheet = async () => {
+  const askRequiredRangeForIngresosSheet = async (options = {}) => {
+    const title = normalizeValue(options.title) || 'Rango obligatorio para planilla';
+    const description = normalizeValue(options.description) || 'Para evitar procesar datos infinitos, seleccioná un rango de fechas antes de continuar.';
     const picker = await openIosSwal({
-      title: 'Rango obligatorio para planilla',
-      html: '<p>Para evitar procesar datos infinitos, seleccioná un rango de fechas antes de continuar.</p><input id="sheetRangeInput" class="swal2-input ios-input" placeholder="Seleccionar rango">',
+      title,
+      html: `<p>${escapeHtml(description)}</p><input id="sheetRangeInput" class="swal2-input ios-input" placeholder="Seleccionar rango">`,
       showCancelButton: true,
       confirmButtonText: 'Continuar',
       cancelButtonText: 'Cancelar',
@@ -1541,7 +1544,8 @@
             mode: 'range',
             dateFormat: 'Y-m-d',
             allowInput: false,
-            disableMobile: true
+            disableMobile: true,
+            defaultDate: getDefaultRangeDates(state.dashboardDateRange)
           });
         }
       },
@@ -2039,9 +2043,10 @@
         checkbox.checked = true;
       });
     });
-    const resolveRowsFromAlert = async (mode, id = '') => {
+    const resolveRowsFromAlert = async (mode, id = '', sourceElement = nodes.expiryAlert) => {
       const latest = getInventoryExpiryAlertRows().filter((row) => row.expired);
-      const selected = new Set([...nodes.expiryAlert.querySelectorAll('[data-inventory-expiry-select]:checked')].map((node) => normalizeValue(node.dataset.inventoryExpirySelect)));
+      const scope = sourceElement?.closest?.('[data-inventory-expiry-alert]') || nodes.expiryAlert;
+      const selected = new Set([...scope.querySelectorAll('[data-inventory-expiry-select]:checked')].map((node) => normalizeValue(node.dataset.inventoryExpirySelect)));
       const targets = mode === 'all' ? latest : mode === 'one' ? latest.filter((row) => row.id === id) : latest.filter((row) => selected.has(row.id));
       if (!targets.length) {
         await openIosSwal({ title: 'Sin seleccion', html: '<p>Selecciona al menos un lote vencido para resolver.</p>', icon: 'info' });
@@ -2051,15 +2056,27 @@
       if (!resolutionType) return;
       await resolveInventoryExpiryRows(targets, resolutionType);
     };
-    nodes.expiryAlert.querySelector('[data-inventory-expiry-resolve-selected]')?.addEventListener('click', () => resolveRowsFromAlert('selected'));
-    nodes.expiryAlert.querySelector('[data-inventory-expiry-resolve-all]')?.addEventListener('click', () => resolveRowsFromAlert('all'));
+    nodes.expiryAlert.querySelector('[data-inventory-expiry-resolve-selected]')?.addEventListener('click', (event) => resolveRowsFromAlert('selected', '', event.currentTarget));
+    nodes.expiryAlert.querySelector('[data-inventory-expiry-resolve-all]')?.addEventListener('click', (event) => resolveRowsFromAlert('all', '', event.currentTarget));
     nodes.expiryAlert.querySelectorAll('[data-inventory-expiry-resolve-one]').forEach((button) => {
-      button.addEventListener('click', () => resolveRowsFromAlert('one', normalizeValue(button.dataset.inventoryExpiryResolveOne)));
+      button.addEventListener('click', (event) => resolveRowsFromAlert('one', normalizeValue(button.dataset.inventoryExpiryResolveOne), event.currentTarget));
     });
   };
 
 
   const renderFamilies = () => {
+    if (!nodes.families) return;
+    if (state.periodMode) {
+      nodes.families.innerHTML = '';
+      nodes.families.hidden = true;
+      nodes.families.classList.add('d-none');
+      nodes.families.setAttribute('aria-hidden', 'true');
+      return;
+    }
+
+    nodes.families.hidden = false;
+    nodes.families.classList.remove('d-none');
+    nodes.families.removeAttribute('aria-hidden');
     const families = Object.values(state.familias).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     const ingredientCounts = Object.values(state.ingredientes).reduce((acc, item) => {
       const familyId = normalizeValue(item?.familyId);
@@ -3151,10 +3168,30 @@
     applyViewerTransform();
   };
 
+  const isViewerPdfUrl = (url) => /\.pdf(?:$|[?#])/i.test(String(url || '').split('?')[0] || '');
+
+  const ensureViewerDocumentPlaceholder = () => {
+    let node = document.getElementById('viewerDocumentPlaceholder');
+    if (node) return node;
+    node = document.createElement('div');
+    node.id = 'viewerDocumentPlaceholder';
+    node.className = 'viewer-document d-none';
+    node.style.display = 'grid';
+    node.style.alignContent = 'center';
+    node.style.justifyItems = 'center';
+    node.style.gap = '12px';
+    node.style.padding = '28px';
+    node.style.textAlign = 'center';
+    node.style.color = '#2f4f8f';
+    nodes.viewerDocument?.insertAdjacentElement('afterend', node);
+    return node;
+  };
+
   const renderViewerImage = () => {
     const item = state.viewerImages[state.viewerIndex];
     if (!item || !nodes.viewerImage) return;
-    const isPdf = /\.pdf($|\?)/i.test(String(item.src || ''));
+    const isPdf = isViewerPdfUrl(item.src);
+    const pdfPlaceholder = ensureViewerDocumentPlaceholder();
     if (nodes.viewerDownloadBtn) {
       nodes.viewerDownloadBtn.href = item.src || '#';
       const rawName = String(item.src || '').split('/').pop()?.split('?')[0] || 'adjunto';
@@ -3163,9 +3200,10 @@
     nodes.viewerStage?.classList.toggle('is-document', isPdf);
     nodes.viewerStage?.classList.toggle('is-image', !isPdf);
     if (nodes.viewerDocument) {
-      nodes.viewerDocument.classList.toggle('d-none', !isPdf);
-      nodes.viewerDocument.src = isPdf ? item.src : '';
+      nodes.viewerDocument.classList.add('d-none');
+      nodes.viewerDocument.src = '';
     }
+    pdfPlaceholder?.classList.toggle('d-none', !isPdf);
     nodes.viewerImage.classList.toggle('d-none', isPdf);
     nodes.viewerImage.setAttribute('draggable', 'false');
     nodes.viewerZoomInBtn?.classList.toggle('d-none', isPdf);
@@ -3173,9 +3211,14 @@
     nodes.viewerStageSpinner?.classList.remove('d-none');
     nodes.viewerImage.classList.remove('is-loaded');
     if (isPdf) {
+      if (pdfPlaceholder) {
+        pdfPlaceholder.innerHTML = `<i class="fa-regular fa-file-pdf" style="font-size:44px;color:#d92d20;"></i><strong>Documento PDF adjunto</strong><p style="margin:0;color:#6073a1;">Para evitar errores del visor interno del navegador, el PDF se abre fuera del modal.</p><a class="btn ios-btn ios-btn-primary" href="${escapeHtml(item.src)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-up-right-from-square"></i><span>Abrir PDF</span></a>`;
+      }
+      nodes.viewerImage.src = '';
       nodes.viewerStageSpinner?.classList.add('d-none');
       return;
     }
+    pdfPlaceholder?.classList.add('d-none');
     state.viewerOffsetX = 0;
     state.viewerOffsetY = 0;
     applyViewerTransform();
@@ -3295,9 +3338,55 @@
     });
   };
 
+  const isPdfAttachmentUrl = (url) => {
+    const raw = String(url || '').split('?')[0] || '';
+    try {
+      return /\.pdf(?:$|[?#])/i.test(decodeURIComponent(raw));
+    } catch (_) {
+      return /\.pdf(?:$|[?#])/i.test(raw);
+    }
+  };
+
+  const blobToDataUrl = (blob) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+
+  const PRINT_CORS_PROXY_URL = 'https://proxy.cors.sh/';
+  const PRINT_CORS_PROXY_KEY = 'live_36d58f4c13cb7d838833506e8f6450623bf2605859ac089fa008cfeddd29d8dd';
+  const isFirebaseStorageUrl = (url) => /firebasestorage\.googleapis\.com|\.firebasestorage\.app/i.test(String(url || ''));
+
+  const fetchPrintableBlob = async (url) => {
+    const safeUrl = normalizeValue(url);
+    if (isFirebaseStorageUrl(safeUrl)) {
+      return fetch(`${PRINT_CORS_PROXY_URL}${safeUrl}`, {
+        cache: 'force-cache',
+        headers: { 'x-cors-api-key': PRINT_CORS_PROXY_KEY }
+      });
+    }
+    return fetch(safeUrl, { cache: 'force-cache', mode: 'cors' });
+  };
+
+  const loadPrintableImageSrc = async (url) => {
+    const safeUrl = normalizeValue(url);
+    if (!safeUrl || /^data:image\//i.test(safeUrl) || isPdfAttachmentUrl(safeUrl)) return safeUrl;
+    try {
+      const response = await fetchPrintableBlob(safeUrl);
+      if (!response.ok) return safeUrl;
+      const blob = await response.blob();
+      if (!String(blob.type || '').startsWith('image/')) return safeUrl;
+      return await blobToDataUrl(blob);
+    } catch (_) {
+      return safeUrl;
+    }
+  };
+
   const preloadImages = async (urls) => {
     const uniqueUrls = [...new Set(urls.filter(Boolean))];
-    if (!uniqueUrls.length) return;
+    const printableMap = {};
+    if (!uniqueUrls.length) return printableMap;
 
     await openIosSwal({
       title: 'Preparando impresión...',
@@ -3305,15 +3394,20 @@
       allowOutsideClick: false,
       showConfirmButton: false,
       didOpen: async () => {
-        await Promise.all(uniqueUrls.map((url) => new Promise((resolve) => {
-          const img = new Image();
-          img.onload = resolve;
-          img.onerror = resolve;
-          img.src = url;
-        })));
+        await Promise.all(uniqueUrls.map(async (url) => {
+          printableMap[url] = await loadPrintableImageSrc(url);
+          if (printableMap[url] !== url || isPdfAttachmentUrl(url)) return;
+          await new Promise((resolve) => {
+            const img = new Image();
+            img.onload = resolve;
+            img.onerror = resolve;
+            img.src = url;
+          });
+        }));
         Swal.close();
       }
     });
+    return printableMap;
   };
 
   const openPrintEntries = async (ingredient, entries) => {
@@ -3451,9 +3545,17 @@
 
     const excluded = new Set(selector.value.mode === 'exclude' ? selector.value.selected : []);
     const scopedRows = rows.filter((row) => !excluded.has(row.ingredientId));
-    if (includeImages) {
-      await preloadImages(scopedRows.flatMap((row) => row.invoiceImageUrls || []).concat(scopedRows.map((row) => row.ingredientImageUrl)));
-    }
+    const printableImageMap = includeImages
+      ? await preloadImages(scopedRows.flatMap((row) => row.invoiceImageUrls || []).concat(scopedRows.map((row) => row.ingredientImageUrl)))
+      : {};
+    const printableImageSrc = (url) => printableImageMap[url] || url;
+    const renderPrintableAttachment = (row, url, idx) => {
+      const caption = `${row.ingredientName} · ${row.entryDate} · ${idx + 1}`;
+      if (isPdfAttachmentUrl(url)) {
+        return `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="min-height:120px;display:flex;align-items:center;justify-content:center;border:1px dashed #b9c8eb;border-radius:10px;color:#31569b;font-weight:800;">PDF adjunto</div><figcaption style="font-size:12px;color:#4b5f8e;margin-top:6px;">${escapeHtml(caption)}</figcaption><a href="${escapeHtml(url)}" target="_blank" rel="noopener" style="font-size:11px;color:#31569b;">Abrir PDF</a></figure>`;
+      }
+      return `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><img src="${escapeHtml(printableImageSrc(url))}" style="width:100%;max-height:320px;object-fit:contain;border-radius:10px;"/><figcaption style="font-size:12px;color:#4b5f8e;margin-top:6px;">${escapeHtml(caption)}</figcaption></figure>`;
+    };
 
     const grouped = scopedRows.reduce((acc, row) => {
       acc[row.ingredientId] = acc[row.ingredientId] || [];
@@ -3472,11 +3574,11 @@
         const traceRows = buildTraceRowsForEntry(row).map((trace) => `<tr style="background:#ffecef;"><td>${escapeHtml(`↳ ${trace.fechaHora}`)}</td><td>${escapeHtml(trace.fechaCaducidad || '-')}</td><td>${escapeHtml(trace.cantidad)}</td><td>${escapeHtml(trace.factura)}</td><td>${escapeHtml(trace.proveedor)}</td><td class="inventario-provider-cell">Trazabilidad</td><td></td></tr>`);
         return [mainRow, resolutionRow, ...traceRows].filter(Boolean);
       }).join('');
-      return `<section style="margin-bottom:14px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">${head.ingredientImageUrl ? `<img src="${head.ingredientImageUrl}" style="width:62px;height:62px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<div><h2 style="margin:0;font-size:18px;">${escapeHtml(head.ingredientName)}</h2><p style="margin:0;color:#55607f;font-size:12px;">${escapeHtml(head.ingredientDescription)}</p></div></div><table><thead><tr><th>Fecha y hora</th><th>Fecha vencimiento</th><th>Cantidad / Disp.</th><th>Cantidad</th><th>N° factura</th><th>Proveedor</th><th>Imagen</th></tr></thead><tbody>${tableRows}</tbody></table></section>`;
+      return `<section style="margin-bottom:14px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">${head.ingredientImageUrl ? `<img src="${escapeHtml(printableImageSrc(head.ingredientImageUrl))}" style="width:62px;height:62px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<div><h2 style="margin:0;font-size:18px;">${escapeHtml(head.ingredientName)}</h2><p style="margin:0;color:#55607f;font-size:12px;">${escapeHtml(head.ingredientDescription)}</p></div></div><table><thead><tr><th>Fecha y hora</th><th>Fecha vencimiento</th><th>Cantidad / Disp.</th><th>Cantidad</th><th>N° factura</th><th>Proveedor</th><th>Imagen</th></tr></thead><tbody>${tableRows}</tbody></table></section>`;
     }).join('');
 
     const imagesHtml = includeImages
-      ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas del período</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${scopedRows.flatMap((row) => (row.invoiceImageUrls || []).map((url, idx) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><img src="${url}" style="width:100%;max-height:320px;object-fit:contain;border-radius:10px;"/><figcaption style="font-size:12px;color:#4b5f8e;margin-top:6px;">${escapeHtml(row.ingredientName)} · ${escapeHtml(row.entryDate)} · ${idx + 1}</figcaption></figure>`)).join('')}</div></section>`
+      ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas del período</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${scopedRows.flatMap((row) => (row.invoiceImageUrls || []).map((url, idx) => renderPrintableAttachment(row, url, idx))).join('')}</div></section>`
       : '';
 
     const win = window.open('', '_blank', 'width=1300,height=900');
@@ -7465,7 +7567,16 @@
   const setPeriodMode = (enabled) => {
     state.periodMode = enabled;
     nodes.searchInput?.closest('.inventario-toolbar')?.classList.toggle('d-none', enabled);
-    nodes.families?.classList.toggle('d-none', enabled);
+    if (nodes.families) {
+      nodes.families.classList.toggle('d-none', enabled);
+      nodes.families.hidden = enabled;
+      if (enabled) {
+        nodes.families.innerHTML = '';
+        nodes.families.setAttribute('aria-hidden', 'true');
+      } else {
+        nodes.families.removeAttribute('aria-hidden');
+      }
+    }
     nodes.statusFilters?.classList.toggle('d-none', enabled);
     nodes.list?.classList.toggle('d-none', enabled);
     nodes.periodView?.classList.toggle('d-none', !enabled);
@@ -7578,11 +7689,11 @@
 
   nodes.openPeriodFilterBtn?.addEventListener('click', async () => {
     state.globalTablePage = 1;
+    setPeriodMode(true);
     nodes.globalLoading?.classList.remove('d-none');
     await ensureFullInventoryLoaded();
     nodes.globalLoading?.classList.add('d-none');
     renderGlobalPeriodTable();
-    setPeriodMode(true);
   });
   nodes.periodBackBtn?.addEventListener('click', async () => {
     await runWithBackSpinner(async () => {
@@ -7706,6 +7817,16 @@
 
   nodes.globalPrintBtn?.addEventListener('click', async () => {
     await ensureFullInventoryLoaded();
+    const forcedRange = await askRequiredRangeForIngresosSheet({
+      title: 'Rango obligatorio para imprimir',
+      description: 'Seleccioná el rango de ingresos que querés imprimir con sus adjuntos.'
+    });
+    if (!forcedRange) return;
+    state.dashboardDateRange = `${forcedRange.from} a ${forcedRange.to}`;
+    if (nodes.globalRange) nodes.globalRange.value = state.dashboardDateRange;
+    nodes.globalClearBtn?.classList.toggle('d-none', !state.dashboardDateRange);
+    state.globalTablePage = 1;
+    renderGlobalPeriodTable();
     await openPrintGlobalPeriod(getGlobalFilteredEntries());
   });
   nodes.globalSheetBtn?.addEventListener('click', async () => {

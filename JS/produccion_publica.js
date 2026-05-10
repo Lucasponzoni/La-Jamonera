@@ -332,20 +332,45 @@
       if (viewerNodes.image) viewerNodes.image.style.transform = `scale(${state.scale})`;
     };
 
+    const isViewerPdfUrl = (url) => /\.pdf(?:$|[?#])/i.test(String(url || '').split('?')[0] || '');
+    const ensurePdfPlaceholder = () => {
+      let node = document.getElementById('viewerDocumentPlaceholder');
+      if (node) return node;
+      node = document.createElement('div');
+      node.id = 'viewerDocumentPlaceholder';
+      node.className = 'viewer-document d-none';
+      node.style.display = 'grid';
+      node.style.alignContent = 'center';
+      node.style.justifyItems = 'center';
+      node.style.gap = '12px';
+      node.style.padding = '28px';
+      node.style.textAlign = 'center';
+      node.style.color = '#2f4f8f';
+      viewerNodes.document?.insertAdjacentElement('afterend', node);
+      return node;
+    };
+
     const render = () => {
       const item = state.images[state.index];
       if (!item || !viewerNodes.image) return;
-      const isPdf = /\.pdf($|\?)/i.test(String(item.src || ''));
-      viewerNodes.document?.classList.toggle('d-none', !isPdf);
-      if (viewerNodes.document) viewerNodes.document.src = isPdf ? item.src : '';
+      const isPdf = isViewerPdfUrl(item.src);
+      const pdfPlaceholder = ensurePdfPlaceholder();
+      viewerNodes.document?.classList.add('d-none');
+      if (viewerNodes.document) viewerNodes.document.src = '';
+      pdfPlaceholder?.classList.toggle('d-none', !isPdf);
       viewerNodes.image.classList.toggle('d-none', isPdf);
       viewerNodes.zoomIn?.classList.toggle('d-none', isPdf);
       viewerNodes.zoomOut?.classList.toggle('d-none', isPdf);
       viewerNodes.spinner?.classList.remove('d-none');
       if (!isPdf) {
+        pdfPlaceholder?.classList.add('d-none');
         viewerNodes.image.classList.remove('is-loaded');
         viewerNodes.image.src = item.src;
       } else {
+        if (pdfPlaceholder) {
+          pdfPlaceholder.innerHTML = `<i class="fa-regular fa-file-pdf" style="font-size:44px;color:#d92d20;"></i><strong>Documento PDF adjunto</strong><p style="margin:0;color:#6073a1;">Para evitar errores del visor interno del navegador, el PDF se abre fuera del modal.</p><a class="btn ios-btn ios-btn-primary" href="${escapeHtml(item.src)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-up-right-from-square"></i><span>Abrir PDF</span></a>`;
+        }
+        viewerNodes.image.src = '';
         viewerNodes.spinner?.classList.add('d-none');
       }
     };
