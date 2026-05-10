@@ -7758,6 +7758,512 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   }
 }
 
+/* ===========================================================
+   Receta card v2 — zonas compactas con collapsibles
+   =========================================================== */
+.receta-card-v2 {
+  align-items: flex-start;
+  padding: 10px 12px;
+  gap: 10px;
+}
+
+.receta-card-v2 .ingrediente-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.receta-card-v2 .ingrediente-avatar img,
+.receta-card-v2 .receta-thumb-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.receta-card-v2 .receta-thumb {
+  width: 100%;
+  height: 100%;
+}
+
+.receta-card-v2 .ingrediente-main {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.receta-card-v2 .receta-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(31, 63, 130, 0.08);
+}
+
+.receta-card-v2 .receta-card-titles {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.receta-card-v2 .receta-card-header-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.receta-card-v2 .receta-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 6px 0 0;
+  border-top: 1px dashed rgba(31, 63, 130, 0.10);
+}
+
+.receta-card-v2 .receta-zone:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.receta-card-v2 .receta-zone-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #4f6aa3;
+}
+
+.receta-card-v2 .receta-zone-title > i {
+  font-size: 0.82rem;
+  color: #6c84b6;
+}
+
+.receta-card-v2 .receta-datos-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.receta-card-v2 .receta-datum {
+  display: grid;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(31, 63, 130, 0.08);
+}
+
+.receta-card-v2 .receta-datum small {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #5b6d95;
+}
+
+.receta-card-v2 .receta-datum strong {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1f3f82;
+  font-variant-numeric: tabular-nums;
+}
+
+.receta-card-v2 .receta-datum.is-info strong {
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: #2a4ea3;
+}
+
+/* Collapsible zones (ingredientes / descripción) */
+.receta-card-v2 .receta-zone-ingredientes,
+.receta-card-v2 .receta-zone-descripcion,
+.receta-card-v2 .receta-zone-etiquetado {
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 10px;
+  border: 1px solid rgba(31, 63, 130, 0.08);
+  padding: 4px 10px;
+  border-top: 1px solid rgba(31, 63, 130, 0.08);
+}
+
+.receta-card-v2 .receta-zone-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 2px 0;
+  color: #4f6aa3;
+  cursor: pointer;
+  text-align: left;
+}
+
+.receta-card-v2 .receta-zone-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.receta-card-v2 .receta-zone-toggle-label {
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.receta-card-v2 .receta-zone-count {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(56, 85, 143, 0.10);
+  color: #38558f;
+}
+
+.receta-card-v2 .receta-zone-toggle-icon {
+  font-size: 0.8rem;
+  color: #6c84b6;
+  transition: transform .18s ease;
+}
+
+.receta-card-v2 .receta-zone-ingredientes[data-collapsed="false"] .receta-zone-toggle-icon,
+.receta-card-v2 .receta-zone-descripcion[data-collapsed="false"] .receta-zone-toggle-icon {
+  transform: rotate(180deg);
+}
+
+.receta-card-v2 .receta-zone-body {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px dashed rgba(31, 63, 130, 0.10);
+}
+
+.receta-card-v2 .receta-zone-ingredientes[data-collapsed="true"] .receta-zone-body,
+.receta-card-v2 .receta-zone-descripcion[data-collapsed="true"] .receta-zone-body {
+  display: none;
+}
+
+.receta-card-v2 .receta-zone-body .receta-card-ingredients,
+.receta-card-v2 .receta-zone-body .receta-card-description {
+  margin: 0;
+  color: #4c5f88;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.receta-card-v2 .receta-zone-etiquetado .receta-print-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.receta-card-v2 .receta-zone-etiquetado .receta-front-inline {
+  margin-top: 6px;
+}
+
+.receta-card-v2 .receta-card-footer {
+  border-top: 1px dashed rgba(31, 63, 130, 0.10);
+  padding-top: 6px;
+  margin: 0;
+}
+
+.receta-card-v2 .receta-card-footer .receta-card-dates {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-size: 0.75rem;
+  color: #6c84b6;
+}
+
+@media (max-width: 520px) {
+  .receta-card-v2 .ingrediente-avatar {
+    width: 56px;
+    height: 56px;
+  }
+  .receta-card-v2 .receta-card-header-chips {
+    width: 100%;
+  }
+}
+
+/* ===========================================================
+   Inventario card v2 — zonas compactas con stat hero
+   =========================================================== */
+.inventario-card-v2 {
+  align-items: flex-start;
+  padding: 10px 12px;
+  gap: 10px;
+}
+
+.inventario-card-v2 .ingrediente-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.inventario-card-v2 .ingrediente-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.inventario-card-v2 .ingrediente-main {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.inventario-card-v2 .inventario-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(31, 63, 130, 0.08);
+}
+
+.inventario-card-v2 .inventario-card-titles {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.inventario-card-v2 .inventario-card-titles .ingrediente-meta {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #5b6d95;
+  font-weight: 600;
+}
+
+.inventario-card-v2 .inventario-card-titles .ingrediente-description {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #6c84b6;
+  line-height: 1.35;
+}
+
+.inventario-card-v2 .inventario-card-header-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.inventario-card-v2 .inventario-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 6px 0 0;
+}
+
+.inventario-card-v2 .inventario-zone:first-of-type {
+  padding-top: 0;
+}
+
+/* --- Stock hero --- */
+.inventario-card-v2 .inventario-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.inventario-card-v2 .inventario-hero-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(31, 63, 130, 0.08);
+}
+
+.inventario-card-v2 .inventario-hero-main > small {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #5b6d95;
+}
+
+.inventario-card-v2 .inventario-hero-value-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.inventario-card-v2 .inventario-hero-value {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-size: 1.7rem;
+  line-height: 1;
+  font-weight: 700;
+  color: #1f4ea5;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.inventario-card-v2 .inventario-hero-value span {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #4f6aa3;
+  margin-left: 3px;
+}
+
+.inventario-card-v2 .inventario-hero-value.inventario-infinity-symbol {
+  font-size: 2.2rem;
+}
+
+.inventario-card-v2 .inventario-hero-unit {
+  font-size: 0.74rem;
+  color: #6c84b6;
+}
+
+.inventario-card-v2 .inventario-hero-real {
+  font-size: 0.72rem;
+  color: #b06c08;
+}
+
+.inventario-card-v2 .inventario-card.status-empty .inventario-hero-value,
+.inventario-card-v2.status-empty .inventario-hero-value {
+  color: #c4314f;
+}
+
+.inventario-card-v2.status-low .inventario-hero-value {
+  color: #b86a08;
+}
+
+.inventario-card-v2.status-good .inventario-hero-value {
+  color: #1f8a48;
+}
+
+.inventario-card-v2 .inventario-hero-side {
+  display: grid;
+  align-content: stretch;
+}
+
+.inventario-card-v2 .inventario-datum {
+  display: grid;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(31, 63, 130, 0.08);
+  height: 100%;
+}
+
+.inventario-card-v2 .inventario-datum small {
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #5b6d95;
+}
+
+.inventario-card-v2 .inventario-datum strong {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #2a3556;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Lotes colapsable --- */
+.inventario-card-v2 .inventario-zone-lotes {
+  background: rgba(255, 244, 228, 0.55);
+  border-radius: 10px;
+  border: 1px solid rgba(176, 108, 8, 0.18);
+  padding: 4px 10px;
+}
+
+.inventario-card-v2 .inventario-zone-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 2px 0;
+  color: #b06c08;
+  cursor: pointer;
+  text-align: left;
+}
+
+.inventario-card-v2 .inventario-zone-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inventario-card-v2 .inventario-zone-toggle-label {
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.inventario-card-v2 .inventario-zone-toggle-icon {
+  font-size: 0.8rem;
+  color: #b06c08;
+  transition: transform .18s ease;
+}
+
+.inventario-card-v2 .inventario-zone-lotes[data-collapsed="false"] .inventario-zone-toggle-icon {
+  transform: rotate(180deg);
+}
+
+.inventario-card-v2 .inventario-zone-body {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px dashed rgba(176, 108, 8, 0.2);
+}
+
+.inventario-card-v2 .inventario-zone-lotes[data-collapsed="true"] .inventario-zone-body {
+  display: none;
+}
+
+/* --- Acciones --- */
+.inventario-card-v2 .inventario-zone-acciones {
+  border-top: 1px dashed rgba(31, 63, 130, 0.10);
+  padding-top: 6px;
+}
+
+.inventario-card-v2 .inventario-zone-acciones .inventario-actions-row {
+  margin-top: 0;
+}
+
+@media (max-width: 520px) {
+  .inventario-card-v2 .inventario-hero-grid {
+    grid-template-columns: 1fr;
+  }
+  .inventario-card-v2 .ingrediente-avatar {
+    width: 56px;
+    height: 56px;
+  }
+  .inventario-card-v2 .inventario-card-header-chips {
+    width: 100%;
+  }
+}
+
 .produccion-main-btn,
 .produccion-to-inventario-btn {
   width: fit-content;

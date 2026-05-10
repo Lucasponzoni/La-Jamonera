@@ -2186,28 +2186,64 @@
           return `<p class="inventario-expiring-line ${entry.type === 'expired' ? 'is-expired' : 'is-soon'}"><strong>${formatQtyUnit(entry.qty, entry.unit)}${pkg}</strong><span>${when}${lot}${entry.expiryDate ? ` · ${formatIsoDateEs(entry.expiryDate)}` : ''}</span></p>`;
         }).join('')}</div>`
         : '';
-      const stockLineHtml = infiniteStock
-        ? `<p class="inventario-stock-line ${stockClass}"><strong class="inventario-infinity-symbol">&infin;</strong><small class="inventario-stock-unit">Disponible</small><span>Sin control manual de stock</span></p>`
-        : `<p class="inventario-stock-line ${stockClass}"><strong class="${expiredQtyInStockUnit > 0.0001 ? 'inventario-expired-strike' : ''}">${stockQty.toFixed(2)}</strong><small class="inventario-stock-unit ${expiredQtyInStockUnit > 0.0001 ? 'inventario-expired-strike' : ''}">${escapeHtml(getMeasureAbbr(stockUnit))}${packageSuffix}</small>${expiredQtyInStockUnit > 0.0001 ? `<span class="inventario-stock-real-line">Real ${realAvailableQty.toFixed(2)} ${escapeHtml(getMeasureAbbr(stockUnit))}${packageSuffix}</span>` : ''}<span>Umbral: ${thresholdQty.toFixed(2)} ${escapeHtml(getMeasureAbbr(stockUnit))} ${normalizeValue(record.lowThresholdMode) === 'custom' ? '(personalizado)' : '(global)'}</span></p>`;
+      const stockAbbr = escapeHtml(getMeasureAbbr(stockUnit));
+      const thresholdMode = normalizeValue(record.lowThresholdMode) === 'custom' ? 'personalizado' : 'global';
+      const heroValueHtml = infiniteStock
+        ? `<strong class="inventario-hero-value inventario-infinity-symbol">&infin;</strong><span class="inventario-hero-unit">Sin control manual</span>`
+        : `<strong class="inventario-hero-value ${expiredQtyInStockUnit > 0.0001 ? 'inventario-expired-strike' : ''}">${stockQty.toFixed(2)}<span>${stockAbbr}${packageSuffix}</span></strong>${expiredQtyInStockUnit > 0.0001 ? `<small class="inventario-hero-real">Real ${realAvailableQty.toFixed(2)} ${stockAbbr}${packageSuffix}</small>` : ''}`;
+      const hasLotes = Boolean(expiringHtml);
       return `
-        <article class="ingrediente-card inventario-card ${status.className}" data-inventario-card="${item.id}">
+        <article class="ingrediente-card inventario-card inventario-card-v2 ${status.className}" data-inventario-card="${item.id}">
           ${ingredientAvatar(item)}
           <div class="ingrediente-main">
-            <div class="inventario-card-head">
-              <h6 class="ingrediente-name">${capitalize(item.name)}</h6>
-              <span class="inventario-status-badge">${status.label}</span>
-            </div>
-            ${recordHasFrozenEntries(record) ? '<span class="inventario-frozen-pill" title="Tiene lotes congelados (vto. 60 días desde el ingreso)"><i class="bi bi-snow2"></i><span>Congelado</span></span>' : ''}
-            <p class="ingrediente-meta">${capitalize(item.familyName)} · ${getMeasureLabel(item.measure || 'kilos')}</p>
-            ${item.description ? `<p class="ingrediente-description">${sentenceCase(item.description)}</p>` : ''}
-            ${stockLineHtml}
-            ${expiringHtml}
+            <header class="inventario-card-header">
+              <div class="inventario-card-titles">
+                <h6 class="ingrediente-name">${capitalize(item.name)}</h6>
+                <p class="ingrediente-meta">${capitalize(item.familyName)} · ${getMeasureLabel(item.measure || 'kilos')}</p>
+                ${item.description ? `<p class="ingrediente-description">${sentenceCase(item.description)}</p>` : ''}
+              </div>
+              <div class="inventario-card-header-chips">
+                ${recordHasFrozenEntries(record) ? '<span class="inventario-frozen-pill" title="Tiene lotes congelados (vto. 60 días desde el ingreso)"><i class="bi bi-snow2"></i><span>Congelado</span></span>' : ''}
+                <span class="inventario-status-badge">${status.label}</span>
+              </div>
+            </header>
+
+            <section class="inventario-zone inventario-zone-stock">
+              <div class="inventario-hero-grid">
+                <div class="inventario-hero-main ${stockClass}">
+                  <small>Stock disponible</small>
+                  <div class="inventario-hero-value-wrap">${heroValueHtml}</div>
+                </div>
+                ${infiniteStock ? '' : `<div class="inventario-hero-side">
+                  <div class="inventario-datum">
+                    <small>Umbral ${thresholdMode}</small>
+                    <strong>${thresholdQty.toFixed(2)} ${stockAbbr}</strong>
+                  </div>
+                </div>`}
+              </div>
+            </section>
+
+            ${hasLotes ? `
+            <section class="inventario-zone inventario-zone-lotes" data-collapsed="true">
+              <button type="button" class="inventario-zone-toggle" data-toggle-inventario-lotes="${item.id}">
+                <span class="inventario-zone-toggle-left">
+                  <i class="fa-solid fa-boxes-stacked"></i>
+                  <span class="inventario-zone-toggle-label">Lotes con vencimiento</span>
+                </span>
+                <i class="fa-solid fa-chevron-down inventario-zone-toggle-icon"></i>
+              </button>
+              <div class="inventario-zone-body">${expiringHtml}</div>
+            </section>` : ''}
+
             ${infiniteStock ? infiniteStockNoticeHtml() : ''}
-            <div class="inventario-actions-row inventory-production-actions">
-              <button type="button" class="btn ios-btn ios-btn-success inventory-production-action-btn is-main" data-inventario-open-editor="${item.id}" ${infiniteStock ? 'disabled title="Stock infinito sin carga manual"' : ''}><i class="fa-solid fa-plus"></i><span>Ingresar Stock</span></button>
-              <button type="button" class="btn ios-btn inventory-production-action-btn is-view inventario-view-btn" data-inventario-open-editor="${item.id}"><i class="fa-regular fa-eye"></i><span>Visualizar</span></button>
-              <button type="button" class="btn ios-btn inventory-production-action-btn is-threshold inventario-threshold-btn" data-inventario-config-item="${item.id}"><i class="fa-solid fa-sliders"></i><span>Umbral</span></button>
-            </div>
+
+            <footer class="inventario-zone inventario-zone-acciones">
+              <div class="inventario-actions-row inventory-production-actions">
+                <button type="button" class="btn ios-btn ios-btn-success inventory-production-action-btn is-main" data-inventario-open-editor="${item.id}" ${infiniteStock ? 'disabled title="Stock infinito sin carga manual"' : ''}><i class="fa-solid fa-plus"></i><span>Ingresar Stock</span></button>
+                <button type="button" class="btn ios-btn inventory-production-action-btn is-view inventario-view-btn" data-inventario-open-editor="${item.id}"><i class="fa-regular fa-eye"></i><span>Visualizar</span></button>
+                <button type="button" class="btn ios-btn inventory-production-action-btn is-threshold inventario-threshold-btn" data-inventario-config-item="${item.id}"><i class="fa-solid fa-sliders"></i><span>Umbral</span></button>
+              </div>
+            </footer>
           </div>
         </article>`;
     }).join('')}`;
@@ -7545,6 +7581,17 @@
       renderFamilies();
       renderStatusFilters();
       renderList();
+      return;
+    }
+
+    const lotesToggle = event.target.closest('[data-toggle-inventario-lotes]');
+    if (lotesToggle) {
+      const section = lotesToggle.closest('.inventario-zone-lotes');
+      if (section) {
+        const collapsed = section.getAttribute('data-collapsed') === 'true';
+        section.setAttribute('data-collapsed', collapsed ? 'false' : 'true');
+      }
+      event.stopPropagation();
       return;
     }
 

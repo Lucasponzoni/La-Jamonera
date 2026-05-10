@@ -1176,37 +1176,94 @@
       const hasNutritionLabel = Boolean(normalizeValue(item.nutrition?.ai?.tableHtml));
       const hasFrontLabels = frontLabels.length > 0;
       const groupLabel = getRecipeGroupLabel(item);
+      const rnpaStatus = getRnpaStatus(item);
+      const daysHtml = rnpaStatus.days == null ? '' : `<span class="receta-rnpa-days ${rnpaStatus.daysTone || 'is-neutral'}"><i class="bi bi-clock-history"></i>${rnpaStatus.days} días</span>`;
+      const ingredientsCount = recipeIngredients.length;
+      const hasDescription = Boolean(normalizeValue(item.description));
+      const hasEtiquetado = hasFrontLabels || hasNutritionLabel;
       return `
-        <article class="ingrediente-card receta-card" data-receta-id="${item.id}">
+        <article class="ingrediente-card receta-card receta-card-v2" data-receta-id="${item.id}">
           <div class="ingrediente-avatar receta-thumb-wrap">
             ${item.imageUrl
               ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="receta-thumb js-receta-thumb" src="${item.imageUrl}" alt="${capitalize(item.title || 'Receta')}" loading="lazy">`
               : getPlaceholderCircle()}
           </div>
           <div class="ingrediente-main receta-main">
-            <h6 class="ingrediente-name receta-name">${capitalize(item.title || 'Sin título')}</h6>
-            ${item.nombreComercial ? `<p class="receta-card-commercial"><i class="bi bi-tag"></i>${escapeHtml(capitalize(item.nombreComercial))}</p>` : ''}
-            <p class="receta-card-folder"><span aria-hidden="true">📁</span>${escapeHtml(groupLabel ? capitalize(groupLabel) : 'Sin carpeta')}</p>
-            <div class="receta-print-actions">
-              <button type="button" class="btn ios-btn ios-btn-secondary receta-print-btn" data-receta-print="nutrition" data-receta-id="${item.id}" ${hasNutritionLabel ? '' : 'disabled'}>
-                <i class="fa-solid fa-print"></i>
-                <span>Tabla nutricional</span>
+            <header class="receta-card-header">
+              <div class="receta-card-titles">
+                <h6 class="ingrediente-name receta-name">${capitalize(item.title || 'Sin título')}</h6>
+                ${item.nombreComercial ? `<p class="receta-card-commercial"><i class="bi bi-tag"></i>${escapeHtml(capitalize(item.nombreComercial))}</p>` : ''}
+                <p class="receta-card-folder"><span aria-hidden="true">📁</span>${escapeHtml(groupLabel ? capitalize(groupLabel) : 'Sin carpeta')}</p>
+              </div>
+              <div class="receta-card-header-chips">
+                <span class="receta-rnpa-badge ${rnpaStatus.className}"><i class="fa-solid ${rnpaStatus.icon}"></i>${rnpaStatus.label}</span>
+                ${daysHtml}
+              </div>
+            </header>
+
+            <section class="receta-zone receta-zone-datos">
+              <div class="receta-datos-row">
+                <div class="receta-datum">
+                  <small>Rinde</small>
+                  <strong>${item.yieldQuantity || '0'} ${label || ''}</strong>
+                </div>
+                ${item.frozenShelfLifeExtension ? `<div class="receta-datum is-info">
+                  <small>Conservación</small>
+                  <strong><i class="bi bi-snow2"></i> Extendido -18°C</strong>
+                </div>` : ''}
+              </div>
+            </section>
+
+            <section class="receta-zone receta-zone-ingredientes" data-collapsed="true">
+              <button type="button" class="receta-zone-toggle" data-toggle-receta-ingredientes="${item.id}">
+                <span class="receta-zone-toggle-left">
+                  <i class="fa-solid fa-flask"></i>
+                  <span class="receta-zone-toggle-label">Ingredientes</span>
+                  <span class="receta-zone-count">${ingredientsCount}</span>
+                </span>
+                <i class="fa-solid fa-chevron-down receta-zone-toggle-icon"></i>
               </button>
-              <button type="button" class="btn ios-btn ios-btn-secondary receta-print-btn" data-receta-print="front" data-receta-id="${item.id}" ${hasFrontLabels ? '' : 'disabled'}>
-                <i class="fa-solid fa-print"></i>
-                <span>Etiquetado frontal</span>
+              <div class="receta-zone-body">
+                <p class="receta-card-ingredients">${recipeIngredients.length ? recipeIngredients.join(' · ') : 'Sin ingredientes vinculados.'}</p>
+              </div>
+            </section>
+
+            ${hasDescription ? `
+            <section class="receta-zone receta-zone-descripcion" data-collapsed="true">
+              <button type="button" class="receta-zone-toggle" data-toggle-receta-descripcion="${item.id}">
+                <span class="receta-zone-toggle-left">
+                  <i class="fa-solid fa-align-left"></i>
+                  <span class="receta-zone-toggle-label">Descripción</span>
+                </span>
+                <i class="fa-solid fa-chevron-down receta-zone-toggle-icon"></i>
               </button>
-            </div>
-            <p class="ingrediente-meta receta-card-meta">Rinde: ${item.yieldQuantity || '0'} ${label || ''}</p>
-            ${item.frozenShelfLifeExtension ? '<div class="receta-rnpa-inline"><span class="receta-rnpa-badge is-exempt"><i class="bi bi-snow2"></i>Vencimiento extendido por congelamiento a -18°C</span></div>' : ''}
-            ${(() => { const rnpaStatus = getRnpaStatus(item); const daysText = rnpaStatus.days == null ? '' : `<span class="receta-rnpa-days ${rnpaStatus.daysTone || 'is-neutral'}"><i class="bi bi-clock-history"></i>${rnpaStatus.days} días</span>`; return `<div class="receta-rnpa-inline"><span class="receta-rnpa-badge ${rnpaStatus.className}"><i class="fa-solid ${rnpaStatus.icon}"></i>${rnpaStatus.label}</span>${daysText}</div>`; })()} 
-            <p class="ingrediente-meta receta-card-ingredients">Ingredientes: ${recipeIngredients.length ? recipeIngredients.join(' · ') : 'Sin ingredientes vinculados.'}</p>
-            ${item.description ? `<p class="ingrediente-description">${capitalize(item.description)}</p>` : '<p class="ingrediente-description"><em>Sin descripción</em></p>'}
-            ${frontLabels.length ? `<div class="receta-front-inline">${buildFrontLabelsHtml(frontLabels, { compact: true })}</div>` : ''}
-            <p class="ingrediente-dates receta-card-dates">
-              <span><i class="fa-regular fa-calendar-plus" aria-hidden="true"></i> Alta: ${formatDateLabel(item.createdAt)}</span>
-              <span><i class="fa-regular fa-calendar-check" aria-hidden="true"></i> Mod: ${formatDateLabel(item.updatedAt)}</span>
-            </p>
+              <div class="receta-zone-body">
+                <p class="receta-card-description">${capitalize(item.description)}</p>
+              </div>
+            </section>` : ''}
+
+            ${hasEtiquetado ? `
+            <section class="receta-zone receta-zone-etiquetado">
+              <h4 class="receta-zone-title"><i class="fa-solid fa-tag"></i><span>Etiquetado</span></h4>
+              <div class="receta-print-actions">
+                <button type="button" class="btn ios-btn ios-btn-secondary receta-print-btn" data-receta-print="nutrition" data-receta-id="${item.id}" ${hasNutritionLabel ? '' : 'disabled'}>
+                  <i class="fa-solid fa-print"></i>
+                  <span>Tabla nutricional</span>
+                </button>
+                <button type="button" class="btn ios-btn ios-btn-secondary receta-print-btn" data-receta-print="front" data-receta-id="${item.id}" ${hasFrontLabels ? '' : 'disabled'}>
+                  <i class="fa-solid fa-print"></i>
+                  <span>Etiquetado frontal</span>
+                </button>
+              </div>
+              ${frontLabels.length ? `<div class="receta-front-inline">${buildFrontLabelsHtml(frontLabels, { compact: true })}</div>` : ''}
+            </section>` : ''}
+
+            <footer class="receta-card-footer">
+              <p class="ingrediente-dates receta-card-dates">
+                <span><i class="fa-regular fa-calendar-plus" aria-hidden="true"></i> Alta: ${formatDateLabel(item.createdAt)}</span>
+                <span><i class="fa-regular fa-calendar-check" aria-hidden="true"></i> Mod: ${formatDateLabel(item.updatedAt)}</span>
+              </p>
+            </footer>
           </div>
           <div class="ingrediente-actions recipe-row-actions">
             <button type="button" class="btn family-manage-btn" data-receta-image-view="${item.id}" title="Ver imagen" ${normalizeValue(item.imageUrl) ? '' : 'disabled'}><i class="fa-regular fa-image"></i></button>
@@ -4391,6 +4448,28 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
       renderRecetas();
       return;
     }
+    const recetaIngredientesToggle = event.target.closest('[data-toggle-receta-ingredientes]');
+    if (recetaIngredientesToggle) {
+      const section = recetaIngredientesToggle.closest('.receta-zone-ingredientes');
+      if (section) {
+        const collapsed = section.getAttribute('data-collapsed') === 'true';
+        section.setAttribute('data-collapsed', collapsed ? 'false' : 'true');
+      }
+      event.stopPropagation();
+      return;
+    }
+
+    const recetaDescripcionToggle = event.target.closest('[data-toggle-receta-descripcion]');
+    if (recetaDescripcionToggle) {
+      const section = recetaDescripcionToggle.closest('.receta-zone-descripcion');
+      if (section) {
+        const collapsed = section.getAttribute('data-collapsed') === 'true';
+        section.setAttribute('data-collapsed', collapsed ? 'false' : 'true');
+      }
+      event.stopPropagation();
+      return;
+    }
+
     const printBtn = event.target.closest('[data-receta-print]');
     if (printBtn) {
       const recipe = await ensureRecipeDetail(printBtn.dataset.recetaId);
