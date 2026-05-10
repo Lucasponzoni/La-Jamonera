@@ -7652,17 +7652,14 @@
       setStateView(getRecipes().length ? 'list' : 'empty');
       return;
     }
-    const buildCoverageChecksHtml = (analysis) => {
-      const available = analysis.requirements.filter((item) => item.missingForMin <= 0.0001).length;
-      return `
-        <div class="produccion-checks-head">${available}/${analysis.requirements.length} ingredientes listos</div>
+    const buildCoverageChecksHtml = (analysis) => `
         <div class="produccion-checks-list">${analysis.requirements.map((item) => `
           <span class="produccion-check-item ${item.missingForMin <= 0.0001 ? 'is-ok' : (item.missingForMinIncludingExpired <= 0.0001 ? 'is-expired' : 'is-missing')}">
             <i class="fa-solid ${item.missingForMin <= 0.0001 ? 'fa-circle-check' : (item.missingForMinIncludingExpired <= 0.0001 ? 'fa-triangle-exclamation' : 'fa-circle-xmark')}"></i>
             <span>${item.name}${item.hasRelatedCoverage ? ` · sustituto ${item.substitutionCount}` : ''}</span>
           </span>`).join('')}
         </div>`;
-    };
+    const countAvailableIngredients = (analysis) => analysis.requirements.filter((item) => item.missingForMin <= 0.0001).length;
     const cardsHtml = list.map((recipe) => {
       const analysis = state.analysis[recipe.id] || analyzeRecipe(recipe);
       const dispatchMeta = getProducedStockMeta(recipe.id);
@@ -7707,79 +7704,122 @@
         }).join('')}${expiredOnlyIngredients.map((item) => `<p><strong>${item.name}:</strong> sin stock fresco · disponible en expirado ${formatQty(item.totalAvailable, item.unit)}</p>`).join('')}</div>`
         : '<p class="produccion-ok-line">Cobertura suficiente para iniciar producción.</p>';
       const lastProductionAt = state.config.lastProductionByRecipe?.[recipe.id] || recipe.lastProductionAt || recipe.production?.lastAt || 0;
+      const expiredKgLine = Number(analysis.expiredKg || 0) > 0.0001
+        ? `<p class="produccion-alert-line is-expired"><i class="fa-solid fa-triangle-exclamation"></i> <strong>Kilos expirados:</strong> <strong>${Number(analysis.expiredKg || 0).toFixed(2)} kg</strong></p>`
+        : '';
+      const expiredWindowsHtml = (() => {
+        if (!analysis.hasExpired) return '';
+        const windows = getRecipeExpiredDateWindows(recipe, analysis, toIsoDate());
+        if (!windows.length) return '';
+        const detail = windows.length
+          ? windows.map((item) => `<span><strong>${escapeHtml(item.ingredientName)}:</strong> ${escapeHtml(formatIsoEs(item.from || ''))} a ${escapeHtml(formatIsoEs(item.to || ''))}</span>`).join('<br>')
+          : `<span>${escapeHtml(formatIsoEs(normalizeValue(formatDateRangeForRecipe(recipe).split(' a ')[0] || '')))} a ${escapeHtml(formatIsoEs(normalizeValue(formatDateRangeForRecipe(recipe).split(' a ')[1] || '')))}</span>`;
+        const headline = (!analysis.canProduce && analysis.canProduceConsideringExpired)
+          ? `Podes producir con lote vencido ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg, pero en este rango por producto:`
+          : 'Lotes vencidos detectados en este rango por producto:';
+        return `<p class="produccion-alert-line is-expired"><i class="fa-solid fa-calendar-days"></i> ${headline}<br>${detail}</p>`;
+      })();
+      const draftLockLine = draftLock?.blockedKg > 0
+        ? `<p class="produccion-alert-line" data-draft-lock-line="${recipe.id}"><i class="fa-solid fa-lock"></i> Bloqueado por borrador: <strong>${draftLock.blockedKg.toFixed(2)} kg</strong> · disponible en <strong data-draft-lock-time="${recipe.id}">${formatCountdown(draftLock.remainingMs)}</strong></p>`
+        : '';
+      const errorsOrMissing = analysis.errors.length
+        ? `<p class="produccion-error">${analysis.errors[0]}</p>`
+        : missingHtml;
+      const hasAlerts = Boolean(badges) || Boolean(expiredKgLine) || Boolean(expiredWindowsHtml) || Boolean(draftLockLine);
+      const ingredientsAvailable = countAvailableIngredients(analysis);
+      const ingredientsTotal = analysis.requirements.length;
+      const coveragePct = (isExpiredOnlyAvailable ? Number(analysis.progressIncludingExpired || 0) : analysis.progress).toFixed(0);
+      const coverageBarClass = isExpiredOnlyAvailable
+        ? 'is-expired'
+        : (analysis.status === 'danger' ? 'is-danger' : analysis.progress >= 100 ? 'is-success' : 'is-warning');
       return `
-        <article class="ingrediente-card receta-card produccion-card ${statusClass}">
+        <article class="ingrediente-card receta-card produccion-card produccion-card-v2 ${statusClass}">
           <div class="ingrediente-avatar receta-thumb-wrap">
             ${recipe.imageUrl
               ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="receta-thumb js-produccion-thumb" src="${recipe.imageUrl}" alt="${capitalize(recipe.title || 'Receta')}" loading="lazy">`
               : getThumbPlaceholder()}
           </div>
           <div class="ingrediente-main receta-main">
-            <div class="produccion-row-head">
-              <div>
+            <header class="produccion-card-header produccion-row-head">
+              <div class="produccion-card-titles">
                 <h6 class="ingrediente-name receta-name">${capitalize(recipe.title || 'Sin título')}</h6>
                 ${recipe.nombreComercial ? `<p class="produccion-nombre-comercial">${escapeHtml(capitalize(recipe.nombreComercial))}</p>` : ''}
                 <p class="produccion-recipe-folder"><span aria-hidden="true">📁</span>${escapeHtml(groupLabel ? capitalize(groupLabel) : 'Sin carpeta')}</p>
               </div>
               <span class="produccion-chip ${statusClass}"><span class="produccion-semaforo"></span>${isExpiredOnlyAvailable ? 'Disponible con expirados' : analysis.statusText}</span>
-            </div>
-            <div class="produccion-stats-line">
-              <div class="produccion-stat-block">
-                <small>Máximo producible</small>
-                ${isExpiredOnlyAvailable
-      ? `<strong class="produccion-max-expired-only">${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg*</strong>`
-      : (draftLock?.blockedKg > 0
-        ? `<div class="produccion-max-values"><strong class="produccion-max-base">${analysis.maxKg.toFixed(2)} kg</strong><strong class="produccion-max-adjusted">${Math.max(0, analysis.maxKg - draftLock.blockedKg).toFixed(2)} kg</strong></div>`
-        : (showInfiniteMax ? '<strong class="produccion-infinite-symbol">&infin;</strong>' : `<strong>${analysis.maxKg.toFixed(2)} kg</strong>`))}
+            </header>
+
+            <section class="produccion-zone produccion-zone-stock">
+              <div class="produccion-hero-grid">
+                <div class="produccion-hero-main">
+                  <small>Máximo producible</small>
+                  ${isExpiredOnlyAvailable
+        ? `<strong class="produccion-hero-value produccion-max-expired-only">${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} <span>kg*</span></strong>`
+        : (draftLock?.blockedKg > 0
+          ? `<div class="produccion-max-values produccion-hero-value"><strong class="produccion-max-base">${analysis.maxKg.toFixed(2)} kg</strong><strong class="produccion-max-adjusted">${Math.max(0, analysis.maxKg - draftLock.blockedKg).toFixed(2)} kg</strong></div>`
+          : (showInfiniteMax ? '<strong class="produccion-hero-value produccion-infinite-symbol">&infin;</strong>' : `<strong class="produccion-hero-value">${analysis.maxKg.toFixed(2)} <span>kg</span></strong>`))}
+                  <div class="produccion-progress-wrap ${isExpiredOnlyAvailable ? 'is-expired-only' : ''}">
+                    <div class="produccion-progress-bar"><span class="${coverageBarClass}" style="width:${(isExpiredOnlyAvailable ? Number(analysis.progressIncludingExpired || 0) : analysis.progress).toFixed(1)}%"></span></div>
+                    <small>Cobertura del mínimo: ${coveragePct}%${isExpiredOnlyAvailable ? ' (con expirados)' : ''}</small>
+                  </div>
+                </div>
+                <div class="produccion-hero-side">
+                  <div class="produccion-stat-block produccion-stat-mini">
+                    <small>Mínimo</small>
+                    <strong>${analysis.minKg.toFixed(2)} kg</strong>
+                  </div>
+                  <div class="produccion-stat-block produccion-stat-mini is-stock-up">
+                    <small>En stock <i class="fa-solid fa-arrow-up"></i></small>
+                    <strong>${dispatchMeta.available.toFixed(2)} kg</strong>
+                  </div>
+                  <div class="produccion-stat-block produccion-stat-mini is-stock-down">
+                    <small>Egresados <i class="fa-solid fa-arrow-down"></i></small>
+                    <strong>${dispatchMeta.lastWeekOut.toFixed(2)} kg</strong>
+                  </div>
+                  <div class="produccion-stat-block produccion-stat-mini produccion-stat-mini-last">
+                    <small>Última producción</small>
+                    <strong>${formatDate(lastProductionAt)}</strong>
+                  </div>
+                </div>
               </div>
-              <div class="produccion-stat-sep" aria-hidden="true"></div>
-              <div class="produccion-stat-block">
-                <small>Mínimo</small>
-                <strong>${analysis.minKg.toFixed(2)} kg</strong>
+              <div class="produccion-zone-footer">
+                <button type="button" class="btn btn-link p-0 produccion-zone-link produccion-product-history-btn" data-open-recipe-history="${recipe.id}"><i class="fa-solid fa-clock-rotate-left"></i> Ver historial</button>
               </div>
-              <div class="produccion-stat-sep" aria-hidden="true"></div>
-              <div class="produccion-stat-block is-stock-up">
-                <small>En stock <i class="fa-solid fa-arrow-up"></i></small>
-                <strong>${dispatchMeta.available.toFixed(2)} kg</strong>
+            </section>
+
+            <section class="produccion-zone produccion-zone-ingredientes" data-collapsed="true">
+              <button type="button" class="produccion-zone-toggle" data-toggle-ingredientes="${recipe.id}">
+                <span class="produccion-zone-toggle-left">
+                  <i class="fa-solid fa-flask"></i>
+                  <span class="produccion-zone-toggle-label">Ingredientes</span>
+                  <span class="produccion-zone-count ${ingredientsAvailable === ingredientsTotal ? 'is-ok' : 'is-warn'}">${ingredientsAvailable}/${ingredientsTotal} listos</span>
+                </span>
+                <i class="fa-solid fa-chevron-down produccion-zone-toggle-icon"></i>
+              </button>
+              ${analysis.missingForMin.length ? `<p class="produccion-zone-summary">Faltan: ${analysis.missingForMin.slice(0, 3).map((item) => escapeHtml(item.name)).join(', ')}${analysis.missingForMin.length > 3 ? ` y ${analysis.missingForMin.length - 3} más` : ''}</p>` : ''}
+              <div class="produccion-zone-body">
+                ${buildCoverageChecksHtml(analysis)}
+                ${errorsOrMissing}
               </div>
-              <div class="produccion-stat-sep" aria-hidden="true"></div>
-              <div class="produccion-stat-block is-stock-down">
-                <small>Últimos egresados <i class="fa-solid fa-arrow-down"></i></small>
-                <strong>${dispatchMeta.lastWeekOut.toFixed(2)} kg</strong>
-              </div>
-              <div class="produccion-stat-sep" aria-hidden="true"></div>
-              <div class="produccion-stat-block">
-                <small><button type="button" class="btn btn-link p-0 produccion-product-history-btn" data-open-recipe-history="${recipe.id}">Historial</button></small>
-              </div>
-            </div>
-            ${Number(analysis.expiredKg || 0) > 0.0001 ? `<p class="produccion-last-line produccion-last-line-expired"><i class="fa-solid fa-triangle-exclamation"></i> <strong>Kilos expirados:</strong> <strong>${Number(analysis.expiredKg || 0).toFixed(2)} kg</strong></p>` : ''}
-            ${(() => {
-              if (!analysis.hasExpired) return '';
-              const windows = getRecipeExpiredDateWindows(recipe, analysis, toIsoDate());
-              if (!windows.length) return '';
-              const detail = windows.length
-                ? windows.map((item) => `<span><strong>${escapeHtml(item.ingredientName)}:</strong> ${escapeHtml(formatIsoEs(item.from || ''))} a ${escapeHtml(formatIsoEs(item.to || ''))}</span>`).join('<br>')
-                : `<span>${escapeHtml(formatIsoEs(normalizeValue(formatDateRangeForRecipe(recipe).split(' a ')[0] || '')))} a ${escapeHtml(formatIsoEs(normalizeValue(formatDateRangeForRecipe(recipe).split(' a ')[1] || '')))}</span>`;
-              const headline = (!analysis.canProduce && analysis.canProduceConsideringExpired)
-                ? `Podes producir con lote vencido ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg, pero en este rango por producto:`
-                : 'Lotes vencidos detectados en este rango por producto:';
-              return `<p class="produccion-last-line produccion-last-line-expired"><i class="fa-solid fa-calendar-days"></i> ${headline}<br>${detail}</p>`;
-            })()}
-            ${draftLock?.blockedKg > 0 ? `<p class="produccion-last-line" data-draft-lock-line="${recipe.id}"><i class="fa-solid fa-lock"></i> Bloqueado por borrador: <strong>${draftLock.blockedKg.toFixed(2)} kg</strong> · disponible en <strong data-draft-lock-time="${recipe.id}">${formatCountdown(draftLock.remainingMs)}</strong></p>` : ''}
-            <p class="produccion-last-line"><i class="fa-regular fa-clock"></i> Última producción: <strong>${formatDate(lastProductionAt)}</strong></p>
-            <div class="produccion-progress-wrap ${isExpiredOnlyAvailable ? 'is-expired-only' : ''}">
-              <div class="produccion-progress-bar"><span class="${isExpiredOnlyAvailable ? 'is-expired' : (analysis.status === 'danger' ? 'is-danger' : analysis.progress >= 100 ? 'is-success' : 'is-warning')}" style="width:${(isExpiredOnlyAvailable ? Number(analysis.progressIncludingExpired || 0) : analysis.progress).toFixed(1)}%"></span></div>
-              <small>Cobertura del mínimo: ${(isExpiredOnlyAvailable ? Number(analysis.progressIncludingExpired || 0) : analysis.progress).toFixed(0)}%${isExpiredOnlyAvailable ? ' (con expirados)' : ''}</small>
-            </div>
-            ${buildCoverageChecksHtml(analysis)}
-            <div class="produccion-badges">${badges}</div>
-            ${analysis.errors.length ? `<p class="produccion-error">${analysis.errors[0]}</p>` : missingHtml}
-            <div class="produccion-actions-row inventory-production-actions">
-              ${action.replace('produccion-main-btn', 'produccion-main-btn inventory-production-action-btn is-main')}
-              <span class="barra-vertical produccion-actions-divider" aria-hidden="true"></span>
-              ${inventoryAction}
-              ${viewAction.replace('produccion-visualizar-btn', 'produccion-visualizar-btn inventory-production-action-btn is-view')}
-              <button type="button" class="btn ios-btn inventory-production-action-btn is-threshold" data-set-recipe-min="${recipe.id}"><i class="fa-solid fa-sliders"></i><span>Umbral</span></button>
+            </section>
+
+            ${hasAlerts ? `
+            <section class="produccion-zone produccion-zone-alertas">
+              <h4 class="produccion-zone-title"><i class="fa-solid fa-triangle-exclamation"></i><span>Alertas</span></h4>
+              ${badges ? `<div class="produccion-badges">${badges}</div>` : ''}
+              ${expiredKgLine}
+              ${expiredWindowsHtml}
+              ${draftLockLine}
+            </section>` : ''}
+
+            <footer class="produccion-zone produccion-zone-acciones">
+              <h4 class="produccion-zone-title"><i class="fa-solid fa-bolt"></i><span>Acciones</span></h4>
+              <div class="produccion-actions-row inventory-production-actions">
+                ${action.replace('produccion-main-btn', 'produccion-main-btn inventory-production-action-btn is-main')}
+                <span class="barra-vertical produccion-actions-divider" aria-hidden="true"></span>
+                ${inventoryAction}
+                ${viewAction.replace('produccion-visualizar-btn', 'produccion-visualizar-btn inventory-production-action-btn is-view')}
+                <button type="button" class="btn ios-btn inventory-production-action-btn is-threshold" data-set-recipe-min="${recipe.id}"><i class="fa-solid fa-sliders"></i><span>Umbral</span></button>
               <div class="produccion-more-wrap">
                 <button type="button" class="btn ios-btn ios-btn-secondary produccion-more-btn" data-recipe-more="${recipe.id}" aria-label="Más opciones"><i class="bi bi-three-dots-vertical"></i></button>
                 <div class="produccion-more-menu d-none">
@@ -7802,6 +7842,7 @@
                 </div>
               </div>
             </div>
+            </footer>
           </div>
         </article>`;
     }).join('');
@@ -9205,6 +9246,17 @@
         const instance = bootstrap.Modal.getOrCreateInstance(modal);
         instance.show();
       }
+      return;
+    }
+
+    const ingredientsToggleBtn = event.target.closest('[data-toggle-ingredientes]');
+    if (ingredientsToggleBtn) {
+      const section = ingredientsToggleBtn.closest('.produccion-zone-ingredientes');
+      if (section) {
+        const isCollapsed = section.getAttribute('data-collapsed') === 'true';
+        section.setAttribute('data-collapsed', isCollapsed ? 'false' : 'true');
+      }
+      event.stopPropagation();
       return;
     }
 

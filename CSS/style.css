@@ -7398,6 +7398,366 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   flex-wrap: wrap;
 }
 
+/* ===========================================================
+   Produccion card v2 — diseño compacto con stat hero
+   =========================================================== */
+.produccion-card-v2 {
+  align-items: flex-start;
+  padding: 10px 12px;
+  gap: 10px;
+}
+
+.produccion-card-v2 .ingrediente-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+}
+
+.produccion-card-v2 .ingrediente-avatar img,
+.produccion-card-v2 .receta-thumb-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.produccion-card-v2 .ingrediente-main {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.produccion-card-v2 .produccion-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(31, 63, 130, 0.08);
+}
+
+.produccion-card-v2 .produccion-card-titles {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.produccion-card-v2 .produccion-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 6px 0 0;
+  border-top: 1px dashed rgba(31, 63, 130, 0.10);
+}
+
+.produccion-card-v2 .produccion-zone:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.produccion-card-v2 .produccion-zone-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #4f6aa3;
+}
+
+.produccion-card-v2 .produccion-zone-title > i {
+  font-size: 0.85rem;
+  color: #6c84b6;
+}
+
+.produccion-card-v2 .produccion-zone-link {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: #4f6aa3;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.produccion-card-v2 .produccion-zone-link:hover {
+  color: #2a3556;
+  text-decoration: underline;
+}
+
+.produccion-card-v2 .produccion-zone-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
+/* --- Stock hero --- */
+.produccion-card-v2 .produccion-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.6fr);
+  gap: 10px;
+  align-items: stretch;
+}
+
+.produccion-card-v2 .produccion-hero-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(232, 240, 255, 0.6) 100%);
+  border: 1px solid rgba(31, 63, 130, 0.10);
+}
+
+.produccion-card-v2 .produccion-hero-main > small {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #5b6d95;
+}
+
+.produccion-card-v2 .produccion-hero-value {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-size: 1.85rem;
+  line-height: 1;
+  font-weight: 700;
+  color: #1f3f82;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  margin: 2px 0;
+}
+
+.produccion-card-v2 .produccion-hero-value span {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+}
+
+.produccion-card-v2 .produccion-hero-main .produccion-max-values .produccion-max-base,
+.produccion-card-v2 .produccion-hero-main .produccion-max-values .produccion-max-adjusted {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.produccion-card-v2 .produccion-hero-value span {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #4f6aa3;
+  margin-left: 3px;
+}
+
+.produccion-card-v2 .produccion-hero-value.produccion-infinite-symbol {
+  font-size: 2.4rem;
+}
+
+.produccion-card-v2 .produccion-hero-value.produccion-max-expired-only {
+  color: #b06c08;
+}
+
+.produccion-card-v2 .produccion-hero-main .produccion-max-values {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.produccion-card-v2 .produccion-hero-main .produccion-progress-wrap {
+  margin-top: auto;
+  display: grid;
+  gap: 2px;
+}
+
+.produccion-card-v2 .produccion-hero-main .produccion-progress-bar {
+  height: 8px;
+}
+
+.produccion-card-v2 .produccion-hero-main .produccion-progress-wrap small {
+  font-size: 0.72rem;
+}
+
+.produccion-card-v2 .produccion-hero-side {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  align-content: stretch;
+}
+
+.produccion-card-v2 .produccion-stat-mini {
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(31, 63, 130, 0.08);
+  gap: 1px;
+}
+
+.produccion-card-v2 .produccion-stat-mini small {
+  font-size: 0.64rem;
+  letter-spacing: .04em;
+}
+
+.produccion-card-v2 .produccion-stat-mini strong {
+  font-size: 0.92rem;
+  line-height: 1.1;
+}
+
+.produccion-card-v2 .produccion-stat-mini-last strong {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #2a3556;
+}
+
+/* --- Ingredientes colapsable --- */
+.produccion-card-v2 .produccion-zone-ingredientes {
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 10px;
+  border: 1px solid rgba(31, 63, 130, 0.08);
+  padding: 4px 10px;
+  border-top: 1px solid rgba(31, 63, 130, 0.08);
+}
+
+.produccion-card-v2 .produccion-zone-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 2px 0;
+  color: #4f6aa3;
+  cursor: pointer;
+  text-align: left;
+}
+
+.produccion-card-v2 .produccion-zone-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.produccion-card-v2 .produccion-zone-toggle-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.produccion-card-v2 .produccion-zone-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(56, 85, 143, 0.10);
+  color: #38558f;
+}
+
+.produccion-card-v2 .produccion-zone-count.is-ok {
+  background: rgba(20, 141, 68, 0.12);
+  color: #148d44;
+}
+
+.produccion-card-v2 .produccion-zone-count.is-warn {
+  background: rgba(176, 108, 8, 0.14);
+  color: #b06c08;
+}
+
+.produccion-card-v2 .produccion-zone-toggle-icon {
+  font-size: 0.82rem;
+  color: #6c84b6;
+  transition: transform .18s ease;
+}
+
+.produccion-card-v2 .produccion-zone-ingredientes[data-collapsed="false"] .produccion-zone-toggle-icon {
+  transform: rotate(180deg);
+}
+
+.produccion-card-v2 .produccion-zone-summary {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #b06c08;
+  font-weight: 600;
+}
+
+.produccion-card-v2 .produccion-zone-body {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.produccion-card-v2 .produccion-zone-ingredientes[data-collapsed="true"] .produccion-zone-body {
+  display: none;
+}
+
+.produccion-card-v2 .produccion-checks-list {
+  margin-top: 0;
+}
+
+.produccion-card-v2 .produccion-zone-ingredientes .produccion-missing-list,
+.produccion-card-v2 .produccion-zone-ingredientes .produccion-ok-line,
+.produccion-card-v2 .produccion-zone-ingredientes .produccion-error {
+  margin-top: 0;
+}
+
+/* --- Alertas --- */
+.produccion-card-v2 .produccion-zone-alertas {
+  background: rgba(255, 244, 228, 0.55);
+  border-radius: 10px;
+  border: 1px solid rgba(176, 108, 8, 0.18);
+  padding: 4px 10px;
+  border-top: 1px solid rgba(176, 108, 8, 0.18);
+}
+
+.produccion-card-v2 .produccion-zone-alertas .produccion-badges {
+  margin-top: 4px;
+}
+
+.produccion-card-v2 .produccion-alert-line {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #60739f;
+}
+
+.produccion-card-v2 .produccion-alert-line.is-expired {
+  color: #b42338;
+  font-weight: 700;
+}
+
+.produccion-card-v2 .produccion-alert-line.is-expired i,
+.produccion-card-v2 .produccion-alert-line.is-expired strong {
+  color: #b42338;
+}
+
+/* --- Acciones --- */
+.produccion-card-v2 .produccion-zone-acciones .produccion-actions-row {
+  margin-top: 0;
+}
+
+@media (max-width: 900px) {
+  .produccion-card-v2 .produccion-hero-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .produccion-card-v2 .produccion-hero-side {
+    grid-template-columns: 1fr 1fr;
+  }
+  .produccion-card-v2 .produccion-hero-value {
+    font-size: 2rem;
+  }
+  .produccion-card-v2 .ingrediente-avatar {
+    width: 68px;
+    height: 68px;
+    border-radius: 999px;
+  }
+}
+
 .produccion-main-btn,
 .produccion-to-inventario-btn {
   width: fit-content;
