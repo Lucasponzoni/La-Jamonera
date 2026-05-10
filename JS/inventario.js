@@ -403,6 +403,7 @@
     number: '',
     expiryDate: '',
     infiniteExpiry: false,
+    observations: '',
     attachmentUrl: '',
     attachmentType: '',
     updatedAt: 0,
@@ -442,6 +443,7 @@
       rne: {
         ...getDefaultProviderRne(),
         ...safeObject(source.rne),
+        observations: normalizeValue(source?.rne?.observations || source?.rne?.observation || source?.rne?.observacion),
         history: Array.isArray(source?.rne?.history) ? source.rne.history : []
       }
     };
@@ -526,7 +528,7 @@
       return { key: 'all', label: 'No alimentos', tone: 'neutral', helper: 'No requiere RNE.' };
     }
     const rne = safeObject(provider?.rne);
-    const hasRne = Boolean(normalizeValue(rne.number) || normalizeValue(rne.attachmentUrl));
+    const hasRne = Boolean(normalizeValue(rne.number) || normalizeValue(rne.observations) || normalizeValue(rne.attachmentUrl));
     if (!hasRne) {
       return { key: 'none', label: 'Sin RNE', tone: 'info', helper: 'Podés cargarlo más tarde.' };
     }
@@ -566,6 +568,7 @@
     number: normalizeValue(source?.number),
     expiryDate: normalizeValue(source?.expiryDate),
     infiniteExpiry: Boolean(source?.infiniteExpiry),
+    observations: normalizeValue(source?.observations || source?.observation || source?.observacion),
     attachmentUrl: normalizeValue(source?.attachmentUrl),
     attachmentType: normalizeValue(source?.attachmentType),
     savedAt: Date.now()
@@ -4875,9 +4878,10 @@
           <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="newProviderNonFood"><span>No pertenece al rubro alimentos</span></label>
           <label for="newProviderPhoto" class="inventario-upload-dropzone"><i class="fa-regular fa-image"></i><span>Foto de perfil: click o arrastrá</span></label><input id="newProviderPhoto" class="form-control image-file-input inventario-hidden-file-input" type="file" accept="image/*"><small id="newProviderPhotoFeedback" class="inventario-file-feedback">Sin foto seleccionada</small>
           <p class="text-start"><small><strong>Opcional:</strong> podés cargar el RNE ahora o hacerlo más tarde.</small></p>
-          <input id="newProviderRneNumber" class="swal2-input ios-input" placeholder="RNE (opcional)">
+          <input id="newProviderRneNumber" class="swal2-input ios-input" placeholder="RNE (opcional, texto libre)">
           <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="newProviderRneInfinite"><span>Vencimiento infinito (∞)</span></label>
           <input id="newProviderRneExpiry" class="swal2-input ios-input" placeholder="Vencimiento RNE (opcional)">
+          <textarea id="newProviderRneObservations" class="swal2-textarea ios-input" rows="2" placeholder="Observaciones RNE (opcional)"></textarea>
           <label for="newProviderRneFile" class="inventario-upload-dropzone"><i class="fa-regular fa-file"></i><span>Adjunto RNE: click o arrastrá</span></label><input id="newProviderRneFile" class="form-control image-file-input inventario-hidden-file-input" type="file" accept="image/*,application/pdf"><small id="newProviderRneFeedback" class="inventario-file-feedback">Sin adjunto seleccionado</small>
         </div>`,
         showCancelButton: true,
@@ -4887,15 +4891,29 @@
           const expiryInput = document.getElementById('newProviderRneExpiry');
           const numberInput = document.getElementById('newProviderRneNumber');
           const infiniteInput = document.getElementById('newProviderRneInfinite');
-          numberInput?.addEventListener('input', () => {
-            numberInput.value = numberInput.value.replace(/[^0-9-]/g, '');
-          });
+          const nonFoodInput = document.getElementById('newProviderNonFood');
+          const observationsInput = document.getElementById('newProviderRneObservations');
+          const rneFileInput = document.getElementById('newProviderRneFile');
           const syncInfinite = () => {
-            if (!expiryInput) return;
-            expiryInput.disabled = Boolean(infiniteInput?.checked);
-            if (infiniteInput?.checked) expiryInput.value = '';
+            const isNonFood = Boolean(nonFoodInput?.checked);
+            if (expiryInput) {
+              expiryInput.disabled = Boolean(infiniteInput?.checked) || isNonFood;
+              if (infiniteInput?.checked || isNonFood) expiryInput.value = '';
+            }
+            if (infiniteInput) {
+              infiniteInput.disabled = isNonFood;
+              if (isNonFood) infiniteInput.checked = false;
+            }
+            if (numberInput) numberInput.disabled = isNonFood;
+            if (observationsInput) observationsInput.disabled = isNonFood;
+            if (rneFileInput) rneFileInput.disabled = isNonFood;
+            if (isNonFood) {
+              if (numberInput) numberInput.value = '';
+              if (observationsInput) observationsInput.value = '';
+            }
           };
           infiniteInput?.addEventListener('change', syncInfinite);
+          nonFoodInput?.addEventListener('change', syncInfinite);
           syncInfinite();
           const wireDrop = (inputId, feedbackId) => {
             const input = document.getElementById(inputId);
@@ -4942,16 +4960,13 @@
           const nonFoodCategory = Boolean(document.getElementById('newProviderNonFood')?.checked);
           const infiniteExpiry = Boolean(document.getElementById('newProviderRneInfinite')?.checked);
           const rneNumber = nonFoodCategory ? '' : normalizeValue(document.getElementById('newProviderRneNumber')?.value);
+          const rneObservations = nonFoodCategory ? '' : normalizeValue(document.getElementById('newProviderRneObservations')?.value);
           const rneExpiry = nonFoodCategory || infiniteExpiry ? '' : normalizeIsoDate(document.getElementById('newProviderRneExpiry')?.value);
           const rneFile = nonFoodCategory ? null : (document.getElementById('newProviderRneFile')?.files?.[0] || null);
           const photoFile = document.getElementById('newProviderPhoto')?.files?.[0] || null;
 
           if (!name) {
             Swal.showValidationMessage('Completá el nombre del proveedor.');
-            return false;
-          }
-          if (!nonFoodCategory && rneNumber && !/^[0-9-]+$/.test(rneNumber)) {
-            Swal.showValidationMessage('El número de RNE solo admite dígitos y guion (-).');
             return false;
           }
           if (rneFile && !ALLOWED_RNE_UPLOAD_TYPES.includes(rneFile.type)) {
@@ -4991,6 +5006,7 @@
               number: rneNumber,
               expiryDate: rneExpiry,
               infiniteExpiry: nonFoodCategory ? false : infiniteExpiry,
+              observations: rneObservations,
               attachmentUrl,
               attachmentType: rneFile?.type || '',
               updatedAt: Date.now()
@@ -6338,10 +6354,12 @@
         <label class="form-label" for="providerNameInput"><strong>Nombre</strong></label>
         <input id="providerNameInput" class="swal2-input ios-input" value="${escapeHtml(provider.name)}" placeholder="Nombre del proveedor">
         <label class="form-label" for="providerRneNumberInput"><strong>RNE</strong></label>
-        <input id="providerRneNumberInput" class="swal2-input ios-input" value="${escapeHtml(currentRne.number || '')}" placeholder="Número de registro (admite guiones)">
+        <input id="providerRneNumberInput" class="swal2-input ios-input" value="${escapeHtml(currentRne.number || '')}" placeholder="Ej: 21-085083, RUCA N° 69354">
         <label class="form-label" for="providerRneExpiryInput"><strong>Fecha de caducidad</strong></label>
         <input id="providerRneExpiryInput" class="swal2-input ios-input" value="${escapeHtml(currentRne.expiryDate || '')}" placeholder="Seleccionar fecha">
         <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="providerRneInfiniteInput" ${currentRne.infiniteExpiry ? 'checked' : ''}><span>Vencimiento infinito (∞)</span></label>
+        <label class="form-label" for="providerRneObservationsInput"><strong>Observaciones</strong></label>
+        <textarea id="providerRneObservationsInput" class="swal2-textarea ios-input" rows="2" placeholder="Observaciones del registro">${escapeHtml(currentRne.observations || '')}</textarea>
         <label class="form-label" for="providerRneFileInput"><strong>Adjunto PDF o imagen</strong></label>
         <input id="providerRneFileInput" class="form-control ios-input image-file-input" type="file" accept="image/*,application/pdf">
         ${normalizeValue(currentRne.attachmentUrl) ? '<small>Si subís un nuevo archivo, el actual pasa al historial.</small>' : '<small>Podés cargar el archivo más tarde.</small>'}
@@ -6354,10 +6372,6 @@
         htmlContainer: 'inventario-provider-form-html'
       },
       willOpen: () => {
-        const numberInput = document.getElementById('providerRneNumberInput');
-        numberInput?.addEventListener('input', () => {
-          numberInput.value = numberInput.value.replace(/[^0-9-]/g, '');
-        });
         if (window.flatpickr) {
           const expiryInput = document.getElementById('providerRneExpiryInput');
           if (expiryInput) {
@@ -6390,16 +6404,13 @@
       preConfirm: async () => {
         const name = normalizeUpper(document.getElementById('providerNameInput')?.value);
         const number = normalizeValue(document.getElementById('providerRneNumberInput')?.value);
+        const observations = normalizeValue(document.getElementById('providerRneObservationsInput')?.value);
         const infiniteExpiry = Boolean(document.getElementById('providerRneInfiniteInput')?.checked);
         const expiryDate = infiniteExpiry ? '' : normalizeIsoDate(document.getElementById('providerRneExpiryInput')?.value);
         const file = document.getElementById('providerRneFileInput')?.files?.[0] || null;
 
         if (!name) {
           Swal.showValidationMessage('Completá el nombre del proveedor.');
-          return false;
-        }
-        if (number && !/^[0-9-]+$/.test(number)) {
-          Swal.showValidationMessage('El RNE solo admite números y guiones.');
           return false;
         }
         if (file && !ALLOWED_RNE_UPLOAD_TYPES.includes(file.type)) {
@@ -6433,6 +6444,7 @@
             number,
             expiryDate,
             infiniteExpiry,
+            observations,
             attachmentUrl,
             attachmentType,
             history,
@@ -6485,7 +6497,7 @@
         const renderProviderCard = (provider) => {
           const rne = safeObject(provider.rne);
           const hasNoFood = Boolean(provider.nonFoodCategory);
-          const hasRne = Boolean(normalizeValue(rne.number) || normalizeValue(rne.attachmentUrl));
+          const hasRne = Boolean(normalizeValue(rne.number) || normalizeValue(rne.observations) || normalizeValue(rne.attachmentUrl));
           const remainingDays = getRneRemainingDays(rne.expiryDate);
           const isInfinite = Boolean(rne.infiniteExpiry);
           const daysTone = getDaysTone(remainingDays);
@@ -6511,7 +6523,7 @@
               </div>
               <p class="inventario-provider-state">${hasNoFood ? 'Proveedor fuera del rubro alimentos' : (hasRne ? 'Registro cargado' : 'Sin registro')}</p>
               ${(provider.email || provider.phone) ? `<p class="inventario-provider-line"><small>${provider.email ? `<i class="fa-regular fa-envelope"></i> ${escapeHtml(provider.email)}` : ''}${provider.email && provider.phone ? ' · ' : ''}${provider.phone ? `<i class="fa-solid fa-phone"></i> ${escapeHtml(provider.phone)}` : ''}</small></p>` : ''}
-              ${hasNoFood ? '<p class="inventario-provider-line"><strong>RNE:</strong> No requerido para este proveedor.</p>' : (hasRne ? `<p class="inventario-provider-line"><strong>N° RNE:</strong> ${escapeHtml(rne.number || 'Sin número')}</p><p class="inventario-provider-line"><strong>Vigencia:</strong> ${validityText}</p>` : '')}
+              ${hasNoFood ? '<p class="inventario-provider-line"><strong>RNE:</strong> No requerido para este proveedor.</p>' : (hasRne ? `<p class="inventario-provider-line"><strong>N° RNE:</strong> ${escapeHtml(rne.number || 'Sin número')}</p><p class="inventario-provider-line"><strong>Vigencia:</strong> ${validityText}</p>${normalizeValue(rne.observations) ? `<p class="inventario-provider-line"><strong>Observaciones:</strong> ${escapeHtml(rne.observations)}</p>` : ''}` : '')}
               <div class="inventario-provider-actions inventario-provider-actions-top">
                 <button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-provider-delete-request="${provider.id}" aria-label="Eliminar proveedor"><i class="fa-solid fa-trash"></i></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-edit="${provider.id}"><i class="fa-solid fa-file-pen"></i><span>${hasRne ? 'Editar registro' : 'Cargar Registro'}</span></button>
                 <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-photo-view="${provider.id}" ${sanitizeImageUrl(provider.photoUrl) ? '' : 'disabled'}><i class="fa-regular fa-image"></i><span>Ver foto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-view="${provider.id}" ${normalizeValue(rne.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i><span>Visualizar adjunto</span></button>
@@ -6536,7 +6548,7 @@
             const providers = sortedProviders().filter((provider) => {
               if (state.providerRneFilter !== 'all' && getProviderRneStatus(provider).key !== state.providerRneFilter) return false;
               if (!state.providerRneSearch) return true;
-              const blob = [provider.name, provider.email, provider.phone, provider.rne?.number].map(normalizeLower).join(' ');
+              const blob = [provider.name, provider.email, provider.phone, provider.rne?.number, provider.rne?.observations].map(normalizeLower).join(' ');
               return blob.includes(state.providerRneSearch);
             });
             const pager = getPagedRows(providers, state.providerRnePage, PAGE_SIZE);
@@ -6596,7 +6608,7 @@
           const rne = { ...getDefaultProviderRne(), ...safeObject(provider.rne) };
           const history = Array.isArray(rne.history) ? rne.history : [];
           const historyHtml = history.length
-            ? `<div class="produccion-rne-history">${history.map((item, index) => `<article class="produccion-rne-history-item" data-provider-history-item="${provider.id}|${index}"><div><strong>Versión ${index + 1}</strong><p><strong>N° RNE:</strong> ${escapeHtml(item.number || '-')}</p><p><strong>Vigencia:</strong> ${escapeHtml(formatIsoDateEs(item.validFrom || item.expiryDate || ''))} → ${item.replacedAt || item.savedAt ? escapeHtml(formatDateTime(item.replacedAt || item.savedAt)) : '-'}</p><p><strong>Vencimiento declarado:</strong> ${escapeHtml(item.expiryDate ? formatIsoDateEs(item.expiryDate) : '-')}</p></div><div class="produccion-rne-history-actions">${item.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-history-view="${provider.id}|${index}"><i class="bi bi-eye"></i><span>Ver</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjunto</button>'}<button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn" data-provider-rne-history-delete="${provider.id}|${index}"><i class="fa-solid fa-trash"></i><span>Borrar</span></button></div></article>`).join('')}</div>`
+            ? `<div class="produccion-rne-history">${history.map((item, index) => `<article class="produccion-rne-history-item" data-provider-history-item="${provider.id}|${index}"><div><strong>Versión ${index + 1}</strong><p><strong>N° RNE:</strong> ${escapeHtml(item.number || '-')}</p><p><strong>Vigencia:</strong> ${escapeHtml(formatIsoDateEs(item.validFrom || item.expiryDate || ''))} → ${item.replacedAt || item.savedAt ? escapeHtml(formatDateTime(item.replacedAt || item.savedAt)) : '-'}</p><p><strong>Vencimiento declarado:</strong> ${escapeHtml(item.expiryDate ? formatIsoDateEs(item.expiryDate) : '-')}</p>${normalizeValue(item.observations) ? `<p><strong>Observaciones:</strong> ${escapeHtml(item.observations)}</p>` : ''}</div><div class="produccion-rne-history-actions">${item.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-history-view="${provider.id}|${index}"><i class="bi bi-eye"></i><span>Ver</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjunto</button>'}<button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn" data-provider-rne-history-delete="${provider.id}|${index}"><i class="fa-solid fa-trash"></i><span>Borrar</span></button></div></article>`).join('')}</div>`
             : '<p class="produccion-rne-history-empty">Aún no hay historial de RNE.</p>';
 
           root.innerHTML = `<div class="inventario-provider-editor-top"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-back><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button></div>
@@ -6617,11 +6629,13 @@
                 <input id="providerPhoneInput" type="text" class="form-control ios-input" value="${escapeHtml(provider.phone || '')}" placeholder="+54 ...">
                 <label class="inventario-check-row inventario-check-row-compact mt-2"><input type="checkbox" id="providerNonFoodInput" ${provider.nonFoodCategory ? 'checked' : ''}><span>No pertenece al rubro alimentos</span></label>
                 <label class="form-label mt-2" for="providerRneNumberInput"><strong>Número de RNE</strong></label>
-                <textarea id="providerRneNumberInput" rows="1" class="form-control ios-input inventario-rne-number-area" placeholder="Ej: 21-085083">${escapeHtml(rne.number || '')}</textarea>
-                <small class="text-muted">Se permiten números y guion (<strong>-</strong>).</small>
+                <textarea id="providerRneNumberInput" rows="1" class="form-control ios-input inventario-rne-number-area" placeholder="Ej: 21-085083, RUCA N° 69354">${escapeHtml(rne.number || '')}</textarea>
+                <small class="text-muted">Se acepta texto libre tal como figura en el registro.</small>
                 <label class="form-label mt-2" for="providerRneExpiryInput"><strong>Fecha de caducidad</strong></label>
                 <input id="providerRneExpiryInput" type="text" class="form-control ios-input" value="${escapeHtml(rne.expiryDate || '')}" placeholder="Seleccionar fecha">
                 <label class="inventario-check-row inventario-check-row-compact mt-2"><input type="checkbox" id="providerRneInfiniteInput" ${rne.infiniteExpiry ? 'checked' : ''}><span>Vencimiento infinito (∞)</span></label>
+                <label class="form-label mt-2" for="providerRneObservationsInput"><strong>Observaciones</strong></label>
+                <textarea id="providerRneObservationsInput" rows="2" class="form-control ios-input" placeholder="Observaciones del RNE">${escapeHtml(rne.observations || '')}</textarea>
                 <label class="form-label mt-2" for="providerRneFileInput"><strong>Archivo adjunto</strong> (PDF o imagen)</label>
                 <div class="produccion-rne-file-row">
                   <input id="providerRneFileInput" class="form-control ios-input image-file-input" type="file" accept="image/*,application/pdf">
@@ -6642,11 +6656,6 @@
               </div>
             </section>`;
 
-          const numberInput = root.querySelector('#providerRneNumberInput');
-          numberInput?.addEventListener('input', () => {
-            numberInput.value = numberInput.value.replace(/[^0-9-]/g, '');
-          });
-
           if (window.flatpickr) {
             const expiryInput = root.querySelector('#providerRneExpiryInput');
             if (expiryInput) {
@@ -6665,6 +6674,7 @@
           const nonFoodInput = root.querySelector('#providerNonFoodInput');
           const expiryInput = root.querySelector('#providerRneExpiryInput');
           const numberInputField = root.querySelector('#providerRneNumberInput');
+          const observationsInputField = root.querySelector('#providerRneObservationsInput');
           const fileInputField = root.querySelector('#providerRneFileInput');
           const syncInfinite = () => {
             if (!expiryInput) return;
@@ -6672,8 +6682,10 @@
             expiryInput.disabled = Boolean(infiniteInput?.checked) || isNonFood;
             if (infiniteInput?.checked || isNonFood) expiryInput.value = '';
             if (numberInputField) numberInputField.disabled = isNonFood;
+            if (observationsInputField) observationsInputField.disabled = isNonFood;
             if (fileInputField) fileInputField.disabled = isNonFood;
             if (isNonFood && numberInputField) numberInputField.value = '';
+            if (isNonFood && observationsInputField) observationsInputField.value = '';
           };
           infiniteInput?.addEventListener('change', syncInfinite);
           nonFoodInput?.addEventListener('change', syncInfinite);
@@ -6734,21 +6746,22 @@
               }
               const wb = new window.ExcelJS.Workbook();
               const ws = wb.addWorksheet('RNE proveedores');
-              ws.mergeCells('A1:C1');
+              ws.mergeCells('A1:D1');
               ws.getCell('A1').value = 'Si la fecha de vencimiento está vacía, se considera INFINITO (∞).';
               ws.getCell('A1').font = { bold: true, color: { argb: 'FF1F3D7A' } };
               ws.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F0FF' } };
               ws.getCell('A1').alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
               ws.getRow(1).height = 24;
-              ws.getRow(3).values = ['Proveedor', 'RNE', 'Vencimiento'];
+              ws.getRow(3).values = ['Proveedor', 'RNE', 'Vencimiento', 'Observacion'];
               ws.getRow(3).height = 22;
               ws.columns = [
                 { key: 'provider', width: 38 },
-                { key: 'rne', width: 24 },
-                { key: 'expiry', width: 20 }
+                { key: 'rne', width: 30 },
+                { key: 'expiry', width: 20 },
+                { key: 'observations', width: 44 }
               ];
               ws.views = [{ state: 'frozen', ySplit: 3 }];
-              ws.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3, column: 3 } };
+              ws.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3, column: 4 } };
               ws.getRow(3).eachCell((cell) => {
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F7AE8' } };
                 cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
@@ -6770,6 +6783,7 @@
                 row.getCell(3).value = isNonFood
                   ? 'NO REQUIERE'
                   : (normalizeValue(rne.expiryDate) ? new Date(`${normalizeValue(rne.expiryDate)}T00:00:00`) : '');
+                row.getCell(4).value = isNonFood ? '' : normalizeValue(rne.observations || '');
                 row.eachCell((cell) => {
                   cell.border = {
                     top: { style: 'thin', color: { argb: 'FFD8E2F5' } },
@@ -6902,6 +6916,7 @@
             const email = normalizeValue(root.querySelector('#providerEmailInput')?.value);
             const phone = normalizeValue(root.querySelector('#providerPhoneInput')?.value);
             const number = normalizeValue(root.querySelector('#providerRneNumberInput')?.value);
+            const observations = normalizeValue(root.querySelector('#providerRneObservationsInput')?.value);
             const nonFoodCategory = Boolean(root.querySelector('#providerNonFoodInput')?.checked);
             const infiniteExpiry = nonFoodCategory ? false : Boolean(root.querySelector('#providerRneInfiniteInput')?.checked);
             const expiryDate = (infiniteExpiry || nonFoodCategory) ? '' : normalizeIsoDate(root.querySelector('#providerRneExpiryInput')?.value);
@@ -6914,12 +6929,6 @@
               saveBtn.disabled = false;
               saveBtn.innerHTML = originalSaveHtml;
               await openIosSwal({ title: 'Dato faltante', html: '<p>Completá el nombre del proveedor.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
-              return;
-            }
-            if (!nonFoodCategory && number && !/^[0-9-]+$/.test(number)) {
-              saveBtn.disabled = false;
-              saveBtn.innerHTML = originalSaveHtml;
-              await openIosSwal({ title: 'RNE inválido', html: '<p>El RNE solo admite números y guiones.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
               return;
             }
             if (file && !ALLOWED_RNE_UPLOAD_TYPES.includes(file.type)) {
@@ -6982,6 +6991,7 @@
                   number: nonFoodCategory ? '' : number,
                   expiryDate,
                   infiniteExpiry,
+                  observations: nonFoodCategory ? '' : observations,
                   attachmentUrl: nonFoodCategory ? '' : attachmentUrl,
                   attachmentType: nonFoodCategory ? '' : attachmentType,
                   validFrom: normalizeValue(currentRne.validFrom) || getArgentinaIsoDate(),
@@ -7067,6 +7077,7 @@
               ...safeObject(provider.rne),
               number: '',
               expiryDate: '',
+              observations: '',
               attachmentUrl: '',
               attachmentType: '',
               validFrom: '',
@@ -7106,41 +7117,57 @@
               const errors = [];
               const providersByName = new Map(sortedProviders().map((provider) => [normalizeUpper(provider.name), provider]));
               const firstRow = ws.getRow(3);
-              const headerTokens = [normalizeUpper(firstRow.getCell(1).text), normalizeUpper(firstRow.getCell(2).text), normalizeUpper(firstRow.getCell(3).text)];
-              if (!headerTokens[0].includes('PROVEEDOR') || !headerTokens[1].includes('RNE') || !headerTokens[2].includes('VENC')) {
+              const normalizeHeader = (value) => normalizeUpper(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+              const headerMap = {};
+              firstRow.eachCell((cell, colNumber) => {
+                const token = normalizeHeader(cell.text);
+                if (token.includes('PROVEEDOR')) headerMap.provider = colNumber;
+                if (token === 'RNE' || token.includes('REGISTRO')) headerMap.rne = colNumber;
+                if (token.includes('VENC') || token.includes('CADUC')) headerMap.expiry = colNumber;
+                if (token.includes('OBSERV')) headerMap.observations = colNumber;
+              });
+              if (!headerMap.provider || !headerMap.rne || !headerMap.expiry) {
                 await openIosSwal({ title: 'Formato incorrecto', html: '<p>Usá la plantilla descargada desde "Descargar Excel".</p>', icon: 'warning', confirmButtonText: 'Entendido' });
                 return;
               }
               let updated = 0;
+              let created = 0;
               for (let rowIndex = 4; rowIndex <= ws.rowCount; rowIndex += 1) {
                 const row = ws.getRow(rowIndex);
-                const name = normalizeUpper(row.getCell(1).text);
-                const rneToken = normalizeValue(row.getCell(2).text);
-                const expiryCell = row.getCell(3).value;
-                if (!name && !rneToken && !normalizeValue(row.getCell(3).text)) continue;
-                const provider = providersByName.get(name);
+                const name = normalizeUpper(row.getCell(headerMap.provider).text);
+                const rneToken = normalizeValue(row.getCell(headerMap.rne).text);
+                const expiryCell = row.getCell(headerMap.expiry).value;
+                const expiryText = normalizeValue(row.getCell(headerMap.expiry).text);
+                const observations = headerMap.observations ? normalizeValue(row.getCell(headerMap.observations).text) : '';
+                if (!name && !rneToken && !expiryText && !observations) continue;
+                if (!name) {
+                  errors.push(`Fila ${rowIndex}: proveedor vacío.`);
+                  continue;
+                }
+                let provider = providersByName.get(name);
                 if (!provider) {
-                  errors.push(`Fila ${rowIndex}: proveedor "${name || '(vacío)'}" no existe.`);
-                  continue;
+                  provider = createProviderWithName(name);
+                  providersByName.set(name, provider);
+                  created += 1;
                 }
-                if (provider.nonFoodCategory) continue;
-                const normalizedRne = normalizeUpper(rneToken) === 'NO REQUIERE' ? '' : normalizeValue(rneToken);
-                if (normalizedRne && !/^[0-9-]+$/.test(normalizedRne)) {
-                  errors.push(`Fila ${rowIndex} (${provider.name}): RNE inválido. Solo números y guiones.`);
-                  continue;
-                }
+                const noRequire = normalizeUpper(rneToken) === 'NO REQUIERE' || normalizeUpper(expiryText) === 'NO REQUIERE';
+                const normalizedRne = noRequire ? '' : normalizeValue(rneToken);
                 const expiryIso = parseExcelDateToIso(expiryCell);
-                const expiryText = normalizeValue(row.getCell(3).text);
-                if (expiryText && normalizeUpper(expiryText) !== 'NO REQUIERE' && !expiryIso) {
+                if (!noRequire && expiryText && !expiryIso) {
                   errors.push(`Fila ${rowIndex} (${provider.name}): vencimiento inválido.`);
                   continue;
                 }
+                provider.nonFoodCategory = Boolean(noRequire);
                 provider.rne = {
                   ...getDefaultProviderRne(),
                   ...safeObject(provider.rne),
                   number: normalizedRne,
-                  expiryDate: expiryIso,
-                  infiniteExpiry: !expiryIso,
+                  expiryDate: noRequire ? '' : expiryIso,
+                  infiniteExpiry: noRequire ? false : !expiryIso,
+                  observations: noRequire ? '' : observations,
+                  attachmentUrl: noRequire ? '' : normalizeValue(provider.rne?.attachmentUrl),
+                  attachmentType: noRequire ? '' : normalizeValue(provider.rne?.attachmentType),
+                  validFrom: noRequire ? '' : normalizeValue(provider.rne?.validFrom),
                   updatedAt: Date.now()
                 };
                 saveProviderInConfig(provider);
@@ -7155,13 +7182,13 @@
                 const details = errors.slice(0, 30).map((error) => `<li>${escapeHtml(error)}</li>`).join('');
                 await openIosSwal({
                   title: updated ? 'Importación parcial' : 'No se pudo importar',
-                  html: `<p>Se actualizaron <strong>${updated}</strong> proveedor(es).</p><p>Errores detectados: <strong>${errors.length}</strong>.</p><ul style="text-align:left;max-height:240px;overflow:auto;">${details}</ul>`,
+                  html: `<p>Se procesaron <strong>${updated}</strong> proveedor(es).${created ? ` Se crearon <strong>${created}</strong> nuevo(s).` : ''}</p><p>Errores detectados: <strong>${errors.length}</strong>.</p><ul style="text-align:left;max-height:240px;overflow:auto;">${details}</ul>`,
                   icon: updated ? 'warning' : 'error',
                   confirmButtonText: 'Entendido'
                 });
                 return;
               }
-              await openIosSwal({ title: 'Importación completada', html: `<p>Se actualizaron <strong>${updated}</strong> proveedor(es).</p>`, icon: 'success', confirmButtonText: 'Entendido' });
+              await openIosSwal({ title: 'Importación completada', html: `<p>Se procesaron <strong>${updated}</strong> proveedor(es).${created ? ` Se crearon <strong>${created}</strong> nuevo(s).` : ''}</p>`, icon: 'success', confirmButtonText: 'Entendido' });
             } catch (error) {
               await openIosSwal({ title: 'No se pudo importar', html: '<p>El archivo Excel tiene errores o está dañado.</p>', icon: 'error', confirmButtonText: 'Entendido' });
             } finally {

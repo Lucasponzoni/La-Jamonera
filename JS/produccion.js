@@ -226,6 +226,7 @@
     number: normalizeValue(source?.number),
     expiryDate: normalizeValue(source?.expiryDate),
     infiniteExpiry: Boolean(source?.infiniteExpiry),
+    observations: normalizeValue(source?.observations || source?.observation || source?.observacion),
     attachmentUrl: normalizeValue(source?.attachmentUrl),
     attachmentType: normalizeValue(source?.attachmentType),
     validFrom: normalizeValue(source?.validFrom),
@@ -247,6 +248,7 @@
       number: acc.number || current.number,
       expiryDate: acc.expiryDate || current.expiryDate,
       infiniteExpiry: Boolean(acc.infiniteExpiry || current.infiniteExpiry),
+      observations: acc.observations || current.observations,
       attachmentUrl: acc.attachmentUrl || current.attachmentUrl,
       attachmentType: acc.attachmentType || current.attachmentType,
       validFrom: acc.validFrom || current.validFrom,
@@ -316,7 +318,7 @@
     ...ingredientPlan,
     lots: (Array.isArray(ingredientPlan?.lots) ? ingredientPlan.lots : []).map((lot) => ({
       ...lot,
-      providerRne: normalizeRneRecord(safeObject(lot?.providerRne?.number || lot?.providerRne?.attachmentUrl ? lot.providerRne : findProviderFromTraceValue(lot?.provider)?.rne))
+      providerRne: normalizeRneRecord(safeObject(lot?.providerRne?.number || lot?.providerRne?.attachmentUrl || lot?.providerRne?.observations ? lot.providerRne : findProviderFromTraceValue(lot?.provider)?.rne))
     }))
   }));
   const capitalize = (value) => normalizeLower(value).replace(/(^|\s)\S/g, (ch) => ch.toUpperCase());
@@ -2113,7 +2115,7 @@
             </button>
             <div id="rneBody" class="step-content d-none">
               <label class="form-label" for="produccionRneNumberInput"><strong>Número de RNE</strong></label>
-              <input id="produccionRneNumberInput" type="text" class="form-control ios-input" placeholder="Ej: 12-34567" value="${escapeHtml(currentRne.number || '')}">
+              <input id="produccionRneNumberInput" type="text" class="form-control ios-input" placeholder="Ej: 12-34567, RUCA 69354" value="${escapeHtml(currentRne.number || '')}">
               <small class="text-muted">Se permiten números y guion (<strong>-</strong>).</small>
               <label class="form-label mt-2" for="produccionRneExpiryInput"><strong>Fecha de caducidad</strong></label>
               <input id="produccionRneExpiryInput" type="text" class="form-control ios-input" placeholder="Seleccionar fecha" value="${escapeHtml(currentRne.expiryDate || '')}">
@@ -2163,7 +2165,6 @@
         const logoViewerBtn = popup.querySelector('#produccionOpenLogoViewerBtn');
         const rneViewerBtn = popup.querySelector('#produccionOpenRneViewerBtn');
         const deleteRneBtn = popup.querySelector('#produccionDeleteRneBtn');
-        const rneInput = popup.querySelector('#produccionRneNumberInput');
 
         const setLoading = () => {
           if (!preview) return;
@@ -2258,9 +2259,6 @@
             button.closest('[data-rne-history-item]')?.remove();
           });
         });
-        rneInput?.addEventListener('input', () => {
-          rneInput.value = rneInput.value.replace(/[^0-9-]/g, '');
-        });
         if (window.flatpickr) {
           const locale = window.flatpickr.l10ns?.es || undefined;
           const expiryInput = popup.querySelector('#produccionRneExpiryInput');
@@ -2294,10 +2292,6 @@
           return false;
         }
         const rneNumber = normalizeValue(document.getElementById('produccionRneNumberInput')?.value);
-        if (rneNumber && !/^[0-9-]+$/.test(rneNumber)) {
-          Swal.showValidationMessage('El número de RNE solo admite dígitos y guion (-).');
-          return false;
-        }
         const rneInfiniteExpiry = Boolean(document.getElementById('produccionRneInfiniteInput')?.checked);
         const rneExpiryDate = rneInfiniteExpiry ? '' : normalizeValue(document.getElementById('produccionRneExpiryInput')?.value);
 
@@ -3194,11 +3188,12 @@
         const lotQty = Number(lot?.takeQty || 0);
         const lotIsFrozen = Boolean(lot?.isFrozen || lot?.frozen);
         const lotEntryDate = normalizeValue(lot?.entryDate || '');
+        const providerRneObservation = normalizeValue(providerRne.observations);
         // Mostrar el nodo "DESCONGELADO DE PRODUCTO" sólo si el lote estaba congelado
         // y la fecha de ingreso es distinta a la fecha de producción.
         const showThaw = lotIsFrozen && lotEntryDate && productionDate && lotEntryDate !== productionDate;
         lines.push(`${lotNodeId}["<b>LOTE ${lotIndex + 1}</b>${lotIsFrozen ? ' ❄' : ''}<br/>${esc(lot?.lotNumber || lot?.entryId || '-')}<br/><b>Usado:</b> ${esc(formatCompactQty(lotQty, lot?.unit || item?.unit || item?.ingredientUnit || ''))}<br/><b>Ingreso:</b> ${esc(formatIsoEs(lot?.entryDate || ''))}<br/><b>VTO:</b> ${esc(formatIsoEs(lot?.expiryDate || ''))}<br/><b>Proveedor:</b> ${esc(lot?.provider || '-')}"]:::toneLot`);
-        lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${esc(getTraceRneDisplay(providerRne))}"]:::toneRegistry`);
+        lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${esc(getTraceRneDisplay(providerRne))}${providerRneObservation ? `<br/><b>Obs:</b> ${esc(providerRneObservation)}` : ''}"]:::toneRegistry`);
         // El nodo de DESCONGELADO va ANTES del LOTE: ingrediente -> DESCONGELADO -> LOTE -> RNE.
         if (showThaw) {
           const thawNodeId = `${lotNodeId}_THAW`;
@@ -3311,12 +3306,14 @@
         const providerRne = resolveProviderRneFromLot(lot);
         return {
           number: providerRne.number,
+          observations: providerRne.observations,
           attachmentUrl: providerRne.attachmentUrl
         };
       });
       const providerRneSummary = providerRneRows.find((row) => row.number)
+        || providerRneRows.find((row) => row.observations)
         || providerRneRows.find((row) => row.attachmentUrl)
-        || { number: '', attachmentUrl: '' };
+        || { number: '', observations: '', attachmentUrl: '' };
       const lotCards = mergedLots.map((lot) => {
         const takenQty = Number(lot.takeQty || 0);
         const availableQty = Number(lot.availableQty || 0);
@@ -3334,6 +3331,7 @@
             <p><strong>Remanente</strong><span>${formatCompactQty(remainingQty, lot.unit || item.unit || '')}</span></p>
             <p><strong>Proveedor</strong><span>${escapeHtml(lot.provider || 'Sin proveedor')}</span></p>
             <p><strong>RNE proveedor</strong><span>${escapeHtml(getTraceRneDisplay(providerRne))}</span></p>
+            ${normalizeValue(providerRne.observations) ? `<p><strong>Obs. RNE</strong><span>${escapeHtml(providerRne.observations)}</span></p>` : ''}
             <p><strong>Factura</strong><span>${escapeHtml(lot.invoiceNumber || '-')}</span></p>
             <p><strong>Ingreso</strong><span>${escapeHtml(normalizeValue(lot.entryDate) ? formatIsoEs(lot.entryDate) : '-')}</span></p>
           </div>
@@ -3351,6 +3349,7 @@
               ${hasInfiniteStock ? '<small><i class="fa-solid fa-infinity"></i> Stock infinito sin trazabilidad</small>' : ''}
               <small>Cantidad usada: ${formatCompactQty(group.plans.reduce((sum, plan) => sum + getIngredientPlanUsedQty(plan, { hasSiblingSubstitute: group.plans.some((candidate) => candidate?.isSubstitute) }), 0), item.unit || item.ingredientUnit || '')}</small>
               <small> - RNE proveedor: <strong>${escapeHtml(getTraceRneDisplay(providerRneSummary))}</strong></small>
+              ${normalizeValue(providerRneSummary.observations) ? `<small> - Obs. RNE: <strong>${escapeHtml(providerRneSummary.observations)}</strong></small>` : ''}
             </div>
           </div>
           <div class="produccion-trace-card-actions">${aggregatedImages.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(aggregatedImages))}"><i class="bi bi-images fa-regular fa-images"></i><span>Ver adjunto (${aggregatedImages.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}${providerRneSummary.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify([providerRneSummary.attachmentUrl]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE sin adjunto</button>'}</div>
