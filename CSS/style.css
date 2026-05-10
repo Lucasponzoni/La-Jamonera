@@ -6535,6 +6535,32 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   font-size: 0.74rem;
 }
 
+.produccion-history-date-stack {
+  display: inline-block !important;
+  gap: 2px;
+  line-height: 1.12;
+  white-space: nowrap;
+}
+
+.produccion-history-date-stack strong {
+  display: block !important;
+  color: #243f73;
+  font-weight: 800;
+}
+
+.produccion-history-date-stack small {
+  display: block !important;
+  color: #6b7ea8;
+  font-size: 0.68rem;
+  font-weight: 800;
+  margin-top: 2px;
+}
+
+.produccion-history-date-stack small span {
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
 .produccion-vto-cell {
   color: #8a4b12 !important;
   font-weight: 800 !important;
@@ -11999,6 +12025,13 @@ tr.inventario-row-frozen > td:first-child::before {
   overflow: visible !important;
   padding-bottom: 0 !important;
   margin-bottom: 8px !important;
+}
+
+.produccion-data.is-history-mode > #produccionRecipeGroups,
+.produccion-data.is-dispatch-mode > #produccionRecipeGroups,
+#produccionRecipeGroups.d-none,
+#produccionRecipeGroups[hidden] {
+  display: none !important;
 }
 
 .family-circle-section {
