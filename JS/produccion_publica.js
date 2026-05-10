@@ -28,6 +28,101 @@
     if (raw.toLowerCase() === 'no perecedero') return 'No perecedero';
     return formatIsoEs(raw);
   };
+  const normalizeRneRecord = (source = {}) => ({
+    number: normalize(source?.number),
+    expiryDate: normalize(source?.expiryDate),
+    infiniteExpiry: Boolean(source?.infiniteExpiry),
+    observations: normalize(source?.observations || source?.observation || source?.observacion),
+    attachmentUrl: normalize(source?.attachmentUrl),
+    attachmentType: normalize(source?.attachmentType),
+    validFrom: normalize(source?.validFrom),
+    updatedAt: Number(source?.updatedAt || 0)
+  });
+  const normalizeRnpaRecord = (source = {}) => ({
+    number: normalize(source?.number),
+    denomination: normalize(source?.denomination),
+    brand: normalize(source?.brand),
+    businessName: normalize(source?.businessName),
+    exempt: Boolean(source?.exempt || source?.rnpaExempt || source?.rnpaNotRequired || source?.subproductNoRnpa),
+    exemptReason: normalize(source?.exemptReason || source?.rnpaExemptReason),
+    expiryDate: normalize(source?.expiryDate),
+    attachmentUrl: normalize(source?.attachmentUrl),
+    attachmentType: normalize(source?.attachmentType),
+    attachmentName: normalize(source?.attachmentName)
+  });
+  const mergeRneRecords = (...records) => records.reduce((acc, source) => {
+    const current = normalizeRneRecord(safeObject(source));
+    return {
+      number: acc.number || current.number,
+      expiryDate: acc.expiryDate || current.expiryDate,
+      infiniteExpiry: Boolean(acc.infiniteExpiry || current.infiniteExpiry),
+      observations: acc.observations || current.observations,
+      attachmentUrl: acc.attachmentUrl || current.attachmentUrl,
+      attachmentType: acc.attachmentType || current.attachmentType,
+      validFrom: acc.validFrom || current.validFrom,
+      updatedAt: Number(acc.updatedAt || current.updatedAt || 0)
+    };
+  }, normalizeRneRecord());
+  const mergeRnpaRecords = (...records) => records.reduce((acc, source) => {
+    const current = normalizeRnpaRecord(safeObject(source));
+    return {
+      number: acc.number || current.number,
+      denomination: acc.denomination || current.denomination,
+      brand: acc.brand || current.brand,
+      businessName: acc.businessName || current.businessName,
+      exempt: Boolean(acc.exempt || current.exempt),
+      exemptReason: acc.exemptReason || current.exemptReason,
+      expiryDate: acc.expiryDate || current.expiryDate,
+      attachmentUrl: acc.attachmentUrl || current.attachmentUrl,
+      attachmentType: acc.attachmentType || current.attachmentType,
+      attachmentName: acc.attachmentName || current.attachmentName
+    };
+  }, normalizeRnpaRecord());
+  const hasRneNumber = (source = {}) => Boolean(normalize(source?.number));
+  const hasRnpaInfo = (source = {}) => {
+    const rnpa = safeObject(source);
+    return Boolean(rnpa.exempt || normalize(rnpa.number) || normalize(rnpa.denomination) || normalize(rnpa.brand) || normalize(rnpa.businessName));
+  };
+  const publicRead = async (path, fallback = null) => {
+    try {
+      const snapshot = await window.dbLaJamonera.ref(path).once('value');
+      const value = snapshot.val();
+      return value === undefined || value === null ? fallback : value;
+    } catch (error) {
+      return fallback;
+    }
+  };
+  const enrichPublicRegistries = async (registro = {}) => {
+    const enriched = JSON.parse(JSON.stringify(registro || {}));
+    enriched.traceability = safeObject(enriched.traceability);
+    enriched.traceability.company = safeObject(enriched.traceability.company);
+    enriched.traceability.product = safeObject(enriched.traceability.product);
+
+    const companyRne = normalizeRneRecord(enriched.traceability.company.rne);
+    if (!hasRneNumber(companyRne)) {
+      const publicCompanyRne = normalizeRneRecord(await publicRead('/produccion/config/rne', {}));
+      enriched.traceability.company.rne = mergeRneRecords(companyRne, publicCompanyRne);
+    }
+
+    const recipeId = normalize(enriched.recipeId || enriched.traceability.product.id);
+    const productRnpa = normalizeRnpaRecord(enriched.traceability.product.rnpa);
+    if (recipeId && !hasRnpaInfo(productRnpa)) {
+      const [rnpa, rnpaNotRequired, rnpaExempt, subproductNoRnpa, rnpaExemptReason] = await Promise.all([
+        publicRead(`/recetas/${recipeId}/rnpa`, {}),
+        publicRead(`/recetas/${recipeId}/rnpaNotRequired`, false),
+        publicRead(`/recetas/${recipeId}/rnpaExempt`, false),
+        publicRead(`/recetas/${recipeId}/subproductNoRnpa`, false),
+        publicRead(`/recetas/${recipeId}/rnpaExemptReason`, '')
+      ]);
+      enriched.traceability.product.rnpa = mergeRnpaRecords(productRnpa, {
+        ...safeObject(rnpa),
+        exempt: Boolean(rnpaNotRequired || rnpaExempt || subproductNoRnpa),
+        exemptReason: normalize(rnpaExemptReason) || 'Venta mostrador'
+      });
+    }
+
+    return enriched;
+  };
   const getUnitMeta = (unitRaw) => {
     const unit = normalize(unitRaw).toLowerCase();
     const massMap = {
@@ -490,8 +585,9 @@
           ? { registro: legacyRegistro, config: {} }
           : {};
       }
-      const registro = safeObject(publicTrace.registro);
-      if (!registro) throw new Error('No encontrado');
+      const registroBase = safeObject(publicTrace.registro);
+      if (!Object.keys(registroBase).length) throw new Error('No encontrado');
+      const registro = await enrichPublicRegistries(registroBase);
       const cfg = safeObject(publicTrace.config);
       await renderPublicTrace(registro, cfg);
     } catch (error) {
