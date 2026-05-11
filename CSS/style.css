@@ -7681,6 +7681,75 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   color: #be2f48;
 }
 
+/* Tone informativo azul: "Vence en N días" para lotes con > 7 días restantes. */
+.produccion-stock-lot-status.is-info {
+  border-color: #b6d8ff;
+  background: #e7f1ff;
+  color: #2c6fb0;
+}
+
+/* Resumen del modal "Stock de ...": 2 pills lado a lado con Total producido /
+   Total disponible. Reemplaza la línea fea de "Total disponible: X kg". */
+.produccion-stock-alert-summary {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 14px;
+}
+
+.produccion-stock-alert-pill {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 1px solid #d6e1ef;
+  background: #f3f6fb;
+  min-width: 140px;
+}
+
+.produccion-stock-alert-pill small {
+  font-size: 0.7rem;
+  color: #6b7689;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.produccion-stock-alert-pill strong {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #173d73;
+  letter-spacing: -0.01em;
+}
+
+.produccion-stock-alert-pill.is-produced {
+  background: #f3ecff;
+  border-color: #ddd5ee;
+}
+
+.produccion-stock-alert-pill.is-produced strong {
+  color: #5e3fa4;
+}
+
+.produccion-stock-alert-pill.is-available {
+  background: #e9f7ef;
+  border-color: #c4e7d2;
+}
+
+.produccion-stock-alert-pill.is-available strong {
+  color: #1f6b4f;
+}
+
+.produccion-stock-qty-cell strong {
+  font-weight: 800;
+  color: #173d73;
+}
+
+.produccion-stock-qty-cell.is-available strong {
+  color: #1f6b4f;
+}
+
 /* --- Ingredientes colapsable --- */
 .produccion-card-v2 .produccion-zone-ingredientes {
   background: rgba(255, 255, 255, 0.5);
@@ -13100,6 +13169,264 @@ tr.inventario-row-frozen > td:first-child::before {
 .family-circle-create .family-circle-name {
   color: #2f8865;
   font-weight: 600;
+}
+
+/* === Card de producción: hero-side rediseñado (v2) ===
+   Reemplaza el layout viejo de stat-blocks por tarjetas con icono a la izquierda
+   y texto a la derecha, más compactas y consistentes. */
+.produccion-hero-side-v2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.produccion-stat-mini-v2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #e6eef9;
+  border-radius: 12px;
+  min-height: 64px;
+  transition: border-color 0.15s ease;
+}
+
+.produccion-stat-mini-v2:hover {
+  border-color: #c7d6ed;
+}
+
+.produccion-stat-mini-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #eef3fb;
+  color: #5b7196;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.produccion-stat-mini-v2.is-stock-up .produccion-stat-mini-icon {
+  background: #e9f7ef;
+  color: #2f8865;
+}
+
+.produccion-stat-mini-v2.is-stock-down .produccion-stat-mini-icon {
+  background: #fdebec;
+  color: #c2434f;
+}
+
+.produccion-stat-mini-v2.is-last .produccion-stat-mini-icon {
+  background: #f3ecff;
+  color: #7e5dbb;
+}
+
+.produccion-stat-mini-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.produccion-stat-mini-text small {
+  font-size: 0.72rem;
+  color: #6b7689;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-weight: 600;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.produccion-stat-mini-period {
+  font-size: 0.62rem;
+  color: #94a0b6;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Botón clickeable para cambiar el período (Egresados). */
+.produccion-stat-mini-period-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  margin-left: 2px;
+  border: 1px solid #d6e1ef;
+  background: #f3f6fb;
+  color: #5b7196;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1.2;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.produccion-stat-mini-period-btn:hover {
+  background: #eaf4ff;
+  border-color: #b6dcff;
+  color: #2c6fb0;
+}
+
+.produccion-stat-mini-period-btn i {
+  font-size: 0.55rem;
+  opacity: 0.7;
+}
+
+/* === Período de egresados (SwAlert centrado) === */
+.produccion-period-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.produccion-period-form .produccion-period-help {
+  margin: 0 0 4px;
+  color: #6b7689;
+  max-width: 360px;
+}
+
+.produccion-period-form .produccion-period-label {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #173d73;
+}
+
+.produccion-period-form .produccion-period-input {
+  display: block !important;
+  width: 140px !important;
+  max-width: 140px !important;
+  margin: 0 auto !important;
+  padding: 10px 12px !important;
+  text-align: center !important;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.produccion-period-presets {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.produccion-period-presets .btn {
+  min-width: 78px;
+}
+
+.produccion-stat-mini-text strong {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #173d73;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.produccion-stat-mini-text strong span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #6b7689;
+  margin-left: 2px;
+}
+
+.produccion-stat-mini-text strong.is-date {
+  font-size: 0.95rem;
+}
+
+.produccion-stat-mini-v2.is-stock-up .produccion-stat-mini-text strong {
+  color: #1f6b4f;
+}
+
+.produccion-stat-mini-v2.is-stock-down .produccion-stat-mini-text strong {
+  color: #8a2c39;
+}
+
+/* Badge "Vence en N días" */
+.produccion-expiry-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  margin-top: 4px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  width: fit-content;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.produccion-expiry-badge.is-warning {
+  background: #fff3d4;
+  color: #8a5d00;
+  border: 1px solid #f0c87a;
+}
+
+.produccion-expiry-badge.is-info {
+  background: #e7f1ff;
+  color: #2c6fb0;
+  border: 1px solid #b6d8ff;
+}
+
+.produccion-expiry-badge.is-danger {
+  background: #fdebec;
+  color: #8a2c39;
+  border: 1px solid #e9a7b0;
+}
+
+.produccion-expiry-badge i {
+  font-size: 0.7rem;
+}
+
+/* Footer de zona stock: dos links separados con divider */
+.produccion-zone-footer-v2 {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-top: 8px;
+  border-top: 1px dashed #e3ebf6;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.produccion-zone-footer-v2 .produccion-zone-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #2c6fb0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.produccion-zone-footer-v2 .produccion-zone-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 700px) {
+  .produccion-hero-side-v2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .produccion-hero-side-v2 {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Modal "Editar/Crear grupo de recetas": forzar alineado a inicio

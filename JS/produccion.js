@@ -219,13 +219,14 @@
     entry.updatedAt = nowTs();
     compactRecipeMovements(entry);
   };
-  const getLastWeekOutFromIndex = (recipeId) => {
+  const getLastWeekOutFromIndex = (recipeId, days = 7) => {
     const entry = safeObject(state.reparto?.productIndex?.[recipeId]);
     const now = Date.now();
-    const weekAgo = now - (7 * 24 * 60 * 60 * 1000);
+    const periodMs = Math.max(1, Number(days) || 7) * 24 * 60 * 60 * 1000;
+    const periodAgo = now - periodMs;
     return Number(Object.entries(safeObject(entry.weeklyOutByWeek)).reduce((acc, [weekIso, qty]) => {
       const weekTs = Number(new Date(`${weekIso}T00:00:00`).getTime());
-      if (!Number.isFinite(weekTs) || weekTs < weekAgo) return acc;
+      if (!Number.isFinite(weekTs) || weekTs < periodAgo) return acc;
       return acc + Math.abs(Number(qty || 0));
     }, 0).toFixed(3));
   };
@@ -1700,14 +1701,60 @@
     state.reparto.registros = safeObject(registros);
     state.repartoRecordsLoaded = true;
   };
+  // Para la card: devuelve la próxima producción NO vencida con stock disponible,
+  // junto con su fecha de vto y los días restantes. Si todos están vencidos o
+  // no hay producciones con stock, retorna nulls.
+  const getRecipeNextExpiryMeta = (recipeId) => {
+    const todayIso = toIsoDate();
+    const candidates = getRegistrosList()
+      .filter((item) => normalizeValue(item.recipeId) === normalizeValue(recipeId) && normalizeValue(item.status) !== 'anulada')
+      .map((registro) => {
+        const expiryIso = resolveProductExpiryIso(registro);
+        const availableKg = getDispatchAvailableByProductionId(registro?.id);
+        const days = expiryIso ? getIsoDiffDays(expiryIso, todayIso) : Number.NaN;
+        return { registro, expiryIso, availableKg, days };
+      })
+      .filter((c) => c.availableKg > 0.0001 && c.expiryIso);
+
+    if (!candidates.length) return { hasStock: false, expiryIso: '', days: null, availableKg: 0, expired: false };
+    // Ordenar por días ascendente (los más próximos a vencer primero).
+    candidates.sort((a, b) => Number(a.days || 0) - Number(b.days || 0));
+    // Preferir el primer NO vencido; si todos vencidos, devolver el primero (peor vencido).
+    const firstValid = candidates.find((c) => Number.isFinite(c.days) && c.days >= 0) || candidates[0];
+    return {
+      hasStock: true,
+      expiryIso: firstValid.expiryIso,
+      days: Number.isFinite(firstValid.days) ? firstValid.days : null,
+      availableKg: Number(firstValid.availableKg.toFixed(3)),
+      expired: Number.isFinite(firstValid.days) && firstValid.days < 0
+    };
+  };
+
+  // Cantidad de días del período "Egresados" en la card. Configurable por el
+  // usuario clickeando el label "(Xd)". Se persiste en localStorage.
+  const getEgresadosPeriodDays = () => {
+    try {
+      const stored = Number(localStorage.getItem('produccion_egresados_period_days'));
+      if (Number.isFinite(stored) && stored > 0 && stored <= 365) return stored;
+    } catch (_) {}
+    return 7;
+  };
+  const setEgresadosPeriodDays = (days) => {
+    const value = Math.max(1, Math.min(365, Math.round(Number(days) || 7)));
+    try { localStorage.setItem('produccion_egresados_period_days', String(value)); } catch (_) {}
+    return value;
+  };
+
   const getProducedStockMeta = (recipeId) => {
+    const periodDays = getEgresadosPeriodDays();
     const indexed = safeObject(state.reparto?.productIndex?.[recipeId]);
     if (Object.keys(indexed).length) {
       return {
         produced: 0,
         dispatched: 0,
         available: toFiniteKg(indexed.availableKg),
-        lastWeekOut: getLastWeekOutFromIndex(recipeId)
+        lastWeekOut: getLastWeekOutFromIndex(recipeId, periodDays),
+        periodDays
       };
     }
     const produced = getRegistrosList()
@@ -1722,16 +1769,16 @@
     }, 0);
     const available = Number(Math.max(0, produced - dispatched).toFixed(3));
     const now = Date.now();
-    const weekAgo = now - (7 * 24 * 60 * 60 * 1000);
+    const periodAgo = now - (periodDays * 24 * 60 * 60 * 1000);
     const lastWeekOut = getDispatchRecordsList().reduce((acc, reparto) => {
       const createdAt = Number(reparto.createdAt || 0);
-      if (!Number.isFinite(createdAt) || createdAt < weekAgo) return acc;
+      if (!Number.isFinite(createdAt) || createdAt < periodAgo) return acc;
       const products = Array.isArray(reparto.products) ? reparto.products : [];
       return acc + products
         .filter((row) => normalizeValue(row.recipeId) === normalizeValue(recipeId))
         .reduce((sum, row) => sum + Math.abs(Number(row.qtyKg || 0)), 0);
     }, 0);
-    return { produced, dispatched, available, lastWeekOut: Number(lastWeekOut.toFixed(3)) };
+    return { produced, dispatched, available, lastWeekOut: Number(lastWeekOut.toFixed(3)), periodDays };
   };
   const getRecipeHistoryRows = (recipeId) => {
     const indexed = safeObject(state.reparto?.productIndex?.[recipeId]);
@@ -4596,18 +4643,28 @@
     .filter((reg) => normalizeValue(reg.recipeId) === normalizeValue(recipeId) && normalizeValue(reg.status) !== 'anulada')
     .map((reg) => {
       const availableKg = getDispatchAvailableByProductionId(reg.id);
+      const producedKg = Number(reg.quantityKg || 0);
       const expiryIso = resolveProductExpiryIso(reg);
       const diff = expiryIso ? getIsoDiffDays(expiryIso, toIsoDate()) : Number.NaN;
-      const status = !expiryIso
-        ? { label: 'Sin VTO', tone: 'is-warning' }
-        : (Number.isFinite(diff) && diff < 0
-          ? { label: 'Vencido', tone: 'is-danger' }
-          : (diff === 0 ? { label: 'Vence hoy', tone: 'is-warning' } : { label: 'No vencido', tone: 'is-success' }));
+      // Tone "is-info" para "vence en N días"; warning sólo si está cerca; danger si vencido.
+      let status;
+      if (!expiryIso) {
+        status = { label: 'Sin VTO', tone: 'is-warning', days: null };
+      } else if (Number.isFinite(diff) && diff < 0) {
+        status = { label: `Vencido hace ${Math.abs(diff)} día${Math.abs(diff) === 1 ? '' : 's'}`, tone: 'is-danger', days: diff };
+      } else if (diff === 0) {
+        status = { label: 'Vence hoy', tone: 'is-warning', days: 0 };
+      } else if (Number.isFinite(diff) && diff <= 7) {
+        status = { label: `Vence en ${diff} día${diff === 1 ? '' : 's'}`, tone: 'is-warning', days: diff };
+      } else {
+        status = { label: `Vence en ${diff} día${diff === 1 ? '' : 's'}`, tone: 'is-info', days: diff };
+      }
       return {
         id: normalizeValue(reg.id),
         productionDate: normalizeValue(reg.productionDate) || toIsoDate(reg.createdAt || nowTs()),
         expiryIso,
         availableKg,
+        producedKg,
         status
       };
     })
@@ -4622,26 +4679,31 @@
     const recipe = safeObject(state.recetas?.[recipeId]);
     const lots = getProductionStockLotsForRecipe(recipeId);
     const totalKg = lots.reduce((sum, lot) => sum + Number(lot.availableKg || 0), 0);
+    const totalProducedKg = lots.reduce((sum, lot) => sum + Number(lot.producedKg || 0), 0);
     const rowsHtml = lots.length
       ? lots.map((lot) => `<tr>
           <td><strong>${escapeHtml(lot.id || '-')}</strong><small>${escapeHtml(formatIsoEs(lot.productionDate || '') || '-')}</small></td>
-          <td>${escapeHtml(formatKgBadgeValue(lot.availableKg))} kg</td>
+          <td class="produccion-stock-qty-cell"><strong>${escapeHtml(formatKgBadgeValue(lot.producedKg))} kg</strong></td>
+          <td class="produccion-stock-qty-cell is-available"><strong>${escapeHtml(formatKgBadgeValue(lot.availableKg))} kg</strong></td>
           <td>${escapeHtml(formatIsoEs(lot.expiryIso || '') || 'Sin VTO')}</td>
           <td><span class="produccion-stock-lot-status ${lot.status.tone}">${escapeHtml(lot.status.label)}</span></td>
         </tr>`).join('')
-      : '<tr><td colspan="4" class="text-center">Sin producciones con stock disponible.</td></tr>';
+      : '<tr><td colspan="5" class="text-center">Sin producciones con stock disponible.</td></tr>';
     await openIosSwal({
       title: `Stock de ${capitalize(recipe.title || 'producto')}`,
       html: `<div class="produccion-stock-alert">
-        <p class="produccion-stock-alert-total">Total disponible: <strong>${escapeHtml(formatKgBadgeValue(totalKg))} kg</strong></p>
+        <div class="produccion-stock-alert-summary">
+          <span class="produccion-stock-alert-pill is-produced"><small>Total producido</small><strong>${escapeHtml(formatKgBadgeValue(totalProducedKg))} kg</strong></span>
+          <span class="produccion-stock-alert-pill is-available"><small>Total disponible</small><strong>${escapeHtml(formatKgBadgeValue(totalKg))} kg</strong></span>
+        </div>
         <div class="table-responsive">
           <table class="table recipe-table inventario-table-compact mb-0">
-            <thead><tr><th>Produccion</th><th>Resta</th><th>VTO</th><th>Estado</th></tr></thead>
+            <thead><tr><th>Producción</th><th>Producido</th><th>Disponible</th><th>VTO</th><th>Estado</th></tr></thead>
             <tbody>${rowsHtml}</tbody>
           </table>
         </div>
       </div>`,
-      width: 760,
+      width: 820,
       confirmButtonText: 'Cerrar',
       customClass: { confirmButton: 'ios-btn ios-btn-secondary' }
     });
@@ -7940,28 +8002,53 @@
                     <small>Cobertura del mínimo: ${coveragePct}%${isExpiredOnlyAvailable ? ' (con expirados)' : ''}</small>
                   </div>
                 </div>
-                <div class="produccion-hero-side">
-                  <div class="produccion-stat-block produccion-stat-mini">
-                    <small>Mínimo</small>
-                    <strong>${analysis.minKg.toFixed(2)} kg</strong>
+                <div class="produccion-hero-side produccion-hero-side-v2">
+                  <div class="produccion-stat-mini-v2">
+                    <span class="produccion-stat-mini-icon"><i class="fa-solid fa-down-long"></i></span>
+                    <div class="produccion-stat-mini-text">
+                      <small>Mínimo</small>
+                      <strong>${analysis.minKg.toFixed(2)} <span>kg</span></strong>
+                    </div>
                   </div>
-                  <div class="produccion-stat-block produccion-stat-mini is-stock-up">
-                    <small>En stock <i class="fa-solid fa-arrow-up"></i></small>
-                    <strong>${dispatchMeta.available.toFixed(2)} kg</strong>
-                    <button type="button" class="produccion-stock-detail-link" data-open-production-stock="${recipe.id}">Ver producciones</button>
+                  <div class="produccion-stat-mini-v2 is-stock-up">
+                    <span class="produccion-stat-mini-icon"><i class="fa-solid fa-warehouse"></i></span>
+                    <div class="produccion-stat-mini-text">
+                      <small>Disponible <i class="fa-solid fa-arrow-up"></i></small>
+                      <strong>${dispatchMeta.available.toFixed(2)} <span>kg</span></strong>
+                      ${(() => {
+                        const expMeta = getRecipeNextExpiryMeta(recipe.id);
+                        if (!expMeta.hasStock) return '';
+                        if (expMeta.expired) {
+                          return `<span class="produccion-expiry-badge is-danger" title="Vto. ${formatIsoEs(expMeta.expiryIso)}"><i class="fa-solid fa-circle-exclamation"></i> Vencido</span>`;
+                        }
+                        if (!Number.isFinite(expMeta.days)) return '';
+                        const tone = expMeta.days <= 7 ? 'is-warning' : 'is-info';
+                        const label = expMeta.days === 0
+                          ? 'Vence hoy'
+                          : `Vence en ${expMeta.days} día${expMeta.days === 1 ? '' : 's'}`;
+                        return `<span class="produccion-expiry-badge ${tone}" title="Vto. ${formatIsoEs(expMeta.expiryIso)} · ${expMeta.availableKg.toFixed(2)} kg"><i class="fa-solid fa-clock"></i> ${label}</span>`;
+                      })()}
+                    </div>
                   </div>
-                  <div class="produccion-stat-block produccion-stat-mini is-stock-down">
-                    <small>Egresados <i class="fa-solid fa-arrow-down"></i></small>
-                    <strong>${dispatchMeta.lastWeekOut.toFixed(2)} kg</strong>
+                  <div class="produccion-stat-mini-v2 is-stock-down">
+                    <span class="produccion-stat-mini-icon"><i class="fa-solid fa-truck-fast"></i></span>
+                    <div class="produccion-stat-mini-text">
+                      <small>Egresados <button type="button" class="produccion-stat-mini-period-btn" data-egresados-period title="Cambiar período de egresados">(${dispatchMeta.periodDays || 7}d) <i class="fa-solid fa-pen"></i></button></small>
+                      <strong>${dispatchMeta.lastWeekOut.toFixed(2)} <span>kg</span></strong>
+                    </div>
                   </div>
-                  <div class="produccion-stat-block produccion-stat-mini produccion-stat-mini-last">
-                    <small>Última producción</small>
-                    <strong>${formatDate(lastProductionAt)}</strong>
+                  <div class="produccion-stat-mini-v2 is-last">
+                    <span class="produccion-stat-mini-icon"><i class="fa-solid fa-calendar-day"></i></span>
+                    <div class="produccion-stat-mini-text">
+                      <small>Última producción</small>
+                      <strong class="is-date">${formatDate(lastProductionAt)}</strong>
+                    </div>
                   </div>
                 </div>
               </div>
-              <div class="produccion-zone-footer">
-                <button type="button" class="btn btn-link p-0 produccion-zone-link produccion-product-history-btn" data-open-recipe-history="${recipe.id}"><i class="fa-solid fa-clock-rotate-left"></i> Ver historial</button>
+              <div class="produccion-zone-footer produccion-zone-footer-v2">
+                <button type="button" class="btn btn-link p-0 produccion-zone-link" data-open-production-stock="${recipe.id}"><i class="fa-solid fa-list-ul"></i> Ver producciones</button>
+                <button type="button" class="btn btn-link p-0 produccion-zone-link produccion-product-history-btn" data-open-recipe-history="${recipe.id}"><i class="fa-solid fa-clock-rotate-left"></i> Historial de movimientos</button>
               </div>
             </section>
 
@@ -9460,6 +9547,49 @@
     const stockBtn = event.target.closest('[data-open-production-stock]');
     if (stockBtn) {
       await openProductionStockLotsAlert(stockBtn.dataset.openProductionStock);
+      return;
+    }
+
+    // Permite al usuario cambiar el período (en días) que define "Egresados".
+    // Persiste en localStorage y re-renderiza todas las cards.
+    if (event.target.closest('[data-egresados-period]')) {
+      event.preventDefault();
+      const current = getEgresadosPeriodDays();
+      const result = await openIosSwal({
+        title: 'Período de egresados',
+        html: `
+          <div class="produccion-period-form text-center">
+            <p class="produccion-period-help"><small>Define cuántos días hacia atrás se cuentan los egresados que se muestran en la card.</small></p>
+            <label class="form-label produccion-period-label" for="egresadosPeriodInput">Días</label>
+            <input id="egresadosPeriodInput" type="number" min="1" max="365" step="1" class="swal2-input ios-input produccion-period-input" value="${current}">
+            <div class="produccion-period-presets">
+              ${[7, 15, 30, 60, 90].map((d) => `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-period-preset="${d}">${d} días</button>`).join('')}
+            </div>
+          </div>`,
+        showCancelButton: true,
+        confirmButtonText: 'Aplicar',
+        cancelButtonText: 'Cancelar',
+        didOpen: () => {
+          document.querySelectorAll('[data-period-preset]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+              const inp = document.getElementById('egresadosPeriodInput');
+              if (inp) inp.value = btn.dataset.periodPreset;
+            });
+          });
+        },
+        preConfirm: () => {
+          const value = Number(document.getElementById('egresadosPeriodInput')?.value);
+          if (!Number.isFinite(value) || value < 1 || value > 365) {
+            Swal.showValidationMessage('Ingresá un número entre 1 y 365');
+            return false;
+          }
+          return value;
+        }
+      });
+      if (result.isConfirmed && Number.isFinite(Number(result.value))) {
+        setEgresadosPeriodDays(Number(result.value));
+        renderList();
+      }
       return;
     }
 
