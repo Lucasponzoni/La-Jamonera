@@ -926,7 +926,24 @@
   const getExpiringSoonEntries = (record) => {
     const daysWindow = currentExpiringDaysFor(record);
     const todayIso = getArgentinaIsoDate();
-    return (Array.isArray(record.entries) ? record.entries : [])
+    const entries = Array.isArray(record?.entries) ? record.entries : [];
+    // Fallback para records lite (vienen de /inventario_index): si no hay
+    // entries, usamos el summary precomputado record.expiringEntries.
+    if (!entries.length && Array.isArray(record?.expiringEntries) && record.expiringEntries.length) {
+      return record.expiringEntries
+        .map((row) => ({
+          entryId: normalizeValue(row.entryId),
+          qty: Number(row.qty || 0),
+          unit: normalizeValue(row.unit) || record.stockUnit || 'kilos',
+          diffDays: Number(row.diffDays || 0),
+          expiryDate: normalizeValue(row.expiryDate),
+          lotNumber: normalizeValue(row.lotNumber),
+          packageQty: Number.isFinite(Number(row.packageQty)) ? Number(row.packageQty) : (record.packageQty || null)
+        }))
+        .filter((row) => row.qty > 0 && row.diffDays >= 0 && row.diffDays <= daysWindow)
+        .sort((a, b) => a.diffDays - b.diffDays);
+    }
+    return entries
       .map((entry) => {
         const expiryDate = normalizeIsoDate(entry.expiryDate);
         const availableQty = getAvailableQty(entry);
@@ -951,7 +968,24 @@
 
   const getExpiredEntries = (record) => {
     const todayIso = getArgentinaIsoDate();
-    return (Array.isArray(record.entries) ? record.entries : [])
+    const entries = Array.isArray(record?.entries) ? record.entries : [];
+    // Fallback para records lite (vienen de /inventario_index): si no hay
+    // entries, usamos el summary precomputado record.expiredEntries.
+    if (!entries.length && Array.isArray(record?.expiredEntries) && record.expiredEntries.length) {
+      return record.expiredEntries
+        .map((row) => ({
+          entryId: normalizeValue(row.entryId),
+          qty: Number(row.qty || 0),
+          unit: normalizeValue(row.unit) || record.stockUnit || 'kilos',
+          diffDays: Math.abs(Number(row.diffDays || 0)),
+          expiryDate: normalizeValue(row.expiryDate),
+          lotNumber: normalizeValue(row.lotNumber),
+          packageQty: Number.isFinite(Number(row.packageQty)) ? Number(row.packageQty) : (record.packageQty || null)
+        }))
+        .filter((row) => row.qty > 0)
+        .sort((a, b) => a.diffDays - b.diffDays);
+    }
+    return entries
       .map((entry) => {
         const expiryDate = normalizeIsoDate(entry.expiryDate);
         const availableQty = getAvailableQty(entry);
@@ -2031,11 +2065,15 @@
 
     const toggle = nodes.expiryAlert.querySelector('[data-inventory-expiry-toggle]');
     const details = nodes.expiryAlert.querySelector('[data-inventory-expiry-details]');
+    const cardEl = nodes.expiryAlert.querySelector('[data-inventory-expiry-alert]');
     toggle?.addEventListener('click', () => {
       const expanded = toggle.getAttribute('aria-expanded') === 'true';
       toggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
       details.hidden = expanded;
       toggle.classList.toggle('is-open', !expanded);
+      // Sólo mostramos el "card frame" alrededor cuando está expandido,
+      // así colapsado el alert no parece un div dentro de otro div.
+      cardEl?.classList.toggle('is-expanded', !expanded);
     });
     nodes.expiryAlert.querySelector('[data-inventory-expiry-config]')?.addEventListener('click', openGlobalConfig);
     nodes.expiryAlert.querySelector('[data-inventory-expiry-select-all]')?.addEventListener('click', () => {
@@ -2098,7 +2136,10 @@
           <span class="family-circle-name">${capitalize(family.name)}</span>
         </button>
       </div>`).join('');
-    const collapsed = Boolean(state.familiesCollapsed);
+    // Si hay búsqueda activa, forzamos el collapse SIN tocar la preferencia
+    // persistida del usuario. Al limpiar la búsqueda vuelve al estado guardado.
+    const hasSearch = Boolean(normalizeValue(state.search));
+    const collapsed = Boolean(state.familiesCollapsed) || hasSearch;
     const activeName = state.activeFamilyId !== 'all'
       ? capitalize(state.familias?.[state.activeFamilyId]?.name || '')
       : '';
@@ -2108,7 +2149,7 @@
           <button type="button" class="family-circle-toggle" data-inv-families-toggle aria-expanded="${!collapsed}">
             <i class="fa-solid ${collapsed ? 'fa-chevron-right' : 'fa-chevron-down'}"></i>
             <span>Familias</span>
-            <small>${families.length} ${families.length === 1 ? 'familia' : 'familias'}${activeName ? ` · filtrando: ${escapeHtml(activeName)}` : ''}</small>
+            <small>${families.length} ${families.length === 1 ? 'familia' : 'familias'}${activeName ? ` · filtrando: ${escapeHtml(activeName)}` : ''}${hasSearch ? ' · oculto por búsqueda' : ''}</small>
           </button>
         </div>
         <div class="family-circle-section-body ${collapsed ? 'd-none' : ''}">
@@ -2188,12 +2229,31 @@
         : '';
       const stockAbbr = escapeHtml(getMeasureAbbr(stockUnit));
       const thresholdMode = normalizeValue(record.lowThresholdMode) === 'custom' ? 'personalizado' : 'global';
+      const hasExpiredStock = expiredQtyInStockUnit > 0.0001;
+      // Si todo lo disponible está vencido, sobrescribimos el status badge a
+      // "Stock vencido" para que se note de un vistazo (en vez de "En stock" verde).
+      const allStockExpired = hasExpiredStock && realAvailableQty <= 0.0001;
+      const effectiveStatus = allStockExpired
+        ? { label: 'Stock vencido', className: 'status-expired' }
+        : (hasExpiredStock ? { label: `${status.label} · con vencidos`, className: status.className + ' has-expired' } : status);
+      // Si hay stock vencido envolvemos el número en .inventario-expired-strike
+      // (para tacharlo en rojo). Si NO hay vencimiento, el número va como texto
+      // directo dentro del strong (sin span extra) para que el CSS global de
+      // span chico no lo agarre.
+      const numberHtml = hasExpiredStock
+        ? `<span class="inventario-expired-strike">${stockQty.toFixed(2)}</span>`
+        : stockQty.toFixed(2);
       const heroValueHtml = infiniteStock
         ? `<strong class="inventario-hero-value inventario-infinity-symbol">&infin;</strong><span class="inventario-hero-unit">Sin control manual</span>`
-        : `<strong class="inventario-hero-value ${expiredQtyInStockUnit > 0.0001 ? 'inventario-expired-strike' : ''}">${stockQty.toFixed(2)}<span>${stockAbbr}${packageSuffix}</span></strong>${expiredQtyInStockUnit > 0.0001 ? `<small class="inventario-hero-real">Real ${realAvailableQty.toFixed(2)} ${stockAbbr}${packageSuffix}</small>` : ''}`;
+        : `<strong class="inventario-hero-value">${numberHtml}<span class="inventario-hero-unit-suffix">${stockAbbr}${packageSuffix}</span></strong>${hasExpiredStock ? `<small class="inventario-hero-real">Real ${realAvailableQty.toFixed(2)} ${stockAbbr}${packageSuffix}</small>` : ''}`;
       const hasLotes = Boolean(expiringHtml);
+      // Banner/CTA para resolver lotes vencidos directamente desde la card.
+      const expiredCount = expiredRows.length;
+      const resolveExpiredBanner = expiredCount > 0
+        ? `<div class="inventario-card-expired-banner"><div class="inventario-card-expired-banner-text"><i class="fa-solid fa-triangle-exclamation"></i><span><strong>${expiredCount}</strong> lote${expiredCount === 1 ? '' : 's'} vencido${expiredCount === 1 ? '' : 's'} con stock (${expiredQtyInStockUnit.toFixed(2)} ${stockAbbr})</span></div><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-inventario-resolve-expired="${item.id}"><i class="fa-solid fa-check"></i><span>Resolver vencidos</span></button></div>`
+        : '';
       return `
-        <article class="ingrediente-card inventario-card inventario-card-v2 ${status.className}" data-inventario-card="${item.id}">
+        <article class="ingrediente-card inventario-card inventario-card-v2 ${effectiveStatus.className}" data-inventario-card="${item.id}">
           ${ingredientAvatar(item)}
           <div class="ingrediente-main">
             <header class="inventario-card-header">
@@ -2204,7 +2264,7 @@
               </div>
               <div class="inventario-card-header-chips">
                 ${recordHasFrozenEntries(record) ? '<span class="inventario-frozen-pill" title="Tiene lotes congelados (vto. 60 días desde el ingreso)"><i class="bi bi-snow2"></i><span>Congelado</span></span>' : ''}
-                <span class="inventario-status-badge">${status.label}</span>
+                <span class="inventario-status-badge ${effectiveStatus.className}">${effectiveStatus.label}</span>
               </div>
             </header>
 
@@ -2222,6 +2282,8 @@
                 </div>`}
               </div>
             </section>
+
+            ${resolveExpiredBanner}
 
             ${hasLotes ? `
             <section class="inventario-zone inventario-zone-lotes" data-collapsed="true">
@@ -3235,11 +3297,6 @@
     }
     nodes.viewerStage?.classList.toggle('is-document', isPdf);
     nodes.viewerStage?.classList.toggle('is-image', !isPdf);
-    if (nodes.viewerDocument) {
-      nodes.viewerDocument.classList.add('d-none');
-      nodes.viewerDocument.src = '';
-    }
-    pdfPlaceholder?.classList.toggle('d-none', !isPdf);
     nodes.viewerImage.classList.toggle('d-none', isPdf);
     nodes.viewerImage.setAttribute('draggable', 'false');
     nodes.viewerZoomInBtn?.classList.toggle('d-none', isPdf);
@@ -3247,12 +3304,30 @@
     nodes.viewerStageSpinner?.classList.remove('d-none');
     nodes.viewerImage.classList.remove('is-loaded');
     if (isPdf) {
+      // Mostramos el PDF INLINE en el iframe. Si por algún motivo el browser
+      // no lo soporta o el iframe falla, dejamos el placeholder como fallback.
+      if (nodes.viewerDocument) {
+        nodes.viewerDocument.classList.remove('d-none');
+        // Usamos #toolbar=1&view=FitH para que arranque ajustado al ancho.
+        nodes.viewerDocument.src = `${item.src}#view=FitH`;
+        nodes.viewerDocument.onload = () => {
+          nodes.viewerStageSpinner?.classList.add('d-none');
+        };
+      }
+      // Placeholder oculto cuando el iframe está activo.
+      pdfPlaceholder?.classList.add('d-none');
       if (pdfPlaceholder) {
-        pdfPlaceholder.innerHTML = `<i class="fa-regular fa-file-pdf" style="font-size:44px;color:#d92d20;"></i><strong>Documento PDF adjunto</strong><p style="margin:0;color:#6073a1;">Para evitar errores del visor interno del navegador, el PDF se abre fuera del modal.</p><a class="btn ios-btn ios-btn-primary" href="${escapeHtml(item.src)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-up-right-from-square"></i><span>Abrir PDF</span></a>`;
+        // Igual lo poblamos como fallback por si el iframe se rompe a futuro.
+        pdfPlaceholder.innerHTML = `<i class="fa-regular fa-file-pdf" style="font-size:44px;color:#d92d20;"></i><strong>Documento PDF adjunto</strong><p style="margin:0;color:#6073a1;">Si el visor interno no carga el PDF, abrilo en una pestaña.</p><a class="btn ios-btn ios-btn-primary" href="${escapeHtml(item.src)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-up-right-from-square"></i><span>Abrir PDF</span></a>`;
       }
       nodes.viewerImage.src = '';
-      nodes.viewerStageSpinner?.classList.add('d-none');
       return;
+    }
+    // No es PDF: ocultamos iframe y placeholder, mostramos imagen.
+    if (nodes.viewerDocument) {
+      nodes.viewerDocument.classList.add('d-none');
+      nodes.viewerDocument.src = '';
+      nodes.viewerDocument.onload = null;
     }
     pdfPlaceholder?.classList.add('d-none');
     state.viewerOffsetX = 0;
@@ -7607,6 +7682,38 @@
     const thresholdBtn = event.target.closest('[data-inventario-config-item]');
     if (thresholdBtn) {
       await openProductThresholdConfig(thresholdBtn.dataset.inventarioConfigItem);
+      return;
+    }
+
+    // Resolver lotes vencidos directamente desde la card.
+    const resolveExpiredBtn = event.target.closest('[data-inventario-resolve-expired]');
+    if (resolveExpiredBtn) {
+      const ingredientId = normalizeValue(resolveExpiredBtn.dataset.inventarioResolveExpired);
+      // El record en la lista puede venir "lite" (sin entries). Forzamos la
+      // carga del detalle completo antes de resolver para que persistInventario
+      // tenga los entries reales y pueda crear los movimientos correspondientes.
+      await ensureInventoryRecordDetail(ingredientId);
+      const record = getRecord(ingredientId);
+      const expired = getExpiredEntries(record);
+      if (!expired.length) return;
+      const resolutionType = await askInventoryExpiryResolutionType(expired.length);
+      if (!resolutionType) return;
+      const ingredient = state.ingredientes[ingredientId] || {};
+      // Adaptamos las filas al shape esperado por resolveInventoryExpiryRows.
+      const rows = expired.map((row) => ({
+        ingredientId,
+        ingredientName: capitalize(ingredient.name || ''),
+        entryId: row.entryId,
+        availableKg: convertToKg(row.qty, row.unit),
+        expired: true,
+        diffDays: row.diffDays
+      }));
+      const resolved = await resolveInventoryExpiryRows(rows, resolutionType);
+      if (resolved > 0) {
+        renderList();
+        renderInventoryExpiryAlert?.();
+      }
+      return;
     }
   };
 
@@ -7706,6 +7813,8 @@
     }
     state.searchRenderTimer = setTimeout(() => {
       state.searchRenderTimer = null;
+      // Re-render de familias para que se colapse / expanda según haya búsqueda.
+      renderFamilies();
       renderList();
     }, 0);
   });

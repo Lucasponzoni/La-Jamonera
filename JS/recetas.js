@@ -914,7 +914,9 @@
     const groups = getRecipeGroupsList();
     const counts = getRecipesByGroupCount();
     const active = state.activeRecipeGroupId || 'all';
-    const collapsed = Boolean(state.recipeGroupsCollapsed);
+    // Si hay búsqueda activa, forzamos collapse sin tocar la preferencia guardada.
+    const hasSearch = Boolean(normalizeValue(state.search));
+    const collapsed = Boolean(state.recipeGroupsCollapsed) || hasSearch;
 
     const renderThumb = (url, alt, count) => {
       const countBadge = Number(count) > 0 ? `<span class="family-circle-count">${Math.min(99, Number(count))}</span>` : '';
@@ -964,7 +966,7 @@
           <button type="button" class="family-circle-toggle" data-recipe-groups-toggle aria-expanded="${!collapsed}">
             <i class="fa-solid ${collapsed ? 'fa-chevron-right' : 'fa-chevron-down'}"></i>
             <span>Grupos de recetas</span>
-            <small>${groups.length} ${groups.length === 1 ? 'grupo' : 'grupos'}${active !== 'all' ? ` · filtrando: ${escapeHtml(safeObject(state.recipeGroups[active]).name || '')}` : ''}</small>
+            <small>${groups.length} ${groups.length === 1 ? 'grupo' : 'grupos'}${active !== 'all' ? ` · filtrando: ${escapeHtml(safeObject(state.recipeGroups[active]).name || '')}` : ''}${hasSearch ? ' · oculto por búsqueda' : ''}</small>
           </button>
         </div>
         <div class="family-circle-section-body ${collapsed ? 'd-none' : ''}">

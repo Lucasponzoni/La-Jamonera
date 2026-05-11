@@ -77,6 +77,38 @@
     if (nodes.version) nodes.version.textContent = version ? `v${version}` : '--';
   };
 
+  // Compara la versión de cada índice persistido en Firebase contra la versión
+  // actual del servicio. Si alguno está atrasado, avisa al usuario para que
+  // ejecute la optimización y regenere los indices con la nueva forma.
+  const checkIndexVersionStatus = async () => {
+    try {
+      await window.laJamoneraReady;
+      const currentVersion = window.laJamoneraIndexService?.version;
+      if (!currentVersion) return;
+      const meta = (await window.dbLaJamoneraRest.read('/_index_meta')) || {};
+      const indexPaths = ['ingredientes_index', 'inventario_index', 'recetas_index', 'produccion_index'];
+      const stale = [];
+      for (const indexName of indexPaths) {
+        const node = await window.dbLaJamoneraRest.read(`/${indexName}`);
+        const indexVersion = Number(node?.version || meta?.[indexName]?.version || 0);
+        if (!indexVersion || indexVersion < currentVersion) {
+          stale.push(`${indexName} (v${indexVersion || '?'})`);
+        }
+      }
+      if (stale.length) {
+        setStatus(`Hay ${stale.length} índice(s) desactualizado(s) (actual: v${currentVersion}). Ejecutá la optimización para regenerarlos.`);
+        appendLine(`Índices desactualizados: ${stale.join(', ')}`, 'error');
+        appendLine(`Esperando ejecución para regenerarlos a v${currentVersion}.`);
+        if (nodes.runBtn) nodes.runBtn.classList.add('btn-pulse-attention');
+      } else {
+        setStatus(`Todos los índices están al día (v${currentVersion}).`);
+        appendLine(`Índices en versión actual v${currentVersion}. Podés volver a ejecutar la optimización para refrescar los snapshots.`, 'ok');
+      }
+    } catch (error) {
+      appendLine(`No se pudo verificar la versión de los índices: ${error?.message || error}`, 'error');
+    }
+  };
+
   const runOptimization = async () => {
     setRunning(true);
     setStatus('Reconstruyendo indices...');
@@ -108,7 +140,8 @@
   };
 
   refreshVersion();
-  appendLine('Pagina lista. Esperando ejecucion.');
+  appendLine('Página lista. Verificando estado de los índices...');
+  checkIndexVersionStatus();
 
   nodes.runBtn?.addEventListener('click', runOptimization);
   nodes.clearBtn?.addEventListener('click', () => {

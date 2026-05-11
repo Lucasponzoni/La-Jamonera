@@ -157,6 +157,44 @@
       min-height: 46px;
       justify-content: center;
     }
+
+    /* Pulso del botón "Ejecutar" cuando hay índices desactualizados. */
+    @keyframes optimizerPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.45); }
+      50%      { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+    }
+
+    .btn-pulse-attention {
+      animation: optimizerPulse 1.8s ease-in-out infinite;
+    }
+
+    .optimizer-changelog {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 0.86rem;
+      color: #1e3a8a;
+      line-height: 1.5;
+    }
+
+    .optimizer-changelog strong {
+      display: block;
+      margin-bottom: 4px;
+      color: #0f172a;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .optimizer-changelog ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .optimizer-changelog li {
+      margin: 2px 0;
+    }
     .optimizer-console-panel {
       min-height: 560px;
       display: flex;
@@ -258,6 +296,16 @@
           <i class="fa-solid fa-bolt" aria-hidden="true"></i>
           <span>Ejecutar optimizacion</span>
         </button>
+
+        <div class="optimizer-changelog" aria-label="Cambios en la versión actual">
+          <strong>Novedades v4</strong>
+          <ul>
+            <li>Inventario: <code>hasFrozenEntries</code>, <code>flagPreferences</code> y <code>expiredEntries/expiringEntries</code> precomputados por item.</li>
+            <li>Recetas: <code>recipeGroupId</code> por receta + nodo <code>recetas_index/groups</code>.</li>
+            <li>Producción: <code>shelfLifeDaysAtProduction</code>, <code>frozenShelfLifeExtensionAtProduction</code>, <code>usedFrozenLot</code> por registro.</li>
+            <li>Si tu versión actual es menor a v4, ejecutá la optimización para que las cards muestren los datos nuevos sin cargar el árbol completo.</li>
+          </ul>
+        </div>
       </div>
 
       <div class="optimizer-console-panel">

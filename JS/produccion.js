@@ -7667,7 +7667,9 @@
     const groups = getRecipeGroupsList();
     const counts = getRecipesByGroupCount();
     const active = state.activeRecipeGroupId || 'all';
-    const collapsed = Boolean(state.recipeGroupsCollapsed);
+    // Si hay búsqueda activa, forzamos collapse sin tocar la preferencia guardada.
+    const hasSearch = Boolean(normalizeValue(state.search));
+    const collapsed = Boolean(state.recipeGroupsCollapsed) || hasSearch;
 
     // Reusa exactamente las clases de inventario para mantener idéntico look.
     const renderThumb = (url, alt, count) => {
@@ -7718,7 +7720,7 @@
           <button type="button" class="family-circle-toggle" data-recipe-groups-toggle aria-expanded="${!collapsed}" aria-controls="produccionRecipeGroupsBody">
             <i class="fa-solid ${collapsed ? 'fa-chevron-right' : 'fa-chevron-down'}"></i>
             <span>Grupos de recetas</span>
-            <small>${groups.length} ${groups.length === 1 ? 'grupo' : 'grupos'}${active !== 'all' ? ` · filtrando: ${escapeHtml(safeObject(state.recipeGroups[active]).name || '')}` : ''}</small>
+            <small>${groups.length} ${groups.length === 1 ? 'grupo' : 'grupos'}${active !== 'all' ? ` · filtrando: ${escapeHtml(safeObject(state.recipeGroups[active]).name || '')}` : ''}${hasSearch ? ' · oculto por búsqueda' : ''}</small>
           </button>
         </div>
         <div id="produccionRecipeGroupsBody" class="family-circle-section-body ${collapsed ? 'd-none' : ''}">
@@ -8376,6 +8378,7 @@
           <button id="produccionQtyMaxBtn" type="button" class="btn ios-btn ios-btn-secondary" ${(isViewOnly || hasOnlyInfiniteStock || state.sinTrazabilidad) ? 'disabled' : ''}>Usar máximo</button>
         </div>
         <p id="produccionQtyHelp" class="produccion-qty-help"></p>
+        <div id="produccionMissingPanel" class="produccion-missing-panel d-none" aria-live="polite"></div>
       </section>
       <section class="recipe-step-card step-block">
         <h6 class="step-title"><span class="recipe-step-number">2</span> Fecha de producción</h6>
@@ -8412,6 +8415,49 @@
     const qtyInput = nodes.editor.querySelector('#produccionQtyInput');
     const dateInput = nodes.editor.querySelector('#produccionDateInput');
     const qtyHelp = nodes.editor.querySelector('#produccionQtyHelp');
+    const missingPanel = nodes.editor.querySelector('#produccionMissingPanel');
+
+    // Construye un panel que lista cada ingrediente con su estado para la fecha
+    // seleccionada: OK (verde) / sólo cubierto con vencidos (amarillo) / faltante
+    // (rojo). Se muestra cuando no se puede producir o cuando hay faltantes,
+    // así el usuario ve de un vistazo qué insumos están bloqueando.
+    const renderMissingPanel = (qty) => {
+      if (!missingPanel) return;
+      const requirements = Array.isArray(analysis?.requirements) ? analysis.requirements : [];
+      const blocking = requirements.filter((item) => Number(item?.missingForMin || 0) > 0.0001);
+      const shouldShow = !state.sinTrazabilidad && (qty <= 0 || blocking.length > 0);
+      if (!shouldShow || !requirements.length) {
+        missingPanel.classList.add('d-none');
+        missingPanel.innerHTML = '';
+        return;
+      }
+      const okCount = requirements.filter((item) => Number(item?.missingForMin || 0) <= 0.0001).length;
+      const totalCount = requirements.length;
+      const items = requirements.map((item) => {
+        const missing = Number(item.missingForMin || 0);
+        const missingWithExpired = Number(item.missingForMinIncludingExpired || 0);
+        let toneClass;
+        let icon;
+        let tag;
+        if (missing <= 0.0001) {
+          toneClass = 'is-ok'; icon = 'fa-circle-check'; tag = 'OK';
+        } else if (missingWithExpired <= 0.0001) {
+          toneClass = 'is-expired'; icon = 'fa-triangle-exclamation'; tag = `Sólo con lotes vencidos · falta ${missing.toFixed(2)} ${item.unit || 'kg'}`;
+        } else {
+          toneClass = 'is-missing'; icon = 'fa-circle-xmark'; tag = `Falta ${missing.toFixed(2)} ${item.unit || 'kg'}`;
+        }
+        const subRel = item.hasRelatedCoverage ? `<small class="produccion-missing-sub">Cubre con sustituto · ${item.substitutionCount || 0}</small>` : '';
+        return `<li class="produccion-missing-item ${toneClass}"><span class="produccion-missing-icon"><i class="fa-solid ${icon}"></i></span><span class="produccion-missing-name"><strong>${escapeHtml(item.name || 'Ingrediente')}</strong>${subRel}<small class="produccion-missing-tag">${escapeHtml(tag)}</small></span></li>`;
+      }).join('');
+      missingPanel.classList.remove('d-none');
+      missingPanel.innerHTML = `
+        <div class="produccion-missing-head">
+          <i class="fa-solid fa-flask"></i>
+          <span><strong>Cobertura de ingredientes</strong></span>
+          <span class="produccion-missing-count ${okCount === totalCount ? 'is-ok' : 'is-warn'}">${okCount}/${totalCount} listos</span>
+        </div>
+        <ul class="produccion-missing-list">${items}</ul>`;
+    };
     const lotsWrap = nodes.editor.querySelector('#produccionLotsBreakdown');
     const confirmBtn = nodes.editor.querySelector('#produccionConfirmBtn');
     const recipeHistoryState = { search: '', range: '' };
@@ -8636,6 +8682,9 @@
       if (expiredLotsCount > 0) {
         qtyHelp.textContent += ` Detectamos ${expiredLotsCount} lote(s) vencido(s): resolvé su estado o cambiá la fecha para continuar.`;
       }
+      // Panel con lista detallada de ingredientes y su estado de cobertura.
+      // Se muestra cuando qty=0 o cuando hay faltantes, así el usuario ve qué bloquea.
+      renderMissingPanel(qty);
       if (!isViewOnly) await ensureReservationForPlan(state.editorPlan);
     };
     nodes.editor.addEventListener('click', async (event) => {
@@ -9456,6 +9505,9 @@
       expiryToggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
       details.hidden = expanded;
       expiryToggle.classList.toggle('is-open', !expanded);
+      // Mostramos el card frame sólo cuando está expandido (consistente con
+      // el alert del inventario): así colapsado se ve como un único pill.
+      card?.classList.toggle('is-expanded', !expanded);
       return;
     }
     if (event.target.closest('[data-product-expiry-config]')) {

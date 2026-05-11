@@ -280,7 +280,9 @@
       </div>
     `).join('');
 
-    const collapsed = Boolean(state.familiesCollapsed);
+    // Si hay búsqueda activa, forzamos collapse sin tocar la preferencia guardada.
+    const hasSearch = Boolean(normalizeValue(state.search));
+    const collapsed = Boolean(state.familiesCollapsed) || hasSearch;
     const activeName = state.activeFamilyId !== 'all'
       ? capitalizeLabel(safeObject(state.ingredientes.familias)[state.activeFamilyId]?.name || '')
       : '';
@@ -291,7 +293,7 @@
           <button type="button" class="family-circle-toggle" data-ing-families-toggle aria-expanded="${!collapsed}">
             <i class="fa-solid ${collapsed ? 'fa-chevron-right' : 'fa-chevron-down'}"></i>
             <span>Familias</span>
-            <small>${families.length} ${families.length === 1 ? 'familia' : 'familias'}${activeName ? ` · filtrando: ${activeName}` : ''}</small>
+            <small>${families.length} ${families.length === 1 ? 'familia' : 'familias'}${activeName ? ` · filtrando: ${activeName}` : ''}${hasSearch ? ' · oculto por búsqueda' : ''}</small>
           </button>
         </div>
         <div class="family-circle-section-body ${collapsed ? 'd-none' : ''}">
@@ -1191,6 +1193,8 @@
     }
     searchRenderTimer = setTimeout(() => {
       searchRenderTimer = null;
+      // Re-render de familias para que se colapse / expanda según haya búsqueda.
+      renderFamilies();
       renderIngredientes();
     }, 0);
   };

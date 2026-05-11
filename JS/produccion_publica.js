@@ -355,23 +355,32 @@
       if (!item || !viewerNodes.image) return;
       const isPdf = isViewerPdfUrl(item.src);
       const pdfPlaceholder = ensurePdfPlaceholder();
-      viewerNodes.document?.classList.add('d-none');
-      if (viewerNodes.document) viewerNodes.document.src = '';
-      pdfPlaceholder?.classList.toggle('d-none', !isPdf);
       viewerNodes.image.classList.toggle('d-none', isPdf);
       viewerNodes.zoomIn?.classList.toggle('d-none', isPdf);
       viewerNodes.zoomOut?.classList.toggle('d-none', isPdf);
       viewerNodes.spinner?.classList.remove('d-none');
       if (!isPdf) {
+        // Imagen: ocultamos iframe + placeholder, mostramos img.
+        if (viewerNodes.document) {
+          viewerNodes.document.classList.add('d-none');
+          viewerNodes.document.src = '';
+          viewerNodes.document.onload = null;
+        }
         pdfPlaceholder?.classList.add('d-none');
         viewerNodes.image.classList.remove('is-loaded');
         viewerNodes.image.src = item.src;
       } else {
+        // PDF inline en el iframe.
+        if (viewerNodes.document) {
+          viewerNodes.document.classList.remove('d-none');
+          viewerNodes.document.src = `${item.src}#view=FitH`;
+          viewerNodes.document.onload = () => viewerNodes.spinner?.classList.add('d-none');
+        }
+        pdfPlaceholder?.classList.add('d-none');
         if (pdfPlaceholder) {
-          pdfPlaceholder.innerHTML = `<i class="fa-regular fa-file-pdf" style="font-size:44px;color:#d92d20;"></i><strong>Documento PDF adjunto</strong><p style="margin:0;color:#6073a1;">Para evitar errores del visor interno del navegador, el PDF se abre fuera del modal.</p><a class="btn ios-btn ios-btn-primary" href="${escapeHtml(item.src)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-up-right-from-square"></i><span>Abrir PDF</span></a>`;
+          pdfPlaceholder.innerHTML = `<i class="fa-regular fa-file-pdf" style="font-size:44px;color:#d92d20;"></i><strong>Documento PDF adjunto</strong><p style="margin:0;color:#6073a1;">Si el visor interno no carga el PDF, abrilo en una pestaña.</p><a class="btn ios-btn ios-btn-primary" href="${escapeHtml(item.src)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-up-right-from-square"></i><span>Abrir PDF</span></a>`;
         }
         viewerNodes.image.src = '';
-        viewerNodes.spinner?.classList.add('d-none');
       }
     };
 

@@ -1,5 +1,11 @@
 (function firebaseIndexesModule() {
-  const INDEX_VERSION = 3;
+  // v4: incluye campos de "Producto congelado" (isFrozen/frozenAt en entries,
+  // hasFrozenEntries en records), preferencias de flags por ingrediente
+  // (flagPreferences), agrupaciones de recetas (recipeGroupId + nodo groups),
+  // y datos de shelf life congelado en producción (shelfLifeDaysAtProduction,
+  // frozenShelfLifeExtensionAtProduction). Bumpear esta versión obliga al
+  // optimizador a regenerar los indices con la nueva forma.
+  const INDEX_VERSION = 4;
   const INDEX_META_PATH = '/_index_meta';
 
   const safeObject = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
@@ -355,21 +361,42 @@
     };
   };
 
-  const summarizeProduction = (row = {}, id = '') => ({
-    id: normalizeValue(row.id || id),
-    recipeId: normalizeValue(row.recipeId),
-    recipeTitle: normalizeValue(row.recipeTitle),
-    quantityKg: toFiniteNumber(row.quantityKg, 0),
-    productionDate: normalizeIso(row.productionDate),
-    createdAt: toFiniteNumber(row.createdAt, 0),
-    status: normalizeValue(row.status),
-    managers: Array.isArray(row.managers) ? row.managers : [],
-    observations: truncate(row.observations, 140),
-    productExpiryDate: normalizeValue(row.productExpiryDate || row.expiryDate),
-    planillaVersion: toFiniteNumber(row.planillaVersion, 0),
-    traceCount: (Array.isArray(row.lots) ? row.lots : []).reduce((sum, plan) => sum + (Array.isArray(plan?.lots) ? plan.lots : []).filter((lot) => toFiniteNumber(lot?.takeQty, 0) > 0.0001).length, 0),
-    __indexLite: true
-  });
+  const summarizeProduction = (row = {}, id = '') => {
+    // Detectamos si alguno de los lotes de ingrediente usados estaba congelado.
+    // Esto sirve para que la trazabilidad pueda mostrar el nodo "DESCONGELADO
+    // DE PRODUCTO" incluso leyendo de la versión lite del registro.
+    const usedFrozenLot = (Array.isArray(row.lots) ? row.lots : []).some((plan) =>
+      Array.isArray(plan?.lots) && plan.lots.some((lot) =>
+        Number(lot?.takeQty || 0) > 0.0001 && (lot?.isFrozen || lot?.frozen)));
+    return {
+      id: normalizeValue(row.id || id),
+      recipeId: normalizeValue(row.recipeId),
+      recipeTitle: normalizeValue(row.recipeTitle),
+      quantityKg: toFiniteNumber(row.quantityKg, 0),
+      productionDate: normalizeIso(row.productionDate),
+      createdAt: toFiniteNumber(row.createdAt, 0),
+      status: normalizeValue(row.status),
+      managers: Array.isArray(row.managers) ? row.managers : [],
+      observations: truncate(row.observations, 140),
+      productExpiryDate: normalizeValue(row.productExpiryDate || row.expiryDate),
+      planillaVersion: toFiniteNumber(row.planillaVersion, 0),
+      traceCount: (Array.isArray(row.lots) ? row.lots : []).reduce((sum, plan) => sum + (Array.isArray(plan?.lots) ? plan.lots : []).filter((lot) => toFiniteNumber(lot?.takeQty, 0) > 0.0001).length, 0),
+      // === Campos nuevos (v4) ===
+      // Necesarios para calcular bien la fecha de vencimiento del producto
+      // terminado cuando productExpiryDate no está persistido (fallback con
+      // shelfLifeDaysAtProduction).
+      shelfLifeDaysAtProduction: toFiniteNumber(row.shelfLifeDaysAtProduction, 0),
+      // Si la receta tiene extensión de vida útil por congelado al envasar.
+      frozenShelfLifeExtensionAtProduction: Boolean(
+        row.frozenShelfLifeExtensionAtProduction ||
+        row.traceability?.product?.frozenShelfLifeExtension
+      ),
+      // Bandera: indica que esta producción consumió al menos un lote
+      // congelado de ingrediente (para badge "Usa lote descongelado").
+      usedFrozenLot,
+      __indexLite: true
+    };
+  };
 
   const buildProduccionIndex = (registros = {}) => {
     const output = {};
