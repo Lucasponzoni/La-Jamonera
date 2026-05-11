@@ -13327,6 +13327,60 @@ tr.inventario-row-frozen > td:first-child::before {
   min-width: 78px;
 }
 
+/* === Card de producción: zona Acciones colapsable ==========================
+   Reusa el patrón visual de .produccion-zone-ingredientes (toggle con icono
+   chevron + body que se colapsa con data-collapsed="true"). */
+.produccion-card-v2 .produccion-zone-acciones {
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 10px;
+  border: 1px solid rgba(31, 63, 130, 0.08);
+  padding: 4px 10px;
+}
+
+.produccion-card-v2 .produccion-zone-acciones .produccion-zone-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #173d73;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.produccion-card-v2 .produccion-zone-acciones .produccion-zone-toggle-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.produccion-card-v2 .produccion-zone-acciones .produccion-zone-toggle-left i {
+  color: #d39c2b;
+}
+
+.produccion-card-v2 .produccion-zone-acciones .produccion-zone-toggle-icon {
+  font-size: 0.78rem;
+  color: #5b7196;
+  transition: transform 0.2s ease;
+}
+
+.produccion-card-v2 .produccion-zone-acciones[data-collapsed="true"] .produccion-zone-toggle-icon {
+  transform: rotate(180deg);
+}
+
+.produccion-card-v2 .produccion-zone-acciones .produccion-zone-body {
+  padding: 4px 0 8px;
+  display: block;
+}
+
+.produccion-card-v2 .produccion-zone-acciones[data-collapsed="true"] .produccion-zone-body {
+  display: none;
+}
+
 .produccion-stat-mini-text strong {
   font-size: 1.05rem;
   font-weight: 800;

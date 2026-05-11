@@ -8077,8 +8077,15 @@
               ${draftLockLine}
             </section>` : ''}
 
-            <footer class="produccion-zone produccion-zone-acciones">
-              <h4 class="produccion-zone-title"><i class="fa-solid fa-bolt"></i><span>Acciones</span></h4>
+            <footer class="produccion-zone produccion-zone-acciones" data-collapsed="false">
+              <button type="button" class="produccion-zone-toggle" data-toggle-acciones="${recipe.id}">
+                <span class="produccion-zone-toggle-left">
+                  <i class="fa-solid fa-bolt"></i>
+                  <span class="produccion-zone-toggle-label">Acciones</span>
+                </span>
+                <i class="fa-solid fa-chevron-up produccion-zone-toggle-icon"></i>
+              </button>
+              <div class="produccion-zone-body">
               <div class="produccion-actions-row inventory-production-actions">
                 ${action.replace('produccion-main-btn', 'produccion-main-btn inventory-production-action-btn is-main')}
                 <span class="barra-vertical produccion-actions-divider" aria-hidden="true"></span>
@@ -8106,6 +8113,7 @@
                   </button>
                 </div>
               </div>
+            </div>
             </div>
             </footer>
           </div>
@@ -9536,6 +9544,17 @@
     const ingredientsToggleBtn = event.target.closest('[data-toggle-ingredientes]');
     if (ingredientsToggleBtn) {
       const section = ingredientsToggleBtn.closest('.produccion-zone-ingredientes');
+      if (section) {
+        const isCollapsed = section.getAttribute('data-collapsed') === 'true';
+        section.setAttribute('data-collapsed', isCollapsed ? 'false' : 'true');
+      }
+      event.stopPropagation();
+      return;
+    }
+
+    const accionesToggleBtn = event.target.closest('[data-toggle-acciones]');
+    if (accionesToggleBtn) {
+      const section = accionesToggleBtn.closest('.produccion-zone-acciones');
       if (section) {
         const isCollapsed = section.getAttribute('data-collapsed') === 'true';
         section.setAttribute('data-collapsed', isCollapsed ? 'false' : 'true');
