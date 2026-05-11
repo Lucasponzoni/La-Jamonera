@@ -367,7 +367,7 @@
     observations: truncate(row.observations, 140),
     productExpiryDate: normalizeValue(row.productExpiryDate || row.expiryDate),
     planillaVersion: toFiniteNumber(row.planillaVersion, 0),
-    traceCount: (Array.isArray(row.lots) ? row.lots : []).reduce((sum, plan) => sum + (Array.isArray(plan?.lots) ? plan.lots.length : 0), 0),
+    traceCount: (Array.isArray(row.lots) ? row.lots : []).reduce((sum, plan) => sum + (Array.isArray(plan?.lots) ? plan.lots : []).filter((lot) => toFiniteNumber(lot?.takeQty, 0) > 0.0001).length, 0),
     __indexLite: true
   });
 

@@ -6,6 +6,7 @@
   const PARKING_NODE_ID = 'focusParkingNode';
   const originalFire = window.Swal.fire.bind(window.Swal);
   let parkingFocus = false;
+  let releasingFocus = false;
 
   const blurActiveElement = () => {
     const active = document.activeElement;
@@ -45,7 +46,6 @@
     }
 
     if (document.querySelector('.modal.show')) {
-      blurActiveElement();
       return;
     }
 
@@ -76,6 +76,14 @@
   };
 
   const releaseFocusFromAriaHiddenContainers = () => {
+    if (releasingFocus) {
+      return;
+    }
+
+    if (document.querySelector('.modal.show')) {
+      return;
+    }
+
     let current = document.activeElement;
     if (!current || current === document.body) {
       return;
@@ -83,9 +91,14 @@
 
     while (current && current !== document.body) {
       if (current.getAttribute && current.getAttribute('aria-hidden') === 'true') {
-        blurActiveElement();
-        if (!document.querySelector('.modal.show')) {
+        releasingFocus = true;
+        try {
+          blurActiveElement();
           parkFocus();
+        } finally {
+          window.setTimeout(() => {
+            releasingFocus = false;
+          }, 0);
         }
         return;
       }

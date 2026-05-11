@@ -5492,7 +5492,9 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   min-width: 0;
 }
 
-#inventarioGlobalRange, #produccionGlobalRange {
+#inventarioGlobalRange,
+#produccionGlobalRange,
+#produccionGlobalSearch {
   border-radius: 5px !important;
 }
 
@@ -6597,6 +6599,16 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   font-weight: 800 !important;
 }
 
+.produccion-vto-stack .produccion-badge {
+  border-radius: 4px;
+}
+
+.produccion-vto-stack .produccion-badge.is-success {
+  border-color: #a7e2bd;
+  background: #eafaf0;
+  color: #168044;
+}
+
 .produccion-trace-v2 {
   display: grid;
   gap: 12px;
@@ -7606,6 +7618,67 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   font-size: 0.8rem;
   font-weight: 700;
   color: #2a3556;
+}
+
+.produccion-stock-lot-status {
+  border: 1px solid #cbd7ef;
+  border-radius: 4px;
+  padding: 1px 5px;
+  background: #eef3ff;
+  color: #38558f;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.produccion-stock-detail-link {
+  appearance: none;
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  color: #2d5aa0;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.produccion-stock-alert {
+  text-align: left;
+}
+
+.produccion-stock-alert-total {
+  margin: 0 0 10px;
+  color: #516897;
+  font-weight: 800;
+}
+
+.produccion-stock-alert td strong,
+.produccion-stock-alert td small {
+  display: block;
+}
+
+.produccion-stock-alert td small {
+  color: #6b7ea8;
+  font-size: 0.72rem;
+}
+
+.produccion-stock-lot-status.is-success {
+  border-color: #a7e2bd;
+  background: #eafaf0;
+  color: #168044;
+}
+
+.produccion-stock-lot-status.is-warning {
+  border-color: #ffd7a4;
+  background: #fff4e4;
+  color: #b26b08;
+}
+
+.produccion-stock-lot-status.is-danger {
+  border-color: #f2b7c4;
+  background: #ffecef;
+  color: #be2f48;
 }
 
 /* --- Ingredientes colapsable --- */

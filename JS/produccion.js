@@ -120,6 +120,10 @@
       rne: { number: '', expiryDate: '', attachmentUrl: '', attachmentType: '', validFrom: '', updatedAt: 0, history: [] }
     }
   };
+  const pendingRegistroDetailIds = new Set();
+  const pendingInventoryDetailIds = new Set();
+  const failedRegistroDetailIds = new Set();
+  const failedInventoryDetailIds = new Set();
   const safeObject = (value) => (value && typeof value === 'object' ? value : {});
   const normalizeValue = (value) => String(value || '').trim();
   const normalizeLower = (value) => normalizeValue(value).toLowerCase();
@@ -191,7 +195,7 @@
     if (!entry) return;
     const moveId = normalizeValue(movement.id) || makeId('prod_move');
     const type = normalizeValue(movement.type) === 'egreso' ? 'egreso' : 'ingreso';
-    const qtyKg = toFiniteKg(movement.qtyKg);
+    const qtyKg = type === 'egreso' ? Math.abs(toFiniteKg(movement.qtyKg)) : toFiniteKg(movement.qtyKg);
     const at = Number(movement.at || nowTs());
     entry.movements[moveId] = {
       id: moveId,
@@ -222,7 +226,7 @@
     return Number(Object.entries(safeObject(entry.weeklyOutByWeek)).reduce((acc, [weekIso, qty]) => {
       const weekTs = Number(new Date(`${weekIso}T00:00:00`).getTime());
       if (!Number.isFinite(weekTs) || weekTs < weekAgo) return acc;
-      return acc + Number(qty || 0);
+      return acc + Math.abs(Number(qty || 0));
     }, 0).toFixed(3));
   };
   const getProvidersCatalog = () => (Array.isArray(state.inventario?.config?.providers) ? state.inventario.config.providers : []);
@@ -616,6 +620,30 @@
     if (!expiryIso) return 'Sin VTO';
     return formatIsoEs(expiryIso);
   };
+  const getProductExpiryStatusMeta = (registro) => {
+    const expiryIso = resolveProductExpiryIso(registro);
+    if (!expiryIso) return { expiryIso: '', label: 'Sin VTO', tone: 'is-warning', expired: false };
+    const availableKg = getDispatchAvailableByProductionId(registro?.id);
+    if (availableKg <= 0.0001) return { expiryIso, label: 'Lote vendido', tone: 'is-success', expired: false, sold: true, availableKg };
+    const diff = getIsoDiffDays(expiryIso, toIsoDate());
+    if (!Number.isFinite(diff)) return { expiryIso, label: 'Sin VTO', tone: 'is-warning', expired: false };
+    if (diff < 0) return { expiryIso, label: `Vencido hace ${Math.abs(diff)} dia(s)`, tone: 'is-danger', expired: true };
+    if (diff === 0) return { expiryIso, label: 'Vence hoy', tone: 'is-warning', expired: false };
+    return { expiryIso, label: 'No vencido', tone: '', expired: false };
+  };
+  const formatKgBadgeValue = (value) => {
+    const amount = Number(value || 0);
+    if (!Number.isFinite(amount)) return '0';
+    return amount.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+  };
+  const renderProductExpiryCell = (registro) => {
+    const meta = getProductExpiryStatusMeta(registro);
+    const availableKg = Number(meta.availableKg ?? getDispatchAvailableByProductionId(registro?.id));
+    const stockLabel = meta.expired && availableKg > 0.0001
+      ? `<small>${formatKgBadgeValue(availableKg)} kg disponibles vencidos</small>`
+      : '';
+    return `<span class="produccion-history-date-stack produccion-vto-stack"><strong>${escapeHtml(formatProductExpiryLabel(registro))}</strong><small class="produccion-badge ${meta.tone}">${escapeHtml(meta.label)}</small>${stockLabel}</span>`;
+  };
   const hasFrozenShelfLifeExtension = (registro = {}) => {
     if (Boolean(registro?.frozenShelfLifeExtensionAtProduction || registro?.traceability?.product?.frozenShelfLifeExtension)) return true;
     const recipe = state.recetas?.[registro?.recipeId] || {};
@@ -647,20 +675,40 @@
   };
   const getRegistrosList = () => Object.values(safeObject(state.registros));
   const getRegistroById = (key) => safeObject(state.registros?.[key]);
+  const isRegistroDetailHydrated = (registro = {}) =>
+    Boolean(registro?.__detailLoaded) || Array.isArray(registro?.lots);
   const ensureRegistroDetail = async (key) => {
     const id = normalizeValue(key);
     if (!id) return null;
     const current = safeObject(state.registros?.[id]);
-    if (current.id && !current.__indexLite) return current;
+    if (current.id && !current.__indexLite && isRegistroDetailHydrated(current)) return current;
     try {
       const detail = safeObject(await window.dbLaJamoneraRest.read(`${REGISTROS_PATH}/${id}`));
       if (detail.id || Object.keys(detail).length) {
-        state.registros[id] = { ...current, ...detail, id, __indexLite: false };
+        const merged = { ...current, ...detail, id, __indexLite: false, __detailLoaded: true };
+        merged.traceCount = getTraceRowsFromRegistro(merged).length;
+        state.registros[id] = merged;
+        failedRegistroDetailIds.delete(id);
         return state.registros[id];
       }
     } catch (error) {
     }
+    failedRegistroDetailIds.add(id);
     return current.id ? current : null;
+  };
+  const hydrateRegistroDetailsForRows = (rows = [], onDone = null, limit = 12) => {
+    const ids = [...new Set((Array.isArray(rows) ? rows : [])
+      .map((row) => normalizeValue(row?.id))
+      .filter((id) => id && !failedRegistroDetailIds.has(id) && !isRegistroDetailHydrated(state.registros?.[id]) && !pendingRegistroDetailIds.has(id)))]
+      .slice(0, limit);
+    if (!ids.length) return false;
+    ids.forEach((id) => pendingRegistroDetailIds.add(id));
+    Promise.all(ids.map((id) => ensureRegistroDetail(id)))
+      .finally(() => {
+        ids.forEach((id) => pendingRegistroDetailIds.delete(id));
+        if (typeof onDone === 'function') onDone();
+      });
+    return true;
   };
   const getGeneralPassword = async () => {
     await window.laJamoneraReady;
@@ -869,13 +917,39 @@
         if (Object.keys(detail).length) {
           state.inventario.items = safeObject(state.inventario.items);
           state.inventario.items[ingredientId] = { ...current, ...detail, __indexLite: false };
+          failedInventoryDetailIds.delete(ingredientId);
+        } else {
+          failedInventoryDetailIds.add(ingredientId);
         }
       } catch (error) {
+        failedInventoryDetailIds.add(ingredientId);
       }
     }));
   };
   const ensureInventoryDetailsForRecipe = async (recipe = {}, options = {}) => {
     await ensureInventoryDetailsForIds(getRecipeIngredientIds(recipe), options);
+  };
+  const hydrateInventoryDetailsForRecipes = (recipes = [], onDone = null, limit = 30) => {
+    const ids = [...new Set((Array.isArray(recipes) ? recipes : []).flatMap((recipe) => getRecipeIngredientIds(recipe))
+      .map(normalizeValue)
+      .filter((id) => {
+        if (!id || pendingInventoryDetailIds.has(id) || failedInventoryDetailIds.has(id)) return false;
+        const current = safeObject(state.inventario.items?.[id]);
+        return !Array.isArray(current.entries) || current.__indexLite;
+      }))].slice(0, limit);
+    if (!ids.length) return false;
+    ids.forEach((id) => pendingInventoryDetailIds.add(id));
+    ensureInventoryDetailsForIds(ids)
+      .then(() => {
+        (Array.isArray(recipes) ? recipes : []).forEach((recipe) => {
+          if (recipe?.id) state.analysis[recipe.id] = analyzeRecipe(recipe);
+        });
+      })
+      .finally(() => {
+        ids.forEach((id) => pendingInventoryDetailIds.delete(id));
+        if (typeof onDone === 'function') onDone();
+      });
+    return true;
   };
   const getInventoryIdsFromPlans = (...plans) => [...new Set(plans.flatMap((plan) =>
     (Array.isArray(plan?.ingredientPlans) ? plan.ingredientPlans : [])
@@ -1643,7 +1717,7 @@
       const products = Array.isArray(reparto.products) ? reparto.products : [];
       const subtotal = products
         .filter((row) => normalizeValue(row.recipeId) === normalizeValue(recipeId))
-        .reduce((sum, row) => sum + Number(row.qtyKg || 0), 0);
+        .reduce((sum, row) => sum + Math.abs(Number(row.qtyKg || 0)), 0);
       return acc + subtotal;
     }, 0);
     const available = Number(Math.max(0, produced - dispatched).toFixed(3));
@@ -1655,7 +1729,7 @@
       const products = Array.isArray(reparto.products) ? reparto.products : [];
       return acc + products
         .filter((row) => normalizeValue(row.recipeId) === normalizeValue(recipeId))
-        .reduce((sum, row) => sum + Number(row.qtyKg || 0), 0);
+        .reduce((sum, row) => sum + Math.abs(Number(row.qtyKg || 0)), 0);
     }, 0);
     return { produced, dispatched, available, lastWeekOut: Number(lastWeekOut.toFixed(3)) };
   };
@@ -2620,6 +2694,14 @@
         lotNumber: normalizeValue(lot?.lotNumber || lot?.entryId || lot?.invoiceNumber) || '-',
         invoiceImageUrls: Array.isArray(lot?.invoiceImageUrls) ? lot.invoiceImageUrls : []
       })));
+  const hasRegistroTracePreview = (registro = {}) => {
+    if (getTraceRowsFromRegistro(registro).length > 0) return true;
+    if (failedRegistroDetailIds.has(normalizeValue(registro?.id))) return false;
+    return !isRegistroDetailHydrated(registro) && Number(registro?.traceCount || 0) > 0;
+  };
+  const isRegistroDetailLoading = (registro = {}) => pendingRegistroDetailIds.has(normalizeValue(registro?.id));
+  const renderTraceLoadingRow = (colspan = 10) =>
+    `<tr class="inventario-trace-row"><td colspan="${colspan}"><div class="d-flex align-items-center justify-content-center gap-2 py-2 text-muted" aria-live="polite"><i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i><span>Cargando movimientos...</span></div></td></tr>`;
   const getTraceIngredientLabelHtml = (trace, { includeRelation = true } = {}) => {
     const ingredientName = escapeHtml(trace?.ingredientName || 'Ingrediente');
     if (!includeRelation || !trace?.isSubstitute || !normalizeValue(trace?.sourceIngredientName)) return ingredientName;
@@ -3879,19 +3961,21 @@
     const rows = getHistoryRows();
     rows.forEach((item) => {
       if (state.historyTraceCollapse[item.id] !== undefined) return;
-      if (getTraceRowsFromRegistro(item).length) state.historyTraceCollapse[item.id] = true;
+      if (hasRegistroTracePreview(item)) state.historyTraceCollapse[item.id] = true;
     });
     const PAGE = 10;
     const pages = Math.max(1, Math.ceil(rows.length / PAGE));
     state.historyPage = Math.min(Math.max(1, state.historyPage), pages);
     const start = (state.historyPage - 1) * PAGE;
     const pageRows = rows.slice(start, start + PAGE);
-    const traceableRows = rows.filter((item) => getTraceRowsFromRegistro(item).length);
+    hydrateRegistroDetailsForRows(pageRows.filter((item) => state.historyTraceCollapse[item.id] === false), renderHistoryTable, PAGE);
+    const traceableRows = rows.filter((item) => hasRegistroTracePreview(item));
     const canCollapseRows = traceableRows.some((item) => state.historyTraceCollapse[item.id] !== true);
     const canExpandRows = traceableRows.some((item) => state.historyTraceCollapse[item.id] === true);
     const htmlRows = pageRows.length ? pageRows.map((item, index) => {
       const manager = getManagerLabel(item);
       const traceRows = getTraceRowsFromRegistro(item);
+      const hasTracePreview = hasRegistroTracePreview(item);
       const isCollapsed = state.historyTraceCollapse[item.id] === true;
       const planillaDisabled = hasPlanillaDisponible(item) ? '' : 'disabled';
       const traceHtml = (!isCollapsed && traceRows.length)
@@ -3906,14 +3990,15 @@
           <td>-</td>
           <td>${trace.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td>
           <td>-</td>
-        </tr>`).join('') : '';
+        </tr>`).join('')
+        : (!isCollapsed && hasTracePreview ? renderTraceLoadingRow(10) : '');
       return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
-        <td><div class="d-flex align-items-center gap-2">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-collapse="${escapeHtml(item.id)}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isCollapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(item.id)}</span></div></td>
+        <td><div class="d-flex align-items-center gap-2">${hasTracePreview ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-collapse="${escapeHtml(item.id)}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isRegistroDetailLoading(item) ? 'fa-circle-notch fa-spin' : (isCollapsed ? 'fa-expand' : 'fa-compress')}"></i></button>` : ''}<span>${escapeHtml(item.id)}</span></div></td>
         <td>${renderProductionDateCell(item)}</td>
         <td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td>
         <td>${Number(item.quantityKg || 0).toFixed(2)} kg</td>
         <td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td>
-        <td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td>
+        <td class="produccion-vto-cell">${renderProductExpiryCell(item)}</td>
         <td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${item.id}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td>
         <td><div class="produccion-planilla-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-planilla="${escapeHtml(item.id)}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-qr-print="${escapeHtml(item.id)}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></button></div></td>
         <td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td>
@@ -4211,7 +4296,7 @@
   };
   const formatDispatchPlanillaQty = (value, unit = 'kg') => {
     const normalizedUnit = normalizeLower(unit || 'kg');
-    const amount = Number(value || 0);
+    const amount = Math.abs(Number(value || 0));
     const pretty = Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
     if (['unidad', 'unidades', 'u', 'un'].includes(normalizedUnit)) {
       return `${pretty} ${amount === 1 ? 'unidad' : 'unidades'}`;
@@ -4224,11 +4309,11 @@
   const getDispatchAllocationDisplay = (item = {}, allocation = {}) => {
     const unit = normalizeValue(allocation.unit || item.qtyUnit || (item.sourceType === 'ingredient' ? 'unidades' : 'kilos'));
     const normalizedUnit = normalizeLower(unit);
-    const amount = Number(allocation.qty || 0) > 0
-      ? Number(allocation.qty || 0)
+    const amount = Math.abs(Number(allocation.qty || 0)) > 0
+      ? Math.abs(Number(allocation.qty || 0))
       : (['unidad', 'unidades', 'u', 'un'].includes(normalizedUnit)
-        ? Number(item.qty || 0)
-        : Number(allocation.qtyKg || item.qtyKg || 0));
+        ? Math.abs(Number(item.qty || 0))
+        : Math.abs(Number(allocation.qtyKg || item.qtyKg || 0)));
     return {
       amount,
       unit,
@@ -4236,7 +4321,7 @@
     };
   };
   const getDispatchProductSummaryLabel = (item = {}) => {
-    const qty = Number(item.qty || 0);
+    const qty = Math.abs(Number(item.qty || 0));
     const unit = normalizeValue(item.qtyUnit || (item.sourceType === 'ingredient' ? 'unidades' : 'kilos'));
     if (qty > 0 && unit) return formatDispatchPlanillaQty(qty, unit);
     const firstAllocation = Array.isArray(item.allocations) ? item.allocations[0] : null;
@@ -4482,7 +4567,7 @@
     const directEgressKg = Object.values(safeObject(state.reparto?.productIndex?.[prod.recipeId]?.movements))
       .filter((movement) => normalizeValue(movement?.type) === 'egreso')
       .filter((movement) => [movement?.sourceId, movement?.sourceCode, movement?.lotNumber].some((value) => normalizeValue(value) === normalizeValue(productionId)))
-      .reduce((acc, movement) => acc + Number(movement?.qtyKg || 0), 0);
+      .reduce((acc, movement) => acc + Math.abs(Number(movement?.qtyKg || 0)), 0);
     return Number(Math.max(0, producedKg - dispatchedKg - directEgressKg).toFixed(3));
   };
   const getDispatchLotProductionDate = (reg = {}) => {
@@ -4507,6 +4592,60 @@
       availableKg: getDispatchAvailableByProductionId(reg.id)
     }))
     .filter((row) => row.availableKg > 0.0001);
+  const getProductionStockLotsForRecipe = (recipeId) => getRegistrosList()
+    .filter((reg) => normalizeValue(reg.recipeId) === normalizeValue(recipeId) && normalizeValue(reg.status) !== 'anulada')
+    .map((reg) => {
+      const availableKg = getDispatchAvailableByProductionId(reg.id);
+      const expiryIso = resolveProductExpiryIso(reg);
+      const diff = expiryIso ? getIsoDiffDays(expiryIso, toIsoDate()) : Number.NaN;
+      const status = !expiryIso
+        ? { label: 'Sin VTO', tone: 'is-warning' }
+        : (Number.isFinite(diff) && diff < 0
+          ? { label: 'Vencido', tone: 'is-danger' }
+          : (diff === 0 ? { label: 'Vence hoy', tone: 'is-warning' } : { label: 'No vencido', tone: 'is-success' }));
+      return {
+        id: normalizeValue(reg.id),
+        productionDate: normalizeValue(reg.productionDate) || toIsoDate(reg.createdAt || nowTs()),
+        expiryIso,
+        availableKg,
+        status
+      };
+    })
+    .filter((row) => row.availableKg > 0.0001)
+    .sort((a, b) => {
+      const expiryA = normalizeValue(a.expiryIso) || '9999-12-31';
+      const expiryB = normalizeValue(b.expiryIso) || '9999-12-31';
+      if (expiryA !== expiryB) return expiryA.localeCompare(expiryB);
+      return normalizeValue(a.productionDate).localeCompare(normalizeValue(b.productionDate));
+    });
+  const openProductionStockLotsAlert = async (recipeId) => {
+    const recipe = safeObject(state.recetas?.[recipeId]);
+    const lots = getProductionStockLotsForRecipe(recipeId);
+    const totalKg = lots.reduce((sum, lot) => sum + Number(lot.availableKg || 0), 0);
+    const rowsHtml = lots.length
+      ? lots.map((lot) => `<tr>
+          <td><strong>${escapeHtml(lot.id || '-')}</strong><small>${escapeHtml(formatIsoEs(lot.productionDate || '') || '-')}</small></td>
+          <td>${escapeHtml(formatKgBadgeValue(lot.availableKg))} kg</td>
+          <td>${escapeHtml(formatIsoEs(lot.expiryIso || '') || 'Sin VTO')}</td>
+          <td><span class="produccion-stock-lot-status ${lot.status.tone}">${escapeHtml(lot.status.label)}</span></td>
+        </tr>`).join('')
+      : '<tr><td colspan="4" class="text-center">Sin producciones con stock disponible.</td></tr>';
+    await openIosSwal({
+      title: `Stock de ${capitalize(recipe.title || 'producto')}`,
+      html: `<div class="produccion-stock-alert">
+        <p class="produccion-stock-alert-total">Total disponible: <strong>${escapeHtml(formatKgBadgeValue(totalKg))} kg</strong></p>
+        <div class="table-responsive">
+          <table class="table recipe-table inventario-table-compact mb-0">
+            <thead><tr><th>Produccion</th><th>Resta</th><th>VTO</th><th>Estado</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>
+      </div>`,
+      width: 760,
+      confirmButtonText: 'Cerrar',
+      customClass: { confirmButton: 'ios-btn ios-btn-secondary' }
+    });
+  };
   const isDispatchLotFutureForDate = (lot = {}, dispatchDateIso = toIsoDate()) => {
     const productionIso = normalizeValue(lot.productionDate);
     return Boolean(productionIso && dispatchDateIso && productionIso > dispatchDateIso);
@@ -4835,8 +4974,8 @@
     let totalIn = 0;
     let totalOut = 0;
     movements.forEach((move) => {
-      const qtyKg = toFiniteKg(move.qtyKg);
       const type = normalizeValue(move.type) === 'egreso' ? 'egreso' : 'ingreso';
+      const qtyKg = type === 'egreso' ? Math.abs(toFiniteKg(move.qtyKg)) : toFiniteKg(move.qtyKg);
       if (type === 'egreso') {
         totalOut += qtyKg;
         const week = getWeekStartIso(move.at || nowTs());
@@ -5048,7 +5187,7 @@
     state.dispatchPage = 1;
     setDispatchMode(true);
     if (nodes.dispatchView) {
-      nodes.dispatchView.innerHTML = '<div class="informes-empty">Cargando repartos...</div>';
+      nodes.dispatchView.innerHTML = '<div class="ingredientes-loading" aria-live="polite"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando repartos" class="meta-spinner-login"><p>Cargando salidas...</p></div>';
     }
     await ensureRepartoRecordsLoaded();
     renderDispatchMain();
@@ -5144,6 +5283,21 @@
     const n = Number.parseFloat(normalized);
     return Number.isFinite(n) ? Number(n.toFixed(3)) : 0;
   };
+  const toDispatchXlsxPositiveQty = (value) => {
+    const qty = Number(parseDispatchXlsxQty(value) || 0);
+    return Number.isFinite(qty) ? Number(Math.abs(qty).toFixed(3)) : 0;
+  };
+  const isDispatchXlsxRowQtyValid = (row) => {
+    if (!row) return false;
+    const sourceQty = Number(row.sourceQty || 0);
+    if (!Number.isFinite(sourceQty) || sourceQty <= 0.0001) return false;
+    const mappedIngredients = Array.isArray(row.mappedIngredients) ? row.mappedIngredients : [];
+    if (mappedIngredients.length) {
+      return mappedIngredients.every((item) => Number(item?.qty || 0) > 0.0001);
+    }
+    const mappedQty = Number(row.mappedQty || 0);
+    return Number.isFinite(mappedQty) && mappedQty > 0.0001;
+  };
   const toDispatchXlsxIsoFromSerial = (value) => {
     const serial = Number(value);
     if (!Number.isFinite(serial)) return '';
@@ -5214,9 +5368,10 @@
     const isIngredient = normalizeValue(rule.targetType) === 'ingredient';
     const targetMap = isIngredient ? safeObject(state.ingredientes) : safeObject(state.recetas);
     const target = safeObject(targetMap[targetId]);
-    const sourceQty = Number(parseDispatchXlsxQty(qtyRaw) || 0);
+    const sourceQty = toDispatchXlsxPositiveQty(qtyRaw);
     const effectiveDispatchDateIso = normalizeDispatchDateToken(options.dispatchDateIso) || toIsoDate();
-    const configuredMultiplier = Number(parseDispatchXlsxQty(rule.customKg) || 0);
+    const configuredMultiplier = toDispatchXlsxPositiveQty(rule.customKg);
+    if (Boolean(rule.useCustomKg) && Number(parseDispatchXlsxQty(rule.customKg) || 0) < 0) rule.customKg = configuredMultiplier;
     const hasConfiguredMultiplier = Boolean(rule.useCustomKg) && configuredMultiplier > 0;
     const effectiveMultiplier = hasConfiguredMultiplier ? configuredMultiplier : 1;
     const ingredientTargets = isIngredient && Array.isArray(rule.ingredientTargets) ? rule.ingredientTargets : [];
@@ -5224,8 +5379,9 @@
       const ingredientId = normalizeValue(targetRow.id);
       const ingredient = safeObject(state.ingredientes?.[ingredientId]);
       const stockMeta = getDispatchXlsxIngredientStockMeta(ingredientId, effectiveDispatchDateIso);
-      const configuredQty = Number(parseDispatchXlsxQty(targetRow.qty) || 0);
+      const configuredQty = toDispatchXlsxPositiveQty(targetRow.qty);
       const useSourceQty = Boolean(targetRow.useSourceQty);
+      if (!useSourceQty && Number(parseDispatchXlsxQty(targetRow.qty) || 0) < 0) targetRow.qty = configuredQty;
       const baseQty = useSourceQty ? sourceQty : configuredQty;
       const qty = Number(((useSourceQty ? baseQty : (baseQty * effectiveMultiplier)) || 0).toFixed(2));
       const unit = normalizeValue(targetRow.unit || stockMeta.unit || ingredient.stockUnit || 'unidades');
@@ -5566,7 +5722,7 @@
               const rawQty = normalizeValue(item.qty);
               return {
                 ...item,
-                qty: rawQty ? parseDispatchXlsxQty(rawQty) : 0,
+                qty: rawQty ? toDispatchXlsxPositiveQty(rawQty) : 0,
                 useSourceQty: !rawQty
               };
             })
@@ -5589,10 +5745,16 @@
           Swal.showValidationMessage('Seleccioná un destino para continuar.');
           return false;
         }
+        const customKgRaw = normalizeValue(document.getElementById('dispatchXlsxMapQty')?.value);
+        const customKg = customKgRaw ? toDispatchXlsxPositiveQty(customKgRaw) : 0;
+        if (customKgRaw && customKg <= 0) {
+          Swal.showValidationMessage('El multiplicador debe ser mayor a 0.');
+          return false;
+        }
         return {
           targetId: picked,
           ingredientTargets: [],
-          customKg: normalizeValue(document.getElementById('dispatchXlsxMapQty')?.value)
+          customKg
         };
       }
     });
@@ -6064,7 +6226,18 @@
       await openIosSwal({ title: 'Responsable requerido', html: '<p>Seleccioná al menos un responsable para procesar el XLSX.</p>', icon: 'warning' });
       return;
     }
-    const rows = (Array.isArray(draft?.rows) ? draft.rows : []).filter((row) => !row.disabled && normalizeValue(row.mappedTargetId));
+    const activeRows = (Array.isArray(draft?.rows) ? draft.rows : []).filter((row) => !row.disabled);
+    const invalidQtyRows = activeRows.filter((row) => !isDispatchXlsxRowQtyValid(row));
+    if (invalidQtyRows.length) {
+      await openIosSwal({ title: 'Cantidad inválida', html: '<p>Hay filas activas con cantidad 0 o inválida. Corregí la relación o deshabilitá esas filas antes de procesar.</p>', icon: 'warning' });
+      return;
+    }
+    const missingTargetRows = activeRows.filter((row) => !normalizeValue(row.mappedTargetId));
+    if (missingTargetRows.length) {
+      await openIosSwal({ title: 'Filas sin relación', html: '<p>Hay filas activas sin producto relacionado. Relacionalas o deshabilitalas antes de procesar.</p>', icon: 'warning' });
+      return;
+    }
+    const rows = activeRows.filter((row) => normalizeValue(row.mappedTargetId));
     if (!rows.length) {
       await openIosSwal({ title: 'Sin filas activas', html: '<p>No hay filas listas para procesar.</p>', icon: 'warning' });
       return;
@@ -6317,7 +6490,7 @@
     const resolutionPreview = buildDispatchXlsxResolutionPreview(draft);
     const rows = Array.isArray(draft.rows) ? draft.rows : [];
     const rowsNeedingDateFix = getDispatchXlsxRowsNeedingDateFix(draft);
-    const readyToProcess = rows.length > 0 && rows.every((row) => row.disabled || normalizeValue(row.mappedTargetId));
+    const readyToProcess = rows.length > 0 && rows.every((row) => row.disabled || (normalizeValue(row.mappedTargetId) && isDispatchXlsxRowQtyValid(row)));
     const unrelatedRows = rows.filter((r) => !normalizeValue(r.mappedTargetId) && !r.disabled);
     const isFilteringUnrelated = state.dispatchXlsxFilter === 'unrelated_only';
     const visibleRows = isFilteringUnrelated ? unrelatedRows : rows;
@@ -6350,6 +6523,7 @@
     };
     const body = xlsxPageSlice.length ? xlsxPageSlice.map((row) => {
       const mappedIngredients = Array.isArray(row.mappedIngredients) ? row.mappedIngredients : [];
+      const rowQtyValid = isDispatchXlsxRowQtyValid(row);
       const getResolvedMissingQty = (item) => {
         const requested = Number(item?.qty || 0);
         const available = Number(item?.available || 0);
@@ -6362,11 +6536,13 @@
       const rowProductPreview = safeObject(resolutionPreview.product?.[normalizeValue(row.id)]);
       const resolvedProductMissingQty = Number(productMissingQty.toFixed(4));
       const rowHasStock = mappedIngredients.length
-        ? !hasAnyIngredientPendingConflict
-        : resolvedProductMissingQty <= 0.0001;
+        ? rowQtyValid && !hasAnyIngredientPendingConflict
+        : rowQtyValid && resolvedProductMissingQty <= 0.0001;
       const stockUnit = normalizeValue(row.mappedAvailableUnit || (mappedIngredients[0]?.unit) || (normalizeValue(row.mappedType) === 'ingredient' ? 'unidades' : 'kg'));
       const availableQty = Number(row.mappedAvailableKg || 0);
-      const qtyClass = rowHasStock
+      const qtyClass = !rowQtyValid
+        ? 'is-danger'
+        : rowHasStock
         ? 'is-ok'
         : (!mappedIngredients.length && availableQty > 0.0001 ? 'is-warning' : 'is-danger');
       const expiredQty = Number(row.mappedExpiredQty || 0);
@@ -6418,7 +6594,7 @@
           return `<div class="dispatch-xlsx-ingredient-item"><small class="dispatch-xlsx-ingredient-line ${toneClass}">• ${escapeHtml(item.title)}: <strong>${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.qty || 0), item.unit || 'u'))}</strong> · Disp.: <strong>${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(item.available || 0), item.unit || 'u'))}</strong>${showExpiredPart ? ` · <span class="dispatch-xlsx-expired-part">${escapeHtml(formatDispatchXlsxQtyWithUnit((Number.isFinite(Number(itemPreview.expiredAvailable)) ? Number(itemPreview.expiredAvailable) : Number(item.expired || 0)), item.unit || 'u'))} vencidas</span>` : ''}${showMissingPart ? ` · <strong>Faltan ${escapeHtml(formatDispatchXlsxQtyWithUnit(missingQty, item.unit || 'u'))}</strong>` : ''}</small>${(resolutionBadge || resolveBtn) ? `<div class="dispatch-xlsx-conflict-actions">${resolutionBadge}${resolveBtn}</div>` : ''}</div>`;
         }).join('')}</div>`
         : '';
-      const stockLine = row.mappedTargetTitle
+      let stockLine = row.mappedTargetTitle
         ? (() => {
           const base = mappedIngredients.length
             ? (rowHasStock
@@ -6457,11 +6633,12 @@
       const clientBadge = row.clientStatus === 'new'
         ? `<span class="produccion-badge is-warning dispatch-xlsx-client-badge">Alta automática · DNI ${escapeHtml(row.clientDoc || '-')}</span>`
         : `<span class="produccion-badge dispatch-xlsx-client-badge">Registrado · DNI ${escapeHtml(row.clientDoc || '-')}</span>`;
+      if (row.mappedTargetTitle && !rowQtyValid) stockLine = 'Cantidad inválida: debe ser mayor a 0.';
       const dateLabel = /^\d{4}-\d{2}-\d{2}$/.test(row.invoiceDate || '') ? formatIsoEs(row.invoiceDate) : (row.invoiceDate || '-');
       const rowStateClass = row.disabled
         ? 'dispatch-xlsx-row-disabled'
         : (row.mappedTargetTitle ? 'dispatch-xlsx-row-related' : 'dispatch-xlsx-row-pending');
-      return `<tr class="${rowStateClass}"><td><div class="dispatch-xlsx-client"><strong class="dispatch-xlsx-client-name" title="${escapeHtml(row.clientName || '-')}">${escapeHtml(row.clientName || '-')}</strong>${clientBadge}</div></td><td class="dispatch-xlsx-invoice-cell">${escapeHtml(row.invoiceNumber || '-')}</td><td class="dispatch-xlsx-date-cell"><input class="form-control ios-input dispatch-xlsx-date-input" data-dispatch-xlsx-date="${escapeHtml(row.id)}" value="${escapeHtml(row.invoiceDate || '')}" placeholder="Fecha reparto"><small>${escapeHtml(dateLabel)}</small></td><td><div class="dispatch-xlsx-mapping"><strong>${escapeHtml(row.sourceProduct || '-')}</strong>${relationMeta}${ingredientDetail}<span class="dispatch-xlsx-map-state ${row.mappedTargetTitle ? 'is-related' : 'is-pending'}">${row.mappedTargetTitle ? `<i class="fa-solid fa-circle-check"></i> Relacionado` : `<i class="bi bi-x-circle-fill"></i> Sin relacionado`}</span></div></td><td class="dispatch-xlsx-kilos-cell"><span class="${qtyClass}">${qtyMap}</span><small class="d-block ${qtyClass}">${stockLine}</small></td><td><label class="dispatch-xlsx-toggle"><input type="checkbox" data-dispatch-xlsx-row-enabled="${escapeHtml(row.id)}" ${row.disabled ? '' : 'checked'}><span>${row.disabled ? 'Deshabilitado' : 'Activo'}</span></label></td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-xlsx-map="${escapeHtml(row.id)}"><i class="fa-solid fa-link"></i><span>Relacionar</span></button></td></tr>`;
+      return `<tr class="${rowStateClass}"><td><div class="dispatch-xlsx-client"><strong class="dispatch-xlsx-client-name" title="${escapeHtml(row.clientName || '-')}">${escapeHtml(row.clientName || '-')}</strong>${clientBadge}</div></td><td class="dispatch-xlsx-invoice-cell">${escapeHtml(row.invoiceNumber || '-')}</td><td class="dispatch-xlsx-date-cell"><input class="form-control ios-input dispatch-xlsx-date-input" data-dispatch-xlsx-date="${escapeHtml(row.id)}" value="${escapeHtml(row.invoiceDate || '')}" placeholder="Fecha reparto"><small>${escapeHtml(dateLabel)}</small></td><td><div class="dispatch-xlsx-mapping"><strong>${escapeHtml(row.sourceProduct || '-')}</strong>${relationMeta}${ingredientDetail}<span class="dispatch-xlsx-map-state ${row.mappedTargetTitle ? 'is-related' : 'is-pending'}">${row.mappedTargetTitle ? `<i class="fa-solid fa-circle-check"></i> Relacionado` : `<i class="bi bi-x-circle-fill"></i> Sin relacionado`}</span></div></td><td class="dispatch-xlsx-kilos-cell"><span class="${qtyClass}">${qtyMap}</span><small class="d-block ${qtyClass}">${stockLine}</small></td><td><label class="dispatch-xlsx-toggle"><input type="checkbox" data-dispatch-xlsx-row-enabled="${escapeHtml(row.id)}" ${row.disabled ? '' : 'checked'}><span>${row.disabled ? 'Deshabilitado' : (rowQtyValid ? 'Activo' : 'Revisar')}</span></label></td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-xlsx-map="${escapeHtml(row.id)}"><i class="fa-solid fa-link"></i><span>Relacionar</span></button></td></tr>`;
     }).join('') : (rows.length
       ? `<tr><td colspan="7" class="text-center">${isFilteringUnrelated ? 'No hay filas sin relación con el filtro activo.' : 'Sin filas en esta página.'}</td></tr>`
       : '<tr><td colspan="7" class="text-center">Adjuntá un XLS/XLSX para comenzar.</td></tr>');
@@ -7771,6 +7948,7 @@
                   <div class="produccion-stat-block produccion-stat-mini is-stock-up">
                     <small>En stock <i class="fa-solid fa-arrow-up"></i></small>
                     <strong>${dispatchMeta.available.toFixed(2)} kg</strong>
+                    <button type="button" class="produccion-stock-detail-link" data-open-production-stock="${recipe.id}">Ver producciones</button>
                   </div>
                   <div class="produccion-stat-block produccion-stat-mini is-stock-down">
                     <small>Egresados <i class="fa-solid fa-arrow-down"></i></small>
@@ -8024,6 +8202,8 @@
     const isViewOnly = mode === 'view';
     state.editorMode = mode;
     state.sinTrazabilidad = !isViewOnly && Boolean(options.sinTrazabilidad);
+    state.editorRenderSeq = Number(state.editorRenderSeq || 0) + 1;
+    const editorRenderSeq = state.editorRenderSeq;
     const recipe = state.recetas[recipeId];
     if (!recipe) return;
     if (!isViewOnly) {
@@ -8228,24 +8408,29 @@
       const rows = getRecipeHistoryRows();
       const node = nodes.editor.querySelector('#produccionRecipeHistory');
       if (!node) return;
+      hydrateRegistroDetailsForRows(rows.filter((item) => state.historyTraceCollapse[item.id] === false).slice(0, 12), () => {
+        if (state.activeRecipeId === recipe.id && state.editorRenderSeq === editorRenderSeq) renderRecipeHistory();
+      }, 12);
       rows.forEach((item) => {
         if (state.historyTraceCollapse[item.id] !== undefined) return;
-        if (getTraceRowsFromRegistro(item).length) state.historyTraceCollapse[item.id] = true;
+        if (hasRegistroTracePreview(item)) state.historyTraceCollapse[item.id] = true;
       });
       if (!rows.length) {
         return;
       }
-      const traceableRows = rows.filter((item) => getTraceRowsFromRegistro(item).length);
+      const traceableRows = rows.filter((item) => hasRegistroTracePreview(item));
       const canCollapseRows = traceableRows.some((item) => state.historyTraceCollapse[item.id] !== true);
       const canExpandRows = traceableRows.some((item) => state.historyTraceCollapse[item.id] === true);
       const htmlRows = rows.map((item, index) => {
         const manager = getManagerLabel(item);
         const traceRows = getTraceRowsFromRegistro(item);
+        const hasTracePreview = hasRegistroTracePreview(item);
         const isCollapsed = state.historyTraceCollapse[item.id] === true;
         const planillaDisabled = hasPlanillaDisponible(item) ? '' : 'disabled';
         const traceHtml = (!isCollapsed && traceRows.length)
           ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${getTraceIngredientLabelHtml(trace)}</span></div></td><td></td><td><span class="produccion-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="produccion-trace-expiry">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td><td><span class="produccion-trace-badge">Trazabilidad</span></td><td>-</td><td>${trace.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images="${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td>-</td></tr>`).join('') : '';
-        return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isCollapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(item.id || '-')}</span></div></td><td>${renderProductionDateCell(item)}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td><div class="produccion-planilla-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></button></div></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-recipe-prod-delete="${escapeHtml(item.id || '')}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${traceHtml}`;
+        const resolvedTraceHtml = traceHtml || (!isCollapsed && hasTracePreview ? renderTraceLoadingRow(10) : '');
+        return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${hasTracePreview ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isRegistroDetailLoading(item) ? 'fa-circle-notch fa-spin' : (isCollapsed ? 'fa-expand' : 'fa-compress')}"></i></button>` : ''}<span>${escapeHtml(item.id || '-')}</span></div></td><td>${renderProductionDateCell(item)}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${renderProductExpiryCell(item)}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td><div class="produccion-planilla-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></button></div></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-recipe-prod-delete="${escapeHtml(item.id || '')}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${resolvedTraceHtml}`;
       }).join('');
       node.innerHTML = `
         <div class="inventario-table-head enhanced">
@@ -8359,6 +8544,7 @@
       if (!isViewOnly) await ensureReservationForPlan(state.editorPlan);
     };
     nodes.editor.addEventListener('click', async (event) => {
+      if (state.editorRenderSeq !== editorRenderSeq) return;
       const resolveExpiredBtn = event.target.closest('[data-resolve-expired-entry]');
       if (resolveExpiredBtn) {
         if (isViewOnly) return;
@@ -8414,14 +8600,14 @@
       }
       if (event.target.closest('#produccionRecipeHistoryCollapseAllRowsBtn')) {
         getRecipeHistoryRows().forEach((item) => {
-          if (getTraceRowsFromRegistro(item).length) state.historyTraceCollapse[item.id] = true;
+          if (hasRegistroTracePreview(item)) state.historyTraceCollapse[item.id] = true;
         });
         renderRecipeHistory();
         return;
       }
       if (event.target.closest('#produccionRecipeHistoryExpandAllRowsBtn')) {
         getRecipeHistoryRows().forEach((item) => {
-          if (getTraceRowsFromRegistro(item).length) state.historyTraceCollapse[item.id] = false;
+          if (hasRegistroTracePreview(item)) state.historyTraceCollapse[item.id] = false;
         });
         renderRecipeHistory();
         return;
@@ -8485,6 +8671,10 @@
           Object.keys(collapseMap).forEach((id) => {
             if (!liveIds.has(normalizeValue(id))) delete collapseMap[id];
           });
+          rows.forEach((item) => {
+            if (collapseMap[item.id] !== undefined) return;
+            if (hasRegistroTracePreview(item)) collapseMap[item.id] = true;
+          });
           expandedPage = Math.min(Math.max(1, expandedPage), Math.max(1, Math.ceil(rows.length / EXPANDED_PAGE_SIZE)));
         };
         const totalPages = () => Math.max(1, Math.ceil(rows.length / EXPANDED_PAGE_SIZE));
@@ -8497,18 +8687,22 @@
           ? getPageRows().map((item, index) => {
             const manager = getManagerLabel(item);
             const traceRows = getTraceRowsFromRegistro(item);
+            const hasTracePreview = hasRegistroTracePreview(item);
             const isCollapsed = collapseMap[item.id] === true;
             const planillaDisabled = hasPlanillaDisponible(item) ? '' : 'disabled';
             const traceHtml = (!isCollapsed && traceRows.length)
               ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${getTraceIngredientLabelHtml(trace)}</span></div></td><td></td><td><span class="produccion-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="produccion-trace-expiry">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td><td><span class="produccion-trace-badge">Trazabilidad</span></td><td>-</td><td>${trace.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images="${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td></tr>`).join('')
               : '';
-            return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isCollapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(item.id || '-')}</span></div></td><td>${renderProductionDateCell(item)}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td><div class="produccion-planilla-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></button></div></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-recipe-prod-delete="${escapeHtml(item.id || '')}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${traceHtml}`;
+            const resolvedTraceHtml = traceHtml || (!isCollapsed && hasTracePreview ? renderTraceLoadingRow(10) : '');
+            return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${hasTracePreview ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isRegistroDetailLoading(item) ? 'fa-circle-notch fa-spin' : (isCollapsed ? 'fa-expand' : 'fa-compress')}"></i></button>` : ''}<span>${escapeHtml(item.id || '-')}</span></div></td><td>${renderProductionDateCell(item)}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${renderProductExpiryCell(item)}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td><div class="produccion-planilla-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></button></div></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-recipe-prod-delete="${escapeHtml(item.id || '')}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${resolvedTraceHtml}`;
           }).join('')
           : '<tr><td colspan="10" class="text-center">Sin producciones.</td></tr>';
         const renderExpandedContent = (popup) => {
           const host = popup.querySelector('#produccionRecipeExpandedHistoryHost');
           if (!host) return;
-          const traceableRows = rows.filter((item) => getTraceRowsFromRegistro(item).length);
+          refreshExpandedRows();
+          hydrateRegistroDetailsForRows(getPageRows().filter((item) => collapseMap[item.id] === false), () => renderExpandedContent(popup), EXPANDED_PAGE_SIZE);
+          const traceableRows = rows.filter((item) => hasRegistroTracePreview(item));
           const canCollapseRows = traceableRows.some((item) => collapseMap[item.id] !== true);
           const canExpandRows = traceableRows.some((item) => collapseMap[item.id] === true);
           const pages = totalPages();
@@ -8526,14 +8720,14 @@
             popup.addEventListener('click', async (clickEvent) => {
               if (clickEvent.target.closest('#produccionRecipeExpandedHistoryCollapseAllRowsBtn')) {
                 rows.forEach((item) => {
-                  if (getTraceRowsFromRegistro(item).length) collapseMap[item.id] = true;
+                  if (hasRegistroTracePreview(item)) collapseMap[item.id] = true;
                 });
                 renderExpandedContent(popup);
                 return;
               }
               if (clickEvent.target.closest('#produccionRecipeExpandedHistoryExpandAllRowsBtn')) {
                 rows.forEach((item) => {
-                  if (getTraceRowsFromRegistro(item).length) collapseMap[item.id] = false;
+                  if (hasRegistroTracePreview(item)) collapseMap[item.id] = false;
                 });
                 renderExpandedContent(popup);
                 return;
@@ -9010,6 +9204,8 @@
   const refreshData = async ({ silent = false } = {}) => {
     if (!silent) setStateView('loading');
     await window.laJamoneraReady;
+    failedRegistroDetailIds.clear();
+    failedInventoryDetailIds.clear();
     const safeRead = async (path, fallback = {}) => {
       try {
         const value = await window.dbLaJamoneraRest.read(path);
@@ -9054,6 +9250,7 @@
       : legacyRepartoStore;
     state.reparto = normalizeDispatchStore(nextRepartoStore);
     state.repartoRecordsLoaded = Object.prototype.hasOwnProperty.call(safeObject(nextRepartoStore), 'registros');
+    Object.values(safeObject(state.reparto.productIndex)).forEach((entry) => rebuildProductIndexEntryMetrics(entry));
     if (!Object.keys(safeObject(state.reparto.productIndex)).length) {
       if (!state.repartoRecordsLoaded) {
         await ensureRepartoRecordsLoaded();
@@ -9260,6 +9457,12 @@
       return;
     }
 
+    const stockBtn = event.target.closest('[data-open-production-stock]');
+    if (stockBtn) {
+      await openProductionStockLotsAlert(stockBtn.dataset.openProductionStock);
+      return;
+    }
+
     const moreBtn = event.target.closest('[data-recipe-more]');
     if (moreBtn) {
       const allMenus = nodes.list?.querySelectorAll('.produccion-more-menu');
@@ -9405,11 +9608,15 @@
       Object.keys(collapseMap).forEach((id) => {
         if (!liveIds.has(normalizeValue(id))) delete collapseMap[id];
       });
+      rows.forEach((item) => {
+        if (collapseMap[item.id] !== undefined) return;
+        if (hasRegistroTracePreview(item)) collapseMap[item.id] = true;
+      });
       expandedPage = Math.min(Math.max(1, expandedPage), Math.max(1, Math.ceil(rows.length / EXPANDED_PAGE_SIZE)));
     };
     rows.forEach((item) => {
       if (collapseMap[item.id] !== undefined) return;
-      if (getTraceRowsFromRegistro(item).length) collapseMap[item.id] = true;
+      if (hasRegistroTracePreview(item)) collapseMap[item.id] = true;
     });
     const totalPages = () => Math.max(1, Math.ceil(rows.length / EXPANDED_PAGE_SIZE));
     const getPageRows = () => {
@@ -9420,6 +9627,7 @@
     const renderRows = () => getPageRows().length ? getPageRows().map((item, index) => {
       const manager = getManagerLabel(item);
       const traceRows = getTraceRowsFromRegistro(item);
+      const hasTracePreview = hasRegistroTracePreview(item);
       const isCollapsed = collapseMap[item.id] === true;
       const planillaDisabled = hasPlanillaDisponible(item) ? '' : 'disabled';
       const traceHtml = (!isCollapsed && traceRows.length) ? traceRows.map((trace) => `<tr class="inventario-trace-row">
@@ -9434,12 +9642,15 @@
         <td>${trace.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}'><i class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td>
         <td>-</td>
       </tr>`).join('') : '';
-      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-expanded-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isCollapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(item.id)}</span></div></td><td>${renderProductionDateCell(item)}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)} (${escapeHtml(manager.role)})</td><td class="produccion-vto-cell">${escapeHtml(formatProductExpiryLabel(item))}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td><div class="produccion-planilla-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></button></div></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-prod-cancel="${escapeHtml(item.id || '')}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${traceHtml}`;
+      const resolvedTraceHtml = traceHtml || (!isCollapsed && hasTracePreview ? renderTraceLoadingRow(10) : '');
+      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${hasTracePreview ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-expanded-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isRegistroDetailLoading(item) ? 'fa-circle-notch fa-spin' : (isCollapsed ? 'fa-expand' : 'fa-compress')}"></i></button>` : ''}<span>${escapeHtml(item.id)}</span></div></td><td>${renderProductionDateCell(item)}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)} (${escapeHtml(manager.role)})</td><td class="produccion-vto-cell">${renderProductExpiryCell(item)}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td><div class="produccion-planilla-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></button></div></td><td>${traceRows.some((trace) => trace.invoiceImageUrls.length) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(traceRows.flatMap((trace) => trace.invoiceImageUrls)))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-prod-cancel="${escapeHtml(item.id || '')}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${resolvedTraceHtml}`;
     }).join('') : '<tr><td colspan="10" class="text-center">Sin producciones.</td></tr>';
     const renderExpandedContent = (popup) => {
       const host = popup.querySelector('#produccionExpandedHistoryHost');
       if (!host) return;
-      const traceableRows = rows.filter((item) => getTraceRowsFromRegistro(item).length);
+      refreshExpandedRows();
+      hydrateRegistroDetailsForRows(getPageRows().filter((item) => collapseMap[item.id] === false), () => renderExpandedContent(popup), EXPANDED_PAGE_SIZE);
+      const traceableRows = rows.filter((item) => hasRegistroTracePreview(item));
       const canCollapseRows = traceableRows.some((item) => collapseMap[item.id] !== true);
       const canExpandRows = traceableRows.some((item) => collapseMap[item.id] === true);
       const pages = totalPages();
@@ -9460,14 +9671,14 @@
         popup.addEventListener('click', async (event) => {
           if (event.target.closest('#produccionExpandedHistoryCollapseAllRowsBtn')) {
             rows.forEach((item) => {
-              if (getTraceRowsFromRegistro(item).length) collapseMap[item.id] = true;
+              if (hasRegistroTracePreview(item)) collapseMap[item.id] = true;
             });
             renderExpandedContent(popup);
             return;
           }
           if (event.target.closest('#produccionExpandedHistoryExpandAllRowsBtn')) {
             rows.forEach((item) => {
-              if (getTraceRowsFromRegistro(item).length) collapseMap[item.id] = false;
+              if (hasRegistroTracePreview(item)) collapseMap[item.id] = false;
             });
             renderExpandedContent(popup);
             return;
@@ -10334,8 +10545,8 @@
         targetType: selectedType,
         targetId: pick.targetId,
         ingredientTargets: Array.isArray(pick.ingredientTargets) ? pick.ingredientTargets : [],
-        useCustomKg: Boolean(normalizeValue(pick.customKg)),
-        customKg: parseDispatchXlsxQty(pick.customKg)
+        useCustomKg: toDispatchXlsxPositiveQty(pick.customKg) > 0,
+        customKg: toDispatchXlsxPositiveQty(pick.customKg)
       };
       delete cfg.disabledProducts[key];
       applyDispatchXlsxRuleToDraftRows(row.sourceProduct);
@@ -11466,14 +11677,14 @@
   nodes.historyTableWrap?.addEventListener('click', async (event) => {
     if (event.target.closest('#produccionHistoryCollapseAllRowsBtn')) {
       getHistoryRows().forEach((item) => {
-        if (getTraceRowsFromRegistro(item).length) state.historyTraceCollapse[item.id] = true;
+        if (hasRegistroTracePreview(item)) state.historyTraceCollapse[item.id] = true;
       });
       renderHistoryTable();
       return;
     }
     if (event.target.closest('#produccionHistoryExpandAllRowsBtn')) {
       getHistoryRows().forEach((item) => {
-        if (getTraceRowsFromRegistro(item).length) state.historyTraceCollapse[item.id] = false;
+        if (hasRegistroTracePreview(item)) state.historyTraceCollapse[item.id] = false;
       });
       renderHistoryTable();
       return;
@@ -11565,7 +11776,9 @@
       await openTraceability(reg);
     }
   };
-  produccionModal.addEventListener('show.bs.modal', async () => {
+  produccionModal.addEventListener('shown.bs.modal', async () => {
+    if (state.modalBootstrapping) return;
+    state.modalBootstrapping = true;
     try {
       const hasLocalCache = Object.keys(safeObject(state.recetas)).length > 0;
       const shouldHardRefresh = !hasLocalCache || (nowTs() - Number(state.lastRefreshAt || 0)) > 45000;
@@ -11585,6 +11798,7 @@
       renderModalRneBadge();
       alignScrollActionsToRight(document);
       if (window.flatpickr && nodes.historyRange) {
+        nodes.historyRange._flatpickr?.destroy?.();
         const locale = window.flatpickr.l10ns?.es || undefined;
         const dayMap = getProductionDayMap();
         disableCalendarSuggestions(nodes.historyRange);
@@ -11614,9 +11828,12 @@
     } catch (error) {
       nodes.empty.querySelector('.ingredientes-empty-text').textContent = 'No se pudo cargar producción desde Firebase.';
       setStateView('empty');
+    } finally {
+      state.modalBootstrapping = false;
     }
   });
   produccionModal.addEventListener('hidden.bs.modal', async () => {
+    state.modalBootstrapping = false;
     if (state.activeRecipeId && state.editorMode !== 'view') {
       await saveEditorDraft();
     }
