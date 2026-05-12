@@ -4723,7 +4723,7 @@
           <span class="produccion-stock-alert-pill is-produced"><small>Total producido</small><strong>${escapeHtml(formatKgBadgeValue(totalProducedKg))} kg</strong></span>
           <span class="produccion-stock-alert-pill is-available"><small>Total disponible</small><strong>${escapeHtml(formatKgBadgeValue(totalKg))} kg</strong></span>
         </div>
-        <div class="table-responsive">
+        <div class="table-responsive inventario-global-table inventario-table-compact-wrap">
           <table class="table recipe-table inventario-table-compact mb-0">
             <thead><tr><th>Producción</th><th>Producido</th><th>Disponible</th><th>VTO</th><th>Estado</th></tr></thead>
             <tbody>${rowsHtml}</tbody>
