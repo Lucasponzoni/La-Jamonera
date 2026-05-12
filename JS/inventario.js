@@ -107,7 +107,8 @@
     searchRenderTimer: null,
     inventoryLoadedFromIndex: false,
     fullInventoryLoaded: false,
-    inventoryDetailLoaded: {}
+    inventoryDetailLoaded: {},
+    inventoryExpiryExpanded: false
   };
 
   const safeObject = (value) => (value && typeof value === 'object' ? value : {});
@@ -1992,6 +1993,7 @@
   const resolveInventoryExpiryRows = async (rows = [], resolutionType = '') => {
     const targets = (Array.isArray(rows) ? rows : []).filter((row) => row?.expired && normalizeValue(row.ingredientId) && normalizeValue(row.entryId));
     if (!targets.length || !normalizeValue(resolutionType)) return 0;
+    state.inventoryExpiryExpanded = true;
     Swal.fire({
       title: 'Resolviendo vencidos...',
       html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Resolviendo" class="meta-spinner-login"></div>',
@@ -2002,11 +2004,16 @@
     let resolved = 0;
     try {
       for (const row of targets) {
+        await ensureInventoryRecordDetail(row.ingredientId);
+        const record = getRecord(row.ingredientId);
+        const entry = (Array.isArray(record.entries) ? record.entries : [])
+          .find((item) => normalizeValue(item.id) === normalizeValue(row.entryId));
+        const actualAvailableKg = getAvailableKg(entry);
         const result = await resolveExpiredEntryStock({
           ingredientId: row.ingredientId,
           entryId: row.entryId,
           resolutionType,
-          qtyKg: Number(row.availableKg || 0)
+          qtyKg: actualAvailableKg
         });
         if (result?.ok) resolved += 1;
       }
@@ -2018,6 +2025,7 @@
       renderFamilies();
       renderStatusFilters();
       renderList();
+      renderInventoryExpiryAlert();
       return resolved;
     } finally {
       if (Swal.isVisible()) Swal.close();
@@ -2029,17 +2037,20 @@
     if (state.periodMode) {
       nodes.expiryAlert.classList.add('d-none');
       nodes.expiryAlert.innerHTML = '';
+      state.inventoryExpiryExpanded = false;
       return;
     }
     const rows = getInventoryExpiryAlertRows();
     if (!rows.length) {
       nodes.expiryAlert.classList.add('d-none');
       nodes.expiryAlert.innerHTML = '';
+      state.inventoryExpiryExpanded = false;
       return;
     }
     const expiredRows = rows.filter((row) => row.expired);
     const soonRows = rows.filter((row) => !row.expired);
     const tone = expiredRows.length ? 'is-danger' : 'is-warning';
+    const expanded = Boolean(state.inventoryExpiryExpanded);
     const title = expiredRows.length
       ? `${expiredRows.length} lote(s) de inventario vencido(s) con stock`
       : `${soonRows.length} lote(s) de inventario proximo(s) a vencer`;
@@ -2051,12 +2062,12 @@
       ${row.expired ? `<button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-inventory-expiry-resolve-one="${escapeHtml(row.id)}"><i class="fa-solid fa-check"></i><span>Resolver</span></button>` : ''}
     </div>`).join('');
     nodes.expiryAlert.classList.remove('d-none');
-    nodes.expiryAlert.innerHTML = `<section class="produccion-expiry-alert-card ${tone}" data-inventory-expiry-alert>
-      <button type="button" class="produccion-rne-expiry-alert ${tone} is-collapsible" data-inventory-expiry-toggle aria-expanded="false">
+    nodes.expiryAlert.innerHTML = `<section class="produccion-expiry-alert-card ${tone} ${expanded ? 'is-expanded' : ''}" data-inventory-expiry-alert>
+      <button type="button" class="produccion-rne-expiry-alert ${tone} is-collapsible ${expanded ? 'is-open' : ''}" data-inventory-expiry-toggle aria-expanded="${expanded ? 'true' : 'false'}">
         <span class="produccion-rne-expiry-text"><i class="bi ${expiredRows.length ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill'}"></i><span>${escapeHtml(title)}</span></span>
-        <span class="produccion-rne-expiry-collapse-meta"><strong>${rows.length}</strong><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
+        <span class="produccion-rne-expiry-collapse-meta"><strong>${rows.length}</strong><i class="fa-solid fa-chevron-${expanded ? 'up' : 'down'}" aria-hidden="true"></i></span>
       </button>
-      <div class="produccion-expiry-alert-details" data-inventory-expiry-details hidden>
+      <div class="produccion-expiry-alert-details" data-inventory-expiry-details ${expanded ? '' : 'hidden'}>
         <div class="produccion-expiry-toolbar">
           <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-inventory-expiry-config><i class="fa-solid fa-sliders"></i><span>Configurar dias</span></button>
           <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-inventory-expiry-select-all ${expiredRows.length ? '' : 'disabled'}><i class="fa-regular fa-square-check"></i><span>Seleccionar vencidos</span></button>
@@ -2070,17 +2081,31 @@
     const toggle = nodes.expiryAlert.querySelector('[data-inventory-expiry-toggle]');
     const details = nodes.expiryAlert.querySelector('[data-inventory-expiry-details]');
     const cardEl = nodes.expiryAlert.querySelector('[data-inventory-expiry-alert]');
-    toggle?.addEventListener('click', () => {
-      const expanded = toggle.getAttribute('aria-expanded') === 'true';
-      toggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-      details.hidden = expanded;
-      toggle.classList.toggle('is-open', !expanded);
+    toggle?.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const wasExpanded = toggle.getAttribute('aria-expanded') === 'true';
+      const nextExpanded = !wasExpanded;
+      state.inventoryExpiryExpanded = nextExpanded;
+      toggle.setAttribute('aria-expanded', nextExpanded ? 'true' : 'false');
+      details.hidden = !nextExpanded;
+      toggle.classList.toggle('is-open', nextExpanded);
+      const icon = toggle.querySelector('.produccion-rne-expiry-collapse-meta i');
+      icon?.classList.toggle('fa-chevron-down', !nextExpanded);
+      icon?.classList.toggle('fa-chevron-up', nextExpanded);
       // Sólo mostramos el "card frame" alrededor cuando está expandido,
       // así colapsado el alert no parece un div dentro de otro div.
-      cardEl?.classList.toggle('is-expanded', !expanded);
+      cardEl?.classList.toggle('is-expanded', nextExpanded);
     });
-    nodes.expiryAlert.querySelector('[data-inventory-expiry-config]')?.addEventListener('click', openGlobalConfig);
-    nodes.expiryAlert.querySelector('[data-inventory-expiry-select-all]')?.addEventListener('click', () => {
+    nodes.expiryAlert.querySelector('[data-inventory-expiry-config]')?.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openGlobalConfig();
+    });
+    nodes.expiryAlert.querySelector('[data-inventory-expiry-select-all]')?.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      state.inventoryExpiryExpanded = true;
       nodes.expiryAlert.querySelectorAll('[data-inventory-expiry-select]:not(:disabled)').forEach((checkbox) => {
         checkbox.checked = true;
       });
@@ -2096,12 +2121,25 @@
       }
       const resolutionType = await askInventoryExpiryResolutionType(targets.length);
       if (!resolutionType) return;
+      state.inventoryExpiryExpanded = true;
       await resolveInventoryExpiryRows(targets, resolutionType);
     };
-    nodes.expiryAlert.querySelector('[data-inventory-expiry-resolve-selected]')?.addEventListener('click', (event) => resolveRowsFromAlert('selected', '', event.currentTarget));
-    nodes.expiryAlert.querySelector('[data-inventory-expiry-resolve-all]')?.addEventListener('click', (event) => resolveRowsFromAlert('all', '', event.currentTarget));
+    nodes.expiryAlert.querySelector('[data-inventory-expiry-resolve-selected]')?.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      resolveRowsFromAlert('selected', '', event.currentTarget);
+    });
+    nodes.expiryAlert.querySelector('[data-inventory-expiry-resolve-all]')?.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      resolveRowsFromAlert('all', '', event.currentTarget);
+    });
     nodes.expiryAlert.querySelectorAll('[data-inventory-expiry-resolve-one]').forEach((button) => {
-      button.addEventListener('click', (event) => resolveRowsFromAlert('one', normalizeValue(button.dataset.inventoryExpiryResolveOne), event.currentTarget));
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        resolveRowsFromAlert('one', normalizeValue(button.dataset.inventoryExpiryResolveOne), event.currentTarget);
+      });
     });
   };
 
@@ -6204,9 +6242,10 @@
   };
 
   const resolveExpiredEntryStock = async ({ ingredientId, entryId, resolutionType, qtyKg }) => {
+    await ensureInventoryRecordDetail(ingredientId);
     const record = getRecord(ingredientId);
     const entries = Array.isArray(record.entries) ? [...record.entries] : [];
-    const index = entries.findIndex((item) => item.id === entryId);
+    const index = entries.findIndex((item) => normalizeValue(item.id) === normalizeValue(entryId));
     if (index < 0) return { ok: false, message: 'Lote no encontrado.' };
     const entry = { ...entries[index] };
     const expiryMeta = getEntryExpiryMeta(entry);
@@ -6214,7 +6253,10 @@
     const availableKg = getAvailableKg(entry);
     const availableQty = getAvailableQty(entry);
     if (!Number.isFinite(availableKg) || availableKg <= 0) return { ok: false, message: 'No hay kilos disponibles para resolver.' };
-    const safeQtyKg = Math.min(Math.max(0.001, Number(qtyKg || 0)), availableKg);
+    const requestedQtyKg = Number(qtyKg);
+    const safeQtyKg = Number.isFinite(requestedQtyKg) && requestedQtyKg > 0.0001
+      ? Math.min(requestedQtyKg, availableKg)
+      : availableKg;
     const ratio = safeQtyKg / availableKg;
     const qtyToDiscount = Number((availableQty * ratio).toFixed(4));
     const availableBase = Number(entry.availableBase);
@@ -6253,7 +6295,7 @@
     recomputeRecordStock(record, entry.unit || 'kilos');
     state.inventario.items[ingredientId] = record;
     rebuildInventarioIndexes();
-    await persistInventario();
+    await persistInventario({ itemIds: [ingredientId] });
     return { ok: true, resolvedKg: safeQtyKg, remainingKg: entry.availableKg };
   };
 
