@@ -629,7 +629,8 @@
   // "lite" (versión liviana del index). Lite sólo aporta valores cuando base
   // no los tiene. Esto evita que persistir el state lite por error destruya
   // datos pesados como nutrition.ai.tableHtml.
-  const safeMergeRecipeForPersist = (base, lite, recipeIdToRefresh) => {
+  const safeMergeRecipeForPersist = (base, lite, options = {}) => {
+    const preferLite = Boolean(options.preferLite);
     const result = { ...safeObject(base) };
     Object.entries(safeObject(lite)).forEach(([key, liteValue]) => {
       if (key === '__indexLite') return;
@@ -641,7 +642,9 @@
         liteValue && typeof liteValue === 'object' && !Array.isArray(liteValue) &&
         baseValue && typeof baseValue === 'object' && !Array.isArray(baseValue);
       if (isObjectMerge) {
-        result[key] = safeMergeRecipeForPersist(baseValue, liteValue);
+        result[key] = safeMergeRecipeForPersist(baseValue, liteValue, options);
+      } else if (preferLite) {
+        result[key] = liteValue;
       } else if (baseValue === undefined || baseValue === null || baseValue === '') {
         // Base no tiene el campo → lite lo aporta.
         result[key] = liteValue;
@@ -652,7 +655,7 @@
     return result;
   };
 
-  const persistRecetas = async () => {
+  const persistRecetas = async (options = {}) => {
     await window.laJamoneraReady;
     // SIEMPRE releemos el /recetas full antes de persistir, así no escribimos
     // placeholders / datos lite. La protección original confiaba en hasLiteRecipes
@@ -661,6 +664,7 @@
     let payload = {};
     try {
       const full = safeObject(await window.dbLaJamoneraRest.read('/recetas'));
+      const preferStateId = normalizeValue(options.preferStateId);
       Object.entries(safeObject(state.recetas)).forEach(([id, recipe]) => {
         const baseFromDb = safeObject(full[id]);
         // Si baseFromDb está vacío (receta nueva), usamos lo del state tal cual.
@@ -669,8 +673,10 @@
           payload[id] = cleanRecipe;
           return;
         }
-        // Si existe base, hacemos merge donde base gana.
-        payload[id] = safeMergeRecipeForPersist(baseFromDb, recipe);
+        // Si existe base, la receta que se acaba de guardar gana con los datos
+        // del editor. Las demas conservan base para que el index liviano no
+        // borre HTML nutricional u otros datos pesados.
+        payload[id] = safeMergeRecipeForPersist(baseFromDb, recipe, { preferLite: id === preferStateId });
       });
       // Recetas borradas localmente (no aparecen en state pero sí en full)
       // se respetan: no las incluimos en payload → write reemplaza /recetas
@@ -2765,6 +2771,13 @@
     renderNutritionAiPreview();
   };
 
+  const syncNutritionAiTableFromEditable = () => {
+    const editable = recipeEditorForm.querySelector('#recipeNutritionAiTableEditable');
+    if (!editable || !state.editor?.nutrition?.ai) return;
+    const html = normalizeValue(editable.innerHTML);
+    if (html) state.editor.nutrition.ai.tableHtml = html;
+  };
+
   const callDeepseekWithFallback = async (payload, apiKey, corsConfig) => {
     const direct = async () => fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
@@ -4204,6 +4217,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     if (!yieldUnit || yieldUnit === NEW_MEASURE_VALUE) throw new Error('Seleccioná una unidad de medida válida.');
     if (!Number.isFinite(shelfLifeDays) || shelfLifeDays <= 0) throw new Error('Ingresá la caducidad en días con un número mayor a 0.');
     if (!Number.isFinite(agingDays) || agingDays < 0) throw new Error(`Ingresá ${prePackagingFreeze ? 'los días de congelado previo a envasado' : 'los días de estacionado'} con un número válido (0 o mayor).`);
+    syncNutritionAiTableFromEditable();
     if (isNutritionAiStale()) throw new Error('Se modificaron datos nutricionales. Rehacé la tabla nutricional con IA antes de guardar.');
 
     const rows = state.editor.rows
@@ -4447,7 +4461,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
       const activeGroupId = normalizeValue(state.activeRecipeGroupId) && state.activeRecipeGroupId !== 'all' ? state.activeRecipeGroupId : '';
       const recipeGroupId = normalizeValue(prev.recipeGroupId || activeGroupId);
       state.recetas[id] = { ...prev, id, ...payload, recipeGroupId, createdAt: prev.createdAt || Date.now(), updatedAt: Date.now() };
-      await persistRecetas();
+      await persistRecetas({ preferStateId: id });
       state.resumeEditor = null;
       state.editorDirty = false;
       renderRecetas();

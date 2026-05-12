@@ -8509,48 +8509,44 @@
         missingPanel.innerHTML = '';
         return;
       }
-      // Detectamos bottlenecks: cada ingrediente con stock acotado, ordenado
-      // por cuál limita más. Se calcula cuánto X kg adicionales rinden de
-      // producto extra basado en la ratio del ingrediente vs receta.
-      const bottlenecks = requirements.map((item) => {
-        const requiredPerKg = Number(item.requiredPerKg ?? item.requiredQtyPerKg ?? 0);
-        const availableQty = Number(item.availableQty ?? 0);
-        const missing = Number(item.missingForMin || 0);
-        const stockUnit = item.unit || 'kilos';
-        const maxKgFromThis = (Number.isFinite(requiredPerKg) && requiredPerKg > 0) ? availableQty / requiredPerKg : Infinity;
+
+      if (!Number.isFinite(Number(state.missingPanelExtraKg)) || Number(state.missingPanelExtraKg) <= 0) state.missingPanelExtraKg = 50;
+      const targetExtraKg = Math.max(0.01, Number(state.missingPanelExtraKg || 50));
+      const targetMaxKg = currentMaxKg + targetExtraKg;
+      const productionDate = normalizeValue(dateInput?.value) || toIsoDate();
+      const candidates = requirements.map((item) => {
+        const neededPerKg = Number(item.neededPerKg || 0);
+        const coverageKg = Number(item.coverage || 0);
+        if (!Number.isFinite(neededPerKg) || neededPerKg <= 0 || item.infiniteStock) return null;
+        const kgGapForTarget = Math.max(0, targetMaxKg - coverageKg);
+        const neededQtyForTarget = kgGapForTarget * neededPerKg;
+        if (neededQtyForTarget <= 0.0001) return null;
         return {
           name: item.name || 'Ingrediente',
-          requiredPerKg,
-          availableQty,
-          missing,
-          stockUnit,
-          maxKgFromThis,
-          infiniteStock: Boolean(item.infiniteStock)
+          unit: item.unit || 'kilos',
+          neededPerKg,
+          coverageKg,
+          directAvailable: Number(item.available || 0),
+          neededQtyForTarget,
+          missingForMin: Number(item.missingForMin || 0),
+          hasExpired: Boolean(item.hasExpired),
+          nextEntryDate: normalizeValue(item.nextEntryDate),
+          relatedCount: Array.isArray(item.relatedOptions) ? item.relatedOptions.length : 0
         };
-      })
-      .filter((b) => Number.isFinite(b.requiredPerKg) && b.requiredPerKg > 0 && !b.infiniteStock)
-      .sort((a, b) => a.maxKgFromThis - b.maxKgFromThis)
-      .slice(0, 5); // top 5 bottlenecks
+      }).filter(Boolean).sort((a, b) => a.coverageKg - b.coverageKg);
 
-      if (!bottlenecks.length) {
+      if (!candidates.length) {
         missingPanel.classList.add('d-none');
         missingPanel.innerHTML = '';
         return;
       }
 
-      // Para cada bottleneck calculamos: "ingresando X kilos producís N kilos más"
-      // Usamos como referencia el "siguiente salto" útil: 10x lo que tenés disponible
-      // como base, o el faltante para producir +50 kg adicionales.
-      const targetExtraKg = 50;
-      const tips = bottlenecks.map((b) => {
-        const needed = Number((b.requiredPerKg * targetExtraKg).toFixed(2));
-        const willProduce = targetExtraKg;
-        return { ...b, needed, willProduce };
-      });
+      const visibleTips = candidates.slice(0, 6);
+      const hiddenCount = Math.max(0, candidates.length - visibleTips.length);
 
       if (typeof state.missingPanelCollapsed !== 'boolean') state.missingPanelCollapsed = true;
       const collapsed = Boolean(state.missingPanelCollapsed);
-      const tipCount = tips.length;
+      const tipCount = candidates.length;
 
       missingPanel.classList.remove('d-none');
       missingPanel.innerHTML = `
@@ -8559,18 +8555,55 @@
           <span class="produccion-missing-toggle-v2-meta">${tipCount} sugerencia${tipCount === 1 ? '' : 's'} <i class="fa-solid fa-chevron-${collapsed ? 'down' : 'up'}"></i></span>
         </button>
         <div class="produccion-missing-body-v2 ${collapsed ? 'd-none' : ''}">
-          ${tips.map((t) => `
-            <p class="produccion-missing-tip-line">
+          <div class="produccion-missing-extra-row">
+            <label for="produccionMissingExtraKg">Extra a producir</label>
+            <div class="produccion-missing-extra-control">
+              <input id="produccionMissingExtraKg" type="number" min="0.01" step="0.01" value="${targetExtraKg.toFixed(2)}" class="form-control ios-input" data-missing-extra-kg>
+              <span>kg</span>
+              <button type="button" class="btn ios-btn ios-btn-secondary produccion-missing-extra-apply" data-missing-extra-apply title="Calcular extra"><i class="fa-solid fa-calculator"></i></button>
+            </div>
+          </div>
+          <p class="produccion-missing-summary-v2">Para pasar de <strong>${currentMaxKg.toFixed(2)} kg</strong> a <strong>${targetMaxKg.toFixed(2)} kg</strong> en ${escapeHtml(formatIsoEs(productionDate))}, ingresá estos insumos.</p>
+          ${visibleTips.map((t) => {
+            const coverageText = Number.isFinite(t.coverageKg) ? `${t.coverageKg.toFixed(2)} kg` : 'sin límite';
+            const flags = [
+              t.missingForMin > 0.0001 ? 'bloquea el mínimo' : '',
+              t.hasExpired ? 'hay lotes vencidos no contados como frescos' : '',
+              t.nextEntryDate ? `stock futuro desde ${formatIsoEs(t.nextEntryDate)}` : '',
+              t.relatedCount ? `${t.relatedCount} sustituto(s) configurado(s)` : ''
+            ].filter(Boolean);
+            return `
+            <div class="produccion-missing-tip-line">
               <i class="fa-solid fa-arrow-trend-up"></i>
-              <span>Ingresando <strong>${t.needed} ${escapeHtml(t.stockUnit)}</strong> de <strong>${escapeHtml(t.name)}</strong> podrás producir <strong>+${t.willProduce} kg</strong> más</span>
-            </p>
-          `).join('')}
+              <span>
+                Ingresá <strong>${escapeHtml(formatQty(t.neededQtyForTarget, t.unit))}</strong> de <strong>${escapeHtml(t.name)}</strong> para que este insumo soporte el salto de <strong>+${targetExtraKg.toFixed(2)} kg</strong>.
+                <small>Hoy este insumo cubre ${escapeHtml(coverageText)}; consumo de receta: ${escapeHtml(formatQty(t.neededPerKg, t.unit))} por kg producido.${flags.length ? ` ${escapeHtml(flags.join(' · '))}.` : ''}</small>
+              </span>
+            </div>`;
+          }).join('')}
+          ${hiddenCount ? `<p class="produccion-missing-more-v2">Y ${hiddenCount} ingrediente(s) más también necesitarían ingreso para ese salto.</p>` : ''}
         </div>`;
       missingPanel.querySelector('[data-toggle-missing]')?.addEventListener('click', (event) => {
         event.preventDefault();
         state.missingPanelCollapsed = !state.missingPanelCollapsed;
         renderMissingPanel(qty);
       });
+      const applyExtra = () => {
+        const input = missingPanel.querySelector('[data-missing-extra-kg]');
+        const next = Number(input?.value || 0);
+        if (Number.isFinite(next) && next > 0) {
+          state.missingPanelExtraKg = next;
+          renderMissingPanel(qty);
+        }
+      };
+      missingPanel.querySelector('[data-missing-extra-kg]')?.addEventListener('change', applyExtra);
+      missingPanel.querySelector('[data-missing-extra-kg]')?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          applyExtra();
+        }
+      });
+      missingPanel.querySelector('[data-missing-extra-apply]')?.addEventListener('click', applyExtra);
     };
     const lotsWrap = nodes.editor.querySelector('#produccionLotsBreakdown');
     const confirmBtn = nodes.editor.querySelector('#produccionConfirmBtn');
