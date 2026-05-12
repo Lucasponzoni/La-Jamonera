@@ -1521,10 +1521,28 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   padding: 0 !important;
 }
 
+.swal2-popup.produccion-confirm-alert {
+  /* Limita el alto del popup completo para que no se estire fuera del viewport.
+     Los botones de acción quedan siempre visibles abajo (fuera del scroll). */
+  max-height: 90vh;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
 .swal2-popup.produccion-confirm-alert .swal2-html-container {
   padding: 0 !important;
-  overflow: hidden;
   border-radius: 0 0 14px 14px;
+  /* Scroll vertical interno: lista de insumos puede ser larga, los botones
+     "Confirmar / Cancelar" siempre quedan visibles abajo. */
+  max-height: calc(90vh - 140px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+}
+
+.swal2-popup.produccion-confirm-alert .swal2-actions {
+  margin-top: 8px !important;
+  flex-shrink: 0;
 }
 
 .swal2-popup.ios-alert.informes-alert .swal2-html-container {
@@ -6831,6 +6849,439 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   line-height: 1.3;
 }
 
+/* === Header con layout VERTICAL: avatar arriba, título, pill comercial,
+   folder. Compartido entre cards de Producción y Recetas para look unificado.
+   Tipografía Space Grotesk en título para coherencia con valores numéricos. */
+.produccion-card-v2 .produccion-card-titles,
+.receta-card-v2 .receta-card-titles {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+/* Avatar redondo arriba del título — tamaño moderado, no domina la card. */
+.produccion-card-avatar {
+  width: 60px !important;
+  height: 60px !important;
+  min-width: 60px !important;
+  max-width: 60px !important;
+  margin-bottom: 4px !important;
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  border: 2px solid #e3ebf6;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.produccion-card-avatar img,
+.produccion-card-avatar .receta-thumb,
+.produccion-card-avatar .thumb-image {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 50% !important;
+  object-fit: cover;
+}
+
+.produccion-card-avatar .thumb-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f6fb;
+}
+
+.produccion-card-avatar .thumb-loading .meta-spinner-login {
+  width: 24px;
+  height: 24px;
+}
+
+/* Título del producto: Space Grotesk grande y prolijo. */
+.produccion-card-v2 .produccion-card-titles .receta-name,
+.produccion-card-v2 .produccion-card-titles .ingrediente-name,
+.receta-card-v2 .receta-card-titles .receta-name,
+.receta-card-v2 .receta-card-titles .ingrediente-name {
+  font-family: 'Space Grotesk', 'Inter', sans-serif !important;
+  font-size: 1.4rem !important;
+  font-weight: 700 !important;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 0;
+  color: #173d73;
+}
+
+/* Pill comercial: violeta, compacta. */
+.produccion-card-v2 .produccion-card-titles .produccion-nombre-comercial,
+.receta-card-v2 .receta-card-titles .produccion-nombre-comercial,
+.receta-card-v2 .receta-card-titles .receta-card-commercial {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  padding: 2px 10px;
+  background: #f3ecff;
+  border: 1px solid #ddd5ee;
+  border-radius: 999px;
+  color: #7e5dbb;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.25;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.produccion-card-v2 .produccion-card-titles .produccion-nombre-comercial::before,
+.receta-card-v2 .receta-card-titles .produccion-nombre-comercial::before,
+.receta-card-v2 .receta-card-titles .receta-card-commercial::before {
+  content: "\f02b"; /* fa-tag */
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  font-size: 0.68rem;
+  opacity: 0.85;
+}
+
+/* Quitamos el icono fa-tag duplicado dentro del span de recetas. */
+.receta-card-v2 .receta-card-titles .receta-card-commercial > .bi-tag {
+  display: none;
+}
+
+/* Carpeta: tipografía secundaria gris. */
+.produccion-card-v2 .produccion-card-titles .produccion-recipe-folder,
+.receta-card-v2 .receta-card-titles .produccion-recipe-folder,
+.receta-card-v2 .receta-card-titles .receta-card-folder {
+  font-size: 0.72rem;
+  color: #687895;
+  font-weight: 500;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Header con menos padding y separación más compacta */
+.produccion-card-v2 .produccion-card-header {
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+  align-items: center;
+}
+
+/* Avatar más chico en cards de producción para no comer altura */
+.produccion-card-v2 .ingrediente-avatar,
+.produccion-card-v2 .receta-thumb-wrap {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  flex-shrink: 0;
+}
+
+.produccion-card-v2 .ingrediente-avatar img,
+.produccion-card-v2 .receta-thumb-wrap img,
+.produccion-card-v2 .ingrediente-avatar .thumb-image,
+.produccion-card-v2 .receta-thumb-wrap .thumb-image {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* (Override removido: el header ahora es vertical — avatar arriba, después
+   título, pill y folder cada uno en su línea, no inline.) */
+
+/* === Hero "Máximo producible" arriba destacado + 4 stat cards abajo === */
+.produccion-card-v2 .produccion-zone-stock {
+  padding: 4px 0 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.produccion-hero-max-v3 {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  padding: 12px 16px;
+  border: 1px solid #c4d8f5;
+  border-radius: 12px;
+  background: linear-gradient(120deg, #eef4ff 0%, #f8fbff 100%);
+}
+
+.produccion-hero-max-v3.is-zero {
+  background: linear-gradient(120deg, #fff0f2 0%, #fff7f8 100%);
+  border-color: #f2b4c0;
+}
+
+.produccion-hero-max-v3.is-zero .produccion-hero-max-icon {
+  background: #b42338;
+  color: #ffffff;
+  box-shadow: 0 4px 14px -4px rgba(180, 35, 56, 0.45);
+}
+
+.produccion-hero-max-v3.is-zero .produccion-hero-max-text small,
+.produccion-hero-max-v3.is-zero .produccion-hero-max-value span,
+.produccion-hero-max-v3.is-zero .produccion-hero-max-progress small {
+  color: #9f2f45;
+}
+
+.produccion-hero-max-v3.is-zero .produccion-hero-max-value {
+  color: #b42338;
+}
+
+.produccion-hero-max-v3.is-zero .produccion-progress-bar {
+  background: #ffe3e8;
+  border-color: #f2b4c0;
+}
+
+.produccion-hero-max-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.produccion-hero-max-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #1f4ea5;
+  color: #ffffff;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+  box-shadow: 0 4px 14px -4px rgba(31, 78, 165, 0.45);
+}
+
+.produccion-hero-max-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+.produccion-hero-max-text small {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: #4f6aa3;
+  text-transform: uppercase;
+  line-height: 1.15;
+}
+
+.produccion-hero-max-value {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-size: 1.9rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: #1f4ea5;
+  line-height: 1.05;
+  margin: 2px 0 0;
+}
+
+.produccion-hero-max-value span {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #4f6aa3;
+  margin-left: 4px;
+  letter-spacing: 0;
+}
+
+.produccion-hero-max-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.produccion-hero-max-progress .produccion-progress-bar {
+  height: 8px;
+  background: #ffffff;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid #d6e3f5;
+}
+
+.produccion-hero-max-progress .produccion-progress-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.produccion-hero-max-progress .produccion-progress-bar > span.is-success { background: linear-gradient(90deg, #2f8865, #44b07b); }
+.produccion-hero-max-progress .produccion-progress-bar > span.is-warning { background: linear-gradient(90deg, #d39c2b, #f0b54a); }
+.produccion-hero-max-progress .produccion-progress-bar > span.is-danger  { background: linear-gradient(90deg, #d04555, #f06a78); }
+.produccion-hero-max-progress .produccion-progress-bar > span.is-expired { background: linear-gradient(90deg, #b65b5b, #d97e7e); }
+
+.produccion-hero-max-progress small {
+  font-size: 0.72rem;
+  color: #5b7196;
+  line-height: 1.2;
+}
+
+@media (max-width: 600px) {
+  .produccion-hero-max-v3 {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
+/* Stats row: 4 cards iguales debajo del hero. */
+.produccion-stats-row-v2 {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 6px;
+  align-items: stretch;
+}
+
+/* Stat-card individual: el text fluye, label puede wrap a 2 líneas sin romper. */
+.produccion-card-v2 .produccion-stats-row-v2 .produccion-stat-mini-v2 {
+  min-width: 0;
+  min-height: 64px;
+  padding: 8px 10px;
+}
+
+.produccion-card-v2 .produccion-stats-row-v2 .produccion-stat-mini-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.produccion-card-v2 .produccion-stats-row-v2 .produccion-stat-mini-text small {
+  font-size: 0.66rem;
+  line-height: 1.15;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.produccion-card-v2 .produccion-stats-row-v2 .produccion-stat-mini-text strong {
+  font-size: 0.98rem;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+/* Card de "Máximo producible": fondo azul claro, icono azul oscuro. */
+.produccion-card-v2 .produccion-stat-mini-v2.is-max {
+  background: linear-gradient(135deg, #eef4ff 0%, #ffffff 100%);
+  border-color: #c4d8f5;
+}
+
+.produccion-card-v2 .produccion-stat-mini-v2.is-max .produccion-stat-mini-icon {
+  background: #1f4ea5;
+  color: #ffffff;
+}
+
+.produccion-card-v2 .produccion-stat-mini-v2.is-max .produccion-stat-mini-text strong {
+  color: #1f4ea5;
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+}
+
+/* Barra de progreso compacta debajo del valor de Máximo */
+.produccion-progress-bar-mini {
+  height: 3px;
+  background: #e3ebf6;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 3px;
+}
+
+.produccion-progress-bar-mini > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+
+.produccion-progress-bar-mini > span.is-success { background: #2f8865; }
+.produccion-progress-bar-mini > span.is-warning { background: #d39c2b; }
+.produccion-progress-bar-mini > span.is-danger  { background: #d04555; }
+.produccion-progress-bar-mini > span.is-expired { background: #b65b5b; }
+
+/* Badge "Vence en N días · X kg" dentro de la stat-card: que pueda wrap si
+   no entra horizontalmente, en vez de cortarse el texto. */
+.produccion-card-v2 .produccion-expiry-badge {
+  white-space: normal;
+  line-height: 1.25;
+  word-break: keep-all;
+  max-width: 100%;
+  font-size: 0.62rem;
+  padding: 1px 7px;
+  margin-top: 3px;
+}
+
+@media (max-width: 1100px) {
+  .produccion-stats-row-v2 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .produccion-stats-row-v2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .produccion-stats-row-v2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Stat-mini-v2 más compactos: padding reducido + min-height menor */
+.produccion-hero-side-v2 {
+  gap: 6px;
+}
+
+.produccion-stat-mini-v2 {
+  padding: 6px 10px;
+  min-height: 52px;
+  gap: 8px;
+}
+
+.produccion-stat-mini-icon {
+  width: 32px;
+  height: 32px;
+  font-size: 0.88rem;
+  border-radius: 8px;
+}
+
+.produccion-stat-mini-text small {
+  font-size: 0.66rem;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+}
+
+.produccion-stat-mini-text strong {
+  font-size: 0.95rem;
+  line-height: 1.15;
+}
+
+.produccion-stat-mini-text strong span {
+  font-size: 0.66rem;
+}
+
+.produccion-stat-mini-text strong.is-date {
+  font-size: 0.85rem;
+}
+
+.produccion-expiry-badge {
+  margin-top: 2px;
+  padding: 1px 7px;
+  font-size: 0.62rem;
+}
+
+/* Footer compacto */
+.produccion-zone-footer-v2 {
+  padding-top: 6px;
+  margin-top: 6px;
+}
+
+.produccion-zone-footer-v2 .produccion-zone-link {
+  font-size: 0.76rem;
+}
+
 .produccion-recipe-folder {
   margin: 2px 0 0;
   color: #687895;
@@ -7445,6 +7896,30 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   color: #be2f48;
 }
 
+/* Tono informativo azul para "Vence en N días" cuando faltan > 7 días.
+   Diferencia visualmente del warning naranja (que se reserva para ≤ 7 días). */
+.produccion-badge.is-info {
+  border-color: #b6d8ff;
+  background: #e7f1ff;
+  color: #2c6fb0;
+}
+
+/* Celda de producto en el historial: nombre principal + nombre comercial chico. */
+.produccion-history-product-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.2;
+}
+
+.produccion-history-product-comercial {
+  font-size: 0.74rem;
+  color: #6b7689;
+  font-weight: 500;
+  font-style: italic;
+  text-transform: none;
+}
+
 .produccion-missing-list {
   margin-top: 8px;
   display: grid;
@@ -7501,19 +7976,51 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 }
 
 .produccion-card-v2 .produccion-card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px 12px;
   padding-bottom: 6px;
   border-bottom: 1px solid rgba(31, 63, 130, 0.08);
 }
 
 .produccion-card-v2 .produccion-card-titles {
-  display: grid;
-  gap: 2px;
+  display: grid !important;
+  grid-template-columns: 76px minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  column-gap: 14px;
+  row-gap: 4px;
+  align-items: center !important;
   min-width: 0;
+}
+
+.produccion-card-v2 .produccion-card-avatar {
+  grid-column: 1;
+  grid-row: 1 / span 3;
+  align-self: start;
+  width: 76px !important;
+  height: 76px !important;
+  min-width: 76px !important;
+  max-width: 76px !important;
+  margin-bottom: 0 !important;
+}
+
+.produccion-card-v2 .produccion-card-titles .receta-name,
+.produccion-card-v2 .produccion-card-titles .ingrediente-name,
+.produccion-card-v2 .produccion-card-titles .produccion-nombre-comercial,
+.produccion-card-v2 .produccion-card-titles .produccion-recipe-folder {
+  grid-column: 2;
+}
+
+.produccion-card-v2 .produccion-card-titles .receta-name,
+.produccion-card-v2 .produccion-card-titles .ingrediente-name {
+  font-size: 1.28rem !important;
+  line-height: 1.08;
+}
+
+.produccion-card-v2 .produccion-chip {
+  align-self: start;
+  white-space: nowrap;
 }
 
 .produccion-card-v2 .produccion-zone {
@@ -7811,6 +8318,39 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   color: #1f6b4f;
 }
 
+/* Botón-link para el código de producción en el modal "Stock de [producto]".
+   Se ve como texto pero al hover indica claramente que es clickeable. */
+.produccion-stock-id-link {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  text-align: left;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+  color: #2c6fb0;
+  transition: color 0.15s ease;
+}
+
+.produccion-stock-id-link:hover {
+  color: #173d73;
+  text-decoration: underline;
+}
+
+.produccion-stock-id-link strong {
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: -0.01em;
+}
+
+.produccion-stock-id-link small {
+  font-size: 0.72rem;
+  color: #6b7689;
+  font-weight: 500;
+}
+
 /* --- Ingredientes colapsable --- */
 .produccion-card-v2 .produccion-zone-ingredientes {
   background: rgba(255, 255, 255, 0.5);
@@ -7965,16 +8505,24 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
    Receta card v2 — zonas compactas con collapsibles
    =========================================================== */
 .receta-card-v2 {
-  align-items: flex-start;
-  padding: 10px 12px;
-  gap: 10px;
+  align-items: stretch;
+  padding: 8px 10px;
+  gap: 8px;
 }
 
 .receta-card-v2 .ingrediente-avatar {
-  width: 72px;
-  height: 72px;
+  width: 56px;
+  height: 56px;
   border-radius: 999px;
   flex-shrink: 0;
+}
+
+.receta-card-v2 .produccion-card-avatar {
+  width: 56px !important;
+  height: 56px !important;
+  min-width: 56px !important;
+  max-width: 56px !important;
+  margin-bottom: 0 !important;
 }
 
 .receta-card-v2 .ingrediente-avatar img,
@@ -7993,23 +8541,51 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 .receta-card-v2 .ingrediente-main {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 
 .receta-card-v2 .receta-card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 12px;
   padding-bottom: 6px;
   border-bottom: 1px solid rgba(31, 63, 130, 0.08);
 }
 
 .receta-card-v2 .receta-card-titles {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-width: 0;
+}
+
+.receta-card-v2 .receta-card-title-copy {
   display: grid;
-  gap: 2px;
+  gap: 4px;
+  min-width: 0;
+}
+
+.receta-card-v2 .receta-card-title-copy .receta-name {
+  font-size: 1.16rem !important;
+  line-height: 1.08;
+}
+
+.receta-card-v2 .receta-card-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+  min-width: 0;
+}
+
+.receta-card-v2 .receta-card-header-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -8018,6 +8594,47 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
+  justify-content: flex-end;
+}
+
+.receta-card-v2 .receta-card-quick-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.receta-card-v2 .receta-quick-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid rgba(31, 63, 130, 0.10);
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #1f3f82;
+  line-height: 1.1;
+}
+
+.receta-card-v2 .receta-quick-stat small {
+  color: #5b6d95;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.receta-card-v2 .receta-quick-stat strong {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.receta-card-v2 .receta-quick-stat.is-info {
+  background: #edf7ff;
+  border-color: #c8e3f7;
+  color: #2a4ea3;
 }
 
 .receta-card-v2 .receta-zone {
@@ -8025,7 +8642,7 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   flex-direction: column;
   gap: 4px;
   margin: 0;
-  padding: 6px 0 0;
+  padding: 4px 0 0;
   border-top: 1px dashed rgba(31, 63, 130, 0.10);
 }
 
@@ -8093,9 +8710,9 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 .receta-card-v2 .receta-zone-descripcion,
 .receta-card-v2 .receta-zone-etiquetado {
   background: rgba(255, 255, 255, 0.5);
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid rgba(31, 63, 130, 0.08);
-  padding: 4px 10px;
+  padding: 3px 9px;
   border-top: 1px solid rgba(31, 63, 130, 0.08);
 }
 
@@ -8180,7 +8797,7 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 
 .receta-card-v2 .receta-card-footer {
   border-top: 1px dashed rgba(31, 63, 130, 0.10);
-  padding-top: 6px;
+  padding-top: 4px;
   margin: 0;
 }
 
@@ -8193,13 +8810,48 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   color: #6c84b6;
 }
 
+.receta-card-v2 .recipe-row-actions {
+  display: flex;
+  flex-direction: column;
+  align-content: start;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px;
+  align-self: flex-start;
+  border-radius: 8px;
+}
+
+.receta-card-v2 .recipe-row-actions .family-manage-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+}
+
 @media (max-width: 520px) {
   .receta-card-v2 .ingrediente-avatar {
-    width: 56px;
-    height: 56px;
+    width: 48px;
+    height: 48px;
   }
-  .receta-card-v2 .receta-card-header-chips {
-    width: 100%;
+  .receta-card-v2 .produccion-card-avatar {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+  }
+  .receta-card-v2 .receta-card-header {
+    grid-template-columns: 1fr;
+  }
+  .receta-card-v2 .receta-card-header-side,
+  .receta-card-v2 .receta-card-header-chips,
+  .receta-card-v2 .receta-card-quick-stats {
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+  .receta-card-v2 .recipe-row-actions {
+    flex-direction: column;
+    width: auto;
+    overflow-x: visible;
   }
 }
 
@@ -12184,17 +12836,259 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   border-bottom: 1px solid #1f2937;
 }
 
-.weekly-sheet-table { width: 100%; border-collapse: collapse; table-layout: fixed; text-transform: uppercase;}
+.weekly-sheet-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  table-layout: fixed;
+  background: #ffffff;
+  border-radius: 0;
+  overflow: visible;
+  box-shadow: 0 2px 12px -6px rgba(15, 23, 42, 0.15);
+}
+
+.weekly-sheet-table th:nth-child(1),
+.weekly-sheet-table td:nth-child(1) {
+  width: 11%;
+}
+
+.weekly-sheet-table th:nth-child(2),
+.weekly-sheet-table td:nth-child(2) {
+  width: 11%;
+}
+
+.weekly-sheet-table th:nth-child(3),
+.weekly-sheet-table td:nth-child(3) {
+  width: 22%;
+}
 
 .weekly-sheet-table th,
 .weekly-sheet-table td {
-  border: 1px solid #334155;
-  padding: 5px 4px;
+  border-bottom: 1px solid #e3ebf6;
+  border-right: 1px solid #e3ebf6;
+  padding: 8px 6px;
   text-align: center;
   vertical-align: middle;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   text-transform: uppercase !important;
-  line-height: 1.15;
+  line-height: 1.2;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.weekly-sheet-table th:last-child,
+.weekly-sheet-table td:last-child {
+  border-right: none;
+}
+
+.weekly-sheet-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Headers: dos tonos (verde para cat/sub/producto, azul para días, gris para total). */
+.weekly-sheet-table th.th-cat {
+  background: #134e4a;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  padding: 10px 6px;
+}
+
+.weekly-sheet-table th.th-day {
+  background: #1e3a8a;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  padding: 10px 6px;
+}
+
+.weekly-sheet-table th.th-total {
+  background: #0f172a;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  padding: 10px 6px;
+}
+
+/* Categoría / Subcategoría: chip-style suave. */
+.weekly-sheet-table td.weekly-cat-cell {
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  color: #2c5e58;
+  background: #f0fdf4;
+  text-transform: uppercase !important;
+}
+
+.weekly-sheet-table td.weekly-cat-cell:nth-child(2) {
+  color: #4a5b78;
+  background: #f4f7fb;
+}
+
+/* Producto: alineado izquierda con foto + texto. */
+.weekly-sheet-table td.weekly-product-td {
+  font-size: 0.82rem;
+  text-align: left;
+  padding: 8px 10px;
+}
+
+.weekly-product-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  text-transform: none !important;
+}
+
+.weekly-product-cell img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e3ebf6;
+  flex-shrink: 0;
+}
+
+.weekly-product-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.2;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.weekly-product-text strong {
+  font-weight: 700;
+  font-size: 0.84rem;
+  letter-spacing: 0;
+  color: #0f172a;
+  text-transform: uppercase !important;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.weekly-product-text small {
+  font-size: 0.7rem;
+  font-weight: 500;
+  font-style: italic;
+  color: #7b5ea7;
+  text-transform: none !important;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
+/* Filas alternadas con un tinte muy suave para legibilidad. */
+.weekly-sheet-table tbody tr:nth-child(even) td:not(.weekly-cat-cell):not(.weekly-total):not(.is-ok):not(.is-missing) {
+  background: #fafbfc;
+}
+
+/* Celdas de días sin producción: tinte ámbar muy claro. */
+.weekly-sheet-table td.is-missing {
+  background: #fff8f1;
+  color: #b85c00;
+  font-weight: 500;
+  font-size: 0.75rem;
+  letter-spacing: 0;
+  text-transform: none !important;
+}
+
+/* Celdas con producción: verde fuerte. */
+.weekly-sheet-table td.is-ok {
+  background: #ecfdf5;
+  color: #065f46;
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+
+/* Total a la derecha: destacado azul. */
+.weekly-sheet-table .weekly-total {
+  font-weight: 800;
+  background: #dbeafe;
+  color: #1e3a8a;
+  font-size: 0.92rem;
+  letter-spacing: -0.01em;
+}
+
+/* Cabecera del bloque (FRIGORIFICO ... PLANILLA): más respiro. */
+.weekly-sheet-block {
+  margin-bottom: 24px;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.weekly-sheet-block h3,
+.weekly-sheet-block h4 {
+  text-align: center;
+  margin: 0 0 12px;
+  padding: 14px 16px;
+  border-radius: 0;
+}
+
+.weekly-sheet-block h3 {
+  background: #0f172a;
+  color: #ffffff;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  font-size: 1rem;
+}
+
+.weekly-sheet-block h4 {
+  background: #eef4ff;
+  color: #1e3a8a;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  padding: 10px 16px;
+  margin-top: -8px;
+  border-radius: 0;
+}
+
+.weekly-sheet-block,
+.weekly-sheet-block h3,
+.weekly-sheet-block h4,
+.weekly-sheet-table,
+.weekly-sheet-table th,
+.weekly-sheet-table td {
+  border-radius: 0 !important;
+}
+
+/* === Modal Producir: realce del nombre y nombre comercial del producto === */
+.produccion-editor-header .inventario-editor-name {
+  font-size: 1.85rem !important;
+  font-weight: 800 !important;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 4px 0 6px;
+  color: #173d73;
+}
+
+.produccion-editor-header .produccion-nombre-comercial-editor {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #7e5dbb;
+  margin: 0 0 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: #f3ecff;
+  border: 1px solid #ddd5ee;
+  border-radius: 999px;
+  width: fit-content;
+}
+
+.produccion-editor-header .produccion-nombre-comercial-editor::before {
+  content: "\f02b"; /* fa-tag */
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  font-size: 0.78rem;
+  opacity: 0.85;
 }
 
 .weekly-sheet-table th.th-cat { background: #14532d; color: #fff; }
@@ -12211,6 +13105,7 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   justify-content: flex-start;
   text-align: left;
   text-transform: uppercase !important;
+  width: 100%;
 }
 
 .weekly-product-cell img {
@@ -12218,6 +13113,7 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   height: 24px;
   border-radius: 999px;
   object-fit: cover;
+  flex: 0 0 auto;
 }
 
 /* =========================================
@@ -13161,14 +14057,31 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 .inventario-frozen-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 999px;
+  flex-wrap: wrap;
+  gap: 3px 5px;
+  max-width: 100%;
+  padding: 3px 8px;
+  border-radius: 7px;
   background: #d9ecff;
   color: #0c3a66;
   font-weight: 600;
   font-size: 0.72rem;
   border: 1px solid #5b9bd5;
+  line-height: 1.15;
+  vertical-align: top;
+}
+
+.inventario-frozen-meta {
+  display: inline-flex;
+  max-width: 100%;
+  margin-top: 3px;
+  vertical-align: top;
+}
+
+.inventario-frozen-since {
+  color: #28547b;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 /* Fila completa de un ingreso congelado: tinte celeste sutil + accent izquierdo. */
@@ -13644,6 +14557,222 @@ tr.inventario-row-frozen > td:first-child::before {
   font-size: 0.7rem;
   color: #6b7689;
   font-style: italic;
+}
+
+/* Toggle del panel colapsable de cobertura. */
+.produccion-missing-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 14px;
+  background: #fff8e6;
+  border: 1px solid #f0d692;
+  border-radius: 10px;
+  color: #6b4f16;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.produccion-missing-toggle.is-ok {
+  background: #effaf4;
+  border-color: #b6e0c8;
+  color: #1f6b4f;
+}
+
+.produccion-missing-toggle.is-warn {
+  background: #fff8e6;
+  border-color: #f0d692;
+  color: #6b4f16;
+}
+
+.produccion-missing-toggle:hover {
+  filter: brightness(0.98);
+}
+
+.produccion-missing-toggle-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.produccion-missing-body {
+  margin-top: 8px;
+  padding: 10px 12px 12px;
+  background: #fff8e6;
+  border: 1px solid #f0d692;
+  border-radius: 12px;
+}
+
+.produccion-missing-help {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  background: #eaf4ff;
+  border: 1px solid #b6d8ff;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  color: #2c6fb0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.produccion-missing-help.is-warn {
+  background: #fdebec;
+  border-color: #f3b9c1;
+  color: #8a2c39;
+}
+
+/* Línea "Con +X ingrediente podés producir +N kg" — sólo cuando OK pero
+   ese ingrediente sigue siendo bottleneck si pides más kg. */
+.produccion-missing-bottleneck {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  padding: 2px 8px;
+  background: #e7f1ff;
+  border: 1px solid #b6d8ff;
+  border-radius: 999px;
+  color: #2c6fb0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.produccion-missing-bottleneck i {
+  font-size: 0.65rem;
+}
+
+/* === Panel "Para producir más" (v2): sutil, debajo del máximo de la fecha ===
+   Colapsado por default. Sin grandes cajas, sin colores estridentes. */
+.produccion-missing-panel-v2 {
+  margin-top: 6px;
+}
+
+.produccion-missing-toggle-v2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 5px 10px;
+  background: transparent;
+  border: 1px dashed #c4d2e4;
+  border-radius: 8px;
+  color: #4f6aa3;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.produccion-missing-toggle-v2:hover {
+  background: #f3f6fb;
+  border-color: #5b7196;
+  color: #173d73;
+  border-style: solid;
+}
+
+.produccion-missing-toggle-v2 i.fa-lightbulb {
+  color: #d39c2b;
+  margin-right: 4px;
+}
+
+.produccion-missing-toggle-v2-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  color: #6b7689;
+  font-weight: 500;
+}
+
+.produccion-missing-body-v2 {
+  margin-top: 6px;
+  padding: 8px 12px;
+  background: #f8fbff;
+  border: 1px solid #d6e4f0;
+  border-radius: 8px;
+}
+
+.produccion-missing-tip-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 4px 0;
+  font-size: 0.82rem;
+  color: #2d3a52;
+  line-height: 1.4;
+}
+
+.produccion-missing-tip-line + .produccion-missing-tip-line {
+  border-top: 1px dashed #e3ebf6;
+}
+
+.produccion-missing-tip-line i {
+  color: #2c6fb0;
+  font-size: 0.78rem;
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.produccion-missing-tip-line strong {
+  color: #173d73;
+  font-weight: 700;
+}
+
+/* === Historial de producción colapsable en el editor === */
+.produccion-history-section .produccion-history-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 8px;
+  margin: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #173d73;
+  font-weight: 600;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.produccion-history-section .produccion-history-toggle:hover {
+  background: #f3f6fb;
+}
+
+.produccion-history-toggle-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.produccion-history-toggle-left .step-title-text {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.produccion-history-toggle-icon {
+  font-size: 0.78rem;
+  color: #5b7196;
+  transition: transform 0.2s ease;
+}
+
+.produccion-history-section[data-collapsed="false"] .produccion-history-toggle-icon {
+  transform: rotate(180deg);
+}
+
+.produccion-history-section[data-collapsed="true"] .produccion-recipe-history-body {
+  display: none;
+}
+
+.produccion-history-section[data-collapsed="false"] .produccion-recipe-history-body {
+  display: block;
+  margin-top: 8px;
 }
 
 .produccion-stat-mini-text strong {

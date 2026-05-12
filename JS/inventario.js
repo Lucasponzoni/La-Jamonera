@@ -420,7 +420,11 @@
 
   const frozenBadgeHtml = (entry) => {
     if (!isEntryFrozen(entry)) return '';
-    return '<span class="inventario-frozen-badge" title="Producto congelado al ingreso (vto. 60 días)"><i class="bi bi-snow2"></i> Congelado</span>';
+    const frozenAt = normalizeValue(entry?.frozenAt);
+    const frozenAtHtml = frozenAt
+      ? `<span class="inventario-frozen-since">desde ${escapeHtml(formatIsoDateEs(frozenAt))}</span>`
+      : '';
+    return `<span class="inventario-frozen-badge" title="Producto congelado al ingreso (vto. 60 días)"><i class="bi bi-snow2"></i><span>Congelado</span>${frozenAtHtml}</span>`;
   };
 
   const recordHasFrozenEntries = (record) =>
@@ -2446,7 +2450,7 @@
       const availableClass = Number(row.availableQty || 0) <= 0 ? 'is-zero' : '';
       const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(resolutionRow.at))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td></tr>` : '';
       return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
-        <td>${escapeHtml(row.entryDateTime)}${getExpiryBadgeHtml(row) ? `<br><small>${getExpiryBadgeHtml(row)}</small>` : ''}${isEntryFrozen(row) ? `<br><small>${frozenBadgeHtml(row)}${row.frozenAt ? ` <span class="text-muted">desde ${escapeHtml(formatIsoDateEs(row.frozenAt))}</span>` : ''}</small>` : ''}</td>
+        <td>${escapeHtml(row.entryDateTime)}${getExpiryBadgeHtml(row) ? `<br><small>${getExpiryBadgeHtml(row)}</small>` : ''}${isEntryFrozen(row) ? `<br><small class="inventario-frozen-meta">${frozenBadgeHtml(row)}</small>` : ''}</td>
         <td>${escapeHtml(row.ingredientName)}</td>
         <td><strong class="${expiredQtyClass}">${Number(row.qty || 0).toFixed(2)} ${escapeHtml(row.unit || '')}</strong><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${Number(row.availableQty || 0).toFixed(2)} ${escapeHtml(getMeasureAbbr(row.unit || ''))}${row.packageQty ? ` x${row.packageQty}` : ''}</span></td>
         <td>${escapeHtml(formatExpiryForUi(row))} </td>
@@ -4245,7 +4249,7 @@
       const hasMovements = getEntryUsages(entry).length > 0;
       return `
       <tr class="inventario-row-tone ${isEntryFrozen(entry) ? 'inventario-row-frozen' : ''} ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
-        <td>${formatEntryDateTime(entry.entryDate, entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}${isEntryFrozen(entry) ? `<br><small>${frozenBadgeHtml(entry)}${entry.frozenAt ? ` <span class="text-muted">desde ${escapeHtml(formatIsoDateEs(entry.frozenAt))}</span>` : ''}</small>` : ''}</td>
+        <td>${formatEntryDateTime(entry.entryDate, entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}${isEntryFrozen(entry) ? `<br><small class="inventario-frozen-meta">${frozenBadgeHtml(entry)}</small>` : ''}</td>
         <td>${escapeHtml(formatExpiryForUi(entry))} </td>
         <td><strong class="${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</strong><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td>
         <td>${escapeHtml(entry.invoiceNumber || '-')}</td>

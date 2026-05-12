@@ -585,15 +585,19 @@
 
   const fetchRecetas = async () => {
     await window.laJamoneraReady;
+    // SIEMPRE leemos /recetas (nodo real, full) en el modal de recetas.
+    // Antes leíamos /recetas_index/items primero, lo que populaba state.recetas
+    // con la versión lite (tableHtml="__indexed__"), y al guardar cualquier
+    // receta se sobrescribía /recetas con los placeholders, destruyendo las
+    // tablas nutricionales reales. Para listar rápido podríamos usar el index
+    // pero en este modal donde el usuario edita, necesitamos datos completos.
+    state.recetas = safeObject(await window.dbLaJamoneraRest.read('/recetas'));
     let indexed = null;
     try {
       indexed = await window.dbLaJamoneraRest.read('/recetas_index');
     } catch (error) {
       indexed = null;
     }
-    state.recetas = indexed?.items
-      ? safeObject(indexed.items)
-      : safeObject(await window.dbLaJamoneraRest.read('/recetas'));
     // Mismos grupos que comparte el modal Producción (Embutidos, Picadas, etc.).
     state.recipeGroups = indexed?.groups
       ? safeObject(indexed.groups)
@@ -621,19 +625,62 @@
     });
   };
 
+  // Hace un deep-merge donde "base" (datos REALES del nodo /recetas) gana sobre
+  // "lite" (versión liviana del index). Lite sólo aporta valores cuando base
+  // no los tiene. Esto evita que persistir el state lite por error destruya
+  // datos pesados como nutrition.ai.tableHtml.
+  const safeMergeRecipeForPersist = (base, lite, recipeIdToRefresh) => {
+    const result = { ...safeObject(base) };
+    Object.entries(safeObject(lite)).forEach(([key, liteValue]) => {
+      if (key === '__indexLite') return;
+      // Reglas defensivas: si el valor lite es un placeholder "__indexed__",
+      // descartarlo siempre (caso histórico — datos contaminados).
+      if (liteValue === '__indexed__') return;
+      const baseValue = base?.[key];
+      const isObjectMerge =
+        liteValue && typeof liteValue === 'object' && !Array.isArray(liteValue) &&
+        baseValue && typeof baseValue === 'object' && !Array.isArray(baseValue);
+      if (isObjectMerge) {
+        result[key] = safeMergeRecipeForPersist(baseValue, liteValue);
+      } else if (baseValue === undefined || baseValue === null || baseValue === '') {
+        // Base no tiene el campo → lite lo aporta.
+        result[key] = liteValue;
+      }
+      // Si base ya tiene un valor → lo dejamos y descartamos el de lite
+      // (porque base es la fuente de verdad).
+    });
+    return result;
+  };
+
   const persistRecetas = async () => {
     await window.laJamoneraReady;
-    const hasLiteRecipes = Object.values(safeObject(state.recetas)).some((item) => item?.__indexLite);
-    let payload = state.recetas;
-    if (hasLiteRecipes) {
+    // SIEMPRE releemos el /recetas full antes de persistir, así no escribimos
+    // placeholders / datos lite. La protección original confiaba en hasLiteRecipes
+    // pero un flag faltante o el state populado del index lite causaron pérdida
+    // de tablas nutricionales y otros datos pesados.
+    let payload = {};
+    try {
       const full = safeObject(await window.dbLaJamoneraRest.read('/recetas'));
-      payload = {};
       Object.entries(safeObject(state.recetas)).forEach(([id, recipe]) => {
-        const base = recipe?.__indexLite && full[id] ? safeObject(full[id]) : {};
-        const { __indexLite, ...cleanRecipe } = safeObject(recipe);
-        payload[id] = { ...base, ...cleanRecipe };
+        const baseFromDb = safeObject(full[id]);
+        // Si baseFromDb está vacío (receta nueva), usamos lo del state tal cual.
+        if (!Object.keys(baseFromDb).length) {
+          const { __indexLite, ...cleanRecipe } = safeObject(recipe);
+          payload[id] = cleanRecipe;
+          return;
+        }
+        // Si existe base, hacemos merge donde base gana.
+        payload[id] = safeMergeRecipeForPersist(baseFromDb, recipe);
       });
+      // Recetas borradas localmente (no aparecen en state pero sí en full)
+      // se respetan: no las incluimos en payload → write reemplaza /recetas
+      // con sólo lo que está en state. ESTE ES EL COMPORTAMIENTO DELIBERADO
+      // de toda app que sincroniza state→DB. Si querés que la borrada se
+      // mantenga local, hay que removerla también del state antes.
       state.recetas = payload;
+    } catch (error) {
+      console.warn('[Recetas] No se pudo leer /recetas para merge seguro. Persisto state actual.', error);
+      payload = state.recetas;
     }
     await window.dbLaJamoneraRest.write('/recetas', payload);
   };
@@ -641,9 +688,19 @@
   const ensureRecipeDetail = async (recipeId) => {
     const id = normalizeValue(recipeId);
     const current = safeObject(state.recetas?.[id]);
-    if (!id || !current.id || !current.__indexLite) return current;
+    if (!id) return current;
+    // SIEMPRE leemos el nodo real /recetas/{id} cuando hay que editar/abrir,
+    // no sólo cuando hay flag __indexLite. Antes confiábamos en el flag y eso
+    // fallaba cuando el index lite había sido escrito al nodo real (con
+    // placeholders tipo "__indexed__" en lugar del HTML real de la tabla
+    // nutricional).
     const detail = safeObject(await window.dbLaJamoneraRest.read(`/recetas/${id}`));
     if (detail.id || Object.keys(detail).length) {
+      // Limpiamos placeholders del index lite ("__indexed__") que pudieron
+      // haberse persistido al nodo real por error.
+      if (detail?.nutrition?.ai?.tableHtml === '__indexed__') {
+        detail.nutrition = { ...safeObject(detail.nutrition), ai: { ...safeObject(detail.nutrition?.ai), tableHtml: '' } };
+      }
       state.recetas[id] = { ...current, ...detail, id, __indexLite: false };
       return state.recetas[id];
     }
@@ -1185,36 +1242,33 @@
       const hasEtiquetado = hasFrontLabels || hasNutritionLabel;
       return `
         <article class="ingrediente-card receta-card receta-card-v2" data-receta-id="${item.id}">
-          <div class="ingrediente-avatar receta-thumb-wrap">
-            ${item.imageUrl
-              ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="receta-thumb js-receta-thumb" src="${item.imageUrl}" alt="${capitalize(item.title || 'Receta')}" loading="lazy">`
-              : getPlaceholderCircle()}
-          </div>
           <div class="ingrediente-main receta-main">
             <header class="receta-card-header">
               <div class="receta-card-titles">
-                <h6 class="ingrediente-name receta-name">${capitalize(item.title || 'Sin título')}</h6>
-                ${item.nombreComercial ? `<p class="receta-card-commercial"><i class="bi bi-tag"></i>${escapeHtml(capitalize(item.nombreComercial))}</p>` : ''}
-                <p class="receta-card-folder"><span aria-hidden="true">📁</span>${escapeHtml(groupLabel ? capitalize(groupLabel) : 'Sin carpeta')}</p>
+                <div class="produccion-card-avatar receta-card-avatar ingrediente-avatar receta-thumb-wrap">
+                  ${item.imageUrl
+                    ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="receta-thumb js-receta-thumb" src="${item.imageUrl}" alt="${capitalize(item.title || 'Receta')}" loading="lazy">`
+                    : getPlaceholderCircle()}
+                </div>
+                <div class="receta-card-title-copy">
+                  <h6 class="ingrediente-name receta-name">${capitalize(item.title || 'Sin título')}</h6>
+                  <div class="receta-card-meta-row">
+                    ${item.nombreComercial ? `<p class="produccion-nombre-comercial receta-card-commercial">${escapeHtml(capitalize(item.nombreComercial))}</p>` : ''}
+                    <p class="produccion-recipe-folder receta-card-folder"><span aria-hidden="true">📁</span>${escapeHtml(groupLabel ? capitalize(groupLabel) : 'Sin carpeta')}</p>
+                  </div>
+                </div>
               </div>
-              <div class="receta-card-header-chips">
-                <span class="receta-rnpa-badge ${rnpaStatus.className}"><i class="fa-solid ${rnpaStatus.icon}"></i>${rnpaStatus.label}</span>
-                ${daysHtml}
+              <div class="receta-card-header-side">
+                <div class="receta-card-header-chips">
+                  <span class="receta-rnpa-badge ${rnpaStatus.className}"><i class="fa-solid ${rnpaStatus.icon}"></i>${rnpaStatus.label}</span>
+                  ${daysHtml}
+                </div>
+                <div class="receta-card-quick-stats">
+                  <span class="receta-quick-stat"><small>Rinde</small><strong>${item.yieldQuantity || '0'} ${label || ''}</strong></span>
+                  ${item.frozenShelfLifeExtension ? `<span class="receta-quick-stat is-info"><small>Conservación</small><strong><i class="bi bi-snow2"></i> -18°C</strong></span>` : ''}
+                </div>
               </div>
             </header>
-
-            <section class="receta-zone receta-zone-datos">
-              <div class="receta-datos-row">
-                <div class="receta-datum">
-                  <small>Rinde</small>
-                  <strong>${item.yieldQuantity || '0'} ${label || ''}</strong>
-                </div>
-                ${item.frozenShelfLifeExtension ? `<div class="receta-datum is-info">
-                  <small>Conservación</small>
-                  <strong><i class="bi bi-snow2"></i> Extendido -18°C</strong>
-                </div>` : ''}
-              </div>
-            </section>
 
             <section class="receta-zone receta-zone-ingredientes" data-collapsed="true">
               <button type="button" class="receta-zone-toggle" data-toggle-receta-ingredientes="${item.id}">
@@ -3844,6 +3898,28 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
   const renderEditor = async (initial = null, editorSeed = null, options = {}) => {
     await fetchIngredientesData();
     const isNewRecipe = !initial || options.forceNew === true;
+    // SIEMPRE recargamos el detalle completo desde /recetas/{id} al editar
+    // (sin importar si el state tiene __indexLite o no), para evitar datos
+    // contaminados con placeholders del index liviano y para asegurar que
+    // tableHtml, frontLabels, etc., vengan completos del nodo real.
+    if (!isNewRecipe && initial?.id) {
+      try {
+        const full = await ensureRecipeDetail(initial.id);
+        if (full && (full.id || Object.keys(full).length)) {
+          initial = { ...initial, ...full, __indexLite: false };
+          // Sanity: si tableHtml quedó como placeholder, lo vaciamos para que
+          // el editor lo trate como "sin definir" y permita regenerar.
+          if (initial?.nutrition?.ai?.tableHtml === '__indexed__') {
+            initial = {
+              ...initial,
+              nutrition: { ...safeObject(initial.nutrition), ai: { ...safeObject(initial.nutrition?.ai), tableHtml: '' } }
+            };
+          }
+        }
+      } catch (error) {
+        console.warn('[Recetas] No se pudo cargar detalle completo para editar.', initial.id, error);
+      }
+    }
     const formInitial = initial || {};
 
     state.editor = editorSeed || {

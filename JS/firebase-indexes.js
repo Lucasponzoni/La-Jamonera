@@ -331,8 +331,18 @@
       rnpaExempt: Boolean(recipe.rnpaExempt),
       rnpaExemptReason: normalizeValue(recipe.rnpaExemptReason),
       nutrition: {
+        // Campos chicos de categorización: se usan en la planilla semanal y
+        // listados — vale la pena incluirlos en el lite.
+        productType: normalizeValue(recipe.nutrition?.productType),
+        category: normalizeValue(recipe.nutrition?.category),
+        subcategory: normalizeValue(recipe.nutrition?.subcategory),
         ai: {
-          tableHtml: normalizeValue(nutritionAi.tableHtml) ? '__indexed__' : '',
+          // NO usar placeholders como "__indexed__" — si por algún bug el
+          // lite se persistía al nodo real, sobrescribía la tabla nutricional
+          // real con el placeholder. Mejor flag booleano que indica que existe
+          // tabla en el nodo real, pero sin el HTML aquí.
+          hasTable: Boolean(normalizeValue(nutritionAi.tableHtml)),
+          tableHtml: '', // siempre vacío en lite — nunca debe overwritear el real
           frontLabels
         }
       },
