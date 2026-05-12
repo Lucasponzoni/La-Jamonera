@@ -933,19 +933,27 @@
     const todayIso = getArgentinaIsoDate();
     const entries = Array.isArray(record?.entries) ? record.entries : [];
     // Fallback para records lite (vienen de /inventario_index): si no hay
-    // entries, usamos el summary precomputado record.expiringEntries.
+    // entries, usamos el summary precomputado. El optimizador congela diffDays
+    // contra el today del momento de la build, así que lo recalculamos contra
+    // el today actual y descartamos los que ya cruzaron a vencido.
     if (!entries.length && Array.isArray(record?.expiringEntries) && record.expiringEntries.length) {
       return record.expiringEntries
-        .map((row) => ({
-          entryId: normalizeValue(row.entryId),
-          qty: Number(row.qty || 0),
-          unit: normalizeValue(row.unit) || record.stockUnit || 'kilos',
-          diffDays: Number(row.diffDays || 0),
-          expiryDate: normalizeValue(row.expiryDate),
-          lotNumber: normalizeValue(row.lotNumber),
-          packageQty: Number.isFinite(Number(row.packageQty)) ? Number(row.packageQty) : (record.packageQty || null)
-        }))
-        .filter((row) => row.qty > 0 && row.diffDays >= 0 && row.diffDays <= daysWindow)
+        .map((row) => {
+          const expiryDate = normalizeValue(row.expiryDate);
+          const diffDays = expiryDate
+            ? Math.round((new Date(`${expiryDate}T00:00:00`).getTime() - new Date(`${todayIso}T00:00:00`).getTime()) / 86400000)
+            : null;
+          return {
+            entryId: normalizeValue(row.entryId),
+            qty: Number(row.qty || 0),
+            unit: normalizeValue(row.unit) || record.stockUnit || 'kilos',
+            diffDays,
+            expiryDate,
+            lotNumber: normalizeValue(row.lotNumber),
+            packageQty: Number.isFinite(Number(row.packageQty)) ? Number(row.packageQty) : (record.packageQty || null)
+          };
+        })
+        .filter((row) => row.qty > 0 && Number.isFinite(row.diffDays) && row.diffDays >= 0 && row.diffDays <= daysWindow)
         .sort((a, b) => a.diffDays - b.diffDays);
     }
     return entries
@@ -975,19 +983,35 @@
     const todayIso = getArgentinaIsoDate();
     const entries = Array.isArray(record?.entries) ? record.entries : [];
     // Fallback para records lite (vienen de /inventario_index): si no hay
-    // entries, usamos el summary precomputado record.expiredEntries.
-    if (!entries.length && Array.isArray(record?.expiredEntries) && record.expiredEntries.length) {
-      return record.expiredEntries
-        .map((row) => ({
-          entryId: normalizeValue(row.entryId),
-          qty: Number(row.qty || 0),
-          unit: normalizeValue(row.unit) || record.stockUnit || 'kilos',
-          diffDays: Math.abs(Number(row.diffDays || 0)),
-          expiryDate: normalizeValue(row.expiryDate),
-          lotNumber: normalizeValue(row.lotNumber),
-          packageQty: Number.isFinite(Number(row.packageQty)) ? Number(row.packageQty) : (record.packageQty || null)
-        }))
-        .filter((row) => row.qty > 0)
+    // entries, usamos el summary precomputado. Mergeamos expiredEntries con los
+    // expiringEntries que ya cruzaron la fecha (el bucket del optimizador es
+    // del día en que se buildeó el índice) y recalculamos diffDays vs today.
+    const liteExpired = Array.isArray(record?.expiredEntries) ? record.expiredEntries : [];
+    const liteExpiring = Array.isArray(record?.expiringEntries) ? record.expiringEntries : [];
+    if (!entries.length && (liteExpired.length || liteExpiring.length)) {
+      const seen = new Set();
+      return [...liteExpired, ...liteExpiring]
+        .map((row) => {
+          const expiryDate = normalizeValue(row.expiryDate);
+          const diffDays = expiryDate
+            ? Math.abs(Math.round((new Date(`${todayIso}T00:00:00`).getTime() - new Date(`${expiryDate}T00:00:00`).getTime()) / 86400000))
+            : 0;
+          return {
+            entryId: normalizeValue(row.entryId),
+            qty: Number(row.qty || 0),
+            unit: normalizeValue(row.unit) || record.stockUnit || 'kilos',
+            diffDays,
+            expiryDate,
+            lotNumber: normalizeValue(row.lotNumber),
+            packageQty: Number.isFinite(Number(row.packageQty)) ? Number(row.packageQty) : (record.packageQty || null)
+          };
+        })
+        .filter((row) => {
+          if (row.qty <= 0 || !row.expiryDate || row.expiryDate >= todayIso) return false;
+          if (seen.has(row.entryId)) return false;
+          seen.add(row.entryId);
+          return true;
+        })
         .sort((a, b) => a.diffDays - b.diffDays);
     }
     return entries
