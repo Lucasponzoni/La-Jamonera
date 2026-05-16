@@ -5686,6 +5686,78 @@
       windows: totals.windows
     };
   };
+  const isSundayIso = (isoDate) => {
+    const text = normalizeDispatchDateToken(isoDate);
+    if (!text) return false;
+    const date = new Date(`${text}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.getUTCDay() === 0;
+  };
+  const moveIsoOffSundayWithinRange = (preferredIso, fromIso = '', toIso = '') => {
+    let candidate = normalizeDispatchDateToken(preferredIso);
+    const from = normalizeDispatchDateToken(fromIso);
+    const to = normalizeDispatchDateToken(toIso);
+    if (!candidate) return '';
+    if (from && candidate < from) candidate = from;
+    if (to && candidate > to) candidate = to;
+    if (!isSundayIso(candidate)) return candidate;
+    const next = addDaysToIso(candidate, 1);
+    if (next && (!to || next <= to)) return next;
+    const prev = addDaysToIso(candidate, -1);
+    if (prev && (!from || prev >= from)) return prev;
+    return '';
+  };
+  const getDispatchXlsxDateFixMeta = (row = {}) => {
+    if (!row || row.disabled) return { hasFix: false };
+    const recipeId = normalizeValue(row.mappedTargetId);
+    if (!recipeId || normalizeValue(row.mappedType) === 'ingredient') return { hasFix: false };
+    if (Array.isArray(row.mappedIngredients) && row.mappedIngredients.length) return { hasFix: false };
+    const mappedQty = Number(row.mappedQty || 0);
+    const availableQty = Number(row.mappedAvailableKg || 0);
+    const missingQty = Number(Math.max(0, mappedQty - availableQty).toFixed(4));
+    if (!Number.isFinite(mappedQty) || mappedQty <= 0.0001 || missingQty <= 0.0001) return { hasFix: false };
+    const dispatchDate = normalizeDispatchDateToken(row.invoiceDate) || toIsoDate();
+    const lots = buildRecipeLotsForDispatch(recipeId);
+    const buildMeta = (type, lot, preferredDate) => {
+      const from = normalizeDispatchDateToken(lot?.productionDate) || normalizeDispatchDateToken(preferredDate);
+      const to = normalizeDispatchDateToken(lot?.expiryDate);
+      const suggestedDate = moveIsoOffSundayWithinRange(preferredDate || from || to, from, to);
+      if (!suggestedDate) return { hasFix: false };
+      return {
+        hasFix: true,
+        type,
+        suggestedDate,
+        from,
+        to,
+        windowText: getDispatchLotWindowLabel(lot || { productionDate: from, expiryDate: to }),
+        availableKg: Number(lot?.availableKg || 0)
+      };
+    };
+    const futureQty = Number(row.mappedFutureQty || 0);
+    const nextAvailableDate = normalizeDispatchDateToken(row.mappedNextAvailableDate);
+    if (futureQty > 0.0001 && nextAvailableDate) {
+      const futureLots = lots
+        .filter((lot) => isDispatchLotFutureForDate(lot, dispatchDate))
+        .sort((a, b) => normalizeValue(a.productionDate).localeCompare(normalizeValue(b.productionDate)));
+      const futureLot = futureLots.find((lot) => Number(lot.availableKg || 0) >= missingQty - 0.0001)
+        || futureLots[0]
+        || { productionDate: nextAvailableDate, expiryDate: '' };
+      return buildMeta('future', futureLot, normalizeDispatchDateToken(futureLot.productionDate) || nextAvailableDate);
+    }
+    const expiredQty = Number(row.mappedExpiredQty || 0);
+    if (expiredQty >= missingQty - 0.0001) {
+      const expiredLots = lots
+        .filter((lot) => isDispatchLotExpiredForDate(lot, dispatchDate))
+        .sort((a, b) => {
+          const expiryA = normalizeValue(a.expiryDate) || '';
+          const expiryB = normalizeValue(b.expiryDate) || '';
+          if (expiryA !== expiryB) return expiryB.localeCompare(expiryA);
+          return normalizeValue(a.productionDate).localeCompare(normalizeValue(b.productionDate));
+        });
+      const expiredLot = expiredLots.find((lot) => Number(lot.availableKg || 0) >= missingQty - 0.0001) || expiredLots[0];
+      if (expiredLot) return buildMeta('expired', expiredLot, normalizeDispatchDateToken(expiredLot.expiryDate) || normalizeDispatchDateToken(expiredLot.productionDate));
+    }
+    return { hasFix: false };
+  };
   const getDispatchXlsxIngredientStockMeta = (ingredientId, dispatchDateIso = toIsoDate()) => {
     const inventoryItem = safeObject(state.inventario?.items?.[ingredientId]);
     const ingredient = safeObject(state.ingredientes?.[ingredientId]);
@@ -6212,16 +6284,7 @@
   };
   const getDispatchXlsxRowsNeedingDateFix = (draft) => {
     if (!draft || !Array.isArray(draft.rows)) return [];
-    return draft.rows.filter((row) => {
-      if (!row || row.disabled) return false;
-      if (!normalizeValue(row.mappedTargetId)) return false;
-      if (Array.isArray(row.mappedIngredients) && row.mappedIngredients.length) return false;
-      const mappedQty = Number(row.mappedQty || 0);
-      const availableQty = Number(row.mappedAvailableKg || 0);
-      const futureQty = Number(row.mappedFutureQty || 0);
-      const nextDate = normalizeValue(row.mappedNextAvailableDate);
-      return mappedQty - availableQty > 0.0001 && futureQty > 0.0001 && Boolean(nextDate);
-    });
+    return draft.rows.filter((row) => getDispatchXlsxDateFixMeta(row).hasFix);
   };
   const applyDispatchXlsxSuggestedDates = (draft, rowIds = []) => {
     if (!draft || !Array.isArray(draft.rows)) return 0;
@@ -6233,7 +6296,8 @@
       if (!pendingRows.length) break;
       let iterationChanged = 0;
       pendingRows.forEach((row) => {
-        const nextDate = normalizeDispatchDateToken(row.mappedNextAvailableDate);
+        const fixMeta = getDispatchXlsxDateFixMeta(row);
+        const nextDate = normalizeDispatchDateToken(fixMeta.suggestedDate || row.mappedNextAvailableDate);
         if (!nextDate || normalizeDispatchDateToken(row.invoiceDate) === nextDate) return;
         row.invoiceDate = nextDate;
         changed += 1;
@@ -6593,10 +6657,22 @@
     const resolutionPreview = buildDispatchXlsxResolutionPreview(draft);
     const rows = Array.isArray(draft.rows) ? draft.rows : [];
     const rowsNeedingDateFix = getDispatchXlsxRowsNeedingDateFix(draft);
+    const rowsNeedingDateFixIds = new Set(rowsNeedingDateFix.map((row) => normalizeValue(row.id)).filter(Boolean));
     const readyToProcess = rows.length > 0 && rows.every((row) => row.disabled || (normalizeValue(row.mappedTargetId) && isDispatchXlsxRowQtyValid(row)));
     const unrelatedRows = rows.filter((r) => !normalizeValue(r.mappedTargetId) && !r.disabled);
+    const conflictRows = rows.filter((row) => {
+      if (!row || row.disabled) return false;
+      if (!normalizeValue(row.mappedTargetId)) return true;
+      if (!isDispatchXlsxRowQtyValid(row)) return true;
+      if (rowsNeedingDateFixIds.has(normalizeValue(row.id))) return true;
+      const mappedIngredients = Array.isArray(row.mappedIngredients) ? row.mappedIngredients : [];
+      if (mappedIngredients.length) {
+        return mappedIngredients.some((item) => Number(item?.qty || 0) - Number(item?.available || 0) > 0.0001);
+      }
+      return Number(row.mappedQty || 0) - Number(row.mappedAvailableKg || 0) > 0.0001;
+    });
     const isFilteringUnrelated = state.dispatchXlsxFilter === 'unrelated_only';
-    const visibleRows = isFilteringUnrelated ? unrelatedRows : rows;
+    const visibleRows = isFilteringUnrelated ? conflictRows : rows;
     const xlsxPageSize = state.dispatchXlsxPageSize || 25;
     const xlsxTotalPages = Math.max(1, Math.ceil(visibleRows.length / xlsxPageSize));
     state.dispatchXlsxPage = Math.min(Math.max(1, state.dispatchXlsxPage || 1), xlsxTotalPages);
@@ -6651,6 +6727,7 @@
       const expiredQty = Number(row.mappedExpiredQty || 0);
       const futureQty = Number(row.mappedFutureQty || 0);
       const nextAvailableDate = normalizeValue(row.mappedNextAvailableDate);
+      const dateFixMeta = getDispatchXlsxDateFixMeta(row);
       const showFutureDateAlert = !mappedIngredients.length
         && (Number(row.mappedQty || 0) - Number(row.mappedAvailableKg || 0) > 0.0001)
         && futureQty > 0.0001
@@ -6721,10 +6798,10 @@
           const missingCreateQty = mappedIngredients.length
             ? mappedIngredients.reduce((acc, item) => acc + getResolvedMissingQty(item), 0)
             : resolvedProductMissingQty;
-          const createHint = missingCreateQty > 0.0001 && futureQty <= 0.0001
+          const createHint = missingCreateQty > 0.0001 && futureQty <= 0.0001 && !dateFixMeta.hasFix
             ? `<span class="dispatch-xlsx-stock-create"> Se creará ${escapeHtml(formatDispatchXlsxQtyWithUnit(missingCreateQty, mappedIngredients.length ? (mappedIngredients[0]?.unit || 'u') : stockUnit))} sin trazabilidad.</span>`
             : '';
-          const productResolveBtn = canResolveProductConflict
+          const productResolveBtn = canResolveProductConflict && !dateFixMeta.hasFix
             ? ` <button type="button" class="btn ios-btn ${productConflictResolutionType ? 'ios-btn-secondary' : 'ios-btn-danger'} dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="production" data-dispatch-xlsx-row="${escapeHtml(row.id)}">${productConflictResolutionType ? 'Cambiar elección' : 'Resolver conflicto'}</button>`
             : '';
           const dateHint = showFutureDateAlert
@@ -6743,7 +6820,7 @@
         : (row.mappedTargetTitle ? 'dispatch-xlsx-row-related' : 'dispatch-xlsx-row-pending');
       return `<tr class="${rowStateClass}"><td><div class="dispatch-xlsx-client"><strong class="dispatch-xlsx-client-name" title="${escapeHtml(row.clientName || '-')}">${escapeHtml(row.clientName || '-')}</strong>${clientBadge}</div></td><td class="dispatch-xlsx-invoice-cell">${escapeHtml(row.invoiceNumber || '-')}</td><td class="dispatch-xlsx-date-cell"><input class="form-control ios-input dispatch-xlsx-date-input" data-dispatch-xlsx-date="${escapeHtml(row.id)}" value="${escapeHtml(row.invoiceDate || '')}" placeholder="Fecha reparto"><small>${escapeHtml(dateLabel)}</small></td><td><div class="dispatch-xlsx-mapping"><strong>${escapeHtml(row.sourceProduct || '-')}</strong>${relationMeta}${ingredientDetail}<span class="dispatch-xlsx-map-state ${row.mappedTargetTitle ? 'is-related' : 'is-pending'}">${row.mappedTargetTitle ? `<i class="fa-solid fa-circle-check"></i> Relacionado` : `<i class="bi bi-x-circle-fill"></i> Sin relacionado`}</span></div></td><td class="dispatch-xlsx-kilos-cell"><span class="${qtyClass}">${qtyMap}</span><small class="d-block ${qtyClass}">${stockLine}</small></td><td><label class="dispatch-xlsx-toggle"><input type="checkbox" data-dispatch-xlsx-row-enabled="${escapeHtml(row.id)}" ${row.disabled ? '' : 'checked'}><span>${row.disabled ? 'Deshabilitado' : (rowQtyValid ? 'Activo' : 'Revisar')}</span></label></td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-xlsx-map="${escapeHtml(row.id)}"><i class="fa-solid fa-link"></i><span>Relacionar</span></button></td></tr>`;
     }).join('') : (rows.length
-      ? `<tr><td colspan="7" class="text-center">${isFilteringUnrelated ? 'No hay filas sin relación con el filtro activo.' : 'Sin filas en esta página.'}</td></tr>`
+      ? `<tr><td colspan="7" class="text-center">${isFilteringUnrelated ? 'No hay conflictos con el filtro activo.' : 'Sin filas en esta página.'}</td></tr>`
       : '<tr><td colspan="7" class="text-center">Adjuntá un XLS/XLSX para comenzar.</td></tr>');
     const uploadHint = state.dispatchXlsxUploadInProgress ? '<span class="dispatch-xlsx-uploading"><i class="fa-solid fa-spinner fa-spin"></i> Subiendo Excel...</span>' : '';
     const usersRows = Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-check" data-user-search="${escapeHtml(normalizeLower(`${user.fullName || ''} ${user.email || ''} ${getDispatchUserRole(user) || ''}`))}"><input type="checkbox" data-dispatch-xlsx-manager="${escapeHtml(user.id)}" value="${escapeHtml(user.id)}" ${(Array.isArray(draft.managers) && draft.managers.includes(user.id)) ? 'checked' : ''}>${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(getDispatchUserRole(user))}</small></span></label>`).join('');
@@ -6754,8 +6831,11 @@
     const fixAllDatesBtn = rowsNeedingDateFix.length
       ? `<button type="button" id="dispatchXlsxFixAllDatesBtn" class="btn recipe-table-action-btn recipe-table-action-btn-neutral"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Corregir fechas (${rowsNeedingDateFix.length})</span></button>`
       : "";
-    const conflictsBtn = unrelatedRows.length
-      ? `<div class="dispatch-xlsx-conflicts-wrap"><button id="dispatchXlsxConflictsBtn" type="button" class="btn recipe-table-action-btn recipe-table-action-btn-danger" aria-expanded="false" aria-controls="dispatchXlsxConflictsPanel"><i class="fa-solid fa-triangle-exclamation"></i><span>Conflictos</span><span class="dispatch-xlsx-conflicts-badge">${unrelatedRows.length}</span></button><div id="dispatchXlsxConflictsPanel" class="dispatch-xlsx-conflicts-panel d-none"><p class="dispatch-xlsx-conflicts-title">${unrelatedRows.length} fila(s) sin relación</p><button type="button" class="btn ios-btn ios-btn-secondary" id="dispatchXlsxConflictsDisableAll"><i class="fa-solid fa-ban"></i><span>Deshabilitar filas sin relación</span></button><button type="button" class="btn ios-btn ios-btn-secondary" id="dispatchXlsxConflictsFilterToggle"><i class="fa-solid fa-filter"></i><span>${isFilteringUnrelated ? 'Quitar filtro de conflictos' : 'Mostrar solo filas sin relación'}</span></button></div></div>`
+    const disableUnrelatedBtn = unrelatedRows.length
+      ? `<button type="button" class="btn ios-btn ios-btn-secondary" id="dispatchXlsxConflictsDisableAll"><i class="fa-solid fa-ban"></i><span>Deshabilitar filas sin relación</span></button>`
+      : '';
+    const conflictsBtn = conflictRows.length
+      ? `<div class="dispatch-xlsx-conflicts-wrap"><button id="dispatchXlsxConflictsBtn" type="button" class="btn recipe-table-action-btn recipe-table-action-btn-danger" aria-expanded="false" aria-controls="dispatchXlsxConflictsPanel"><i class="fa-solid fa-triangle-exclamation"></i><span>Conflictos</span><span class="dispatch-xlsx-conflicts-badge">${conflictRows.length}</span></button><div id="dispatchXlsxConflictsPanel" class="dispatch-xlsx-conflicts-panel d-none"><p class="dispatch-xlsx-conflicts-title">${conflictRows.length} fila(s) con conflicto</p>${disableUnrelatedBtn}<button type="button" class="btn ios-btn ios-btn-secondary" id="dispatchXlsxConflictsFilterToggle"><i class="fa-solid fa-filter"></i><span>${isFilteringUnrelated ? 'Quitar filtro de conflictos' : 'Mostrar solo conflictos'}</span></button></div></div>`
       : (isFilteringUnrelated
         ? `<button type="button" id="dispatchXlsxConflictsFilterToggle" class="btn recipe-table-action-btn recipe-table-action-btn-neutral"><i class="fa-solid fa-filter-circle-xmark"></i><span>Quitar filtro de conflictos</span></button>`
         : '');
@@ -6765,22 +6845,31 @@
     nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Repartos por XLSX</h6><div class="dispatch-xlsx-head-actions">${uploadHint}${conflictsBtn}${fixAllDatesBtn}<button id="dispatchXlsxUploadBtn" type="button" class="btn recipe-table-action-btn recipe-table-action-btn-monography"><i class="fa-solid fa-file-arrow-up"></i><span>Adjuntar XLSX</span></button><button type="button" id="dispatchXlsxHistoryBtn" class="btn recipe-table-action-btn recipe-table-action-btn-neutral"><i class="fa-regular fa-message"></i><span>Historial de Archivos</span></button></div><input id="dispatchXlsxFileInput" class="d-none" type="file" accept=".xlsx,.xls"></div><section class="recipe-step-card step-block produccion-dispatch-create"><h6 class="step-title"><span class="recipe-step-number">1</span> Previsualización importada ${draft.uploadedFileName ? `<small>· ${escapeHtml(draft.uploadedFileName)}</small>` : ''}</h6><div class="table-responsive recipe-table-wrap dispatch-products-table dispatch-xlsx-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0 dispatch-xlsx-table"><thead><tr><th>Cliente</th><th>Factura</th><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div>${xlsxPaginationHtml}</section>${vehicleManagersSection}<div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchXlsxProcessBtn" ${readyToProcess ? '' : 'disabled'}><i class="fa-solid fa-gears"></i><span>Procesar ingresos</span></button></div>`;
     nodes.dispatchView.querySelectorAll('.dispatch-xlsx-date-cell small').forEach((node) => node.remove());
     nodes.dispatchView.querySelectorAll('.dispatch-xlsx-stock-future').forEach((hint) => {
-      const row = hint.closest('tr');
-      if (!row) return;
       const stockCell = hint.closest('td');
       if (stockCell) {
         const separator = hint.previousSibling;
         if (separator && separator.nodeType === Node.ELEMENT_NODE && separator.tagName === 'BR') separator.remove();
         hint.remove();
       }
-      const rowId = normalizeValue(row.querySelector('[data-dispatch-xlsx-date]')?.dataset.dispatchXlsxDate);
-      if (!rowId || row.nextElementSibling?.classList.contains('dispatch-xlsx-date-alert-row')) return;
-      const sourceRow = rows.find((item) => normalizeValue(item.id) === rowId);
-      const nextDate = normalizeValue(sourceRow?.mappedNextAvailableDate);
+    });
+    rowsNeedingDateFix.forEach((sourceRow) => {
+      const rowId = normalizeValue(sourceRow?.id);
+      if (!rowId) return;
+      const dateInput = Array.from(nodes.dispatchView.querySelectorAll('[data-dispatch-xlsx-date]'))
+        .find((input) => normalizeValue(input.dataset.dispatchXlsxDate) === rowId);
+      const row = dateInput?.closest('tr');
+      if (!row || row.nextElementSibling?.classList.contains('dispatch-xlsx-date-alert-row')) return;
+      const fixMeta = getDispatchXlsxDateFixMeta(sourceRow);
+      const nextDate = normalizeDispatchDateToken(fixMeta.suggestedDate || sourceRow.mappedNextAvailableDate);
       if (!nextDate) return;
+      const selectedDate = normalizeDispatchDateToken(sourceRow.invoiceDate) || toIsoDate();
+      const reason = fixMeta.type === 'expired'
+        ? `No se puede repartir el ${escapeHtml(formatIsoEs(selectedDate))}: el lote esta vencido para esa fecha.`
+        : `No se puede repartir el ${escapeHtml(formatIsoEs(selectedDate))}: el lote todavia no estaba elaborado.`;
+      const windowText = normalizeValue(fixMeta.windowText) || `desde ${formatIsoEs(nextDate)}`;
       const alertRow = document.createElement('tr');
       alertRow.className = 'dispatch-xlsx-date-alert-row';
-      alertRow.innerHTML = `<td colspan="7"><div class="dispatch-xlsx-date-alert"><span class="dispatch-xlsx-date-alert-copy"><i class="fa-solid fa-calendar-days"></i><strong>Hay stock, pero se puede repartir desde ${escapeHtml(formatIsoEs(nextDate))}.</strong><span>Corregi la fecha de reparto para usar este lote.</span></span><button type="button" class="btn ios-btn ios-btn-secondary dispatch-xlsx-fix-date-btn" data-dispatch-xlsx-fix-date="${escapeHtml(rowId)}" data-dispatch-xlsx-next-date="${escapeHtml(nextDate)}"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Corregir fecha</span></button></div></td>`;
+      alertRow.innerHTML = `<td colspan="7"><div class="dispatch-xlsx-date-alert"><span class="dispatch-xlsx-date-alert-copy"><i class="fa-solid fa-calendar-days"></i><strong>${reason}</strong><span>Se puede repartir ${escapeHtml(windowText)}. Fecha sugerida: ${escapeHtml(formatIsoEs(nextDate))}.</span></span><button type="button" class="btn ios-btn ios-btn-secondary dispatch-xlsx-fix-date-btn" data-dispatch-xlsx-fix-date="${escapeHtml(rowId)}" data-dispatch-xlsx-next-date="${escapeHtml(nextDate)}"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Corregir fecha</span></button></div></td>`;
       row.insertAdjacentElement('afterend', alertRow);
     });
     if (hasImportedFile) prepareThumbLoaders('.js-produccion-user-photo');

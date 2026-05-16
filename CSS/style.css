@@ -1055,6 +1055,7 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
 
 .ingrediente-description {
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -5355,6 +5356,7 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   font-size: 0.78rem;
   line-height: 1.25;
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;

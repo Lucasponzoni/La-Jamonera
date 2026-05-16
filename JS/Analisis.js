@@ -88,7 +88,9 @@
     viewerImages: [],
     imageViewerIndex: 0,
     viewerScale: 1,
-    editingId: null
+    editingId: null,
+    editingOriginal: null,
+    editingOriginalPath: null
   };
 
   let datePicker         = null;
@@ -100,6 +102,8 @@
   // ── utils ──────────────────────────────────────────────────────────────────
   const normalizeValue = (v) => String(v || '').trim();
   const normalizeLower = (v) => normalizeValue(v).toLowerCase();
+  const normalizePin = (v) => normalizeValue(v);
+  const pinsMatch = (entered, stored) => normalizePin(entered) === normalizePin(stored);
   const makeId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const escapeHtml = (v) => String(v || '')
     .replaceAll('&', '&amp;').replaceAll('<', '&lt;')
@@ -145,12 +149,29 @@
   const getCurrentDate = () => datePicker?.selectedDates?.[0] || new Date();
 
   const fileIcon = (file) => {
-    const n = normalizeLower(file.name);
+    const n = normalizeLower(file?.name || file?.filename || '');
     if (n.endsWith('.pdf'))  return 'bi-file-earmark-pdf';
     if (n.endsWith('.doc') || n.endsWith('.docx')) return 'bi-file-earmark-word';
     if (n.endsWith('.xls') || n.endsWith('.xlsx') || n.endsWith('.csv')) return 'bi-file-earmark-excel';
     return 'bi-file-earmark-text';
   };
+
+  const getAttachmentName = (item) => item?.file?.name || item?.name || 'Adjunto';
+  const getAttachmentType = (item) => item?.type || (normalizeLower(getAttachmentName(item)).match(/\.(png|jpe?g|webp|gif)$/) ? 'image' : 'doc');
+  const getAttachmentPreviewUrl = (item) => item?.previewUrl || item?.url || '';
+  const getAttachmentSize = (item) => Number(item?.file?.size ?? item?.size ?? 0);
+  const getAttachmentMime = (item) => item?.file?.type || item?.mime || '';
+  const shouldRevokeAttachmentPreview = (item) => Boolean(item?.previewUrl && !item?.existing);
+  const toExistingAttachmentItem = (item) => ({
+    id: item?.id || makeId('att_saved'),
+    existing: true,
+    name: getAttachmentName(item),
+    type: getAttachmentType(item),
+    mime: getAttachmentMime(item),
+    size: getAttachmentSize(item),
+    url: item?.url || '',
+    previewUrl: getAttachmentType(item) === 'image' ? (item?.url || '') : ''
+  });
 
   const renderUserAvatar = (user) => {
     if (user.photoUrl) return `<span class="user-avatar-thumb"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-user-photo" src="${user.photoUrl}" alt="${escapeHtml(user.fullName)}"></span>`;
@@ -246,6 +267,15 @@
     }
   };
 
+  const loadUsers = async ({ force = false } = {}) => {
+    await window.laJamoneraReady;
+    if (force) window.dbLaJamoneraRest?.clearCache?.('/informes/users');
+    const users = await window.dbLaJamoneraRest.read('/informes/users');
+    state.users = (users && typeof users === 'object') ? users : {};
+    renderUsers();
+    return state.users;
+  };
+
   const openUserForm = async (initial = null) => {
     let pendingUpload = null;
     const result = await openSwal({
@@ -267,7 +297,7 @@
               <input id="aqUserEmail" class="swal2-input ios-input" type="email" autocomplete="off" placeholder="usuario@empresa.com" value="${initial ? escapeHtml(initial.email || '') : ''}">
               <label for="aqUserPin">Clave de 4 dígitos *</label>
               <div class="ios-input-group d-flex align-items-center px-2">
-                <input id="aqUserPin" class="swal2-input ios-input border-0 bg-transparent flex-grow-1" type="password" maxlength="4" inputmode="numeric" autocomplete="one-time-code" placeholder="4 dígitos" value="${initial ? escapeHtml(initial.pin) : ''}">
+                <input id="aqUserPin" class="swal2-input ios-input border-0 bg-transparent flex-grow-1" type="password" maxlength="4" inputmode="numeric" autocomplete="new-password" placeholder="4 dígitos" value="${initial ? escapeHtml(initial.pin) : ''}">
                 <button id="aqTogglePin" type="button" class="btn ios-toggle-pass" aria-label="Ver/ocultar"><i class="fa-solid fa-eye"></i></button>
               </div>
             </div>
@@ -339,16 +369,19 @@
       return;
     }
     analisisAttachmentsGrid.innerHTML = state.attachments.map((item, idx) => {
-      if (item.type === 'image') {
+      const itemType = getAttachmentType(item);
+      const itemName = getAttachmentName(item);
+      const itemUrl = getAttachmentPreviewUrl(item);
+      if (itemType === 'image') {
         return `<button type="button" class="attachment-card" data-view-image="${idx}">
           <span class="attachment-loader"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"></span>
-          <img src="${item.previewUrl}" alt="${escapeHtml(item.file.name)}" class="attachment-image js-attachment-preview">
+          <img src="${escapeHtml(itemUrl)}" alt="${escapeHtml(itemName)}" class="attachment-image js-attachment-preview">
         </button>`;
       }
-      const isPdf = normalizeLower(item.file.name).endsWith('.pdf');
+      const isPdf = normalizeLower(itemName).endsWith('.pdf');
       return `<div class="attachment-card attachment-doc${isPdf ? ' attachment-pdf' : ''}">
-        <i class="bi ${fileIcon(item.file)}"${isPdf ? ' style="color:#e74c3c;"' : ''}></i>
-        <span>${escapeHtml(item.file.name)}</span>
+        <i class="bi ${fileIcon(item.file || { name: itemName })}"${isPdf ? ' style="color:#e74c3c;"' : ''}></i>
+        <span>${escapeHtml(itemName)}</span>
         <button type="button" class="btn-close btn-close-sm" data-remove-attachment="${idx}" title="Quitar" style="margin-left:auto;"></button>
       </div>`;
     }).join('');
@@ -376,6 +409,7 @@
 
   const restoreDraft = () => {
     try {
+      if (state.editingId) return;
       const raw = localStorage.getItem(DRAFT_KEY);
       if (!raw) return;
       const d = JSON.parse(raw);
@@ -567,16 +601,16 @@ REGLAS:
     input: 'password',
     inputClass: 'ios-input informes-key-input',
     inputLabel: 'Ingresá la clave de 4 dígitos',
-    inputAttributes: { maxlength: 4, inputmode: 'numeric', autocomplete: 'one-time-code' },
+    inputAttributes: { maxlength: 4, inputmode: 'numeric', autocomplete: 'new-password' },
     confirmButtonText: 'Validar', showCancelButton: true, cancelButtonText: 'Cancelar',
     customClass: { popup: 'informes-key-alert' },
     didOpen: () => {
       const input = document.querySelector('.swal2-input.informes-key-input');
-      if (input) { input.setAttribute('autocomplete', 'one-time-code'); input.setAttribute('autocorrect', 'off'); input.setAttribute('autocapitalize', 'off'); input.setAttribute('spellcheck', 'false'); }
+      if (input) { input.setAttribute('autocomplete', 'new-password'); input.setAttribute('autocorrect', 'off'); input.setAttribute('autocapitalize', 'off'); input.setAttribute('spellcheck', 'false'); }
     },
     preConfirm: (val) => {
       if (!/^\d{4}$/.test(String(val || ''))) { Swal.showValidationMessage('La clave debe tener 4 dígitos numéricos.'); return false; }
-      return String(val);
+      return normalizePin(val);
     }
   });
 
@@ -591,7 +625,8 @@ REGLAS:
     if (!typeVal) { await openSwal({ title: 'Falta tipo', html: '<p>Seleccioná el tipo de análisis.</p>', icon: 'warning', confirmButtonText: 'Entendido' }); return; }
 
     const keyCheck = await promptUserKey();
-    if (!keyCheck.isConfirmed || keyCheck.value !== state.users[userId].pin) {
+    if (keyCheck.isConfirmed) await loadUsers({ force: true });
+    if (!keyCheck.isConfirmed || !pinsMatch(keyCheck.value, state.users[userId]?.pin)) {
       if (keyCheck.isConfirmed) await openSwal({ title: 'Clave incorrecta', html: '<p>No coincide la clave del usuario.</p>', icon: 'error', confirmButtonText: 'Entendido' });
       return;
     }
@@ -611,6 +646,16 @@ REGLAS:
       await window.laJamoneraReady;
       const attachmentsSaved = [];
       for (const item of state.attachments) {
+        if (item.existing) {
+          attachmentsSaved.push({
+            name: getAttachmentName(item),
+            type: getAttachmentType(item),
+            mime: getAttachmentMime(item),
+            size: getAttachmentSize(item),
+            url: item.url || getAttachmentPreviewUrl(item)
+          });
+          continue;
+        }
         const folder = item.type === 'image' ? 'images' : 'docs';
         const url = await uploadToStorage(item.file, `analisis_quimicos/${year}/${month}/${day}/${recordId}/${folder}`);
         attachmentsSaved.push({ name: item.file.name, type: item.type, mime: item.file.type, size: item.file.size, url });
@@ -620,14 +665,15 @@ REGLAS:
       const labValue = getLabValue();
       const basePath = `/analisis_quimicos/${year}/${month}/${day}/${recordId}`;
       const payload  = {
-        id: recordId, createdAt: Date.now(), reportDate: `${year}-${month}-${day}`,
+        id: recordId, createdAt: state.editingOriginal?.createdAt || Date.now(), updatedAt: Date.now(), reportDate: `${year}-${month}-${day}`,
         userId, userName: state.users[userId].fullName,
         userPosition: state.users[userId].position, userEmail: state.users[userId].email || '',
         analysisType: typeVal, analysisLabel: typeMeta.label,
         html, observations: normalizeValue(analisisObservations?.value),
         sampleId: normalizeValue(analisisSampleId?.value), laboratory: labValue,
         importance: Number(analisisImportanceRange?.value || 50),
-        attachments: attachmentsSaved, comments: {}
+        attachments: attachmentsSaved,
+        comments: state.editingOriginal?.comments || {}
       };
 
       await window.dbLaJamoneraRest.write(basePath, payload);
@@ -636,11 +682,16 @@ REGLAS:
         userId, userName: state.users[userId].fullName,
         analysisType: typeVal, analysisLabel: typeMeta.label,
         importance: payload.importance, createdAt: payload.createdAt,
-        attachmentsCount: attachmentsSaved.length, commentsCount: 0,
+        attachmentsCount: attachmentsSaved.length, commentsCount: Object.keys(state.editingOriginal?.comments || {}).length,
         sampleId: payload.sampleId, laboratory: labValue
       });
 
-      state.attachments.forEach((a) => { if (a.previewUrl) URL.revokeObjectURL(a.previewUrl); });
+      if (state.editingOriginalPath && state.editingOriginalPath !== basePath) {
+        await window.dbLaJamoneraRest.write(state.editingOriginalPath, null);
+        await window.dbLaJamoneraRest.write(`/analisis_quimicos_index/${state.editingOriginal.year}/${state.editingOriginal.month}/${state.editingOriginal.day}/${recordId}`, null);
+      }
+
+      state.attachments.forEach((a) => { if (shouldRevokeAttachmentPreview(a)) URL.revokeObjectURL(a.previewUrl); });
       state.attachments = [];
       renderAttachments();
       if (analisisEditor) analisisEditor.innerHTML = '';
@@ -650,6 +701,8 @@ REGLAS:
       selectAnalysisType('');
       updatePreview(); clearDraft();
       state.editingId = null;
+      state.editingOriginal = null;
+      state.editingOriginalPath = null;
 
       await loadRecordsBoard();
       renderLabSelect();
@@ -862,12 +915,16 @@ REGLAS:
     const record = state.records.find((r) => r.id === recordId);
     if (!record) return;
     const full = await ensureRecordDetail(record);
+    await loadUsers({ force: true });
     const keyCheck = await promptUserKey();
     if (!keyCheck.isConfirmed) return;
     const user = state.users[full.userId];
-    if (!user || keyCheck.value !== user.pin) {
+    if (!user || !pinsMatch(keyCheck.value, user.pin)) {
       await openSwal({ title: 'Clave incorrecta', html: '<p>No coincide la clave.</p>', icon: 'error', confirmButtonText: 'Entendido' }); return;
     }
+    state.editingId = recordId;
+    state.editingOriginal = full;
+    state.editingOriginalPath = `/analisis_quimicos/${full.year}/${full.month}/${full.day}/${recordId}`;
 
     const modal = bootstrap.Modal.getOrCreateInstance(analisisModal);
     modal.show();
@@ -880,14 +937,9 @@ REGLAS:
     if (full.analysisType) selectAnalysisType(full.analysisType);
     if (analisisUserSelect) analisisUserSelect.value = full.userId || '';
     renderLabSelect(full.laboratory || '');
-
-    state.editingId = recordId;
-
-    try {
-      await window.laJamoneraReady;
-      await window.dbLaJamoneraRest.write(`/analisis_quimicos/${full.year}/${full.month}/${full.day}/${recordId}`, null);
-      await window.dbLaJamoneraRest.write(`/analisis_quimicos_index/${full.year}/${full.month}/${full.day}/${recordId}`, null);
-    } catch (e) {}
+    state.attachments.forEach((a) => { if (shouldRevokeAttachmentPreview(a)) URL.revokeObjectURL(a.previewUrl); });
+    state.attachments = (Array.isArray(full.attachments) ? full.attachments : []).map(toExistingAttachmentItem);
+    renderAttachments();
 
     state.records = state.records.filter((r) => r.id !== recordId);
     applyFilters();
@@ -904,10 +956,11 @@ REGLAS:
       customClass: { confirmButton: 'ios-btn ios-btn-danger' }
     });
     if (!confirm.isConfirmed) return;
+    await loadUsers({ force: true });
     const keyCheck = await promptUserKey();
     if (!keyCheck.isConfirmed) return;
     const user = state.users[record.userId];
-    if (!user || keyCheck.value !== user.pin) {
+    if (!user || !pinsMatch(keyCheck.value, user.pin)) {
       await openSwal({ title: 'Clave incorrecta', html: '<p>No coincide la clave.</p>', icon: 'error', confirmButtonText: 'Entendido' }); return;
     }
     try {
@@ -1121,14 +1174,14 @@ REGLAS:
   analisisAttachmentsGrid?.addEventListener('click', (e) => {
     if (e.target.closest('[data-view-image]')) {
       const idx    = parseInt(e.target.closest('[data-view-image]').dataset.viewImage, 10);
-      const images = state.attachments.filter((a) => a.type === 'image').map((a) => ({ url: a.previewUrl, name: a.file.name }));
-      const imgIdx = state.attachments.slice(0, idx + 1).filter((a) => a.type === 'image').length - 1;
+      const images = state.attachments.filter((a) => getAttachmentType(a) === 'image').map((a) => ({ url: getAttachmentPreviewUrl(a), name: getAttachmentName(a) }));
+      const imgIdx = state.attachments.slice(0, idx + 1).filter((a) => getAttachmentType(a) === 'image').length - 1;
       openViewerWithImages(images, Math.max(0, imgIdx)); return;
     }
     if (e.target.closest('[data-remove-attachment]')) {
       const idx  = parseInt(e.target.closest('[data-remove-attachment]').dataset.removeAttachment, 10);
       const item = state.attachments[idx];
-      if (item?.previewUrl) URL.revokeObjectURL(item.previewUrl);
+      if (shouldRevokeAttachmentPreview(item)) URL.revokeObjectURL(item.previewUrl);
       state.attachments.splice(idx, 1);
       renderAttachments();
     }
@@ -1143,13 +1196,15 @@ REGLAS:
     if (analisisObservations)   analisisObservations.value = '';
     if (analisisSampleId)       analisisSampleId.value = '';
     if (analisisImportanceRange) { analisisImportanceRange.value = '50'; updateImportanceLabel(); }
-    state.attachments.forEach((a) => { if (a.previewUrl) URL.revokeObjectURL(a.previewUrl); });
+    state.attachments.forEach((a) => { if (shouldRevokeAttachmentPreview(a)) URL.revokeObjectURL(a.previewUrl); });
     state.attachments = [];
     renderAttachments();
     selectAnalysisType('');
     renderLabSelect();
     updatePreview(); clearDraft();
     state.editingId = null;
+    state.editingOriginal = null;
+    state.editingOriginalPath = null;
   });
 
   analisisFormatIABtn?.addEventListener('click', formatWithIA);
@@ -1158,10 +1213,7 @@ REGLAS:
   const loadData = async () => {
     setModalState('loading');
     try {
-      await window.laJamoneraReady;
-      const users = await window.dbLaJamoneraRest.read('/informes/users');
-      state.users = (users && typeof users === 'object') ? users : {};
-      renderUsers();
+      await loadUsers();
       renderAttachments();
       setModalState('data');
       renderLabSelect();
