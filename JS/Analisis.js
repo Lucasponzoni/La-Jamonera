@@ -735,6 +735,8 @@ REGLAS:
     const source = isFiltered ? state.filteredRecords : state.records;
     if (!source.length) { setBoardState('empty'); return; }
 
+    if (analisisCardsGrid) analisisCardsGrid.innerHTML = '';
+
     const total  = Math.max(1, Math.ceil(source.length / RECORDS_PER_PAGE));
     state.currentPage = Math.min(state.currentPage, total);
     const start  = (state.currentPage - 1) * RECORDS_PER_PAGE;
@@ -758,7 +760,7 @@ REGLAS:
         <td>${record.sampleId ? `<span class="sample-chip"><i class="fa-solid fa-vial"></i> ${escapeHtml(record.sampleId)}</span>` : '<span class="analisis-td-empty">—</span>'}</td>
         <td>${record.laboratory ? `<span class="analisis-lab-chip"><i class="fa-solid fa-flask"></i> ${escapeHtml(record.laboratory)}</span>` : '<span class="analisis-td-empty">—</span>'}</td>
         <td class="analisis-td-user"><strong>${escapeHtml(displayName)}</strong><small>${escapeHtml(user.position || record.userPosition || '')}</small></td>
-        <td><span class="importance-chip importance-${importance.tone}">${importance.label}</span></td>
+        <td style="white-space:nowrap;"><span class="importance-chip importance-${importance.tone}">${importance.label}</span></td>
         <td style="text-align:center;white-space:nowrap;">${attachments.length ? `<span class="informe-attach-chip"><i class="fa-solid fa-paperclip"></i> ${attachments.length}</span>` : '<span class="analisis-td-empty">—</span>'}</td>
         <td>
           <div class="analisis-table-actions">
