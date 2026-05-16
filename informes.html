@@ -66,6 +66,9 @@
                 <li class="nav-item">
                   <a class="nav-link topbar-link active" href="./informes.html" aria-current="page">Informes bromatológicos</a>
                 </li>
+                <li class="nav-item">
+                  <a class="nav-link topbar-link" href="./analisis.html">Análisis químicos</a>
+                </li>
               </ul>
 
               <div class="topbar-user dropdown">
@@ -220,6 +223,15 @@
                     </div>
                     </div>
                   </div>
+                  <!-- Botón IA -->
+                  <div class="ai-format-btn-wrap" style="display:flex;align-items:center;gap:10px;margin:8px 0;padding:10px 14px;border-radius:14px;background:linear-gradient(135deg,#f0f4ff,#f5f0ff);border:1.5px solid #c7d4f5;">
+                    <button id="informeFormatIABtn" type="button" class="btn ios-btn" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border:none;">
+                      <img src="./IMG/ia-unscreen.gif" alt="IA" style="width:22px;height:22px;object-fit:contain;">
+                      <span>Arreglar con IA</span>
+                    </button>
+                    <span style="font-size:0.78rem;color:#5a6a9a;flex:1;">Estructura el texto con títulos, subtítulos y resalta hallazgos importantes</span>
+                  </div>
+
                   <div id="informeEditor" class="informe-editor" contenteditable="true" aria-label="Editor de texto enriquecido" data-placeholder="Escribí el informe acá..."></div>
                 </div>
 

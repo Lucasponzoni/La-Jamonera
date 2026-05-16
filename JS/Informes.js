@@ -1107,12 +1107,15 @@
       informesPagination.innerHTML = '';
       return;
     }
-    let html = `<button class="btn ios-btn ios-btn-secondary" data-page="${Math.max(1, state.currentPage - 1)}">Anterior</button>`;
-    for (let page = 1; page <= totalPages; page += 1) {
-      html += `<button class="btn ios-btn ${page === state.currentPage ? 'ios-btn-primary' : 'ios-btn-secondary'}" data-page="${page}">${page}</button>`;
-    }
-    html += `<button class="btn ios-btn ios-btn-secondary" data-page="${Math.min(totalPages, state.currentPage + 1)}">Siguiente</button>`;
-    informesPagination.innerHTML = html;
+    const cur = state.currentPage;
+    const pages = Array.from({ length: totalPages }, (_, i) => i + 1)
+      .map((p) => `<li class="page-item${p === cur ? ' active' : ''}"><button class="page-link" data-page="${p}">${p}</button></li>`)
+      .join('');
+    informesPagination.innerHTML = `<nav aria-label="Paginación de informes"><ul class="pagination pagination-sm justify-content-center mb-0">
+      <li class="page-item${cur === 1 ? ' disabled' : ''}"><button class="page-link" data-page="${Math.max(1, cur - 1)}">‹</button></li>
+      ${pages}
+      <li class="page-item${cur === totalPages ? ' disabled' : ''}"><button class="page-link" data-page="${Math.min(totalPages, cur + 1)}">›</button></li>
+    </ul></nav>`;
   };
 
   const needsReportDetailForCard = (report = {}) => Boolean(
@@ -1604,6 +1607,84 @@
 
 
 
+  const callDeepseekIa = async (payload) => {
+    await window.laJamoneraReady;
+    const keyNode = await window.dbLaJamoneraRest.read('/deepseek/apiKey');
+    const apiKey  = typeof keyNode === 'string' ? normalizeValue(keyNode) : normalizeValue(keyNode?.apiKey);
+    if (!apiKey) throw new Error('Clave IA no configurada en Firebase.');
+    const corsNode   = await window.dbLaJamoneraRest.read('/deepseek');
+    const proxyUrl   = normalizeValue(corsNode?.url_corsh);
+    const proxyKey   = normalizeValue(corsNode?.cosh_api_key);
+    const ENDPOINT   = 'https://api.deepseek.com/chat/completions';
+    const doFetch    = (url, headers) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(payload) });
+    try {
+      const res = await doFetch(ENDPOINT, { Authorization: `Bearer ${apiKey}` });
+      if (res.ok) return res;
+      throw new Error(`IA ${res.status}`);
+    } catch (err) {
+      if (!proxyUrl) throw err;
+      const endpoint = `${proxyUrl}${proxyUrl.endsWith('/') ? '' : '/'}${ENDPOINT}`;
+      const headers  = { Authorization: `Bearer ${apiKey}` };
+      if (proxyKey) headers['x-cors-api-key'] = proxyKey;
+      const proxyRes = await doFetch(endpoint, headers);
+      if (!proxyRes.ok) throw new Error(`IA proxy ${proxyRes.status}`);
+      return proxyRes;
+    }
+  };
+
+  const formatInformeWithIA = async () => {
+    const editorHtml = normalizeValue(informeEditor?.innerHTML);
+    if (!editorHtml || editorHtml === '<br>') {
+      await openIosSwal({ title: 'Sin contenido', html: '<p>Escribí algo en el editor antes de usar la IA.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+      return;
+    }
+    const btn = document.getElementById('informeFormatIABtn');
+    const originalHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<img src="./IMG/Meta-ai-logo.webp" class="meta-spinner-login" style="width:20px;height:20px;object-fit:contain;"> Procesando...';
+    }
+    try {
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = editorHtml;
+      const plainText = (tempDiv.textContent || tempDiv.innerText || '').trim();
+      const payload = {
+        model: 'deepseek-chat',
+        temperature: 0.2,
+        messages: [
+          {
+            role: 'system',
+            content: `Sos un asistente especializado en informes bromatológicos. Formateá el texto en HTML estructurado profesional.
+
+REGLAS:
+1. <h3 style="color:#1f2a44;margin:14px 0 6px;font-size:1.05rem;font-weight:700;border-bottom:2px solid #e2e8f4;padding-bottom:4px;"> para títulos
+2. <h4 style="color:#2d4f8a;margin:10px 0 4px;font-size:0.92rem;font-weight:600;"> para subtítulos
+3. <p style="margin:0 0 8px;line-height:1.6;"> para párrafos
+4. <ul style="margin:4px 0 10px;padding-left:20px;"><li style="margin-bottom:4px;"> para listas
+5. <mark style="background:#fff3cd;padding:2px 4px;border-radius:3px;font-weight:600;"> para valores fuera de norma, alertas, no conformidades
+6. <mark style="background:#d4edda;padding:2px 4px;border-radius:3px;"> para valores conformes explícitos
+7. Mantené TODA la información original
+8. Respondé SOLO con HTML, sin markdown`
+          },
+          { role: 'user', content: `Formateá este informe bromatológico:\n\n${plainText}` }
+        ]
+      };
+      const response = await callDeepseekIa(payload);
+      const data = await response.json();
+      let content = data?.choices?.[0]?.message?.content || '';
+      content = content.replace(/^```html?\s*/i, '').replace(/\s*```$/i, '').trim();
+      if (!content) throw new Error('La IA no devolvió contenido.');
+      informeEditor.innerHTML = content;
+      updatePreview();
+      persistDraft();
+      window.laJamoneraNotify?.show({ type: 'success', title: 'Texto formateado', message: 'El informe fue estructurado correctamente.' });
+    } catch (err) {
+      await openIosSwal({ title: 'Error con IA', html: `<p>No se pudo conectar con la IA.</p><small style="color:#888;">${escapeHtml(err?.message || '')}</small>`, icon: 'error', confirmButtonText: 'Entendido' });
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+    }
+  };
+
   const findReportById = (reportId) => {
     const source = state.reports || [];
     return source.find((item) => item.id === reportId) || null;
@@ -1939,6 +2020,13 @@
             <button type="button" class="editor-btn" data-edit-cmd="justifyLeft"><i class="fa-solid fa-align-left"></i></button>
             <button type="button" class="editor-btn" data-edit-cmd="justifyCenter"><i class="fa-solid fa-align-center"></i></button>
           </div>
+          <div style="display:flex;align-items:center;gap:10px;margin:8px 0;padding:10px 14px;border-radius:14px;background:linear-gradient(135deg,#f0f4ff,#f5f0ff);border:1.5px solid #c7d4f5;">
+            <button type="button" id="editFormatIABtn" class="btn ios-btn" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border:none;">
+              <img src="./IMG/ia-unscreen.gif" alt="IA" style="width:22px;height:22px;object-fit:contain;">
+              <span>Arreglar con IA</span>
+            </button>
+            <span style="font-size:0.78rem;color:#5a6a9a;flex:1;">Estructura el texto con títulos, subtítulos y resalta hallazgos importantes</span>
+          </div>
           <div class="report-editor-scroll"><div id="editReportHtml" class="informe-editor" contenteditable="true">${report.html || ''}</div></div>
           <div class="importance-wrap mt-3">
             <label class="form-label" for="editImportanceRange">Importancia sanitaria</label>
@@ -1986,6 +2074,52 @@
             editEditor?.focus();
             document.execCommand(button.dataset.editCmd, false, null);
           });
+        });
+
+        popup.querySelector('#editFormatIABtn')?.addEventListener('click', async () => {
+          const currentHtml = normalizeValue(editEditor?.innerHTML);
+          if (!currentHtml || currentHtml === '<br>') return;
+          const btn = popup.querySelector('#editFormatIABtn');
+          const originalHtml = btn ? btn.innerHTML : '';
+          if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<img src="./IMG/Meta-ai-logo.webp" class="meta-spinner-login" style="width:20px;height:20px;object-fit:contain;"> Procesando...';
+          }
+          try {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = currentHtml;
+            const plainText = (tempDiv.textContent || tempDiv.innerText || '').trim();
+            const payload = {
+              model: 'deepseek-chat', temperature: 0.2,
+              messages: [
+                {
+                  role: 'system',
+                  content: `Sos un asistente especializado en informes bromatológicos. Formateá el texto en HTML estructurado profesional.
+
+REGLAS:
+1. <h3 style="color:#1f2a44;margin:14px 0 6px;font-size:1.05rem;font-weight:700;border-bottom:2px solid #e2e8f4;padding-bottom:4px;"> para títulos
+2. <h4 style="color:#2d4f8a;margin:10px 0 4px;font-size:0.92rem;font-weight:600;"> para subtítulos
+3. <p style="margin:0 0 8px;line-height:1.6;"> para párrafos
+4. <ul style="margin:4px 0 10px;padding-left:20px;"><li style="margin-bottom:4px;"> para listas
+5. <mark style="background:#fff3cd;padding:2px 4px;border-radius:3px;font-weight:600;"> para valores fuera de norma, alertas, no conformidades
+6. <mark style="background:#d4edda;padding:2px 4px;border-radius:3px;"> para valores conformes explícitos
+7. Mantené TODA la información original
+8. Respondé SOLO con HTML, sin markdown`
+                },
+                { role: 'user', content: `Formateá este informe:\n\n${plainText}` }
+              ]
+            };
+            const response = await callDeepseekIa(payload);
+            const data = await response.json();
+            let content = data?.choices?.[0]?.message?.content || '';
+            content = content.replace(/^```html?\s*/i, '').replace(/\s*```$/i, '').trim();
+            if (content && editEditor) editEditor.innerHTML = content;
+            window.laJamoneraNotify?.show({ type: 'success', title: 'Texto formateado', message: 'El informe fue estructurado correctamente.' });
+          } catch (err) {
+            window.laJamoneraNotify?.show({ type: 'error', title: 'Error con IA', message: err?.message || 'No se pudo conectar.' });
+          } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+          }
         });
 
         editImportanceRange?.addEventListener('input', updateEditImportanceLabel);
@@ -3073,6 +3207,8 @@
       applyDateFilter(null, null);
     });
   }
+
+  document.getElementById('informeFormatIABtn')?.addEventListener('click', formatInformeWithIA);
 
   informesModal.addEventListener('show.bs.modal', async () => {
     if (!datePicker && window.flatpickr) {
