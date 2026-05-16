@@ -933,6 +933,7 @@ REGLAS:
       title: 'Imprimir análisis', html: '<p>¿Incluir imágenes adjuntas?</p>',
       showDenyButton: true, showCancelButton: true,
       confirmButtonText: 'Con imágenes', denyButtonText: 'Sin imágenes', cancelButtonText: 'Cancelar',
+      scrollbarPadding: false, scrollBehavior: 'inside',
       customClass: { confirmButton: 'ios-btn ios-btn-success', denyButton: 'ios-btn ios-btn-secondary', cancelButton: 'ios-btn ios-btn-secondary' }
     });
     if (!choice.isConfirmed && !choice.isDenied) return;

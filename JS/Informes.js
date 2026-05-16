@@ -562,6 +562,7 @@
       confirmButtonText: 'Imprimir',
       denyButtonText: 'Descargar PDF',
       cancelButtonText: 'Cancelar',
+      scrollbarPadding: false, scrollBehavior: 'inside',
       customClass: {
         popup: 'informes-print-choice-alert',
         confirmButton: 'ios-btn ios-btn-primary',

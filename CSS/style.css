@@ -2838,6 +2838,7 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   border-radius: 999px;
   padding: 4px 10px;
   font-size: 0.82rem;
+  white-space: nowrap;
   font-weight: 700;
 }
 
@@ -6614,9 +6615,10 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   }
 
   .swal2-container {
-    padding: 0 !important;
+    padding: 0 0 max(8px, env(safe-area-inset-bottom, 0px)) 0 !important;
   }
 }
+
 
 .produccion-umbral-global-btn,
 .produccion-umbral-btn {
