@@ -8933,21 +8933,24 @@
       } else if (formatInput) {
         qtyInput.value = qty.toFixed(2);
       }
-      // Limpieza automática: si cambió la fecha y ahora hay lotes aptos para
-      // un ingrediente que estaba marcado como "sin trazabilidad", lo sacamos
-      // del set para no producir innecesariamente sin trazabilidad.
+      // Limpieza automática: si cambió la fecha y ahora hay lotes DIRECTOS
+      // (no sustitutos) aptos para un ingrediente que estaba marcado como
+      // "sin trazabilidad", lo sacamos del set. Usamos directCoverage para
+      // no descartar selecciones del usuario cuando sólo hay sustitutos.
       if (state.skipTraceIngredients instanceof Set && state.skipTraceIngredients.size > 0) {
         const reqMap = new Map((analysis.requirements || []).map((r) => [normalizeValue(r.ingredientId), r]));
         const qtyForCheck = qty;
         [...state.skipTraceIngredients].forEach((id) => {
           const key = normalizeValue(id);
           const req = reqMap.get(key);
-          if (!req) { state.skipTraceIngredients.delete(id); return; }
-          // Si la cobertura directa (lotes ok) ya alcanza la cantidad pedida → ya no se justifica el skip.
-          if (Number(req.coverage || 0) >= qtyForCheck - 0.0001) {
+          if (!req) return; // No tocamos si no encontramos requirement — preserva selección del usuario.
+          // Sólo limpiamos si la cobertura DIRECTA ya alcanza la cantidad pedida.
+          if (Number(req.directCoverage || 0) >= qtyForCheck - 0.0001) {
             state.skipTraceIngredients.delete(id);
           }
         });
+        // Re-sync el flag global con el set ya limpio.
+        state.sinTrazabilidad = state.skipTraceIngredients.size > 0;
       }
       state.editorPlan = buildPlanForRecipe(recipe, qty, productionDate, { sinTrazabilidad: state.sinTrazabilidad, skipTraceIngredients: state.skipTraceIngredients });
       lotsWrap.innerHTML = buildLotsBreakdownHtml(state.editorPlan);
@@ -9443,7 +9446,10 @@
           });
           if (action.isDismissed) return; // Cancelar — no produce.
           if (action.isDenied && suggestedDate) {
-            // Cambiar a fecha sugerida y revalidar.
+            // Cambiar a fecha sugerida y revalidar. Limpiamos cualquier marca
+            // previa de "sin trazabilidad" — la nueva fecha resuelve el bloqueo.
+            state.sinTrazabilidad = false;
+            if (state.skipTraceIngredients instanceof Set) state.skipTraceIngredients.clear();
             if (dateInput) {
               dateInput.value = suggestedDate;
               if (dateInput._flatpickr) dateInput._flatpickr.setDate(suggestedDate, false);
@@ -9452,13 +9458,10 @@
             return;
           }
           if (action.isConfirmed) {
-            // Activar sin trazabilidad para los ingredientes bloqueados.
-            state.sinTrazabilidad = true;
+            // Sin trazabilidad SÓLO para los ingredientes bloqueados — no global.
             if (!(state.skipTraceIngredients instanceof Set)) state.skipTraceIngredients = new Set();
-            blockedIngredients.forEach((b) => state.skipTraceIngredients.add(b.id));
+            blockedIngredients.forEach((b) => state.skipTraceIngredients.add(normalizeValue(b.id)));
             await updateEditorPlan();
-            // Re-entramos con flag showConfirmModal — el usuario ya pidió
-            // sin trazabilidad, mostramos el listado para revisar antes de guardar.
             return confirmProduction({ showConfirmModal: true });
           }
         }
@@ -9514,14 +9517,12 @@
         const fullName = normalizeValue(u.fullName || u.name || u.email || mid);
         return `<span class="pc-confirm-manager-chip"><i class="bi bi-person"></i> ${escapeHtml(fullName)}</span>`;
       }).join('');
-      const skipSet = state.skipTraceIngredients instanceof Set ? state.skipTraceIngredients : new Set();
+      // Confiamos en el flag del plan (`noTraceability`/`sinTrazabilidad`)
+      // que setea buildPlanForRecipe — refleja correctamente per-ingrediente.
       const summaryRows = (revalidated.ingredientPlans || []).map((row) => {
         const need = Number(row.requiredQty || row.neededQty || 0);
         const isInfinite = Boolean(row.infiniteStock);
-        // Sin-traz por ingrediente sólo si el usuario lo eligió manualmente,
-        // no por "infinite stock" (que es categoría aparte).
-        const isUserSkip = skipSet.has(normalizeValue(row.sourceIngredientId || row.ingredientId));
-        const sinTraz = !isInfinite && (isUserSkip || (state.sinTrazabilidad && !isInfinite));
+        const sinTraz = !isInfinite && Boolean(row.noTraceability || row.sinTrazabilidad);
         const lotsCount = (row.lots || []).filter((lot) => Number(lot.takeQty || 0) > 0.0001).length;
         let badge = '';
         if (isInfinite) {
@@ -9534,9 +9535,7 @@
         const rowClass = isInfinite ? 'is-infinite' : (sinTraz ? 'is-sin-traz' : '');
         return `<li class="${rowClass}"><strong>${escapeHtml(capitalize(row.ingredientName || ''))}</strong><span class="pc-confirm-qty">${need.toFixed(3)} kg</span>${badge}</li>`;
       }).join('');
-      // Contar ingredientes realmente bajo "sin trazabilidad" por el usuario
-      // (excluye infinite stock que es otra categoría).
-      const skipCount = (revalidated.ingredientPlans || []).filter((row) => !row.infiniteStock && (skipSet.has(normalizeValue(row.sourceIngredientId || row.ingredientId)) || (state.sinTrazabilidad && !row.infiniteStock))).length;
+      const skipCount = (revalidated.ingredientPlans || []).filter((row) => !row.infiniteStock && Boolean(row.noTraceability || row.sinTrazabilidad)).length;
       const sinTrazBanner = skipCount > 0
         ? `<div class="pc-confirm-warning"><i class="bi bi-exclamation-triangle-fill"></i><span>Se guardará <strong>sin trazabilidad</strong> ${skipCount} ingrediente${skipCount === 1 ? '' : 's'}. Revisá el listado antes de confirmar.</span></div>`
         : '';
