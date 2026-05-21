@@ -1210,10 +1210,23 @@
     renderRecipeGroups();
     const query = normalizeLower(state.search);
     const activeGroup = state.activeRecipeGroupId || 'all';
-    const baseSource = getRecetasArray()
-      .filter((item) => activeGroup === 'all' || normalizeValue(item?.recipeGroupId) === activeGroup)
-      .filter((item) => !query || normalizeLower(item.title).includes(query) || normalizeLower(item.nombreComercial).includes(query) || normalizeLower(item.description).includes(query) || normalizeLower(getRecipeGroupLabel(item)).includes(query))
+    const matchesQuery = (item) => !query
+      || normalizeLower(item.title).includes(query)
+      || normalizeLower(item.nombreComercial).includes(query)
+      || normalizeLower(item.description).includes(query)
+      || normalizeLower(getRecipeGroupLabel(item)).includes(query);
+    const allMatching = getRecetasArray()
+      .filter(matchesQuery)
       .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+    const inGroup = allMatching.filter((item) => activeGroup === 'all' || normalizeValue(item?.recipeGroupId) === activeGroup);
+    const outsideGroup = allMatching.filter((item) => activeGroup !== 'all' && normalizeValue(item?.recipeGroupId) !== activeGroup);
+    let helperHtml = '';
+    let baseSource = inGroup;
+    if (!inGroup.length && outsideGroup.length && query) {
+      const groupName = state.recipeGroups?.[activeGroup]?.name || '';
+      helperHtml = `<div class="ingrediente-empty-list with-illustration"><p class="ingrediente-empty-title">No hay recetas en "${escapeHtml(capitalize(groupName))}" con esa búsqueda.</p><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-search-all><i class="bi bi-lightning-charge"></i><span>Buscar en toda la base</span></button></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del grupo</strong> seleccionado</p>`;
+      baseSource = outsideGroup;
+    }
     updateRnpaFilterButtons(baseSource);
     renderRnpaAlert(baseSource);
 
@@ -1232,7 +1245,7 @@
     }
 
     const measureMap = new Map(getMeasureOptions().map((item) => [item.value, item.label]));
-    recetasList.innerHTML = source.map((item) => {
+    recetasList.innerHTML = helperHtml + source.map((item) => {
       const label = measureMap.get(normalizeLower(item.yieldUnit)) || capitalize(item.yieldUnit || '');
       const recipeIngredients = (Array.isArray(item.rows) ? item.rows : [])
         .filter((row) => row.type === 'ingredient' && normalizeValue(row.ingredientName))
@@ -4614,5 +4627,12 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     if (editBtn) return renderEditor(await ensureRecipeDetail(editBtn.dataset.recetaEdit));
     const deleteBtn = event.target.closest('[data-receta-delete]');
     if (deleteBtn) return removeRecipe(deleteBtn.dataset.recetaDelete);
+    // "Buscar en toda la base" cuando grupo activo y no hay matches.
+    if (event.target.closest('[data-recipe-search-all]')) {
+      state.activeRecipeGroupId = 'all';
+      renderRecipeGroups();
+      renderRecetas();
+      return;
+    }
   });
 })();

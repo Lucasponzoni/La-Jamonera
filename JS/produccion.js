@@ -2090,8 +2090,22 @@
       }
 
       const missing = Math.max(0, Number(remaining.toFixed(4)));
+      // Sin trazabilidad si: flag global activo, O el ingrediente está marcado
+      // individualmente en options.skipTraceIngredients (Set).
+      const skipSet = options.skipTraceIngredients instanceof Set ? options.skipTraceIngredients : null;
+      const isSkipped = skipSet ? skipSet.has(normalizeValue(requirement.ingredientId)) : false;
+      const sinTrazForThis = options.sinTrazabilidad || isSkipped;
+      // Marcamos los plans existentes del ingrediente como noTraceability si está skippeado.
+      if (isSkipped) {
+        ingredientPlans.forEach((p) => {
+          if (normalizeValue(p.sourceIngredientId || p.ingredientId) === normalizeValue(requirement.ingredientId)) {
+            p.noTraceability = true;
+            p.sinTrazabilidad = true;
+          }
+        });
+      }
       if (missing > 0.0001) {
-        if (options.sinTrazabilidad) {
+        if (sinTrazForThis) {
           const existingPlan = ingredientPlans.find((p) => normalizeValue(p.ingredientId) === normalizeValue(requirement.ingredientId) && !p.isSubstitute);
           if (existingPlan) {
             existingPlan.missingQty = Number((Number(existingPlan.missingQty || 0) + missing).toFixed(4));
@@ -8013,10 +8027,25 @@
     renderRecipeGroups();
     const query = normalizeLower(state.search);
     const activeGroup = state.activeRecipeGroupId || 'all';
-    const list = getRecipes()
-      .filter((item) => activeGroup === 'all' || normalizeValue(item?.recipeGroupId) === activeGroup)
-      .filter((item) => !query || normalizeLower(item.title).includes(query) || normalizeLower(item.description).includes(query) || normalizeLower(item.nombreComercial).includes(query) || normalizeLower(getRecipeGroupLabel(item)).includes(query))
+    const matchesQuery = (item) => !query
+      || normalizeLower(item.title).includes(query)
+      || normalizeLower(item.description).includes(query)
+      || normalizeLower(item.nombreComercial).includes(query)
+      || normalizeLower(getRecipeGroupLabel(item)).includes(query);
+    const allMatching = getRecipes()
+      .filter(matchesQuery)
       .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+    const inGroup = allMatching.filter((item) => activeGroup === 'all' || normalizeValue(item?.recipeGroupId) === activeGroup);
+    const outsideGroup = allMatching.filter((item) => activeGroup !== 'all' && normalizeValue(item?.recipeGroupId) !== activeGroup);
+    // Si filtro de grupo activo + búsqueda + 0 resultados en grupo + sí hay fuera
+    // → mostramos "Sin resultados en este grupo" + helper para ver toda la base.
+    let helperHtml = '';
+    let list = inGroup;
+    if (!inGroup.length && outsideGroup.length && query) {
+      const groupName = activeGroup === 'all' ? '' : (state.recipeGroups?.[activeGroup]?.name || '');
+      helperHtml = `<div class="ingrediente-empty-list with-illustration"><p class="ingrediente-empty-title">No hay resultados en "${escapeHtml(capitalize(groupName))}".</p><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-search-all><i class="bi bi-lightning-charge"></i><span>Buscar en toda la base</span></button></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del grupo</strong> seleccionado</p>`;
+      list = outsideGroup;
+    }
     if (!list.length) {
       nodes.list.innerHTML = '<div class="ingrediente-empty-list">No hay recetas para ese filtro.</div>';
       updateProduccionListScrollHint();
@@ -8204,7 +8233,7 @@
               </div>
             </section>
 
-            <section class="produccion-zone produccion-zone-ingredientes" data-collapsed="true">
+            <section class="produccion-zone produccion-zone-ingredientes" data-collapsed="${query ? 'false' : 'true'}">
               <button type="button" class="produccion-zone-toggle" data-toggle-ingredientes="${recipe.id}">
                 <span class="produccion-zone-toggle-left">
                   <i class="fa-solid fa-flask"></i>
@@ -8293,7 +8322,7 @@
         </section>`
       : '';
     const productExpiryAlertHtml = buildProductExpiryAlertHtml();
-    nodes.list.innerHTML = `${productExpiryAlertHtml}${draftsHtml}${cardsHtml}`;
+    nodes.list.innerHTML = `${productExpiryAlertHtml}${draftsHtml}${helperHtml}${cardsHtml}`;
     document.querySelectorAll('.js-produccion-thumb').forEach((image) => {
       const wrap = image.closest('.receta-thumb-wrap');
       image.addEventListener('error', () => {
@@ -8360,7 +8389,10 @@
       const hasSubstituteCoverage = !row.isSubstitute && plan.ingredientPlans.some((item) => item.isSubstitute && normalizeValue(item.sourceIngredientId) === normalizeValue(row.ingredientId) && Number(item.availableQty || 0) > 0.0001);
       const rowInfiniteStock = Boolean(row.infiniteStock || row.noTraceability);
       const hasMeaningfulMissing = Number(row.missingQty || 0) > 0.0005;
-      const toneClass = rowInfiniteStock ? 'is-infinite' : (hasMeaningfulMissing ? (hasSubstituteCoverage ? 'is-substitutable' : 'is-missing') : '');
+      const isSkippedIngredient = (state.skipTraceIngredients instanceof Set)
+        && state.skipTraceIngredients.has(normalizeValue(row.sourceIngredientId || row.ingredientId));
+      const toneClass = isSkippedIngredient ? 'is-sin-traz'
+        : (rowInfiniteStock ? 'is-infinite' : (hasMeaningfulMissing ? (hasSubstituteCoverage ? 'is-substitutable' : 'is-missing') : ''));
       const availableHtml = rowInfiniteStock
         ? '<span class="produccion-available-value">· Disponible <strong class="produccion-infinite-symbol">&infin;</strong></span>'
         : `<span class="produccion-available-value">· Disponible <strong>${formatCompactQty(row.availableQty, row.ingredientUnit)}</strong></span>`;
@@ -8370,8 +8402,9 @@
           <div class="produccion-lote-main">
             <img src="${state.ingredientes[row.ingredientId]?.imageUrl || FIAMBRES_IMAGE}" alt="${row.ingredientName}" class="produccion-lote-ingredient-image">
             <div>
-              <h6>${row.ingredientName}${hasSubstituteCoverage ? ' <span class="produccion-lote-substitute-state"><i class="fa-solid fa-link"></i> Disponible con sustitutos</span>' : ''}</h6>
+              <h6>${row.ingredientName}${hasSubstituteCoverage ? ' <span class="produccion-lote-substitute-state"><i class="fa-solid fa-link"></i> Disponible con sustitutos</span>' : ''}${isSkippedIngredient ? ' <span class="produccion-lote-sin-traz-badge"><i class="bi bi-exclamation-triangle-fill"></i> Sin trazabilidad</span>' : ''}</h6>
               ${row.isSubstitute ? `<p class="produccion-lote-substitute-line"><i class="fa-solid fa-link"></i> Sustituye a <strong>${escapeHtml(row.sourceIngredientName || row.sourceIngredientId || '')}</strong></p>` : ''}
+              ${isSkippedIngredient ? `<p class="produccion-lote-sin-traz-note"><i class="bi bi-exclamation-triangle-fill"></i> Este ingrediente se producirá <strong>sin trazabilidad</strong> — los faltantes no se descontarán de stock. <button type="button" class="produccion-lote-undo-skip" data-skip-trace-ingredient="${escapeHtml(row.sourceIngredientId || row.ingredientId)}" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-rotate-left"></i> Quitar</button></p>` : ''}
               <p>
                 <span class="produccion-needs-label">Necesita</span>
                 <strong class="produccion-needs-value">${formatCompactQty(row.neededQty, row.ingredientUnit)}</strong>
@@ -8395,8 +8428,16 @@
             <div><strong>Ingreso:</strong> ${formatIsoEs(lot.entryDate || '') || formatDateTime(lot.createdAt)}</div>
             <div><strong>Vence:</strong> ${formatExpiryHuman(lot.expiryDate)} ${normalizeLower(lot.expiryDate) === 'no perecedero' ? '' : getExpiryBadge(lot.expiryDate)}</div>
             <div><strong>Usar:</strong> ${formatCompactQty(lot.takeQty, lot.unit)}</div>
-            ${lot.status === 'expired' ? `<div class="produccion-lote-expired-help"><strong>Lote expirado:</strong> no se usará con fecha ${formatIsoEs(plan.productionDate)}. Cambiá la fecha o resolvelo manualmente ${formatValidProductionRange(lot.entryDate, lot.expiryDate)}.</div>` : ''}
-            ${lot.status === 'future' ? `<div class="produccion-lote-expired-help"><strong>Lote posterior a la fecha:</strong> ingresó el ${formatIsoEs(lot.entryDate || '')}. No se usará con fecha ${formatIsoEs(plan.productionDate)}; cambiá la producción a ${formatIsoEs(lot.entryDate || '')} o producí sin trazabilidad para el faltante.</div>` : ''}
+            ${lot.status === 'expired' ? `<div class="produccion-lote-expired-help"><strong>Lote expirado:</strong> no se usará con fecha ${formatIsoEs(plan.productionDate)}. Cambiá la fecha o resolvelo manualmente ${formatValidProductionRange(lot.entryDate, lot.expiryDate)}.</div>
+              <div class="produccion-lote-blocked-actions">
+                <button type="button" class="btn ios-btn ios-btn-secondary" data-set-production-date="${escapeHtml(lot.entryDate || '')}" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-calendar-day"></i><span>Cambiar fecha</span></button>
+                <button type="button" class="btn ios-btn ios-btn-warning" data-skip-trace-ingredient="${escapeHtml(lot.ingredientId)}" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-arrow-right"></i><span>Producir sin trazabilidad este ingrediente</span></button>
+              </div>` : ''}
+            ${lot.status === 'future' ? `<div class="produccion-lote-expired-help"><strong>Lote posterior a la fecha:</strong> ingresó el ${formatIsoEs(lot.entryDate || '')}. No se usará con fecha ${formatIsoEs(plan.productionDate)}; cambiá la producción a ${formatIsoEs(lot.entryDate || '')} o producí sin trazabilidad para el faltante.</div>
+              <div class="produccion-lote-blocked-actions">
+                <button type="button" class="btn ios-btn ios-btn-secondary" data-set-production-date="${escapeHtml(lot.entryDate || '')}" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-calendar-day"></i><span>Usar fecha ${formatIsoEs(lot.entryDate || '')}</span></button>
+                <button type="button" class="btn ios-btn ios-btn-warning" data-skip-trace-ingredient="${escapeHtml(lot.ingredientId)}" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-arrow-right"></i><span>Producir sin trazabilidad este ingrediente</span></button>
+              </div>` : ''}
             <div><strong class="produccion-provider-key">Proveedor:</strong> ${lot.provider || '-'}</div>
             <div><strong>Factura:</strong> ${lot.invoiceNumber || '-'}</div>
             <div class="produccion-lote-adjuntos-row"><strong>Adjuntos:</strong> ${lot.invoiceImageUrls.length
@@ -8500,7 +8541,7 @@
     const initialManagers = Array.isArray(ownDraft?.managers) ? ownDraft.managers : preferredManagers;
     state.pendingExpiryActions = isViewOnly ? {} : safeObject(ownDraft?.pendingExpiryActions);
     state.lotCollapseState = {};
-    state.editorPlan = buildPlanForRecipe(recipe, initialQty, initialDate, { sinTrazabilidad: state.sinTrazabilidad });
+    state.editorPlan = buildPlanForRecipe(recipe, initialQty, initialDate, { sinTrazabilidad: state.sinTrazabilidad, skipTraceIngredients: state.skipTraceIngredients });
     if (!isViewOnly) await ensureReservationForPlan(state.editorPlan);
     state.activeDraftId = isViewOnly ? '' : (ownDraft?.id || state.activeDraftId);
     nodes.editor.innerHTML = `
@@ -8892,7 +8933,23 @@
       } else if (formatInput) {
         qtyInput.value = qty.toFixed(2);
       }
-      state.editorPlan = buildPlanForRecipe(recipe, qty, productionDate, { sinTrazabilidad: state.sinTrazabilidad });
+      // Limpieza automática: si cambió la fecha y ahora hay lotes aptos para
+      // un ingrediente que estaba marcado como "sin trazabilidad", lo sacamos
+      // del set para no producir innecesariamente sin trazabilidad.
+      if (state.skipTraceIngredients instanceof Set && state.skipTraceIngredients.size > 0) {
+        const reqMap = new Map((analysis.requirements || []).map((r) => [normalizeValue(r.ingredientId), r]));
+        const qtyForCheck = qty;
+        [...state.skipTraceIngredients].forEach((id) => {
+          const key = normalizeValue(id);
+          const req = reqMap.get(key);
+          if (!req) { state.skipTraceIngredients.delete(id); return; }
+          // Si la cobertura directa (lotes ok) ya alcanza la cantidad pedida → ya no se justifica el skip.
+          if (Number(req.coverage || 0) >= qtyForCheck - 0.0001) {
+            state.skipTraceIngredients.delete(id);
+          }
+        });
+      }
+      state.editorPlan = buildPlanForRecipe(recipe, qty, productionDate, { sinTrazabilidad: state.sinTrazabilidad, skipTraceIngredients: state.skipTraceIngredients });
       lotsWrap.innerHTML = buildLotsBreakdownHtml(state.editorPlan);
       renderRecipeHistory();
       const expiredLotsCount = state.editorPlan.ingredientPlans.reduce((acc, row) => acc + row.lots.filter((lot) => lot.status === 'expired' && Number(lot.takeQty || 0) > 0.0001).length, 0);
@@ -8964,6 +9021,42 @@
         await openIosSwal({ title: 'Acción preparada', html: '<p>La resolución se aplicará al confirmar la producción.</p>', icon: 'success', confirmButtonText: 'Continuar' });
         return;
       }
+
+      // Cambiar fecha de producción al ISO del lote (entryDate del lote futuro
+      // o fin del rango válido del expirado).
+      const setDateBtn = event.target.closest('[data-set-production-date]');
+      if (setDateBtn) {
+        if (isViewOnly) return;
+        const newIso = normalizeValue(setDateBtn.dataset.setProductionDate);
+        if (!newIso) return;
+        if (dateInput) {
+          dateInput.value = newIso;
+          if (dateInput._flatpickr) dateInput._flatpickr.setDate(newIso, false);
+        }
+        await updateEditorPlan();
+        return;
+      }
+
+      // Toggle "sin trazabilidad" para un ingrediente puntual.
+      // Click una vez → marca, click otra vez → desmarca.
+      const skipTraceBtn = event.target.closest('[data-skip-trace-ingredient]');
+      if (skipTraceBtn) {
+        if (isViewOnly) return;
+        const ingredientId = normalizeValue(skipTraceBtn.dataset.skipTraceIngredient);
+        if (!ingredientId) return;
+        if (!(state.skipTraceIngredients instanceof Set)) state.skipTraceIngredients = new Set();
+        if (state.skipTraceIngredients.has(ingredientId)) {
+          state.skipTraceIngredients.delete(ingredientId);
+        } else {
+          state.skipTraceIngredients.add(ingredientId);
+        }
+        // Si hay al menos uno marcado, activamos el flag global sinTrazabilidad
+        // para que el plan use la rama correspondiente al persistir.
+        state.sinTrazabilidad = state.skipTraceIngredients.size > 0;
+        await updateEditorPlan();
+        return;
+      }
+
       const toggleBtn = event.target.closest('[data-lot-toggle]');
       if (toggleBtn && state.editorPlan) {
         const ingredientId = toggleBtn.dataset.lotToggle;
@@ -9296,11 +9389,81 @@
       await saveEditorDraft();
     });
     prepareThumbLoaders('.js-produccion-head-photo, .js-produccion-user-photo');
-    const confirmProduction = async () => {
+    const confirmProduction = async (opts = {}) => {
       await ensureInventoryDetailsForRecipe(recipe, { force: true });
       const qty = parsePositive(qtyInput.value, 0.1);
       const date = normalizeValue(dateInput.value) || toIsoDate();
-      const revalidated = buildPlanForRecipe(recipe, qty, date, { sinTrazabilidad: state.sinTrazabilidad });
+      const revalidated = buildPlanForRecipe(recipe, qty, date, { sinTrazabilidad: state.sinTrazabilidad, skipTraceIngredients: state.skipTraceIngredients });
+
+      // Prompt si hay ingredientes con SOLO lotes bloqueados (future/expired)
+      // y el usuario no resolvió (cambiar fecha o sin trazabilidad).
+      // Detectamos ingredientes con missingQty > 0 que tienen lotes future
+      // o expired disponibles pero ningún lote ok.
+      if (!state.sinTrazabilidad) {
+        const blockedIngredients = revalidated.ingredientPlans
+          .filter((row) => {
+            if (row.infiniteStock || row.noTraceability) return false;
+            const hasOkLot = (row.lots || []).some((lot) => lot.status === 'ok' || lot.status === 'soon');
+            const hasFutureLot = (row.lots || []).some((lot) => lot.status === 'future' && Number(lot.availableQty || 0) > 0.0001);
+            const hasExpiredStock = (row.lots || []).some((lot) => lot.status === 'expired' && Number(lot.availableQty || 0) > 0.0001);
+            const missing = Number(row.neededQty || row.requiredQty || 0) - (row.lots || []).reduce((acc, lot) => acc + Number(lot.takeQty || 0), 0);
+            return missing > 0.0001 && !hasOkLot && (hasFutureLot || hasExpiredStock);
+          })
+          .map((row) => ({
+            id: row.ingredientId,
+            name: row.ingredientName,
+            futureLot: (row.lots || []).find((lot) => lot.status === 'future' && Number(lot.availableQty || 0) > 0.0001),
+            expiredLot: (row.lots || []).find((lot) => lot.status === 'expired' && Number(lot.availableQty || 0) > 0.0001)
+          }));
+        if (blockedIngredients.length) {
+          const listHtml = blockedIngredients.map((b) => {
+            const sugDate = b.futureLot?.entryDate || '';
+            return `<li><strong>${escapeHtml(capitalize(b.name))}</strong>${sugDate ? ` — lote disponible desde ${escapeHtml(formatIsoEs(sugDate))}` : (b.expiredLot ? ' — sólo lotes vencidos' : '')}</li>`;
+          }).join('');
+          // Si hay varios ingredientes bloqueados con distintas fechas futuras,
+          // sugerimos la MÁS TARDÍA (la que garantiza que todos tengan stock).
+          const futureDates = blockedIngredients.map((b) => b.futureLot?.entryDate).filter(Boolean).sort();
+          const suggestedDate = futureDates.length ? futureDates[futureDates.length - 1] : '';
+          const action = await openIosSwal({
+            title: 'Hay ingredientes bloqueados',
+            html: `<p>Estos ingredientes no tienen lotes aptos para <strong>${escapeHtml(formatIsoEs(date))}</strong>:</p><ul style="text-align:left;margin:8px 0;">${listHtml}</ul><p>¿Cómo continuamos?</p>`,
+            icon: 'warning',
+            showCancelButton: true,
+            showDenyButton: Boolean(suggestedDate),
+            confirmButtonText: 'Sin trazabilidad',
+            denyButtonText: suggestedDate ? `Usar ${formatIsoEs(suggestedDate)}` : 'Cambiar fecha',
+            cancelButtonText: 'Cancelar',
+            width: 600,
+            customClass: {
+              popup: 'produccion-blocked-alert',
+              confirmButton: 'ios-btn ios-btn-warning',
+              denyButton: 'ios-btn ios-btn-secondary',
+              cancelButton: 'ios-btn ios-btn-secondary'
+            }
+          });
+          if (action.isDismissed) return; // Cancelar — no produce.
+          if (action.isDenied && suggestedDate) {
+            // Cambiar a fecha sugerida y revalidar.
+            if (dateInput) {
+              dateInput.value = suggestedDate;
+              if (dateInput._flatpickr) dateInput._flatpickr.setDate(suggestedDate, false);
+            }
+            await updateEditorPlan();
+            return;
+          }
+          if (action.isConfirmed) {
+            // Activar sin trazabilidad para los ingredientes bloqueados.
+            state.sinTrazabilidad = true;
+            if (!(state.skipTraceIngredients instanceof Set)) state.skipTraceIngredients = new Set();
+            blockedIngredients.forEach((b) => state.skipTraceIngredients.add(b.id));
+            await updateEditorPlan();
+            // Re-entramos con flag showConfirmModal — el usuario ya pidió
+            // sin trazabilidad, mostramos el listado para revisar antes de guardar.
+            return confirmProduction({ showConfirmModal: true });
+          }
+        }
+      }
+
       const revalidatedExpiredLots = revalidated.ingredientPlans.reduce((acc, row) => acc + row.lots.filter((lot) => lot.status === 'expired' && Number(lot.takeQty || 0) > 0.0001).length, 0);
       if (revalidatedExpiredLots > 0) {
         await openIosSwal({
@@ -9341,21 +9504,42 @@
         }
         return;
       }
-      const managerSummary = managers.map((token) => {
-        const manager = getManagerDisplay(token);
-        return `${escapeHtml(manager.name)} (${escapeHtml(manager.role)})`;
-      }).join('<br>');
       const productExpiry = addDaysToIso(date, Number(recipe.shelfLifeDays || 0));
-      const summaryRows = buildProductionConfirmSummaryRows(revalidated.ingredientPlans);
-      const qtyGrams = Number((qty * 1000).toFixed(3));
-      const sinTrazIngredients = revalidated.ingredientPlans.filter((p) => p.sinTrazabilidad);
-      const sinTrazBanner = state.sinTrazabilidad && sinTrazIngredients.length
-        ? `<div class="produccion-sin-traz-banner" style="margin:0;border-radius:0;border-left:none;border-right:none;border-top:none"><i class="bi bi-exclamation-triangle-fill"></i><div><strong>Sin trazabilidad parcial</strong>${sinTrazIngredients.map((p) => escapeHtml(p.ingredientName)).join(', ')} no serán trazados.</div></div>`
-        : '';
-      const managersHtml = managers.map((token) => {
-        const mgr = getManagerDisplay(token);
-        return `<span class="pc-confirm-manager-pill"><i class="bi bi-person-fill"></i>${escapeHtml(mgr.name)}${mgr.role ? ` <small style="opacity:.7">· ${escapeHtml(mgr.role)}</small>` : ''}</span>`;
+      const qtyGrams = qty * 1000;
+      // Modal "Confirmar producción final" se muestra SIEMPRE.
+      const hasSkipTrace = state.skipTraceIngredients instanceof Set && state.skipTraceIngredients.size > 0;
+      const usersMap = safeObject(state.users);
+      const managersHtml = managers.map((mid) => {
+        const u = Object.values(usersMap).find((x) => normalizeValue(x.id) === mid || normalizeValue(x.email) === mid) || {};
+        const fullName = normalizeValue(u.fullName || u.name || u.email || mid);
+        return `<span class="pc-confirm-manager-chip"><i class="bi bi-person"></i> ${escapeHtml(fullName)}</span>`;
       }).join('');
+      const skipSet = state.skipTraceIngredients instanceof Set ? state.skipTraceIngredients : new Set();
+      const summaryRows = (revalidated.ingredientPlans || []).map((row) => {
+        const need = Number(row.requiredQty || row.neededQty || 0);
+        const isInfinite = Boolean(row.infiniteStock);
+        // Sin-traz por ingrediente sólo si el usuario lo eligió manualmente,
+        // no por "infinite stock" (que es categoría aparte).
+        const isUserSkip = skipSet.has(normalizeValue(row.sourceIngredientId || row.ingredientId));
+        const sinTraz = !isInfinite && (isUserSkip || (state.sinTrazabilidad && !isInfinite));
+        const lotsCount = (row.lots || []).filter((lot) => Number(lot.takeQty || 0) > 0.0001).length;
+        let badge = '';
+        if (isInfinite) {
+          badge = '<span class="pc-confirm-infinite-badge"><i class="bi bi-infinity"></i> Stock infinito</span>';
+        } else if (sinTraz) {
+          badge = '<span class="pc-confirm-sin-traz-badge">Sin trazabilidad</span>';
+        } else if (lotsCount) {
+          badge = `<small class="pc-confirm-lots-count">${lotsCount} lote${lotsCount === 1 ? '' : 's'}</small>`;
+        }
+        const rowClass = isInfinite ? 'is-infinite' : (sinTraz ? 'is-sin-traz' : '');
+        return `<li class="${rowClass}"><strong>${escapeHtml(capitalize(row.ingredientName || ''))}</strong><span class="pc-confirm-qty">${need.toFixed(3)} kg</span>${badge}</li>`;
+      }).join('');
+      // Contar ingredientes realmente bajo "sin trazabilidad" por el usuario
+      // (excluye infinite stock que es otra categoría).
+      const skipCount = (revalidated.ingredientPlans || []).filter((row) => !row.infiniteStock && (skipSet.has(normalizeValue(row.sourceIngredientId || row.ingredientId)) || (state.sinTrazabilidad && !row.infiniteStock))).length;
+      const sinTrazBanner = skipCount > 0
+        ? `<div class="pc-confirm-warning"><i class="bi bi-exclamation-triangle-fill"></i><span>Se guardará <strong>sin trazabilidad</strong> ${skipCount} ingrediente${skipCount === 1 ? '' : 's'}. Revisá el listado antes de confirmar.</span></div>`
+        : '';
       const confirm = await openIosSwal({
         title: 'Confirmar producción final',
         html: `<div class="text-start produccion-confirm-summary produccion-confirm-card">
@@ -9756,6 +9940,13 @@
 
   nodes.list.addEventListener('scroll', updateProduccionListScrollHint);
   nodes.list.addEventListener('click', async (event) => {
+    // "Buscar en toda la base" cuando filtro de grupo activo y no hay matches.
+    if (event.target.closest('[data-prod-search-all]')) {
+      state.activeRecipeGroupId = 'all';
+      renderRecipeGroups();
+      renderList();
+      return;
+    }
     const expiryToggle = event.target.closest('[data-product-expiry-toggle]');
     if (expiryToggle) {
       const card = expiryToggle.closest('[data-production-expiry-alert]');
@@ -10720,27 +10911,54 @@
       const date = normalizeValue(row.productionDate);
       return date && date >= range.from && date <= range.to;
     });
+    // Alinear segmentos a semanas calendario (Lunes a Domingo) que CONTIENEN
+    // el range elegido. Así, aunque el usuario elija "Mié 13 a Vie 22" o sólo
+    // "Lun a Vie", siempre evaluamos la semana entera para detectar producción
+    // en sábado/domingo. Si hay producción en finde, se muestran esos días.
+    const toIsoDateFromObj = (d) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+    const mondayOf = (iso) => {
+      const d = new Date(`${iso}T00:00:00`);
+      const w = d.getDay(); // 0=Dom, 1=Lun ... 6=Sab
+      const offsetToMonday = w === 0 ? -6 : 1 - w;
+      d.setDate(d.getDate() + offsetToMonday);
+      return toIsoDateFromObj(d);
+    };
+    const sundayOf = (iso) => {
+      const d = new Date(`${iso}T00:00:00`);
+      const w = d.getDay();
+      const offsetToSunday = w === 0 ? 0 : 7 - w;
+      d.setDate(d.getDate() + offsetToSunday);
+      return toIsoDateFromObj(d);
+    };
     const segments = [];
-    let cursor = range.from;
-    while (cursor && cursor <= range.to) {
-      const segEndCandidate = addIsoDays(cursor, 6);
-      const segEnd = segEndCandidate > range.to ? range.to : segEndCandidate;
+    let cursor = mondayOf(range.from);
+    const lastSunday = sundayOf(range.to);
+    while (cursor && cursor <= lastSunday) {
+      const segEnd = addIsoDays(cursor, 6); // Lun + 6 = Dom
       segments.push({ start: cursor, end: segEnd });
       cursor = addIsoDays(segEnd, 1);
     }
     const dayLabelByIndex = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     const html = `<div class="weekly-production-sheet">${segments.map((segment, idx) => {
+      // Semana completa Lun-Dom para evaluar producción.
       const dayIsos = [];
       let d = segment.start;
       while (d && d <= segment.end) {
         dayIsos.push(d);
         d = addIsoDays(d, 1);
       }
+      // hasWeekendProduction = true si hay quantityKg>0 en sáb/dom de esa semana.
       const hasWeekendProduction = dayIsos.some((iso) => {
         const weekday = new Date(`${iso}T00:00:00`).getDay();
         if (!(weekday === 0 || weekday === 6)) return false;
         return rowsInRange.some((row) => normalizeValue(row.productionDate) === iso && Number(row.quantityKg || 0) > 0);
       });
+      // Default Lun-Vie. Si hay producción en sáb/dom, también se incluyen.
       const displayIsos = dayIsos.filter((iso) => {
         const weekday = new Date(`${iso}T00:00:00`).getDay();
         if (weekday >= 1 && weekday <= 5) return true;
