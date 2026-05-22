@@ -511,53 +511,162 @@
     apply();
   };
 
+  const TRACE_PENDING_RNE = 'Pendiente';
+  const TRACE_PENDING_RNPA = 'Pendiente';
+  const INFINITE_STOCK_NOTICE = 'Stock infinito, producto comprado en el dia por caja chica, sin trazabilidad.';
+
+  const formatCompactQty = (value, unit = '') => {
+    const amount = Number(value || 0);
+    if (!Number.isFinite(amount)) return `0 ${unit}`.trim();
+    const digits = amount >= 10 ? 2 : 3;
+    return `${amount.toFixed(digits)} ${unit}`.trim();
+  };
+
+  const getTraceRneDisplay = (source = {}) => normalize(source?.number) || TRACE_PENDING_RNE;
+
+  const getTraceRnpaNumberDisplay = (source = {}) => {
+    if (source?.exempt) {
+      const reason = normalize(source?.exemptReason) || 'Venta mostrador';
+      return `No requiere RNPA - ${reason}`;
+    }
+    return normalize(source?.number) || TRACE_PENDING_RNPA;
+  };
+
+  const getTraceRnpaDetailDisplay = (source = {}) => {
+    if (source?.exempt) return '';
+    const detail = normalize(source?.denomination || source?.brand || source?.businessName);
+    if (detail) return detail;
+    return normalize(source?.number) ? '' : TRACE_PENDING_RNPA;
+  };
+
+  const resolveProviderRneFromLot = (lot = {}) => normalizeRneRecord(safeObject(lot?.providerRne));
+
+  const getManagerDisplay = (token, usersMap = {}) => {
+    const user = safeObject(usersMap[token]);
+    const raw = normalize(token);
+    const fallbackName = raw && !raw.startsWith('usr_') ? raw : 'Sin responsable';
+    return {
+      name: normalize(user?.fullName || user?.name) || fallbackName,
+      role: normalize(user?.position || user?.role || user?.sector) || 'Encargado'
+    };
+  };
 
   const renderPublicTrace = async (registro, config) => {
-    const companyRne = normalize(registro?.traceability?.company?.rne?.number || '-');
-    const rnpa = normalize(registro?.traceability?.product?.rnpa?.number || '-');
-    const companyRneAttachment = normalize(registro?.traceability?.company?.rne?.attachmentUrl);
-    const rnpaAttachment = normalize(registro?.traceability?.product?.rnpa?.attachmentUrl);
-    const ingredients = Array.isArray(registro?.lots) ? registro.lots : [];
-    const traceIngredients = Array.isArray(registro?.traceability?.ingredients) ? registro.traceability.ingredients : [];
+    const companyRne = normalizeRneRecord(safeObject(registro?.traceability?.company?.rne));
+    const productRnpa = normalizeRnpaRecord(safeObject(registro?.traceability?.product?.rnpa));
+    const productRnpaNumber = getTraceRnpaNumberDisplay(productRnpa);
+    const productRnpaLabel = getTraceRnpaDetailDisplay(productRnpa);
+    const companyRneAttachment = normalize(companyRne.attachmentUrl);
+    const rnpaAttachment = normalize(productRnpa.attachmentUrl);
     const commercialName = normalize(registro?.recipeNombreComercial || registro?.traceability?.product?.nombreComercial);
     const packaging = resolvePackaging(registro);
     const frozenShelfLifeExtension = hasFrozenShelfLifeExtension(registro);
+    const usersMap = safeObject(config?.usersMap);
+    const allPlans = Array.isArray(registro?.lots) ? registro.lots : [];
+    const traceIngredients = Array.isArray(registro?.traceability?.ingredients) ? registro.traceability.ingredients : [];
+
+    const groupedIngredients = Object.values(allPlans.reduce((acc, item, index) => {
+      const key = normalize(item?.sourceIngredientId || item?.ingredientId || `trace_${index}`);
+      if (!acc[key]) {
+        acc[key] = {
+          sourceIngredientId: key,
+          sourceIngredientName: normalize(item?.sourceIngredientName || item?.ingredientName || 'Ingrediente'),
+          plans: []
+        };
+      }
+      acc[key].plans.push(item);
+      return acc;
+    }, {}));
+
+    const ingredientsHtml = groupedIngredients.map((group, idx) => {
+      const item = group.plans[0] || {};
+      const traceIngredient = traceIngredients.find((row) => normalize(row?.ingredientId) === normalize(item?.ingredientId));
+      const ingredientImage = normalize(item?.ingredientImageUrl || traceIngredient?.ingredientImageUrl);
+      const mergedLots = group.plans.flatMap((plan) => (Array.isArray(plan.lots) ? plan.lots : []));
+      const hasInfiniteStock = group.plans.some((plan) => plan?.infiniteStock || plan?.noTraceability);
+      const aggregatedImages = mergedLots.flatMap((lot) => (Array.isArray(lot?.invoiceImageUrls) ? lot.invoiceImageUrls : []));
+      const providerRneRows = mergedLots.map((lot) => resolveProviderRneFromLot(lot));
+      const providerRneSummary = providerRneRows.find((row) => row.number) || providerRneRows.find((row) => row.observations) || providerRneRows.find((row) => row.attachmentUrl) || { number: '', observations: '', attachmentUrl: '' };
+      const totalUsedQty = group.plans.reduce((sum, plan) => sum + getIngredientPlanUsedQty(plan, { hasSiblingSubstitute: group.plans.some((candidate) => candidate?.isSubstitute) }), 0);
+
+      const lotCards = mergedLots.map((lot) => {
+        const takenQty = Number(lot?.takeQty || 0);
+        const availableQty = Number(lot?.availableQty || 0);
+        const remainingQty = Math.max(0, availableQty - takenQty);
+        const providerRne = resolveProviderRneFromLot(lot);
+        return `<article class="produccion-trace-lot-card">
+          <div class="produccion-trace-lot-head">
+            <strong><i class="bi bi-upc-scan fa-solid fa-barcode"></i> Lote ${escapeHtml(lot?.lotNumber || lot?.entryId || '-')}</strong>
+            ${Boolean(lot?.isFrozen || lot?.frozen) ? '<span class="produccion-trace-used-badge">Congelado a -18 grados</span>' : ''}
+            <span class="produccion-trace-used-badge">Vencimiento al elaborar: ${escapeHtml(formatIsoEs(lot?.expiryDate || ''))}</span>
+          </div>
+          <div class="produccion-trace-grid">
+            <p><strong>Usado</strong><span>${formatCompactQty(takenQty, lot?.unit || item?.ingredientUnit || '')}</span></p>
+            <p><strong>Disponible</strong><span>${formatCompactQty(availableQty, lot?.unit || item?.ingredientUnit || '')}</span></p>
+            <p><strong>Remanente</strong><span>${formatCompactQty(remainingQty, lot?.unit || item?.ingredientUnit || '')}</span></p>
+            <p><strong>Proveedor</strong><span>${escapeHtml(lot?.provider || 'Sin proveedor')}</span></p>
+            <p><strong>RNE proveedor</strong><span>${escapeHtml(getTraceRneDisplay(providerRne))}</span></p>
+            ${normalize(providerRne.observations) ? `<p><strong>Obs. RNE</strong><span>${escapeHtml(providerRne.observations)}</span></p>` : ''}
+            <p><strong>Factura</strong><span>${escapeHtml(lot?.invoiceNumber || '-')}</span></p>
+            <p><strong>Ingreso</strong><span>${escapeHtml(normalize(lot?.entryDate) ? formatIsoEs(lot.entryDate) : '-')}</span></p>
+          </div>
+          <div class="produccion-trace-card-actions">${Array.isArray(lot?.invoiceImageUrls) && lot.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-public-images='${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}'><i class="bi bi-paperclip fa-solid fa-paperclip"></i><span>Ver adjunto (${lot.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}${providerRne.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-public-images='${encodeURIComponent(JSON.stringify([providerRne.attachmentUrl]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE sin adjunto</button>'}</div>
+        </article>`;
+      }).join('');
+
+      return `<article class="produccion-trace-ingredient-card">
+        <header>
+          <div class="produccion-trace-ingredient-head-main">
+            <span class="produccion-trace-ingredient-index">${idx + 1}</span>
+            <span class="produccion-trace-ingredient-avatar">${ingredientImage ? `<img src="${escapeHtml(ingredientImage)}" alt="${escapeHtml(item?.ingredientName || 'Ingrediente')}">` : '<i class="bi bi-basket2-fill fa-solid fa-carrot"></i>'}</span>
+            <div>
+              <h6><i class="bi bi-box-seam fa-solid fa-box-open"></i> ${escapeHtml(group.sourceIngredientName || item?.ingredientName || item?.ingredientId || 'Ingrediente')}</h6>
+              ${group.plans.some((plan) => plan.isSubstitute) ? `<small><i class="fa-solid fa-link"></i> Sustitutos usados: ${escapeHtml(group.plans.filter((plan) => plan.isSubstitute).map((plan) => plan.ingredientName).join(' + ') || '-')}</small>` : ''}
+              ${hasInfiniteStock ? '<small><i class="fa-solid fa-infinity"></i> Stock infinito sin trazabilidad</small>' : ''}
+              <small>Cantidad usada: ${formatCompactQty(totalUsedQty, item?.unit || item?.ingredientUnit || '')}</small>
+              <small> - RNE proveedor: <strong>${escapeHtml(getTraceRneDisplay(providerRneSummary))}</strong></small>
+              ${normalize(providerRneSummary.observations) ? `<small> - Obs. RNE: <strong>${escapeHtml(providerRneSummary.observations)}</strong></small>` : ''}
+            </div>
+          </div>
+          <div class="produccion-trace-card-actions">${aggregatedImages.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-public-images='${encodeURIComponent(JSON.stringify(aggregatedImages))}'><i class="bi bi-images fa-regular fa-images"></i><span>Ver adjunto (${aggregatedImages.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}${providerRneSummary.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-public-images='${encodeURIComponent(JSON.stringify([providerRneSummary.attachmentUrl]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE sin adjunto</button>'}</div>
+        </header>
+        <div class="produccion-trace-lots">${lotCards || (hasInfiniteStock ? `<div class="produccion-lote-infinite-note"><i class="fa-solid fa-infinity" aria-hidden="true"></i><span>${escapeHtml(INFINITE_STOCK_NOTICE)}</span></div>` : '<p class="m-0">Sin lotes asociados.</p>')}</div>
+      </article>`;
+    }).join('') || '<p class="ingrediente-empty-list">Sin desglose de lotes para esta producción.</p>';
+
+    const managersHtml = (Array.isArray(registro?.managers) ? registro.managers : []).map((token) => {
+      const manager = getManagerDisplay(token, usersMap);
+      return `<span class="produccion-trace-chip"><i class="bi bi-person-badge fa-solid fa-user-tie"></i><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span>`;
+    }).join('') || '<span class="produccion-trace-chip"><i class="bi bi-person-x fa-solid fa-user-xmark"></i><strong>Sin responsable</strong><small>Encargado</small></span>';
 
     dataNode.innerHTML = `<section class="produccion-trace-v2 produccion-trace-apple-viewer">
-      <article class="produccion-trace-summary">
-        <h6><i class="bi bi-diagram-3 fa-solid fa-diagram-project"></i> Trazabilidad ${escapeHtml(registro.id)}</h6>
-        <div class="produccion-trace-grid">
-          <p><strong>Empresa</strong><span>FRIGORIFICO LA JAMONERA SA</span></p>
-          <p><strong>RNE empresa</strong><span>${escapeHtml(companyRne)}</span></p>
-          <p><strong>Producto</strong><span>${escapeHtml(registro.recipeTitle || '-')}</span></p>
-          ${commercialName ? `<p><strong>Nombre comercial</strong><span>${escapeHtml(commercialName)}</span></p>` : ''}
-          <p><strong>RNPA</strong><span>${escapeHtml(rnpa)}</span></p>
-          <p><strong>Cantidad final</strong><span>${Number(registro.quantityKg || 0).toFixed(2)} kg</span></p>
-          ${frozenShelfLifeExtension ? `<p><strong>Vencimiento</strong><span>${escapeHtml(getFrozenShelfLifeExtensionLabel())}</span></p>` : ''}
-          ${packaging.agingDays > 0 && packaging.packagingDate ? `<p><strong>${escapeHtml(packaging.label)}</strong><span>${escapeHtml(formatIsoEs(packaging.packagingDate))} (+${packaging.agingDays})</span></p>` : ''}
-          <p><strong>Fecha</strong><span>${escapeHtml(formatDateTime(registro.createdAt))}</span></p>
-          <p><strong>Estado</strong><span>${escapeHtml(registro.status || '-')}</span></p>
+      <div class="produccion-trace-diagram-wrap">
+        <div class="produccion-trace-diagram">
+          <article class="produccion-trace-summary">
+            <h6><i class="bi bi-diagram-3 fa-solid fa-diagram-project"></i> Trazabilidad ${escapeHtml(registro.id)}</h6>
+            <div class="produccion-trace-grid">
+              <p><strong>Empresa</strong><span>FRIGORIFICO LA JAMONERA SA</span></p>
+              <p><strong>RNE empresa</strong><span>${escapeHtml(getTraceRneDisplay(companyRne))}</span></p>
+              <p><strong>Producto</strong><span>${escapeHtml(registro.recipeTitle || '-')}</span></p>
+              ${commercialName ? `<p><strong>Nombre comercial</strong><span>${escapeHtml(commercialName)}</span></p>` : ''}
+              <p><strong>RNPA</strong><span>${escapeHtml(productRnpaNumber)}</span></p>
+              ${productRnpaLabel ? `<p><strong>Detalle RNPA</strong><span>${escapeHtml(productRnpaLabel)}</span></p>` : ''}
+              <p><strong>Cantidad final</strong><span>${Number(registro.quantityKg || 0).toFixed(2)} kg</span></p>
+              ${frozenShelfLifeExtension ? `<p><strong>Vencimiento</strong><span>${escapeHtml(getFrozenShelfLifeExtensionLabel())}</span></p>` : ''}
+              ${packaging.agingDays > 0 && packaging.packagingDate ? `<p><strong>${escapeHtml(packaging.label)}</strong><span>${escapeHtml(formatIsoEs(packaging.packagingDate))} (+${packaging.agingDays})</span></p>` : ''}
+              <p><strong>Fecha</strong><span>${escapeHtml(formatDateTime(registro.createdAt))}</span></p>
+              <p><strong>Estado</strong><span>${escapeHtml(registro.status || '-')}</span></p>
+            </div>
+            <div class="produccion-trace-card-actions">
+              ${companyRneAttachment ? '<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="publicCompanyRneAttachmentBtn"><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE empresa</span></button>' : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE empresa sin adjunto</button>'}
+              ${productRnpa.exempt ? '<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" disabled><i class="fa-solid fa-store"></i><span>RNPA no requerido</span></button>' : (rnpaAttachment ? '<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="publicRnpaAttachmentBtn"><i class="fa-regular fa-eye"></i><span>Ver adjunto RNPA</span></button>' : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNPA sin adjunto</button>')}
+            </div>
+            <div class="produccion-trace-managers">${managersHtml}</div>
+            <div class="public-trace-planilla-row"><button id="publicOpenPlanillaBtn" type="button" class="btn ios-btn ios-btn-primary public-open-planilla-btn"><i class="fa-regular fa-file-lines"></i><span>Ver planilla</span></button></div>
+          </article>
+          <div class="produccion-trace-mermaid-wrap"><div class="produccion-trace-mermaid" data-public-mermaid><div class="produccion-trace-mermaid-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"><p>Renderizando diagrama...</p></div><button type="button" class="produccion-trace-mermaid-overlay" data-public-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button></div></div>
+          <div class="produccion-trace-ingredients">${ingredientsHtml}</div>
         </div>
-        <div class="produccion-trace-card-actions">
-          ${companyRneAttachment ? '<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="publicCompanyRneAttachmentBtn"><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE empresa</span></button>' : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE empresa sin adjunto</button>'}
-          ${rnpaAttachment ? '<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="publicRnpaAttachmentBtn"><i class="fa-regular fa-eye"></i><span>Ver adjunto RNPA</span></button>' : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNPA sin adjunto</button>'}
-        </div>
-        <div class="public-trace-planilla-row"><button id="publicOpenPlanillaBtn" type="button" class="btn ios-btn ios-btn-primary public-open-planilla-btn"><i class="fa-regular fa-file-lines"></i><span>Ver planilla</span></button></div>
-      </article>
-      <div class="produccion-trace-mermaid-wrap"><div class="produccion-trace-mermaid" data-public-mermaid><div class="produccion-trace-mermaid-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"><p>Renderizando diagrama...</p></div><button type="button" class="produccion-trace-mermaid-overlay" data-public-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button></div></div>
-        ${ingredients.map((item, idx) => {
-          const lots = Array.isArray(item?.lots) ? item.lots : [];
-          const traceIngredient = traceIngredients.find((row) => normalize(row?.ingredientId) === normalize(item?.ingredientId));
-          const ingredientImage = normalize(item?.ingredientImageUrl || traceIngredient?.ingredientImageUrl);
-          const mergedAttachments = lots.flatMap((lot) => (Array.isArray(lot?.invoiceImageUrls) ? lot.invoiceImageUrls : []));
-          const providerRneAttachment = normalize(lots.find((lot) => normalize(lot?.providerRne?.attachmentUrl))?.providerRne?.attachmentUrl);
-          return `<article class="produccion-trace-ingredient-card"><header><div class="produccion-trace-ingredient-head-main"><span class="produccion-trace-ingredient-index">${idx + 1}</span><span class="produccion-trace-ingredient-avatar">${ingredientImage ? `<img src="${escapeHtml(ingredientImage)}" alt="${escapeHtml(item?.ingredientName || 'Ingrediente')}">` : '<i class="bi bi-basket2-fill fa-solid fa-carrot"></i>'}</span><h6>${escapeHtml(item?.ingredientName || 'Ingrediente')}</h6></div></header><div class="produccion-trace-lots">${lots.map((lot) => {
-            const used = Number(lot?.takeQty || 0);
-            const available = Number(lot?.availableQty || 0);
-            const remaining = Math.max(0, available - used);
-            return `<article class="produccion-trace-lot-card"><div class="produccion-trace-lot-head"><strong><i class="bi bi-upc-scan fa-solid fa-barcode"></i> Lote ${escapeHtml(lot?.lotNumber || lot?.entryId || '-')}</strong><span class="produccion-trace-used-badge">Vencimiento al elaborar: ${escapeHtml(formatIsoEs(lot?.expiryDate || ''))}</span></div><div class="produccion-trace-grid"><p><strong>Usado</strong><span>${used.toFixed(3)} ${escapeHtml(lot?.unit || item?.ingredientUnit || '')}</span></p><p><strong>Disponible</strong><span>${available.toFixed(3)} ${escapeHtml(lot?.unit || item?.ingredientUnit || '')}</span></p><p><strong>Remanente</strong><span>${remaining.toFixed(3)} ${escapeHtml(lot?.unit || item?.ingredientUnit || '')}</span></p><p><strong>Proveedor</strong><span>${escapeHtml(lot?.provider || '-')}</span></p><p><strong>N° factura</strong><span>${escapeHtml(lot?.invoiceNumber || '-')}</span></p><p><strong>Ingreso</strong><span>${escapeHtml(formatIsoEs(lot?.entryDate || '-'))}</span></p><p><strong>RNE proveedor</strong><span>${escapeHtml(lot?.providerRne?.number || '-')}</span></p></div></article>`;
-          }).join('') || '<p class="m-0">Sin lotes asociados.</p>'}</div><div class="produccion-trace-card-actions">${mergedAttachments.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-public-images='${encodeURIComponent(JSON.stringify(mergedAttachments))}'><i class="fa-regular fa-images"></i><span>Ver adjuntos (${mergedAttachments.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}${providerRneAttachment ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-public-images='${encodeURIComponent(JSON.stringify([providerRneAttachment]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE sin adjunto</button>'}</div></article>`;
-        }).join('') || '<p class="ingrediente-empty-list">Sin desglose de lotes para esta producción.</p>'}
       </div>
     </section>`;
 
