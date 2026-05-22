@@ -447,6 +447,13 @@
     img.addEventListener('error', resolve, { once: true });
   }))));
 
+  const waitWindowLoad = (win) => new Promise((resolve) => {
+    const finish = () => (win.document?.fonts ? win.document.fonts.ready.then(resolve, resolve) : resolve());
+    if (!win || win.document.readyState === 'complete') { finish(); return; }
+    win.addEventListener('load', finish, { once: true });
+    setTimeout(resolve, 5000);
+  });
+
   const renderQr = (host, registro) => {
     if (!host || !window.QRCode) return;
     host.innerHTML = '';
@@ -458,6 +465,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
     <link rel="stylesheet" href="./CSS/style.css">
     <style>body{font-family:"Inter","Segoe UI",Arial,sans-serif;padding:8px;background:#ffffff;}</style>`;
 
@@ -467,7 +475,7 @@
     const documentTitle = escapeHtml(getPlanillaDocumentTitle(registro));
     win.document.write(`<html><head>${buildPlanillaHeadHtml(documentTitle)}</head><body>${root.outerHTML}</body></html>`);
     win.document.close();
-    await new Promise((resolve) => setTimeout(resolve, 240));
+    await waitWindowLoad(win);
     const printRoot = win.document.querySelector('#planillaProduccionPrintable');
     if (printRoot?.querySelector('.planilla-summary-grid')) printRoot.querySelector('.planilla-summary-grid').style.gridTemplateColumns = 'repeat(4, minmax(0, 1fr))';
     const qrHost = win.document.querySelector('#planillaQrTarget');
@@ -508,12 +516,10 @@
     }
     const win = window.open('', '_blank', 'width=1240,height=900');
     if (!win) return;
-    win.document.write(`<html><head>${buildPlanillaHeadHtml('Planillas masivas')}</head><body style="display:grid;gap:12px;">${printNodes.map((html, index) => `<section style="${index ? 'page-break-before:always;' : ''}">${html}</section>`).join('')}</body></html>`);
+    win.document.write(`<html><head>${buildPlanillaHeadHtml('Planillas masivas')}<script>window.addEventListener('load',function(){(document.fonts?document.fonts.ready:Promise.resolve()).then(function(){window.print();});});<\/script></head><body style="display:grid;gap:12px;">${printNodes.map((html, index) => `<section style="${index ? 'page-break-before:always;' : ''}">${html}</section>`).join('')}</body></html>`);
     win.document.close();
-    await waitImages(win.document.body);
     onProgress?.(100);
     win.focus();
-    win.print();
   };
 
   const openByRegistro = async (registro, context = {}) => {

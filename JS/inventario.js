@@ -4875,7 +4875,7 @@
             const packageVal = normalizeValue(extra.packageQty || (packageLocked ? extraRecord.packageQty : ''));
             const avatarHtml = extraIngredient?.imageUrl
               ? `<span class="recipe-inline-avatar-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-inventario-thumb" src="${escapeHtml(extraIngredient.imageUrl)}" alt="${escapeHtml(capitalize(extraIngredient.name))}" loading="lazy"></span>`
-              : '<span class="recipe-inline-avatar-wrap recipe-inline-avatar-fallback"><span class="recipe-small-placeholder"><i class="fa-solid fa-bowl-food"></i></span></span>';
+              : '<span class="recipe-inline-avatar-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-bowl-food"></i></span></span>';
             return `<tr data-bulk-index="${idx}" class="inventario-bulk-main-row">
               <td><i class="fa-solid fa-grip-lines"></i></td>
               <td>

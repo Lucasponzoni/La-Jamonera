@@ -10432,13 +10432,63 @@
   });
 
   const openMassPlanillasByPeriod = async () => {
+    if (!normalizeValue(state.historyRange)) {
+      const rangeResult = await openIosSwal({
+        title: 'Rango obligatorio para planilla',
+        html: '<p>Seleccioná un rango de fechas antes de generar planillas masivas.</p><input id="massPlanillaRangeInput" class="form-control ios-input mt-2" placeholder="Seleccionar rango de fechas" autocomplete="off">',
+        showCancelButton: true,
+        confirmButtonText: 'Continuar',
+        cancelButtonText: 'Cancelar',
+        didOpen: () => {
+          const inp = document.getElementById('massPlanillaRangeInput');
+          if (window.flatpickr && inp) {
+            let pickedRange = '';
+            disableCalendarSuggestions(inp);
+            window.flatpickr(inp, {
+              locale: window.flatpickr.l10ns?.es || undefined,
+              mode: 'range',
+              dateFormat: 'Y-m-d',
+              allowInput: false,
+              onClose: (_d, _s, instance) => {
+                const from = instance.selectedDates[0] ? getArgentinaIsoDate(instance.selectedDates[0]) : '';
+                const to = instance.selectedDates[1] ? getArgentinaIsoDate(instance.selectedDates[1]) : from;
+                pickedRange = from && to ? `${from} a ${to}` : from;
+                inp.value = pickedRange;
+              }
+            });
+          }
+        },
+        preConfirm: () => {
+          const val = normalizeValue(document.getElementById('massPlanillaRangeInput')?.value);
+          if (!val) { Swal.showValidationMessage('Seleccioná un rango de fechas.'); return false; }
+          return val;
+        }
+      });
+      if (!rangeResult.isConfirmed) return;
+      state.historyRange = rangeResult.value;
+      const historyRangeInput = document.getElementById('historyRange');
+      if (historyRangeInput) historyRangeInput.value = rangeResult.value;
+    }
     const rows = getHistoryRows();
     if (!rows.length) {
       await openIosSwal({ title: 'Sin datos', html: '<p>No hay producciones para el período seleccionado.</p>', icon: 'info' });
       return;
     }
 
-    const catalog = getDispatchProductCatalogByKind(rows);
+    const catalog = (() => {
+      const production = {};
+      rows.forEach((row) => {
+        const id = normalizeValue(row.recipeId || row.recipeTitle);
+        if (!id || production[id]) return;
+        production[id] = {
+          id,
+          title: normalizeValue(row.recipeTitle) || 'Sin nombre',
+          imageUrl: normalizeValue(row.recipeImageUrl || state.recetas?.[row.recipeId]?.imageUrl),
+          kind: 'production'
+        };
+      });
+      return { production: Object.values(production), ingredient: [] };
+    })();
 
     const selector = await openIosSwal({
       title: 'Selector de productos',
@@ -10490,7 +10540,11 @@
       customClass: { popup: 'ios-alert produccion-loading-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' },
       didOpen: async () => {
         try {
-          await window.laJamoneraPlanillaProduccion?.printBatch?.(filtered, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users) }, (progress) => {
+          const progressText = document.getElementById('massPlanillasProgressText');
+          if (progressText) progressText.textContent = '0% Cargando datos...';
+          await Promise.all(filtered.map((row) => ensureRegistroDetail(row.id)));
+          const hydratedRows = filtered.map((row) => getRegistroById(row.id) || row);
+          await window.laJamoneraPlanillaProduccion?.printBatch?.(hydratedRows, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users) }, (progress) => {
             const value = Math.max(0, Math.min(100, Number(progress) || 0));
             const bar = document.getElementById('massPlanillasProgressBar');
             const text = document.getElementById('massPlanillasProgressText');
@@ -10544,15 +10598,15 @@
 
   const buildDispatchMassSelectorHtml = (catalog) => {
     const renderItems = (items, key) => items.length
-      ? items.map((item) => `<label class="inventario-check-row inventario-selector-row dispatch-mass-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap dispatch-mass-photo-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-dispatch-mass-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}"></span>` : '<span class="inventario-print-photo-wrap dispatch-mass-photo-wrap"><span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span></span>'}<input type="checkbox" data-dispatch-mass-planilla-recipe="${key}" value="${escapeHtml(item.id)}"><span>${escapeHtml(item.title)}</span></label>`).join('')
-      : '<p class="text-muted mb-0">No hay elementos en esta sección.</p>';
+      ? items.map((item) => `<label class="inventario-check-row inventario-selector-row dispatch-mass-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap dispatch-mass-photo-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-dispatch-mass-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}"></span>` : '<span class="inventario-print-photo-wrap dispatch-mass-photo-wrap"><span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span></span>'}<input type="checkbox" data-dispatch-mass-planilla-recipe="${key}" value="${escapeHtml(item.id)}"><span>${escapeHtml(normalizeUpper(item.title))}</span></label>`).join('')
+      : '';
     return `<div class="swal-stack-fields text-start">
       <label class="inventario-check-row"><input type="radio" name="dispatchMassPlanillaScope" value="all" checked><span>Incluir todos los productos</span></label>
       <label class="inventario-check-row"><input type="radio" name="dispatchMassPlanillaScope" value="exclude"><span>Excluir algunos productos</span></label>
       <label class="inventario-check-row"><input type="radio" name="dispatchMassPlanillaScope" value="with_qr"><span>Incluir solo con QR de trazabilidad</span></label>
       <div id="dispatchMassPlanillasScope" class="notify-specific-users-list d-none">
-        <div class="step-block"><strong>Productos</strong>${renderItems(catalog.production, 'production')}</div>
-        <div class="step-block"><strong>Ingredientes</strong>${renderItems(catalog.ingredient, 'ingredient')}</div>
+        <div class="step-block"><span class="selector-section-label">Productos</span>${renderItems(catalog.production, 'production')}</div>
+        ${catalog.ingredient.length ? `<div class="step-block"><span class="selector-section-label">Ingredientes</span>${renderItems(catalog.ingredient, 'ingredient')}</div>` : ''}
       </div>
       <div id="dispatchMassQrScope" class="notify-specific-users-list d-none">
         <label class="inventario-check-row"><input type="radio" name="dispatchMassQrKind" value="all" checked><span>Imprimir todo</span></label>
@@ -10879,7 +10933,7 @@
     }, {}));
     const selector = await openIosSwal({
       title: 'Selector de productos',
-      html: `<div class="swal-stack-fields text-start"><label class="inventario-check-row"><input type="radio" name="weeklyPlanillaScope" value="all" checked><span>Incluir todos los productos</span></label><label class="inventario-check-row"><input type="radio" name="weeklyPlanillaScope" value="exclude"><span>Excluir algunos productos</span></label><div id="weeklyPlanillasScope" class="notify-specific-users-list d-none"><div class="step-block"><strong>Productos</strong>${uniqueRecipes.map((item) => `<label class="inventario-check-row inventario-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-weekly-production-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}"></span>` : ''}<input type="checkbox" data-weekly-planilla-recipe value="${escapeHtml(item.id)}"><span>${escapeHtml(item.title)}</span></label>`).join('')}</div></div></div>`,
+      html: `<div class="swal-stack-fields text-start"><label class="inventario-check-row"><input type="radio" name="weeklyPlanillaScope" value="all" checked><span>Incluir todos los productos</span></label><label class="inventario-check-row"><input type="radio" name="weeklyPlanillaScope" value="exclude"><span>Excluir algunos productos</span></label><div id="weeklyPlanillasScope" class="notify-specific-users-list d-none"><div class="step-block"><span class="selector-section-label">Productos</span>${uniqueRecipes.map((item) => `<label class="inventario-check-row inventario-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap dispatch-mass-photo-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-weekly-production-thumb" style="width:42px;height:42px;border-radius:999px;object-fit:cover;" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}"></span>` : '<span class="inventario-print-photo-wrap dispatch-mass-photo-wrap"><span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span></span>'}<input type="checkbox" data-weekly-planilla-recipe value="${escapeHtml(item.id)}"><span>${escapeHtml(normalizeUpper(item.title))}</span></label>`).join('')}</div></div></div>`,
       showCancelButton: true,
       confirmButtonText: 'Continuar',
       cancelButtonText: 'Cancelar',
@@ -11032,7 +11086,7 @@
       const manager = getManagerLabel(item);
       const productImage = normalizeValue(item?.traceability?.product?.imageUrl) || normalizeValue(state.recetas?.[item.recipeId]?.imageUrl);
         const productCell = `<span style="display:inline-flex;align-items:center;gap:8px;">${productImage ? `<img src="${escapeHtml(productImage)}" style="width:28px;height:28px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<strong>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</strong></span>`;
-      const main = `<tr><td>${escapeHtml(item.id)}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${productCell}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)}<br><small>${escapeHtml(manager.role)}</small></td><td>${escapeHtml(formatProductExpiryLabel(item))} (VTO)</td></tr>`;
+      const main = `<tr><td>${escapeHtml(item.id)}</td><td>${escapeHtml(formatIsoEs(item.productionDate))}</td><td>${productCell}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)}<br><small>${escapeHtml(manager.role)}</small></td><td>${escapeHtml(formatProductExpiryLabel(item))} (VTO)</td></tr>`;
       const resolutions = (Array.isArray(item?.lots) ? item.lots : [])
         .flatMap((plan) => (Array.isArray(plan?.lots) ? plan.lots : [])
           .flatMap((lot) => (Array.isArray(lot?.expiryResolutions) ? lot.expiryResolutions : [])
@@ -11046,7 +11100,7 @@
     const imagesHtml = includeImages && tracesWithAttachments.length
       ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas del período</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${tracesWithAttachments.map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><figcaption style="font-size:12px;color:#4b5f8e;font-weight:700;">${escapeHtml(getTraceIngredientLabelText(trace))}</figcaption></div>${(trace.invoiceImageUrls || []).map((url, idx) => `<img src="${url}" style="width:100%;max-height:240px;object-fit:contain;border-radius:10px;margin-top:${idx ? '8px' : '0'};">`).join('')}</figure>`).join('')}</div></section>`
       : '';
-    win.document.write(`<html><head><title>Producción por período</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.is-trace-row td{background:#ffecef}.is-resolution-row td{background:#fff6d9}.print-trace-date{color:#1f6fd6;font-weight:700}.print-trace-vto{color:#b04a09;font-weight:700}</style></head><body><h1>Producción por período • La Jamonera</h1><table><thead><tr><th>ID producción</th><th>Fecha y hora</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
+    win.document.write(`<html><head><title>Producción por período</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.is-trace-row td{background:#ffecef}.is-resolution-row td{background:#fff6d9}.print-trace-date{color:#1f6fd6;font-weight:700}.print-trace-vto{color:#b04a09;font-weight:700}</style></head><body><h1>Producción por período • La Jamonera</h1><table><thead><tr><th>ID producción</th><th>Fecha</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
     win.document.close();
     win.focus();
     await waitPrintAssets(win);
