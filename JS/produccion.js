@@ -8386,9 +8386,14 @@
         <button type="button" class="btn ios-btn ios-btn-secondary" id="produccionCollapseAllBtn" ${allCollapsed ? 'disabled' : ''}>Colapsar todo</button>
         <button type="button" class="btn ios-btn ios-btn-secondary" id="produccionExpandAllBtn" ${allExpanded ? 'disabled' : ''}>Descolapsar todo</button>
       </div>` + plan.ingredientPlans.map((row, index) => {
-      const hasSubstituteCoverage = !row.isSubstitute && plan.ingredientPlans.some((item) => item.isSubstitute && normalizeValue(item.sourceIngredientId) === normalizeValue(row.ingredientId) && Number(item.availableQty || 0) > 0.0001);
+      const substituteCoveredQty = row.isSubstitute ? 0 : plan.ingredientPlans
+        .filter((item) => item.isSubstitute && normalizeValue(item.sourceIngredientId) === normalizeValue(row.ingredientId))
+        .reduce((sum, item) => sum + Number(item.neededQty || 0), 0);
+      const hasSubstituteCoverage = !row.isSubstitute && substituteCoveredQty > 0.0001;
       const rowInfiniteStock = Boolean(row.infiniteStock || row.noTraceability);
-      const hasMeaningfulMissing = Number(row.missingQty || 0) > 0.0005;
+      const netMissingQty = Math.max(0, Number(row.missingQty || 0) - substituteCoveredQty);
+      const fullyCoveredBySubstitute = hasSubstituteCoverage && netMissingQty <= 0.0005;
+      const hasMeaningfulMissing = netMissingQty > 0.0005;
       const isSkippedIngredient = (state.skipTraceIngredients instanceof Set)
         && state.skipTraceIngredients.has(normalizeValue(row.sourceIngredientId || row.ingredientId));
       const toneClass = isSkippedIngredient ? 'is-sin-traz'
@@ -8409,7 +8414,7 @@
                 <span class="produccion-needs-label">Necesita</span>
                 <strong class="produccion-needs-value">${formatCompactQty(row.neededQty, row.ingredientUnit)}</strong>
                 ${availableHtml}
-                ${hasMeaningfulMissing ? ` <em>· Faltan ${formatCompactQty(row.missingQty, row.ingredientUnit)}</em>` : ''}
+                ${hasMeaningfulMissing ? ` <em>· Faltan ${formatCompactQty(netMissingQty, row.ingredientUnit)}</em>` : ''}
               </p>
             </div>
           </div>
@@ -8433,7 +8438,7 @@
                 <button type="button" class="btn ios-btn ios-btn-secondary" data-set-production-date="${escapeHtml(lot.entryDate || '')}" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-calendar-day"></i><span>Cambiar fecha</span></button>
                 <button type="button" class="btn ios-btn ios-btn-warning" data-skip-trace-ingredient="${escapeHtml(lot.ingredientId)}" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-arrow-right"></i><span>Producir sin trazabilidad este ingrediente</span></button>
               </div>` : ''}
-            ${lot.status === 'future' ? `<div class="produccion-lote-expired-help"><strong>Lote posterior a la fecha:</strong> ingresó el ${formatIsoEs(lot.entryDate || '')}. No se usará con fecha ${formatIsoEs(plan.productionDate)}; cambiá la producción a ${formatIsoEs(lot.entryDate || '')} o producí sin trazabilidad para el faltante.</div>
+            ${lot.status === 'future' && !fullyCoveredBySubstitute ? `<div class="produccion-lote-expired-help"><strong>Lote posterior a la fecha:</strong> ingresó el ${formatIsoEs(lot.entryDate || '')}. No se usará con fecha ${formatIsoEs(plan.productionDate)}; cambiá la producción a ${formatIsoEs(lot.entryDate || '')} o producí sin trazabilidad para el faltante.</div>
               <div class="produccion-lote-blocked-actions">
                 <button type="button" class="btn ios-btn ios-btn-secondary" data-set-production-date="${escapeHtml(lot.entryDate || '')}" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-calendar-day"></i><span>Usar fecha ${formatIsoEs(lot.entryDate || '')}</span></button>
                 <button type="button" class="btn ios-btn ios-btn-warning" data-skip-trace-ingredient="${escapeHtml(lot.ingredientId)}" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-arrow-right"></i><span>Producir sin trazabilidad este ingrediente</span></button>
@@ -8457,6 +8462,9 @@
     const productionDate = normalizeValue(nodes.editor.querySelector('#produccionDateInput')?.value) || toIsoDate();
     const observations = normalizeValue(nodes.editor.querySelector('#produccionObsInput')?.value);
     const managers = [...nodes.editor.querySelectorAll('[data-manager-check]:checked')].map((node) => node.value).filter(Boolean);
+    const skipTraceList = state.skipTraceIngredients instanceof Set
+      ? [...state.skipTraceIngredients]
+      : [];
     await persistDraft({
       recipeId: recipe.id,
       quantityKg: qty,
@@ -8466,6 +8474,8 @@
       locks: state.editorPlan.locks,
       lotPlan: state.editorPlan,
       pendingExpiryActions: safeObject(state.pendingExpiryActions),
+      skipTraceIngredients: skipTraceList,
+      sinTrazabilidad: Boolean(state.sinTrazabilidad),
       reservationId: state.activeReservationId,
       step: 'editor',
       status: 'active'
@@ -8540,6 +8550,16 @@
     const initialObs = ownDraft?.observations || '';
     const initialManagers = Array.isArray(ownDraft?.managers) ? ownDraft.managers : preferredManagers;
     state.pendingExpiryActions = isViewOnly ? {} : safeObject(ownDraft?.pendingExpiryActions);
+    if (isViewOnly) {
+      state.skipTraceIngredients = new Set();
+      state.sinTrazabilidad = false;
+    } else if (ownDraft) {
+      const restoredSkip = Array.isArray(ownDraft.skipTraceIngredients) ? ownDraft.skipTraceIngredients : [];
+      state.skipTraceIngredients = new Set(restoredSkip.map((id) => normalizeValue(id)).filter(Boolean));
+      state.sinTrazabilidad = Boolean(ownDraft.sinTrazabilidad);
+    } else {
+      state.skipTraceIngredients = new Set();
+    }
     state.lotCollapseState = {};
     state.editorPlan = buildPlanForRecipe(recipe, initialQty, initialDate, { sinTrazabilidad: state.sinTrazabilidad, skipTraceIngredients: state.skipTraceIngredients });
     if (!isViewOnly) await ensureReservationForPlan(state.editorPlan);
@@ -9406,10 +9426,15 @@
         const blockedIngredients = revalidated.ingredientPlans
           .filter((row) => {
             if (row.infiniteStock || row.noTraceability) return false;
+            if (row.isSubstitute) return false;
             const hasOkLot = (row.lots || []).some((lot) => lot.status === 'ok' || lot.status === 'soon');
             const hasFutureLot = (row.lots || []).some((lot) => lot.status === 'future' && Number(lot.availableQty || 0) > 0.0001);
             const hasExpiredStock = (row.lots || []).some((lot) => lot.status === 'expired' && Number(lot.availableQty || 0) > 0.0001);
-            const missing = Number(row.neededQty || row.requiredQty || 0) - (row.lots || []).reduce((acc, lot) => acc + Number(lot.takeQty || 0), 0);
+            const substituteCovered = revalidated.ingredientPlans
+              .filter((item) => item.isSubstitute && normalizeValue(item.sourceIngredientId) === normalizeValue(row.ingredientId))
+              .reduce((sum, item) => sum + Number(item.neededQty || 0), 0);
+            const rawMissing = Number(row.neededQty || row.requiredQty || 0) - (row.lots || []).reduce((acc, lot) => acc + Number(lot.takeQty || 0), 0);
+            const missing = Math.max(0, rawMissing - substituteCovered);
             return missing > 0.0001 && !hasOkLot && (hasFutureLot || hasExpiredStock);
           })
           .map((row) => ({
@@ -9519,21 +9544,64 @@
       }).join('');
       // Confiamos en el flag del plan (`noTraceability`/`sinTrazabilidad`)
       // que setea buildPlanForRecipe — refleja correctamente per-ingrediente.
-      const summaryRows = (revalidated.ingredientPlans || []).map((row) => {
-        const need = Number(row.requiredQty || row.neededQty || 0);
+      // Agrupamos: ingrediente original como parent, sustitutos anidados debajo
+      // con etiqueta "Sustituye a X" para que el resumen quede legible.
+      const renderRowBadge = (row) => {
         const isInfinite = Boolean(row.infiniteStock);
         const sinTraz = !isInfinite && Boolean(row.noTraceability || row.sinTrazabilidad);
         const lotsCount = (row.lots || []).filter((lot) => Number(lot.takeQty || 0) > 0.0001).length;
-        let badge = '';
-        if (isInfinite) {
-          badge = '<span class="pc-confirm-infinite-badge"><i class="bi bi-infinity"></i> Stock infinito</span>';
-        } else if (sinTraz) {
-          badge = '<span class="pc-confirm-sin-traz-badge">Sin trazabilidad</span>';
-        } else if (lotsCount) {
-          badge = `<small class="pc-confirm-lots-count">${lotsCount} lote${lotsCount === 1 ? '' : 's'}</small>`;
+        if (isInfinite) return '<span class="pc-confirm-infinite-badge"><i class="bi bi-infinity"></i> Stock infinito</span>';
+        if (sinTraz) return '<span class="pc-confirm-sin-traz-badge">Sin trazabilidad</span>';
+        if (lotsCount) return `<small class="pc-confirm-lots-count">${lotsCount} lote${lotsCount === 1 ? '' : 's'}</small>`;
+        return '';
+      };
+      const planGroupsOrder = [];
+      const planGroupsMap = new Map();
+      (revalidated.ingredientPlans || []).forEach((row) => {
+        const key = normalizeValue(row.sourceIngredientId || row.ingredientId);
+        if (!planGroupsMap.has(key)) {
+          planGroupsMap.set(key, { parent: null, subs: [] });
+          planGroupsOrder.push(key);
         }
-        const rowClass = isInfinite ? 'is-infinite' : (sinTraz ? 'is-sin-traz' : '');
-        return `<li class="${rowClass}"><strong>${escapeHtml(capitalize(row.ingredientName || ''))}</strong><span class="pc-confirm-qty">${need.toFixed(3)} kg</span>${badge}</li>`;
+        const entry = planGroupsMap.get(key);
+        if (row.isSubstitute) entry.subs.push(row);
+        else entry.parent = row;
+      });
+      const summaryRows = planGroupsOrder.map((key) => {
+        const { parent, subs } = planGroupsMap.get(key);
+        const parentTakeKg = parent ? (parent.lots || []).reduce((sum, lot) => sum + Number(lot.takeQty || 0), 0) : 0;
+        const subsTotal = subs.reduce((sum, sub) => sum + Number(sub.neededQty || 0), 0);
+        const parentNeed = parent ? Number(parent.requiredQty || parent.neededQty || 0) : subsTotal;
+        const parentName = parent ? parent.ingredientName : (subs[0]?.sourceIngredientName || '');
+        const parentInfinite = Boolean(parent?.infiniteStock);
+        const parentSinTraz = !parentInfinite && Boolean(parent?.noTraceability || parent?.sinTrazabilidad);
+        const fullyBySubstitute = !parentInfinite && parentTakeKg <= 0.0001 && subsTotal > 0.0001;
+        let parentBadge;
+        if (fullyBySubstitute) {
+          parentBadge = '<span class="pc-confirm-substituted-badge"><i class="fa-solid fa-link"></i> Cubierto por sustituto</span>';
+        } else {
+          parentBadge = parent ? renderRowBadge(parent) : '';
+        }
+        const parentClass = parentInfinite ? 'is-infinite' : (parentSinTraz ? 'is-sin-traz' : (fullyBySubstitute ? 'is-substituted' : ''));
+        const subsHtml = subs.map((sub) => {
+          const subNeed = Number(sub.requiredQty || sub.neededQty || 0);
+          const subBadge = renderRowBadge(sub);
+          const subClass = Boolean(sub.infiniteStock) ? 'is-infinite' : (Boolean(sub.noTraceability || sub.sinTrazabilidad) ? 'is-sin-traz' : '');
+          return `<li class="pc-confirm-substitute-row ${subClass}">
+            <span class="pc-confirm-substitute-prefix"><i class="fa-solid fa-link"></i> Sustituye a <strong>${escapeHtml(capitalize(parentName))}</strong> con</span>
+            <strong>${escapeHtml(capitalize(sub.ingredientName || ''))}</strong>
+            <span class="pc-confirm-qty">${subNeed.toFixed(3)} kg</span>
+            ${subBadge}
+          </li>`;
+        }).join('');
+        return `<li class="pc-confirm-parent-row ${parentClass}">
+          <div class="pc-confirm-parent-line">
+            <strong>${escapeHtml(capitalize(parentName))}</strong>
+            <span class="pc-confirm-qty">${parentNeed.toFixed(3)} kg</span>
+            ${parentBadge}
+          </div>
+          ${subsHtml ? `<ul class="pc-confirm-substitute-list">${subsHtml}</ul>` : ''}
+        </li>`;
       }).join('');
       const skipCount = (revalidated.ingredientPlans || []).filter((row) => !row.infiniteStock && Boolean(row.noTraceability || row.sinTrazabilidad)).length;
       const sinTrazBanner = skipCount > 0

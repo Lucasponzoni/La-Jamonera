@@ -9708,6 +9708,84 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   background: #fffdf0;
 }
 
+.produccion-confirm-ingredients li.pc-confirm-parent-row {
+  display: block;
+  padding: 8px 10px;
+}
+
+.produccion-confirm-ingredients li.pc-confirm-parent-row.is-substituted {
+  border-color: #c7d2fe;
+  background: #f5f7ff;
+}
+
+.pc-confirm-parent-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.pc-confirm-substitute-list {
+  list-style: none;
+  margin: 6px 0 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pc-confirm-substitute-list .pc-confirm-substitute-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: #334155;
+  background: #ffffff;
+  border: 1px dashed #c7d2fe;
+  border-radius: 8px;
+  padding: 5px 9px;
+  margin-left: 14px;
+  position: relative;
+}
+
+.pc-confirm-substitute-list .pc-confirm-substitute-row::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  width: 8px;
+  height: 1px;
+  background: #c7d2fe;
+}
+
+.pc-confirm-substitute-prefix {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #4338ca;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.pc-confirm-substitute-prefix i { color: #6366f1; font-size: 0.7rem; }
+
+.pc-confirm-substituted-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #3730a3;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 6px;
+  padding: 2px 7px;
+  margin-left: 6px;
+}
+
+.pc-confirm-substituted-badge i { color: #6366f1; font-size: 0.7rem; }
+
 .pc-infinite-badge {
   display: inline-flex;
   align-items: center;
