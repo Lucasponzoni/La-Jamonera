@@ -183,8 +183,22 @@
     const rnpaExempt = Boolean(recipe?.rnpaNotRequired || recipe?.rnpaExempt || recipe?.subproductNoRnpa || existingRnpa.exempt);
     const rnpaNumber = normalizeValue(existingRnpa.number) || normalizeValue(recipeRnpa.number);
     const currentCommercialName = normalizeValue(recipe.nombreComercial);
+    // Vencimiento de respaldo: si el registro no lo trae persistido, lo calculamos
+    // como envasado + caducidad (no producción + caducidad). envasado = producción
+    // + estacionado (agingDays). Respeta el snapshot si ya existe.
+    let productExpiryDate = normalizeValue(registro.productExpiryDate);
+    if (!productExpiryDate) {
+      const prod = normalizeValue(registro.productionDate);
+      const shelfLifeDays = Number(registro.shelfLifeDaysAtProduction ?? recipe.shelfLifeDays);
+      const agingDays = Number(registro.agingDaysAtProduction ?? recipe.agingDays) || 0;
+      if (prod && Number.isFinite(shelfLifeDays) && shelfLifeDays > 0) {
+        const packagingDate = normalizeValue(registro.packagingDate) || (agingDays > 0 ? addDaysToIso(prod, agingDays) : prod);
+        productExpiryDate = addDaysToIso(packagingDate, shelfLifeDays);
+      }
+    }
     return {
       ...registro,
+      productExpiryDate,
       recipeNombreComercial: currentCommercialName,
       traceability: {
         ...safeObject(registro.traceability),

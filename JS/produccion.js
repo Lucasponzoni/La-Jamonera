@@ -624,7 +624,11 @@
     const productionDate = normalizeValue(registro?.productionDate) || toIsoDate(registro?.createdAt || nowTs());
     const shelfLifeDays = Number(registro?.shelfLifeDaysAtProduction ?? recipe?.shelfLifeDays);
     if (!Number.isFinite(shelfLifeDays) || shelfLifeDays <= 0 || !productionDate) return '';
-    return addDaysToIso(productionDate, shelfLifeDays);
+    // La caducidad corre desde el envasado (producción + estacionado), no desde
+    // la producción. Si no hay estacionado, packagingDate queda vacío y se usa
+    // la fecha de producción.
+    const packagingDate = normalizeValue(resolvePackagingFromRegistro(registro).packagingDate) || productionDate;
+    return addDaysToIso(packagingDate, shelfLifeDays);
   };
   const formatProductExpiryLabel = (registro) => {
     const expiryIso = resolveProductExpiryIso(registro);
@@ -9596,7 +9600,11 @@
         }
         return;
       }
-      const productExpiry = addDaysToIso(date, Number(recipe.shelfLifeDays || 0));
+      // El vencimiento corre desde el ENVASADO (producción + estacionado), no
+      // desde la fecha de producción. envasado = getRecipePackagingMeta().packagingDate
+      // (= producción + agingDays, ajustado para no caer domingo). Si no hay
+      // estacionado, packagingDate queda vacío y se usa la fecha de producción.
+      const productExpiry = addDaysToIso(normalizeValue(getRecipePackagingMeta(recipe, date).packagingDate) || date, Number(recipe.shelfLifeDays || 0));
       const qtyGrams = qty * 1000;
       // Modal "Confirmar producción final" se muestra SIEMPRE.
       const hasSkipTrace = state.skipTraceIngredients instanceof Set && state.skipTraceIngredients.size > 0;
