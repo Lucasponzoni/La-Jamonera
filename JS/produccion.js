@@ -8438,6 +8438,9 @@
         <button type="button" class="btn ios-btn ios-btn-secondary" id="produccionCollapseAllBtn" ${allCollapsed ? 'disabled' : ''}>Colapsar todo</button>
         <button type="button" class="btn ios-btn ios-btn-secondary" id="produccionExpandAllBtn" ${allExpanded ? 'disabled' : ''}>Descolapsar todo</button>
       </div>` + plan.ingredientPlans.map((row, index) => {
+      // Ocultar sustitutos que no aportan a la fecha (todo vencido/futuro → neededQty 0).
+      // Mantiene index alineado con groupKeys devolviendo ''.
+      if (row.isSubstitute && !(row.infiniteStock || row.noTraceability) && Number(row.neededQty || 0) <= 0.0001) return '';
       const substituteCoveredQty = row.isSubstitute ? 0 : plan.ingredientPlans
         .filter((item) => item.isSubstitute && normalizeValue(item.sourceIngredientId) === normalizeValue(row.ingredientId))
         .reduce((sum, item) => sum + Number(item.neededQty || 0), 0);
@@ -8450,24 +8453,65 @@
         && state.skipTraceIngredients.has(normalizeValue(row.sourceIngredientId || row.ingredientId));
       const toneClass = isSkippedIngredient ? 'is-sin-traz'
         : (rowInfiniteStock ? 'is-infinite' : (hasMeaningfulMissing ? (hasSubstituteCoverage ? 'is-substitutable' : 'is-missing') : ''));
-      const availableHtml = rowInfiniteStock
-        ? '<span class="produccion-available-value">· Disponible <strong class="produccion-infinite-symbol">&infin;</strong></span>'
-        : `<span class="produccion-available-value">· Disponible <strong>${formatCompactQty(row.availableQty, row.ingredientUnit)}</strong></span>`;
+      const unit = row.ingredientUnit;
+      const fmt = (q) => formatCompactQty(q, unit);
+      // Chip de estado: texto + color para entender la fila de un vistazo.
+      const statusChips = [];
+      if (isSkippedIngredient) {
+        statusChips.push('<span class="produccion-lote-status-chip is-sin-traz"><i class="bi bi-exclamation-triangle-fill"></i> Sin trazabilidad</span>');
+      } else if (row.isSubstitute) {
+        statusChips.push(`<span class="produccion-lote-status-chip is-substitute"><i class="fa-solid fa-link"></i> Aporta ${fmt(row.neededQty)}</span>`);
+      } else if (rowInfiniteStock) {
+        statusChips.push('<span class="produccion-lote-status-chip is-infinite"><i class="fa-solid fa-infinity"></i> Stock infinito</span>');
+      } else {
+        if (hasSubstituteCoverage) {
+          statusChips.push('<span class="produccion-lote-status-chip is-substitutable"><i class="fa-solid fa-link"></i> Cubierto con sustitutos</span>');
+        }
+        if (hasMeaningfulMissing) {
+          statusChips.push(`<span class="produccion-lote-status-chip is-missing"><i class="bi bi-exclamation-triangle-fill"></i> Faltan ${fmt(netMissingQty)}</span>`);
+        } else if (!hasSubstituteCoverage) {
+          statusChips.push('<span class="produccion-lote-status-chip is-ok"><i class="fa-solid fa-check"></i> Completo</span>');
+        }
+      }
+      const statusChipsHtml = statusChips.join(' ');
+      // Detalle de cantidades en palabras claras.
+      let qtyDetailHtml;
+      if (row.isSubstitute) {
+        qtyDetailHtml = `<p class="produccion-lote-qty-detail">
+          <span class="produccion-qty-need">Aporta a la receta: <strong>${fmt(row.neededQty)}</strong></span>
+          <span class="produccion-qty-sep">·</span>
+          <span class="produccion-qty-have">Stock disponible: <strong>${fmt(row.availableQty)}</strong></span>
+        </p>`;
+      } else {
+        const ownLabel = hasSubstituteCoverage ? 'Stock propio' : 'Disponible';
+        const parts = [];
+        if (rowInfiniteStock) {
+          parts.push('<span class="produccion-qty-have">Disponible: <strong class="produccion-infinite-symbol">&infin;</strong></span>');
+        } else if (Number(row.availableQty || 0) > 0.0001) {
+          parts.push(`<span class="produccion-qty-have">${ownLabel}: <strong>${fmt(row.availableQty)}</strong></span>`);
+        }
+        if (hasSubstituteCoverage) {
+          parts.push(`<span class="produccion-qty-substitute">Cubren sustitutos: <strong>${fmt(substituteCoveredQty)}</strong></span>`);
+        }
+        if (hasMeaningfulMissing) {
+          parts.push(`<span class="produccion-qty-missing">Falta conseguir: <strong>${fmt(netMissingQty)}</strong></span>`);
+        }
+        qtyDetailHtml = `<p class="produccion-lote-qty-detail">
+          <span class="produccion-qty-need">Receta necesita: <strong>${fmt(row.neededQty)}</strong></span>
+          ${parts.length ? `<span class="produccion-qty-sub-line">${parts.join('<span class="produccion-qty-sep">·</span>')}</span>` : ''}
+        </p>`;
+      }
       return `
       <article class="produccion-lote-group ${toneClass}" data-lot-group="${row.ingredientId}_${index}">
         <header class="produccion-lote-head">
           <div class="produccion-lote-main">
             <img src="${state.ingredientes[row.ingredientId]?.imageUrl || FIAMBRES_IMAGE}" alt="${row.ingredientName}" class="produccion-lote-ingredient-image">
             <div>
-              <h6>${row.ingredientName}${hasSubstituteCoverage ? ' <span class="produccion-lote-substitute-state"><i class="fa-solid fa-link"></i> Disponible con sustitutos</span>' : ''}${isSkippedIngredient ? ' <span class="produccion-lote-sin-traz-badge"><i class="bi bi-exclamation-triangle-fill"></i> Sin trazabilidad</span>' : ''}</h6>
-              ${row.isSubstitute ? `<p class="produccion-lote-substitute-line"><i class="fa-solid fa-link"></i> Sustituye a <strong>${escapeHtml(row.sourceIngredientName || row.sourceIngredientId || '')}</strong></p>` : ''}
+              <h6>${row.ingredientName}</h6>
+              ${statusChipsHtml ? `<div class="produccion-lote-status-chips">${statusChipsHtml}</div>` : ''}
+              ${row.isSubstitute ? `<p class="produccion-lote-substitute-line"><i class="fa-solid fa-link"></i> Reemplaza a <strong>${escapeHtml(row.sourceIngredientName || row.sourceIngredientId || '')}</strong></p>` : ''}
               ${isSkippedIngredient ? `<p class="produccion-lote-sin-traz-note"><i class="bi bi-exclamation-triangle-fill"></i> Este ingrediente se producirá <strong>sin trazabilidad</strong> — los faltantes no se descontarán de stock. <button type="button" class="produccion-lote-undo-skip" data-skip-trace-ingredient="${escapeHtml(row.sourceIngredientId || row.ingredientId)}" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-rotate-left"></i> Quitar</button></p>` : ''}
-              <p>
-                <span class="produccion-needs-label">Necesita</span>
-                <strong class="produccion-needs-value">${formatCompactQty(row.neededQty, row.ingredientUnit)}</strong>
-                ${availableHtml}
-                ${hasMeaningfulMissing ? ` <em>· Faltan ${formatCompactQty(netMissingQty, row.ingredientUnit)}</em>` : ''}
-              </p>
+              ${qtyDetailHtml}
             </div>
           </div>
           <div class="produccion-lote-head-actions">

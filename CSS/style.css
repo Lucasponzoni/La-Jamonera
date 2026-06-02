@@ -10120,6 +10120,110 @@ div:where(.swal2-container).swal2-center>.swal2-popup {
   font-weight: 700;
 }
 
+/* Chips de estado: lectura de un vistazo (Completo / Cubierto / Faltan / etc.) */
+.produccion-lote-status-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 2px;
+}
+
+.produccion-lote-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  border: 1px solid transparent;
+  line-height: 1.2;
+}
+
+.produccion-lote-status-chip.is-ok {
+  background: #eafaf0;
+  border-color: #b8eac8;
+  color: #128a43;
+}
+
+.produccion-lote-status-chip.is-infinite {
+  background: #eafaf0;
+  border-color: #b8eac8;
+  color: #128a43;
+}
+
+.produccion-lote-status-chip.is-substitute {
+  background: #eef0ff;
+  border-color: #c7ccf7;
+  color: #4a48c4;
+}
+
+.produccion-lote-status-chip.is-substitutable {
+  background: #fff1db;
+  border-color: #f2c98c;
+  color: #b15f08;
+}
+
+.produccion-lote-status-chip.is-missing {
+  background: #fdecef;
+  border-color: #f2c2c9;
+  color: #b53c53;
+}
+
+.produccion-lote-status-chip.is-sin-traz {
+  background: #fff1db;
+  border-color: #f2c98c;
+  color: #b15f08;
+}
+
+/* Detalle de cantidades en palabras claras */
+.produccion-lote-qty-detail {
+  margin: 4px 0 0;
+  font-size: 0.84rem;
+  color: #5a6f97;
+  line-height: 1.5;
+}
+
+.produccion-lote-qty-detail .produccion-qty-need {
+  color: #2b416f;
+  font-weight: 700;
+}
+
+.produccion-lote-qty-detail .produccion-qty-need strong {
+  color: #158346;
+  font-weight: 800;
+}
+
+.produccion-lote-qty-detail .produccion-qty-sub-line {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-left: 6px;
+}
+
+.produccion-lote-qty-detail .produccion-qty-have strong {
+  color: #2b416f;
+  font-weight: 800;
+}
+
+.produccion-lote-qty-detail .produccion-qty-substitute {
+  color: #b15f08;
+}
+
+.produccion-lote-qty-detail .produccion-qty-substitute strong {
+  font-weight: 800;
+}
+
+.produccion-lote-qty-detail .produccion-qty-missing {
+  color: #b53c53;
+  font-weight: 700;
+}
+
+.produccion-lote-qty-detail .produccion-qty-sep {
+  color: #aab4cc;
+  margin: 0 2px;
+}
+
 .produccion-lote-ingredient-image {
   width: 42px;
   height: 42px;
