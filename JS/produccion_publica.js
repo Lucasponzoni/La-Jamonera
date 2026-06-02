@@ -582,7 +582,7 @@
       const item = group.plans[0] || {};
       const traceIngredient = traceIngredients.find((row) => normalize(row?.ingredientId) === normalize(item?.ingredientId));
       const ingredientImage = normalize(item?.ingredientImageUrl || traceIngredient?.ingredientImageUrl);
-      const mergedLots = group.plans.flatMap((plan) => (Array.isArray(plan.lots) ? plan.lots : []));
+      const mergedLots = group.plans.flatMap((plan) => (Array.isArray(plan.lots) ? plan.lots : [])).filter((lot) => Number(lot?.takeQty || 0) > 0.0001);
       const hasInfiniteStock = group.plans.some((plan) => plan?.infiniteStock || plan?.noTraceability);
       const aggregatedImages = mergedLots.flatMap((lot) => (Array.isArray(lot?.invoiceImageUrls) ? lot.invoiceImageUrls : []));
       const providerRneRows = mergedLots.map((lot) => resolveProviderRneFromLot(lot));
@@ -621,7 +621,7 @@
             <span class="produccion-trace-ingredient-avatar">${ingredientImage ? `<img src="${escapeHtml(ingredientImage)}" alt="${escapeHtml(item?.ingredientName || 'Ingrediente')}">` : '<i class="bi bi-basket2-fill fa-solid fa-carrot"></i>'}</span>
             <div>
               <h6><i class="bi bi-box-seam fa-solid fa-box-open"></i> ${escapeHtml(group.sourceIngredientName || item?.ingredientName || item?.ingredientId || 'Ingrediente')}</h6>
-              ${group.plans.some((plan) => plan.isSubstitute) ? `<small><i class="fa-solid fa-link"></i> Sustitutos usados: ${escapeHtml(group.plans.filter((plan) => plan.isSubstitute).map((plan) => plan.ingredientName).join(' + ') || '-')}</small>` : ''}
+              ${group.plans.some((plan) => plan.isSubstitute && getIngredientPlanUsedQty(plan) > 0.0001) ? `<small><i class="fa-solid fa-link"></i> Sustitutos usados: ${escapeHtml(group.plans.filter((plan) => plan.isSubstitute && getIngredientPlanUsedQty(plan) > 0.0001).map((plan) => plan.ingredientName).join(' + ') || '-')}</small>` : ''}
               ${hasInfiniteStock ? '<small><i class="fa-solid fa-infinity"></i> Stock infinito sin trazabilidad</small>' : ''}
               <small>Cantidad usada: ${formatCompactQty(totalUsedQty, item?.unit || item?.ingredientUnit || '')}</small>
               <small> - RNE proveedor: <strong>${escapeHtml(getTraceRneDisplay(providerRneSummary))}</strong></small>
