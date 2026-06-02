@@ -73,6 +73,7 @@
     activeRecipeId: '',
     editorMode: 'produce',
     sinTrazabilidad: false,
+    loteAntiguo: false,
     activeDraftId: '',
     activeReservationId: '',
     reservationTick: null,
@@ -440,6 +441,15 @@
       return Math.max(0, qty - (qty * ratio));
     }
     return qty;
+  };
+  // Cantidad ORIGINAL del lote (entry.qty), ignorando consumo posterior. Se usa
+  // sólo en modo "lote antiguo" (producción retroactiva): los lotes ya consumidos
+  // siguen existiendo como entries con disponible 0, pero a la fecha histórica
+  // tenían su cantidad completa para la trazabilidad.
+  const getEntryOriginalQty = (entry) => {
+    const qty = parseNumber(entry?.qty);
+    if (Number.isFinite(qty) && qty > 0) return qty;
+    return getEntryAvailableQty(entry);
   };
   const getEntryAvailableKg = (entry) => {
     const availableKg = Number(entry?.availableKg);
@@ -1482,14 +1492,16 @@
     }
     return Number(low.toFixed(4));
   };
-  const allocateAcrossFefoGroup = ({ entries = [], remaining = 0, requirement, productionDateIso, warnings }) => {
+  const allocateAcrossFefoGroup = ({ entries = [], remaining = 0, requirement, productionDateIso, warnings, loteAntiguo = false }) => {
     const lots = [];
     let pending = Number(remaining || 0);
     if (pending <= 0 || !entries.length) return { lots, remaining: 0 };
     const availableGroup = entries.map((entry) => {
       const entryUnit = normalizeLower(entry.unit || requirement.unit);
-      const entryQty = getEntryAvailableQty(entry);
-      const reservedByOther = reservedByOthersForEntry(requirement.ingredientId, entry.id, entryUnit);
+      // En lote antiguo usamos la cantidad ORIGINAL e ignoramos reservas vigentes:
+      // no se descuenta stock, sólo se arma la trazabilidad histórica.
+      const entryQty = loteAntiguo ? getEntryOriginalQty(entry) : getEntryAvailableQty(entry);
+      const reservedByOther = loteAntiguo ? 0 : reservedByOthersForEntry(requirement.ingredientId, entry.id, entryUnit);
       const available = Math.max(0, entryQty - reservedByOther);
       const expiryIso = isEntryNoPerecedero(entry) ? '' : normalizeValue(entry.expiryDate);
       const futureForDate = isEntryFutureForProductionDate(entry, productionDateIso);
@@ -1898,7 +1910,8 @@
               unit: requirement.unit
             },
             productionDateIso,
-            warnings
+            warnings,
+            loteAntiguo: Boolean(options.loteAntiguo)
           });
           localRemaining = allocation.remaining;
           lots.push(...allocation.lots);
@@ -1991,8 +2004,8 @@
           });
           const prepared = group.entries.map(({ entry, related }) => {
             const entryUnit = normalizeLower(entry.unit || requirement.unit);
-            const entryQty = getEntryAvailableQty(entry);
-            const reservedByOther = reservedByOthersForEntry(related.ingredientId, entry.id, entryUnit);
+            const entryQty = options.loteAntiguo ? getEntryOriginalQty(entry) : getEntryAvailableQty(entry);
+            const reservedByOther = options.loteAntiguo ? 0 : reservedByOthersForEntry(related.ingredientId, entry.id, entryUnit);
             const available = Math.max(0, entryQty - reservedByOther);
             const expiryIso = isEntryNoPerecedero(entry) ? '' : normalizeValue(entry.expiryDate);
             const futureForDate = isEntryFutureForProductionDate(entry, productionDateIso);
@@ -2105,7 +2118,12 @@
         });
       }
       if (missing > 0.0001) {
-        if (sinTrazForThis) {
+        if (options.loteAntiguo) {
+          // Lote antiguo: avisar pero permitir. No bloquea (no va a conflicts).
+          // Los lotes históricos asignados quedan para la trazabilidad; el faltante
+          // sólo se informa porque no se descuenta stock.
+          warnings.push(`${requirement.name}: los lotes de la fecha ${productionDateIso} no cubren ${formatQty(missing, requirement.unit)}. Se produce igual (sin descontar stock).`);
+        } else if (sinTrazForThis) {
           const existingPlan = ingredientPlans.find((p) => normalizeValue(p.ingredientId) === normalizeValue(requirement.ingredientId) && !p.isSubstitute);
           if (existingPlan) {
             existingPlan.missingQty = Number((Number(existingPlan.missingQty || 0) + missing).toFixed(4));
@@ -4082,7 +4100,8 @@
             item?.recipeNombreComercial ||
             state.recetas?.[item?.recipeId]?.nombreComercial
           );
-          return `<span class="produccion-history-product-cell"><strong>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</strong>${comercial ? `<small class="produccion-history-product-comercial">${escapeHtml(capitalize(comercial))}</small>` : ''}</span>`;
+          const loteAntiguoBadge = item.loteAntiguo ? '<small class="produccion-lote-antiguo-tag"><i class="bi bi-calendar-minus"></i> Lote antiguo</small>' : '';
+          return `<span class="produccion-history-product-cell"><strong>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</strong>${comercial ? `<small class="produccion-history-product-comercial">${escapeHtml(capitalize(comercial))}</small>` : ''}${loteAntiguoBadge}</span>`;
         })()}</td>
         <td>${Number(item.quantityKg || 0).toFixed(2)} kg</td>
         <td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td>
@@ -7513,9 +7532,12 @@
       await openIosSwal({ title: 'Eliminación bloqueada', html: '<p>Esta producción está asociada a una salida de productos. Eliminá primero los repartos vinculados.</p>', icon: 'warning' });
       return;
     }
+    const isLoteAntiguo = Boolean(registro.loteAntiguo);
     const confirmDelete = await openIosSwal({
       title: 'Eliminar producción',
-      html: '<p>Se eliminará la producción, se restaurará el stock de insumos usados y se limpiarán los movimientos relacionados del historial.</p><small>Esta acción no se puede deshacer.</small>',
+      html: isLoteAntiguo
+        ? '<p>Se eliminará la producción de <strong>lote antiguo</strong> y su trazabilidad. No hay stock que restaurar (esta producción nunca tocó inventario).</p><small>Esta acción no se puede deshacer.</small>'
+        : '<p>Se eliminará la producción, se restaurará el stock de insumos usados y se limpiarán los movimientos relacionados del historial.</p><small>Esta acción no se puede deshacer.</small>',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Eliminar',
@@ -7524,8 +7546,23 @@
     if (!confirmDelete.isConfirmed) return;
     const auth = await askSensitivePassword('Clave general requerida', '<p>Confirmá para eliminar la producción y revertir su impacto.</p>', true);
     if (!auth.isConfirmed) return;
-    showRestoringStockOverlay();
+    showRestoringStockOverlay(isLoteAntiguo ? 'Eliminando producción...' : 'Restaurando stock...');
     try {
+      if (isLoteAntiguo) {
+        // Lote antiguo: nunca descontó stock ni registró movimiento en producto.
+        // Sólo borramos el registro y su trazabilidad pública; NO restauramos nada.
+        const registros = deepClone(state.registros);
+        const previous = deepClone(registros[productionId]);
+        delete registros[productionId];
+        await window.dbLaJamoneraRest.write(`${REGISTROS_PATH}/${productionId}`, null);
+        await removePublicTrace(productionId);
+        await appendAudit({ action: 'produccion_lote_antiguo_eliminada', productionId, before: previous, after: null, reason: auth.value.reason });
+        state.registros = registros;
+        await refreshAfterMutation();
+        if (Swal.isVisible()) Swal.close();
+        await openIosSwal({ title: 'Producción eliminada', html: `<p>Se eliminó ${productionId} (lote antiguo).</p>`, icon: 'success', confirmButtonText: 'Entendido' });
+        return true;
+      }
       await ensureInventoryDetailsForIds(getInventoryIdsFromPlans({ ingredientPlans: registro.lots || [] }), { force: true });
       const latestInventory = safeObject(state.inventario);
       const restored = applyPlanOnInventory(latestInventory, { ingredientPlans: registro.lots || [] }, productionId, registro.productionDate, 'restore');
@@ -7616,6 +7653,10 @@
   const editProduction = async (registro) => {
     if (registro.status === 'anulada') {
       await openIosSwal({ title: 'No editable', html: '<p>Una producción anulada no puede editarse.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+      return;
+    }
+    if (registro.loteAntiguo) {
+      await openIosSwal({ title: 'No editable', html: '<p>Una producción de <strong>lote antiguo</strong> (retroactiva) no puede editarse. Si necesitás corregirla, eliminala y cargala de nuevo.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
       return;
     }
     const auth = await askSensitivePassword('Editar producción', '<p>Se recalculará el consumo FEFO.</p>', true);
@@ -8285,6 +8326,13 @@
                       <span class="produccion-more-item-desc">Insumos sin stock no serán trazados</span>
                     </span>
                   </button>
+                  <button type="button" class="produccion-more-item" data-produce-lote-antiguo="${recipe.id}">
+                    <span class="produccion-more-item-icon"><i class="bi bi-calendar-minus"></i></span>
+                    <span class="produccion-more-item-body">
+                      <span class="produccion-more-item-label">Producir lote antiguo</span>
+                      <span class="produccion-more-item-desc">Producción retroactiva, sin tocar stock</span>
+                    </span>
+                  </button>
                   <button type="button" class="produccion-more-item" data-recipe-image-view="${recipe.id}" ${normalizeValue(recipe.imageUrl) ? '' : 'disabled'}>
                     <span class="produccion-more-item-icon"><i class="fa-regular fa-image"></i></span>
                     <span class="produccion-more-item-body">
@@ -8433,22 +8481,26 @@
             <div><strong>Ingreso:</strong> ${formatIsoEs(lot.entryDate || '') || formatDateTime(lot.createdAt)}</div>
             <div><strong>Vence:</strong> ${formatExpiryHuman(lot.expiryDate)} ${normalizeLower(lot.expiryDate) === 'no perecedero' ? '' : getExpiryBadge(lot.expiryDate)}</div>
             <div><strong>Usar:</strong> ${formatCompactQty(lot.takeQty, lot.unit)}</div>
-            ${lot.status === 'expired' ? `<div class="produccion-lote-expired-help"><strong>Lote expirado:</strong> no se usará con fecha ${formatIsoEs(plan.productionDate)}. Cambiá la fecha o resolvelo manualmente ${formatValidProductionRange(lot.entryDate, lot.expiryDate)}.</div>
+            ${lot.status === 'expired' ? (state.loteAntiguo
+              ? `<div class="produccion-lote-neutral-help"><i class="bi bi-info-circle"></i> Lote ya vencido al ${formatIsoEs(plan.productionDate)} ${formatValidProductionRange(lot.entryDate, lot.expiryDate)}: no se usa para la trazabilidad de esta fecha.</div>`
+              : `<div class="produccion-lote-expired-help"><strong>Lote expirado:</strong> no se usará con fecha ${formatIsoEs(plan.productionDate)}. Cambiá la fecha o resolvelo manualmente ${formatValidProductionRange(lot.entryDate, lot.expiryDate)}.</div>
               <div class="produccion-lote-blocked-actions">
                 <button type="button" class="btn ios-btn ios-btn-secondary" data-set-production-date="${escapeHtml(lot.entryDate || '')}" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-calendar-day"></i><span>Cambiar fecha</span></button>
                 <button type="button" class="btn ios-btn ios-btn-warning" data-skip-trace-ingredient="${escapeHtml(lot.ingredientId)}" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-arrow-right"></i><span>Producir sin trazabilidad este ingrediente</span></button>
-              </div>` : ''}
-            ${lot.status === 'future' && !fullyCoveredBySubstitute ? `<div class="produccion-lote-expired-help"><strong>Lote posterior a la fecha:</strong> ingresó el ${formatIsoEs(lot.entryDate || '')}. No se usará con fecha ${formatIsoEs(plan.productionDate)}; cambiá la producción a ${formatIsoEs(lot.entryDate || '')} o producí sin trazabilidad para el faltante.</div>
+              </div>`) : ''}
+            ${lot.status === 'future' && !fullyCoveredBySubstitute ? (state.loteAntiguo
+              ? `<div class="produccion-lote-neutral-help"><i class="bi bi-info-circle"></i> Lote ingresado el ${formatIsoEs(lot.entryDate || '')}, posterior al ${formatIsoEs(plan.productionDate)}: no existía a esa fecha, no se usa.</div>`
+              : `<div class="produccion-lote-expired-help"><strong>Lote posterior a la fecha:</strong> ingresó el ${formatIsoEs(lot.entryDate || '')}. No se usará con fecha ${formatIsoEs(plan.productionDate)}; cambiá la producción a ${formatIsoEs(lot.entryDate || '')} o producí sin trazabilidad para el faltante.</div>
               <div class="produccion-lote-blocked-actions">
                 <button type="button" class="btn ios-btn ios-btn-secondary" data-set-production-date="${escapeHtml(lot.entryDate || '')}" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-calendar-day"></i><span>Usar fecha ${formatIsoEs(lot.entryDate || '')}</span></button>
                 <button type="button" class="btn ios-btn ios-btn-warning" data-skip-trace-ingredient="${escapeHtml(lot.ingredientId)}" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-arrow-right"></i><span>Producir sin trazabilidad este ingrediente</span></button>
-              </div>` : ''}
+              </div>`) : ''}
             <div><strong class="produccion-provider-key">Proveedor:</strong> ${lot.provider || '-'}</div>
             <div><strong>Factura:</strong> ${lot.invoiceNumber || '-'}</div>
             <div class="produccion-lote-adjuntos-row"><strong>Adjuntos:</strong> ${lot.invoiceImageUrls.length
               ? `<button type="button" class="btn ios-btn ios-btn-secondary produccion-lote-adjuntos-btn" data-lot-images="${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Ver (${lot.invoiceImageUrls.length})</span></button>`
               : '<span>Sin adjuntos</span>'}</div>
-            ${lot.status === 'expired' ? `<div class="produccion-lote-expired-actions"><button type="button" class="btn ios-btn ios-btn-secondary" data-resolve-expired-lot="${escapeHtml(lot.ingredientId)}" data-resolve-expired-entry="${escapeHtml(lot.entryId)}" data-resolve-expired-qtykg="${Number(lot.availableKg || 0).toFixed(4)}" data-resolve-expired-mode="sold_counter" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-shop"></i><span>Vendido en mostrador</span></button><button type="button" class="btn ios-btn ios-btn-danger" data-resolve-expired-lot="${escapeHtml(lot.ingredientId)}" data-resolve-expired-entry="${escapeHtml(lot.entryId)}" data-resolve-expired-qtykg="${Number(lot.availableKg || 0).toFixed(4)}" data-resolve-expired-mode="decommissioned" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-trash"></i><span>Decomisado</span></button></div>` : ''}
+            ${lot.status === 'expired' && !state.loteAntiguo ? `<div class="produccion-lote-expired-actions"><button type="button" class="btn ios-btn ios-btn-secondary" data-resolve-expired-lot="${escapeHtml(lot.ingredientId)}" data-resolve-expired-entry="${escapeHtml(lot.entryId)}" data-resolve-expired-qtykg="${Number(lot.availableKg || 0).toFixed(4)}" data-resolve-expired-mode="sold_counter" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-shop"></i><span>Vendido en mostrador</span></button><button type="button" class="btn ios-btn ios-btn-danger" data-resolve-expired-lot="${escapeHtml(lot.ingredientId)}" data-resolve-expired-entry="${escapeHtml(lot.entryId)}" data-resolve-expired-qtykg="${Number(lot.availableKg || 0).toFixed(4)}" data-resolve-expired-mode="decommissioned" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-trash"></i><span>Decomisado</span></button></div>` : ''}
           </div>`).join('<hr class="produccion-lote-separator">') : (rowInfiniteStock ? `<div class="produccion-lote-infinite-note"><i class="fa-solid fa-infinity" aria-hidden="true"></i><span>${escapeHtml(INFINITE_STOCK_NOTICE)}</span></div>` : '<p class="produccion-lote-empty">Sin lotes aptos para la fecha elegida.</p>')}
         </div>
       </article>
@@ -8500,6 +8552,7 @@
     const isViewOnly = mode === 'view';
     state.editorMode = mode;
     state.sinTrazabilidad = !isViewOnly && Boolean(options.sinTrazabilidad);
+    state.loteAntiguo = !isViewOnly && Boolean(options.loteAntiguo);
     state.editorRenderSeq = Number(state.editorRenderSeq || 0) + 1;
     const editorRenderSeq = state.editorRenderSeq;
     const recipe = state.recetas[recipeId];
@@ -8510,7 +8563,7 @@
     await ensureInventoryDetailsForRecipe(recipe);
     let analysis = state.analysis[recipeId] || analyzeRecipe(recipe);
     if (!analysis) return;
-    const foreignDraft = !isViewOnly ? getForeignDraftConflict(recipe.id) : null;
+    const foreignDraft = (!isViewOnly && !state.loteAntiguo) ? getForeignDraftConflict(recipe.id) : null;
     if (foreignDraft) {
       const action = await openIosSwal({
         title: 'Conflicto de borrador',
@@ -8531,14 +8584,15 @@
         state.drafts = next;
       }
     }
-    const ownDraft = !isViewOnly ? getCurrentDraftForRecipe(recipe.id) : null;
+    const ownDraft = (!isViewOnly && !state.loteAntiguo) ? getCurrentDraftForRecipe(recipe.id) : null;
     const preferredManagers = Array.isArray(state.config.preferredManagersByRecipe?.[recipe.id])
       ? state.config.preferredManagersByRecipe[recipe.id]
       : (Array.isArray(state.config.preferredManagers) ? state.config.preferredManagers : []);
-    const initialDate = ownDraft?.productionDate || toIsoDate();
+    // Lote antiguo: fecha por defecto ~1 mes atrás (cualquier fecha pasada es válida).
+    const initialDate = ownDraft?.productionDate || (state.loteAntiguo ? addDaysToIso(toIsoDate(), -30) : toIsoDate());
     analysis = analyzeRecipe(recipe, initialDate);
     const hasOnlyInfiniteStock = Array.isArray(analysis.requirements) && analysis.requirements.length && analysis.requirements.every((item) => item.infiniteStock);
-    const editorMaxKg = (hasOnlyInfiniteStock || state.sinTrazabilidad) ? 999999 : Math.max(0.1, Number(analysis.maxKg || 0), Number(analysis.maxKgIncludingExpired || 0));
+    const editorMaxKg = (hasOnlyInfiniteStock || state.sinTrazabilidad || state.loteAntiguo) ? 999999 : Math.max(0.1, Number(analysis.maxKg || 0), Number(analysis.maxKgIncludingExpired || 0));
     const requestedInitialQty = ownDraft ? parsePositive(ownDraft.quantityKg, analysis.minKg) : Math.max(analysis.minKg, 0.1);
     // En modo VISUALIZAR (isViewOnly) NO clampeamos al stock disponible:
     // queremos mostrar al usuario qué lotes se usarían "si tuviera stock"
@@ -8561,15 +8615,16 @@
       state.skipTraceIngredients = new Set();
     }
     state.lotCollapseState = {};
-    state.editorPlan = buildPlanForRecipe(recipe, initialQty, initialDate, { sinTrazabilidad: state.sinTrazabilidad, skipTraceIngredients: state.skipTraceIngredients });
-    if (!isViewOnly) await ensureReservationForPlan(state.editorPlan);
+    state.editorPlan = buildPlanForRecipe(recipe, initialQty, initialDate, { sinTrazabilidad: state.sinTrazabilidad, skipTraceIngredients: state.skipTraceIngredients, loteAntiguo: state.loteAntiguo });
+    // Lote antiguo no reserva stock (no se descuenta nada).
+    if (!isViewOnly && !state.loteAntiguo) await ensureReservationForPlan(state.editorPlan);
     state.activeDraftId = isViewOnly ? '' : (ownDraft?.id || state.activeDraftId);
     nodes.editor.innerHTML = `
       <div class="recetas-editor-header produccion-editor-header">
         <button id="produccionBackBtn" type="button" class="btn ios-btn ios-btn-secondary recetas-back-btn"><i class="fa-solid fa-arrow-left"></i><span>Atrás</span></button>
         <div>
-          <p class="recetas-editor-kicker">${isViewOnly ? 'Visualización' : 'Producción'}</p>
-          <h6 class="recetas-editor-title mb-0">${isViewOnly ? 'Detalle de producción (solo lectura)' : 'Detalle de producción'}</h6>
+          <p class="recetas-editor-kicker">${isViewOnly ? 'Visualización' : (state.loteAntiguo ? 'Lote antiguo' : 'Producción')}</p>
+          <h6 class="recetas-editor-title mb-0">${isViewOnly ? 'Detalle de producción (solo lectura)' : (state.loteAntiguo ? 'Producción retroactiva (lote antiguo)' : 'Detalle de producción')}</h6>
         </div>
       </div>
       <section class="inventario-product-head-v2 produccion-head-box">
@@ -8584,17 +8639,18 @@
           <h3 class="inventario-editor-name">${capitalize(recipe.title || 'Sin título')}</h3>
           ${recipe.nombreComercial ? `<p class="produccion-nombre-comercial-editor">${escapeHtml(capitalize(recipe.nombreComercial))}</p>` : ''}
           <p class="inventario-editor-meta">${capitalize(recipe.description || 'Sin descripción.')}</p>
-          <p class="produccion-max-line">Máximo para la fecha: <strong id="produccionDateMaxValue">${hasOnlyInfiniteStock ? '&infin;' : `${analysis.maxKg.toFixed(2)} kg`}</strong><span id="produccionDateMaxHelp">${(!hasOnlyInfiniteStock && Number(analysis.maxKgIncludingExpired || 0) > Number(analysis.maxKg || 0)) ? ` <span class="produccion-expired-max-help">(con vencidos: ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg)</span>` : ''}</span></p>
+          <p class="produccion-max-line"${state.loteAntiguo ? ' style="display:none"' : ''}>Máximo para la fecha: <strong id="produccionDateMaxValue">${hasOnlyInfiniteStock ? '&infin;' : `${analysis.maxKg.toFixed(2)} kg`}</strong><span id="produccionDateMaxHelp">${(!hasOnlyInfiniteStock && Number(analysis.maxKgIncludingExpired || 0) > Number(analysis.maxKg || 0)) ? ` <span class="produccion-expired-max-help">(con vencidos: ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg)</span>` : ''}</span></p>
           <div id="produccionMissingPanel" class="produccion-missing-panel-v2 d-none" aria-live="polite"></div>
           <p id="produccionReservaTimer" class="produccion-reserva-timer"></p>
         </div>
       </section>
       ${state.sinTrazabilidad ? `<div class="produccion-sin-traz-banner"><i class="bi bi-exclamation-triangle-fill"></i><div><strong>Modo sin trazabilidad activo</strong>Los insumos sin stock suficiente se registrarán como "sin trazabilidad" en esta producción. El resto se traza normalmente.</div></div>` : ''}
+      ${state.loteAntiguo ? `<div class="produccion-sin-traz-banner produccion-lote-antiguo-banner"><i class="bi bi-calendar-minus"></i><div><strong>Modo lote antiguo (producción retroactiva)</strong>Elegí una fecha pasada. Buscamos los lotes que existían y no estaban vencidos a esa fecha. <b>No</b> se descuenta stock ni se registra movimiento en producto/ingredientes: sólo se genera la planilla y la trazabilidad.</div></div>` : ''}
       <section class="recipe-step-card step-block">
         <h6 class="step-title"><span class="recipe-step-number">1</span> ¿Qué cantidad deseás producir?</h6>
         <div class="produccion-qty-grid">
           <input id="produccionQtyInput" type="number" min="0.1" step="0.01" max="${editorMaxKg.toFixed(2)}" value="${initialQty.toFixed(2)}" class="form-control ios-input" ${isViewOnly ? 'disabled' : ''}>
-          <button id="produccionQtyMaxBtn" type="button" class="btn ios-btn ios-btn-secondary" ${(isViewOnly || hasOnlyInfiniteStock || state.sinTrazabilidad) ? 'disabled' : ''}>Usar máximo</button>
+          <button id="produccionQtyMaxBtn" type="button" class="btn ios-btn ios-btn-secondary" ${(isViewOnly || hasOnlyInfiniteStock || state.sinTrazabilidad || state.loteAntiguo) ? 'disabled' : ''}>Usar máximo</button>
         </div>
         <p id="produccionQtyHelp" class="produccion-qty-help"></p>
       </section>
@@ -8633,7 +8689,9 @@
         <div class="produccion-final-actions">
           ${isViewOnly
             ? '<span class="produccion-view-only-note"><i class="fa-regular fa-eye"></i><span>Entraste desde Visualizar: no se guardan borradores ni se puede confirmar.</span></span>'
-            : '<button id="produccionSaveDraftBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-floppy-disk"></i><span>Guardar borrador</span></button><button id="produccionConfirmBtn" type="button" class="btn ios-btn ios-btn-success"><i class="fa-solid fa-check"></i><span>Confirmar producción</span></button>'}
+            : (state.loteAntiguo
+              ? '<button id="produccionConfirmBtn" type="button" class="btn ios-btn ios-btn-success"><i class="fa-solid fa-check"></i><span>Confirmar producción retroactiva</span></button>'
+              : '<button id="produccionSaveDraftBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-floppy-disk"></i><span>Guardar borrador</span></button><button id="produccionConfirmBtn" type="button" class="btn ios-btn ios-btn-success"><i class="fa-solid fa-check"></i><span>Confirmar producción</span></button>')}
         </div>
       </section>`;
     const qtyInput = nodes.editor.querySelector('#produccionQtyInput');
@@ -8932,7 +8990,7 @@
       analysis = analyzeRecipe(recipe, productionDate);
       const hasOnlyInfiniteStockForDate = Array.isArray(analysis.requirements) && analysis.requirements.length && analysis.requirements.every((item) => item.infiniteStock);
       const traceableMaxKg = hasOnlyInfiniteStockForDate ? 999999 : Math.max(0, Number(analysis.maxKg || 0));
-      const editorMaxKg = state.sinTrazabilidad ? 999999 : Math.max(0, Number(analysis.maxKg || 0), Number(analysis.maxKgIncludingExpired || 0));
+      const editorMaxKg = (state.sinTrazabilidad || state.loteAntiguo) ? 999999 : Math.max(0, Number(analysis.maxKg || 0), Number(analysis.maxKgIncludingExpired || 0));
       const maxValueNode = nodes.editor.querySelector('#produccionDateMaxValue');
       const maxHelpNode = nodes.editor.querySelector('#produccionDateMaxHelp');
       if (maxValueNode) maxValueNode.innerHTML = hasOnlyInfiniteStockForDate ? '&infin;' : `${traceableMaxKg.toFixed(2)} kg`;
@@ -8945,9 +9003,9 @@
           : '';
         maxHelpNode.innerHTML = `${expiredExtra}${futureExtra}`;
       }
-      if (!state.sinTrazabilidad) qtyInput.max = editorMaxKg.toFixed(2);
+      if (!state.sinTrazabilidad && !state.loteAntiguo) qtyInput.max = editorMaxKg.toFixed(2);
       let qty = parsePositive(qtyInput.value, 0.1);
-      if (!state.sinTrazabilidad && qty > editorMaxKg) {
+      if (!state.sinTrazabilidad && !state.loteAntiguo && qty > editorMaxKg) {
         qty = editorMaxKg;
         qtyInput.value = qty.toFixed(2);
       } else if (formatInput) {
@@ -8972,14 +9030,17 @@
         // Re-sync el flag global con el set ya limpio.
         state.sinTrazabilidad = state.skipTraceIngredients.size > 0;
       }
-      state.editorPlan = buildPlanForRecipe(recipe, qty, productionDate, { sinTrazabilidad: state.sinTrazabilidad, skipTraceIngredients: state.skipTraceIngredients });
+      state.editorPlan = buildPlanForRecipe(recipe, qty, productionDate, { sinTrazabilidad: state.sinTrazabilidad, skipTraceIngredients: state.skipTraceIngredients, loteAntiguo: state.loteAntiguo });
       lotsWrap.innerHTML = buildLotsBreakdownHtml(state.editorPlan);
       renderRecipeHistory();
       const expiredLotsCount = state.editorPlan.ingredientPlans.reduce((acc, row) => acc + row.lots.filter((lot) => lot.status === 'expired' && Number(lot.takeQty || 0) > 0.0001).length, 0);
-      const canConfirm = !isViewOnly && (state.editorPlan.isValid || state.sinTrazabilidad) && qty > 0 && expiredLotsCount === 0;
+      // Lote antiguo: nunca bloquea por validez ni por vencidos (sólo asigna lotes 'ok' históricos).
+      const canConfirm = !isViewOnly && (state.editorPlan.isValid || state.sinTrazabilidad || state.loteAntiguo) && qty > 0 && (state.loteAntiguo || expiredLotsCount === 0);
       if (confirmBtn) confirmBtn.disabled = !canConfirm;
       if (canConfirm) {
-        qtyHelp.textContent = state.sinTrazabilidad
+        qtyHelp.textContent = state.loteAntiguo
+          ? `Producción retroactiva para ${formatIsoEs(productionDate)}. Escala: ${qty.toFixed(2)} kg. No se descuenta stock; se generan planilla y trazabilidad con los lotes de esa fecha.`
+          : state.sinTrazabilidad
           ? `Escala: ${qty.toFixed(2)} kg. Modo sin trazabilidad: los insumos faltantes no serán trazados.`
           : `Podés producir ${traceableMaxKg === 999999 ? 'sin límite trazable' : `hasta ${traceableMaxKg.toFixed(2)} kg trazables`} para ${formatIsoEs(productionDate)}. Escala aplicada: ${qty.toFixed(2)} kg.`;
       } else if (isViewOnly) {
@@ -9001,7 +9062,7 @@
       // Panel con lista detallada de ingredientes y su estado de cobertura.
       // Se muestra cuando qty=0 o cuando hay faltantes, así el usuario ve qué bloquea.
       renderMissingPanel(qty);
-      if (!isViewOnly) await ensureReservationForPlan(state.editorPlan);
+      if (!isViewOnly && !state.loteAntiguo) await ensureReservationForPlan(state.editorPlan);
     };
     nodes.editor.addEventListener('click', async (event) => {
       if (state.editorRenderSeq !== editorRenderSeq) return;
@@ -9123,7 +9184,7 @@
       const recipePlanillaBtn = event.target.closest('[data-recipe-prod-planilla]');
       if (recipePlanillaBtn) {
         const reg = await ensureRegistroDetail(recipePlanillaBtn.dataset.recipeProdPlanilla);
-        if (reg) await window.laJamoneraPlanillaProduccion?.openByRegistro?.(reg, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users) });
+        if (reg) await window.laJamoneraPlanillaProduccion?.openByRegistro?.(reg, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users), recetas: safeObject(state.recetas) });
         return;
       }
       const recipeQrPrintBtn = event.target.closest('[data-recipe-prod-qr-print]');
@@ -9256,7 +9317,7 @@
               const planillaBtn = clickEvent.target.closest('[data-recipe-prod-planilla]');
               if (planillaBtn) {
                 const reg = await ensureRegistroDetail(planillaBtn.dataset.recipeProdPlanilla);
-                if (reg) await window.laJamoneraPlanillaProduccion?.openByRegistro?.(reg, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users) });
+                if (reg) await window.laJamoneraPlanillaProduccion?.openByRegistro?.(reg, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users), recetas: safeObject(state.recetas) });
                 return;
               }
               const qrPrintBtn = clickEvent.target.closest('[data-recipe-prod-qr-print]');
@@ -9383,6 +9444,8 @@
         altInput: true,
         altFormat: 'd/m/Y',
         defaultDate: initialDate,
+        // Lote antiguo: sólo fechas pasadas (tope = ayer).
+        maxDate: state.loteAntiguo ? addDaysToIso(toIsoDate(), -1) : undefined,
         allowInput: true,
         onChange: async () => {
           await updateEditorPlan();
@@ -9416,13 +9479,14 @@
       await ensureInventoryDetailsForRecipe(recipe, { force: true });
       const qty = parsePositive(qtyInput.value, 0.1);
       const date = normalizeValue(dateInput.value) || toIsoDate();
-      const revalidated = buildPlanForRecipe(recipe, qty, date, { sinTrazabilidad: state.sinTrazabilidad, skipTraceIngredients: state.skipTraceIngredients });
+      const revalidated = buildPlanForRecipe(recipe, qty, date, { sinTrazabilidad: state.sinTrazabilidad, skipTraceIngredients: state.skipTraceIngredients, loteAntiguo: state.loteAntiguo });
 
       // Prompt si hay ingredientes con SOLO lotes bloqueados (future/expired)
       // y el usuario no resolvió (cambiar fecha o sin trazabilidad).
       // Detectamos ingredientes con missingQty > 0 que tienen lotes future
       // o expired disponibles pero ningún lote ok.
-      if (!state.sinTrazabilidad) {
+      // Lote antiguo: avisa pero permite, no mostramos este prompt bloqueante.
+      if (!state.sinTrazabilidad && !state.loteAntiguo) {
         const blockedIngredients = revalidated.ingredientPlans
           .filter((row) => {
             if (row.infiniteStock || row.noTraceability) return false;
@@ -9504,7 +9568,7 @@
         renderRecipeHistory();
         return;
       }
-      if (!revalidated.isValid && !state.sinTrazabilidad) {
+      if (!revalidated.isValid && !state.sinTrazabilidad && !state.loteAntiguo) {
         await openIosSwal({
           title: 'Stock cambió durante la edición',
           html: `<p>Recalculamos y encontramos conflictos:</p><ul>${revalidated.conflicts.map((item) => `<li>${item}</li>`).join('')}</ul>`,
@@ -9604,9 +9668,11 @@
         </li>`;
       }).join('');
       const skipCount = (revalidated.ingredientPlans || []).filter((row) => !row.infiniteStock && Boolean(row.noTraceability || row.sinTrazabilidad)).length;
-      const sinTrazBanner = skipCount > 0
-        ? `<div class="pc-confirm-warning"><i class="bi bi-exclamation-triangle-fill"></i><span>Se guardará <strong>sin trazabilidad</strong> ${skipCount} ingrediente${skipCount === 1 ? '' : 's'}. Revisá el listado antes de confirmar.</span></div>`
-        : '';
+      const sinTrazBanner = state.loteAntiguo
+        ? `<div class="pc-confirm-warning"><i class="bi bi-calendar-minus"></i><span>Producción <strong>retroactiva (lote antiguo)</strong> para ${escapeHtml(formatIsoEs(date))}. <strong>No</strong> se descuenta stock ni se registra en producto/ingredientes. Sólo planilla + trazabilidad.</span></div>`
+        : (skipCount > 0
+          ? `<div class="pc-confirm-warning"><i class="bi bi-exclamation-triangle-fill"></i><span>Se guardará <strong>sin trazabilidad</strong> ${skipCount} ingrediente${skipCount === 1 ? '' : 's'}. Revisá el listado antes de confirmar.</span></div>`
+          : '');
       const confirm = await openIosSwal({
         title: 'Confirmar producción final',
         html: `<div class="text-start produccion-confirm-summary produccion-confirm-card">
@@ -9669,8 +9735,10 @@
         const prefix = normalizeValue(state.config.idConfig?.prefix) || 'PROD-LJ';
         const productionId = `${prefix}-${dateToken}-${String(nextSequence).padStart(4, '0')}`;
         const observations = normalizeValue(nodes.editor.querySelector('#produccionObsInput')?.value);
-        const inventoryWithResolutions = applyPendingExpiryActionsOnInventory(state.inventario);
-        const inventarioNext = applyPlanOnInventory(inventoryWithResolutions, revalidated, productionId, date, 'consume');
+        // Lote antiguo (retroactivo): NO toca inventario. No descuenta stock ni
+        // aplica resoluciones de vencidos. inventarioNext queda sin cambios.
+        const inventoryWithResolutions = state.loteAntiguo ? state.inventario : applyPendingExpiryActionsOnInventory(state.inventario);
+        const inventarioNext = state.loteAntiguo ? state.inventario : applyPlanOnInventory(inventoryWithResolutions, revalidated, productionId, date, 'consume');
         const packagingMeta = getRecipePackagingMeta(recipe, date);
         const agingDaysAtProduction = Number(packagingMeta.agingDays || 0);
         const recipeRnpa = safeObject(recipe.rnpa);
@@ -9750,7 +9818,8 @@
         createdAt: nowTs(),
         status: 'confirmada',
         sinTrazabilidad: Boolean(state.sinTrazabilidad),
-        reservationId: state.activeReservationId,
+        loteAntiguo: Boolean(state.loteAntiguo),
+        reservationId: state.loteAntiguo ? '' : state.activeReservationId,
         planillaVersion: 1,
         publicTraceUrl: getPublicTraceUrlForProduction(productionId),
         exports: {},
@@ -9759,27 +9828,36 @@
         // `revalidated` es el plan validado que se acaba de aplicar sobre
         // inventarioNext (líneas arriba). Antes se referenciaba `plan` que no
         // existía en este scope y causaba ReferenceError al confirmar.
-        await writeInventoryRecordsForPlans(inventarioNext, revalidated);
+        if (!state.loteAntiguo) {
+          // Sólo producción normal escribe inventario (descuento de ingredientes).
+          await writeInventoryRecordsForPlans(inventarioNext, revalidated);
+        }
         await window.dbLaJamoneraRest.write(SEQUENCE_PATH, nextSequence);
         await window.dbLaJamoneraRest.write(`${REGISTROS_PATH}/${productionId}`, registro);
         await publishPublicTrace(registro);
-        appendRecipeMovement(recipe.id, {
-          id: `ing_${productionId}`,
-          type: 'ingreso',
-          qtyKg: qty,
-          at: nowTs(),
-          sourceId: productionId,
-          sourceCode: productionId,
-          label: 'Producción confirmada',
-          date
-        });
-        await window.dbLaJamoneraRest.write(`${REPARTO_PATH}/productIndex/${recipe.id}`, stripUndefinedDeep(safeObject(state.reparto?.productIndex?.[recipe.id])));
-        await appendAudit({ action: 'produccion_confirmada', productionId, before: null, after: registro, reason: 'confirmacion final' });
-        state.config.lastProductionByRecipe[recipe.id] = nowTs();
-        await persistConfig();
-        await releaseReservation('confirmed');
-        await discardDraft();
+        if (!state.loteAntiguo) {
+          // Sólo producción normal registra el ingreso en el stock del producto.
+          appendRecipeMovement(recipe.id, {
+            id: `ing_${productionId}`,
+            type: 'ingreso',
+            qtyKg: qty,
+            at: nowTs(),
+            sourceId: productionId,
+            sourceCode: productionId,
+            label: 'Producción confirmada',
+            date
+          });
+          await window.dbLaJamoneraRest.write(`${REPARTO_PATH}/productIndex/${recipe.id}`, stripUndefinedDeep(safeObject(state.reparto?.productIndex?.[recipe.id])));
+        }
+        await appendAudit({ action: state.loteAntiguo ? 'produccion_lote_antiguo' : 'produccion_confirmada', productionId, before: null, after: registro, reason: state.loteAntiguo ? 'produccion retroactiva (lote antiguo)' : 'confirmacion final' });
+        if (!state.loteAntiguo) {
+          state.config.lastProductionByRecipe[recipe.id] = nowTs();
+          await persistConfig();
+          await releaseReservation('confirmed');
+          await discardDraft();
+        }
         state.pendingExpiryActions = {};
+        state.loteAntiguo = false;
         await refreshData();
         renderList();
         Swal.close();
@@ -9811,7 +9889,17 @@
       }
     });
     nodes.editor.querySelector('#produccionBackBtn').addEventListener('click', async () => {
-      if (!isViewOnly) {
+      if (state.loteAntiguo) {
+        const result = await openIosSwal({
+          title: '¿Deseás salir?',
+          html: '<p>Se cerrará la producción de lote antiguo. No se guarda borrador.</p>',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: 'Salir',
+          cancelButtonText: 'Seguir'
+        });
+        if (!result.isConfirmed) return;
+      } else if (!isViewOnly) {
         const result = await openIosSwal({
           title: '¿Deseás salir de esta producción?',
           html: '<p>Podés guardar el borrador para retomarlo más tarde o descartarlo.</p>',
@@ -9839,6 +9927,7 @@
       state.activeRecipeId = '';
       state.editorMode = 'produce';
       state.sinTrazabilidad = false;
+      state.loteAntiguo = false;
       state.activeReservationId = '';
       if (state.reservationTick) {
         clearInterval(state.reservationTick);
@@ -10230,6 +10319,32 @@
       return;
     }
 
+    const loteAntiguoBtn = event.target.closest('[data-produce-lote-antiguo]');
+    if (loteAntiguoBtn) {
+      const recipeId = loteAntiguoBtn.dataset.produceLoteAntiguo;
+      state.activeRecipeId = recipeId;
+      state.editorMode = 'produce';
+      Swal.fire({
+        title: 'Cargando producción...',
+        html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando producción" class="meta-spinner-login"></div>',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        customClass: { popup: 'ios-alert produccion-loading-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' }
+      });
+      try {
+        await renderEditor(recipeId, { mode: 'produce', loteAntiguo: true });
+      } catch (error) {
+        await openIosSwal({ title: 'No se pudo abrir producción', html: '<p>Hubo un error al preparar el editor. Intentá nuevamente.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+        state.activeRecipeId = '';
+        state.editorMode = 'produce';
+        state.loteAntiguo = false;
+        setStateView('list');
+      } finally {
+        Swal.close();
+      }
+      return;
+    }
+
     const produceBtn = event.target.closest('[data-open-produccion]');
     if (produceBtn) {
       state.activeRecipeId = produceBtn.dataset.openProduccion;
@@ -10612,7 +10727,7 @@
           if (progressText) progressText.textContent = '0% Cargando datos...';
           await Promise.all(filtered.map((row) => ensureRegistroDetail(row.id)));
           const hydratedRows = filtered.map((row) => getRegistroById(row.id) || row);
-          await window.laJamoneraPlanillaProduccion?.printBatch?.(hydratedRows, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users) }, (progress) => {
+          await window.laJamoneraPlanillaProduccion?.printBatch?.(hydratedRows, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users), recetas: safeObject(state.recetas) }, (progress) => {
             const value = Math.max(0, Math.min(100, Number(progress) || 0));
             const bar = document.getElementById('massPlanillasProgressBar');
             const text = document.getElementById('massPlanillasProgressText');
@@ -10685,6 +10800,50 @@
   };
 
   const openMassDispatchPlanillasByPeriod = async () => {
+    // Igual que "Producciones guardadas": si no hay rango seleccionado, lo pedimos
+    // antes del selector de exclusión.
+    if (!normalizeValue(state.dispatchRange)) {
+      const rangeResult = await openIosSwal({
+        title: 'Rango obligatorio para planilla',
+        html: '<p>Seleccioná un rango de fechas antes de generar planillas masivas.</p><input id="massDispatchPlanillaRangeInput" class="form-control ios-input mt-2" placeholder="Seleccionar rango de fechas" autocomplete="off">',
+        showCancelButton: true,
+        confirmButtonText: 'Continuar',
+        cancelButtonText: 'Cancelar',
+        didOpen: () => {
+          const inp = document.getElementById('massDispatchPlanillaRangeInput');
+          if (window.flatpickr && inp) {
+            let pickedRange = '';
+            disableCalendarSuggestions(inp);
+            window.flatpickr(inp, {
+              locale: window.flatpickr.l10ns?.es || undefined,
+              mode: 'range',
+              dateFormat: 'Y-m-d',
+              allowInput: false,
+              onClose: (_d, _s, instance) => {
+                const from = instance.selectedDates[0] ? getArgentinaIsoDate(instance.selectedDates[0]) : '';
+                const to = instance.selectedDates[1] ? getArgentinaIsoDate(instance.selectedDates[1]) : from;
+                pickedRange = from && to ? `${from} a ${to}` : from;
+                inp.value = pickedRange;
+              }
+            });
+          }
+        },
+        preConfirm: () => {
+          const val = normalizeValue(document.getElementById('massDispatchPlanillaRangeInput')?.value);
+          if (!val) { Swal.showValidationMessage('Seleccioná un rango de fechas.'); return false; }
+          return val;
+        }
+      });
+      if (!rangeResult.isConfirmed) return;
+      state.dispatchRange = rangeResult.value;
+      const dispatchRangeInput = document.getElementById('produccionDispatchRange');
+      if (dispatchRangeInput) {
+        dispatchRangeInput.value = rangeResult.value;
+        if (dispatchRangeInput._flatpickr) dispatchRangeInput._flatpickr.setDate(normalizeValue(rangeResult.value).split(' a ').filter(Boolean), false);
+      }
+      state.dispatchPage = 1;
+      renderDispatchHistoryTable();
+    }
     const rows = getDispatchRows();
     if (!rows.length) {
       await openIosSwal({ title: 'Sin datos', html: '<p>No hay repartos para el período seleccionado.</p>', icon: 'info' });
@@ -12508,7 +12667,7 @@
     const planillaBtn = event.target.closest('[data-prod-planilla]');
     if (planillaBtn) {
       const reg = await ensureRegistroDetail(planillaBtn.dataset.prodPlanilla);
-      if (reg) await window.laJamoneraPlanillaProduccion?.openByRegistro?.(reg, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users) });
+      if (reg) await window.laJamoneraPlanillaProduccion?.openByRegistro?.(reg, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users), recetas: safeObject(state.recetas) });
       return;
     }
     const qrPrintBtn = event.target.closest('[data-prod-qr-print]');

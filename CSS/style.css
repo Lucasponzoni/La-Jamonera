@@ -10571,6 +10571,22 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   font-size: 0.82rem;
 }
 
+/* Nota neutral para lotes vencidos/posteriores en modo lote antiguo. */
+.produccion-lote-neutral-help {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
+.produccion-lote-neutral-help i {
+  color: #9aa3af;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
 .produccion-lote-expired-actions {
   grid-column: 1 / -1;
   display: flex;
@@ -13710,6 +13726,36 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   display: block;
   font-size: 0.85rem;
   margin-bottom: 2px;
+}
+
+/* --- Lote antiguo (producción retroactiva) --- */
+.produccion-lote-antiguo-banner {
+  background: #eef3ff;
+  border-color: #c3d4ff;
+  color: #2a4d8f;
+}
+
+.produccion-lote-antiguo-banner i {
+  color: #3a6bd6;
+}
+
+.produccion-lote-antiguo-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  margin-top: 2px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #eef3ff;
+  border: 1px solid #c3d4ff;
+  color: #2a4d8f;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.produccion-lote-antiguo-tag i {
+  font-size: 0.72rem;
 }
 
 /* --- nombre comercial in editor header --- */
