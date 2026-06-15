@@ -1,0 +1,20 @@
+{
+  "name": "la-jamonera-functions",
+  "description": "Proxy Cloud Functions para La Jamonera (MailUp, DeepSeek IA, imagenes Storage)",
+  "private": true,
+  "main": "index.js",
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^6.1.1"
+  }
+}

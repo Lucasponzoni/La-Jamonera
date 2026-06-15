@@ -1613,9 +1613,6 @@
     const keyNode = await window.dbLaJamoneraRest.read('/deepseek/apiKey');
     const apiKey  = typeof keyNode === 'string' ? normalizeValue(keyNode) : normalizeValue(keyNode?.apiKey);
     if (!apiKey) throw new Error('Clave IA no configurada en Firebase.');
-    const corsNode   = await window.dbLaJamoneraRest.read('/deepseek');
-    const proxyUrl   = normalizeValue(corsNode?.url_corsh);
-    const proxyKey   = normalizeValue(corsNode?.cosh_api_key);
     const ENDPOINT   = 'https://api.deepseek.com/chat/completions';
     const doFetch    = (url, headers) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(payload) });
     try {
@@ -1623,11 +1620,9 @@
       if (res.ok) return res;
       throw new Error(`IA ${res.status}`);
     } catch (err) {
-      if (!proxyUrl) throw err;
-      const endpoint = `${proxyUrl}${proxyUrl.endsWith('/') ? '' : '/'}${ENDPOINT}`;
-      const headers  = { Authorization: `Bearer ${apiKey}` };
-      if (proxyKey) headers['x-cors-api-key'] = proxyKey;
-      const proxyRes = await doFetch(endpoint, headers);
+      // Fallback via Cloud Function (reemplazo de cors.sh). La key vive en el server.
+      if (!window.laJamoneraProxy) throw err;
+      const proxyRes = await window.laJamoneraProxy.postJson('/ia', payload);
       if (!proxyRes.ok) throw new Error(`IA proxy ${proxyRes.status}`);
       return proxyRes;
     }

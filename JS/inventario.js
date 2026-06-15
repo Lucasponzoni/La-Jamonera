@@ -1382,19 +1382,15 @@
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify(payload)
     });
-    const proxyUrl = normalizeValue(corsConfig?.url || corsConfig?.url_corsh || '');
-    const proxyKey = normalizeValue(corsConfig?.key || corsConfig?.cosh_api_key || '');
     try {
       const res = await direct();
       if (res.ok) return res;
       const txt = await res.text();
       throw new Error(`DeepSeek ${res.status}: ${txt}`);
     } catch (error) {
-      if (!proxyUrl) throw error;
-      const endpoint = `${proxyUrl}${proxyUrl.endsWith('/') ? '' : '/'}https://api.deepseek.com/chat/completions`;
-      const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` };
-      if (proxyKey) headers['x-cors-api-key'] = proxyKey;
-      const proxyRes = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(payload) });
+      // Fallback via Cloud Function (reemplazo de cors.sh). La key vive en el server.
+      if (!window.laJamoneraProxy) throw error;
+      const proxyRes = await window.laJamoneraProxy.postJson('/ia', payload);
       if (!proxyRes.ok) {
         const txt = await proxyRes.text();
         throw new Error(`CORS proxy ${proxyRes.status}: ${txt}`);
@@ -3531,17 +3527,13 @@
     reader.readAsDataURL(blob);
   });
 
-  const PRINT_CORS_PROXY_URL = 'https://proxy.cors.sh/';
-  const PRINT_CORS_PROXY_KEY = 'live_36d58f4c13cb7d838833506e8f6450623bf2605859ac089fa008cfeddd29d8dd';
   const isFirebaseStorageUrl = (url) => /firebasestorage\.googleapis\.com|\.firebasestorage\.app/i.test(String(url || ''));
 
   const fetchPrintableBlob = async (url) => {
     const safeUrl = normalizeValue(url);
-    if (isFirebaseStorageUrl(safeUrl)) {
-      return fetch(`${PRINT_CORS_PROXY_URL}${safeUrl}`, {
-        cache: 'force-cache',
-        headers: { 'x-cors-api-key': PRINT_CORS_PROXY_KEY }
-      });
+    // Imagenes de Storage: via Cloud Function (reemplazo de cors.sh) para sumar cabeceras CORS.
+    if (isFirebaseStorageUrl(safeUrl) && window.laJamoneraProxy) {
+      return window.laJamoneraProxy.imageResponse(safeUrl);
     }
     return fetch(safeUrl, { cache: 'force-cache', mode: 'cors' });
   };
