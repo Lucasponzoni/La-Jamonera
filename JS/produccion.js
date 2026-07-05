@@ -23,6 +23,7 @@
     historyLoading: document.getElementById('produccionGlobalLoading'),
     historyTableWrap: document.getElementById('produccionGlobalTableWrap'),
     dispatchBtn: document.getElementById('produccionDispatchBtn'),
+    viewToggleBtn: document.getElementById('produccionViewToggleBtn'),
     dispatchView: document.getElementById('produccionDispatchView'),
     rneAlert: document.getElementById('produccionRneAlert'),
     modalTitle: document.getElementById('produccionModalLabel')
@@ -61,6 +62,9 @@
     recipeGroups: {},
     activeRecipeGroupId: 'all',
     recipeGroupsCollapsed: (() => { try { return localStorage.getItem('produccion_recipe_groups_collapsed') === '1'; } catch (_) { return false; } })(),
+    // La vista compacta es la inicial en cada apertura del modal;
+    // el toggle sólo cambia la vista mientras el modal está abierto.
+    compactList: true,
     ingredientes: {},
     inventario: {},
     users: {},
@@ -8070,6 +8074,7 @@
     renderRneExpiryAlert();
     renderModalRneBadge();
     renderRecipeGroups();
+    nodes.list.classList.toggle('is-compact', Boolean(state.compactList));
     const query = normalizeLower(state.search);
     const activeGroup = state.activeRecipeGroupId || 'all';
     const matchesQuery = (item) => !query
@@ -8080,6 +8085,21 @@
     const allMatching = getRecipes()
       .filter(matchesQuery)
       .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+    // Vista compacta: recetas más producidas arriba para ubicarlas rápido.
+    const usageByRecipe = {};
+    if (state.compactList) {
+      getRegistrosList().forEach((reg) => {
+        if (normalizeValue(reg.status) === 'anulada') return;
+        const rid = normalizeValue(reg.recipeId);
+        if (!rid) return;
+        usageByRecipe[rid] = (usageByRecipe[rid] || 0) + 1;
+      });
+      const usageOf = (item) => usageByRecipe[normalizeValue(item.id)] || 0;
+      const lastProductionOf = (item) => Number(state.config.lastProductionByRecipe?.[item.id] || item.lastProductionAt || item.production?.lastAt || 0);
+      allMatching.sort((a, b) => (usageOf(b) - usageOf(a))
+        || (lastProductionOf(b) - lastProductionOf(a))
+        || (Number(b.updatedAt || 0) - Number(a.updatedAt || 0)));
+    }
     const inGroup = allMatching.filter((item) => activeGroup === 'all' || normalizeValue(item?.recipeGroupId) === activeGroup);
     const outsideGroup = allMatching.filter((item) => activeGroup !== 'all' && normalizeValue(item?.recipeGroupId) !== activeGroup);
     // Si filtro de grupo activo + búsqueda + 0 resultados en grupo + sí hay fuera
@@ -8105,7 +8125,70 @@
           </span>`).join('')}
         </div>`;
     const countAvailableIngredients = (analysis) => analysis.requirements.filter((item) => item.missingForMin <= 0.0001).length;
-    const cardsHtml = list.map((recipe) => {
+    // Menú "Más opciones" compartido entre la tarjeta completa y la fila compacta.
+    const buildMoreMenuHtml = (recipe) => `
+              <div class="produccion-more-wrap">
+                <button type="button" class="btn ios-btn ios-btn-secondary produccion-more-btn" data-recipe-more="${recipe.id}" aria-label="Más opciones"><i class="bi bi-three-dots-vertical"></i></button>
+                <div class="produccion-more-menu d-none">
+                  <p class="produccion-more-menu-header">Más opciones</p>
+                  <div class="produccion-more-divider"></div>
+                  <button type="button" class="produccion-more-item" data-produce-sin-trazabilidad="${recipe.id}">
+                    <span class="produccion-more-item-icon"><i class="bi bi-exclamation-triangle-fill"></i></span>
+                    <span class="produccion-more-item-body">
+                      <span class="produccion-more-item-label">Producir sin trazabilidad</span>
+                      <span class="produccion-more-item-desc">Insumos sin stock no serán trazados</span>
+                    </span>
+                  </button>
+                  <button type="button" class="produccion-more-item" data-produce-lote-antiguo="${recipe.id}">
+                    <span class="produccion-more-item-icon"><i class="bi bi-calendar-minus"></i></span>
+                    <span class="produccion-more-item-body">
+                      <span class="produccion-more-item-label">Producir lote antiguo</span>
+                      <span class="produccion-more-item-desc">Producción retroactiva, sin tocar stock</span>
+                    </span>
+                  </button>
+                  <button type="button" class="produccion-more-item" data-recipe-image-view="${recipe.id}" ${normalizeValue(recipe.imageUrl) ? '' : 'disabled'}>
+                    <span class="produccion-more-item-icon"><i class="fa-regular fa-image"></i></span>
+                    <span class="produccion-more-item-body">
+                      <span class="produccion-more-item-label">Ver imagen</span>
+                      <span class="produccion-more-item-desc">Imagen de la receta</span>
+                    </span>
+                  </button>
+                </div>
+              </div>`;
+    // Fila compacta: una línea por receta (semáforo + nombre + máximo + producir).
+    // Toda la fila abre el modo "Visualizar"; el botón "+" abre "Producir".
+    const buildCompactRowHtml = (recipe) => {
+      const analysis = state.analysis[recipe.id] || analyzeRecipe(recipe);
+      const isExpiredOnlyAvailable = Boolean(!analysis.canProduce && analysis.canProduceConsideringExpired);
+      const showInfiniteMax = Array.isArray(analysis.requirements) && analysis.requirements.length && analysis.requirements.every((item) => item.infiniteStock);
+      const statusClass = isExpiredOnlyAvailable
+        ? 'tone-expired'
+        : (analysis.status === 'success' ? 'tone-success' : analysis.status === 'warning' ? 'tone-warning' : 'tone-danger');
+      const canOpenProduction = Boolean(analysis.canProduce || analysis.canProduceConsideringExpired);
+      const maxKg = isExpiredOnlyAvailable ? Number(analysis.maxKgIncludingExpired || 0) : Number(analysis.maxKg || 0);
+      const maxHtml = showInfiniteMax
+        ? '<strong class="produccion-compact-max">&infin;</strong>'
+        : `<strong class="produccion-compact-max ${maxKg <= 0.0001 ? 'is-zero' : ''}">${maxKg.toFixed(2)} <span>kg${isExpiredOnlyAvailable ? '*' : ''}</span></strong>`;
+      const usageCount = usageByRecipe[normalizeValue(recipe.id)] || 0;
+      const thumb = recipe.imageUrl
+        ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="receta-thumb js-produccion-thumb" src="${recipe.imageUrl}" alt="${capitalize(recipe.title || 'Receta')}" loading="lazy">`
+        : getThumbPlaceholder();
+      const statusLabel = isExpiredOnlyAvailable ? 'Disponible con expirados' : analysis.statusText;
+      return `
+        <article class="produccion-compact-row ${statusClass}" data-open-produccion="${recipe.id}" data-open-produccion-mode="view" title="${escapeHtml(capitalize(recipe.title || 'Receta'))} · ${escapeHtml(statusLabel)} · Tocá para visualizar">
+          <span class="produccion-compact-thumb receta-thumb-wrap">${thumb}</span>
+          <span class="produccion-semaforo" aria-hidden="true"></span>
+          <span class="produccion-compact-name">
+            <strong>${capitalize(recipe.title || 'Sin título')}</strong>
+            ${recipe.nombreComercial ? `<small>${escapeHtml(capitalize(recipe.nombreComercial))}</small>` : ''}
+          </span>
+          <span class="produccion-compact-uses" title="Producciones registradas"><i class="fa-solid fa-industry"></i>${usageCount}</span>
+          ${maxHtml}
+          <button type="button" class="btn ios-btn ${canOpenProduction ? (analysis.canProduce ? 'ios-btn-success' : 'ios-btn-danger') : 'ios-btn-success is-disabled'} produccion-compact-produce-btn" data-open-produccion="${recipe.id}" data-open-produccion-mode="produce" ${canOpenProduction ? '' : 'disabled'} title="Producir"><i class="bi bi-plus-lg"></i></button>
+          ${buildMoreMenuHtml(recipe)}
+        </article>`;
+    };
+    const cardsHtml = state.compactList ? list.map(buildCompactRowHtml).join('') : list.map((recipe) => {
       const analysis = state.analysis[recipe.id] || analyzeRecipe(recipe);
       const dispatchMeta = getProducedStockMeta(recipe.id);
       const draftLock = getRecipeDraftLockInfo(recipe.id);
@@ -8318,34 +8401,7 @@
                 ${inventoryAction}
                 ${viewAction.replace('produccion-visualizar-btn', 'produccion-visualizar-btn inventory-production-action-btn is-view')}
                 <button type="button" class="btn ios-btn inventory-production-action-btn is-threshold" data-set-recipe-min="${recipe.id}"><i class="fa-solid fa-sliders"></i><span>Umbral</span></button>
-              <div class="produccion-more-wrap">
-                <button type="button" class="btn ios-btn ios-btn-secondary produccion-more-btn" data-recipe-more="${recipe.id}" aria-label="Más opciones"><i class="bi bi-three-dots-vertical"></i></button>
-                <div class="produccion-more-menu d-none">
-                  <p class="produccion-more-menu-header">Más opciones</p>
-                  <div class="produccion-more-divider"></div>
-                  <button type="button" class="produccion-more-item" data-produce-sin-trazabilidad="${recipe.id}">
-                    <span class="produccion-more-item-icon"><i class="bi bi-exclamation-triangle-fill"></i></span>
-                    <span class="produccion-more-item-body">
-                      <span class="produccion-more-item-label">Producir sin trazabilidad</span>
-                      <span class="produccion-more-item-desc">Insumos sin stock no serán trazados</span>
-                    </span>
-                  </button>
-                  <button type="button" class="produccion-more-item" data-produce-lote-antiguo="${recipe.id}">
-                    <span class="produccion-more-item-icon"><i class="bi bi-calendar-minus"></i></span>
-                    <span class="produccion-more-item-body">
-                      <span class="produccion-more-item-label">Producir lote antiguo</span>
-                      <span class="produccion-more-item-desc">Producción retroactiva, sin tocar stock</span>
-                    </span>
-                  </button>
-                  <button type="button" class="produccion-more-item" data-recipe-image-view="${recipe.id}" ${normalizeValue(recipe.imageUrl) ? '' : 'disabled'}>
-                    <span class="produccion-more-item-icon"><i class="fa-regular fa-image"></i></span>
-                    <span class="produccion-more-item-body">
-                      <span class="produccion-more-item-label">Ver imagen</span>
-                      <span class="produccion-more-item-desc">Imagen de la receta</span>
-                    </span>
-                  </button>
-                </div>
-              </div>
+              ${buildMoreMenuHtml(recipe)}
             </div>
             </div>
             </footer>
@@ -10108,6 +10164,24 @@
     renderList();
   });
 
+  // Alterna entre vista compacta (filas de una línea, ordenadas por más
+  // producidas) y vista desglosada (tarjetas completas). Preferencia local.
+  const updateProduccionViewToggleBtn = () => {
+    if (!nodes.viewToggleBtn) return;
+    const compact = Boolean(state.compactList);
+    nodes.viewToggleBtn.classList.toggle('is-active', compact);
+    nodes.viewToggleBtn.innerHTML = compact
+      ? '<i class="fa-solid fa-table-cells-large"></i><span>Vista desglosada</span>'
+      : '<i class="fa-solid fa-list"></i><span>Vista compacta</span>';
+    nodes.viewToggleBtn.title = compact ? 'Cambiar a vista desglosada' : 'Cambiar a vista compacta';
+  };
+  nodes.viewToggleBtn?.addEventListener('click', () => {
+    state.compactList = !state.compactList;
+    updateProduccionViewToggleBtn();
+    renderList();
+  });
+  updateProduccionViewToggleBtn();
+
   // Listener delegado del strip de grupos: filtrar, crear, editar, eliminar,
   // administrar recetas asignadas. Es delegado porque el HTML se reescribe
   // en cada renderRecipeGroups().
@@ -10399,6 +10473,9 @@
 
     const produceBtn = event.target.closest('[data-open-produccion]');
     if (produceBtn) {
+      // Clicks dentro del menú "Más opciones" (header/divider) no deben
+      // abrir la receta: en la fila compacta el article tiene data-open-produccion.
+      if (event.target.closest('.produccion-more-menu')) return;
       state.activeRecipeId = produceBtn.dataset.openProduccion;
       state.editorMode = normalizeValue(produceBtn.dataset.openProduccionMode) === 'view' ? 'view' : 'produce';
       Swal.fire({
@@ -12809,6 +12886,9 @@
         refreshData({ silent: true }).catch(() => {});
       }
       state.historyTraceCollapse = {};
+      // Cada apertura del modal arranca en vista compacta.
+      state.compactList = true;
+      updateProduccionViewToggleBtn();
       if (state.resumeDispatchXlsxSession && hasDispatchXlsxDraftChanges(state.dispatchXlsxDraft)) {
         setDispatchMode(true);
         renderDispatchXlsxCreate(state.dispatchXlsxDraft);
