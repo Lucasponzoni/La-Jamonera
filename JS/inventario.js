@@ -8,9 +8,24 @@
     { key: 'remito_factura', label: 'Remito o Factura' },
     { key: 'fecha_fabricacion', label: 'Fecha de fabricación' },
     { key: 'fecha_hoy', label: 'Fecha de hoy' },
+    { key: 'fecha_vencimiento', label: 'Fecha de vencimiento' },
+    { key: 'iniciales_producto', label: 'Iniciales del producto' },
     { key: 'siglas_personalizadas', label: 'Siglas personalizadas' }
   ];
   const LOT_SEPARATORS = ['.', '-', '_', ',', ';', '|'];
+  // Versión del esquema de configuración de lote. Los registros guardados con
+  // una versión anterior (o sin versión) se pisan con el default LJ-VTO-INICIALES
+  // hasta que el usuario guarde una configuración propia (que ya sale versionada).
+  const LOT_CONFIG_VERSION = 2;
+  const buildDefaultLotConfig = () => ({
+    configured: true,
+    collapsed: true,
+    version: LOT_CONFIG_VERSION,
+    tokens: ['siglas_personalizadas', 'fecha_vencimiento', 'iniciales_producto'],
+    customAcronym: 'LJ',
+    includeSeparator: true,
+    separator: '-'
+  });
   const PAGE_SIZE = 10;
   const NO_DATA_IMAGE_URL = 'https://firebasestorage.googleapis.com/v0/b/fg-lj-d6325.firebasestorage.app/o/extras%2FNo%20data.png?alt=media&token=2d7086a4-6f7d-4fb8-aa8c-51c579f59828';
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -833,24 +848,22 @@
     packageQty: null,
     expiringSoonDays: null,
     suggestedExpiryDays: null,
-    lotConfig: {
-      configured: false,
-      collapsed: false,
-      tokens: [],
-      customAcronym: '',
-      includeSeparator: false,
-      separator: '-'
-    },
+    lotConfig: buildDefaultLotConfig(),
     weeklySheetConfig: getDefaultWeeklySheetConfig()
   });
 
   const getRecord = (ingredientId) => {
     const saved = safeObject(state.inventario.items[ingredientId]);
     const base = getDefaultRecord(ingredientId);
+    // Config de lote: sólo respetamos la guardada si es de la versión actual;
+    // las viejas (o inexistentes) se reemplazan por el default LJ-VTO-INICIALES.
+    const savedLotConfig = safeObject(saved.lotConfig);
     const merged = {
       ...base,
       ...saved,
-      lotConfig: { ...base.lotConfig, ...safeObject(saved.lotConfig) },
+      lotConfig: Number(savedLotConfig.version) >= LOT_CONFIG_VERSION
+        ? { ...base.lotConfig, ...savedLotConfig }
+        : buildDefaultLotConfig(),
       weeklySheetConfig: { ...getDefaultWeeklySheetConfig(), ...safeObject(saved.weeklySheetConfig) }
     };
     merged.infiniteStock = isInfiniteStockRecord(merged);
@@ -1223,6 +1236,9 @@
         globalLowThresholdKg: Number(inv?.config?.globalLowThresholdKg) >= 0 ? Number(inv.config.globalLowThresholdKg) : DEFAULT_LOW_THRESHOLD,
         globalLowThresholdUnits: Number(inv?.config?.globalLowThresholdUnits) >= 0 ? Number(inv.config.globalLowThresholdUnits) : DEFAULT_LOW_THRESHOLD,
         expiringSoonDays: Number(inv?.config?.expiringSoonDays) >= 0 ? Number(inv.config.expiringSoonDays) : DEFAULT_EXPIRING_SOON_DAYS,
+        // Flag de migración one-shot: lotes históricos regenerados al formato
+        // LJ-ddmmaaaa-INICIALES. Debe sobrevivir la normalización del config.
+        lotMigrationV2: Boolean(inv?.config?.lotMigrationV2),
         providers: Array.isArray(inv?.config?.providers)
           ? inv.config.providers.map((item) => normalizeProvider(item)).filter(Boolean)
           : []
@@ -2673,6 +2689,30 @@
     return `${day || '01'}${month || '01'}${year || '1900'}`;
   };
 
+  // Fecha de vencimiento para el número de lote, formato numérico ddmmaaaa
+  // (día/mes/año como se lee en español): 10072026. Sin vencimiento → SINVTO.
+  const formatLotExpiryDate = (isoDate) => (normalizeIsoDate(isoDate) ? formatDateCompactDmy(isoDate) : 'SINVTO');
+
+  // Iniciales del producto para el lote: una letra por palabra significativa
+  // ("Pimienta Negra Molida" → PNM); una sola palabra usa sus 3 primeras letras.
+  // Los tokens de tamaño/código con dígitos se ignoran (ver abajo).
+  const LOT_INITIALS_STOPWORDS = ['de', 'del', 'la', 'las', 'el', 'los', 'y', 'con', 'sin', 'a', 'en', 'para'];
+  const getProductInitials = (name) => {
+    const clean = normalizeValue(name)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9\s]/g, ' ');
+    const allWords = clean.split(/\s+/).filter((word) => word && !LOT_INITIALS_STOPWORDS.includes(word.toLowerCase()));
+    // Palabras "reales": sólo letras. Los códigos/tamaños con dígitos ("X220",
+    // "500g") se descartan salvo que no quede ninguna palabra alfabética, así
+    // "Aceituna Rellena Barbera X220" → ARB (no ARBX).
+    const alphaWords = allWords.filter((word) => /^[a-zA-Z]+$/.test(word));
+    const words = alphaWords.length ? alphaWords : allWords;
+    if (!words.length) return 'PROD';
+    if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
+    return words.slice(0, 4).map((word) => word[0]).join('').toUpperCase();
+  };
+
   const openWeeklySheetConfig = async (ingredientId, { force = false } = {}) => {
     const ingredient = state.ingredientes[ingredientId];
     if (!ingredient) return false;
@@ -2976,7 +3016,7 @@
     });
   };
 
-  const buildLotNumber = ({ lotConfig, invoiceNumber, entryDate }) => {
+  const buildLotNumber = ({ lotConfig, invoiceNumber, entryDate, expiryDate, productName }) => {
     const config = safeObject(lotConfig);
     const tokens = Array.isArray(config.tokens) ? config.tokens : [];
     const custom = normalizeUpper(config.customAcronym);
@@ -2986,6 +3026,8 @@
       if (token === 'remito_factura') return normalizeValue(invoiceNumber) || 'SIN-FACT';
       if (token === 'fecha_fabricacion') return formatDateCompactDmy(entryDate);
       if (token === 'fecha_hoy') return formatDateCompactDmy(getArgentinaIsoDate());
+      if (token === 'fecha_vencimiento') return formatLotExpiryDate(expiryDate);
+      if (token === 'iniciales_producto') return getProductInitials(productName);
       if (token === 'siglas_personalizadas') return custom || 'LJ';
       return normalizeUpper(token);
     }).filter(Boolean);
@@ -3259,6 +3301,7 @@
         'Fecha caducidad': [entry.expiryDate || '-', getExpiryBadgeText(entry)].filter(Boolean).join(' · '),
         Cantidad: `${formatEntryDetailLabel(entry).qtyLabel} · ${formatEntryDetailLabel(entry).availableLabel}`,
         'N° factura': entry.invoiceNumber || '-',
+        Lote: entry.lotNumber || '-',
         Proveedor: providerLabel(entry.provider),
         Imágenes: imageLinksText(entry),
         __firstImage: urls[0] || '',
@@ -3270,6 +3313,7 @@
           'Fecha caducidad': resolutionRow.badge,
           Cantidad: `-${resolutionRow.resolvedKg.toFixed(2)} kilos · disp. ${resolutionRow.availableKg.toFixed(3)} kg`,
           'N° factura': entry.invoiceNumber || '-',
+          Lote: entry.lotNumber || '-',
           Proveedor: providerLabel(entry.provider),
           Imágenes: 'Resolución',
           __tone: isBlueResolutionStatus(resolutionRow.status) ? 'resolution_yellow' : 'normal'
@@ -3281,7 +3325,8 @@
             Fecha: `↳ ${trace.fechaHora}`,
             'Fecha caducidad': trace.fechaCaducidad,
             Cantidad: trace.cantidad,
-            'N° factura': trace.factura,
+            'N° factura': '-',
+            Lote: trace.factura,
             Proveedor: trace.proveedor,
             Imágenes: 'Trazabilidad',
             __tone: 'trace'
@@ -4156,6 +4201,7 @@
       // entry real que se está editando — no queremos mostrar el badge ámbar.
       flagsFromPreferences: { noPerecedero: false, isFrozen: false, usoInternoEmpresa: false },
       invoiceNumber: entry.invoiceNumber || '',
+      customLot: normalizeValue(entry.customLot || ''),
       provider: providerId,
       invoiceImageFile: null,
       invoiceImageFiles: [],
@@ -4289,6 +4335,7 @@
           <td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(trace.createdAt)}</div></td>
           <td>${getTraceTypeLabelHtml(trace)}</td>
           <td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td>
+          <td></td>
           <td>${escapeHtml(trace.ingredientLot)}</td>
           <td>${escapeHtml((trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? providerLabel(entry.provider) : trace.productionId)}</td>
           <td>${(trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? '<span class="inventario-internal-no-trace">Sin trazabilidad</span>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td>
@@ -4298,7 +4345,7 @@
       const availableQtyInUnit = getAvailableInUnit(entry, entry.unit || '');
       const availableClass = availableQtyInUnit <= 0.0001 ? 'is-zero' : '';
       const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
-      const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(resolutionRow.at)}</div></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td><td></td></tr>` : '';
+      const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(resolutionRow.at)}</div></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td>${escapeHtml(entry.lotNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td><td></td></tr>` : '';
       const canEditEntry = availableQtyInUnit > 0.0001;
       const hasMovements = getEntryUsages(entry).length > 0;
       return `
@@ -4307,6 +4354,7 @@
         <td>${escapeHtml(formatExpiryForUi(entry))} </td>
         <td><strong class="${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</strong><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td>
         <td>${escapeHtml(entry.invoiceNumber || '-')}</td>
+        <td class="inventario-lot-cell">${escapeHtml(entry.lotNumber || '-')}${entry.customLot ? '<br><small class="text-muted">lote propio</small>' : ''}</td>
         <td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td>
         <td>${entryImageUrls(entry).length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-invoice-image="${entry.id}"><i class="fa-regular fa-image"></i><span>Ver (${entryImageUrls(entry).length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin foto</button>'}</td>
         <td>
@@ -4324,7 +4372,7 @@
           </div>
         </td>
       </tr>${resolutionHtml}${traceHtml}`;
-    }).join('') : '<tr><td colspan="7" class="text-center">Sin ingresos para mostrar.</td></tr>';
+    }).join('') : '<tr><td colspan="8" class="text-center">Sin ingresos para mostrar.</td></tr>';
 
     const canCollapse = canCollapseAnyRows(filtered, collapseMap);
     const canExpand = canExpandAnyRows(filtered, collapseMap);
@@ -4353,7 +4401,7 @@
         </div>
         <div class="table-responsive inventario-table-compact-wrap">
           <table class="table recipe-table inventario-table-compact mb-0">
-            <thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura</th><th>Proveedor</th><th>Imagen</th><th>Acción</th></tr></thead>
+            <thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura</th><th>Lote</th><th>Proveedor</th><th>Imagen</th><th>Acción</th></tr></thead>
             <tbody>${rowsHtml}</tbody>
           </table>
         </div>
@@ -4588,6 +4636,7 @@
         ? { noPerecedero: prefNoPerecedero, isFrozen: prefIsFrozen, usoInternoEmpresa: prefAutoEgreso }
         : { noPerecedero: false, isFrozen: false, usoInternoEmpresa: false },
       invoiceNumber: '',
+      customLot: '',
       provider: '',
       invoiceImageFile: null,
       invoiceImageFiles: [],
@@ -4776,6 +4825,11 @@
             <textarea id="inventoryInvoiceNumber" name="inventory_code_free" class="form-control ios-input inventario-invoice-textarea" rows="1" placeholder="Ej: A-000123" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" ${stockDisabledAttr}>${escapeHtml(state.editorDraft.invoiceNumber)}</textarea>
           </div>
           <div class="recipe-field recipe-field-half">
+            <label class="form-label" for="inventoryCustomLot"><i class="fa-solid fa-barcode inventario-step-icon"></i> Lote propio del producto (opcional)</label>
+            <input id="inventoryCustomLot" class="form-control ios-input" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ej: L4521-A (lote de fábrica)" value="${escapeHtml(state.editorDraft.customLot || '')}" ${stockDisabledAttr}>
+            <small class="text-muted">Si el producto trae su propio lote (ej: condimentos), cargalo acá: reemplaza al lote automático sólo para este ingreso.</small>
+          </div>
+          <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryProviderSearch"><i class="bi bi-box-seam-fill inventario-step-icon"></i> Proveedor</label>
             <div class="recipe-ing-autocomplete">
               <div class="recipe-ing-input-wrap">
@@ -4921,6 +4975,7 @@
         if (frozenExpiry) state.editorDraft.expiryDate = frozenExpiry;
       }
       state.editorDraft.invoiceNumber = nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value || '';
+      state.editorDraft.customLot = nodes.editorForm.querySelector('#inventoryCustomLot')?.value || '';
       state.editorDraft.provider = nodes.editorForm.querySelector('#inventoryProvider')?.value || '';
       state.editorDraft.customAcronym = nodes.editorForm.querySelector('#lotCustomAcronym')?.value || '';
       state.editorDraft.includeSeparator = Boolean(nodes.editorForm.querySelector('#lotIncludeSeparator')?.checked);
@@ -4984,7 +5039,20 @@
     const renderPattern = () => {
       const separator = state.editorDraft.includeSeparator ? state.editorDraft.separator : '';
       const pattern = state.editorDraft.tokens.map((token) => '${' + lotTokenLabelFor(token, state.editorDraft.customAcronym).replaceAll(' ', '_') + '}').join(separator);
-      nodes.editorForm.querySelector('#lotPatternPreview').textContent = pattern || 'Sin patrón definido';
+      // Ejemplo real del lote con los datos actuales del formulario.
+      const sample = state.editorDraft.tokens.length ? buildLotNumber({
+        lotConfig: {
+          tokens: [...state.editorDraft.tokens],
+          customAcronym: normalizeValue(state.editorDraft.customAcronym),
+          includeSeparator: Boolean(state.editorDraft.includeSeparator),
+          separator: normalizeValue(state.editorDraft.separator) || '-'
+        },
+        invoiceNumber: normalizeValue(state.editorDraft.invoiceNumber) || 'A-000123',
+        entryDate: state.editorDraft.entryDate || getArgentinaIsoDate(),
+        expiryDate: state.editorDraft.expiryDate || addDaysToIso(getArgentinaIsoDate(), 5),
+        productName: ingredient.name || ''
+      }) : '';
+      nodes.editorForm.querySelector('#lotPatternPreview').textContent = pattern ? `${pattern}${sample ? `  →  ${sample}` : ''}` : 'Sin patrón definido';
       nodes.editorForm.querySelector('.inventario-collapse-summary').innerHTML = buildLotSummaryBadges(state.editorDraft);
     };
 
@@ -5118,6 +5186,7 @@
             ...state.editorDraft,
             qty: '',
             invoiceNumber: '',
+            customLot: '',
             provider: '',
             invoiceImageFiles: [],
             invoiceImageFile: null,
@@ -5147,6 +5216,7 @@
         editingEntryId: '',
         qty: '',
         invoiceNumber: '',
+        customLot: '',
         provider: '',
         invoiceImageFiles: [],
         invoiceImageFile: null,
@@ -5963,14 +6033,14 @@
         const resolutionLabel = resolutionMeta.badge;
         const resolutionRow = getEntryResolutionRowData(entry);
         const traceHtml = (!isCollapsed && traceRows.length)
-          ? traceRows.map((trace) => `<tr class="${getTraceRowClass(trace)}"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(trace.createdAt)}</div></td><td>${getTraceTypeLabelHtml(trace)}</td><td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml((trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? providerLabel(entry.provider) : trace.productionId)}</td><td>${(trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? '<span class="inventario-internal-no-trace">Sin trazabilidad</span>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td><td></td></tr>`).join('')
+          ? traceRows.map((trace) => `<tr class="${getTraceRowClass(trace)}"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(trace.createdAt)}</div></td><td>${getTraceTypeLabelHtml(trace)}</td><td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td></td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml((trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? providerLabel(entry.provider) : trace.productionId)}</td><td>${(trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? '<span class="inventario-internal-no-trace">Sin trazabilidad</span>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td></tr>`).join('')
           : '';
         const availableQtyInUnit = getAvailableInUnit(entry, entry.unit || '');
         const availableClass = availableQtyInUnit <= 0.0001 ? 'is-zero' : '';
         const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
-        const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(resolutionRow.at)}</div></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td></tr>` : '';
-        return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${formatEntryDateTime(entry.entryDate, entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}</td><td>${escapeHtml(formatExpiryForUi(entry))} </td><td><strong class="${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</strong><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRow) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expanded-entry-collapse="${entry.id}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(entryImageUrls(entry))}</div></td></tr>${resolutionHtml}${traceHtml}`;
-      }).join('') : '<tr><td colspan="6" class="text-center">Sin ingresos para mostrar.</td></tr>';
+        const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(resolutionRow.at)}</div></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td>${escapeHtml(entry.lotNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td></tr>` : '';
+        return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${formatEntryDateTime(entry.entryDate, entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}</td><td>${escapeHtml(formatExpiryForUi(entry))} </td><td><strong class="${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</strong><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-lot-cell">${escapeHtml(entry.lotNumber || '-')}${entry.customLot ? '<br><small class="text-muted">lote propio</small>' : ''}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRow) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expanded-entry-collapse="${entry.id}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(entryImageUrls(entry))}</div></td></tr>${resolutionHtml}${traceHtml}`;
+      }).join('') : '<tr><td colspan="7" class="text-center">Sin ingresos para mostrar.</td></tr>';
       await openIosSwal({
         title: 'Historial ampliado',
         html: '<div id="inventarioExpandedEntryHost" class="inventario-expand-wrap"></div>',
@@ -5986,7 +6056,7 @@
             const pageRows = fullRows.slice(start, start + PAGE_SIZE);
             const canCollapse = fullRows.some((entry) => hasEntryDetailRows(entry) && collapseMap[entry.id] === false);
             const canExpand = fullRows.some((entry) => hasEntryDetailRows(entry) && collapseMap[entry.id] !== false);
-            host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioExpandedEntryCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar todo</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioExpandedEntryExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar todo</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura</th><th>Proveedor</th><th>Imagen</th></tr></thead><tbody>${renderRows(pageRows)}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-expanded-entry-page="prev" ${expandedPage <= 1 ? 'disabled' : ''} aria-label="Página anterior"><i class="fa-solid fa-chevron-left"></i></button><span>Página ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-expanded-entry-page="next" ${expandedPage >= pages ? 'disabled' : ''} aria-label="Página siguiente"><i class="fa-solid fa-chevron-right"></i></button></div>`;
+            host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioExpandedEntryCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar todo</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioExpandedEntryExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar todo</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura</th><th>Lote</th><th>Proveedor</th><th>Imagen</th></tr></thead><tbody>${renderRows(pageRows)}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-expanded-entry-page="prev" ${expandedPage <= 1 ? 'disabled' : ''} aria-label="Página anterior"><i class="fa-solid fa-chevron-left"></i></button><span>Página ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-expanded-entry-page="next" ${expandedPage >= pages ? 'disabled' : ''} aria-label="Página siguiente"><i class="fa-solid fa-chevron-right"></i></button></div>`;
           };
           renderContent();
           popup.addEventListener('click', async (event) => {
@@ -6054,7 +6124,7 @@
       await makeWorkbook({
         fileName: `inventario_${normalizeLower(ingredient.name || 'producto')}_${Date.now()}.xlsx`,
         sheetName: 'Historial',
-        headers: ['Fecha', 'Fecha caducidad', 'Cantidad', 'N° factura', 'Proveedor', 'Imágenes'],
+        headers: ['Fecha', 'Fecha caducidad', 'Cantidad', 'N° factura', 'Lote', 'Proveedor', 'Imágenes'],
         rows: payload
       });
     });
@@ -6349,6 +6419,7 @@
       record.lotConfig = {
         configured: Array.isArray(draft.tokens) && draft.tokens.length > 0,
         collapsed: Array.isArray(draft.tokens) && draft.tokens.length > 0,
+        version: LOT_CONFIG_VERSION,
         tokens: [...(Array.isArray(draft.tokens) ? draft.tokens : [])],
         customAcronym: normalizeValue(draft.customAcronym),
         includeSeparator: Boolean(draft.includeSeparator),
@@ -6396,6 +6467,7 @@
       : normalizeValue(nodes.editorForm.querySelector('#inventoryExpiryDate')?.value);
     const usoInternoEmpresa = Boolean(nodes.editorForm.querySelector('#inventoryUsoInternoEmpresa')?.checked);
     const invoiceNumber = normalizeValue(nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value);
+    const customLot = normalizeValue(nodes.editorForm.querySelector('#inventoryCustomLot')?.value);
     const providerId = normalizeValue(nodes.editorForm.querySelector('#inventoryProvider')?.value);
     const providerData = findProviderById(providerId);
     const provider = providerLabel(providerId);
@@ -6558,6 +6630,28 @@
         entry.provider = provider;
         entry.invoiceImageUrls = invoiceImageUrls;
         entry.invoiceImageUrl = invoiceImageUrls[0] || '';
+        // Lote propio editado: si se carga uno, reemplaza el lote del ingreso.
+        if (customLot) {
+          entry.lotNumber = normalizeUpper(customLot);
+          entry.customLot = normalizeUpper(customLot);
+        } else if (!normalizeValue(entry.customLot)) {
+          // Sin lote propio: regenerar el lote automático porque el vencimiento
+          // pudo cambiar en esta edición (p.ej. congelado fuerza +60 días) y la
+          // fecha dentro del lote debe reflejarlo.
+          entry.lotNumber = buildLotNumber({
+            lotConfig: {
+              configured: state.editorDraft.tokens.length > 0,
+              tokens: [...state.editorDraft.tokens],
+              customAcronym: normalizeValue(state.editorDraft.customAcronym),
+              includeSeparator: Boolean(state.editorDraft.includeSeparator),
+              separator: normalizeValue(state.editorDraft.separator) || '-'
+            },
+            invoiceNumber,
+            entryDate,
+            expiryDate: noPerecedero ? '' : expiryDate,
+            productName: state.ingredientes[ingredientId]?.name || ''
+          });
+        }
         entry.lastEditedAt = Date.now();
 
         if (usoInternoEmpresa) {
@@ -6602,6 +6696,7 @@
           editingEntryId: '',
           qty: '',
           invoiceNumber: '',
+          customLot: '',
           provider: '',
           invoiceImageCountLabel: 'Sin archivos seleccionados',
           invoiceImageFiles: [],
@@ -6615,7 +6710,7 @@
         return;
       }
 
-      const buildEntry = ({ targetIngredientId, targetRecord, qtyValue, unitValue, packageQtyValue, entryDateValue, expiryDateValue, noPerecederoValue, usoInternoValue, isFrozenValue }) => {
+      const buildEntry = ({ targetIngredientId, targetRecord, qtyValue, unitValue, packageQtyValue, entryDateValue, expiryDateValue, noPerecederoValue, usoInternoValue, isFrozenValue, customLotValue = '' }) => {
         // Si es congelado y NO es no-perecedero, forzamos el vto a 60 días.
         if (isFrozenValue && !noPerecederoValue && entryDateValue) {
           const forced = addDaysToIso(entryDateValue, FROZEN_EXPIRY_DAYS);
@@ -6623,7 +6718,10 @@
         }
         const qtyBase = Number(toBase(qtyValue, unitValue).toFixed(6));
         const qtyKg = Number(convertToKg(qtyValue, unitValue).toFixed(4));
-        const lotNumber = buildLotNumber({
+        // Lote propio del ingreso (ej: lote de fábrica de un condimento):
+        // reemplaza al lote generado por la configuración.
+        const customLot = normalizeUpper(customLotValue);
+        const lotNumber = customLot || buildLotNumber({
           lotConfig: {
             configured: state.editorDraft.tokens.length > 0,
             tokens: [...state.editorDraft.tokens],
@@ -6632,7 +6730,9 @@
             separator: normalizeValue(state.editorDraft.separator) || '-'
           },
           invoiceNumber,
-          entryDate: entryDateValue
+          entryDate: entryDateValue,
+          expiryDate: noPerecederoValue ? '' : expiryDateValue,
+          productName: state.ingredientes[targetIngredientId]?.name || ''
         });
 
         const entry = {
@@ -6654,6 +6754,7 @@
           expiryDate: noPerecederoValue ? '' : expiryDateValue,
           invoiceNumber,
           lotNumber,
+          customLot,
           provider,
           lotStatus: 'disponible',
           invoiceImageUrl: invoiceImageUrls[0] || '',
@@ -6702,7 +6803,8 @@
         expiryDateValue: expiryDate,
         noPerecederoValue: noPerecedero,
         usoInternoValue: usoInternoEmpresa,
-        isFrozenValue: isFrozenMain
+        isFrozenValue: isFrozenMain,
+        customLotValue: customLot
       });
 
       for (const extra of bulkEntries) {
@@ -6734,6 +6836,7 @@
       record.lotConfig = {
         configured: state.editorDraft.tokens.length > 0,
         collapsed: state.editorDraft.tokens.length > 0,
+        version: LOT_CONFIG_VERSION,
         tokens: [...state.editorDraft.tokens],
         customAcronym: normalizeValue(state.editorDraft.customAcronym),
         includeSeparator: Boolean(state.editorDraft.includeSeparator),
@@ -6758,6 +6861,7 @@
         ...state.editorDraft,
         qty: '',
         invoiceNumber: '',
+        customLot: '',
         provider: '',
         invoiceImageCountLabel: 'Sin archivos seleccionados',
         invoiceImageFiles: [],
