@@ -2038,6 +2038,7 @@
       customClass: { popup: 'ios-alert ingredientes-alert ingredientes-saving-alert' }
     });
     let resolved = 0;
+    let failureMessage = '';
     try {
       for (const row of targets) {
         await ensureInventoryRecordDetail(row.ingredientId);
@@ -2052,6 +2053,7 @@
           qtyKg: actualAvailableKg
         });
         if (result?.ok) resolved += 1;
+        else if (!failureMessage) failureMessage = normalizeValue(result?.message) || 'No se pudo resolver el lote vencido.';
       }
       state.activeFamilyId = 'all';
       state.activeStockStatus = 'all';
@@ -2062,6 +2064,9 @@
       renderStatusFilters();
       renderList();
       renderInventoryExpiryAlert();
+      if (!resolved && failureMessage) {
+        await openIosSwal({ title: 'No se pudo resolver', html: `<p>${escapeHtml(failureMessage)}</p>`, icon: 'error', confirmButtonText: 'Entendido' });
+      }
       return resolved;
     } finally {
       if (Swal.isVisible()) Swal.close();
@@ -6338,12 +6343,16 @@
     if (!expiryMeta.isExpired) return { ok: false, message: 'El lote no está expirado o no tiene stock disponible.' };
     const availableKg = getAvailableKg(entry);
     const availableQty = getAvailableQty(entry);
-    if (!Number.isFinite(availableKg) || availableKg <= 0) return { ok: false, message: 'No hay kilos disponibles para resolver.' };
+    const hasKg = Number.isFinite(availableKg) && availableKg > 0.0001;
+    const hasQty = Number.isFinite(availableQty) && availableQty > 0.0001;
+    // Lotes cargados en unidades no convierten a kilos (convertToKg devuelve 0):
+    // en ese caso se resuelve el stock completo por cantidad.
+    if (!hasKg && !hasQty) return { ok: false, message: 'No hay stock disponible para resolver.' };
     const requestedQtyKg = Number(qtyKg);
-    const safeQtyKg = Number.isFinite(requestedQtyKg) && requestedQtyKg > 0.0001
-      ? Math.min(requestedQtyKg, availableKg)
-      : availableKg;
-    const ratio = safeQtyKg / availableKg;
+    const safeQtyKg = hasKg
+      ? (Number.isFinite(requestedQtyKg) && requestedQtyKg > 0.0001 ? Math.min(requestedQtyKg, availableKg) : availableKg)
+      : 0;
+    const ratio = hasKg ? safeQtyKg / availableKg : 1;
     const qtyToDiscount = Number((availableQty * ratio).toFixed(4));
     const availableBase = Number(entry.availableBase);
     const qtyBase = Number(entry.qtyBase);
@@ -6370,7 +6379,7 @@
       reference: normalizeValue(resolutionType),
       observation: normalizeValue(resolutionType) === 'decommissioned' ? 'Lote vencido decomisado' : 'Lote vencido vendido en mostrador'
     });
-    if (entry.availableKg <= 0.0001) {
+    if (entry.availableKg <= 0.0001 && entry.availableQty <= 0.0001) {
       entry.expiryResolutionStatus = normalizeValue(resolutionType);
       entry.status = normalizeValue(resolutionType);
       entry.lotStatus = normalizeValue(resolutionType) === 'decommissioned' ? 'decomisado' : 'sin_trazabilidad';
