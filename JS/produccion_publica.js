@@ -319,7 +319,8 @@
       next: document.getElementById('viewerNextBtn'),
       zoomIn: document.getElementById('viewerZoomInBtn'),
       zoomOut: document.getElementById('viewerZoomOutBtn'),
-      back: document.getElementById('viewerBackBtn')
+      back: document.getElementById('viewerBackBtn'),
+      counter: document.getElementById('viewerCounter')
     };
 
     if (!viewerNodes.modal || !window.bootstrap?.Modal) return null;
@@ -353,6 +354,10 @@
     const render = () => {
       const item = state.images[state.index];
       if (!item || !viewerNodes.image) return;
+      if (viewerNodes.counter) {
+        viewerNodes.counter.textContent = `${state.index + 1}/${state.images.length}`;
+        viewerNodes.counter.classList.toggle('d-none', state.images.length <= 1);
+      }
       const isPdf = isViewerPdfUrl(item.src);
       const pdfPlaceholder = ensurePdfPlaceholder();
       viewerNodes.image.classList.toggle('d-none', isPdf);

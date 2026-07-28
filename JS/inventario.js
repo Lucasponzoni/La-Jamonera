@@ -5,7 +5,7 @@
   const DEFAULT_LOW_THRESHOLD = 5;
   const DEFAULT_EXPIRING_SOON_DAYS = 2;
   const LOT_TOKEN_OPTIONS = [
-    { key: 'remito_factura', label: 'Remito o Factura' },
+    { key: 'remito_factura', label: 'N° de factura' },
     { key: 'fecha_fabricacion', label: 'Fecha de fabricación' },
     { key: 'fecha_hoy', label: 'Fecha de hoy' },
     { key: 'fecha_vencimiento', label: 'Fecha de vencimiento' },
@@ -14,14 +14,15 @@
   ];
   const LOT_SEPARATORS = ['.', '-', '_', ',', ';', '|'];
   // Versión del esquema de configuración de lote. Los registros guardados con
-  // una versión anterior (o sin versión) se pisan con el default LJ-VTO-INICIALES
-  // hasta que el usuario guarde una configuración propia (que ya sale versionada).
-  const LOT_CONFIG_VERSION = 2;
+  // una versión anterior (o sin versión) se pisan con el default N° DE FACTURA
+  // (el lote es directamente el número de factura del ingreso) hasta que el
+  // usuario guarde una configuración propia (que ya sale versionada).
+  const LOT_CONFIG_VERSION = 3;
   const buildDefaultLotConfig = () => ({
     configured: true,
     collapsed: true,
     version: LOT_CONFIG_VERSION,
-    tokens: ['siglas_personalizadas', 'fecha_vencimiento', 'iniciales_producto'],
+    tokens: ['remito_factura'],
     customAcronym: 'LJ',
     includeSeparator: true,
     separator: '-'
@@ -81,6 +82,7 @@
     viewerDocument: $('viewerDocument'),
     viewerPrevBtn: $('viewerPrevBtn'),
     viewerNextBtn: $('viewerNextBtn'),
+    viewerCounter: $('viewerCounter'),
     viewerZoomInBtn: $('viewerZoomInBtn'),
     viewerZoomOutBtn: $('viewerZoomOutBtn'),
     viewerBackBtn: $('viewerBackBtn'),
@@ -856,7 +858,7 @@
     const saved = safeObject(state.inventario.items[ingredientId]);
     const base = getDefaultRecord(ingredientId);
     // Config de lote: sólo respetamos la guardada si es de la versión actual;
-    // las viejas (o inexistentes) se reemplazan por el default LJ-VTO-INICIALES.
+    // las viejas (o inexistentes) se reemplazan por el default N° DE FACTURA.
     const savedLotConfig = safeObject(saved.lotConfig);
     const merged = {
       ...base,
@@ -2444,6 +2446,9 @@
           entryId: entry.id,
           unit: entry.unit || '',
           invoiceNumber: entry.invoiceNumber || '-',
+          remitoNumber: normalizeValue(entry.remitoNumber),
+          lotNumber: normalizeValue(entry.lotNumber),
+          customLot: normalizeValue(entry.customLot),
           provider: providerLabel(entry.provider),
           invoiceImageUrls: entryImageUrls(entry),
           invoiceImageUrl: entryImageUrls(entry)[0] || '',
@@ -2533,7 +2538,7 @@
         <td>${escapeHtml(row.ingredientName)}</td>
         <td><strong class="${expiredQtyClass}">${Number(row.qty || 0).toFixed(2)} ${escapeHtml(row.unit || '')}</strong><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${Number(row.availableQty || 0).toFixed(2)} ${escapeHtml(getMeasureAbbr(row.unit || ''))}${row.packageQty ? ` x${row.packageQty}` : ''}</span></td>
         <td>${escapeHtml(formatExpiryForUi(row))} </td>
-        <td>${escapeHtml(row.invoiceNumber)}</td>
+        <td>${escapeHtml(`${row.invoiceNumber}${normalizeValue(row.remitoNumber) ? ` | ${row.remitoNumber}` : ''}`)}</td>
         <td class="inventario-provider-cell">${escapeHtml(row.provider)}</td>
         <td><div class="inventario-entry-actions">${(traces.length || resolutionRow) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-toggle-global-collapse="${row.entryId}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${row.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-global-images="${encodeURIComponent(JSON.stringify(row.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Ver (${row.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>No posee foto</button>'}</div></td>
       </tr>${resolutionHtml}${traceHtml}`;
@@ -3400,6 +3405,10 @@
   const renderViewerImage = () => {
     const item = state.viewerImages[state.viewerIndex];
     if (!item || !nodes.viewerImage) return;
+    if (nodes.viewerCounter) {
+      nodes.viewerCounter.textContent = `${state.viewerIndex + 1}/${state.viewerImages.length}`;
+      nodes.viewerCounter.classList.toggle('d-none', state.viewerImages.length <= 1);
+    }
     const isPdf = isViewerPdfUrl(item.src);
     const pdfPlaceholder = ensureViewerDocumentPlaceholder();
     if (nodes.viewerDownloadBtn) {
@@ -3906,10 +3915,11 @@
               const providerAvatarHtml = providerPhoto
                 ? `<span class="sheet-provider-avatar"><img src="${escapeHtml(providerPhoto)}" alt="${escapeHtml(providerName)}"></span>`
                 : `<span class="sheet-provider-avatar sheet-provider-avatar-fallback">${escapeHtml(providerInitial)}</span>`;
+              const facturaUp = `${String(row.invoiceNumber || '-').toUpperCase()}${normalizeValue(row.remitoNumber) ? ` | ${String(row.remitoNumber).toUpperCase()}` : ''}`;
               const loteUp = String(row.lotNumber || row.invoiceNumber || '-').toUpperCase();
               const vtoUp = String(vtoLabel || 'NO PERECEDERO').toUpperCase();
               return `<tr class="sheet-product-row">
-                <td colspan="8">
+                <td colspan="9">
                   <div class="sheet-entry-product-wrap sheet-entry-product-wrap-full">
                     ${productImage || '<span class="sheet-mini-avatar sheet-mini-avatar-empty"><i class="fa-solid fa-box"></i></span>'}
                     <div class="sheet-entry-product-copy">
@@ -3923,6 +3933,7 @@
                 <td>${escapeHtml(productUp)}</td>
                 <td>${escapeHtml(formatShortDateTimeEs(row.createdAt))}</td>
                 <td>${escapeHtml(qtyLabel)}</td>
+                <td>${escapeHtml(facturaUp)}</td>
                 <td>${escapeHtml(loteUp)}</td>
                 <td>${escapeHtml(vtoUp)}</td>
                 <td>${escapeHtml(`${temp} °C`)}</td>
@@ -3956,10 +3967,11 @@
                 ? `<table class="sheet-entry-data-table">
                     <thead>
                       <tr>
-                        <th>Producto</th>
+                        <th>Materia Prima</th>
                         <th>Fecha y hora</th>
                         <th>Cantidad</th>
-                        <th>Lote / Remito</th>
+                        <th>Factura / Remito</th>
+                        <th>Lote</th>
                         <th>Vencimiento</th>
                         <th>Temperatura</th>
                         <th>Recibió</th>
@@ -4068,7 +4080,8 @@
       title: 'Editar ingreso',
       width: 'min(760px, 96vw)',
       html: `<div class="swal-stack-fields text-start">
-        <div class="inventario-bulk-grid"><input id="editInventoryQty" class="swal2-input ios-input" type="number" min="0" step="0.01" value="${Number(entry.qty || 0)}"><input id="editInventoryInvoice" class="swal2-input ios-input" value="${escapeHtml(entry.invoiceNumber || '')}" placeholder="Factura/remito"></div>
+        <div class="inventario-bulk-grid"><input id="editInventoryQty" class="swal2-input ios-input" type="number" min="0" step="0.01" value="${Number(entry.qty || 0)}"><input id="editInventoryInvoice" class="swal2-input ios-input" value="${escapeHtml(entry.invoiceNumber || '')}" placeholder="N° factura"></div>
+        <input id="editInventoryRemito" class="swal2-input ios-input" value="${escapeHtml(entry.remitoNumber || '')}" placeholder="N° remito (opcional)">
         <div class="inventario-bulk-grid"><input id="editInventoryEntryDate" class="swal2-input ios-input" value="${escapeHtml(entry.entryDate || '')}" placeholder="Fecha ingreso"><input id="editInventoryExpiryDate" class="swal2-input ios-input" value="${escapeHtml(entry.expiryDate || '')}" placeholder="Fecha caducidad"></div>
         <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="editInventoryNoPerecedero" ${entry.noPerecedero ? 'checked' : ''}><span>No perecedero</span></label>
         <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="editInventoryUsoInternoEmpresa" ${entry.usoInternoEmpresa ? 'checked' : ''}><span>Envases primarios & más</span></label>
@@ -4128,6 +4141,7 @@
       preConfirm: async () => {
         const qty = parseNumber(document.getElementById('editInventoryQty')?.value);
         const invoice = normalizeValue(document.getElementById('editInventoryInvoice')?.value);
+        const remito = normalizeValue(document.getElementById('editInventoryRemito')?.value);
         const entryDate = normalizeValue(document.getElementById('editInventoryEntryDate')?.value);
         const noPerecedero = Boolean(document.getElementById('editInventoryNoPerecedero')?.checked);
         const usoInternoEmpresa = Boolean(document.getElementById('editInventoryUsoInternoEmpresa')?.checked);
@@ -4150,7 +4164,7 @@
           const uploaded = await uploadImageToStorage(file, 'inventario/facturas');
           if (uploaded) urls.push(uploaded);
         }
-        return { qty, invoice, entryDate, expiryDate, noPerecedero, usoInternoEmpresa, provider, userId, urls };
+        return { qty, invoice, remito, entryDate, expiryDate, noPerecedero, usoInternoEmpresa, provider, userId, urls };
       }
     });
 
@@ -4167,6 +4181,7 @@
     entry.availableBase = Number(toBase(entry.availableQty, entry.unit || 'kilos').toFixed(6));
     entry.availableKg = Number(convertToKg(entry.availableQty, entry.unit || 'kilos').toFixed(4));
     entry.invoiceNumber = form.value.invoice;
+    entry.remitoNumber = form.value.remito;
     entry.entryDate = form.value.entryDate;
     entry.expiryDate = form.value.noPerecedero ? '' : form.value.expiryDate;
     entry.noPerecedero = Boolean(form.value.noPerecedero);
@@ -4206,6 +4221,7 @@
       // entry real que se está editando — no queremos mostrar el badge ámbar.
       flagsFromPreferences: { noPerecedero: false, isFrozen: false, usoInternoEmpresa: false },
       invoiceNumber: entry.invoiceNumber || '',
+      remitoNumber: normalizeValue(entry.remitoNumber || ''),
       customLot: normalizeValue(entry.customLot || ''),
       provider: providerId,
       invoiceImageFile: null,
@@ -4641,6 +4657,7 @@
         ? { noPerecedero: prefNoPerecedero, isFrozen: prefIsFrozen, usoInternoEmpresa: prefAutoEgreso }
         : { noPerecedero: false, isFrozen: false, usoInternoEmpresa: false },
       invoiceNumber: '',
+      remitoNumber: '',
       customLot: '',
       provider: '',
       invoiceImageFile: null,
@@ -4826,8 +4843,12 @@
             ${state.editorDraft.isFrozen ? `<small class="text-muted d-block mt-1"><i class="bi bi-info-circle me-1"></i>Vencimiento fijo a <strong>${FROZEN_EXPIRY_DAYS} días</strong> desde la fecha de ingreso.</small>` : ''}
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryInvoiceNumber"><i class="fa-solid fa-file-invoice inventario-step-icon"></i> Número de factura/remito</label>
+            <label class="form-label" for="inventoryInvoiceNumber"><i class="fa-solid fa-file-invoice inventario-step-icon"></i> Número de factura</label>
             <textarea id="inventoryInvoiceNumber" name="inventory_code_free" class="form-control ios-input inventario-invoice-textarea" rows="1" placeholder="Ej: A-000123" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" ${stockDisabledAttr}>${escapeHtml(state.editorDraft.invoiceNumber)}</textarea>
+          </div>
+          <div class="recipe-field recipe-field-half">
+            <label class="form-label" for="inventoryRemitoNumber"><i class="fa-regular fa-file-lines inventario-step-icon"></i> Número de remito (opcional)</label>
+            <input id="inventoryRemitoNumber" name="inventory_remito_free" class="form-control ios-input" placeholder="Ej: R-0001-00045678" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" value="${escapeHtml(state.editorDraft.remitoNumber || '')}" ${stockDisabledAttr}>
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="form-label" for="inventoryCustomLot"><i class="fa-solid fa-barcode inventario-step-icon"></i> Lote propio del producto (opcional)</label>
@@ -4980,6 +5001,7 @@
         if (frozenExpiry) state.editorDraft.expiryDate = frozenExpiry;
       }
       state.editorDraft.invoiceNumber = nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value || '';
+      state.editorDraft.remitoNumber = nodes.editorForm.querySelector('#inventoryRemitoNumber')?.value || '';
       state.editorDraft.customLot = nodes.editorForm.querySelector('#inventoryCustomLot')?.value || '';
       state.editorDraft.provider = nodes.editorForm.querySelector('#inventoryProvider')?.value || '';
       state.editorDraft.customAcronym = nodes.editorForm.querySelector('#lotCustomAcronym')?.value || '';
@@ -5191,6 +5213,7 @@
             ...state.editorDraft,
             qty: '',
             invoiceNumber: '',
+            remitoNumber: '',
             customLot: '',
             provider: '',
             invoiceImageFiles: [],
@@ -5221,6 +5244,7 @@
         editingEntryId: '',
         qty: '',
         invoiceNumber: '',
+        remitoNumber: '',
         customLot: '',
         provider: '',
         invoiceImageFiles: [],
@@ -6476,6 +6500,7 @@
       : normalizeValue(nodes.editorForm.querySelector('#inventoryExpiryDate')?.value);
     const usoInternoEmpresa = Boolean(nodes.editorForm.querySelector('#inventoryUsoInternoEmpresa')?.checked);
     const invoiceNumber = normalizeValue(nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value);
+    const remitoNumber = normalizeValue(nodes.editorForm.querySelector('#inventoryRemitoNumber')?.value);
     const customLot = normalizeValue(nodes.editorForm.querySelector('#inventoryCustomLot')?.value);
     const providerId = normalizeValue(nodes.editorForm.querySelector('#inventoryProvider')?.value);
     const providerData = findProviderById(providerId);
@@ -6530,7 +6555,7 @@
     }
 
     if (!invoiceNumber) {
-      await openIosSwal({ title: 'Dato faltante', html: '<p>Completá el número de factura o remito.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+      await openIosSwal({ title: 'Dato faltante', html: '<p>Completá el número de factura.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
       return;
     }
 
@@ -6625,6 +6650,7 @@
         entry.availableKg = nextAvailableKg;
         entry.packageQty = nextPackageQty;
         entry.invoiceNumber = invoiceNumber;
+        entry.remitoNumber = remitoNumber;
         entry.entryDate = entryDate;
         entry.expiryDate = noPerecedero ? '' : expiryDate;
         entry.noPerecedero = Boolean(noPerecedero);
@@ -6705,6 +6731,7 @@
           editingEntryId: '',
           qty: '',
           invoiceNumber: '',
+          remitoNumber: '',
           customLot: '',
           provider: '',
           invoiceImageCountLabel: 'Sin archivos seleccionados',
@@ -6762,6 +6789,7 @@
           entryDate: entryDateValue,
           expiryDate: noPerecederoValue ? '' : expiryDateValue,
           invoiceNumber,
+          remitoNumber,
           lotNumber,
           customLot,
           provider,
@@ -6870,6 +6898,7 @@
         ...state.editorDraft,
         qty: '',
         invoiceNumber: '',
+        remitoNumber: '',
         customLot: '',
         provider: '',
         invoiceImageCountLabel: 'Sin archivos seleccionados',

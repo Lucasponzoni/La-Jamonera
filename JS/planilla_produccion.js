@@ -200,6 +200,10 @@
       ...registro,
       productExpiryDate,
       recipeNombreComercial: currentCommercialName,
+      // Datos de receta para la planilla protocolo: base de cálculo y vida útil.
+      recipeYieldQuantity: recipe.yieldQuantity,
+      recipeYieldUnit: normalizeValue(recipe.yieldUnit),
+      recipeShelfLifeDays: Number(registro.shelfLifeDaysAtProduction ?? recipe.shelfLifeDays) || 0,
       traceability: {
         ...safeObject(registro.traceability),
         product: {
@@ -369,18 +373,20 @@
       return acc;
     }, {}));
 
-    const renderIngredientCell = (row) => `<div class="planilla-ingredient-main">
-      <span class="planilla-avatar">${row.ingredientImage ? `<img src="${escapeHtml(row.ingredientImage)}" alt="${escapeHtml(row.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span>
-      <span><strong>${escapeHtml(row.ingredientName)}</strong>${row.relation ? `<small class="planilla-substitute-note"><i class="fa-solid fa-link"></i> ${escapeHtml(row.relation)}</small>` : ''}</span>
-    </div>`;
+    // Formato protocolo: sin avatar/foto del producto. Cantidad expresada en KG
+    // como pide el registro oficial; si la unidad no es de peso se muestra tal cual.
+    const renderQtyKg = (row) => {
+      const kg = Number(row.qtyKg || 0);
+      if (kg > 0.000001) return kg.toFixed(3);
+      return normalizeValue(row.qty) || '-';
+    };
 
     const renderDataRow = (row, className = '') => `<tr class="${className}">
-      <td>${renderIngredientCell(row)}</td>
+      <td class="planilla-proto-ing"><strong>${escapeHtml(row.ingredientName)}</strong>${row.relation ? `<small class="planilla-substitute-note"><i class="fa-solid fa-link"></i> ${escapeHtml(row.relation)}</small>` : ''}</td>
       <td>${escapeHtml(row.provider)}</td>
       <td>${escapeHtml(row.lotNumber)}</td>
       <td>${escapeHtml(formatIsoEs(row.expiryDate))}</td>
-      <td>${escapeHtml(row.rne)}</td>
-      <td class="planilla-qty-cell">${escapeHtml(row.qty)}</td>
+      <td class="planilla-qty-cell">${escapeHtml(renderQtyKg(row))}</td>
     </tr>`;
 
     return groups.map((group) => {
@@ -392,14 +398,14 @@
       const directText = directUsed > 0.0001 ? `ORIGINAL USADO: ${formatQty(directUsed, group.sourceUnit)}` : 'INGREDIENTE ORIGINAL SIN CONSUMO DIRECTO';
       const sourceRequiredLabel = escapeHtml(formatQty(group.sourceRequiredQty || totalUsed, group.sourceUnit));
       const totalUsedLabel = escapeHtml(formatQty(totalUsed, group.sourceUnit));
-      return `<tr class="planilla-source-row"><td colspan="6">
+      return `<tr class="planilla-source-row"><td colspan="5">
         <div class="planilla-source-head">
           <strong>${escapeHtml(normalizeUpper(group.sourceIngredientName))}</strong>
           <span><i class="fa-solid fa-link"></i> ${badge}</span>
         </div>
         <div class="planilla-source-meta">REQUERIDO: <b>${sourceRequiredLabel}</b> <span aria-hidden="true">|</span> TOTAL USADO: <b>${totalUsedLabel}</b> <span aria-hidden="true">|</span> ${escapeHtml(directText)}</div>
       </td></tr>${group.rows.map((row) => renderDataRow(row, row.isSubstitute ? 'planilla-substitute-row' : '')).join('')}`;
-    }).join('') || '<tr><td colspan="6">SIN INGREDIENTES CARGADOS.</td></tr>';
+    }).join('') || '<tr><td colspan="5">SIN INGREDIENTES CARGADOS.</td></tr>';
   };
 
   const buildPlanillaHtml = (registro, context = {}) => {
@@ -424,33 +430,60 @@
 
     const observationsLabel = normalizeUpper(observations.replace(/\u00c2\u00b7/g, '|'));
 
-    return `<div class="planilla-card planilla-print-a4" id="planillaProduccionPrintable">
-      <header class="planilla-doc-header">
-        <div class="planilla-doc-title">
-          <p>FRIGORIFICO LA JAMONERA &bull; REGISTRO DE PROTOCOLO DE PRODUCCION</p>
-          <h2>${escapeHtml(normalizeUpper(registro?.recipeTitle || '-'))}</h2>
-          ${commercialName ? `<small class="planilla-commercial-name">NOMBRE COMERCIAL: ${escapeHtml(normalizeUpper(commercialName))}</small>` : ''}
-          <span>${escapeHtml(registro?.id || '-')}</span>
+    // Base de c\u00e1lculo: kilos sobre los que est\u00e1 calculada la receta (desde recetas).
+    const yieldQty = Number(registro?.recipeYieldQuantity || 0);
+    const yieldUnit = normalizeUpper(registro?.recipeYieldUnit || 'KG');
+    const baseCalculoLabel = yieldQty > 0 ? `${yieldQty % 1 ? yieldQty.toFixed(2) : yieldQty} ${yieldUnit} DE PRODUCCI\u00d3N` : '-';
+    const shelfLifeDays = Number(registro?.recipeShelfLifeDays || 0);
+    const lapsoAptitudLabel = shelfLifeDays > 0
+      ? `LAPSO DE APTITUD: ${shelfLifeDays} D\u00cdAS A PARTIR DE LA FECHA DE ENVASADO / ROTULADO`
+      : '';
+    // Ingredientes del r\u00f3tulo: nombres de las materias primas usadas en la producci\u00f3n.
+    const rotuloIngredients = [...new Set(ingredientRows.map((row) => normalizeValue(row.ingredientName).toLowerCase()).filter(Boolean))].join(', ');
+
+    return `<div class="planilla-card planilla-print-a4 planilla-proto" id="planillaProduccionPrintable">
+      <table class="planilla-proto-head-table">
+        <tbody>
+          <tr>
+            <td class="planilla-proto-brand">Frigor\u00edfico<br><strong>La Jamonera</strong></td>
+            <td class="planilla-proto-doc-title">REGISTRO PROTOCOLO DE PRODUCCI\u00d3N</td>
+            <td class="planilla-proto-version"><span>Versi\u00f3n <strong>004</strong></span><span>F. Elaboraci\u00f3n <strong>DIC 2025</strong></span></td>
+          </tr>
+          <tr>
+            <td class="planilla-proto-format-label">FORMATO</td>
+            <td colspan="2" class="planilla-proto-format-value">${escapeHtml(registro?.id || '-')} &bull; EMITIDO: ${escapeHtml(formatDateTime(registro?.createdAt))} &bull; RNE EMPRESA ${escapeHtml(registro?.traceability?.company?.rne?.number || '-')}</td>
+          </tr>
+        </tbody>
+      </table>
+      <table class="planilla-proto-fields-table">
+        <tbody>
+          <tr><th>FECHA DE ELABORACI\u00d3N</th><td>${escapeHtml(formatIsoEs(registro?.productionDate || '') || '-')}</td></tr>
+          <tr><th>FECHA DE ${escapeHtml(getPackagingLabel(registro))} / ROTULADO</th><td>${escapeHtml(getPackagingDateDisplay(registro))}</td></tr>
+          <tr><th>PRODUCTO</th><td><strong>${escapeHtml(normalizeUpper(registro?.recipeTitle || '-'))}</strong>${commercialName ? ` <small>(${escapeHtml(normalizeUpper(commercialName))})</small>` : ''}</td></tr>
+          <tr><th>N\u00b0 LOTE ASIGNADO</th><td>${escapeHtml(getProductionLotDisplay(registro))}</td></tr>
+          <tr><th>FECHA DE VENCIMIENTO</th><td>${escapeHtml(normalizeUpper(getProductExpiryDisplay(registro)))}</td></tr>
+          <tr><th>BASE DE C\u00c1LCULO</th><td>${escapeHtml(baseCalculoLabel)}</td></tr>
+          <tr><th>RNPA</th><td>${escapeHtml(rnpaDisplay)}</td></tr>
+        </tbody>
+      </table>
+      <div class="planilla-table-scroll"><table class="planilla-table planilla-formula-table planilla-proto-formula">
+        <thead><tr><th>MATERIA PRIMA</th><th>MARCA</th><th>N\u00b0 DE LOTE</th><th>VENCIMIENTO</th><th>CANTIDAD KG</th></tr></thead>
+        <tbody>${formulaRows}
+          <tr class="planilla-proto-total-row"><td colspan="4"><strong>TOTAL</strong></td><td class="planilla-qty-cell"><strong>${totalIngredients.toFixed(3)}</strong></td></tr>
+        </tbody>
+      </table></div>
+      <p class="planilla-proto-aptitud">N/A: No Aplica${lapsoAptitudLabel ? `<br>${escapeHtml(lapsoAptitudLabel)}` : ''}</p>
+      <table class="planilla-proto-fields-table">
+        <tbody>
+          <tr><th>CANTIDAD OBTENIDA DEL PRODUCTO EN KILOS</th><td>${escapeHtml(`${Number(registro?.quantityKg || 0).toFixed(2)} KG`)}${merma > 0.0005 ? ` <small>(MERMA ${merma.toFixed(3)} KG)</small>` : ''}</td></tr>
+          <tr><th>FIRMA RESPONSABLE</th><td>${escapeHtml(normalizeUpper(managerLabel))}</td></tr>
+        </tbody>
+      </table>
+      <section class="planilla-proto-bottom">
+        <div class="planilla-proto-observations">
+          <p><strong>OBSERVACIONES:</strong> ${escapeHtml(observationsLabel)}</p>
+          ${rotuloIngredients ? `<p><strong>Ingredientes (r\u00f3tulo):</strong> ${escapeHtml(rotuloIngredients)}.</p>` : ''}
         </div>
-        <div class="planilla-doc-brand">
-          <strong>FRIGORIFICO LA JAMONERA S.A.</strong>
-          <small>Emitido: ${escapeHtml(formatDateTime(registro?.createdAt))}</small>
-          <small>RNE EMPRESA ${escapeHtml(registro?.traceability?.company?.rne?.number || '-')}</small>
-        </div>
-      </header>
-      <section class="planilla-summary-grid">
-        <div class="planilla-summary-item"><strong>PERIODO</strong><span>${escapeHtml(formatMonthYearEs(registro?.productionDate || ''))}</span></div>
-        <div class="planilla-summary-item"><strong>ELABORACION</strong><span>${escapeHtml(normalizeUpper(formatIsoEs(registro?.productionDate || '')))}</span></div>
-        <div class="planilla-summary-item"><strong>${escapeHtml(getPackagingLabel(registro))}</strong><span>${escapeHtml(getPackagingDateDisplay(registro))}</span></div>
-        <div class="planilla-summary-item"><strong>VENCIMIENTO</strong><span>${escapeHtml(normalizeUpper(getProductExpiryDisplay(registro)))}</span></div>
-        <div class="planilla-summary-item"><strong>NRO. LOTE</strong><span>${escapeHtml(getProductionLotDisplay(registro))}</span></div>
-        <div class="planilla-summary-item"><strong>RNPA PRODUCTO</strong><span>${escapeHtml(rnpaDisplay)}</span></div>
-        <div class="planilla-summary-item"><strong>OBTENIDO</strong><span>${escapeHtml(normalizeUpper(`${Number(registro?.quantityKg || 0).toFixed(2)} KG`))}</span></div>
-        <div class="planilla-summary-item"><strong>MERMA</strong><span>${escapeHtml(normalizeUpper(`${merma.toFixed(3)} KG`))}</span></div>
-      </section>
-      <section class="planilla-formula-card"><h3>FORMULA / MATERIAS PRIMAS</h3><div class="planilla-table-scroll"><table class="planilla-table planilla-formula-table"><thead><tr><th>MATERIA PRIMA</th><th>PROVEEDOR</th><th>LOTE</th><th>VENCIMIENTO</th><th>RNE</th><th>CANTIDAD</th></tr></thead><tbody>${formulaRows}</tbody></table></div></section>
-      <section class="planilla-bottom-grid">
-        <div class="planilla-kpis-grid"><p><strong>RESPONSABLE:</strong> ${escapeHtml(normalizeUpper(managerLabel))}</p><p><strong>OBSERVACIONES:</strong> ${escapeHtml(observationsLabel)}</p></div>
         <article class="planilla-qr-card"><div id="planillaQrTarget"></div><p class="planilla-qr-note">QR trazabilidad</p></article>
       </section>
     </div>`;
@@ -467,6 +500,19 @@
     win.addEventListener('load', finish, { once: true });
     setTimeout(resolve, 5000);
   });
+
+  // Espera explícita de las hojas de estilo del popup de impresión: el readyState
+  // puede quedar "complete" antes de que el CSS externo termine de bajar y la
+  // impresora se abre con la planilla sin estilos. Cada <link> resuelve por load,
+  // error o timeout de 4s.
+  const waitStylesheets = (win) => Promise.all(
+    [...(win?.document?.querySelectorAll('link[rel="stylesheet"]') || [])].map((link) => new Promise((resolve) => {
+      if (link.sheet) return resolve();
+      link.addEventListener('load', resolve, { once: true });
+      link.addEventListener('error', resolve, { once: true });
+      setTimeout(resolve, 4000);
+    }))
+  ).then(() => (win.document?.fonts ? win.document.fonts.ready.catch(() => {}) : null));
 
   const renderQr = (host, registro) => {
     if (!host || !window.QRCode) return;
@@ -490,6 +536,9 @@
     win.document.write(`<html><head>${buildPlanillaHeadHtml(documentTitle)}</head><body>${root.outerHTML}</body></html>`);
     win.document.close();
     await waitWindowLoad(win);
+    // CSS primero, después la impresora: sin esto el diálogo podía abrirse con
+    // la planilla sin estilos.
+    try { await waitStylesheets(win); } catch (e) {}
     const printRoot = win.document.querySelector('#planillaProduccionPrintable');
     if (printRoot?.querySelector('.planilla-summary-grid')) printRoot.querySelector('.planilla-summary-grid').style.gridTemplateColumns = 'repeat(4, minmax(0, 1fr))';
     const qrHost = win.document.querySelector('#planillaQrTarget');
@@ -497,6 +546,7 @@
       renderQr(qrHost, registro);
     }
     try { await waitImages(win.document.body); } catch (e) {}
+    await new Promise((resolve) => win.requestAnimationFrame ? win.requestAnimationFrame(() => resolve()) : setTimeout(resolve, 50));
     win.focus();
     win.print();
   };

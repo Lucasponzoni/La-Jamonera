@@ -16399,3 +16399,182 @@ tr.inventario-row-frozen > td:first-child::before {
   .frozen-info-list--two-col { grid-template-columns: 1fr; }
   .frozen-info-temp-grid { grid-template-columns: 1fr; }
 }
+
+
+/* ============================================================
+   Planilla protocolo de producción (formato registro oficial)
+   ============================================================ */
+.planilla-proto {
+  display: grid;
+  gap: 10px;
+}
+
+.planilla-proto-head-table,
+.planilla-proto-fields-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.planilla-proto-head-table td,
+.planilla-proto-fields-table th,
+.planilla-proto-fields-table td {
+  border: 1px solid #13233c;
+  padding: 6px 10px;
+  font-size: 0.72rem;
+  color: #14233d;
+  background: #fff;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.planilla-proto-brand {
+  width: 22%;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.planilla-proto-brand strong {
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.planilla-proto-doc-title {
+  text-align: center !important;
+  font-weight: 900;
+  font-size: 0.86rem !important;
+  letter-spacing: 0.04em;
+}
+
+.planilla-proto-version {
+  width: 20%;
+  font-size: 0.62rem !important;
+}
+
+.planilla-proto-version span {
+  display: block;
+  line-height: 1.35;
+}
+
+.planilla-proto-format-label {
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  background: #eef3ff !important;
+  width: 22%;
+}
+
+.planilla-proto-format-value {
+  font-size: 0.62rem !important;
+  color: #44557c !important;
+}
+
+.planilla-proto-fields-table th {
+  width: 38%;
+  background: #eef3ff;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+}
+
+.planilla-proto-fields-table td small {
+  color: #5d6f96;
+  font-weight: 700;
+}
+
+.planilla-proto-formula th:nth-child(1),
+.planilla-proto-formula td:nth-child(1) {
+  width: 30%;
+}
+
+.planilla-proto-formula th:nth-child(2),
+.planilla-proto-formula td:nth-child(2) {
+  width: 26%;
+}
+
+.planilla-proto-formula th:nth-child(3),
+.planilla-proto-formula td:nth-child(3) {
+  width: 18%;
+}
+
+.planilla-proto-formula th:nth-child(4),
+.planilla-proto-formula td:nth-child(4) {
+  width: 13%;
+}
+
+.planilla-proto-formula th:nth-child(5),
+.planilla-proto-formula td:nth-child(5) {
+  width: 13%;
+}
+
+.planilla-proto-ing strong {
+  font-weight: 800;
+  color: #14233d;
+}
+
+.planilla-proto-total-row td {
+  background: #eef3ff;
+  font-weight: 900;
+}
+
+.planilla-proto-aptitud {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #44557c;
+  line-height: 1.4;
+}
+
+.planilla-proto-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.planilla-proto-observations {
+  border: 1px solid #13233c;
+  padding: 8px 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.planilla-proto-observations p {
+  margin: 0;
+  font-size: 0.66rem;
+  line-height: 1.4;
+  color: #14233d;
+}
+
+@media (max-width: 640px) {
+  .planilla-proto-bottom {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  .planilla-proto-head-table td,
+  .planilla-proto-fields-table th,
+  .planilla-proto-fields-table td {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* Contador del visor de adjuntos (ej: 2/10) */
+.viewer-counter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #13233c;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  user-select: none;
+}
