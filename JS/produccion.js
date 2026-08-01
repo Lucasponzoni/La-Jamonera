@@ -1944,41 +1944,51 @@
         });
       };
 
-      consumeIngredientSource({
+      // ============================================================
+      // Pool FEFO combinado (original + sustitutos): la prioridad la
+      // define la antigüedad del lote (vencimiento más próximo primero
+      // y, a igual fecha, proporcional al stock disponible), NO el rol
+      // de original/sustituto. Los topes por sustituto (maxShare de la
+      // receta) se siguen respetando.
+      // ============================================================
+      const originalSource = {
         ingredientId: requirement.ingredientId,
         ingredientName: requirement.name,
         maxShare: 1,
-        isSubstitute: false
-      });
+        isOriginal: true
+      };
+      const relatedSources = requirement.relatedOptions.map((related) => ({ ...related, isOriginal: false }));
+      const originalRecordForPlan = safeObject(state.inventario.items?.[requirement.ingredientId]);
 
-      if (remaining > 0.0001 && requirement.relatedOptions.length) {
-        const substituteNeed = remaining;
+      // Disponibilidad del original en unidad de receta (para el plan
+      // informativo cuando el pool no le asigna consumo).
+      const computeAvailableInReqUnit = (ingredientId) => {
+        const record = safeObject(state.inventario.items?.[ingredientId]);
+        const reqMeta = getUnitMeta(requirement.unit);
+        return (Array.isArray(record.entries) ? record.entries : []).reduce((sum, entry) => {
+          const entryUnit = normalizeLower(entry.unit || requirement.unit);
+          if (getUnitMeta(entryUnit).category !== reqMeta.category) return sum;
+          const expiryIso = isEntryNoPerecedero(entry) ? '' : normalizeValue(entry.expiryDate);
+          if (expiryIso && expiryIso < productionDateIso) return sum;
+          if (isEntryFutureForProductionDate(entry, productionDateIso)) return sum;
+          const entryQty = options.loteAntiguo ? getEntryOriginalQty(entry) : getEntryAvailableQty(entry);
+          const reservedByOther = options.loteAntiguo ? 0 : reservedByOthersForEntry(ingredientId, entry.id, entryUnit);
+          return sum + Math.max(0, fromBase(toBase(Math.max(0, entryQty - reservedByOther), entryUnit), requirement.unit));
+        }, 0);
+      };
+
+      const allocatePooled = (sources, poolNeed) => {
+        const substituteNeed = poolNeed;
         const substituteGroups = [];
         const usageByRelated = {};
-        requirement.relatedOptions.forEach((related) => {
+        const infiniteSources = [];
+        sources.forEach((related) => {
           const maxAllowed = Math.min(substituteNeed, rowNeed * Math.max(0, Number(related.maxShare || 0)));
           if (maxAllowed <= 0.0001) return;
           const record = safeObject(state.inventario.items?.[related.ingredientId]);
           if (isInfiniteStockRecord(record)) {
-            const plannedUsed = Number(Math.min(remaining, maxAllowed).toFixed(4));
-            if (plannedUsed <= 0.0001) return;
-            ingredientPlans.push({
-              ingredientId: related.ingredientId,
-              ingredientName: related.ingredientName,
-              ingredientUnit: requirement.unit,
-              neededQty: plannedUsed,
-              availableQty: INFINITE_STOCK_AVAILABLE_QTY,
-              missingQty: 0,
-              sourceIngredientId: requirement.ingredientId,
-              sourceIngredientName: requirement.name,
-              substitutionLabel: `Sustituye a ${requirement.name}`,
-              isSubstitute: true,
-              infiniteStock: true,
-              noTraceability: true,
-              lots: []
-            });
-            usageByRelated[related.ingredientId] = Number((Number(usageByRelated[related.ingredientId] || 0) + plannedUsed).toFixed(4));
-            remaining = Math.max(0, Number((remaining - plannedUsed).toFixed(6)));
+            // Stock infinito no compite por antigüedad: cubre el faltante al final.
+            infiniteSources.push({ related, maxAllowed });
             return;
           }
           const entries = sortEntriesFEFO(Array.isArray(record.entries) ? record.entries : []);
@@ -1988,7 +1998,7 @@
             const entryMeta = getUnitMeta(entryUnit);
             if (entryMeta.category !== reqMeta.category) return;
             const expiryKey = isEntryNoPerecedero(entry) ? '9999-12-31' : (normalizeValue(entry.expiryDate) || '9999-12-31');
-            const createdKey = Number(entry.createdAt || 0);
+            const createdKey = String(Number(entry.createdAt || 0)).padStart(15, '0');
             const key = `${expiryKey}::${createdKey}`;
             let group = substituteGroups.find((item) => item.key === key);
             if (!group) {
@@ -2002,6 +2012,9 @@
             });
           });
         });
+        // FEFO estricto entre TODOS los ingredientes del pool: los grupos se
+        // recorren por fecha de vencimiento y antigüedad de carga.
+        substituteGroups.sort((a, b) => a.key.localeCompare(b.key));
 
         substituteGroups.forEach((group) => {
           if (remaining <= 0.0001) return;
@@ -2082,7 +2095,8 @@
             };
             const plannedUsed = Number(lot.takeQty || 0);
             if (!plannedUsed && lot.status !== 'expired') return;
-            const existing = ingredientPlans.find((plan) => plan.isSubstitute && normalizeValue(plan.ingredientId) === normalizeValue(item.related.ingredientId) && normalizeValue(plan.sourceIngredientId) === normalizeValue(requirement.ingredientId));
+            const expectSubstitute = !item.related.isOriginal;
+            const existing = ingredientPlans.find((plan) => Boolean(plan.isSubstitute) === expectSubstitute && normalizeValue(plan.ingredientId) === normalizeValue(item.related.ingredientId) && normalizeValue(plan.sourceIngredientId) === normalizeValue(requirement.ingredientId));
             if (existing) {
               existing.neededQty = Number((existing.neededQty + plannedUsed).toFixed(4));
               existing.availableQty = Number((existing.availableQty + Number(lot.availableQty || 0)).toFixed(4));
@@ -2097,8 +2111,8 @@
                 missingQty: 0,
                 sourceIngredientId: requirement.ingredientId,
                 sourceIngredientName: requirement.name,
-                substitutionLabel: `Sustituye a ${requirement.name}`,
-                isSubstitute: true,
+                substitutionLabel: expectSubstitute ? `Sustituye a ${requirement.name}` : '',
+                isSubstitute: expectSubstitute,
                 lots: [lot]
               });
             }
@@ -2108,6 +2122,60 @@
             }
           });
         });
+
+        // Fuentes con stock infinito del pool: cubren el faltante al final,
+        // sin competir por antigüedad con los lotes reales.
+        infiniteSources.forEach(({ related, maxAllowed }) => {
+          if (remaining <= 0.0001) return;
+          const plannedUsed = Number(Math.min(remaining, maxAllowed).toFixed(4));
+          if (plannedUsed <= 0.0001) return;
+          const expectSubstitute = !related.isOriginal;
+          ingredientPlans.push({
+            ingredientId: related.ingredientId,
+            ingredientName: related.ingredientName,
+            ingredientUnit: requirement.unit,
+            neededQty: plannedUsed,
+            availableQty: INFINITE_STOCK_AVAILABLE_QTY,
+            missingQty: 0,
+            sourceIngredientId: requirement.ingredientId,
+            sourceIngredientName: requirement.name,
+            substitutionLabel: expectSubstitute ? `Sustituye a ${requirement.name}` : '',
+            isSubstitute: expectSubstitute,
+            infiniteStock: true,
+            noTraceability: true,
+            lots: []
+          });
+          usageByRelated[related.ingredientId] = Number((Number(usageByRelated[related.ingredientId] || 0) + plannedUsed).toFixed(4));
+          remaining = Math.max(0, Number((remaining - plannedUsed).toFixed(6)));
+        });
+      };
+
+      if (isInfiniteStockRecord(originalRecordForPlan) || !relatedSources.length) {
+        // Original con stock infinito o receta sin sustitutos: consumo directo
+        // clásico (original primero, sustitutos sólo para el faltante).
+        consumeIngredientSource(originalSource);
+        if (remaining > 0.0001 && relatedSources.length) {
+          allocatePooled(relatedSources, remaining);
+        }
+      } else {
+        allocatePooled([originalSource, ...relatedSources], rowNeed);
+        // Si el pool no le asignó consumo al original (sustitutos más viejos
+        // cubrieron todo), dejamos su plan informativo con el stock visible.
+        if (!ingredientPlans.some((plan) => !plan.isSubstitute && normalizeValue(plan.ingredientId) === normalizeValue(requirement.ingredientId))) {
+          ingredientPlans.push({
+            ingredientId: requirement.ingredientId,
+            ingredientName: requirement.name,
+            ingredientUnit: requirement.unit,
+            neededQty: 0,
+            availableQty: Number(computeAvailableInReqUnit(requirement.ingredientId).toFixed(4)),
+            missingQty: 0,
+            sourceIngredientId: requirement.ingredientId,
+            sourceIngredientName: requirement.name,
+            substitutionLabel: '',
+            isSubstitute: false,
+            lots: []
+          });
+        }
       }
 
       const missing = Math.max(0, Number(remaining.toFixed(4)));
