@@ -64,13 +64,77 @@
   const getAuth = () => window.authLaJamonera || firebase.app('laJamonera').auth();
   const getDb = () => window.dbLaJamonera || firebase.app('laJamonera').database();
 
+  // ============================================================
+  // Anti-cuelgue: el SDK de RTDB no tiene timeout propio. Tras una
+  // suspensión de pestaña o corte de red, once()/set() pueden quedar
+  // pendientes para siempre y la UI se clava en "Cargando..." hasta
+  // recargar. Acá: timeout + reconexión forzada + un reintento; si
+  // vuelve a fallar, rechazamos con error claro (los catch de la UI
+  // cierran el spinner y muestran el mensaje).
+  // ============================================================
+  const READ_TIMEOUT_MS = 20_000;
+  const WRITE_TIMEOUT_MS = 45_000;
+  const AUTH_TIMEOUT_MS = 12_000;
+
+  const withTimeout = (promise, ms, label) => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      const error = new Error(`Se agotó el tiempo de ${label} (${Math.round(ms / 1000)}s). Revisá la conexión a internet.`);
+      error.isTimeout = true;
+      reject(error);
+    }, ms);
+    Promise.resolve(promise).then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); }
+    );
+  });
+
+  let reconnecting = false;
+  const forceReconnect = () => {
+    if (reconnecting) return;
+    reconnecting = true;
+    try { getDb().goOffline(); } catch (error) {}
+    setTimeout(() => {
+      try { getDb().goOnline(); } catch (error) {}
+      reconnecting = false;
+    }, 400);
+  };
+
+  const runWithReconnectRetry = async (factory, ms, label) => {
+    try {
+      return await withTimeout(factory(), ms, label);
+    } catch (error) {
+      if (!error || !error.isTimeout) throw error;
+      console.warn(`[Firebase] ${label}: timeout. Forzando reconexión y reintentando...`);
+      forceReconnect();
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      return withTimeout(factory(), ms, label);
+    }
+  };
+
   const waitForAuth = () => new Promise((resolve, reject) => {
     const auth = getAuth();
+    // Vía rápida: sesión ya resuelta. Evita esperar un evento de auth que a
+    // veces no vuelve a dispararse después de suspender la pestaña.
+    if (auth.currentUser) {
+      resolve(auth.currentUser);
+      return;
+    }
+    let settled = false;
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { unsubscribe(); } catch (error) {}
+      fn(value);
+    };
+    const timer = setTimeout(() => {
+      if (auth.currentUser) finish(resolve, auth.currentUser);
+      else finish(reject, new Error('No se pudo verificar la sesión (timeout). Revisá la conexión.'));
+    }, AUTH_TIMEOUT_MS);
     const unsubscribe = auth.onAuthStateChanged((user) => {
-      unsubscribe();
-      if (user) resolve(user);
-      else reject(new Error('Usuario no autenticado.'));
-    }, reject);
+      if (user) finish(resolve, user);
+      else finish(reject, new Error('Usuario no autenticado.'));
+    }, (error) => finish(reject, error));
   });
 
   const waitForInitialAuth = () => new Promise((resolve, reject) => {
@@ -88,7 +152,7 @@
     if (cached.hit) return cached.value;
     if (pendingReads.has(key)) return clone(await pendingReads.get(key));
 
-    const promise = getDb().ref(key).once('value')
+    const promise = runWithReconnectRetry(() => getDb().ref(key).once('value'), READ_TIMEOUT_MS, `lectura de ${key}`)
       .then((snapshot) => {
         const value = snapshot.val();
         setCache(key, value);
@@ -171,7 +235,7 @@
     await waitForAuth();
     const key = normalizePath(path);
     const cleanValue = value === undefined ? null : value;
-    await writeChunkedRoot(key, cleanValue);
+    await runWithReconnectRetry(() => writeChunkedRoot(key, cleanValue), WRITE_TIMEOUT_MS, `escritura de ${key}`);
     invalidateCache(key);
     setCache(key, cleanValue);
     await syncIndexAfterWrite(key, cleanValue, 'write');
@@ -182,7 +246,7 @@
     await waitForAuth();
     const key = normalizePath(path);
     const cleanValue = value === undefined ? null : value;
-    await getDb().ref(key).update(cleanValue);
+    await runWithReconnectRetry(() => getDb().ref(key).update(cleanValue), WRITE_TIMEOUT_MS, `actualización de ${key}`);
     invalidateCache(key);
     await syncIndexAfterWrite(key, cleanValue, 'update');
     return { ok: true };
@@ -220,6 +284,14 @@
         invalidateCache(path);
       }
     };
+
+    // Al volver de una pestaña suspendida, empujamos la reconexión del socket
+    // de RTDB para que la próxima lectura/escritura no quede colgada.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        try { getDb().goOnline(); } catch (error) {}
+      }
+    });
 
     return waitForInitialAuth();
   };
