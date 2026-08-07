@@ -25,6 +25,17 @@
     const month = date.toLocaleDateString('es-AR', { month: 'long' }).toUpperCase();
     return `${month} ${date.getFullYear()}`;
   };
+
+  // Mes abreviado (ENE..DIC) para el encabezado del protocolo: se usa la fecha
+  // real de elaboracion de la produccion, no un valor fijo.
+  const MONTHS_SHORT_ES = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
+  const formatMonthShortYearEs = (value) => {
+    const text = normalizeValue(value);
+    if (!text) return '-';
+    const date = /^\d{4}-\d{2}-\d{2}/.test(text) ? new Date(`${text.slice(0, 10)}T00:00:00`) : new Date(Number(text));
+    if (Number.isNaN(date.getTime())) return '-';
+    return `${MONTHS_SHORT_ES[date.getMonth()]} ${date.getFullYear()}`;
+  };
   const addDaysToIso = (isoDate, days) => {
     const text = normalizeValue(isoDate);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return '';
@@ -440,6 +451,8 @@
       : '';
     // Ingredientes del r\u00f3tulo: nombres de las materias primas usadas en la producci\u00f3n.
     const rotuloIngredients = [...new Set(ingredientRows.map((row) => normalizeValue(row.ingredientName).toLowerCase()).filter(Boolean))].join(', ');
+    // Encabezado "F. Elaboracion": mes/anio real de la produccion (fallback: alta del registro).
+    const elaborationMonthLabel = formatMonthShortYearEs(registro?.productionDate || registro?.createdAt || '');
 
     return `<div class="planilla-card planilla-print-a4 planilla-proto" id="planillaProduccionPrintable">
       <table class="planilla-proto-head-table">
@@ -447,7 +460,7 @@
           <tr>
             <td class="planilla-proto-brand">Frigor\u00edfico<br><strong>La Jamonera</strong></td>
             <td class="planilla-proto-doc-title">REGISTRO PROTOCOLO DE PRODUCCI\u00d3N</td>
-            <td class="planilla-proto-version"><span>Versi\u00f3n <strong>004</strong></span><span>F. Elaboraci\u00f3n <strong>DIC 2025</strong></span></td>
+            <td class="planilla-proto-version"><span>Versi\u00f3n <strong>004</strong></span><span>F. Elaboraci\u00f3n <strong>${escapeHtml(elaborationMonthLabel)}</strong></span></td>
           </tr>
           <tr>
             <td class="planilla-proto-format-label">FORMATO</td>
