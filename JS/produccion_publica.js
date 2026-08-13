@@ -190,6 +190,42 @@
     return Number((base / 1000).toFixed(6));
   };
 
+  // Un mismo lote de proveedor puede venir cargado como varias entradas de
+  // inventario. La trazabilidad publica debe mostrar el lote real, no cada
+  // entrada interna: se consolidan sumando lo usado.
+  const mergeTraceLotsByLotNumber = (lots = []) => {
+    const merged = [];
+    const index = {};
+    (Array.isArray(lots) ? lots : []).forEach((lot, position) => {
+      const lotNumber = normalize(lot?.lotNumber);
+      const key = lotNumber
+        ? [
+          lotNumber.toLowerCase(),
+          normalize(lot?.expiryDate),
+          normalize(lot?.provider).toLowerCase(),
+          normalize(lot?.unit).toLowerCase(),
+          (lot?.isFrozen || lot?.frozen) ? 'F' : 'N'
+        ].join('::')
+        : `entry::${normalize(lot?.entryId) || position}`;
+      const existing = index[key];
+      if (!existing) {
+        const clone = {
+          ...lot,
+          entryIds: [normalize(lot?.entryId)].filter(Boolean),
+          mergedEntries: 1
+        };
+        index[key] = clone;
+        merged.push(clone);
+        return;
+      }
+      existing.takeQty = Number((Number(existing.takeQty || 0) + Number(lot?.takeQty || 0)).toFixed(4));
+      existing.mergedEntries += 1;
+      const entryId = normalize(lot?.entryId);
+      if (entryId && !existing.entryIds.includes(entryId)) existing.entryIds.push(entryId);
+    });
+    return merged;
+  };
+
   const getId = () => {
     const params = new URLSearchParams(window.location.search);
     const queryId = normalize(params.get('id'));
@@ -272,21 +308,31 @@
       lines.push('R -.-> E');
     }
     ingredients.forEach((plan, idx) => {
-      const lots = Array.isArray(plan?.lots) && plan.lots.length ? plan.lots.filter((lot) => Number(lot?.takeQty || 0) > 0.0001) : [{}];
+      const lots = Array.isArray(plan?.lots) && plan.lots.length ? mergeTraceLotsByLotNumber(plan.lots.filter((lot) => Number(lot?.takeQty || 0) > 0.0001)) : [{}];
       const nodeId = `ING_${idx + 1}`;
       const traceIngredient = (Array.isArray(registro?.traceability?.ingredients) ? registro.traceability.ingredients : []).find((row) => normalize(row?.ingredientId) === normalize(plan?.ingredientId));
       const usedQty = getIngredientPlanUsedQty(plan, { hasSiblingSubstitute: hasSubstituteSibling(allPlans, plan) });
       const relationLabel = plan?.isSubstitute && normalize(plan?.sourceIngredientName) ? `<br/><b>Sustituye a:</b> ${escapeHtml(plan.sourceIngredientName)}` : '';
       lines.push(`${nodeId}["<b>${idx + 1}. ${escapeHtml((plan?.ingredientName || traceIngredient?.ingredientName || 'Ingrediente').toUpperCase())}</b>${relationLabel}<br/><b>Usado total:</b> ${escapeHtml(String(Number(usedQty || 0).toFixed(3)))} ${escapeHtml(plan?.ingredientUnit || plan?.unit || '')}<br/><b>Lotes usados:</b> ${lots.length}"]:::toneIngredient`);
       lines.push(`I --> ${nodeId}`);
+      const traceLots = Array.isArray(traceIngredient?.lots) ? traceIngredient.lots : [];
       let previousLotNodeId = '';
       lots.forEach((lot, lotIndex) => {
-        const traceLot = (Array.isArray(traceIngredient?.lots) ? traceIngredient.lots : [])[lotIndex] || {};
+        // Los lots del plan vienen consolidados por numero de lote, asi que el
+        // indice ya no alinea con traceability.ingredients[].lots: se busca por
+        // numero de lote y, si no hay, por alguna de las entradas consolidadas.
+        const lotNumberKey = normalize(lot?.lotNumber);
+        const lotEntryIds = Array.isArray(lot?.entryIds) ? lot.entryIds : [];
+        const traceLot = (lotNumberKey ? traceLots.find((row) => normalize(row?.lotNumber) === lotNumberKey) : null)
+          || (lotEntryIds.length ? traceLots.find((row) => normalize(row?.entryId) && lotEntryIds.includes(normalize(row?.entryId))) : null)
+          || traceLots[lotIndex]
+          || {};
         const lotNodeId = `${nodeId}_LOT_${lotIndex + 1}`;
         const rneId = `${lotNodeId}_RNE`;
         const providerRne = normalize(lot?.providerRne?.number || traceLot?.providerRne?.number || '-');
         const takeQty = Number(lot?.takeQty || traceLot?.takeQty || 0);
-        lines.push(`${lotNodeId}["<b>LOTE ${lotIndex + 1}</b><br/>${escapeHtml(lot?.lotNumber || traceLot?.lotNumber || lot?.entryId || traceLot?.entryId || '-')}<br/><b>Usado:</b> ${escapeHtml(takeQty.toFixed(3))} ${escapeHtml(lot?.unit || plan?.ingredientUnit || plan?.unit || '')}<br/><b>Proveedor:</b> ${escapeHtml(lot?.provider || traceLot?.provider || '-')}<br/><b>VTO:</b> ${escapeHtml(formatExpiryHuman(lot?.expiryDate || traceLot?.expiryDate || ''))}"]:::toneLot`);
+        const mergedEntriesLabel = Number(lot?.mergedEntries || 1) > 1 ? `<br/><b>Ingresos del lote:</b> ${Number(lot.mergedEntries)}` : '';
+        lines.push(`${lotNodeId}["<b>LOTE ${lotIndex + 1}</b><br/>${escapeHtml(lot?.lotNumber || traceLot?.lotNumber || lot?.entryId || traceLot?.entryId || '-')}<br/><b>Usado:</b> ${escapeHtml(takeQty.toFixed(3))} ${escapeHtml(lot?.unit || plan?.ingredientUnit || plan?.unit || '')}${mergedEntriesLabel}<br/><b>Proveedor:</b> ${escapeHtml(lot?.provider || traceLot?.provider || '-')}<br/><b>VTO:</b> ${escapeHtml(formatExpiryHuman(lot?.expiryDate || traceLot?.expiryDate || ''))}"]:::toneLot`);
         lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${escapeHtml(providerRne || '-')}"]:::toneRegistry`);
         lines.push(`${nodeId} -.->|LOTE ${lotIndex + 1}| ${lotNodeId}`);
         lines.push(`${lotNodeId} -.->|RNE| ${rneId}`);

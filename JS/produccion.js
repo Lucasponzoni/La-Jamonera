@@ -3516,6 +3516,71 @@
     return /^[a-zA-Z_]/.test(base) ? base : `N_${base}`;
   };
 
+  // Un mismo lote de proveedor puede estar cargado como varias entradas de
+  // inventario (recepciones parciales del mismo remito, cargas en varias filas).
+  // El consumo se asigna por entrada, pero la trazabilidad debe mostrar el lote
+  // real: se consolidan las entradas del mismo lote en un unico nodo sumando lo
+  // usado y lo disponible.
+  const mergeTraceLotsByLotNumber = (lots = []) => {
+    const merged = [];
+    const index = {};
+    (Array.isArray(lots) ? lots : []).forEach((lot, position) => {
+      const lotNumber = normalizeValue(lot?.lotNumber);
+      const key = lotNumber
+        ? [
+          normalizeLower(lotNumber),
+          normalizeValue(lot?.expiryDate),
+          normalizeLower(lot?.provider),
+          normalizeLower(lot?.unit),
+          (lot?.isFrozen || lot?.frozen) ? 'F' : 'N'
+        ].join('::')
+        : `entry::${normalizeValue(lot?.entryId) || position}`;
+      const existing = index[key];
+      if (!existing) {
+        const clone = {
+          ...lot,
+          entryIds: [normalizeValue(lot?.entryId)].filter(Boolean),
+          mergedEntries: 1
+        };
+        index[key] = clone;
+        merged.push(clone);
+        return;
+      }
+      existing.takeQty = Number((Number(existing.takeQty || 0) + Number(lot?.takeQty || 0)).toFixed(4));
+      existing.takeBaseQty = Number((Number(existing.takeBaseQty || 0) + Number(lot?.takeBaseQty || 0)).toFixed(6));
+      existing.availableQty = Number((Number(existing.availableQty || 0) + Number(lot?.availableQty || 0)).toFixed(4));
+      existing.entryAvailableQty = Number((Number(existing.entryAvailableQty || 0) + Number(lot?.entryAvailableQty || 0)).toFixed(4));
+      existing.availableKg = Number((Number(existing.availableKg || 0) + Number(lot?.availableKg || 0)).toFixed(6));
+      existing.mergedEntries += 1;
+      const entryId = normalizeValue(lot?.entryId);
+      if (entryId && !existing.entryIds.includes(entryId)) existing.entryIds.push(entryId);
+      const images = Array.isArray(lot?.invoiceImageUrls) ? lot.invoiceImageUrls : [];
+      if (images.length) {
+        const current = Array.isArray(existing.invoiceImageUrls) ? existing.invoiceImageUrls.slice() : [];
+        images.forEach((url) => { if (url && !current.includes(url)) current.push(url); });
+        existing.invoiceImageUrls = current;
+      }
+      // El estado mas critico entre las entradas del lote manda.
+      const incomingStatus = normalizeValue(lot?.status);
+      if (incomingStatus === 'expired') existing.status = 'expired';
+      else if (incomingStatus === 'soon' && normalizeValue(existing.status) !== 'expired') existing.status = 'soon';
+      const incomingEntryDate = normalizeValue(lot?.entryDate);
+      if (incomingEntryDate && (!normalizeValue(existing.entryDate) || incomingEntryDate < normalizeValue(existing.entryDate))) {
+        existing.entryDate = incomingEntryDate;
+      }
+      // Un lote puede haber ingresado con mas de una factura.
+      const incomingInvoice = normalizeValue(lot?.invoiceNumber);
+      if (incomingInvoice && incomingInvoice !== '-') {
+        const currentInvoices = normalizeValue(existing.invoiceNumber) && existing.invoiceNumber !== '-'
+          ? String(existing.invoiceNumber).split(' + ').map((value) => normalizeValue(value)).filter(Boolean)
+          : [];
+        if (!currentInvoices.includes(incomingInvoice)) currentInvoices.push(incomingInvoice);
+        existing.invoiceNumber = currentInvoices.join(' + ');
+      }
+    });
+    return merged;
+  };
+
   const getTraceIngredientGroups = (registro) => Object.values((Array.isArray(registro?.lots) ? registro.lots : []).reduce((acc, item, index) => {
     const key = normalizeValue(item?.sourceIngredientId || item?.ingredientId || `trace_${index}`);
     if (!acc[key]) {
@@ -3585,7 +3650,7 @@
       const usedPlans = group.plans.filter((plan) => getIngredientPlanUsedQty(plan, { hasSiblingSubstitute }) > 0.0001);
       const plansToRender = usedPlans.length ? usedPlans : group.plans;
       const item = plansToRender[0] || group.plans[0] || {};
-      const lots = plansToRender.flatMap((plan) => Array.isArray(plan?.lots) ? plan.lots.filter((lot) => Number(lot?.takeQty || 0) > 0.0001) : []);
+      const lots = mergeTraceLotsByLotNumber(plansToRender.flatMap((plan) => Array.isArray(plan?.lots) ? plan.lots.filter((lot) => Number(lot?.takeQty || 0) > 0.0001) : []));
       const frozenLots = lots.filter((lot) => Boolean(lot?.isFrozen || lot?.frozen));
       const frozenQtyByUnit = frozenLots.reduce((acc, lot) => {
         const unit = normalizeValue(lot?.unit || item?.unit || item?.ingredientUnit || '');
@@ -3617,7 +3682,7 @@
           lines.push(`${nodeId} --> ${planNodeId}`);
         }
         let previousLotNodeId = '';
-        const planLots = (Array.isArray(plan?.lots) ? plan.lots : []).filter((lot) => Number(lot?.takeQty || 0) > 0.0001);
+        const planLots = mergeTraceLotsByLotNumber((Array.isArray(plan?.lots) ? plan.lots : []).filter((lot) => Number(lot?.takeQty || 0) > 0.0001));
         if (!planLots.length) return;
         planLots.forEach((lot, lotIndex) => {
           const lotNodeId = `${planNodeId}_LOT_${lotIndex + 1}`;
@@ -3628,7 +3693,8 @@
         const providerRneObservation = normalizeValue(providerRne.observations);
         // Mostrar el paso de descongelado para todo lote marcado como congelado.
         const showThaw = lotIsFrozen;
-        lines.push(`${lotNodeId}["<b>LOTE ${lotIndex + 1}</b>${lotIsFrozen ? ' ❄' : ''}<br/>${esc(lot?.lotNumber || lot?.entryId || '-')}<br/><b>Usado:</b> ${esc(formatCompactQty(lotQty, lot?.unit || item?.unit || item?.ingredientUnit || ''))}<br/><b>Ingreso:</b> ${esc(formatIsoEs(lot?.entryDate || ''))}<br/><b>VTO:</b> ${esc(formatIsoEs(lot?.expiryDate || ''))}<br/><b>Proveedor:</b> ${esc(lot?.provider || '-')}"]:::toneLot`);
+        const mergedEntriesLabel = Number(lot?.mergedEntries || 1) > 1 ? `<br/><b>Ingresos del lote:</b> ${Number(lot.mergedEntries)}` : '';
+        lines.push(`${lotNodeId}["<b>LOTE ${lotIndex + 1}</b>${lotIsFrozen ? ' ❄' : ''}<br/>${esc(lot?.lotNumber || lot?.entryId || '-')}<br/><b>Usado:</b> ${esc(formatCompactQty(lotQty, lot?.unit || item?.unit || item?.ingredientUnit || ''))}${mergedEntriesLabel}<br/><b>Ingreso:</b> ${esc(formatIsoEs(lot?.entryDate || ''))}<br/><b>VTO:</b> ${esc(formatIsoEs(lot?.expiryDate || ''))}<br/><b>Proveedor:</b> ${esc(lot?.provider || '-')}"]:::toneLot`);
         lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${esc(getTraceRneDisplay(providerRne))}${providerRneObservation ? `<br/><b>Obs:</b> ${esc(providerRneObservation)}` : ''}"]:::toneRegistry`);
         // El nodo de DESCONGELADO va ANTES del LOTE: ingrediente -> DESCONGELADO -> LOTE -> RNE.
         if (showThaw) {
@@ -3688,7 +3754,7 @@
     const productLabel = normalizeValue(registro?.recipeTitle || 'Producto');
     const ingredientRows = ingredients.map((group, index) => {
       const firstPlan = group.plans[0] || {};
-      const lots = group.plans.flatMap((plan) => Array.isArray(plan?.lots) ? plan.lots.filter((lot) => Number(lot?.takeQty || 0) > 0.0001) : []);
+      const lots = mergeTraceLotsByLotNumber(group.plans.flatMap((plan) => Array.isArray(plan?.lots) ? plan.lots.filter((lot) => Number(lot?.takeQty || 0) > 0.0001) : []));
       const firstLot = lots[0] || (Array.isArray(firstPlan?.lots) && firstPlan.lots[0] ? firstPlan.lots[0] : {});
       const hasSiblingSubstitute = group.plans.some((plan) => plan?.isSubstitute);
       const totalQty = group.plans.reduce((sum, plan) => sum + getIngredientPlanUsedQty(plan, { hasSiblingSubstitute }), 0);
@@ -3737,7 +3803,7 @@
     const ingredients = groupedIngredients.map((group, idx) => {
       const item = group.plans[0] || {};
       const ingredientImage = normalizeValue(state.ingredientes[item.ingredientId]?.imageUrl);
-      const mergedLots = group.plans.flatMap((plan) => Array.isArray(plan.lots) ? plan.lots : []).filter((lot) => Number(lot?.takeQty || 0) > 0.0001);
+      const mergedLots = mergeTraceLotsByLotNumber(group.plans.flatMap((plan) => Array.isArray(plan.lots) ? plan.lots : []).filter((lot) => Number(lot?.takeQty || 0) > 0.0001));
       const hasInfiniteStock = group.plans.some((plan) => plan?.infiniteStock || plan?.noTraceability);
       const aggregatedImages = mergedLots.flatMap((lot) => Array.isArray(lot.invoiceImageUrls) ? lot.invoiceImageUrls : []);
       const providerRneRows = mergedLots.map((lot) => {
@@ -3761,6 +3827,7 @@
           <div class="produccion-trace-lot-head">
             <strong><i class="bi bi-upc-scan fa-solid fa-barcode"></i> Lote ${escapeHtml(lot.lotNumber || lot.entryId || '-')}</strong>
             ${Boolean(lot?.isFrozen || lot?.frozen) ? '<span class="produccion-trace-used-badge">Congelado a -18 grados</span>' : ''}
+            ${Number(lot?.mergedEntries || 1) > 1 ? `<span class="produccion-trace-used-badge">${Number(lot.mergedEntries)} ingresos del mismo lote</span>` : ''}
             <span class="produccion-trace-used-badge">Vencimiento al elaborar: ${escapeHtml(formatIsoEs(lot.expiryDate || ''))}</span>
           </div>
           <div class="produccion-trace-grid">
