@@ -83,6 +83,7 @@
     reservationTick: null,
     draftsTick: null,
     editorPlan: null,
+    editorDesiredQty: 0,
     pendingExpiryActions: {},
     lotCollapseState: {},
     historyMode: false,
@@ -8310,7 +8311,11 @@
       const statusClass = isExpiredOnlyAvailable
         ? 'tone-expired'
         : (analysis.status === 'success' ? 'tone-success' : analysis.status === 'warning' ? 'tone-warning' : 'tone-danger');
-      const canOpenProduction = Boolean(analysis.canProduce || analysis.canProduceConsideringExpired);
+      // Entrar a producir nunca se bloquea por falta de stock: dentro del editor
+      // el usuario puede cambiar la fecha (lotes viejos/futuros) y recalcular.
+      // Sólo se bloquea si la receta no tiene ingredientes válidos.
+      const canOpenProduction = Array.isArray(analysis.requirements) && analysis.requirements.length > 0;
+      const hasStockToday = Boolean(analysis.canProduce || analysis.canProduceConsideringExpired);
       const maxKg = isExpiredOnlyAvailable ? Number(analysis.maxKgIncludingExpired || 0) : Number(analysis.maxKg || 0);
       const maxHtml = showInfiniteMax
         ? '<strong class="produccion-compact-max">&infin;</strong>'
@@ -8330,7 +8335,7 @@
           </span>
           <span class="produccion-compact-uses" title="Producciones registradas"><i class="fa-solid fa-industry"></i>${usageCount}</span>
           ${maxHtml}
-          <button type="button" class="btn ios-btn ${canOpenProduction ? (analysis.canProduce ? 'ios-btn-success' : 'ios-btn-danger') : 'ios-btn-success is-disabled'} produccion-compact-produce-btn" data-open-produccion="${recipe.id}" data-open-produccion-mode="produce" ${canOpenProduction ? '' : 'disabled'} title="Producir"><i class="bi bi-plus-lg"></i></button>
+          <button type="button" class="btn ios-btn ${analysis.canProduce ? 'ios-btn-success' : 'ios-btn-danger'} ${canOpenProduction ? '' : 'is-disabled'} produccion-compact-produce-btn" data-open-produccion="${recipe.id}" data-open-produccion-mode="produce" ${canOpenProduction ? '' : 'disabled'} title="${hasStockToday ? 'Producir' : 'Sin stock para hoy: entrá y probá otra fecha'}"><i class="bi bi-plus-lg"></i></button>
           ${buildMoreMenuHtml(recipe)}
         </article>`;
     };
@@ -8344,11 +8349,11 @@
       const statusClass = isExpiredOnlyAvailable
         ? 'tone-expired'
         : (analysis.status === 'success' ? 'tone-success' : analysis.status === 'warning' ? 'tone-warning' : 'tone-danger');
-      const canOpenProduction = Boolean(analysis.canProduce || analysis.canProduceConsideringExpired);
-      const actionToneClass = canOpenProduction
-        ? (analysis.canProduce ? 'ios-btn-success' : 'ios-btn-danger')
-        : 'ios-btn-success';
-      const action = `<button type="button" class="btn ios-btn ${actionToneClass} produccion-main-btn ${canOpenProduction ? '' : 'is-disabled'}" data-open-produccion="${recipe.id}" data-open-produccion-mode="produce" ${canOpenProduction ? '' : 'disabled'}><i class="bi bi-plus-lg"></i><span>Producir</span></button>`;
+      // Entrar a producir nunca se bloquea por falta de stock (ver fila compacta).
+      const canOpenProduction = Array.isArray(analysis.requirements) && analysis.requirements.length > 0;
+      const hasStockToday = Boolean(analysis.canProduce || analysis.canProduceConsideringExpired);
+      const actionToneClass = analysis.canProduce ? 'ios-btn-success' : 'ios-btn-danger';
+      const action = `<button type="button" class="btn ios-btn ${actionToneClass} produccion-main-btn ${canOpenProduction ? '' : 'is-disabled'}" data-open-produccion="${recipe.id}" data-open-produccion-mode="produce" ${canOpenProduction ? '' : 'disabled'} title="${hasStockToday ? 'Producir' : 'Sin stock para hoy: entrá y probá otra fecha'}"><i class="bi bi-plus-lg"></i><span>Producir</span></button>`;
       const inventoryAction = analysis.canProduce
         ? ''
         : `<button type="button" class="btn ios-btn inventory-production-action-btn is-inventory" data-open-inventario="1"><i class="fa-solid fa-boxes-stacked"></i><span>Inventario</span></button>`;
@@ -8851,6 +8856,10 @@
     const initialQty = isViewOnly
       ? Math.max(0.1, requestedInitialQty)
       : Math.min(editorMaxKg, Math.max(0.1, requestedInitialQty));
+    // Cantidad que el usuario pidió realmente (antes de clampear por stock).
+    // Si entró sin stock para hoy y después elige otra fecha con lotes, la
+    // recuperamos en vez de dejar el input pegado al mínimo.
+    state.editorDesiredQty = Math.max(0.1, requestedInitialQty);
     const initialObs = ownDraft?.observations || '';
     const initialManagers = Array.isArray(ownDraft?.managers) ? ownDraft.managers : preferredManagers;
     state.pendingExpiryActions = isViewOnly ? {} : safeObject(ownDraft?.pendingExpiryActions);
@@ -9255,6 +9264,16 @@
       }
       if (!state.sinTrazabilidad && !state.loteAntiguo) qtyInput.max = editorMaxKg.toFixed(2);
       let qty = parsePositive(qtyInput.value, 0.1);
+      // Al cambiar la fecha puede aparecer stock que antes no estaba (lotes con
+      // ingreso anterior, o vencidos que a esa fecha todavía eran válidos).
+      // En ese caso devolvemos la cantidad deseada, acotada al nuevo máximo.
+      if (!state.sinTrazabilidad && !state.loteAntiguo) {
+        const desired = Math.min(Number(state.editorDesiredQty || 0), editorMaxKg);
+        if (desired > qty + 0.0001) {
+          qty = desired;
+          qtyInput.value = qty.toFixed(2);
+        }
+      }
       if (!state.sinTrazabilidad && !state.loteAntiguo && qty > editorMaxKg) {
         qty = editorMaxKg;
         qtyInput.value = qty.toFixed(2);
@@ -9298,7 +9317,7 @@
       } else if (qty <= 0) {
         qtyHelp.textContent = analysis.nextAvailableDate
           ? `Para ${formatIsoEs(productionDate)} no hay stock trazable. Hay stock desde ${formatIsoEs(analysis.nextAvailableDate)}: cambiá la fecha o producí sin trazabilidad.`
-          : 'Ajustá kilos para confirmar producción.';
+          : `Para ${formatIsoEs(productionDate)} no hay stock trazable. Probá con una fecha anterior (lotes que a esa fecha todavía no estaban vencidos) o producí sin trazabilidad.`;
       } else {
         const conflictText = state.editorPlan.conflicts.slice(0, 2).join(' ');
         const futureHint = analysis.nextAvailableDate
@@ -9701,14 +9720,20 @@
           await updateEditorPlan();
         }
       });
+    } else {
+      // Sin flatpickr el input queda como texto plano: recalculamos igual.
+      dateInput.addEventListener('change', async () => { await updateEditorPlan(); });
     }
-    qtyInput.addEventListener('input', async () => { await updateEditorPlan(); });
-    qtyInput.addEventListener('change', async () => { await updateEditorPlan(); });
-    qtyInput.addEventListener('blur', async () => { await updateEditorPlan(); });
+    // Lo que el usuario tipea manda: pasa a ser la cantidad deseada de referencia.
+    const rememberDesiredQty = () => { state.editorDesiredQty = parsePositive(qtyInput.value, 0.1); };
+    qtyInput.addEventListener('input', async () => { rememberDesiredQty(); await updateEditorPlan(); });
+    qtyInput.addEventListener('change', async () => { rememberDesiredQty(); await updateEditorPlan(); });
+    qtyInput.addEventListener('blur', async () => { rememberDesiredQty(); await updateEditorPlan(); });
     nodes.editor.querySelector('#produccionQtyMaxBtn').addEventListener('click', async () => {
       const productionDate = normalizeValue(dateInput.value) || toIsoDate();
       analysis = analyzeRecipe(recipe, productionDate);
       qtyInput.value = Math.max(Number(analysis.maxKg || 0), Number(analysis.maxKgIncludingExpired || 0)).toFixed(2);
+      rememberDesiredQty();
       await updateEditorPlan();
     });
     nodes.editor.querySelector('#produccionSaveManagersPrefBtn')?.addEventListener('click', async () => {
@@ -10990,6 +11015,26 @@
       return;
     }
 
+    // Hidratamos ANTES de preguntar: sin los lots no sabemos si las producciones
+    // tienen facturas adjuntas para ofrecer las hojas extra.
+    await openIosSwal({
+      title: 'Planillas masivas',
+      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando datos" class="meta-spinner-login"></div><p>Cargando datos de las producciones...</p>',
+      allowOutsideClick: false,
+      showConfirmButton: false,
+      customClass: { popup: 'produccion-loading-alert' },
+      didOpen: async () => {
+        try {
+          await Promise.all(filtered.map((row) => ensureRegistroDetail(row.id)));
+        } finally {
+          Swal.close();
+        }
+      }
+    });
+    const hydratedRows = filtered.map((row) => getRegistroById(row.id) || row);
+    const invoiceOptions = await window.laJamoneraPlanillaProduccion?.askInvoiceOptions?.(hydratedRows);
+    if (invoiceOptions === null) return;
+
     await Swal.fire({
       title: 'Planillas masivas',
       html: '<div class="planilla-progress-wrap"><div class="planilla-progress-bar"><span id="massPlanillasProgressBar" style="width:0%"></span></div><p id="massPlanillasProgressText" class="planilla-progress-text">0% Preparando...</p></div>',
@@ -10998,16 +11043,12 @@
       customClass: { popup: 'ios-alert produccion-loading-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' },
       didOpen: async () => {
         try {
-          const progressText = document.getElementById('massPlanillasProgressText');
-          if (progressText) progressText.textContent = '0% Cargando datos...';
-          await Promise.all(filtered.map((row) => ensureRegistroDetail(row.id)));
-          const hydratedRows = filtered.map((row) => getRegistroById(row.id) || row);
-          await window.laJamoneraPlanillaProduccion?.printBatch?.(hydratedRows, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users), recetas: safeObject(state.recetas) }, (progress) => {
+          await window.laJamoneraPlanillaProduccion?.printBatch?.(hydratedRows, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users), recetas: safeObject(state.recetas), invoiceOptions }, (progress, label) => {
             const value = Math.max(0, Math.min(100, Number(progress) || 0));
             const bar = document.getElementById('massPlanillasProgressBar');
             const text = document.getElementById('massPlanillasProgressText');
             if (bar) bar.style.width = `${value}%`;
-            if (text) text.textContent = `${value}% Procesando planillas...`;
+            if (text) text.textContent = `${value}% ${normalizeValue(label) || 'Procesando planillas...'}`;
           });
         } finally {
           Swal.close();

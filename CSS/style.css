@@ -1657,6 +1657,48 @@ img.is-broken-image {
   }
 }
 
+/* Dialogo "Facturas de ingredientes" (impresion de planillas): tres acciones
+   que no entran comodas en una fila, mismo patron que dispatch-xlsx-disable. */
+.swal2-popup.ios-alert.planilla-facturas-alert {
+  max-width: 560px;
+}
+
+.swal2-popup.ios-alert.planilla-facturas-alert .swal2-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.swal2-popup.ios-alert.planilla-facturas-alert .swal2-actions .ios-btn {
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+  padding-inline: 12px;
+  white-space: normal;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.swal2-popup.ios-alert.planilla-facturas-alert .swal-stack-fields {
+  margin-top: 10px;
+}
+
+.planilla-facturas-note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #55607f;
+  text-align: left;
+}
+
+@media (max-width: 560px) {
+  .swal2-popup.ios-alert.planilla-facturas-alert .swal2-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 640px) {
   .swal2-popup.ios-alert.expiry-resolution-alert .swal2-actions {
     grid-template-columns: minmax(0, 1fr);

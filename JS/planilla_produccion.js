@@ -115,6 +115,384 @@
   });
 
   const ensureQrLib = async () => (window.QRCode ? true : loadScript('https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js', 'la-jamonera-qrcode'));
+
+  // ---------------------------------------------------------------------------
+  // Facturas de ingredientes: hojas extra que se imprimen DESPUES de la planilla.
+  // Muchos adjuntos son PDF y el navegador no imprime un PDF embebido, asi que se
+  // rasterizan a imagen con pdf.js (carga diferida) antes de armar la grilla.
+  // ---------------------------------------------------------------------------
+  const PDF_LIB_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.min.js';
+  const PDF_WORKER_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js';
+  // 1.8 alcanza para imprimir a tamano casi real (~170 dpi) y pesa ~20% menos que
+  // 2.0, que importa cuando un lote junta cientos de paginas en memoria.
+  const PDF_RENDER_SCALE = 1.8;
+  const JPEG_QUALITY = 0.8;
+
+  const ensurePdfLib = async () => {
+    if (window.pdfjsLib) return window.pdfjsLib;
+    await loadScript(PDF_LIB_URL, 'la-jamonera-pdfjs');
+    if (!window.pdfjsLib) return null;
+    try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_WORKER_URL; } catch (_) {}
+    return window.pdfjsLib;
+  };
+
+  const isPdfAttachmentUrl = (url) => {
+    const raw = String(url || '').split('?')[0] || '';
+    try {
+      return /\.pdf(?:$|[?#])/i.test(decodeURIComponent(raw));
+    } catch (_) {
+      return /\.pdf(?:$|[?#])/i.test(raw);
+    }
+  };
+
+  const isFirebaseStorageUrl = (url) => /firebasestorage\.googleapis\.com|\.firebasestorage\.app/i.test(String(url || ''));
+
+  // Storage necesita el proxy (Cloud Function) para sumar cabeceras CORS: sin eso
+  // no se pueden leer los bytes del adjunto para rasterizar ni pasar a dataURL.
+  const fetchAttachmentResponse = async (url) => {
+    if (isFirebaseStorageUrl(url) && window.laJamoneraProxy) return window.laJamoneraProxy.imageResponse(url);
+    return fetch(url, { cache: 'force-cache', mode: 'cors' });
+  };
+
+  const blobToDataUrl = (blob) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+
+  const readImageSize = (src) => new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: Number(img.naturalWidth) || 0, height: Number(img.naturalHeight) || 0 });
+    img.onerror = () => resolve({ width: 0, height: 0 });
+    img.src = src;
+  });
+
+  const renderPdfPagesToDataUrls = async (arrayBuffer) => {
+    const pdfjsLib = await ensurePdfLib();
+    if (!pdfjsLib) return [];
+    const doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const pages = [];
+    for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber += 1) {
+      const page = await doc.getPage(pageNumber);
+      const viewport = page.getViewport({ scale: PDF_RENDER_SCALE });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.floor(viewport.width));
+      canvas.height = Math.max(1, Math.floor(viewport.height));
+      const canvasContext = canvas.getContext('2d');
+      canvasContext.fillStyle = '#ffffff';
+      canvasContext.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({ canvasContext, viewport }).promise;
+      pages.push({ dataUrl: canvas.toDataURL('image/jpeg', JPEG_QUALITY), pageNumber, totalPages: doc.numPages, width: canvas.width, height: canvas.height });
+      // Liberamos el canvas y cedemos el hilo: un PDF de muchas paginas si no
+      // deja la pestana sin responder.
+      canvas.width = 1;
+      canvas.height = 1;
+      await yieldToUi();
+    }
+    try { await doc.destroy(); } catch (_) {}
+    return pages;
+  };
+
+  // Tope de imagenes por lote de impresion: cada pagina rasterizada son ~300-500KB
+  // de dataURL y todo queda vivo en memoria hasta que se cierra la ventana. Con
+  // rangos largos el navegador se queda sin memoria y se traba.
+  const BATCH_IMAGE_LIMIT = 250;
+
+  // Cede el hilo principal para que la barra de progreso se pinte y la pestana
+  // no quede sin responder mientras se rasteriza un rango largo.
+  const yieldToUi = () => new Promise((resolve) => {
+    if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(() => setTimeout(resolve, 0));
+    else setTimeout(resolve, 0);
+  });
+
+  // Cache por URL: en planillas masivas la misma factura se repite entre
+  // producciones y rasterizar un PDF es caro. Los dataURL pesan, asi que el
+  // cache se poda con FIFO simple.
+  const ATTACHMENT_CACHE_LIMIT = 80;
+  const attachmentRenderCache = new Map();
+  const cacheAttachmentImages = (url, images) => {
+    if (attachmentRenderCache.size >= ATTACHMENT_CACHE_LIMIT) {
+      const oldestKey = attachmentRenderCache.keys().next().value;
+      if (oldestKey !== undefined) attachmentRenderCache.delete(oldestKey);
+    }
+    attachmentRenderCache.set(url, images);
+  };
+
+  const renderAttachmentToImages = async (url) => {
+    const safeUrl = normalizeValue(url);
+    if (!safeUrl) return [];
+    if (attachmentRenderCache.has(safeUrl)) return attachmentRenderCache.get(safeUrl);
+    let images = [];
+    try {
+      const response = await fetchAttachmentResponse(safeUrl);
+      if (response && response.ok) {
+        const blob = await response.blob();
+        const blobType = String(blob.type || '').toLowerCase();
+        if (isPdfAttachmentUrl(safeUrl) || blobType.includes('pdf')) {
+          const pages = await renderPdfPagesToDataUrls(await blob.arrayBuffer());
+          images = pages.map((page) => ({
+            src: page.dataUrl,
+            pageLabel: page.totalPages > 1 ? `pág. ${page.pageNumber}/${page.totalPages}` : '',
+            width: page.width,
+            height: page.height
+          }));
+        } else if (blobType.startsWith('image/')) {
+          const src = await blobToDataUrl(blob);
+          const size = await readImageSize(src);
+          images = [{ src, pageLabel: '', width: size.width, height: size.height }];
+        }
+      }
+    } catch (_) {
+      images = [];
+    }
+    // Fallback: si no se pudo leer (CORS, 404), imprimimos la URL directa — el
+    // <img> no necesita CORS aunque el fetch haya fallado. Un PDF que no se pudo
+    // rasterizar no tiene fallback posible: se avisa en la celda.
+    if (!images.length) {
+      images = isPdfAttachmentUrl(safeUrl)
+        ? [{ src: '', pageLabel: '', failed: true, width: 0, height: 0 }]
+        : [{ src: safeUrl, pageLabel: '', width: 0, height: 0 }];
+    }
+    cacheAttachmentImages(safeUrl, images);
+    return images;
+  };
+
+  // Adjuntos de la produccion, deduplicados por URL: una misma factura puede
+  // respaldar varios lotes/ingredientes y se imprime una sola vez.
+  const collectRegistroInvoices = (registro = {}) => {
+    const byUrl = new Map();
+    (Array.isArray(registro?.lots) ? registro.lots : []).forEach((ingredientPlan) => {
+      const ingredientName = normalizeUpper(ingredientPlan?.ingredientName) || 'INGREDIENTE';
+      (Array.isArray(ingredientPlan?.lots) ? ingredientPlan.lots : []).forEach((lot) => {
+        if (Number(lot?.takeQty || 0) <= 0.0001) return;
+        const invoiceNumber = normalizeValue(lot?.invoiceNumber);
+        const lotNumber = normalizeValue(lot?.lotNumber || lot?.entryId);
+        (Array.isArray(lot?.invoiceImageUrls) ? lot.invoiceImageUrls : []).forEach((rawUrl) => {
+          const url = normalizeValue(rawUrl);
+          if (!url) return;
+          const current = byUrl.get(url) || { url, ingredients: [], invoiceNumbers: [], lotNumbers: [] };
+          if (!current.ingredients.includes(ingredientName)) current.ingredients.push(ingredientName);
+          if (invoiceNumber && !current.invoiceNumbers.includes(invoiceNumber)) current.invoiceNumbers.push(invoiceNumber);
+          if (lotNumber && !current.lotNumbers.includes(lotNumber)) current.lotNumbers.push(lotNumber);
+          byUrl.set(url, current);
+        });
+      });
+    });
+    return [...byUrl.values()];
+  };
+
+  const countRegistroInvoices = (registros = []) => (Array.isArray(registros) ? registros : [registros])
+    .reduce((sum, registro) => sum + collectRegistroInvoices(registro).length, 0);
+
+  const buildInvoiceCaption = (invoice = {}) => [
+    (invoice.ingredients || []).join(' + '),
+    (invoice.invoiceNumbers || []).length ? `Factura ${invoice.invoiceNumbers.join(', ')}` : '',
+    (invoice.lotNumbers || []).length ? `Lote ${invoice.lotNumbers.join(', ')}` : ''
+  ].filter(Boolean).join(' · ');
+
+  // Baja y rasteriza los adjuntos de una produccion. Devuelve una celda por
+  // imagen (un PDF de 3 paginas aporta 3 celdas).
+  const buildInvoiceCellsForRegistro = async (registro, onStep) => {
+    const invoices = collectRegistroInvoices(registro);
+    const cells = [];
+    for (let index = 0; index < invoices.length; index += 1) {
+      const invoice = invoices[index];
+      const caption = buildInvoiceCaption(invoice);
+      // Se avisa ANTES de bajar/rasterizar: un PDF grande tarda varios segundos
+      // y sin esto la barra se queda quieta en 0.
+      onStep?.(index, invoices.length);
+      const images = await renderAttachmentToImages(invoice.url);
+      await yieldToUi();
+      images.forEach((image) => cells.push({
+        src: image.src,
+        failed: Boolean(image.failed),
+        // Relacion alto/ancho del original: decide si conviene recortar la franja
+        // superior (documento vertical) o mostrarlo entero (escaneo apaisado).
+        aspect: Number(image.width) > 0 ? Number(image.height) / Number(image.width) : 0,
+        caption: image.pageLabel ? `${caption} · ${image.pageLabel}` : caption
+      }));
+      onStep?.(index + 1, invoices.length);
+    }
+    return cells;
+  };
+
+  // La escala a la que se imprime cada factura la fija el lado que "ata" la celda.
+  // Por eso la grilla no es siempre 1 columna:
+  //   1 y 2 por hoja -> bandas anchas: la factura sale casi a tamaño real y se
+  //     recorta la franja superior (proveedor, CUIT, N° y fecha, items).
+  //   3 por hoja -> banda mas baja, recorte mas corto pero sigue a escala grande.
+  //   4 por hoja -> 2x2: el cuadrante (93 x 132 mm) tiene casi la misma forma que
+  //     un A4, asi que entra la factura COMPLETA. Apilar 4 bandas daria una tira
+  //     4:1 donde solo se ve el logo.
+  const INVOICE_GRID_BY_PER_PAGE = {
+    1: { cols: 1, rows: 1 },
+    2: { cols: 1, rows: 2 },
+    3: { cols: 1, rows: 3 },
+    4: { cols: 2, rows: 2 }
+  };
+
+  // Debajo de esta relacion alto/ancho el adjunto ya es apaisado (foto o escaneo
+  // recortado): no hay franja superior que valga la pena recortar, se muestra
+  // entero. Un A4 vertical tiene 1.41.
+  const PORTRAIT_ASPECT_MIN = 1.15;
+
+  // Sin flexbox: Chrome fragmenta mal los contenedores flex al paginar y la
+  // imagen con flex-basis:0 colapsaba a altura cero (recuadro vacio al imprimir).
+  // Todo va con alturas definidas en mm para que la grilla resuelva filas reales.
+  // Ademas se fija @page y el ancho del body a la medida util de una A4 para que
+  // lo que se ve en la ventana sea exactamente lo que sale por impresora.
+  const INVOICE_PRINT_STYLE = `<style>
+    @page{size:A4 portrait;margin:10mm;}
+    body{width:190mm;margin:0 auto;padding:0;}
+    .planilla-facturas-page{page-break-before:always;break-before:page;height:275mm;box-sizing:border-box;overflow:hidden;}
+    .planilla-facturas-page-title{margin:0 0 3mm;height:6mm;line-height:6mm;font-size:10pt;font-weight:800;color:#31569b;text-transform:uppercase;letter-spacing:.02em;}
+    .planilla-facturas-grid{display:grid;gap:3mm;height:266mm;}
+    .planilla-facturas-cell{margin:0;box-sizing:border-box;height:100%;border:1px solid #d7def2;border-radius:8px;padding:2mm;overflow:hidden;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    /* cover + top: la celda se llena y se ve la franja superior del documento.
+       Es lo que maximiza la escala para una celda dada. */
+    .planilla-facturas-cell img{display:block;width:100%;height:calc(100% - 6mm);object-fit:cover;object-position:top center;background:#fff;}
+    /* Adjunto apaisado o de tamaño desconocido: entero, sin recortar. */
+    .planilla-facturas-cell.is-whole img{object-fit:contain;object-position:center;}
+    .planilla-facturas-cell figcaption{height:6mm;line-height:6mm;font-size:8pt;color:#4b5f8e;text-align:center;font-weight:700;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+    .planilla-facturas-failed{box-sizing:border-box;height:calc(100% - 6mm);display:flex;align-items:center;justify-content:center;border:1px dashed #b9c8eb;border-radius:8px;color:#b42338;font-weight:800;font-size:9pt;text-align:center;padding:4mm;}
+  </style>`;
+
+  const toSafeImgSrc = (src) => (/^data:image\//i.test(String(src || '')) ? String(src) : escapeHtml(src));
+
+  const buildInvoiceSheetsHtml = (cells = [], perPage = 4, headerLabel = '') => {
+    if (!cells.length) return '';
+    const grid = INVOICE_GRID_BY_PER_PAGE[Number(perPage)] || INVOICE_GRID_BY_PER_PAGE[4];
+    const cols = Math.max(1, Number(grid.cols) || 1);
+    const slots = Math.max(1, cols * Math.max(1, Number(grid.rows) || 1));
+    const sheets = [];
+    for (let index = 0; index < cells.length; index += slots) sheets.push(cells.slice(index, index + slots));
+    return sheets.map((sheetCells, sheetIndex) => {
+      // La ultima hoja puede quedar incompleta: repartimos el alto entre las
+      // facturas que hay en vez de dejar bandas vacias (con 1 sola factura y
+      // "4 por hoja" ocupaba un cuarto de pagina y sobraba el resto).
+      const colsForSheet = Math.min(cols, Math.max(1, sheetCells.length));
+      const rowsForSheet = Math.max(1, Math.ceil(sheetCells.length / colsForSheet));
+      const isSingleCell = sheetCells.length === 1;
+      const cellHtml = (cell) => {
+        // Una celda sola ocupa la hoja entera: ahi entra la factura completa.
+        // Un adjunto apaisado (o sin tamaño conocido) tampoco se recorta: no
+        // tiene "franja superior" util y cover lo dejaria en una tira.
+        const showWhole = isSingleCell || !(Number(cell.aspect) >= PORTRAIT_ASPECT_MIN);
+        const className = showWhole ? 'planilla-facturas-cell is-whole' : 'planilla-facturas-cell';
+        const body = cell.failed
+          ? '<div class="planilla-facturas-failed">No se pudo convertir el PDF a imagen</div>'
+          : `<img src="${toSafeImgSrc(cell.src)}" alt="${escapeHtml(cell.caption)}">`;
+        return `<figure class="${className}">${body}<figcaption>${escapeHtml(cell.caption)}</figcaption></figure>`;
+      };
+      return `
+      <section class="planilla-facturas-page">
+        <p class="planilla-facturas-page-title">Facturas de ingredientes${headerLabel ? ` · ${escapeHtml(headerLabel)}` : ''} · hoja ${sheetIndex + 1}/${sheets.length}</p>
+        <div class="planilla-facturas-grid" style="grid-template-columns:repeat(${colsForSheet},minmax(0,1fr));grid-template-rows:repeat(${rowsForSheet},minmax(0,1fr));">
+          ${sheetCells.map(cellHtml).join('')}
+        </div>
+      </section>`;
+    }).join('');
+  };
+
+  // A4 vertical con margen de 10mm => 190 x 277 mm utiles. A 96dpi son 1047px de
+  // alto. Como el body de la ventana de impresion se fija en 190mm, lo que se
+  // mide en pantalla coincide con lo que se pagina.
+  const MM_TO_PX = 96 / 25.4;
+  const PAGE_CONTENT_HEIGHT_PX = Math.round(275 * MM_TO_PX);
+  const MIN_PLANILLA_ZOOM = 0.55;
+
+  // La planilla tiene que entrar en una hoja: si se pasa, se achica con zoom
+  // hasta que entre (con piso, para no volverla ilegible).
+  const fitPlanillaToOnePage = (node) => {
+    if (!node) return;
+    node.style.zoom = '';
+    const height = node.getBoundingClientRect?.().height || 0;
+    if (!height || height <= PAGE_CONTENT_HEIGHT_PX) return;
+    const zoom = Math.max(MIN_PLANILLA_ZOOM, Math.floor((PAGE_CONTENT_HEIGHT_PX / height) * 1000) / 1000);
+    node.style.zoom = String(zoom);
+  };
+
+  const fitAllPlanillasToOnePage = (win) => {
+    // querySelectorAll por atributo: en el lote hay un id repetido por planilla.
+    (win?.document?.querySelectorAll('[id="planillaProduccionPrintable"]') || []).forEach(fitPlanillaToOnePage);
+  };
+
+  const warnPopupBlocked = async () => {
+    if (typeof Swal === 'undefined') return;
+    await openPlanillaSwal({
+      title: 'Ventana bloqueada',
+      html: '<p>El navegador bloqueó la ventana de impresión. Habilitá las ventanas emergentes para este sitio y volvé a intentar.</p>',
+      icon: 'warning',
+      confirmButtonText: 'Entendido',
+      customClass: { popup: 'ios-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text', confirmButton: 'ios-btn ios-btn-primary' }
+    });
+  };
+
+  const openPlanillaSwal = (options = {}) => {
+    // Mismo target que el resto de la app: si hay un modal Bootstrap abierto el
+    // dialogo se monta adentro para no quedar detras.
+    const activeBootstrapModal = document.querySelector('.modal.show .modal-content');
+    return Swal.fire({ target: activeBootstrapModal || document.body, returnFocus: false, buttonsStyling: false, ...options });
+  };
+
+  // Pregunta si se anexan las hojas de facturas y en cuantas partes se divide la
+  // hoja. Devuelve null si el usuario cancela la impresion.
+  const askInvoiceOptions = async (registros = []) => {
+    const total = countRegistroInvoices(registros);
+    if (!total || typeof Swal === 'undefined') return { include: false, perPage: 4 };
+    const optionHtml = (value, label) => `<label class="inventario-check-row"><input type="radio" name="planillaFacturasPerPage" value="${value}"${value === 4 ? ' checked' : ''}><span>${label}</span></label>`;
+    const perPageNote = 'Las facturas verticales se recortan a la franja superior (proveedor, N° de comprobante, fecha) para que se lean; las apaisadas y las que quedan solas en la hoja se imprimen enteras.';
+    const result = await openPlanillaSwal({
+      title: 'Facturas de ingredientes',
+      html: `<p>Se detectaron <strong>${total}</strong> factura(s) adjunta(s). ¿Las imprimo después de la planilla?</p>
+        <div class="swal-stack-fields text-start">
+          <span class="selector-section-label">¿En cuántas partes divido la hoja?</span>
+          ${optionHtml(1, '1 por hoja · factura completa, lo más grande posible')}
+          ${optionHtml(2, '2 por hoja · franja superior bien grande')}
+          ${optionHtml(3, '3 por hoja · franja superior')}
+          ${optionHtml(4, '4 por hoja (2 × 2) · factura completa más chica')}
+        </div>
+        <p class="planilla-facturas-note">${perPageNote} Los adjuntos en PDF se convierten a imagen antes de imprimir.</p>`,
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: 'Incluir facturas',
+      denyButtonText: 'Solo planilla',
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        popup: 'ios-alert planilla-facturas-alert',
+        title: 'ios-alert-title',
+        htmlContainer: 'ios-alert-text',
+        confirmButton: 'ios-btn ios-btn-primary',
+        denyButton: 'ios-btn ios-btn-secondary',
+        cancelButton: 'ios-btn ios-btn-secondary'
+      },
+      preConfirm: () => ({
+        perPage: Number(Swal.getHtmlContainer()?.querySelector('input[name="planillaFacturasPerPage"]:checked')?.value) || 4
+      })
+    });
+    if (result.isDismissed) return null;
+    if (result.isDenied) return { include: false, perPage: 4 };
+    return { include: true, perPage: Number(result.value?.perPage) || 4 };
+  };
+
+  const openInvoiceProgressSwal = () => openPlanillaSwal({
+    title: 'Preparando facturas...',
+    html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Preparando facturas" class="meta-spinner-login"></div><div class="planilla-progress-wrap"><div class="planilla-progress-bar"><span id="planillaFacturasProgressBar" style="width:0%"></span></div><p id="planillaFacturasProgressText" class="planilla-progress-text">0% Descargando adjuntos...</p></div>',
+    allowOutsideClick: false,
+    showConfirmButton: false,
+    customClass: { popup: 'ios-alert produccion-loading-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' }
+  });
+
+  const setInvoiceProgress = (done, total) => {
+    const safeTotal = Math.max(1, Number(total) || 0);
+    const value = Math.max(0, Math.min(100, Math.round((Number(done) || 0) / safeTotal * 100)));
+    const bar = document.getElementById('planillaFacturasProgressBar');
+    const text = document.getElementById('planillaFacturasProgressText');
+    if (bar) bar.style.width = `${value}%`;
+    if (text) text.textContent = `${value}% · adjunto ${Math.min(done, safeTotal)} de ${safeTotal}`;
+  };
+
   const getTraceUrl = (registro) => normalizeValue(registro?.publicTraceUrl) || `${TRACE_BASE_URL}${encodeURIComponent(normalizeValue(registro?.id))}`;
   const getPackagingLabel = (registro = {}) => {
     const type = normalizeValue(registro?.packagingDelayTypeAtProduction || registro?.packagingDelayType || registro?.traceability?.product?.packagingDelayType);
@@ -542,11 +920,29 @@
     <link rel="stylesheet" href="./CSS/style.css">
     <style>body{font-family:"Inter","Segoe UI",Arial,sans-serif;padding:8px;background:#ffffff;}</style>`;
 
-  const printPlanilla = async (root, registro) => {
+  const printPlanilla = async (root, registro, options = {}) => {
+    const invoiceOptions = options.invoiceOptions !== undefined ? options.invoiceOptions : await askInvoiceOptions([registro]);
+    if (invoiceOptions === null) return;
+    const withInvoices = Boolean(invoiceOptions?.include);
+    // Primero se bajan y rasterizan los adjuntos con la barra a la vista; la
+    // ventana de impresion se abre recien cuando esta todo listo.
+    let invoicesHtml = '';
+    if (withInvoices) {
+      openInvoiceProgressSwal();
+      try {
+        const cells = await buildInvoiceCellsForRegistro(registro, setInvoiceProgress);
+        invoicesHtml = buildInvoiceSheetsHtml(cells, invoiceOptions.perPage, normalizeValue(registro?.id));
+      } finally {
+        Swal.close();
+      }
+    }
     const win = window.open('', '_blank', 'width=1240,height=900');
-    if (!win) return;
+    if (!win) {
+      await warnPopupBlocked();
+      return;
+    }
     const documentTitle = escapeHtml(getPlanillaDocumentTitle(registro));
-    win.document.write(`<html><head>${buildPlanillaHeadHtml(documentTitle)}</head><body>${root.outerHTML}</body></html>`);
+    win.document.write(`<html><head>${buildPlanillaHeadHtml(documentTitle)}${INVOICE_PRINT_STYLE}</head><body>${root.outerHTML}${invoicesHtml}</body></html>`);
     win.document.close();
     await waitWindowLoad(win);
     // CSS primero, después la impresora: sin esto el diálogo podía abrirse con
@@ -560,6 +956,8 @@
     }
     try { await waitImages(win.document.body); } catch (e) {}
     await new Promise((resolve) => win.requestAnimationFrame ? win.requestAnimationFrame(() => resolve()) : setTimeout(resolve, 50));
+    // Se mide despues de cargar imagenes y fuentes: antes el alto no es el real.
+    fitAllPlanillasToOnePage(win);
     win.focus();
     win.print();
   };
@@ -584,19 +982,73 @@
   const printBatch = async (registros, context = {}, onProgress) => {
     const rows = Array.isArray(registros) ? registros : [];
     if (!rows.length) return;
+    // context.invoiceOptions lo resuelve quien llama (produccion.js) antes de
+    // abrir su barra de progreso, para no pisar el diálogo de la pregunta.
+    const invoiceOptions = context.invoiceOptions || null;
+    const withInvoices = Boolean(invoiceOptions?.include);
     const printNodes = [];
+    // Con facturas cada produccion son 2 pasos (planilla + adjuntos): el avance
+    // se reparte entre ambos para que la barra no se quede clavada.
+    const stepsPerRow = withInvoices ? 2 : 1;
+    const totalSteps = Math.max(1, rows.length * stepsPerRow);
+    let doneSteps = 0;
+    let renderedImages = 0;
+    let skippedImages = 0;
+    const report = (label) => onProgress?.(Math.min(95, Math.round((doneSteps / totalSteps) * 95)), label);
     for (let index = 0; index < rows.length; index += 1) {
+      report(`Planilla ${index + 1} de ${rows.length}`);
       const node = await createPrintableNode(rows[index], context);
-      if (node) printNodes.push(node.outerHTML);
-      const value = Math.min(95, Math.round(((index + 1) / rows.length) * 95));
-      onProgress?.(value);
+      doneSteps += 1;
+      let invoicesHtml = '';
+      if (withInvoices) {
+        if (renderedImages < BATCH_IMAGE_LIMIT) {
+          // Cada planilla arrastra sus propias hojas de facturas atrás.
+          const cells = await buildInvoiceCellsForRegistro(rows[index], (attachmentDone, attachmentTotal) => {
+            report(`Facturas ${index + 1} de ${rows.length} · adjunto ${Math.min(attachmentDone + 1, attachmentTotal)} de ${attachmentTotal}`);
+          });
+          renderedImages += cells.length;
+          invoicesHtml = buildInvoiceSheetsHtml(cells, invoiceOptions.perPage, normalizeValue(rows[index]?.id));
+        } else {
+          skippedImages += countRegistroInvoices([rows[index]]);
+        }
+        doneSteps += 1;
+      }
+      if (node) printNodes.push(`${node.outerHTML}${invoicesHtml}`);
+      report(`Planilla ${index + 1} de ${rows.length} lista`);
+      // Respiro para el hilo principal: sin esto un rango largo congela la UI y
+      // la barra de progreso no se pinta.
+      await yieldToUi();
+    }
+    if (skippedImages > 0) {
+      // Nada de cortes silenciosos: si se llego al tope se avisa.
+      console.warn(`[planillas masivas] tope de ${BATCH_IMAGE_LIMIT} imagenes alcanzado: ${skippedImages} adjunto(s) no se imprimieron.`);
+      await openPlanillaSwal({
+        title: 'Facturas parcialmente incluidas',
+        html: `<p>Se alcanzó el tope de <strong>${BATCH_IMAGE_LIMIT}</strong> imágenes para un mismo lote de impresión (evita que el navegador se quede sin memoria).</p><p><strong>${skippedImages}</strong> adjunto(s) quedaron afuera. Las planillas salen completas igual. Para incluirlos todos, imprimí el período en rangos más cortos.</p>`,
+        icon: 'warning',
+        confirmButtonText: 'Continuar',
+        customClass: { popup: 'ios-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text', confirmButton: 'ios-btn ios-btn-primary' }
+      });
     }
     const win = window.open('', '_blank', 'width=1240,height=900');
-    if (!win) return;
-    win.document.write(`<html><head>${buildPlanillaHeadHtml('Planillas masivas')}<script>window.addEventListener('load',function(){(document.fonts?document.fonts.ready:Promise.resolve()).then(function(){window.print();});});<\/script></head><body style="display:grid;gap:12px;">${printNodes.map((html, index) => `<section style="${index ? 'page-break-before:always;' : ''}">${html}</section>`).join('')}</body></html>`);
+    if (!win) {
+      onProgress?.(100);
+      await warnPopupBlocked();
+      return;
+    }
+    win.document.write(`<html><head>${buildPlanillaHeadHtml('Planillas masivas')}${INVOICE_PRINT_STYLE}</head><body>${printNodes.map((html, index) => `<section style="${index ? 'page-break-before:always;' : ''}">${html}</section>`).join('')}</body></html>`);
     win.document.close();
+    // Los dataURL ya viven en el DOM de la ventana: soltamos la copia en JS.
+    printNodes.length = 0;
+    attachmentRenderCache.clear();
     onProgress?.(100);
+    await waitWindowLoad(win);
+    try { await waitStylesheets(win); } catch (e) {}
+    try { await waitImages(win.document.body); } catch (e) {}
+    await new Promise((resolve) => win.requestAnimationFrame ? win.requestAnimationFrame(() => resolve()) : setTimeout(resolve, 50));
+    fitAllPlanillasToOnePage(win);
     win.focus();
+    win.print();
   };
 
   const openByRegistro = async (registro, context = {}) => {
@@ -622,7 +1074,14 @@
         if (!node) return;
         renderQr(node.querySelector('#planillaQrTarget'), registro);
         await waitImages(node);
-        popup.querySelector('#planillaPrintBtn')?.addEventListener('click', async () => printPlanilla(node, registro));
+        popup.querySelector('#planillaPrintBtn')?.addEventListener('click', async () => {
+          // SweetAlert soporta un solo diálogo a la vez y la pregunta por las
+          // facturas abre otro: clonamos la planilla y cerramos la vista previa
+          // antes de imprimir para no pelear por el popup.
+          const printableClone = node.cloneNode(true);
+          Swal.close();
+          await printPlanilla(printableClone, registro);
+        });
       }
     });
   };
@@ -638,5 +1097,5 @@
     await openByRegistro(registro, context);
   };
 
-  window.laJamoneraPlanillaProduccion = { openByRegistro, openById, getTraceUrl, printBatch };
+  window.laJamoneraPlanillaProduccion = { openByRegistro, openById, getTraceUrl, printBatch, askInvoiceOptions };
 })();
