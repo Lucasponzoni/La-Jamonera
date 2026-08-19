@@ -9453,7 +9453,7 @@
       const recipePlanillaBtn = event.target.closest('[data-recipe-prod-planilla]');
       if (recipePlanillaBtn) {
         const reg = await ensureRegistroDetail(recipePlanillaBtn.dataset.recipeProdPlanilla);
-        if (reg) await window.laJamoneraPlanillaProduccion?.openByRegistro?.(reg, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users), recetas: safeObject(state.recetas) });
+        if (reg) await window.laJamoneraPlanillaProduccion?.openByRegistro?.(reg, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users), recetas: safeObject(state.recetas), allowInvoices: true });
         return;
       }
       const recipeQrPrintBtn = event.target.closest('[data-recipe-prod-qr-print]');
@@ -9586,7 +9586,7 @@
               const planillaBtn = clickEvent.target.closest('[data-recipe-prod-planilla]');
               if (planillaBtn) {
                 const reg = await ensureRegistroDetail(planillaBtn.dataset.recipeProdPlanilla);
-                if (reg) await window.laJamoneraPlanillaProduccion?.openByRegistro?.(reg, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users), recetas: safeObject(state.recetas) });
+                if (reg) await window.laJamoneraPlanillaProduccion?.openByRegistro?.(reg, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users), recetas: safeObject(state.recetas), allowInvoices: true });
                 return;
               }
               const qrPrintBtn = clickEvent.target.closest('[data-recipe-prod-qr-print]');
@@ -11043,7 +11043,7 @@
       customClass: { popup: 'ios-alert produccion-loading-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' },
       didOpen: async () => {
         try {
-          await window.laJamoneraPlanillaProduccion?.printBatch?.(hydratedRows, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users), recetas: safeObject(state.recetas), invoiceOptions }, (progress, label) => {
+          await window.laJamoneraPlanillaProduccion?.printBatch?.(hydratedRows, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users), recetas: safeObject(state.recetas), invoiceOptions, allowInvoices: true }, (progress, label) => {
             const value = Math.max(0, Math.min(100, Number(progress) || 0));
             const bar = document.getElementById('massPlanillasProgressBar');
             const text = document.getElementById('massPlanillasProgressText');
@@ -12983,7 +12983,7 @@
     const planillaBtn = event.target.closest('[data-prod-planilla]');
     if (planillaBtn) {
       const reg = await ensureRegistroDetail(planillaBtn.dataset.prodPlanilla);
-      if (reg) await window.laJamoneraPlanillaProduccion?.openByRegistro?.(reg, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users), recetas: safeObject(state.recetas) });
+      if (reg) await window.laJamoneraPlanillaProduccion?.openByRegistro?.(reg, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users), recetas: safeObject(state.recetas), allowInvoices: true });
       return;
     }
     const qrPrintBtn = event.target.closest('[data-prod-qr-print]');

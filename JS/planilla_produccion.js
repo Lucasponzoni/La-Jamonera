@@ -224,23 +224,34 @@
     if (!safeUrl) return [];
     if (attachmentRenderCache.has(safeUrl)) return attachmentRenderCache.get(safeUrl);
     let images = [];
+    // Se arrastra aparte de la URL: Storage a veces sirve el PDF como
+    // application/octet-stream y con nombre sin extension, y ahi la unica pista
+    // fiable son los magic bytes.
+    let looksLikePdf = isPdfAttachmentUrl(safeUrl);
     try {
       const response = await fetchAttachmentResponse(safeUrl);
       if (response && response.ok) {
         const blob = await response.blob();
         const blobType = String(blob.type || '').toLowerCase();
-        if (isPdfAttachmentUrl(safeUrl) || blobType.includes('pdf')) {
-          const pages = await renderPdfPagesToDataUrls(await blob.arrayBuffer());
+        const buffer = await blob.arrayBuffer();
+        const head = new Uint8Array(buffer.slice(0, 5));
+        // "%PDF"
+        const hasPdfMagic = head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46;
+        if (hasPdfMagic || blobType.includes('pdf')) looksLikePdf = true;
+        if (looksLikePdf) {
+          const pages = await renderPdfPagesToDataUrls(buffer);
           images = pages.map((page) => ({
             src: page.dataUrl,
             pageLabel: page.totalPages > 1 ? `pág. ${page.pageNumber}/${page.totalPages}` : '',
             width: page.width,
             height: page.height
           }));
-        } else if (blobType.startsWith('image/')) {
+        } else {
           const src = await blobToDataUrl(blob);
           const size = await readImageSize(src);
-          images = [{ src, pageLabel: '', width: size.width, height: size.height }];
+          // Si no se pudo medir, el dataURL no era una imagen valida: se descarta
+          // para que caiga al fallback en vez de imprimir un recuadro roto.
+          if (size.width > 0) images = [{ src, pageLabel: '', width: size.width, height: size.height }];
         }
       }
     } catch (_) {
@@ -250,7 +261,7 @@
     // <img> no necesita CORS aunque el fetch haya fallado. Un PDF que no se pudo
     // rasterizar no tiene fallback posible: se avisa en la celda.
     if (!images.length) {
-      images = isPdfAttachmentUrl(safeUrl)
+      images = looksLikePdf
         ? [{ src: '', pageLabel: '', failed: true, width: 0, height: 0 }]
         : [{ src: safeUrl, pageLabel: '', width: 0, height: 0 }];
     }
@@ -921,7 +932,13 @@
     <style>body{font-family:"Inter","Segoe UI",Arial,sans-serif;padding:8px;background:#ffffff;}</style>`;
 
   const printPlanilla = async (root, registro, options = {}) => {
-    const invoiceOptions = options.invoiceOptions !== undefined ? options.invoiceOptions : await askInvoiceOptions([registro]);
+    // Las hojas de facturas son solo para el back-office autenticado: necesitan el
+    // proxy /image (Storage no tiene CORS) y muestran datos de proveedores. La
+    // pagina publica de trazabilidad (produccion_publica.html) no las habilita.
+    let invoiceOptions = options.invoiceOptions !== undefined ? options.invoiceOptions : null;
+    if (invoiceOptions === null) {
+      invoiceOptions = options.allowInvoices ? await askInvoiceOptions([registro]) : { include: false, perPage: 4 };
+    }
     if (invoiceOptions === null) return;
     const withInvoices = Boolean(invoiceOptions?.include);
     // Primero se bajan y rasterizan los adjuntos con la barra a la vista; la
@@ -984,7 +1001,7 @@
     if (!rows.length) return;
     // context.invoiceOptions lo resuelve quien llama (produccion.js) antes de
     // abrir su barra de progreso, para no pisar el diálogo de la pregunta.
-    const invoiceOptions = context.invoiceOptions || null;
+    const invoiceOptions = context.allowInvoices ? (context.invoiceOptions || null) : null;
     const withInvoices = Boolean(invoiceOptions?.include);
     const printNodes = [];
     // Con facturas cada produccion son 2 pasos (planilla + adjuntos): el avance
@@ -1058,8 +1075,9 @@
     Swal.close();
     if (!printable) return;
 
+    const printOptions = { allowInvoices: Boolean(context.allowInvoices) };
     if (window.matchMedia('(max-width: 768px)').matches && !context.forceModalOnMobile) {
-      await printPlanilla(printable, registro);
+      await printPlanilla(printable, registro, printOptions);
       return;
     }
 
@@ -1075,12 +1093,18 @@
         renderQr(node.querySelector('#planillaQrTarget'), registro);
         await waitImages(node);
         popup.querySelector('#planillaPrintBtn')?.addEventListener('click', async () => {
+          // Sin facturas no hay segundo diálogo: la vista previa queda abierta
+          // como siempre (es el caso de la pagina publica de trazabilidad).
+          if (!printOptions.allowInvoices) {
+            await printPlanilla(node, registro, printOptions);
+            return;
+          }
           // SweetAlert soporta un solo diálogo a la vez y la pregunta por las
           // facturas abre otro: clonamos la planilla y cerramos la vista previa
           // antes de imprimir para no pelear por el popup.
           const printableClone = node.cloneNode(true);
           Swal.close();
-          await printPlanilla(printableClone, registro);
+          await printPlanilla(printableClone, registro, printOptions);
         });
       }
     });
