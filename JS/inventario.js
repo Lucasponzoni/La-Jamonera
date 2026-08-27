@@ -1273,6 +1273,16 @@
     await loadData({ forceFull: true });
   };
 
+  // loadData() sin forceFull relee /inventario_index, cuyos records vienen
+  // "lite" (sin entries). Si eso pasa mientras el editor de un ingrediente esta
+  // abierto, la tabla de ingresos queda vacia ("Sin ingresos para mostrar")
+  // hasta salir y volver a entrar. Recargamos el detalle del ingrediente
+  // abierto para que la tabla se repinte con sus entries reales.
+  const reloadEditorData = async (ingredientId) => {
+    await loadData();
+    await ensureInventoryRecordDetail(ingredientId);
+  };
+
   const filteredIngredients = () => Object.values(state.ingredientes)
     .filter((item) => {
       if (state.activeFamilyId !== 'all' && item.familyId !== state.activeFamilyId) return false;
@@ -5292,7 +5302,7 @@
       } finally {
         inventarioModal.removeAttribute('inert');
       }
-      await loadData();
+      await reloadEditorData(ingredientId);
       renderEditor(ingredientId, state.editorDraft);
     });
 
@@ -5327,7 +5337,7 @@
       });
       if (result.isConfirmed) {
         await persistMeasuresIfNeeded(result.value.name, result.value.abbr);
-        await loadData();
+        await reloadEditorData(ingredientId);
         state.editorDraft.unit = result.value.name;
       }
       renderEditor(ingredientId, state.editorDraft);
@@ -5701,7 +5711,7 @@
         } finally {
           inventarioModal.removeAttribute('inert');
         }
-        await loadData();
+        await reloadEditorData(ingredientId);
         renderEditor(ingredientId, state.editorDraft);
       });
       bulkSuggestDropdown = dropdown;
@@ -6227,7 +6237,7 @@
         closeEntryMoreMenus();
         const updated = await clearEntryMovements(ingredientId, btn.dataset.clearEntryMovements);
         if (!updated) return;
-        await loadData();
+        await reloadEditorData(ingredientId);
         renderEditor(ingredientId, state.editorDraft);
       });
     });
@@ -6238,7 +6248,7 @@
         const deleted = await removeEntryWithSecurity(ingredientId, btn.dataset.deleteEntry);
         if (!deleted) return;
         state.tablePage = 1;
-        await loadData();
+        await reloadEditorData(ingredientId);
         renderEditor(ingredientId, state.editorDraft);
       });
     });
