@@ -2050,9 +2050,16 @@
               const share = groupRemaining * (remainingEntry / totalWeight);
               const take = Math.min(remainingEntry, relatedCap, share);
               if (take <= 0.0001) return;
-              item.takeQty = Number((item.takeQty + take).toFixed(4));
-              perRelatedCap[item.related.ingredientId] = Number((relatedCap - take).toFixed(4));
-              groupRemaining = Math.max(0, Number((groupRemaining - take).toFixed(6)));
+              // Descontamos lo que REALMENTE quedó asignado después de redondear
+              // takeQty a 4 decimales. Si restáramos `take` sin redondear, el grupo
+              // se daba por servido (groupRemaining ~ 0, sin pasada de sobrante)
+              // mientras la suma de los lotes quedaba hasta 0.0003 kg corta: ese
+              // resto volvía como faltante y bloqueaba con "faltan 0.00 kilos".
+              const previousTake = item.takeQty;
+              item.takeQty = Number((previousTake + take).toFixed(4));
+              const applied = Number((item.takeQty - previousTake).toFixed(6));
+              perRelatedCap[item.related.ingredientId] = Number((relatedCap - applied).toFixed(4));
+              groupRemaining = Math.max(0, Number((groupRemaining - applied).toFixed(6)));
             });
           }
           if (groupRemaining > 0.0001) {
@@ -2064,9 +2071,11 @@
                 const relatedCap = Math.max(0, perRelatedCap[item.related.ingredientId] || 0);
                 const take = Math.min(remainingEntry, relatedCap, groupRemaining);
                 if (take <= 0.0001) return;
-                item.takeQty = Number((item.takeQty + take).toFixed(4));
-                perRelatedCap[item.related.ingredientId] = Number((relatedCap - take).toFixed(4));
-                groupRemaining = Math.max(0, Number((groupRemaining - take).toFixed(6)));
+                const previousTake = item.takeQty;
+                item.takeQty = Number((previousTake + take).toFixed(4));
+                const applied = Number((item.takeQty - previousTake).toFixed(6));
+                perRelatedCap[item.related.ingredientId] = Number((relatedCap - applied).toFixed(4));
+                groupRemaining = Math.max(0, Number((groupRemaining - applied).toFixed(6)));
               });
           }
           prepared.forEach((item) => {
