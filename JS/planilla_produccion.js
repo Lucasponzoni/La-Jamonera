@@ -382,7 +382,17 @@
       // La ultima hoja puede quedar incompleta: repartimos el alto entre las
       // facturas que hay en vez de dejar bandas vacias (con 1 sola factura y
       // "4 por hoja" ocupaba un cuarto de pagina y sobraba el resto).
-      const colsForSheet = Math.min(cols, Math.max(1, sheetCells.length));
+      // Si ademas queda en UNA sola fila de varias columnas, la hoja termina
+      // partida al medio en vertical: con "4 por hoja" y 2 sobrantes, 2x2
+      // degeneraba en dos columnas de 93 x 266 mm y una factura A4 ahi se
+      // recorta el 50% de los costados. En ese caso se apila: dos bandas de
+      // 190 x 131 mm muestran la franja superior completa y al doble de escala.
+      const defaultCols = Math.min(cols, Math.max(1, sheetCells.length));
+      const defaultRows = Math.max(1, Math.ceil(sheetCells.length / defaultCols));
+      const stackedGrid = (defaultRows === 1 && defaultCols > 1)
+        ? INVOICE_GRID_BY_PER_PAGE[sheetCells.length]
+        : null;
+      const colsForSheet = stackedGrid ? Math.max(1, Number(stackedGrid.cols) || 1) : defaultCols;
       const rowsForSheet = Math.max(1, Math.ceil(sheetCells.length / colsForSheet));
       const isSingleCell = sheetCells.length === 1;
       const cellHtml = (cell) => {
