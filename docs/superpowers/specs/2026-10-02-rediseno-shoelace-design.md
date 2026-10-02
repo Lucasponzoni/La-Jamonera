@@ -35,7 +35,7 @@ Fecha: 2026-10-02 · Rama: `rediseno-shoelace` · Estado: aprobado por Lucas (ej
   - Script inline mínimo en `<head>` de cada página: lee `localStorage['lj-theme']` y pone `class="sl-theme-dark"` en `<html>` antes de pintar (sin parpadeo).
   - Tras login: lee/escribe `/userPreferences/{uid}/theme` (`'light'|'dark'`); Firebase manda, localStorage es caché.
   - Botón luna/sol en la barra superior. Default: claro.
-  - Charts (Chart.js) re-coloreados con tokens al cambiar tema.
+  - Gráficos: **Chart.js se reemplaza por Apache ECharts 5** (pedido de Lucas), vendorizado en `vendor/echarts/echarts.min.js`; tema propio claro/oscuro desde los tokens `--lj-*`, re-render en `lj-theme-change`.
   - `produccion_publica.html` (vista pública) siempre clara.
 - **Tipografía/íconos**: Inter global; Font Awesome se queda; `bi bi-*` → `<sl-icon name="*">` (mismo set).
 
@@ -55,6 +55,7 @@ Fecha: 2026-10-02 · Rama: `rediseno-shoelace` · Estado: aprobado por Lucas (ej
 | spinners propios | `<sl-spinner>` |
 | notificaciones `ios-notify` | `<sl-alert>.toast()` |
 | tablas | tabla HTML + estilos del tema, scroll horizontal |
+| Gráfico del panel (Chart.js) | **ECharts 5** con tema claro/oscuro | `panelcontrol.js:807` |
 | flatpickr ×31 | flatpickr con tema, enganchado al `<input>` interno del `sl-input` (o input nativo oculto) |
 | `type="file"` | **se quedan nativos ocultos**, disparados por `sl-button` |
 | impresiones/PDF/QR | **sin cambios** |

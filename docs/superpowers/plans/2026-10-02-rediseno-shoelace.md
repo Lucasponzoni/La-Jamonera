@@ -6,7 +6,7 @@
 
 **Architecture:** Capa base nueva en `JS/ui/` (tema, puente de eventos de formularios, modales, alertas Swal-compatibles) + tokens CSS. Después cada módulo (un archivo JS + su CSS) se migra contra esas interfaces con reglas fijas y un linter de patrones heredados. Validación con un banco Playwright que bloquea escrituras a Firebase.
 
-**Tech Stack:** Shoelace 2.20.1 (vendorizado), vanilla JS, Firebase RTDB compat 8.10.1, flatpickr, Chart.js, Playwright-core + Edge (sólo pruebas, fuera del repo).
+**Tech Stack:** Shoelace 2.20.1 (vendorizado), vanilla JS, Firebase RTDB compat 8.10.1, flatpickr, Apache ECharts 5 (reemplaza Chart.js), Playwright-core + Edge (sólo pruebas, fuera del repo).
 
 **Spec:** `docs/superpowers/specs/2026-10-02-rediseno-shoelace-design.md`
 
@@ -18,6 +18,7 @@
 - Colores claro: fondo `#f6f8fc`, superficie `#ffffff`, superficie-2 `#f2f5fb`, borde `#dfe5f0`, borde fuerte `#cfd8e8`, texto `#1f2a44`, apagado `#55607f`, marca `#173d73`, acento `#1f5fbf`. Oscuro: fondo `#0f1522`, superficie `#161e2e`, superficie-2 `#1c2638`, borde `#26324a`, borde fuerte `#334262`, texto `#e3e9f5`, apagado `#93a0bb`, marca `#cddcff`, acento `#6ea0ff`.
 - Modo oscuro: clase `sl-theme-dark` en `<html>`; caché `localStorage['lj-theme']`; fuente de verdad `/userPreferences/{uid}/theme` (`'light'|'dark'`); default claro; `produccion_publica.html` siempre claro.
 - Font Awesome se queda. `bi bi-x` → `<sl-icon name="x">`.
+- Gráficos con **Apache ECharts 5** vendorizado (`vendor/echarts/`); Chart.js: 0 referencias al final.
 - Impresiones/PDF/planillas/QR: **no se modifican**.
 - No cambiar lógica de negocio, rutas de Firebase ni forma de los datos.
 - `<input>` nativo permitido sólo para: `type=file` (oculto), `type=color`, `type=range`, `type=hidden`, y campos con flatpickr (clase `lj-input`).
@@ -672,7 +673,7 @@ Cada task migra **un archivo JS + su CSS de módulo** aplicando la **Receta R** 
 |---|---|---|---|
 | 8 | `JS/ingredientes.js` | `modules/ingredientes.css` | ingredientes |
 | 9 | `JS/usuarios.js`, `JS/Notificaciones.js`, `JS/app.js`, `JS/login.js` | `modules/usuarios.css`, `modules/login.css` | usuarios, login |
-| 10 | `JS/panelcontrol.js` (+ Chart.js con colores de tema y re-render en `lj-theme-change`) | `CSS/panel.css` | index |
+| 10 | `JS/panelcontrol.js`: **reemplazar Chart.js por ECharts 5** (vendorizar `vendor/echarts/echarts.min.js`, quitar Chart.js de index.html, mismos datos/series/tipos que hoy incl. el selector de tipo de gráfico, colores desde `--lj-*`, `chart.dispose()`+re-init en `lj-theme-change`, `resize` en cambio de tamaño; cargar skill `dataviz` antes de escribir el gráfico) | `CSS/panel.css` | index |
 | 11 | `JS/recetas.js` | `modules/recetas.css` | recetas |
 | 12 | `JS/inventario.js` | `modules/inventario.css` | inventario |
 | 13 | `JS/produccion.js` líneas 1–6000 (core, editor, planes, lotes) | `modules/produccion.css` (secciones editor/lista) | produccion |
