@@ -34,7 +34,7 @@ const root = path.resolve(__dirname, '..');
 const htmlFiles = fs.readdirSync(root).filter((name) => name.endsWith('.html'));
 
 // src="./JS/app.js" | href="./CSS/style.css", con o sin ?v= previo.
-const ASSET_REF = /(\s(?:src|href)=")(\.\/(?:JS|CSS)\/[^"?]+)(\?[^"]*)?(")/g;
+const ASSET_REF = /(\s(?:src|href)=")(\.\/(?:JS|CSS|vendor)\/[^"?]+)(\?[^"]*)?(")/g;
 
 let totalRefs = 0;
 let changedFiles = 0;
