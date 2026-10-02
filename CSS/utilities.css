@@ -1,0 +1,15 @@
+.d-none { display: none !important; } .d-block { display: block !important; } .d-flex { display: flex !important; } .d-inline-flex { display: inline-flex !important; }
+.flex-wrap { flex-wrap: wrap !important; } .flex-column { flex-direction: column !important; } .flex-grow-1 { flex-grow: 1 !important; }
+.align-items-center { align-items: center !important; } .align-items-start { align-items: flex-start !important; } .align-items-end { align-items: flex-end !important; }
+.justify-content-between { justify-content: space-between !important; } .justify-content-center { justify-content: center !important; } .justify-content-end { justify-content: flex-end !important; } .justify-content-start { justify-content: flex-start !important; }
+.gap-1 { gap: 4px !important; } .gap-2 { gap: 8px !important; } .gap-3 { gap: 16px !important; }
+.w-100 { width: 100% !important; } .text-start { text-align: left !important; } .text-center { text-align: center !important; } .text-end { text-align: right !important; }
+.text-muted { color: var(--lj-muted) !important; } .text-danger { color: var(--lj-danger) !important; } .text-warning { color: var(--lj-warning) !important; } .text-dark { color: var(--lj-text) !important; }
+.bg-transparent { background: transparent !important; } .bg-light { background: var(--lj-surface-2) !important; } .bg-warning { background: var(--lj-warning-soft) !important; } .border-0 { border: 0 !important; } .shadow { box-shadow: var(--lj-shadow) !important; }
+.visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; border: 0 !important; }
+.container-fluid { width: 100%; padding-left: 12px; padding-right: 12px; margin: 0 auto; }
+.rounded-pill { border-radius: 999px !important; }
+.m-0 { margin: 0 !important; } .mt-1 { margin-top: 4px !important; } .mt-2 { margin-top: 8px !important; } .mt-3 { margin-top: 16px !important; } .mt-4 { margin-top: 24px !important; }
+.mb-0 { margin-bottom: 0 !important; } .mb-1 { margin-bottom: 4px !important; } .mb-2 { margin-bottom: 8px !important; } .mb-3 { margin-bottom: 16px !important; }
+.me-1 { margin-right: 4px !important; } .me-2 { margin-right: 8px !important; } .ms-1 { margin-left: 4px !important; } .ms-2 { margin-left: 8px !important; } .mx-3 { margin-left: 16px !important; margin-right: 16px !important; }
+.p-0 { padding: 0 !important; } .px-0 { padding-left: 0 !important; padding-right: 0 !important; } .px-2 { padding-left: 8px !important; padding-right: 8px !important; } .py-2 { padding-top: 8px !important; padding-bottom: 8px !important; } .py-3 { padding-top: 16px !important; padding-bottom: 16px !important; }
