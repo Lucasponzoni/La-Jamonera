@@ -1,0 +1,354 @@
+/* ===========================================================
+   Receta card v2 — zonas compactas con collapsibles
+   =========================================================== */
+.receta-card-v2 {
+  align-items: stretch;
+  padding: 8px 10px;
+  gap: 8px;
+}
+
+.receta-card-v2 .ingrediente-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.receta-card-v2 .produccion-card-avatar {
+  width: 56px !important;
+  height: 56px !important;
+  min-width: 56px !important;
+  max-width: 56px !important;
+  margin-bottom: 0 !important;
+}
+
+.receta-card-v2 .ingrediente-avatar img,
+.receta-card-v2 .receta-thumb-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.receta-card-v2 .receta-thumb {
+  width: 100%;
+  height: 100%;
+}
+
+.receta-card-v2 .ingrediente-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.receta-card-v2 .receta-card-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(31, 63, 130, 0.08);
+}
+
+.receta-card-v2 .receta-card-titles {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-width: 0;
+}
+
+.receta-card-v2 .receta-card-title-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.receta-card-v2 .receta-card-title-copy .receta-name {
+  font-size: 1.16rem !important;
+  line-height: 1.08;
+}
+
+.receta-card-v2 .receta-card-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+  min-width: 0;
+}
+
+.receta-card-v2 .receta-card-header-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.receta-card-v2 .receta-card-header-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.receta-card-v2 .receta-card-quick-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.receta-card-v2 .receta-quick-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid rgba(31, 63, 130, 0.10);
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #1f3f82;
+  line-height: 1.1;
+}
+
+.receta-card-v2 .receta-quick-stat small {
+  color: #5b6d95;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.receta-card-v2 .receta-quick-stat strong {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.receta-card-v2 .receta-quick-stat.is-info {
+  background: #edf7ff;
+  border-color: #c8e3f7;
+  color: #2a4ea3;
+}
+
+.receta-card-v2 .receta-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 4px 0 0;
+  border-top: 1px dashed rgba(31, 63, 130, 0.10);
+}
+
+.receta-card-v2 .receta-zone:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.receta-card-v2 .receta-zone-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #4f6aa3;
+}
+
+.receta-card-v2 .receta-zone-title > i {
+  font-size: 0.82rem;
+  color: #6c84b6;
+}
+
+.receta-card-v2 .receta-datos-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.receta-card-v2 .receta-datum {
+  display: grid;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(31, 63, 130, 0.08);
+}
+
+.receta-card-v2 .receta-datum small {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #5b6d95;
+}
+
+.receta-card-v2 .receta-datum strong {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1f3f82;
+  font-variant-numeric: tabular-nums;
+}
+
+.receta-card-v2 .receta-datum.is-info strong {
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: #2a4ea3;
+}
+
+/* Collapsible zones (ingredientes / descripción) */
+.receta-card-v2 .receta-zone-ingredientes,
+.receta-card-v2 .receta-zone-descripcion,
+.receta-card-v2 .receta-zone-etiquetado {
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  border: 1px solid rgba(31, 63, 130, 0.08);
+  padding: 3px 9px;
+  border-top: 1px solid rgba(31, 63, 130, 0.08);
+}
+
+.receta-card-v2 .receta-zone-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 2px 0;
+  color: #4f6aa3;
+  cursor: pointer;
+  text-align: left;
+}
+
+.receta-card-v2 .receta-zone-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.receta-card-v2 .receta-zone-toggle-label {
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.receta-card-v2 .receta-zone-count {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(56, 85, 143, 0.10);
+  color: #38558f;
+}
+
+.receta-card-v2 .receta-zone-toggle-icon {
+  font-size: 0.8rem;
+  color: #6c84b6;
+  transition: transform .18s ease;
+}
+
+.receta-card-v2 .receta-zone-ingredientes[data-collapsed="false"] .receta-zone-toggle-icon,
+.receta-card-v2 .receta-zone-descripcion[data-collapsed="false"] .receta-zone-toggle-icon {
+  transform: rotate(180deg);
+}
+
+.receta-card-v2 .receta-zone-body {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px dashed rgba(31, 63, 130, 0.10);
+}
+
+.receta-card-v2 .receta-zone-ingredientes[data-collapsed="true"] .receta-zone-body,
+.receta-card-v2 .receta-zone-descripcion[data-collapsed="true"] .receta-zone-body {
+  display: none;
+}
+
+.receta-card-v2 .receta-zone-body .receta-card-ingredients,
+.receta-card-v2 .receta-zone-body .receta-card-description {
+  margin: 0;
+  color: #4c5f88;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.receta-card-v2 .receta-zone-etiquetado .receta-print-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.receta-card-v2 .receta-zone-etiquetado .receta-front-inline {
+  margin-top: 6px;
+}
+
+.receta-card-v2 .receta-card-footer {
+  border-top: 1px dashed rgba(31, 63, 130, 0.10);
+  padding-top: 4px;
+  margin: 0;
+}
+
+.receta-card-v2 .receta-card-footer .receta-card-dates {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-size: 0.75rem;
+  color: #6c84b6;
+}
+
+.receta-card-v2 .recipe-row-actions {
+  display: flex;
+  flex-direction: column;
+  align-content: start;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px;
+  align-self: flex-start;
+  border-radius: 8px;
+}
+
+.receta-card-v2 .recipe-row-actions .family-manage-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+}
+
+@media (max-width: 520px) {
+  .receta-card-v2 .ingrediente-avatar {
+    width: 48px;
+    height: 48px;
+  }
+  .receta-card-v2 .produccion-card-avatar {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+  }
+  .receta-card-v2 .receta-card-header {
+    grid-template-columns: 1fr;
+  }
+  .receta-card-v2 .receta-card-header-side,
+  .receta-card-v2 .receta-card-header-chips,
+  .receta-card-v2 .receta-card-quick-stats {
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+  .receta-card-v2 .recipe-row-actions {
+    flex-direction: column;
+    width: auto;
+    overflow-x: visible;
+  }
+}
+

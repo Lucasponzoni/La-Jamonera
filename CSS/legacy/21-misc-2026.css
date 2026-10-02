@@ -1,0 +1,1680 @@
+/* === Frozen product (CAA/SENASA) ============================================
+   Estilos para el flag "producto congelado" en Inventario y Producción.
+   - Icono ❄ junto al nombre del producto cuando tiene lotes congelados.
+   - Badge "Congelado" en historial de ingresos.
+   - Botón circular de info que abre el alert con la guía CAA/SENASA.
+   - Popup ampliado con tipografía legible y secciones bien separadas.
+============================================================================ */
+.inventario-frozen-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #d9ecff;
+  color: #0c3a66;
+  font-size: 0.85rem;
+  margin-left: 6px;
+  vertical-align: middle;
+  border: 1px solid #5b9bd5;
+}
+
+/* Pill badge "Congelado" en la card del catálogo: visible, claro, no invasivo */
+.inventario-frozen-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 8px;
+  margin: 4px 0 0;
+  border-radius: 999px;
+  background: #eaf4ff;
+  color: #0c3a66;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid #5b9bd5;
+  width: fit-content;
+  line-height: 1;
+}
+
+.inventario-frozen-pill i {
+  font-size: 0.9rem;
+  color: #2c6fb0;
+}
+
+.inventario-frozen-badge {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px 5px;
+  max-width: 100%;
+  padding: 3px 8px;
+  border-radius: 7px;
+  background: #d9ecff;
+  color: #0c3a66;
+  font-weight: 600;
+  font-size: 0.72rem;
+  border: 1px solid #5b9bd5;
+  line-height: 1.15;
+  vertical-align: top;
+}
+
+.inventario-frozen-meta {
+  display: inline-flex;
+  max-width: 100%;
+  margin-top: 3px;
+  vertical-align: top;
+}
+
+.inventario-frozen-since {
+  color: #28547b;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Fila completa de un ingreso congelado: tinte celeste sutil + accent izquierdo. */
+tr.inventario-row-frozen > td {
+  background: #f3f9ff !important;
+}
+
+tr.inventario-row-frozen.is-even-row > td {
+  background: #ecf4fc !important;
+}
+
+tr.inventario-row-frozen > td:first-child {
+  position: relative;
+}
+
+tr.inventario-row-frozen > td:first-child::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  background: #5b9bd5;
+  border-radius: 0 3px 3px 0;
+}
+
+/* === Sección colapsable de familias / grupos =============================
+   Patrón compartido entre Inventario (familias de ingredientes) y Producción
+   (grupos de recetas). Cabecera con toggle + body con la fila de círculos.
+=========================================================================== */
+
+/* El contenedor padre puede traer flex+scroll de estilos viejos
+   (.familias-circles del inventario). Lo neutralizamos cuando alberga
+   una .family-circle-section, para que el header colapsable se renderice
+   en bloque y la fila de círculos viva dentro de su propio body. */
+.familias-circles:has(.family-circle-section),
+.produccion-recipe-groups,
+#familiasCircles:has(.family-circle-section) {
+  display: block !important;
+  overflow: visible !important;
+  padding-bottom: 0 !important;
+  margin-bottom: 8px !important;
+}
+
+.produccion-data.is-history-mode > #produccionRecipeGroups,
+.produccion-data.is-dispatch-mode > #produccionRecipeGroups,
+#produccionRecipeGroups.d-none,
+#produccionRecipeGroups[hidden] {
+  display: none !important;
+}
+
+.family-circle-section {
+  margin: 4px 0 12px;
+}
+
+.family-circle-section.is-collapsed {
+  margin-bottom: 4px;
+}
+
+.family-circle-section-head {
+  display: flex;
+  align-items: center;
+}
+
+.family-circle-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  padding: 6px 10px;
+  margin: 0;
+  cursor: pointer;
+  color: #173d73;
+  font-weight: 600;
+  font-size: 0.92rem;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.family-circle-toggle:hover {
+  background: #eef3fb;
+}
+
+.family-circle-toggle i {
+  font-size: 0.78rem;
+  color: #5b7196;
+  transition: transform 0.15s ease;
+}
+
+.family-circle-toggle small {
+  font-weight: 400;
+  color: #6b7689;
+  font-size: 0.78rem;
+  margin-left: 4px;
+}
+
+.family-circle-section-body {
+  margin-top: 4px;
+}
+
+.family-circles-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 4px 8px;
+  scrollbar-width: thin;
+}
+
+/* Botón "+ Crear" reusa la circle-item con dashed accent. */
+.family-circle-create .family-circle-thumb-create {
+  background: #f0fdf4;
+  color: #2f8865;
+  border: 2px dashed #98c9b0;
+}
+
+.family-circle-create .family-circle-name {
+  color: #2f8865;
+  font-weight: 600;
+}
+
+/* === Card de producción: hero-side rediseñado (v2) ===
+   Reemplaza el layout viejo de stat-blocks por tarjetas con icono a la izquierda
+   y texto a la derecha, más compactas y consistentes. */
+.produccion-hero-side-v2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.produccion-stat-mini-v2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #e6eef9;
+  border-radius: 12px;
+  min-height: 64px;
+  transition: border-color 0.15s ease;
+}
+
+.produccion-stat-mini-v2:hover {
+  border-color: #c7d6ed;
+}
+
+.produccion-stat-mini-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #eef3fb;
+  color: #5b7196;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.produccion-stat-mini-v2.is-stock-up .produccion-stat-mini-icon {
+  background: #e9f7ef;
+  color: #2f8865;
+}
+
+.produccion-stat-mini-v2.is-stock-down .produccion-stat-mini-icon {
+  background: #fdebec;
+  color: #c2434f;
+}
+
+.produccion-stat-mini-v2.is-last .produccion-stat-mini-icon {
+  background: #f3ecff;
+  color: #7e5dbb;
+}
+
+.produccion-stat-mini-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.produccion-stat-mini-text small {
+  font-size: 0.72rem;
+  color: #6b7689;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-weight: 600;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.produccion-stat-mini-period {
+  font-size: 0.62rem;
+  color: #94a0b6;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Botón clickeable para cambiar el período (Egresados). */
+.produccion-stat-mini-period-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  margin-left: 2px;
+  border: 1px solid #d6e1ef;
+  background: #f3f6fb;
+  color: #5b7196;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1.2;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.produccion-stat-mini-period-btn:hover {
+  background: #eaf4ff;
+  border-color: #b6dcff;
+  color: #2c6fb0;
+}
+
+.produccion-stat-mini-period-btn i {
+  font-size: 0.55rem;
+  opacity: 0.7;
+}
+
+/* === Período de egresados (SwAlert centrado) === */
+.produccion-period-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.produccion-period-form .produccion-period-help {
+  margin: 0 0 4px;
+  color: #6b7689;
+  max-width: 360px;
+}
+
+.produccion-period-form .produccion-period-label {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #173d73;
+}
+
+.produccion-period-form .produccion-period-input {
+  display: block !important;
+  width: 140px !important;
+  max-width: 140px !important;
+  margin: 0 auto !important;
+  padding: 10px 12px !important;
+  text-align: center !important;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.produccion-period-presets {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.produccion-period-presets .btn {
+  min-width: 78px;
+}
+
+/* === Card de producción: zona Acciones colapsable ==========================
+   Reusa el patrón visual de .produccion-zone-ingredientes (toggle con icono
+   chevron + body que se colapsa con data-collapsed="true"). */
+.produccion-card-v2 .produccion-zone-acciones {
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 10px;
+  border: 1px solid rgba(31, 63, 130, 0.08);
+  padding: 4px 10px;
+}
+
+.produccion-card-v2 .produccion-zone-acciones .produccion-zone-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #173d73;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.produccion-card-v2 .produccion-zone-acciones .produccion-zone-toggle-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.produccion-card-v2 .produccion-zone-acciones .produccion-zone-toggle-left i {
+  color: #d39c2b;
+}
+
+.produccion-card-v2 .produccion-zone-acciones .produccion-zone-toggle-icon {
+  font-size: 0.78rem;
+  color: #5b7196;
+  transition: transform 0.2s ease;
+}
+
+.produccion-card-v2 .produccion-zone-acciones[data-collapsed="true"] .produccion-zone-toggle-icon {
+  transform: rotate(180deg);
+}
+
+.produccion-card-v2 .produccion-zone-acciones .produccion-zone-body {
+  padding: 4px 0 8px;
+  display: block;
+}
+
+.produccion-card-v2 .produccion-zone-acciones[data-collapsed="true"] .produccion-zone-body {
+  display: none;
+}
+
+/* === Panel "Cobertura de ingredientes" en el editor de producción ============
+   Cuando qty=0 (no se puede producir para la fecha) o hay faltantes, mostramos
+   un listado claro de cada ingrediente con su estado: OK (verde), sólo con
+   lotes vencidos (amarillo) o faltante (rojo). Así el usuario ve de un vistazo
+   qué insumos están bloqueando la producción. */
+.produccion-missing-panel {
+  margin-top: 12px;
+  padding: 10px 12px 12px;
+  background: #fff8e6;
+  border: 1px solid #f0d692;
+  border-radius: 12px;
+}
+
+.produccion-missing-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 0.88rem;
+  color: #6b4f16;
+}
+
+.produccion-missing-head i {
+  color: #d39c2b;
+}
+
+.produccion-missing-count {
+  margin-left: auto;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fff3d4;
+  color: #8a5d00;
+  border: 1px solid #f0d692;
+}
+
+.produccion-missing-count.is-ok {
+  background: #e9f7ef;
+  color: #1f6b4f;
+  border-color: #b6e0c8;
+}
+
+.produccion-missing-count.is-warn {
+  background: #fdebec;
+  color: #8a2c39;
+  border-color: #f3b9c1;
+}
+
+.produccion-missing-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 6px 10px;
+}
+
+.produccion-missing-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #ffffff;
+  border: 1px solid #e3ebf6;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  color: #2d3a52;
+}
+
+.produccion-missing-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  font-size: 0.78rem;
+}
+
+.produccion-missing-item.is-ok .produccion-missing-icon {
+  background: #e9f7ef;
+  color: #2f8865;
+}
+
+.produccion-missing-item.is-ok {
+  border-color: #c4e7d2;
+}
+
+.produccion-missing-item.is-expired .produccion-missing-icon {
+  background: #fff4e4;
+  color: #b26b08;
+}
+
+.produccion-missing-item.is-expired {
+  border-color: #f0c87a;
+  background: #fffaf0;
+}
+
+.produccion-missing-item.is-missing .produccion-missing-icon {
+  background: #fdebec;
+  color: #c2434f;
+}
+
+.produccion-missing-item.is-missing {
+  border-color: #f3b9c1;
+  background: #fff5f6;
+}
+
+.produccion-missing-name {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.produccion-missing-name strong {
+  font-weight: 700;
+  color: #173d73;
+  line-height: 1.2;
+}
+
+.produccion-missing-tag {
+  font-size: 0.72rem;
+  color: #6b7689;
+  line-height: 1.3;
+}
+
+.produccion-missing-item.is-missing .produccion-missing-tag {
+  color: #8a2c39;
+  font-weight: 600;
+}
+
+.produccion-missing-item.is-expired .produccion-missing-tag {
+  color: #8a5d00;
+  font-weight: 600;
+}
+
+.produccion-missing-sub {
+  font-size: 0.7rem;
+  color: #6b7689;
+  font-style: italic;
+}
+
+/* Toggle del panel colapsable de cobertura. */
+.produccion-missing-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 14px;
+  background: #fff8e6;
+  border: 1px solid #f0d692;
+  border-radius: 10px;
+  color: #6b4f16;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.produccion-missing-toggle.is-ok {
+  background: #effaf4;
+  border-color: #b6e0c8;
+  color: #1f6b4f;
+}
+
+.produccion-missing-toggle.is-warn {
+  background: #fff8e6;
+  border-color: #f0d692;
+  color: #6b4f16;
+}
+
+.produccion-missing-toggle:hover {
+  filter: brightness(0.98);
+}
+
+.produccion-missing-toggle-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.produccion-missing-body {
+  margin-top: 8px;
+  padding: 10px 12px 12px;
+  background: #fff8e6;
+  border: 1px solid #f0d692;
+  border-radius: 12px;
+}
+
+.produccion-missing-help {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  background: #eaf4ff;
+  border: 1px solid #b6d8ff;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  color: #2c6fb0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.produccion-missing-help.is-warn {
+  background: #fdebec;
+  border-color: #f3b9c1;
+  color: #8a2c39;
+}
+
+/* Línea "Con +X ingrediente podés producir +N kg" — sólo cuando OK pero
+   ese ingrediente sigue siendo bottleneck si pides más kg. */
+.produccion-missing-bottleneck {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  padding: 2px 8px;
+  background: #e7f1ff;
+  border: 1px solid #b6d8ff;
+  border-radius: 999px;
+  color: #2c6fb0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.produccion-missing-bottleneck i {
+  font-size: 0.65rem;
+}
+
+/* === Panel "Para producir más" (v2): sutil, debajo del máximo de la fecha ===
+   Colapsado por default. Sin grandes cajas, sin colores estridentes. */
+.produccion-missing-panel-v2 {
+  margin-top: 6px;
+}
+
+.produccion-missing-toggle-v2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 5px 10px;
+  background: transparent;
+  border: 1px dashed #c4d2e4;
+  border-radius: 8px;
+  color: #4f6aa3;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.produccion-missing-toggle-v2:hover {
+  background: #f3f6fb;
+  border-color: #5b7196;
+  color: #173d73;
+  border-style: solid;
+}
+
+.produccion-missing-toggle-v2 i.fa-lightbulb {
+  color: #d39c2b;
+  margin-right: 4px;
+}
+
+.produccion-missing-toggle-v2-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  color: #6b7689;
+  font-weight: 500;
+}
+
+.produccion-missing-body-v2 {
+  margin-top: 6px;
+  padding: 8px 12px;
+  background: #f8fbff;
+  border: 1px solid #d6e4f0;
+  border-radius: 8px;
+}
+
+.produccion-missing-extra-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.produccion-missing-extra-row label {
+  margin: 0;
+  color: #4f628a;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.produccion-missing-extra-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 150px;
+}
+
+.produccion-missing-extra-control input {
+  max-width: 110px;
+  height: 32px;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #173d73;
+}
+
+.produccion-missing-extra-control span {
+  color: #5f7197;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.produccion-missing-extra-apply {
+  width: 32px;
+  height: 32px;
+  min-height: 32px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+}
+
+.produccion-missing-summary-v2 {
+  margin: 0 0 6px;
+  color: #4f628a;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.produccion-missing-summary-v2 strong {
+  color: #173d73;
+}
+
+.produccion-missing-tip-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 4px 0;
+  font-size: 0.82rem;
+  color: #2d3a52;
+  line-height: 1.4;
+}
+
+.produccion-missing-tip-line + .produccion-missing-tip-line {
+  border-top: 1px dashed #e3ebf6;
+}
+
+.produccion-missing-tip-line i {
+  color: #2c6fb0;
+  font-size: 0.78rem;
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.produccion-missing-tip-line strong {
+  color: #173d73;
+  font-weight: 700;
+}
+
+.produccion-missing-tip-line small {
+  display: block;
+  margin-top: 2px;
+  color: #6b7689;
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.produccion-missing-more-v2 {
+  margin: 6px 0 0;
+  color: #5f7197;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+/* === Historial de producción colapsable en el editor === */
+.produccion-history-section .produccion-history-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 8px;
+  margin: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #173d73;
+  font-weight: 600;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.produccion-history-section .produccion-history-toggle:hover {
+  background: #f3f6fb;
+}
+
+.produccion-history-toggle-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.produccion-history-toggle-left .step-title-text {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.produccion-history-toggle-icon {
+  font-size: 0.78rem;
+  color: #5b7196;
+  transition: transform 0.2s ease;
+}
+
+.produccion-history-section[data-collapsed="false"] .produccion-history-toggle-icon {
+  transform: rotate(180deg);
+}
+
+.produccion-history-section[data-collapsed="true"] .produccion-recipe-history-body {
+  display: none;
+}
+
+.produccion-history-section[data-collapsed="false"] .produccion-recipe-history-body {
+  display: block;
+  margin-top: 8px;
+}
+
+.produccion-stat-mini-text strong {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #173d73;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.produccion-stat-mini-text strong span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #6b7689;
+  margin-left: 2px;
+}
+
+.produccion-stat-mini-text strong.is-date {
+  font-size: 0.95rem;
+}
+
+.produccion-stat-mini-v2.is-stock-up .produccion-stat-mini-text strong {
+  color: #1f6b4f;
+}
+
+.produccion-stat-mini-v2.is-stock-down .produccion-stat-mini-text strong {
+  color: #8a2c39;
+}
+
+/* Badge "Vence en N días" */
+.produccion-expiry-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  margin-top: 4px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  width: fit-content;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.produccion-expiry-badge.is-warning {
+  background: #fff3d4;
+  color: #8a5d00;
+  border: 1px solid #f0c87a;
+}
+
+.produccion-expiry-badge.is-info {
+  background: #e7f1ff;
+  color: #2c6fb0;
+  border: 1px solid #b6d8ff;
+}
+
+.produccion-expiry-badge.is-danger {
+  background: #fdebec;
+  color: #8a2c39;
+  border: 1px solid #e9a7b0;
+}
+
+.produccion-expiry-badge i {
+  font-size: 0.7rem;
+}
+
+/* Footer de zona stock: dos links separados con divider */
+.produccion-zone-footer-v2 {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-top: 8px;
+  border-top: 1px dashed #e3ebf6;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.produccion-zone-footer-v2 .produccion-zone-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #2c6fb0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.produccion-zone-footer-v2 .produccion-zone-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 700px) {
+  .produccion-hero-side-v2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .produccion-hero-side-v2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Modal "Editar/Crear grupo de recetas": forzar alineado a inicio
+   (SweetAlert pone text-align: center por defecto) y arreglar el padding/width
+   que SweetAlert le mete a los .swal2-input (margin auto + width ~80%). */
+.recipe-group-form,
+.recipe-group-form .step-block,
+.recipe-group-form .step-title,
+.recipe-group-form .step-content,
+.recipe-group-form label {
+  text-align: left !important;
+}
+
+.recipe-group-form .step-title {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #173d73;
+}
+
+.recipe-group-form label {
+  display: block;
+  font-size: 0.82rem;
+  color: #2d3a52;
+  font-weight: 600;
+  margin: 8px 0 4px;
+}
+
+.recipe-group-form .image-method-buttons {
+  justify-content: flex-start;
+}
+
+.recipe-group-form .image-preview-circle {
+  margin: 12px 0 4px;
+}
+
+/* Reset de los anchos / márgenes raros que SweetAlert aplica a sus inputs.
+   Forzamos full-width, padding consistente y sin auto-centering. */
+.recipe-group-form input.swal2-input,
+.recipe-group-form input.ios-input,
+.recipe-group-form .swal2-input {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 0 6px !important;
+  padding: 10px 12px !important;
+  text-align: left !important;
+  box-sizing: border-box;
+  font-size: 0.95rem;
+}
+
+.recipe-group-form .ai-generate-btn {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.recipe-group-form .ai-alert-note {
+  margin-top: 8px;
+  font-size: 0.82rem;
+}
+
+.recipe-group-form .step-content {
+  padding: 0;
+}
+
+.recipe-group-form .step-block {
+  margin-bottom: 14px;
+}
+
+/* Modal de asignación: lista de recetas con checkbox + thumb + nombre */
+.produccion-group-assign-list {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.produccion-group-assign-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  margin: 4px 0;
+  border: 1px solid #e3ebf6;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.produccion-group-assign-row:hover {
+  background: #f7fbff;
+  border-color: #b6dcff;
+}
+
+.produccion-group-assign-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.produccion-group-assign-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #f3f6fb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #6b7689;
+  flex-shrink: 0;
+}
+
+.produccion-group-assign-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.produccion-group-assign-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.88rem;
+  color: #2d3a52;
+}
+
+.produccion-group-assign-name small {
+  color: #6b7689;
+  font-size: 0.74rem;
+}
+
+@media (max-width: 600px) {
+  .produccion-recipe-group-btn {
+    width: 76px;
+  }
+  .produccion-recipe-group-thumb {
+    width: 56px;
+    height: 56px;
+  }
+  .produccion-recipe-group-actions {
+    border-left: none;
+    border-top: 1px dashed #d6e1ef;
+    width: 100%;
+    padding: 8px 0 0;
+    margin: 8px 0 0;
+  }
+}
+
+.inventario-frozen-row {
+  position: relative;
+  align-items: center;
+}
+
+.inventario-frozen-row > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.frozen-info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid #5b9bd5;
+  background: #eaf4ff;
+  color: #0c3a66;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 50%;
+  transition: transform 0.15s ease, background 0.15s ease;
+  vertical-align: middle;
+}
+
+.frozen-info-icon:hover {
+  background: #d6e7f7;
+  transform: scale(1.1);
+}
+
+.frozen-info-icon i {
+  font-size: 0.85rem;
+}
+
+/* === Bloque "Tipo de producto" en form de ingreso ============================
+   Reemplaza los checkboxes sueltos por tarjetas seleccionables.
+============================================================================ */
+.inventario-flags-block {
+  background: #f8fafe;
+  border: 1px solid #e4ebf7;
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-top: 6px;
+}
+
+.inventario-flags-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #e1e8f4;
+  font-weight: 600;
+  color: #173d73;
+  font-size: 0.92rem;
+}
+
+.inventario-flags-head i {
+  color: #5b9bd5;
+}
+
+.inventario-flags-head small {
+  margin-left: auto;
+  font-weight: 400;
+  font-size: 0.75rem;
+}
+
+.inventario-flags-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+/* Wrap relativo que contiene el tile + el botón de info posicionado afuera del label.
+   Al sacar el botón del <label>, evitamos que el browser togglee el checkbox cuando
+   el usuario clickea sobre el ícono de info. */
+.inventario-flag-tile-wrap {
+  position: relative;
+}
+
+.inventario-flag-tile {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  margin: 0;
+  background: #ffffff;
+  border: 1.5px solid #e3ebf6;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  min-height: 70px;
+}
+
+/* Cuando el tile tiene botón de info, empujamos el check 36px a la izquierda
+   y posicionamos el botón de info en el espacio liberado, pegado al borde
+   derecho. Así NUNCA pueden solaparse: check está a la izquierda, info a la
+   derecha, separados por 14px. */
+.inventario-flag-tile.has-info .inventario-flag-tile-check {
+  margin-right: 36px;
+}
+
+.inventario-flag-tile-info-btn {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  z-index: 2;
+}
+
+/* Override del hover global de .frozen-info-icon que aplicaba scale(1.1)
+   y nos rompía el translateY(-50%) (porque transform se reemplaza, no
+   se acumula). Acá combinamos ambas transformaciones. */
+.inventario-flag-tile-info-btn:hover {
+  transform: translateY(-50%) scale(1.12);
+}
+
+.inventario-flag-tile:hover {
+  border-color: #b6d8ff;
+  background: #f7fbff;
+}
+
+/* Checkbox real oculto, lo reemplazamos por el círculo .inventario-flag-tile-check */
+.inventario-flag-tile input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
+
+.inventario-flag-tile-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid #c4d2e4;
+  border-radius: 50%;
+  background: #ffffff;
+  color: transparent;
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.inventario-flag-tile-check i {
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+/* Estado tildado */
+.inventario-flag-tile.is-checked,
+.inventario-flag-tile:has(input:checked) {
+  border-color: #2c6fb0;
+  background: #eaf4ff;
+}
+
+.inventario-flag-tile.is-checked .inventario-flag-tile-check,
+.inventario-flag-tile:has(input:checked) .inventario-flag-tile-check {
+  background: #2c6fb0;
+  border-color: #2c6fb0;
+  color: #ffffff;
+}
+
+/* Variantes por tipo */
+.inventario-flag-tile[data-flag="frozen"].is-checked,
+.inventario-flag-tile[data-flag="frozen"]:has(input:checked) {
+  border-color: #5b9bd5;
+  background: #eaf4ff;
+}
+
+.inventario-flag-tile[data-flag="frozen"].is-checked .inventario-flag-tile-icon,
+.inventario-flag-tile[data-flag="frozen"]:has(input:checked) .inventario-flag-tile-icon {
+  background: #2c6fb0;
+  color: #ffffff;
+}
+
+.inventario-flag-tile[data-flag="autoegreso"].is-checked,
+.inventario-flag-tile[data-flag="autoegreso"]:has(input:checked) {
+  border-color: #b893d9;
+  background: #f3ecff;
+}
+
+.inventario-flag-tile[data-flag="autoegreso"].is-checked .inventario-flag-tile-check,
+.inventario-flag-tile[data-flag="autoegreso"]:has(input:checked) .inventario-flag-tile-check {
+  background: #7e5dbb;
+  border-color: #7e5dbb;
+}
+
+.inventario-flag-tile[data-flag="autoegreso"].is-checked .inventario-flag-tile-icon,
+.inventario-flag-tile[data-flag="autoegreso"]:has(input:checked) .inventario-flag-tile-icon {
+  background: #7e5dbb;
+  color: #ffffff;
+}
+
+.inventario-flag-tile[data-flag="noperecedero"].is-checked .inventario-flag-tile-check,
+.inventario-flag-tile[data-flag="noperecedero"]:has(input:checked) .inventario-flag-tile-check {
+  background: #2f8865;
+  border-color: #2f8865;
+}
+
+.inventario-flag-tile[data-flag="noperecedero"].is-checked .inventario-flag-tile-icon,
+.inventario-flag-tile[data-flag="noperecedero"]:has(input:checked) .inventario-flag-tile-icon {
+  background: #2f8865;
+  color: #ffffff;
+}
+
+/* Aviso "tildado por preferencia": franja inferior fina, no compite con el body. */
+.inventario-flag-tile.is-from-pref {
+  /* el padding extra evita que la franja tape la descripción */
+  padding-bottom: 26px;
+}
+
+.inventario-flag-tile-pref {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #8a6500;
+  background: #fff8e1;
+  border-top: 1px solid #f0d692;
+  border-radius: 0 0 11px 11px; /* sigue el border-radius del tile (12px - 1px del border) */
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inventario-flag-tile-pref i {
+  color: #d39c2b;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+}
+
+.inventario-flag-tile-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #eef3fb;
+  color: #5b9bd5;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.inventario-flag-tile-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.inventario-flag-tile-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: #173d73;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.2;
+}
+
+.inventario-flag-tile-desc {
+  font-size: 0.76rem;
+  color: #6b7689;
+  line-height: 1.3;
+}
+
+.inventario-flag-tile-info {
+  margin-left: 4px;
+}
+
+@media (max-width: 600px) {
+  .inventario-flags-grid {
+    grid-template-columns: 1fr;
+  }
+  .inventario-flags-head small {
+    display: none;
+  }
+  .inventario-flag-tile {
+    grid-template-columns: 40px 1fr auto;
+    padding: 10px 12px;
+    min-height: 64px;
+  }
+  .inventario-flag-tile-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 1rem;
+  }
+}
+
+/* === Popup CAA/SENASA: tarjetas con color, jerarquía clara, lectura cómoda === */
+.frozen-info-alert.swal2-popup {
+  padding: 18px 18px 12px !important;
+  border-radius: 22px !important;
+  background: #ffffff;
+}
+
+.frozen-info-alert .swal2-title {
+  display: none;
+}
+
+.frozen-info-alert .swal2-icon {
+  display: none !important;
+}
+
+.frozen-info-alert .swal2-html-container {
+  text-align: left !important;
+  max-height: 72vh;
+  overflow-y: auto;
+  margin: 0 !important;
+  padding: 4px !important;
+}
+
+.frozen-info-content {
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: #1f2a44;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* Hero */
+.frozen-info-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  margin: 0 0 14px;
+  border-radius: 16px;
+  background: #eaf4ff;
+  border: 1px solid #b6dcff;
+}
+
+.frozen-info-hero-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  background: #2c6fb0;
+  color: #ffffff;
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+
+.frozen-info-kicker {
+  margin: 0 0 2px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  color: #2c6fb0;
+}
+
+.frozen-info-hero-title {
+  margin: 0;
+  font-size: 1.18rem;
+  font-weight: 800;
+  color: #0c3a66;
+  letter-spacing: -0.01em;
+}
+
+.frozen-info-hero-sub {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  color: #4a5b78;
+}
+
+/* Tarjetas */
+.frozen-info-card {
+  background: #ffffff;
+  border: 1px solid #e6eef9;
+  border-radius: 14px;
+  padding: 12px 14px 10px;
+  margin: 0 0 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.frozen-info-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--frozen-card-accent, #5b9bd5);
+}
+
+.frozen-info-card--blue   { --frozen-card-accent: #5b9bd5; background: #f5fbff; border-color: #d6e7f7; }
+.frozen-info-card--ice    { --frozen-card-accent: #4ea7d9; background: #eef8ff; border-color: #cfe6f7; }
+.frozen-info-card--mint   { --frozen-card-accent: #4cb38a; background: #effaf4; border-color: #cce8da; }
+.frozen-info-card--rose   { --frozen-card-accent: #d97a92; background: #fff0f4; border-color: #f3d0db; }
+.frozen-info-card--violet { --frozen-card-accent: #8a78c8; background: #f3f0fa; border-color: #ddd5ee; }
+
+.frozen-info-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #e3ebf6;
+}
+
+.frozen-info-card-head h4 {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #173d73;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.frozen-info-card-head h4 i {
+  color: var(--frozen-card-accent, #5b9bd5);
+  font-size: 1.05rem;
+}
+
+.frozen-info-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--frozen-card-accent, #5b9bd5);
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+}
+
+/* Listas */
+.frozen-info-list {
+  margin: 4px 0 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.frozen-info-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 0.9rem;
+  color: #2d3a52;
+}
+
+.frozen-info-list li i {
+  color: var(--frozen-card-accent, #5b9bd5);
+  font-size: 0.95rem;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.frozen-info-list li i.bi-x-circle-fill { color: #d76478; }
+.frozen-info-list li i.bi-clock-fill { color: #d39c2b; }
+
+.frozen-info-list--two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 14px;
+}
+
+.frozen-info-text {
+  margin: 4px 0 6px;
+  font-size: 0.9rem;
+  color: #2d3a52;
+}
+
+/* Callouts */
+.frozen-info-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  margin: 6px 0;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.frozen-info-callout i {
+  font-size: 1.05rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.frozen-info-callout p {
+  margin: 0;
+}
+
+.frozen-info-callout--warn {
+  background: #fff5e0;
+  color: #6b4f16;
+  border: 1px solid #f0d692;
+}
+
+.frozen-info-callout--warn i { color: #d39c2b; }
+
+.frozen-info-callout--info {
+  background: #eaf4ff;
+  color: #173d73;
+  border: 1px solid #c4dcf7;
+}
+
+.frozen-info-callout--info i { color: #2c6fb0; }
+
+/* Bloque de temperaturas */
+.frozen-info-temp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.frozen-info-temp {
+  background: #2c6fb0;
+  color: #ffffff;
+  padding: 10px 12px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.frozen-info-temp strong {
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.frozen-info-temp span {
+  font-size: 0.78rem;
+  opacity: 0.92;
+  line-height: 1.3;
+}
+
+.frozen-info-temp--alt {
+  background: #d39c2b;
+}
+
+/* Conclusión */
+.frozen-info-conclusion {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  margin: 8px 0 0;
+  border-radius: 14px;
+  background: #fff8e6;
+  border: 1px solid #f0d692;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.frozen-info-conclusion i {
+  color: #d39c2b;
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.frozen-info-conclusion p {
+  margin: 0;
+  color: #5b4413;
+}
+
+@media (max-width: 768px) {
+  .frozen-info-content { font-size: 0.9rem; }
+  .frozen-info-hero { padding: 12px; gap: 10px; }
+  .frozen-info-hero-icon { width: 44px; height: 44px; font-size: 1.3rem; }
+  .frozen-info-hero-title { font-size: 1.02rem; }
+  .frozen-info-card { padding: 10px 12px; }
+  .frozen-info-list--two-col { grid-template-columns: 1fr; }
+  .frozen-info-temp-grid { grid-template-columns: 1fr; }
+}
+
+

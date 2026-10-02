@@ -933,12 +933,14 @@
     new window.QRCode(host, { text: getTraceUrl(registro), width: 130, height: 130, colorDark: '#111827', colorLight: '#ffffff' });
   };
 
+  // Mismo orden de cascada que el viejo CSS/style.css (partido en CSS/legacy/).
+  const PLANILLA_PRINT_CSS = ["00-base", "01-login", "02-modal-ingredientes", "03-componentes", "04-informes", "05-recetas", "06-inventario", "07-produccion", "08-produccion-card", "09-recetas-card", "10-inventario-card", "11-produccion-2", "12-trazabilidad-ui", "13-trazabilidad-diagrama", "14-inventario-rne", "15-planilla", "16-trazabilidad-publica", "17-inventario-3", "18-produccion-qr", "19-reparto", "20-usuarios", "21-misc-2026", "22-planilla-protocolo"];
   const buildPlanillaHeadHtml = (title) => `<title>${title}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
-    <link rel="stylesheet" href="./CSS/style.css">
+    ${PLANILLA_PRINT_CSS.map((name) => `<link rel="stylesheet" href="./CSS/legacy/${name}.css">`).join('')}
     <style>body{font-family:"Inter","Segoe UI",Arial,sans-serif;padding:8px;background:#ffffff;}</style>`;
 
   const printPlanilla = async (root, registro, options = {}) => {

@@ -1,0 +1,639 @@
+/* =========================================
+   INVENTARIO / PRODUCCIÓN TRACE UI
+========================================= */
+.inventario-available-line {
+  color: #6c7a98;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.inventario-expired-strike {
+  text-decoration: line-through;
+  text-decoration-color: #c2434f;
+  text-decoration-thickness: 2px;
+  text-decoration-skip-ink: none;
+  color: #94a3b8 !important;
+  opacity: 0.85;
+  display: inline-block;
+}
+
+/* La unidad (Kg.) va en su propio span sin strike: queda visible y "normal".
+   Le bajamos el color para que igual se vea "secundaria" cuando hay vencimiento. */
+.inventario-hero-value:has(.inventario-expired-strike) .inventario-hero-unit-suffix {
+  color: #94a3b8;
+  margin-left: 4px;
+}
+
+.inventario-trace-row td {
+  background: #f8ecee !important;
+  border-top: 1px dashed #b82646 !important;
+  color: #810c0c;
+  font-size: 0.82rem;
+}
+
+.inventario-resolution-row td {
+  background: #eaf1ff !important;
+  border-top: 1px dashed #0c40a8 !important;
+  color: #002a73;
+  font-size: 0.82rem;
+}
+
+.inventario-internal-use-row td {
+  background: #fff2e3 !important;
+  border-top: 1px dashed #ef8f27 !important;
+  font-size: 0.82rem;
+}
+
+#copyIngredientIdBtn {
+  border-radius: 0 14px 14px 0 !important;
+}
+
+.produccion-dispatch-table-center th,
+.produccion-dispatch-table-center td {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.produccion-dispatch-table-center .inventario-trace-main {
+  justify-content: center;
+}
+
+.produccion-dispatch-table-center .inventario-trace-row td,
+.produccion-dispatch-table-center .inventario-internal-use-row td {
+  color: #1f2a44;
+}
+
+.produccion-dispatch-table-center .inventario-dispatch-group-row td {
+  background: #f0f2f5 !important;
+  border-top: 1px dashed #c3cad6 !important;
+  color: #425066;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-align: left;
+}
+
+.produccion-dispatch-table-center .inventario-internal-use-row td {
+  text-align: center;
+}
+
+.inventario-internal-meta {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.inventario-internal-meta small {
+  color: #9a4f0a;
+  font-weight: 600;
+}
+
+.inventario-internal-no-trace {
+  color: #9a4f0a;
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
+  background: #fff4d1 !important;
+}
+
+.inventario-expired-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #a3162f;
+  background: #ffd5df;
+  border: 1px solid #f3a5b6;
+}
+
+.inventario-expiry-days-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  margin-top: 2px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.inventario-expiry-days-badge.is-success {
+  background: linear-gradient(90deg, #30d158 0%, #34c759 100%);
+}
+
+.inventario-expiry-days-badge.is-warning {
+  background: linear-gradient(90deg, #ffb340 0%, #ff8a00 100%);
+}
+
+.inventario-expiry-days-badge.is-danger {
+  background: linear-gradient(90deg, #ff5e57 0%, #ff3b30 100%);
+}
+
+.inventario-expiry-days-badge.is-neutral {
+  background: #8e97ad;
+}
+
+.inventario-resolution-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #2156b8;
+  background: #e7efff;
+  border: 1px solid #bdd0ff;
+}
+
+.produccion-lote-expired-help {
+  grid-column: 1 / -1;
+  color: #b42338;
+  font-size: 0.82rem;
+}
+
+/* Nota neutral para lotes vencidos/posteriores en modo lote antiguo. */
+.produccion-lote-neutral-help {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
+.produccion-lote-neutral-help i {
+  color: #9aa3af;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.produccion-lote-expired-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Acciones para lotes bloqueados (future/expired): "Cambiar fecha" y
+   "Producir sin trazabilidad este ingrediente". */
+.produccion-lote-blocked-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.produccion-lote-blocked-actions .ios-btn-warning {
+  background: #fff4e4;
+  color: #b26b08;
+  border-color: #f0c87a;
+  font-weight: 700;
+}
+
+.produccion-lote-blocked-actions .ios-btn-warning:hover {
+  background: #ffe9c6;
+}
+
+/* Card de ingrediente marcada como "sin trazabilidad". */
+.produccion-lote-group.is-sin-traz {
+  background: #fff8e6;
+  border-color: #f0d692;
+}
+
+.produccion-lote-sin-traz-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: #fff3d4;
+  color: #8a5d00;
+  border: 1px solid #f0c87a;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.produccion-lote-sin-traz-badge i {
+  font-size: 0.7rem;
+  color: #d39c2b;
+}
+
+.produccion-lote-sin-traz-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  margin: 4px 0;
+  background: #fff8e6;
+  border: 1px solid #f0d692;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: #6b4f16;
+  flex-wrap: wrap;
+}
+
+.produccion-lote-sin-traz-note i {
+  color: #d39c2b;
+}
+
+.produccion-lote-sin-traz-note strong {
+  color: #8a5d00;
+  font-weight: 700;
+}
+
+.produccion-lote-undo-skip {
+  margin-left: 6px;
+  padding: 2px 8px;
+  background: #ffffff;
+  border: 1px solid #d39c2b;
+  border-radius: 999px;
+  color: #8a5d00;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.15s ease;
+}
+
+.produccion-lote-undo-skip:hover:not(:disabled) {
+  background: #fff3d4;
+}
+
+.produccion-lote-undo-skip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Alert "Hay ingredientes bloqueados": botones más anchos, texto no cortado. */
+.produccion-blocked-alert .swal2-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.produccion-blocked-alert .swal2-actions .ios-btn {
+  flex: 0 1 auto;
+  min-width: 140px;
+  white-space: nowrap;
+  padding: 10px 16px;
+}
+
+.produccion-resolve-qty-wrap {
+  text-align: center;
+}
+
+.produccion-resolve-qty-wrap .swal2-input {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.inventario-trace-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inventario-trace-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid #d6deef;
+  background: #eef2fd;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.inventario-trace-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.inventario-trace-avatar .thumb-loading .meta-spinner-login {
+  width: 16px;
+  height: 16px;
+}
+
+.inventario-trace-label {
+  font-weight: 700;
+  color: #465a88;
+}
+
+.inventario-trace-relation {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #7c57cc;
+  vertical-align: middle;
+}
+
+.inventario-trace-icon {
+  width: 18px;
+  height: 18px;
+  color: #5b7ec8;
+  flex-shrink: 0;
+}
+
+.inventario-trace-kilos {
+  color: #d31233 !important;
+  font-weight: 800;
+}
+
+.inventario-available-line.is-zero {
+  color: #cc3f52;
+  text-decoration: line-through;
+}
+
+.produccion-visualizar-btn {
+  background: #edf3ff;
+  color: #2a4ea3;
+  width: fit-content;
+}
+
+.produccion-recipe-history {
+  border: 1px solid #d8e2f7;
+  border-radius: 14px;
+  padding: 10px;
+  background: #fbfdff;
+}
+
+/* =========================================
+   AJUSTES UX INVENTARIO/PRODUCCIÓN (REVISION)
+========================================= */
+.inventario-trace-toolbar {
+  justify-content: flex-start;
+}
+
+.inventario-trace-toolbar .inventario-period-divider {
+  margin-right: 2px;
+}
+
+.produccion-actions-row .produccion-visualizar-btn,
+.produccion-visualizar-btn {
+  width: fit-content;
+  max-width: none;
+  min-height: 40px;
+}
+
+.produccion-umbral-btn {
+  width: fit-content;
+  max-width: none;
+  min-height: 40px;
+  border-radius: 16px;
+  border: 1px solid #dcdcdc;
+  background: #ececef;
+  color: #4d4f57;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 8px 14px;
+}
+
+.produccion-umbral-btn i {
+  color: #666a73;
+}
+
+.produccion-umbral-btn:hover {
+  background: #e2e3e8;
+  color: #3f424a;
+}
+
+.produccion-actions-row .inventory-production-action-btn.is-threshold {
+  min-height: 38px;
+  border-radius: 14px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 8px 14px;
+  background: #eceef3;
+  color: #555c68;
+  border: 1px solid #d6d8de;
+}
+
+.produccion-actions-row .inventory-production-action-btn.is-threshold i {
+  color: inherit;
+}
+
+.produccion-actions-row .inventory-production-action-btn.is-threshold:hover {
+  background: #dee4f0;
+  color: #434f6a;
+}
+
+.swal2-popup.ios-alert.produccion-umbral-alert {
+  max-width: 520px;
+}
+
+.produccion-umbral-alert .swal2-html-container {
+  text-align: center;
+}
+
+.produccion-umbral-alert .swal2-actions {
+  justify-content: center;
+}
+
+.produccion-umbral-alert .swal2-input.ios-input {
+  margin-inline: auto;
+  text-align: center;
+}
+
+.produccion-company-logo-preview-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+.produccion-company-logo-preview {
+  width: 120px;
+  height: 120px;
+  border-radius: 999px;
+  border: 1px solid #d6def3;
+  background: #eef3ff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #6280bf;
+  font-size: 1.8rem;
+}
+
+.produccion-company-logo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.produccion-company-logo-loading {
+  width: 100%;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.produccion-company-logo-spinner {
+  width: 42px;
+  height: 42px;
+}
+
+.viewer-document {
+  width: 100%;
+  min-height: 72vh;
+  border: 0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.produccion-config-form {
+  text-align: left;
+}
+
+.produccion-config-section {
+  background: linear-gradient(180deg, #f9fbff 0%, #f3f7ff 100%);
+}
+
+.produccion-config-toggle {
+  border: 1px solid #ced8f1;
+}
+
+.swal2-popup.produccion-umbral-alert .inventario-collapse-head-styled {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.swal2-popup.produccion-umbral-alert .produccion-config-toggle > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.swal2-popup.produccion-umbral-alert .inventario-collapse-summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+}
+
+.produccion-config-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 10px 0;
+}
+
+.produccion-rne-file-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.produccion-rne-upload-loading {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid #d7e2fb;
+  background: #f5f8ff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.produccion-rne-history-wrap {
+  margin-top: 12px;
+  border-top: 1px dashed #c9d7f5;
+  padding-top: 10px;
+}
+
+.produccion-rne-history {
+  max-height: 150px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.produccion-rne-history-item {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid #dbe4fa;
+  border-radius: 12px;
+  padding: 10px;
+  background: #fff;
+  margin-bottom: 8px;
+}
+
+.produccion-rne-history-item > div {
+  flex: 1;
+  text-align: left;
+}
+
+.produccion-rne-history-item p {
+  margin: 0;
+  font-size: 0.84rem;
+  color: #455a8a;
+}
+
+.produccion-rne-history-empty {
+  color: #6f7f9f;
+  margin: 0;
+}
+
+.produccion-trace-alert {
+  background: #f9fbff;
+}
+
+.swal2-popup.produccion-trace-alert .swal2-html-container {
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  text-align: left;
+}
+
+.produccion-trace-apple-viewer {
+  border: 1px solid #dfe6f8;
+  border-radius: 16px;
+  padding: 12px;
+  background-image: radial-gradient(circle at 1px 1px, rgba(117, 136, 180, 0.16) 1px, transparent 0);
+  background-size: 18px 18px;
+  background-color: #f5f8ff;
+}
+
+.produccion-trace-ingredient-avatar {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  flex: 0 0 42px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid #d2dcf2;
+  background: #eef3ff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #4c69a5;
+}
+
+.produccion-trace-ingredient-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+

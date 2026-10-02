@@ -1,0 +1,601 @@
+/* =========================================
+   TRAZABILIDAD · DIAGRAMA IOS
+========================================= */
+
+.produccion-trace-diagram-wrap {
+  max-height: 68vh;
+  overflow: auto;
+  border: 1px solid #d2def6;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  touch-action: pan-x pan-y;
+}
+
+.produccion-trace-diagram {
+  min-width: 100%;
+  padding: 14px;
+  transform-origin: top left;
+}
+
+.produccion-trace-toolbar-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 6px;
+  border: 1px solid #dbe5f8;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(4px);
+}
+
+.produccion-trace-toolbar-zoom .inventario-threshold-btn {
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.produccion-trace-zoom-value {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 58px;
+  text-align: center;
+  font-weight: 800;
+  color: #2f4f8b;
+  background: #eef3ff;
+  border: 1px solid #d7e2f8;
+  border-radius: 10px;
+  padding: 4px 8px;
+  min-height: 36px;
+}
+
+.produccion-trace-ingredient-card {
+  border: 1px solid #dbe4f8;
+  border-radius: 14px;
+  background: #f8fbff;
+  padding: 8px;
+}
+
+.produccion-trace-ingredient-card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.produccion-trace-ingredient-head-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.produccion-trace-ingredient-index {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  flex: 0 0 24px;
+  border-radius: 999px;
+  background: #dfeaff;
+  color: #284782;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.75rem;
+}
+
+.produccion-trace-ingredient-head-main h6 {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.produccion-trace-ingredients {
+  gap: 14px;
+  padding-right: 4px;
+}
+
+.produccion-trace-ingredient-card {
+  background: #fbfdff;
+  padding: 8px;
+}
+
+.produccion-trace-lot-card {
+  background: #fff;
+  border-color: #d6e1f8;
+  padding: 8px;
+}
+
+.produccion-trace-ingredient-card .inventario-threshold-btn {
+  flex-shrink: 0;
+}
+
+.produccion-trace-ingredient-card .inventario-threshold-btn span {
+  white-space: nowrap;
+}
+
+.produccion-trace-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.produccion-trace-card-actions .inventario-no-photo-btn,
+.produccion-trace-card-actions .inventario-threshold-btn {
+  margin: 0;
+}
+
+.produccion-trace-used-badge {
+  border: 1px solid #d7e2f8;
+  border-radius: 999px;
+  background: #edf3ff;
+  color: #355995;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 8px;
+}
+
+.produccion-trace-mermaid-wrap {
+  border: 2px dashed #c7d5f1;
+  border-radius: 16px;
+  background-image: radial-gradient(circle at 1px 1px, rgba(117, 136, 180, 0.16) 1px, transparent 0);
+  background-size: 18px 18px;
+  background-color: #fbfcff;
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+
+.produccion-trace-mermaid {
+  min-height: 260px;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+
+.produccion-trace-mermaid-loading {
+  min-height: 240px;
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  text-align: center;
+  color: #53658c;
+}
+
+.produccion-trace-mermaid-loading .meta-spinner-login {
+  width: 58px;
+  height: 58px;
+}
+
+.produccion-trace-mermaid-loading p {
+  margin: 0;
+  font-weight: 600;
+}
+
+.produccion-trace-fallback-diagram {
+  display: grid;
+  gap: 10px;
+  text-align: left;
+}
+
+.produccion-trace-fallback-flow {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.produccion-trace-fallback-node {
+  border: 1px solid #d3def4;
+  border-radius: 12px;
+  background: #f4f8ff;
+  padding: 6px 10px;
+  min-width: 150px;
+  display: grid;
+  gap: 2px;
+  flex: 1 1 160px;
+}
+
+.produccion-trace-fallback-node small {
+  color: #667aa5;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.produccion-trace-fallback-node strong {
+  color: #234684;
+}
+
+.produccion-trace-fallback-node span {
+  color: #5f729b;
+  font-size: 0.8rem;
+}
+
+.produccion-trace-fallback-arrow {
+  align-self: center;
+  color: #5578ba;
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.produccion-trace-fallback-meta {
+  border: 1px solid #dbe4f8;
+  border-radius: 12px;
+  background: #fbfdff;
+  padding: 6px 10px;
+}
+
+.produccion-trace-fallback-meta p {
+  margin: 0;
+  color: #395487;
+  font-size: 0.84rem;
+}
+
+.produccion-trace-fallback-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.produccion-trace-fallback-list li {
+  color: #2e487d;
+  display: grid;
+  gap: 2px;
+}
+
+.produccion-trace-fallback-list li span {
+  color: #5f729b;
+  font-size: 0.82rem;
+}
+
+.produccion-trace-mermaid.is-dragging {
+  cursor: grabbing;
+}
+
+.produccion-trace-mermaid .mermaid {
+  min-width: 640px;
+  width: max-content;
+  font-size: 14px;
+}
+
+.produccion-trace-mermaid svg {
+  max-width: none;
+  height: auto;
+  display: block;
+}
+
+@media (max-width: 991.98px) {
+  .toolbar-scroll-x,
+  .produccion-toolbar-actions,
+  .inventario-toolbar-actions {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    flex-wrap: nowrap;
+  }
+
+  .toolbar-scroll-x::-webkit-scrollbar,
+  .produccion-toolbar-actions::-webkit-scrollbar,
+  .inventario-toolbar-actions::-webkit-scrollbar {
+    height: 5px;
+  }
+
+  .toolbar-scroll-x::-webkit-scrollbar-thumb,
+  .produccion-toolbar-actions::-webkit-scrollbar-thumb,
+  .inventario-toolbar-actions::-webkit-scrollbar-thumb {
+    background: #cfd8f4;
+    border-radius: 999px;
+  }
+
+  .dispatch-actions-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .dispatch-actions-row .recipe-table-action-btn,
+  .dispatch-actions-row .ios-btn {
+    width: 100%;
+    max-width: none;
+    justify-content: center;
+  }
+
+  .dispatch-vehicle-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .dispatch-vehicle-actions .ios-btn {
+    width: 100%;
+    max-width: none;
+    justify-content: center;
+  }
+
+  .dispatch-client-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .swal2-popup.produccion-umbral-alert {
+    width: min(96vw, 560px) !important;
+    padding: 1rem 0.8rem 0.95rem;
+  }
+
+  .swal2-popup.produccion-umbral-alert .swal2-html-container {
+    padding-inline: 0;
+  }
+
+  .swal2-popup.produccion-umbral-alert .inventario-collapse-head-styled {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .swal2-popup.produccion-umbral-alert .produccion-config-actions .ios-btn {
+    width: 100%;
+    max-width: none;
+    justify-content: center;
+  }
+
+  .produccion-rne-file-row {
+    grid-template-columns: 1fr;
+  }
+
+  .produccion-trace-fallback-arrow {
+    width: 100%;
+    text-align: center;
+  }
+
+  .produccion-trace-diagram {
+    padding: 10px;
+  }
+
+  .produccion-trace-toolbar-zoom {
+    width: fit-content;
+    max-width: 100%;
+    margin-inline: auto;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .produccion-trace-zoom-value {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-width: 52px;
+    padding: 4px 6px;
+    font-size: 0.86rem;
+    min-height: 36px;
+  }
+
+  .produccion-trace-lot-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .produccion-trace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .produccion-trace-ingredient-card header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .produccion-trace-ingredient-card .inventario-threshold-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .produccion-trace-mermaid .mermaid {
+    min-width: 320px;
+  }
+}
+
+.produccion-rne-spinner{width:24px;height:24px;}
+
+.receta-rnpa-inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:4px 0;}
+.receta-rnpa-badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-size:.72rem;font-weight:700;border:1px solid #cfd8f0;background:#eef3ff;color:#30508f;}
+.receta-rnpa-badge.is-pending,.receta-rnpa-badge.is-danger{background:#ffecef;border-color:#f2b4c0;color:#a6324a;}
+.receta-rnpa-badge.is-warning{background:#fff4e7;border-color:#f3d4ad;color:#9a621d;}
+.receta-rnpa-badge.is-ok{background:#e9f8ef;border-color:#b6e4c4;color:#1f8a48;}
+.receta-rnpa-badge.is-exempt{background:#f1f5f9;border-color:#d4dce8;color:#49617f;}
+.receta-rnpa-days{font-size:.75rem;color:#5f6a89;display:inline-flex;align-items:center;gap:4px;}
+.receta-rnpa-days.is-warning{color:#9a621d;font-weight:700;}
+.receta-rnpa-days.is-danger{color:#a6324a;font-weight:700;}
+.receta-rnpa-days.is-ok{color:#1f8a48;font-weight:700;}
+.recetas-rnpa-filters{display:flex;gap:8px;overflow-x:auto;flex-wrap:nowrap;padding:4px 2px 12px;scrollbar-width:thin;}
+.recetas-rnpa-filters .inventario-status-btn:disabled{opacity:.45;cursor:not-allowed;}
+.recipe-rnpa-block{border:1px solid #dbe3f6;border-radius:14px;padding:10px;background:#f8faff;}
+.recipe-rnpa-exempt-row{margin:4px 0 10px;color:#33476a;font-weight:700;}
+.recipe-rnpa-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+.recipe-rnpa-grid.is-disabled{opacity:.52;filter:saturate(.75);}
+.recipe-rnpa-actions{grid-column:1 / -1;display:flex;justify-content:flex-start;}
+@media (max-width:768px){.recipe-rnpa-grid{grid-template-columns:1fr;}}
+
+.inventario-collapse-head-styled i.bi{margin-right:6px;color:#466ab3;}
+.inventario-collapse-head-styled{transition:background-color .2s ease,border-color .2s ease;}
+.inventario-collapse-head-styled:hover{background:#eef4ff;border-color:#c9d8f7;}
+.inventario-collapse-head-styled.is-open{background:#e9f1ff;border-color:#b7caf2;}
+.produccion-rne-expiry-alert{display:flex;align-items:center;gap:8px;border-radius:12px;padding:10px 12px;margin-bottom:10px;border:1px solid #f1d3ab;background:#fff4e5;color:#9a5e16;font-weight:600;}
+.produccion-rne-expiry-alert.is-danger{border-color:#f2b4c0;background:#ffecef;color:#a6324a;}
+.produccion-rne-expiry-alert.is-ok{border-color:#b6e4c4;background:#e9f8ef;color:#1f8a48;}
+.produccion-rne-expiry-alert i{font-size:1rem;}
+.produccion-rne-expiry-alert.is-collapsible {
+  width: 100%;
+  cursor: pointer;
+  justify-content: space-between;
+  text-align: left;
+}
+
+.produccion-rne-expiry-text,
+.produccion-rne-expiry-collapse-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.produccion-rne-expiry-collapse-meta strong {
+  min-width: 24px;
+  text-align: center;
+}
+
+.produccion-rne-expiry-collapse-meta i {
+  transition: transform 0.2s ease;
+}
+
+.produccion-rne-expiry-alert.is-collapsible.is-open .produccion-rne-expiry-collapse-meta i {
+  transform: rotate(180deg);
+}
+
+.produccion-expiry-alert-card,
+.inventario-expiry-alert-host {
+  margin-bottom: 10px;
+}
+
+/* Card que envuelve el alert colapsable + los detalles. Antes tenía borde y
+   fondo propios, lo que generaba un "div dentro de div" visualmente. Ahora
+   actúa como simple contenedor transparente; el botón interno (.produccion-
+   rne-expiry-alert) es el único elemento con look de pill. Sólo cuando está
+   EXPANDIDO mostramos el fondo del card para enmarcar los detalles. */
+.produccion-expiry-alert-card {
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.produccion-expiry-alert-card.is-expanded {
+  border: 1px solid #f1d3ab;
+  border-radius: 14px;
+  background: #fffaf1;
+  padding: 8px;
+}
+
+.produccion-expiry-alert-card.is-danger.is-expanded {
+  border-color: #f2b4c0;
+  background: #fff5f7;
+}
+
+/* Cuando el card está expandido, el botón interno queda pegado al borde top.
+   Sacamos su margin-bottom para que no haga doble espacio. */
+.produccion-expiry-alert-card.is-expanded .produccion-rne-expiry-alert {
+  margin-bottom: 8px;
+}
+
+.produccion-expiry-alert-details {
+  display: grid;
+  gap: 8px;
+}
+
+.produccion-expiry-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.produccion-expiry-list {
+  display: grid;
+  gap: 6px;
+}
+
+.produccion-expiry-row {
+  border: 1px solid #dbe4f5;
+  border-radius: 10px;
+  background: #fff;
+  padding: 7px;
+  display: grid;
+  grid-template-columns: auto 34px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.produccion-expiry-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+}
+
+.produccion-expiry-row.is-expired {
+  border-color: #f2b4c0;
+  background: #fff8f9;
+}
+
+.produccion-expiry-row.is-soon {
+  border-color: #f1d3ab;
+  background: #fffdf7;
+}
+
+.produccion-expiry-thumb {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid #d7def2;
+  background: #f5f8ff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #49669f;
+}
+
+.produccion-expiry-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.produccion-expiry-info {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.produccion-expiry-info strong {
+  color: #1f2a44;
+  font-size: 0.9rem;
+  line-height: 1.1;
+}
+
+.produccion-expiry-info small {
+  color: #5f6a89;
+  font-weight: 700;
+}
+
+.produccion-expiry-qty {
+  color: #1f7a46;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .produccion-expiry-row {
+    grid-template-columns: auto 34px minmax(0, 1fr);
+  }
+
+  .produccion-expiry-row .inventario-threshold-btn,
+  .produccion-expiry-qty {
+    grid-column: 2 / -1;
+    justify-self: start;
+  }
+}
+
+.produccion-modal-rne-badges{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:8px;}
+.produccion-modal-rne-badge{display:inline-flex;align-items:center;gap:6px;border:1px solid #d7def2;background:#eef3ff;color:#30508f;border-radius:999px;padding:3px 10px;font-size:.72rem;font-weight:700;}
+.produccion-modal-rne-badge.is-warning{background:#fff4e7;border-color:#f3d4ad;color:#9a621d;}
+.produccion-modal-rne-badge.is-danger{background:#ffecef;border-color:#f2b4c0;color:#a6324a;}
+.produccion-modal-rne-badge.is-ok{background:#e9f8ef;border-color:#b6e4c4;color:#1f8a48;}
+

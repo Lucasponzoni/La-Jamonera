@@ -1,0 +1,1762 @@
+/* =========================================
+   INVENTARIO
+========================================= */
+.inventario-toolbar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.inventario-toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+.inventario-status-filters {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 10px;
+  scrollbar-width: thin;
+}
+
+.inventario-status-btn {
+  border: 1px solid #d6def3;
+  border-radius: 999px;
+  background: #f4f7ff;
+  color: #31579f;
+  min-height: 34px;
+  padding: 6px 12px;
+  white-space: nowrap;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.inventario-status-btn strong {
+  font-size: 0.72rem;
+}
+
+.inventario-status-btn.is-active {
+  outline: 2px solid #b3c6ef;
+}
+
+.inventario-status-btn.tone-danger { background: #ffecef; color: #c4314f; border-color: #ffc4cc; }
+.inventario-status-btn.tone-warning { background: #fff3e2; color: #b86a08; border-color: #ffd7a1; }
+.inventario-status-btn.tone-success { background: #e7f8ee; color: #128a43; border-color: #b8eac8; }
+.inventario-status-btn.tone-info { background: #eaf1ff; color: #285ac7; border-color: #c8d9ff; }
+
+.inventario-list.has-scroll-hint::after {
+  content: '↓ Deslizá para ver más ingredientes';
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: block;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #7048e9;
+  background: linear-gradient(to bottom, rgba(242, 245, 252, 0), rgb(236 231 255));
+  padding: 10px 0 4px;
+  margin-top: -28px;
+  pointer-events: none;
+}
+
+.inventario-card {
+  align-items: flex-start;
+}
+
+.inventario-card.is-selected {
+  border-color: #99b3ea;
+}
+
+.inventario-card.status-never {
+  background: #f1f3f8;
+  border-color: #d6dbe8;
+}
+
+.inventario-card.status-empty {
+  background: #fff2f2;
+  border-color: #ffc8c8;
+}
+
+.inventario-card.status-low {
+  background: #fff5e8;
+  border-color: #ffd7a6;
+}
+
+.inventario-card.status-good {
+  background: #f5fbf5;
+  border-color: #cceacc;
+}
+
+.inventario-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.inventario-status-badge {
+  font-size: 0.74rem;
+  border-radius: 999px;
+  border: 1px solid #cfdaef;
+  padding: 4px 10px;
+  color: #2a4f9b;
+  background: #edf2ff;
+}
+
+.inventario-stock-line {
+  margin: 6px 0 0;
+  display: block;
+  color: #4c5e86;
+}
+
+.inventario-stock-line strong {
+  color: #1f4ea5;
+  font-size: 18px;
+}
+
+.inventario-stock-unit {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #1f4ea5;
+  margin-left: 4px;
+}
+
+.inventario-stock-line > span {
+  display: block;
+  margin-top: 2px;
+}
+
+.inventario-expiring-list {
+  margin-top: 6px;
+  display: grid;
+  gap: 2px;
+}
+
+.inventario-expiring-line {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #4f6596;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 2px 0;
+}
+
+.inventario-expiring-line strong {
+  color: #2a4f9b;
+}
+
+.inventario-expiring-line.is-soon span {
+  color: #b56f08;
+  font-weight: 700;
+}
+
+.inventario-expiring-line.is-expired span {
+  color: #c62c45;
+  font-weight: 700;
+}
+
+.inventario-stock-real-line {
+  display: block;
+  margin-top: 2px;
+  font-weight: 700;
+  color: #0e8f42;
+}
+
+.inventario-expiring-list-editor {
+  margin-top: 0;
+}
+
+.inventario-stock-line-expired strong {
+  color: #b42338;
+}
+
+.inventario-stock-line-expired .inventario-stock-unit,
+.inventario-stock-line-expired > span {
+  color: #b42338;
+  font-weight: 700;
+}
+
+.inventario-stock-line-expired em {
+  color: #b42338;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.inventario-actions-row {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.toolbar-scroll-x {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+  white-space: nowrap;
+  padding-bottom: 4px;
+}
+
+.toolbar-scroll-x > * {
+  flex: 0 0 auto;
+}
+
+.inventory-production-actions {
+  gap: 8px;
+}
+
+.inventory-production-action-btn {
+  min-height: 38px;
+  border-radius: 14px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 8px 14px;
+}
+
+.inventory-production-action-btn.is-main {
+  background: #34c759;
+  border: 1px solid #34c759;
+  color: #fff;
+}
+
+.inventory-production-action-btn.is-main:hover {
+  background: #28b14a;
+  color: #fff;
+}
+
+.inventory-production-action-btn.is-view {
+  background: #1f7ae8;
+  border: 1px solid #1f7ae8;
+  color: #fff;
+}
+
+.inventory-production-action-btn.is-view:hover {
+  background: #166ad0;
+  color: #fff;
+}
+
+.inventory-production-action-btn.is-threshold {
+  background: #eceef3;
+  color: #555c68;
+  border: 1px solid #d6d8de;
+}
+
+.inventory-production-action-btn.is-threshold:hover {
+  background: #dee4f0;
+  color: #434f6a;
+}
+
+.inventory-production-action-btn.is-inventory {
+  background: #ff8a2a;
+  border: 1px solid #ff8a2a;
+  color: #fff;
+}
+
+.inventory-production-action-btn.is-inventory:hover {
+  background: #ef7c1e;
+  border-color: #ef7c1e;
+  color: #fff;
+}
+
+.inventario-actions-row .ios-btn {
+  width: fit-content;
+  max-width: none;
+}
+
+.inventario-threshold-btn {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  border-radius: 5px;
+}
+
+.inventory-production-action-btn.inventario-threshold-btn {
+  min-height: 38px;
+  padding: 8px 14px;
+  font-size: 0.88rem;
+  border-radius: 14px;
+}
+
+.inventario-actions-row .inventario-threshold-btn:not(.inventory-production-action-btn) {
+  min-height: 34px;
+  background-color: #edf3ff;
+  color: #2a4ea3;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  border-radius: 12px;
+  font-size: 0.82rem;
+  border: 1px solid #d3dbf0;
+}
+
+.inventario-actions-row .inventario-threshold-btn:not(.inventory-production-action-btn):hover {
+  background-color: #dce7ff;
+  color: #1f3e8a;
+  cursor: pointer;
+}
+
+.inventario-threshold-btn i {
+  font-size: 0.76rem;
+}
+
+.inventario-no-photo-btn {
+  min-height: 30px;
+  border-radius: 999px;
+  font-size: 0.73rem;
+  padding: 4px 9px;
+}
+
+.inventario-icon-only-btn {
+  min-width: 36px;
+  width: 36px;
+  padding: 0;
+}
+
+.inventario-editor-product {
+  text-align: center;
+}
+
+.inventario-editor-photo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
+  background-image: url("https://i.postimg.cc/SxTLsN2M/Ingredientes.png");
+  background-size: cover;
+  background-position: center;
+  padding: 6px 10px;
+  border-radius: 12px 12px 0 0;
+}
+
+.inventario-editor-photo .ingrediente-avatar {
+  width: 88px;
+  height: 88px;
+}
+
+.inventario-editor-name {
+  color: #ff8a2a;
+  font-weight: 800;
+  margin: 0;
+}
+
+.inventario-editor-meta {
+  margin: 4px 0 10px;
+  color: #58709d;
+}
+
+.inventario-lot-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, auto) 1fr;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.inventario-lot-separator {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.inventario-lot-separator select {
+  max-width: 120px;
+}
+
+.inventario-lot-subtitle {
+  margin: 10px 0 6px;
+  font-size: 0.84rem;
+  color: #516898;
+  font-weight: 700;
+}
+
+.inventario-lot-order {
+  min-height: 42px;
+  border: 1px dashed #cfdaf2;
+  border-radius: 12px;
+  background: #f8faff;
+  padding: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inventario-token-chip {
+  border: 1px solid #c6d8ff;
+  background: #edf3ff;
+  color: #355baf;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.inventario-token-chip.is-dragging {
+  opacity: 0.6;
+}
+
+.inventario-lot-preview-wrap {
+  margin-top: 10px;
+}
+
+.inventario-lot-preview {
+  display: block;
+  border: 1px solid #d5e0f7;
+  background: #f5f8ff;
+  border-radius: 10px;
+  padding: 6px 10px;
+  color: #24468e;
+}
+
+/* =========================================
+   RESPONSIVE INVENTARIO
+========================================= */
+@media (max-width: 991.98px) {
+  .inventario-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .inventario-toolbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .inventario-toolbar-actions .ios-btn {
+    width: fit-content;
+    max-width: none;
+  }
+
+  .inventario-lot-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================================
+   INVENTARIO AJUSTES V2
+========================================= */
+.inventario-stock-line.is-zero strong {
+  color: #cc3f52;
+  font-size: 18px;
+}
+
+.inventario-stock-line.is-zero .inventario-stock-unit {
+  color: #cc3f52;
+}
+
+.inventario-stock-line.is-infinite strong,
+.inventario-infinity-symbol {
+  color: #128a43;
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.inventario-infinite-stock-note,
+.produccion-lote-infinite-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #b8eac8;
+  background: #eefaf2;
+  color: #1d7540;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  font-weight: 650;
+  margin-top: 8px;
+}
+
+.inventario-infinite-stock-note i,
+.produccion-lote-infinite-note i {
+  color: #14a34a;
+}
+
+.inventario-infinite-toggle {
+  min-height: 38px;
+  border: 1px solid #cfe7d6;
+  background: #eefaf2;
+  color: #187a3c;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-weight: 750;
+}
+
+.inventario-infinite-toggle .meta-spinner {
+  width: 18px;
+  height: 18px;
+}
+
+.inventario-upload-dropzone.is-disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.inventario-editing-entry-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid #bed0f6;
+  background: #eef4ff;
+  color: #274d96;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.inventario-threshold-btn {
+  width: fit-content;
+  max-width: none;
+}
+
+.inventario-view-btn {
+  width: fit-content;
+  max-width: none;
+}
+
+.inventario-product-head-v2 {
+  border: 1px dashed #cdd9f2;
+  border-radius: 18px;
+  padding: 14px;
+  background: #f8faff;
+}
+
+.inventario-product-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.inventario-editor-kicker {
+  margin: 0;
+  margin-top: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.75rem;
+  color: #6e7fa5;
+}
+
+.inventario-editor-photo .ingrediente-avatar {
+  width: 96px;
+  height: 96px;
+  border: 3px solid #34c759;
+}
+
+.inventario-editor-name {
+  font-size: 1.45rem;
+  color: #1f3e8a;
+}
+
+.inventario-editor-meta {
+  margin: 0;
+}
+
+.inventario-editor-measure {
+  margin: 0;
+  color: #6c7ea8;
+  font-size: 0.88rem;
+}
+
+.inventario-stat-card.is-danger strong {
+  color: #cc3f52;
+}
+
+.inventario-check-grid {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.inventario-check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #36507f;
+  font-weight: 600;
+  text-align: start;
+}
+
+.inventario-check-row input {
+  width: 18px;
+  height: 18px;
+}
+
+.inventario-weekly-bulk-alert {
+  width: min(1100px, 96vw);
+}
+
+.inventario-weekly-bulk-alert .swal2-html-container {
+  padding: 0 !important;
+}
+
+.inventario-weekly-config-btn {
+  white-space: nowrap;
+}
+
+.inventario-weekly-bulk-wrap {
+  text-align: left;
+}
+
+.inventario-weekly-bulk-intro {
+  margin: 0 0 12px;
+  color: #566684;
+  text-align: center;
+}
+
+.inventario-weekly-bulk-list {
+  display: grid;
+  gap: 10px;
+  max-height: 62vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+
+.inventario-weekly-row {
+  border: 1px solid #c9daf5;
+  border-radius: 16px;
+  padding: 8px;
+  background: #f5f9ff;
+  display: grid;
+  gap: 8px;
+}
+
+.inventario-weekly-row.is-perishable {
+  border-color: #b9e8cb;
+  background: #ecfaf2;
+}
+
+.inventario-weekly-row.is-non-perishable {
+  border-color: #c7d9ff;
+  background: #edf4ff;
+}
+
+.inventario-weekly-product-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.inventario-weekly-product-head > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.inventario-weekly-thumb-wrap {
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  border: 1px solid #d2dbef;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #edf2ff;
+  color: #355899;
+}
+
+.inventario-weekly-thumb-wrap .thumb-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.inventario-weekly-thumb-wrap .thumb-loading,
+.inventario-weekly-thumb-wrap .thumb-loading .meta-spinner {
+  width: 100%;
+  height: 100%;
+}
+
+.inventario-weekly-bulk-alert .swal2-actions .ios-btn {
+  width: auto;
+  max-width: none;
+  min-width: 160px;
+}
+
+.inventario-weekly-bulk-alert .swal2-actions .inventario-weekly-cancel-btn {
+  min-width: 120px;
+}
+
+.swal2-popup.inventario-edit-entry-alert .swal2-input,
+.swal2-popup.inventario-edit-entry-alert .swal2-select,
+.swal2-popup.inventario-edit-entry-alert .swal2-file {
+  margin: 0 !important;
+}
+
+.inventario-weekly-product-head h6 {
+  margin: 0;
+  color: #26395d;
+}
+
+.inventario-weekly-product-head p {
+  margin: 1px 0 0;
+  color: #60739d;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  display: -webkit-box;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+.inventario-weekly-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 6px 10px;
+  align-items: center;
+}
+
+.inventario-weekly-grid .inventario-check-row span {
+  overflow-wrap: anywhere;
+}
+
+.inventario-weekly-rotation {
+  color: #36507f;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.inventario-weekly-rotation .swal2-input {
+  margin: 0;
+  min-height: 38px;
+  max-width: 115px;
+}
+
+@media (max-width: 768px) {
+  .inventario-weekly-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.inventario-check-row-compact {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.inventario-internal-switch-wrap {
+  padding-top: 2px;
+}
+
+.inventario-inline-fields {
+  margin-top: 8px;
+}
+
+.inventario-token-placeholder {
+  border: 1px dashed #cbd8f3;
+  border-radius: 12px;
+  color: #657ca8;
+  padding: 10px;
+  width: 100%;
+  text-align: center;
+}
+
+.inventario-token-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: grab;
+}
+
+.inventario-token-chip.drag-over {
+  border: 1px dashed #7da1ea;
+  background: #eef4ff;
+}
+
+.inventario-config-badge.is-muted {
+  background: #eff3ff;
+  color: #6b7ea9;
+}
+
+.inventario-table-head.enhanced {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.inventario-table-range {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inventario-pagination.enhanced {
+  margin-top: 10px;
+  border-top: 1px solid #d9e2f6;
+  padding-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.inventario-period-board {
+  margin-top: 0;
+  border: 1px solid #dbe4f7;
+  border-radius: 16px;
+  padding: 12px;
+  background: #fbfcff;
+}
+
+.inventario-period-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+
+.inventario-period-actions-scroll {
+  width: 100%;
+}
+
+.inventario-period-filters #inventarioGlobalClearBtn, .inventario-period-filters #produccionGlobalClearBtn {
+  border-radius: 5px !important;
+}
+
+#inventarioGlobalRange,
+#produccionGlobalRange {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.inventario-period-filters:has(#inventarioGlobalClearBtn:not(.d-none)) #inventarioGlobalRange,
+.inventario-period-filters:has(#produccionGlobalClearBtn:not(.d-none)) #produccionGlobalRange {
+  grid-column: 1 / 6;
+}
+
+#inventarioGlobalClearBtn,
+#produccionGlobalClearBtn {
+  grid-column: 6;
+  justify-self: end;
+}
+
+#inventarioGlobalApplyBtn,
+#produccionGlobalApplyBtn,
+#inventarioGlobalExpandBtn,
+#produccionGlobalExpandBtn,
+#inventarioGlobalExcelBtn,
+#produccionGlobalExcelBtn,
+.inventario-period-divider,
+#inventarioGlobalPrintBtn,
+#inventarioGlobalSheetBtn,
+#produccionGlobalPrintBtn {
+  grid-row: 2;
+}
+
+#inventarioGlobalRange,
+#produccionGlobalRange {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+#inventarioGlobalRange,
+#produccionGlobalRange,
+#produccionGlobalSearch {
+  border-radius: 5px !important;
+}
+
+.inventario-period-divider {
+  width: 1px;
+  height: 30px;
+  background: #ccd7ef;
+  align-self: center;
+}
+
+.inventario-table-compact-wrap {
+  overflow-x: auto;
+}
+
+.inventario-table-compact {
+  min-width: 760px;
+}
+
+.inventario-table-compact th {
+  font-size: 0.72rem;
+  padding: 7px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  text-align: center;
+  font-weight: 800;
+  color: #284a93;
+  white-space: nowrap;
+}
+
+.inventario-table-compact td {
+  font-size: 0.9rem;
+  padding: 7px 8px;
+  text-align: start;
+  font-weight: 700;
+  color: #2f426d;
+  white-space: nowrap;
+}
+
+.inventario-provider-cell {
+  font-weight: 400 !important;
+}
+
+.inventario-table-compact tbody tr:nth-child(odd) {
+  background: #f6f9ff;
+}
+
+.inventario-table-compact tbody tr:nth-child(even) {
+  background: #edf3ff;
+}
+
+.inventario-table-compact tbody tr.is-even-row > td {
+  background: white !important;
+  border-bottom: 1px solid #e1e9f5 !important;
+}
+
+.inventario-table-compact tbody tr.is-odd-row > td {
+  background: #f7faff !important;
+  border-bottom: 1px solid #e1e9f5 !important;
+}
+
+.inventario-table-compact tbody td:nth-child(3) {
+  color: #1f8a44;
+  text-transform: uppercase;
+}
+
+.inventario-table-compact tbody td:nth-child(4) {
+  color: #2f5fb0;
+}
+
+.inventario-field-feedback {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.76rem;
+  color: #6f7f9f;
+}
+
+.inventario-field-feedback.is-error {
+  color: #c4314f;
+  font-weight: 700;
+}
+
+.image-viewer-controls.image-viewer-controls-inventario {
+  grid-template-columns: 2fr repeat(4, minmax(0, 1fr));
+}
+
+.image-viewer-modal .ios-modal-body {
+  max-height: calc(100vh - 120px);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+}
+
+
+@media (max-width: 991.98px) {
+  .inventario-pagination.enhanced {
+    flex-direction: row;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+
+  .inventario-pagination.enhanced span {
+    min-width: 120px;
+    text-align: center;
+  }
+
+  .inventario-pagination.enhanced .inventario-page-btn {
+    min-width: 40px;
+    padding-inline: 10px;
+  }
+}
+
+.inventario-head-action {
+  flex: 1;
+  width: 100%;
+  max-width: none;
+}
+
+.inventario-product-head-stats {
+  display: grid;
+  gap: 8px;
+}
+
+.inventario-collapse-head-styled {
+  margin-bottom: 5px;
+  width: 100%;
+  border: 1px solid #d8e1f5;
+  border-radius: 16px;
+  background: #f7faff;
+  color: #2a3f70;
+  min-height: 46px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.inventario-collapse-summary {
+  color: #6c7ea9;
+  font-size: 0.9rem;
+}
+
+.inventario-day-kg {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 1px;
+  background: #2e7fe6;
+  color: #fff;
+  border-radius: 12px;
+  width: fit-content;
+  font-size: 0.56rem;
+  line-height: 1;
+  padding: 2px 4px;
+  pointer-events: none;
+  text-wrap: nowrap;
+}
+
+.inventario-day-kg.is-mixed {
+  background: #10b981;
+}
+
+.flatpickr-day {
+  position: relative;
+}
+
+.flatpickr-day.today {
+    border-color: #ff4747;
+    background-color: #ff1010;
+    color: white;
+    font-weight: 700;
+}
+
+.inventario-period-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+#inventarioGlobalLoading {
+  min-height: 150px;
+}
+
+.swal2-popup.ios-alert .swal2-deny:not(.ios-btn-deny-critical) {
+  background: #e6ebfa !important;
+  color: #2a4ea3 !important;
+}
+
+.swal2-popup.ios-alert .swal2-deny.ios-btn-deny-critical {
+  background: #ff4d4f !important;
+  color: #fff !important;
+}
+
+.swal2-popup.ios-alert.informes-print-choice-alert .swal2-deny,
+.swal2-popup.ios-alert.informes-print-choice-alert .swal2-deny.ios-btn,
+.swal2-popup.ios-alert.informes-print-choice-alert .swal2-deny.ios-btn-success {
+  background: #34c759 !important;
+  border-color: #2fb44f !important;
+  color: #fff !important;
+}
+
+.inventario-card.status-never .inventario-status-badge {
+  background: #eceff7;
+  border-color: #d5dcec;
+  color: #516187;
+}
+
+.inventario-card.status-empty .inventario-status-badge {
+  background: #ffecef;
+  border-color: #ffc4cc;
+  color: #c4314f;
+}
+
+.inventario-card.status-low .inventario-status-badge {
+  background: #fff3e2;
+  border-color: #ffd7a1;
+  color: #b86a08;
+}
+
+.inventario-card.status-good .inventario-status-badge {
+  background: #e7f8ee;
+  border-color: #b8eac8;
+  color: #128a43;
+}
+
+/* Stock vencido: badge rojo prominente. */
+.inventario-card.status-expired,
+.inventario-status-badge.status-expired {
+  background: #fdebec;
+  border-color: #f3b9c1;
+  color: #8a2c39;
+}
+
+.inventario-card.status-expired .inventario-status-badge,
+.inventario-status-badge.status-expired {
+  background: #fdebec;
+  border-color: #d34555;
+  color: #8a2c39;
+  font-weight: 700;
+}
+
+/* Mix: "En stock · con vencidos" — el badge mantiene el color del estado base
+   pero le agregamos un borde naranja para marcar que hay un problema. */
+.inventario-status-badge.has-expired {
+  border-color: #f0a060;
+  box-shadow: 0 0 0 1px #f0a060;
+}
+
+/* Banner CTA "Resolver vencidos" dentro de la card */
+.inventario-card-expired-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  margin: 8px 0 4px;
+  background: #fff4f6;
+  border: 1px solid #f3b9c1;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  color: #8a2c39;
+  flex-wrap: wrap;
+}
+
+.inventario-card-expired-banner-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.inventario-card-expired-banner-text i {
+  color: #c2434f;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.inventario-card-expired-banner-text strong {
+  color: #8a2c39;
+}
+
+.inventario-card-expired-banner .btn {
+  flex-shrink: 0;
+}
+
+.inventario-save-inline {
+  margin-top: 12px;
+  justify-content: flex-end;
+}
+
+.inventario-add-bulk-btn {
+  background: #1fb35f;
+  border-color: #1fb35f;
+  color: #fff;
+}
+
+.inventario-add-bulk-btn:hover {
+  background: #17934d;
+  border-color: #17934d;
+  color: #fff;
+}
+
+#saveInventorySpinner {
+  width: 22px;
+  height: 22px;
+}
+
+.inventario-product-head-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.inventario-product-head-stats .inventario-stat-card {
+  min-width: 180px;
+}
+
+.inventario-head-action {
+  width: fit-content;
+  max-width: none;
+  flex: 0 0 auto;
+}
+
+.inventario-history-toolbar {
+  display: grid;
+  gap: 8px;
+}
+
+.inventario-page-btn {
+  min-width: 44px;
+  padding-inline: 12px;
+}
+
+.inventario-entry-actions {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.inventario-entry-actions .inventario-delete-btn{
+  border-radius: 5px !important;
+}
+
+.inventario-entry-more-wrap {
+  display: inline-flex;
+}
+
+.inventario-entry-more-menu {
+  position: fixed;
+  min-width: 190px;
+  padding: 6px;
+  border: 1px solid #d8e2f6;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(23, 36, 68, 0.18);
+  z-index: 3300;
+}
+
+.inventario-entry-more-menu button {
+  width: 100%;
+  min-height: 34px;
+  border: 0;
+  border-radius: 6px;
+  background: #fff4f4;
+  color: #b42338;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-start;
+  padding: 7px 9px;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.inventario-entry-more-menu button:disabled {
+  opacity: .48;
+  cursor: not-allowed;
+  color: #7d8799;
+  background: #f3f5fa;
+}
+
+.inventario-table-head.enhanced #inventarioEntriesSearch {
+  border-color: #d2d8e8;
+  background: #f2f4fa;
+}
+
+.inventario-collapse-summary {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  max-width: 60%;
+}
+
+.inventario-print-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.inventario-selector-row {
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.inventario-bulk-table-wrap {
+  margin-top: 10px;
+}
+
+.inventario-bulk-table thead th {
+  background: #e8eefb;
+  color: #36569b;
+  font-weight: 700;
+  border-bottom: 1px solid #d1ddf5;
+}
+
+.inventario-bulk-main-row td {
+  vertical-align: middle;
+}
+
+.inventario-bulk-main-row .recipe-ing-input-wrap {
+  grid-template-columns: 32px 1fr;
+  gap: 12px;
+}
+
+.inventario-bulk-main-row .recipe-inline-avatar-wrap {
+  width: 24px;
+  height: 24px;
+}
+
+.inventario-bulk-main-row .recipe-small-placeholder i {
+  font-size: 0.7rem;
+}
+
+.inventario-bulk-unit-cell {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(125px, auto);
+  gap: 8px;
+  align-items: center;
+}
+
+.inventario-bulk-secondary-row td {
+  border-top: 0;
+  padding-top: 2px;
+  padding-bottom: 10px;
+}
+
+.inventario-bulk-row-extras {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #f6f8ff;
+  width: 100%;
+  justify-content: flex-end;
+}
+
+@media (max-width: 991.98px) {
+  .inventario-bulk-unit-cell {
+    grid-template-columns: 1fr;
+  }
+}
+
+.inventario-expand-btn {
+  background: #ff8a2a;
+  border: 1px solid #ff8a2a;
+  color: #fff;
+}
+
+.inventario-expand-btn:hover {
+  background: #ef7c1e;
+  border-color: #ef7c1e;
+  color: #fff;
+}
+
+.inventario-step-icon {
+  margin-right: 6px;
+  color: #4a5f8f;
+  font-size: 0.92rem;
+}
+
+.inventario-stock-grid {
+  border: 1px solid #dbe4f8;
+  border-radius: 14px;
+  background: #fbfcff;
+  padding: 12px;
+}
+
+.inventario-stock-grid .form-label {
+  color: #425681;
+  font-weight: 700;
+}
+
+.inventario-upload-dropzone {
+  width: 100%;
+  min-height: 64px;
+  border: 1px dashed #b8c9ee;
+  border-radius: 12px;
+  background: #f5f8ff;
+  color: #3b5da7;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-align: center;
+  padding: 12px;
+}
+
+.inventario-upload-dropzone.is-dragging {
+  border-color: #5e7de8;
+  background: #eaf1ff;
+}
+
+.inventario-hidden-file-input {
+  display: none;
+}
+
+.inventario-file-feedback {
+  display: block;
+  margin-top: 6px;
+  color: #5f6f94;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.inventario-file-upload-list {
+  display: grid;
+  gap: 6px;
+  text-align: left;
+}
+
+.inventario-file-upload-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 30px;
+  border: 1px solid #d8e2f6;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+.inventario-file-upload-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  color: #2c3d64;
+}
+
+.inventario-file-upload-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  font-weight: 800;
+}
+
+.inventario-file-upload-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.inventario-file-upload-remove {
+  width: 24px;
+  height: 24px;
+  border: 1px solid #f1b7bd;
+  border-radius: 999px;
+  background: #fff3f4;
+  color: #b42338;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  font-size: 0.72rem;
+}
+
+.inventario-file-upload-remove:hover {
+  background: #ffe1e5;
+}
+
+.inventario-file-upload-status .meta-spinner {
+  width: 16px;
+  height: 16px;
+}
+
+.inventario-file-upload-status.is-uploading {
+  color: #315eb7;
+}
+
+.inventario-file-upload-status.is-done {
+  color: #14833e;
+}
+
+.inventario-file-upload-status.is-error {
+  color: #c0392b;
+}
+
+#imageViewerModal {
+  z-index: 3200;
+}
+
+.modal-backdrop.inventory-image-backdrop {
+  z-index: 3190;
+}
+
+.inventario-expand-btn {
+  background: #ff8a2a;
+  border: 1px solid #ff8a2a;
+  color: #fff;
+}
+
+.inventario-expand-btn:hover {
+  background: #ef7c1e;
+  border-color: #ef7c1e;
+  color: #fff;
+}
+
+.inventario-step-icon {
+  margin-right: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #315aa6;
+  font-size: 0.72rem;
+}
+
+.inventario-row-tone.is-even-row {
+  background: #f7faff !important;
+}
+
+.inventario-row-tone.is-odd-row {
+  background: #eaf1ff !important;
+}
+
+#imageViewerModal {
+  z-index: 3200;
+}
+
+.modal-backdrop.inventory-image-backdrop {
+  z-index: 3190;
+}
+
+.inventario-print-photo-wrap {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid #d4def5;
+  background: #edf2fd;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 34px;
+  position: relative;
+}
+
+.inventario-print-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  padding: 5px;
+  border-radius: 999px;
+  display: block;
+  background: #fff;
+}
+
+.inventario-config-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #cddaf5;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  color: #31579f;
+  background: #edf3ff;
+  white-space: nowrap;
+}
+
+.inventario-day-kg {
+  bottom: -3px;
+  background: #d93a4f;
+}
+
+#inventarioEditor {
+  overflow-x: hidden;
+}
+
+#inventarioEditor .inventario-table-compact {
+  min-width: 980px;
+  table-layout: auto;
+}
+
+#inventarioEditor .inventario-table-compact th,
+#inventarioEditor .inventario-table-compact td {
+  white-space: nowrap;
+}
+
+.inventario-product-head-stats .inventario-stat-card:first-child {
+  border-color: #cfd9f1;
+  background: #f5f7fd;
+}
+
+.inventario-product-head-stats .inventario-stat-card:first-child small {
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  color: #4a5e8f;
+  font-weight: 700;
+}
+
+.inventario-product-head-stats .inventario-stat-card:first-child strong {
+  font-size: 1.35rem;
+  color: #7a5ce6;
+  font-weight: 800;
+}
+
+#inventarioOpenPeriodFilterBtn span {
+  white-space: nowrap;
+}
+
+.swal2-popup .swal-stack-fields .swal2-input + .swal2-input {
+  margin-top: 10px;
+}
+
+.ios-btn-danger {
+  background: #ff3b30;
+  color: #fff;
+}
+
+.ios-btn-danger:hover {
+  background: #e02c22;
+  color: #fff;
+}
+
+@media (max-width: 991.98px) {
+  .inventario-table-range {
+    grid-template-columns: 1fr;
+  }
+
+  .inventario-history-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .inventario-print-row {
+    justify-content: flex-start;
+  }
+
+  .toolbar-scroll-x {
+    width: 100%;
+  }
+
+  .inventario-period-actions-scroll {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .inventario-collapse-head-styled {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .inventario-collapse-summary {
+    max-width: 100%;
+    justify-content: flex-start;
+  }
+
+  .inventario-expand-btn {
+    display: none;
+  }
+
+  #inventarioGlobalRange,
+  #produccionGlobalRange {
+    grid-column: 1 / -1;
+  }
+
+  #inventarioGlobalClearBtn,
+  #produccionGlobalClearBtn {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  #inventarioGlobalApplyBtn,
+  #produccionGlobalApplyBtn,
+  #inventarioGlobalExpandBtn,
+  #produccionGlobalExpandBtn,
+  #inventarioGlobalExcelBtn,
+  #produccionGlobalExcelBtn,
+  #inventarioGlobalPrintBtn,
+  #inventarioGlobalSheetBtn,
+  #produccionGlobalPrintBtn,
+  #produccionGlobalMassPlanillasBtn,
+  .inventario-period-divider {
+    grid-row: auto;
+  }
+
+  .inventario-period-divider {
+    display: none;
+  }
+}
+
+.inventario-invoice-textarea {
+  min-height: 44px;
+  resize: vertical;
+}
+
+#inventarioEntriesRange {
+  border-color: #9cb3e7;
+  background: #f7f9ff;
+}
+
+.viewer-stage #viewerStageSpinner .meta-spinner-login {
+  width: 88px;
+  height: 88px;
+}
+
+.inventario-config-badge.is-secondary {
+  background: #eef1f8;
+  color: #6e7f9f;
+  border-color: #d9deeb;
+}
+
+#inventarioEntriesSearch::-webkit-search-cancel-button {
+  -webkit-appearance: searchfield-cancel-button;
+  cursor: pointer;
+}
+
+.inventario-delete-btn {
+  background: #f44336;
+  border: 1px solid #f44336;
+  color: white;
+}
+
+.inventario-delete-btn:hover {
+  background: #ce372c;
+  color: white;
+}
+
+.inventario-period-filters .inventario-delete-btn{
+  border-radius: 5px !important;
+}
+
+.inventario-stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inventario-head-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inventario-day-kg {
+  bottom: -5px;
+  background: #6f5be6;
+  padding: 2px 4px;
+  font-size: 0.6rem;
+}
+
+.inventario-product-head-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+

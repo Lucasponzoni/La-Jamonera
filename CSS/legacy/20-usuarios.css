@@ -1,0 +1,130 @@
+/* =========================================
+   USUARIOS MANAGER MODAL
+========================================= */
+#usersManagerList.informes-users-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  flex-wrap: initial;
+  gap: 12px;
+  margin-bottom: 14px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: 60vh;
+  padding: 4px;
+}
+
+#usersManagerList.informes-users-list::after {
+  content: none;
+  display: none;
+}
+
+.users-manager-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #e1e7f5;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 12px 14px;
+  min-width: 0;
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+
+.users-manager-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgb(31 59 116 / 10%);
+  border-color: #c8d3ef;
+}
+
+.users-manager-card-main {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.users-manager-card .user-avatar-thumb {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+}
+
+.users-manager-card-info {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.users-manager-card-info h6 {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #2a3556;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.users-manager-card-info p {
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+}
+
+.users-manager-card-position {
+  font-size: 0.82rem;
+  color: #55607f;
+  font-weight: 500;
+}
+
+.users-manager-card-email {
+  font-size: 0.76rem;
+  color: #7a8299;
+}
+
+.users-manager-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.users-manager-card-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid #d3dbf0;
+  background: #eff3ff;
+  color: #2a4ea3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 0.95rem;
+  transition: background-color .2s ease, color .2s ease, border-color .2s ease;
+}
+
+.users-manager-card-btn:hover {
+  background: #dbe5ff;
+  color: #1f3e8a;
+}
+
+.users-manager-card-btn.is-danger {
+  background: #fff1f3;
+  color: #b42338;
+  border-color: #f0c3c9;
+}
+
+.users-manager-card-btn.is-danger:hover {
+  background: #ffd9df;
+  color: #951b2d;
+}
+
+#usersManagerModal .informes-toolbar {
+  justify-content: flex-end;
+}
+
