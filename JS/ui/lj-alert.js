@@ -36,18 +36,19 @@
   const render = (state) => {
     const { opts, popup } = state;
     const cc = opts.customClass || {};
-    popup.className = ['lj-alert', ...String(cc.popup || '').split(/\s+/).filter(Boolean)].join(' ');
+    // Clases swal2-* además de las propias: el CSS de los módulos sigue apuntando a esa estructura.
+    popup.className = ['lj-alert', 'swal2-popup', ...String(cc.popup || '').split(/\s+/).filter(Boolean)].join(' ');
     popup.replaceChildren();
 
     if (opts.icon && ICONS[opts.icon]) {
       const icon = document.createElement('div');
-      icon.className = `lj-alert-icon is-${opts.icon}`;
+      icon.className = `lj-alert-icon swal2-icon is-${opts.icon}`;
       icon.innerHTML = `<sl-icon name="${ICONS[opts.icon]}"></sl-icon>`;
       popup.append(icon);
     }
     if (opts.title != null && opts.title !== '') {
       const title = document.createElement('h2');
-      title.className = ['lj-alert-title', cc.title].filter(Boolean).join(' ');
+      title.className = ['lj-alert-title', 'swal2-title', cc.title].filter(Boolean).join(' ');
       title.id = `lj-alert-title-${state.id}`;
       setContent(title, opts.title);
       popup.append(title);
@@ -55,7 +56,7 @@
     } else state.title = null;
 
     const html = document.createElement('div');
-    html.className = ['lj-alert-html', cc.htmlContainer].filter(Boolean).join(' ');
+    html.className = ['lj-alert-html', 'swal2-html-container', cc.htmlContainer].filter(Boolean).join(' ');
     if (opts.html != null) setContent(html, opts.html); else if (opts.text != null) html.textContent = String(opts.text);
     if (html.childNodes.length) popup.append(html);
     state.html = html;
@@ -83,7 +84,7 @@
     state.validation = validation;
 
     const actions = document.createElement('div');
-    actions.className = 'lj-alert-actions';
+    actions.className = 'lj-alert-actions swal2-actions';
     const buttons = [];
     state.confirm = state.deny = state.cancel = null;
     if (opts.showConfirmButton !== false) {

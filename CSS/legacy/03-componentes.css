@@ -1,280 +1,70 @@
 /* =========================================
-   COMPONENTES IOS (INPUTS/BOTONES/ALERT)
+   COMPONENTES (ALERTAS)
+   Los controles ios-* fueron reemplazados por Shoelace (sl-button, sl-input).
+   Las alertas son LJAlert (sl-dialog) con clases compatibles swal2-* en el contenido.
 ========================================= */
-.ios-input,
-.ios-input-group {
-  border-radius: 14px;
-  border: 1px solid #d2d8e8;
-  background: #f2f4fa;
-}
-
-.ios-input {
-  border-radius: 14px;
-  color: #3a4564;
-}
-
-.ios-input:focus {
-  border-color: #9caad2;
-  background: #f7f9ff;
-  box-shadow: none;
-}
-
-.ios-input::placeholder {
-  color: #7d87a4;
-}
-
-.ios-input-group > .ios-input {
-  border: 0;
-  min-height: 48px;
-}
-
-.ios-toggle-pass {
-  border: 0;
-  border-left: 1px solid #d2d8e8;
-  border-radius: 0 14px 14px 0;
-  background: transparent;
-  color: #2d7df0;
-  min-width: 48px;
-  transition: background-color 0.25s ease, color 0.25s ease;
-}
-
-.ios-toggle-pass:hover {
-  background: #e9edf8;
-  color: #1f7ae8;
-}
-
-.ios-toggle-pass:focus,
-.ios-toggle-pass:active {
-  box-shadow: none;
-}
-
-.ios-btn {
-  border: 0;
-  border-radius: 14px;
-  min-height: 48px;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: background-color 0.25s ease, color 0.25s ease, opacity 0.25s ease;
-}
-
-.ios-btn:hover {
-  opacity: 0.94;
-}
-
-.ios-btn:focus,
-.ios-btn:active {
-  box-shadow: none;
-}
-
-.ios-btn-primary {
-  background: #1f7ae8;
-  color: #fff;
-}
-
-.ios-btn-primary:hover {
-  background: #166ad0;
-  color: #fff;
-}
-
-.ios-btn-primary[disabled] {
-  opacity: 0.75;
-}
-
-.ios-btn-success {
-  background: #34c759;
-  color: #fff;
-}
-
-.ios-btn-success:hover {
-  background: #28b14a;
-  color: #fff;
-}
-
-.ios-btn-warning {
-  background: #ff9f0a;
-  color: #fff;
-}
-
-.ios-btn-warning:hover {
-  background: #e88f05;
-  color: #fff;
-}
-
-.ios-btn-secondary {
-
-  width: 100%;
-  max-width: 320px;
-  background: #e6ebfa;
-  color: #2a4ea3;
-}
-
-.ios-btn-secondary:hover {
-  background: #d6def6;
-  color: #1f3e8a;
-}
-
-.swal2-popup.ios-alert {
-  border-radius: 22px;
-  border: 1px solid #dce3f5;
-  background: #f8f9fd;
-  padding: 1.4rem;
-}
-
 .text-center {
   text-align: center;
 }
 
-.swal2-title.ios-alert-title {
-  color: #2a3556;
-  font-size: 1.4rem;
-  margin-bottom: 0.4rem;
-}
-
-.swal2-html-container.ios-alert-text {
-  color: #5a6482;
-  font-size: 0.98rem;
-  margin-top: 0;
-  padding: 0 !important;
-}
-
-.swal2-popup.produccion-confirm-alert {
-  /* Limita el alto del popup completo para que no se estire fuera del viewport.
-     Los botones de acción quedan siempre visibles abajo (fuera del scroll). */
-  max-height: 90vh;
-  display: flex !important;
-  flex-direction: column !important;
-}
-
+/* Alertas con mucho contenido: scroll interno y botones siempre visibles. */
 .swal2-popup.produccion-confirm-alert .swal2-html-container {
-  padding: 0 !important;
-  border-radius: 0 0 14px 14px;
-  /* Scroll vertical interno: lista de insumos puede ser larga, los botones
-     "Confirmar / Cancelar" siempre quedan visibles abajo. */
-  max-height: calc(90vh - 140px);
+  max-height: calc(90vh - 160px);
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
 }
 
-.swal2-popup.produccion-confirm-alert .swal2-actions {
-  margin-top: 8px !important;
-  flex-shrink: 0;
-}
-
 .swal2-popup.ios-alert.informes-alert .swal2-html-container {
-  padding: 0 !important;
   text-align: center;
 }
 
+.swal2-popup.ios-alert.informes-alert sl-textarea,
 .swal2-popup.ios-alert.informes-alert .swal2-textarea {
-  margin: 0 !important;
-  width: 100% !important;
-  min-height: 120px;
-}
-
-.swal2-popup.ios-alert.informes-alert .swal2-select,
-.swal2-popup.ios-alert.informes-alert .swal2-input,
-.swal2-popup.ios-alert.informes-alert .swal2-file {
-  margin: 0 0 10px !important;
-  width: 100% !important;
-}
-
-.swal2-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
   width: 100%;
 }
 
-.swal2-actions .ios-btn {
-  min-width: 150px;
-  width: auto;
-  max-width: none;
-  margin: 0;
-  padding-inline: 22px;
-  white-space: nowrap;
+.swal2-popup.ios-alert.informes-alert sl-select,
+.swal2-popup.ios-alert.informes-alert sl-input,
+.swal2-popup.ios-alert.informes-alert .swal2-file {
+  width: 100%;
+  margin: 0 0 10px;
 }
 
-.swal2-actions .swal2-cancel.ios-btn-secondary {
-  min-width: 150px;
+.swal2-actions sl-button {
+  min-width: 120px;
 }
 
 .swal2-actions .inventario-clear-movements-confirm-btn {
-  min-width: 220px;
+  min-width: 200px;
 }
 
-.swal2-popup.ios-alert.expiry-resolution-alert .swal2-actions {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(160px, auto));
-  align-items: stretch;
-  justify-content: center;
-  gap: 10px;
-}
-
-.swal2-popup.ios-alert.expiry-resolution-alert .swal2-actions .ios-btn {
-  min-width: 160px;
-  width: 100%;
-  max-width: 190px;
-  padding-inline: 14px;
-  white-space: normal;
-  line-height: 1.15;
-  text-align: center;
-}
-
-.swal2-popup.ios-alert.expiry-resolution-alert .swal2-confirm {
-  min-width: 184px;
-  max-width: 210px;
-}
-
-.swal2-popup.ios-alert.dispatch-xlsx-disable-alert .swal2-actions {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(150px, 1fr));
-  gap: 10px;
-  width: 100%;
-}
-
-.swal2-popup.ios-alert.dispatch-xlsx-disable-alert .swal2-actions .ios-btn {
-  min-width: 0;
-  width: 100%;
-  max-width: none;
-  padding-inline: 14px;
-  white-space: normal;
-  line-height: 1.15;
-  text-align: center;
-}
-
-@media (max-width: 560px) {
-  .swal2-popup.ios-alert.dispatch-xlsx-disable-alert .swal2-actions {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-/* Dialogo "Facturas de ingredientes" (impresion de planillas): tres acciones
-   que no entran comodas en una fila, mismo patron que dispatch-xlsx-disable. */
-.swal2-popup.ios-alert.planilla-facturas-alert {
-  max-width: 560px;
-}
-
+/* Alertas de 3 acciones: grilla pareja, 1 columna en celular. */
+.swal2-popup.ios-alert.expiry-resolution-alert .swal2-actions,
+.swal2-popup.ios-alert.dispatch-xlsx-disable-alert .swal2-actions,
 .swal2-popup.ios-alert.planilla-facturas-alert .swal2-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  margin-top: 6px;
 }
 
-.swal2-popup.ios-alert.planilla-facturas-alert .swal2-actions .ios-btn {
+.swal2-popup.ios-alert.expiry-resolution-alert .swal2-actions sl-button,
+.swal2-popup.ios-alert.dispatch-xlsx-disable-alert .swal2-actions sl-button,
+.swal2-popup.ios-alert.planilla-facturas-alert .swal2-actions sl-button {
   min-width: 0;
   width: 100%;
-  max-width: none;
-  padding-inline: 12px;
+}
+
+.swal2-popup.ios-alert.expiry-resolution-alert .swal2-actions sl-button::part(label),
+.swal2-popup.ios-alert.dispatch-xlsx-disable-alert .swal2-actions sl-button::part(label),
+.swal2-popup.ios-alert.planilla-facturas-alert .swal2-actions sl-button::part(label) {
   white-space: normal;
   line-height: 1.15;
-  text-align: center;
+}
+
+sl-dialog.lj-alert-dialog:has(.planilla-facturas-alert) {
+  --width: 560px;
 }
 
 .swal2-popup.ios-alert.planilla-facturas-alert .swal-stack-fields {
@@ -285,26 +75,15 @@
   margin: 12px 0 0;
   font-size: 12px;
   line-height: 1.35;
-  color: #55607f;
+  color: var(--lj-muted);
   text-align: left;
 }
 
-@media (max-width: 560px) {
+@media (max-width: 640px) {
+  .swal2-popup.ios-alert.expiry-resolution-alert .swal2-actions,
+  .swal2-popup.ios-alert.dispatch-xlsx-disable-alert .swal2-actions,
   .swal2-popup.ios-alert.planilla-facturas-alert .swal2-actions {
     grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 640px) {
-  .swal2-popup.ios-alert.expiry-resolution-alert .swal2-actions {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .swal2-popup.ios-alert.expiry-resolution-alert .swal2-actions .ios-btn,
-  .swal2-popup.ios-alert.expiry-resolution-alert .swal2-confirm {
-    min-width: 0;
-    max-width: none;
-    width: 100%;
   }
 }
 
@@ -318,27 +97,23 @@
 }
 
 .meta-spinner-login {
-  width: 80px;
-  height: 80px;
+  width: 72px;
+  height: 72px;
   animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
+/* Preferencias de aviso por email (informes) */
 .report-notify-wrap {
-  border: 1px solid #d7e1f7;
-  border-radius: 16px;
-  padding: 14px;
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius-lg);
+  padding: 12px;
   margin-bottom: 12px;
-  background: #f7faff;
+  background: var(--lj-surface-2);
   display: grid;
   gap: 10px;
 }
@@ -353,7 +128,7 @@
 
 .report-notify-title {
   margin: 0;
-  color: #2f4d8a;
+  color: var(--lj-brand);
   font-weight: 700;
 }
 
@@ -367,18 +142,12 @@
   align-items: center;
   gap: 10px;
   font-weight: 600;
-  color: #36507f;
-}
-
-.report-notify-check input {
-  width: 18px;
-  height: 18px;
-  accent-color: #1976d2;
+  color: var(--lj-text);
 }
 
 .notify-specific-users-list {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   max-height: 190px;
   overflow: auto;
   padding-right: 4px;
@@ -390,9 +159,9 @@
   justify-content: space-between;
   gap: 12px;
   padding: 6px 10px;
-  border-radius: 12px;
-  border: 1px solid #d8e2f7;
-  background: #ffffff;
+  border-radius: var(--lj-radius);
+  border: 1px solid var(--lj-border);
+  background: var(--lj-surface);
 }
 
 .notify-user-main {
@@ -406,29 +175,27 @@
   line-height: 1.2;
 }
 
-.notify-user-text strong {
-  color: #2f4572;
-}
+.notify-user-text strong { color: var(--lj-text); }
+.notify-user-text small { color: var(--lj-muted); }
 
-.notify-user-text small {
-  color: #6e7fa5;
-}
-
+/* Avisos flotantes propios */
 .ios-notify-stack {
   position: fixed;
   right: 14px;
   bottom: 14px;
   z-index: 2500;
   display: grid;
-  gap: 10px;
+  gap: 8px;
   width: min(360px, calc(100vw - 28px));
 }
 
 .ios-notify-card {
-  background: #ffffff;
-  border: 1px solid #dce5f8;
-  border-radius: 16px;
-  padding: 12px;
+  background: var(--lj-surface);
+  border: 1px solid var(--lj-border);
+  border-left: 3px solid var(--lj-accent);
+  border-radius: var(--lj-radius-lg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 10px 12px;
   display: grid;
   grid-template-columns: auto 1fr auto;
   gap: 10px;
@@ -437,15 +204,11 @@
   transition: transform 0.24s ease, opacity 0.24s ease;
 }
 
-.ios-notify-card.is-visible {
-  transform: translateY(0);
-  opacity: 1;
-}
-
-.ios-notify-card.is-leaving {
-  transform: translateX(14px);
-  opacity: 0;
-}
+.ios-notify-card.is-visible { transform: translateY(0); opacity: 1; }
+.ios-notify-card.is-leaving { transform: translateX(14px); opacity: 0; }
+.ios-notify-card.type-success { border-left-color: var(--lj-success); }
+.ios-notify-card.type-error { border-left-color: var(--lj-danger); }
+.ios-notify-card.type-warning { border-left-color: var(--lj-warning); }
 
 .ios-notify-icon-wrap {
   width: 28px;
@@ -453,41 +216,30 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: #edf3ff;
-  color: #2e63be;
+  background: var(--lj-accent-soft);
+  color: var(--lj-accent);
 }
 
-.ios-notify-card.type-success .ios-notify-icon-wrap {
-  background: #e9f8ef;
-  color: #1f9d50;
-}
-
-.ios-notify-card.type-error .ios-notify-icon-wrap {
-  background: #ffeef0;
-  color: #cc3f52;
-}
-
-.ios-notify-card.type-warning .ios-notify-icon-wrap {
-  background: #fff4e7;
-  color: #bd6b1c;
-}
+.ios-notify-card.type-success .ios-notify-icon-wrap { background: var(--lj-success-soft); color: var(--lj-success); }
+.ios-notify-card.type-error .ios-notify-icon-wrap { background: var(--lj-danger-soft); color: var(--lj-danger); }
+.ios-notify-card.type-warning .ios-notify-icon-wrap { background: var(--lj-warning-soft); color: var(--lj-warning); }
 
 .ios-notify-content strong {
   display: block;
-  color: #2a3e67;
+  color: var(--lj-text);
   margin-bottom: 2px;
 }
 
 .ios-notify-content p {
   margin: 0;
-  color: #5f729b;
-  font-size: 0.9rem;
+  color: var(--lj-muted);
+  font-size: 13px;
 }
 
 .ios-notify-close {
   border: none;
   background: transparent;
-  color: #7990bb;
+  color: var(--lj-muted);
   padding: 0;
 }
 
@@ -495,21 +247,6 @@
    RESPONSIVE
 ========================================= */
 @media (max-width: 991.98px) {
-  .topbar-links {
-    margin-top: 12px;
-    margin-bottom: 8px;
-  }
-
-  .topbar-user {
-    display: flex;
-    align-items: end;
-    justify-content: end;
-  }
-
-  .topbar-user-menu {
-    margin-top: 8px;
-  }
-
   .footer-main {
     flex-direction: column;
     align-items: stretch;
@@ -521,39 +258,29 @@
     justify-content: stretch;
   }
 
-  .footer-actions .ios-btn,
+  .footer-actions sl-button,
   .footer-actions .footer-action-link {
     flex: 1 1 0;
     justify-content: center;
-    max-width: none;
   }
-}
 
-@media (max-width: 991.98px) {
   .contenido {
-    width: calc(100%);
-    padding-top: 16px;
+    width: 100%;
+    padding-top: 12px;
   }
 
   .header-content,
   .home-content {
-    padding: 10px 15px;
+    padding: 10px 12px;
     border-radius: 0;
+    border-left: 0;
+    border-right: 0;
   }
 
   .home-actions-scroll {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
-  }
-
-  .home-actions-scroll::-webkit-scrollbar {
-    height: 5px;
-  }
-
-  .home-actions-scroll::-webkit-scrollbar-thumb {
-    background: #cfd8f4;
-    border-radius: 999px;
   }
 
   .ingredientes-toolbar {
@@ -577,22 +304,17 @@
     grid-template-columns: 1fr;
   }
 
-  .family-inline-create .ios-btn-secondary {
-    max-width: none;
-  }
-
   .custom-measure-wrap {
     grid-template-columns: 1fr;
   }
 
   .app-footer {
     width: 100%;
-    padding: 18px 12px 14px;
+    padding: 16px 12px 14px;
   }
 
   .app-footer-white {
-    padding: 18px 16px 14px;
-    border-radius: 18px;
+    padding: 16px;
   }
 }
 
@@ -604,9 +326,4 @@
   .brand-image {
     width: 78px;
   }
-
-  .swal2-actions {
-    flex-wrap: nowrap;
-  }
 }
-
