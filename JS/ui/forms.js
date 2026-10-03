@@ -51,14 +51,42 @@
       el.value = '';
       el.dispatchEvent(new Event('input', { bubbles: true }));
     }
+    // Autocompletado posterior (p.ej. al abrir un formulario con campo de clave): un email que
+    // aparece sin que se haya tecleado ni pegado nada se descarta.
+    const guard = () => {
+      if (el.dataset.ljTyped || !/@/.test(String(el.value || ''))) return;
+      el.value = '';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    el.addEventListener('sl-input', guard);
+    el.addEventListener('input', guard);
+    el.addEventListener('change', guard);
   };
-  const scan = (root) => { if (root.querySelectorAll) root.querySelectorAll(SEARCH_SEL).forEach(noAutofill); };
-  document.addEventListener('keydown', (e) => { const t = e.target.closest?.(SEARCH_SEL); if (t) t.dataset.ljTyped = '1'; }, true);
+  // Campos de clave fuera del login (PIN de usuarios, claves de API): que el navegador no los tome
+  // por un login ni ofrezca la contraseña guardada.
+  const PASS_SEL = 'sl-input[type="password"], input[type="password"]';
+  const noPasswordFill = (el) => {
+    if (document.documentElement.classList.contains('login-protected') || el.dataset.ljNoPassFill) return;
+    el.dataset.ljNoPassFill = '1';
+    el.setAttribute('autocomplete', 'new-password');
+    el.setAttribute('data-lpignore', 'true');
+    el.setAttribute('data-1p-ignore', '');
+    if (!el.getAttribute('name')) el.setAttribute('name', `lj-secret-${Math.random().toString(36).slice(2, 8)}`);
+  };
+  const scan = (root) => {
+    if (!root.querySelectorAll) return;
+    root.querySelectorAll(SEARCH_SEL).forEach(noAutofill);
+    root.querySelectorAll(PASS_SEL).forEach(noPasswordFill);
+  };
+  const markTyped = (e) => { const t = e.target.closest?.(SEARCH_SEL); if (t) t.dataset.ljTyped = '1'; };
+  document.addEventListener('keydown', markTyped, true);
+  document.addEventListener('paste', markTyped, true);
   const start = () => {
     scan(document);
     new MutationObserver((muts) => muts.forEach((m) => m.addedNodes.forEach((n) => {
       if (n.nodeType !== 1) return;
       if (n.matches?.(SEARCH_SEL)) noAutofill(n);
+      if (n.matches?.(PASS_SEL)) noPasswordFill(n);
       scan(n);
     }))).observe(document.body, { childList: true, subtree: true });
     // Autocompletado tardío del navegador (llega después de la carga).
