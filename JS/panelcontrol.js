@@ -869,7 +869,7 @@ const printReport = async (report) => {
       splitNumber: narrow ? 3 : 5,
       axisLine: { show: false },
       axisTick: { show: false },
-      splitLine: { lineStyle: { color: theme.border, width: 1, type: 'solid' } },
+      splitLine: { lineStyle: { color: theme.border, width: 1, type: 'dotted' } },
       axisLabel: { color: theme.muted, fontSize: 11, formatter: formatAxis }
     };
     const grid = { left: isHorizontal ? 8 : (narrow ? 28 : 16), right: isHorizontal ? 48 : 16, top: 16, bottom: 8, containLabel: true };
@@ -920,7 +920,7 @@ const printReport = async (report) => {
         data: values.map((value, index) => ({ value, itemStyle: { color: theme.categorical[index % theme.categorical.length] } })),
         barMaxWidth: 24,
         barCategoryGap: '30%',
-        itemStyle: { borderRadius: isHorizontal ? [0, 4, 4, 0] : [4, 4, 0, 0] },
+        itemStyle: { borderRadius: 0 },
         emphasis: { itemStyle: { opacity: 0.85 } },
         label: isHorizontal
           ? { show: true, position: 'right', distance: 6, color: theme.muted, fontSize: 11, formatter: (p) => formatAxis(p.value) }
