@@ -22,7 +22,14 @@ body {
   margin: 0;
   min-height: 100vh;
   color: var(--lj-text);
-  background: var(--lj-bg);
+  /* Fondo: tinte suave arriba + grilla de puntos muy sutil (plano, sin manchas de color). */
+  background-color: var(--lj-bg);
+  background-image:
+    linear-gradient(180deg, var(--lj-bg-tint) 0, var(--lj-bg) 420px),
+    radial-gradient(var(--lj-bg-dot) 1px, transparent 1.2px);
+  background-size: 100% 100%, 18px 18px;
+  background-repeat: no-repeat, repeat;
+  background-attachment: fixed, fixed;
 }
 
 html.index-protected body,
@@ -364,171 +371,171 @@ a { color: var(--lj-accent); }
 /* =========================================
    FOOTER
 ========================================= */
-.app-footer {
+.lj-footer {
+  margin-top: 32px;
+  background: var(--lj-surface);
+  border-top: 1px solid var(--lj-border);
+  color: var(--lj-text);
+}
+
+.lj-footer-inner {
   width: min(1200px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 24px 0 20px;
-  display: block;
+  padding: 28px 0 24px;
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 32px;
 }
 
-.app-footer-white {
-  position: relative;
-  width: 100%;
-  background: var(--lj-surface);
-  border: 1px solid var(--lj-border);
-  border-radius: var(--lj-radius-lg);
-  padding: 20px 24px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.lj-footer-col {
+  display: grid;
+  align-content: start;
+  gap: 10px;
 }
 
-.footer-main {
-  width: 100%;
-  max-width: 980px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-
-.footer-brand-block {
+.lj-footer-brand-row {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
-.footer-brand-logo {
-  width: 48px;
-  height: 48px;
+.lj-footer-logo {
+  width: 44px;
+  height: 44px;
   object-fit: contain;
 }
 
-.footer-brand-info {
-  display: grid;
-  gap: 4px;
-}
-
-.footer-brand-title {
+.lj-footer-title {
   margin: 0;
-  font-size: 1.05rem;
-  font-weight: 700;
+  font-family: 'Viga', sans-serif;
+  font-size: 1.2rem;
+  line-height: 1.1;
   color: var(--lj-brand);
 }
 
-.footer-brand-text {
-  margin: 0;
+.lj-footer-subtitle {
+  margin: 2px 0 0;
+  font-size: 12px;
   color: var(--lj-muted);
-  font-size: 0.84rem;
-  font-weight: 500;
 }
 
-.footer-session-badge {
+.lj-footer-text {
+  margin: 0;
+  max-width: 34ch;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--lj-muted);
+}
+
+.lj-footer-heading {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lj-muted);
+}
+
+.lj-footer-links {
+  list-style: none;
+  display: grid;
+  gap: 2px;
+}
+
+.lj-footer-links a {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-  padding: 3px 8px;
-  border-radius: var(--lj-radius);
+  gap: 8px;
+  height: 30px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--lj-text);
+  text-decoration: none;
+}
+
+.lj-footer-links a i {
+  width: 16px;
+  text-align: center;
+  color: var(--lj-muted);
+}
+
+.lj-footer-links a:hover,
+.lj-footer-links a:hover i {
+  color: var(--lj-accent);
+}
+
+.lj-footer-session {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  height: 30px;
+  padding: 0 10px;
+  font-size: 13px;
+  color: var(--lj-muted);
   background: var(--lj-surface-2);
   border: 1px solid var(--lj-border);
-  color: var(--lj-muted);
-  font-size: 0.74rem;
-  font-weight: 500;
-  width: fit-content;
+  border-radius: var(--lj-radius);
 }
 
-.footer-session-badge i {
-  color: var(--lj-accent);
-  font-size: 0.86rem;
-}
+.lj-footer-session sl-icon { color: var(--lj-accent); }
 
-.footer-session-badge strong {
+.lj-footer-session strong {
   color: var(--lj-text);
-  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
-.footer-actions {
+.lj-footer-actions {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
   gap: 8px;
 }
 
-.footer-action-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 36px;
-  padding: 0 12px;
-  border-radius: var(--lj-radius);
-  border: 1px solid var(--lj-border-strong);
-  background: var(--lj-surface);
-  color: var(--lj-text);
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-}
+.lj-footer-support i { color: #25d366; font-size: 15px; }
 
-.footer-action-link:hover {
-  background: var(--lj-accent-soft);
-}
-
-.footer-action-link .support-icon {
-  width: 20px;
-  height: 20px;
-}
-
-.footer-divider {
-  width: 100%;
-  height: 1px;
-  background: var(--lj-border);
-}
-
-.footer-bottom {
-  display: grid;
-  gap: 6px;
-  text-align: center;
-  width: 100%;
-  max-width: 980px;
-  margin: 0 auto;
-}
-
-.footer-legal,
-.footer-copy {
-  margin: 0;
-  color: var(--lj-muted);
-  font-size: 0.78rem;
-  line-height: 1.55;
-}
-
-.footer-legal a,
-.footer-copy a {
-  color: var(--lj-accent);
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.footer-legal a:hover,
-.footer-copy a:hover {
-  text-decoration: underline;
-}
-
-.footer-mail {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 6px;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--lj-radius);
+.lj-footer-bottom {
+  border-top: 1px solid var(--lj-border);
   background: var(--lj-surface-2);
-  color: var(--lj-accent);
-  font-size: 0.8rem;
-  border: 1px solid var(--lj-border);
 }
 
+.lj-footer-bottom p {
+  width: min(1200px, calc(100% - 32px));
+  margin: 0 auto;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--lj-muted);
+}
+
+.lj-footer-copy {
+  padding-top: 12px;
+}
+
+.lj-footer-legal {
+  padding: 2px 0 14px;
+  font-size: 11px !important;
+}
+
+.lj-footer-bottom a {
+  color: var(--lj-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.lj-footer-bottom a:hover { text-decoration: underline; }
+
+.lj-footer-mail {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 4px;
+  font-size: 14px;
+}
+
+@media (max-width: 767.98px) {
+  .lj-footer-inner {
+    grid-template-columns: 1fr;
+    gap: 22px;
+    padding: 22px 0 18px;
+  }
+
+  .lj-footer-actions sl-button { flex: 1 1 0; }
+}

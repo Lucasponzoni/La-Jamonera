@@ -197,7 +197,7 @@
   const familyAvatar = (url, alt, itemCount = 0) => {
     const countBadge = Number(itemCount) > 0 ? `<span class="family-circle-count">${Math.min(99, Number(itemCount))}</span>` : '';
     return url
-      ? `<span class="family-circle-thumb"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-family-thumb" src="${url}" alt="${alt}" loading="lazy">${countBadge}</span>`
+      ? `<span class="family-circle-thumb"><span class="thumb-loading"><sl-spinner class="meta-spinner" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-family-thumb" src="${url}" alt="${alt}" loading="lazy">${countBadge}</span>`
       : `<span class="family-circle-thumb family-circle-thumb-placeholder">${PLACEHOLDER_ICON}${countBadge}</span>`;
   };
 
@@ -264,7 +264,7 @@
   };
 
   const ingredientAvatar = (url, alt) => url
-    ? `<div class="ingrediente-avatar"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingrediente-thumb" src="${url}" alt="${alt}" loading="lazy"></div>`
+    ? `<div class="ingrediente-avatar"><span class="thumb-loading"><sl-spinner class="meta-spinner" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-ingrediente-thumb" src="${url}" alt="${alt}" loading="lazy"></div>`
     : `<div class="ingrediente-avatar ingrediente-avatar-placeholder">${PLACEHOLDER_ICON}</div>`;
 
   const prepareThumbLoaders = (selector) => {
@@ -421,8 +421,8 @@
         </sl-radio-group>
       </div>
       <div id="ingredientPrintProductsScope" class="notify-specific-users-list d-none">
-        <div class="step-block"><strong>Familias</strong>${getFamiliasArray().map((family) => `<sl-checkbox class="ingredientes-print-check" data-ingredient-print-family value="${family.id}"><span class="ingredientes-print-check-label">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${escapeHtml(family.imageUrl)}" alt="${escapeHtml(capitalizeLabel(family.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<span>${escapeHtml(capitalizeLabel(family.name))}</span></span></sl-checkbox>`).join('')}</div>
-        <div class="step-block"><strong>Productos</strong>${getIngredientesArray().map((item) => `<sl-checkbox class="ingredientes-print-check" data-ingredient-print-product data-family-id="${item.familyId || ''}" value="${item.id}"><span class="ingredientes-print-check-label">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(capitalizeLabel(item.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<span>${escapeHtml(capitalizeLabel(item.name))}</span></span></sl-checkbox>`).join('')}</div>
+        <div class="step-block"><strong>Familias</strong>${getFamiliasArray().map((family) => `<sl-checkbox class="ingredientes-print-check" data-ingredient-print-family value="${family.id}"><span class="ingredientes-print-check-label">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${escapeHtml(family.imageUrl)}" alt="${escapeHtml(capitalizeLabel(family.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<span>${escapeHtml(capitalizeLabel(family.name))}</span></span></sl-checkbox>`).join('')}</div>
+        <div class="step-block"><strong>Productos</strong>${getIngredientesArray().map((item) => `<sl-checkbox class="ingredientes-print-check" data-ingredient-print-product data-family-id="${item.familyId || ''}" value="${item.id}"><span class="ingredientes-print-check-label">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(capitalizeLabel(item.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<span>${escapeHtml(capitalizeLabel(item.name))}</span></span></sl-checkbox>`).join('')}</div>
       </div>
     </div>`,
     showCancelButton: true,
@@ -464,7 +464,7 @@
 
   const showPreparingPrintAlert = () => Swal.fire({
     title: 'Preparando selector...',
-    html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Preparando selector" class="meta-spinner-login"></div>',
+    html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Preparando selector"></sl-spinner></div>',
     allowOutsideClick: false,
     allowEscapeKey: false,
     showConfirmButton: false,
@@ -747,7 +747,7 @@
           if (optional) return '';
           throw new Error(`Archivo no admitido: ${message}`);
         }
-        preview.innerHTML = `<span class="image-preview-overlay"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Subiendo"></span>`;
+        preview.innerHTML = `<span class="image-preview-overlay"><sl-spinner class="meta-spinner-login" aria-label="Subiendo"></sl-spinner></span>`;
         return uploadImageToStorage(file, uploadFolder);
       }
       if (method === 'ai') {
@@ -770,7 +770,7 @@
   const showSavingOverlay = () => {
     Swal.fire({
       title: 'Guardando...',
-      html: '<img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner-login">',
+      html: '<sl-spinner class="meta-spinner-login" aria-label="Guardando"></sl-spinner>',
       allowOutsideClick: false,
       allowEscapeKey: false,
       showConfirmButton: false,

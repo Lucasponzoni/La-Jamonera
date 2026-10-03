@@ -44,7 +44,7 @@
 
   const userAvatarHtml = (user) => {
     if (normalizeValue(user.photoUrl)) {
-      return `<span class="user-avatar-thumb"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-user-manager-photo" src="${escapeHtml(user.photoUrl)}" alt="${escapeHtml(user.fullName)}"></span>`;
+      return `<span class="user-avatar-thumb"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-user-manager-photo" src="${escapeHtml(user.photoUrl)}" alt="${escapeHtml(user.fullName)}"></span>`;
     }
     return `<span class="user-avatar-thumb user-avatar-initials">${escapeHtml(initialsFromName(user.fullName) || 'U')}</span>`;
   };
@@ -148,7 +148,7 @@
             return;
           }
           pendingFile = file;
-          preview.innerHTML = '<span class="image-preview-overlay"><img src="./IMG/Meta-ai-logo.webp" alt="Subiendo" class="meta-spinner-login"></span>';
+          preview.innerHTML = '<span class="image-preview-overlay"><sl-spinner class="meta-spinner-login" aria-label="Subiendo"></sl-spinner></span>';
           const tempUrl = URL.createObjectURL(file);
           setTimeout(() => {
             preview.innerHTML = `<img src="${tempUrl}" alt="Vista previa">`;

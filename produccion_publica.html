@@ -44,7 +44,7 @@
 </head>
 <body class="public-trace-page">
   <main class="contenido py-3">
-    <div id="publicTraceLoading" class="public-trace-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"></div>
+    <div id="publicTraceLoading" class="public-trace-spinner"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></div>
     <section id="publicTraceData" class="d-none"></section>
   </main>
 
@@ -62,7 +62,7 @@
             <sl-button variant="default" id="viewerNextBtn" type="button"><i class="fa-solid fa-chevron-right"></i></sl-button>
           </div>
           <div id="viewerStage" class="viewer-stage">
-            <span id="viewerStageSpinner" class="thumb-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"></span>
+            <span id="viewerStageSpinner" class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span>
             <iframe id="viewerDocument" src="" title="Documento adjunto" class="viewer-document d-none"></iframe>
             <img id="viewerImage" src="" alt="Imagen adjunta">
           </div>

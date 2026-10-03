@@ -715,7 +715,7 @@
             <div class="produccion-trace-managers">${managersHtml}</div>
             <div class="public-trace-planilla-row"><sl-button variant="primary" id="publicOpenPlanillaBtn" type="button" class="public-open-planilla-btn"><i slot="prefix" class="fa-regular fa-file-lines"></i>Ver planilla</sl-button></div>
           </article>
-          <div class="produccion-trace-mermaid-wrap"><div class="produccion-trace-mermaid" data-public-mermaid><div class="produccion-trace-mermaid-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"><p>Renderizando diagrama...</p></div><button type="button" class="lj-tile produccion-trace-mermaid-overlay" data-public-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button></div></div>
+          <div class="produccion-trace-mermaid-wrap"><div class="produccion-trace-mermaid" data-public-mermaid><div class="produccion-trace-mermaid-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner><p>Renderizando diagrama...</p></div><button type="button" class="lj-tile produccion-trace-mermaid-overlay" data-public-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button></div></div>
           <div class="produccion-trace-ingredients">${ingredientsHtml}</div>
         </div>
       </div>

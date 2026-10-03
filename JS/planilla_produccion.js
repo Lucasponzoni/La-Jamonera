@@ -497,7 +497,7 @@
 
   const openInvoiceProgressSwal = () => openPlanillaSwal({
     title: 'Preparando facturas...',
-    html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Preparando facturas" class="meta-spinner-login"></div><div class="planilla-progress-wrap"><div class="planilla-progress-bar"><span id="planillaFacturasProgressBar" style="width:0%"></span></div><p id="planillaFacturasProgressText" class="planilla-progress-text">0% Descargando adjuntos...</p></div>',
+    html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Preparando facturas"></sl-spinner></div><div class="planilla-progress-wrap"><div class="planilla-progress-bar"><span id="planillaFacturasProgressBar" style="width:0%"></span></div><p id="planillaFacturasProgressText" class="planilla-progress-text">0% Descargando adjuntos...</p></div>',
     allowOutsideClick: false,
     showConfirmButton: false,
     customClass: { popup: 'ios-alert produccion-loading-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' }
@@ -1080,7 +1080,7 @@
 
   const openByRegistro = async (registro, context = {}) => {
     if (!registro || typeof Swal === 'undefined') return;
-    Swal.fire({ title: 'Generando planilla...', html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando planilla" class="meta-spinner-login"></div>', allowOutsideClick: false, showConfirmButton: false, customClass: { popup: 'ios-alert produccion-loading-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' } });
+    Swal.fire({ title: 'Generando planilla...', html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Cargando planilla"></sl-spinner></div>', allowOutsideClick: false, showConfirmButton: false, customClass: { popup: 'ios-alert produccion-loading-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' } });
     const printable = await createPrintableNode(registro, context);
     Swal.close();
     if (!printable) return;

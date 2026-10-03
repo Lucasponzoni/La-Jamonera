@@ -150,7 +150,7 @@
           <section id="panelDashboard" class="panel-grid" aria-live="polite">
             <article id="panelResumen" class="glass-card panel-card panel-card-wide panel-summary-card">
               <header class="panel-card-head"><h3><sl-icon name="speedometer2"></sl-icon> Recordatorios y estado general</h3></header>
-              <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando métricas" class="panel-spinner"></div></div>
+              <div class="panel-card-body"><div class="panel-spinner-wrap"><sl-spinner class="panel-spinner" aria-label="Cargando métricas"></sl-spinner></div></div>
             </article>
 
             <article id="panelProduccion" class="glass-card panel-card panel-card-wide">
@@ -166,7 +166,7 @@
                   <input id="panelChartRange" class="lj-input panel-range-input" placeholder="Filtrar rango de fechas">
                 </div>
               </header>
-              <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando producción" class="panel-spinner"></div></div>
+              <div class="panel-card-body"><div class="panel-spinner-wrap"><sl-spinner class="panel-spinner" aria-label="Cargando producción"></sl-spinner></div></div>
             </article>
 
             <article id="panelUltimoInforme" class="glass-card panel-card">
@@ -175,23 +175,23 @@
                 <span id="panelInformeAgo" class="panel-pill d-none"></span>
               </header>
               <div class="panel-card-body">
-                <div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando informe" class="panel-spinner"></div>
+                <div class="panel-spinner-wrap"><sl-spinner class="panel-spinner" aria-label="Cargando informe"></sl-spinner></div>
               </div>
             </article>
 
             <article id="panelRne" class="glass-card panel-card">
               <header class="panel-card-head"><h3><sl-icon name="shield-check"></sl-icon> Proveedores con RNE pendiente</h3></header>
-              <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando proveedores" class="panel-spinner"></div></div>
+              <div class="panel-card-body"><div class="panel-spinner-wrap"><sl-spinner class="panel-spinner" aria-label="Cargando proveedores"></sl-spinner></div></div>
             </article>
 
             <article id="panelRnpa" class="glass-card panel-card">
               <header class="panel-card-head"><h3><sl-icon name="clipboard2-check"></sl-icon> RNPA de recetas</h3></header>
-              <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando RNPA" class="panel-spinner"></div></div>
+              <div class="panel-card-body"><div class="panel-spinner-wrap"><sl-spinner class="panel-spinner" aria-label="Cargando RNPA"></sl-spinner></div></div>
             </article>
 
             <article id="panelTransporte" class="glass-card panel-card">
               <header class="panel-card-head"><h3><sl-icon name="truck-front"></sl-icon> Transporte habilitado (UTA/URA)</h3></header>
-              <div class="panel-card-body"><div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando transporte" class="panel-spinner"></div></div>
+              <div class="panel-card-body"><div class="panel-spinner-wrap"><sl-spinner class="panel-spinner" aria-label="Cargando transporte"></sl-spinner></div></div>
             </article>
 
             
@@ -493,50 +493,57 @@
         </div>
       </sl-dialog>
 
-      <footer class="app-footer app-footer-white">
-        <div class="footer-main">
-          <div class="footer-brand-block">
-            <img src="./IMG/La Jamonera Cerdito.webp" alt="Logo La Jamonera" class="footer-brand-logo">
-            <div class="footer-brand-info">
-              <h3 class="footer-brand-title">La Jamonera</h3>
-              <p class="footer-brand-text">Back Office · Panel de gestión</p>
-              <div class="footer-session-badge" aria-live="polite">
-                <sl-icon name="clock-history" aria-hidden="true"></sl-icon>
-                <span>Sesión:</span>
-                <strong id="sessionCountdown">--h --m</strong>
+      <footer class="lj-footer app-footer">
+        <div class="lj-footer-inner">
+          <section class="lj-footer-col lj-footer-brand" aria-label="La Jamonera">
+            <div class="lj-footer-brand-row">
+              <img src="./IMG/La Jamonera Cerdito.webp" alt="Logo La Jamonera" class="lj-footer-logo">
+              <div>
+                <p class="lj-footer-title">La Jamonera</p>
+                <p class="lj-footer-subtitle">Back Office · Panel de gestión</p>
               </div>
             </div>
-          </div>
+            <p class="lj-footer-text">Producción, inventario, recetas y trazabilidad de la planta en un solo lugar.</p>
+          </section>
 
-          <div class="footer-actions">
-            <a class="footer-action-link footer-support" href="https://wa.me/543416292861?text=Nos%20contactamos%20de%20Frigorifico%20la%20Jamonera%20desde%20el%20back%20office." target="_blank" rel="noopener noreferrer">
-              <img src="./IMG/WhatsApp Logo.webp" alt="" class="support-icon" aria-hidden="true">
-              <span>Contactar soporte</span>
-            </a>
+          <nav class="lj-footer-col" aria-label="Secciones">
+            <p class="lj-footer-heading">Secciones</p>
+            <ul class="lj-footer-links">
+              <li><a href="./index.html"><i class="fa-solid fa-industry" aria-hidden="true"></i>Mi Fabrica</a></li>
+              <li><a href="./informes.html"><i class="fa-solid fa-file-medical" aria-hidden="true"></i>Informes bromatológicos</a></li>
+              <li><a href="./analisis.html"><i class="fa-solid fa-flask" aria-hidden="true"></i>Análisis químicos</a></li>
+            </ul>
+          </nav>
 
-            <sl-button variant="default" id="footerLogoutBtn" class="js-logout footer-logout-btn" type="button">
-              <sl-icon name="box-arrow-right" slot="prefix" aria-hidden="true"></sl-icon>
-              <span>Cerrar sesión</span>
-            </sl-button>
-          </div>
+          <section class="lj-footer-col" aria-label="Sesión y soporte">
+            <p class="lj-footer-heading">Tu sesión</p>
+            <div class="lj-footer-session" aria-live="polite">
+              <sl-icon name="clock-history" aria-hidden="true"></sl-icon>
+              <span>Vence en</span>
+              <strong id="sessionCountdown">--h --m</strong>
+            </div>
+            <div class="lj-footer-actions">
+              <sl-button variant="default" size="small" href="https://wa.me/543416292861?text=Nos%20contactamos%20de%20Frigorifico%20la%20Jamonera%20desde%20el%20back%20office." target="_blank" class="lj-footer-support">
+                <i slot="prefix" class="fa-brands fa-whatsapp" aria-hidden="true"></i>Soporte
+              </sl-button>
+              <sl-button variant="default" size="small" id="footerLogoutBtn" class="js-logout footer-logout-btn" type="button">
+                <sl-icon name="box-arrow-right" slot="prefix" aria-hidden="true"></sl-icon>Cerrar sesión
+              </sl-button>
+            </div>
+          </section>
         </div>
 
-        <div class="footer-divider" aria-hidden="true"></div>
-
-        <div class="footer-bottom">
-          <p class="footer-legal">
+        <div class="lj-footer-bottom">
+          <p class="lj-footer-copy">
+            © <span id="currentYear"></span> La Jamonera · Back Office para empresas · powered by
+            <a href="https://asesoriabromatologicaros.com.ar/index.html" target="_blank" rel="noopener noreferrer">ABR</a>
+            · Ponzoni Lucas
+            <a class="lj-footer-mail" href="mailto:pablomanuelscalise@gmail.com" target="_blank" rel="noopener noreferrer" aria-label="Enviar email"><sl-icon name="envelope"></sl-icon></a>
+          </p>
+          <p class="lj-footer-legal">
             El uso de este sitio implica la aceptación de los términos, condiciones y políticas de privacidad de
             <a href="https://asesoriabromatologicaros.com.ar/index.html" target="_blank" rel="noopener noreferrer">Asesoría Bromatológica Rosario</a>.
             Las imágenes son a modo ilustrativo.
-          </p>
-
-          <p class="footer-copy">
-            © <span id="currentYear"></span> · Back Office para empresas · powered by
-            <a href="https://asesoriabromatologicaros.com.ar/index.html" target="_blank" rel="noopener noreferrer">ABR</a>
-            · Author: Ponzoni Lucas
-            <a class="footer-mail" href="mailto:pablomanuelscalise@gmail.com" target="_blank" rel="noopener noreferrer" aria-label="Enviar email">
-              <sl-icon name="envelope" aria-hidden="true"></sl-icon>
-            </a>
           </p>
         </div>
       </footer>

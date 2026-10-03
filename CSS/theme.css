@@ -4,12 +4,14 @@
   --lj-success: #1f7a4c; --lj-success-soft: #e3f5ec; --lj-warning: #9a6200; --lj-warning-soft: #fff3dd;
   --lj-danger: #b42338; --lj-danger-soft: #ffecef; --lj-overlay: rgba(23, 34, 58, .35); --lj-shadow: 0 1px 2px rgba(23, 34, 58, .06);
   --lj-radius: 5px; --lj-radius-lg: 6px;
+  --lj-bg-tint: #e9effb; --lj-bg-dot: rgba(23, 61, 115, .07);
 }
 .sl-theme-dark {
   --lj-bg: #0f1522; --lj-surface: #161e2e; --lj-surface-2: #1c2638; --lj-border: #26324a; --lj-border-strong: #334262;
   --lj-text: #e3e9f5; --lj-muted: #93a0bb; --lj-brand: #cddcff; --lj-accent: #6ea0ff; --lj-accent-soft: #16233d;
   --lj-success: #5fd39a; --lj-success-soft: #12301f; --lj-warning: #f2b75a; --lj-warning-soft: #33260f;
   --lj-danger: #ff8a9a; --lj-danger-soft: #3a1820; --lj-overlay: rgba(0, 0, 0, .55); --lj-shadow: none;
+  --lj-bg-tint: #131c2d; --lj-bg-dot: rgba(205, 220, 255, .05);
 }
 :root {
   --sl-font-sans: Inter, "Segoe UI", Arial, sans-serif;
@@ -112,3 +114,25 @@ sl-button[variant="text"]::part(base) { color: var(--lj-accent); }
 
 /* Opciones de selects: mismo tamaño que los controles */
 sl-option::part(base) { font-size: 13px; padding-top: 6px; padding-bottom: 6px; }
+
+/* Spinner (sl-spinner reemplaza al viejo spinner de imagen). El tamaño sale de font-size;
+   se ignoran los width/height y la animación "spin" que las reglas viejas daban a la imagen. */
+sl-spinner { --indicator-color: var(--lj-accent); --track-color: var(--lj-border); --track-width: 3px; width: 1em !important; height: 1em !important; animation: none !important; flex-shrink: 0; }
+sl-spinner.meta-spinner-login { font-size: 56px; }
+sl-spinner.meta-spinner { font-size: 20px; }
+.thumb-loading sl-spinner, .attachment-loader sl-spinner { font-size: 22px; --track-width: 2px; }
+.modal-local-overlay sl-spinner { font-size: 48px; }
+sl-button sl-spinner, .report-notify-save-btn sl-spinner, .ai-format-btn sl-spinner { font-size: 18px; --track-width: 2px; }
+.lj-alert sl-spinner.meta-spinner-login, .informes-saving-spinner sl-spinner { font-size: 48px; }
+.informes-saving-spinner { display: flex; justify-content: center; padding: 8px 0; }
+
+/* El reset global "* { margin: 0 }" pisa el margen que Shoelace da a prefijos/sufijos vía ::slotted. */
+sl-input > [slot="prefix"], sl-select > [slot="prefix"] { margin-inline-start: var(--sl-input-spacing-medium); color: var(--lj-muted); }
+sl-input > [slot="suffix"], sl-select > [slot="suffix"] { margin-inline-end: var(--sl-input-spacing-medium); color: var(--lj-muted); }
+sl-input[size="small"] > [slot="prefix"], sl-select[size="small"] > [slot="prefix"] { margin-inline-start: var(--sl-input-spacing-small); }
+sl-input[size="small"] > [slot="suffix"], sl-select[size="small"] > [slot="suffix"] { margin-inline-end: var(--sl-input-spacing-small); }
+
+/* Badges y tags: esquinas apenas redondeadas (sin forma de píldora). */
+sl-badge::part(base), sl-tag::part(base) { border-radius: 4px; }
+sl-badge[pill]::part(base), sl-tag[pill]::part(base) { border-radius: 4px; }
+.badge, .rounded-pill { border-radius: 4px !important; }
