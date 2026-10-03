@@ -62,187 +62,6 @@
   <link rel="stylesheet" href="./CSS/legacy/20-usuarios.css?v=202608282255">
   <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202608282255">
   <link rel="stylesheet" href="./CSS/legacy/22-planilla-protocolo.css?v=202608282255">
-  <style>
-    /* ---- ANÁLISIS QUÍMICOS - estilos propios ---- */
-    .analisis-type-chips {
-      display: flex;
-      flex-wrap: nowrap;
-      gap: 8px;
-      margin: 12px 0 4px;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: none;
-      padding-bottom: 4px;
-    }
-    .analisis-type-chips::-webkit-scrollbar { display: none; }
-    .analisis-type-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 6px 14px;
-      border-radius: 999px;
-      border: 1.5px solid #d3dbf0;
-      background: #fff;
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: #3d4f7c;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      white-space: nowrap;
-    }
-    .analisis-type-chip:hover { background: #eef2ff; border-color: #4b78e8; }
-    .analisis-type-chip.active {
-      background: linear-gradient(135deg, #4b78e8, #6c3fc5);
-      border-color: transparent;
-      color: #fff;
-    }
-    .analisis-type-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      font-weight: 700;
-      background: #eef2ff;
-      color: #2a4ea3;
-      border: 1px solid #c7d4f5;
-    }
-    .analisis-card-type {
-      margin-bottom: 8px;
-    }
-    .analisis-type-select-wrap {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin: 8px 0;
-    }
-    .analisis-type-option {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 14px;
-      border-radius: 14px;
-      border: 2px solid #e2e8f4;
-      background: #f8faff;
-      cursor: pointer;
-      font-size: 0.88rem;
-      font-weight: 600;
-      color: #3d4f7c;
-      transition: all 0.2s ease;
-    }
-    .analisis-type-option:hover { border-color: #4b78e8; background: #eef2ff; }
-    .analisis-type-option.selected { border-color: #4b78e8; background: #eef2ff; color: #1d3a8a; }
-    .analisis-type-option .type-icon { font-size: 1.1rem; color: #4b78e8; }
-    .analisis-observations-wrap { margin-top: 14px; }
-    .analisis-observations-wrap label { font-size: 0.85rem; font-weight: 600; color: #3d4f7c; margin-bottom: 6px; display: block; }
-    .analisis-observations-input {
-      width: 100%;
-      min-height: 80px;
-      border: 1.5px solid #d3dbf0;
-      border-radius: 14px;
-      padding: 10px 14px;
-      font-size: 0.9rem;
-      color: #1f2a44;
-      background: #f8faff;
-      resize: vertical;
-      transition: border-color 0.2s;
-    }
-    .analisis-observations-input:focus { border-color: #4b78e8; outline: none; background: #fff; }
-    .analisis-sample-wrap { margin-top: 10px; display: flex; gap: 12px; flex-wrap: wrap; }
-    .analisis-sample-wrap > div { flex: 1; min-width: 160px; }
-    .analisis-sample-wrap label { font-size: 0.82rem; font-weight: 600; color: #3d4f7c; margin-bottom: 4px; display: block; }
-    .ai-format-btn-wrap {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin: 10px 0;
-      padding: 10px 14px;
-      background: linear-gradient(135deg, #f0f4ff, #f5f0ff);
-    }
-    .ai-format-btn-wrap .ai-hint { font-size: 0.78rem; color: #5a6a9a; flex: 1; }
-    .ia-icon-btn { width: 22px; height: 22px; object-fit: contain; }
-    .ios-btn-purple {
-      background: linear-gradient(135deg, #7c3aed, #5b21b6);
-      color: #fff;
-      border: none;
-    }
-    .ios-btn-purple:hover { background: linear-gradient(135deg, #6d28d9, #4c1d95); color: #fff; }
-    .ios-btn-purple:disabled { opacity: 0.6; }
-    /* card overrides */
-    .analisis-card { position: relative; }
-    .analisis-meta-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
-    .sample-chip {
-      display: inline-flex; align-items: center; gap: 4px;
-      padding: 3px 10px; border-radius: 999px;
-      font-size: 0.72rem; font-weight: 600;
-      background: #f0f4ff; color: #2a4ea3; border: 1px solid #c7d4f5;
-    }
-    /* filter panel */
-    .analisis-filter-panel {
-      background: rgba(255,255,255,0.85);
-      backdrop-filter: blur(10px);
-      border: 1px solid #dce4f5;
-      border-radius: 16px;
-      padding: 14px 16px;
-      margin-bottom: 14px;
-    }
-    .analisis-filter-panel h6 { font-size: 0.82rem; font-weight: 700; color: #3d4f7c; margin-bottom: 8px; }
-
-    /* ---- tabla de análisis ---- */
-    .analisis-table-wrap {
-      grid-column: 1 / -1;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      border-radius: 14px;
-      border: 1px solid #dce4f5;
-      background: #fff;
-    }
-    .analisis-table {
-      width: 100%;
-      min-width: 680px;
-      border-collapse: collapse;
-      font-size: 0.85rem;
-    }
-    .analisis-table thead th {
-      background: linear-gradient(135deg, #f0f4ff, #eef2ff);
-      color: #2d4f8a;
-      font-weight: 700;
-      font-size: 0.76rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      padding: 10px 14px;
-      white-space: nowrap;
-      border-bottom: 2px solid #dce4f5;
-      position: sticky;
-      top: 0;
-    }
-    .analisis-table tbody tr {
-      border-bottom: 1px solid #edf1fb;
-      transition: background 0.12s;
-    }
-    .analisis-table tbody tr:last-child { border-bottom: none; }
-    .analisis-table tbody tr:hover { background: #f5f8ff; }
-    .analisis-table td {
-      padding: 9px 14px;
-      vertical-align: middle;
-      color: #2a3555;
-    }
-    .analisis-td-date { white-space: nowrap; }
-    .analisis-td-date span { display: block; font-weight: 600; font-size: 0.82rem; color: #1f2a44; }
-    .analisis-td-date small { color: #7a89b0; font-size: 0.72rem; }
-    .analisis-td-user strong { display: block; font-size: 0.82rem; }
-    .analisis-td-user small { color: #7a89b0; font-size: 0.72rem; }
-    .analisis-td-empty { color: #b0b8d0; font-size: 0.8rem; }
-    .analisis-table-actions { display: flex; gap: 5px; align-items: center; flex-wrap: nowrap; }
-    .analisis-table-actions sl-button { font-size: 0.76rem; }
-    .analisis-lab-chip {
-      display: inline-flex; align-items: center; gap: 4px;
-      padding: 3px 10px; border-radius: 999px;
-      font-size: 0.72rem; font-weight: 600; white-space: nowrap;
-      background: #fff8e1; color: #92610a; border: 1px solid #f0c040;
-    }
-  </style>
 </head>
 <body>
   <main class="app-shell container-fluid px-0">
@@ -311,7 +130,7 @@
 
         <div class="home-content informes-home-content">
           <div id="analisisBoardLoading" class="informes-board-loading" aria-live="polite">
-            <img src="./IMG/Meta-ai-logo.webp" alt="Cargando análisis" class="meta-spinner-login informes-board-spinner">
+            <sl-spinner class="meta-spinner-login informes-board-spinner" aria-label="Cargando análisis"></sl-spinner>
           </div>
           <div id="analisisBoardEmpty" class="informes-board-empty d-none">No hay análisis para cargar</div>
           <div id="analisisCardsGrid" class="informes-cards-grid d-none"></div>
@@ -326,7 +145,7 @@
         </div>
         <div class="lj-dialog-body">
               <div id="analisisLoading" class="informes-loading" aria-live="polite">
-                <img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login">
+                <sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner>
               </div>
 
               <div id="analisisData" class="informes-data d-none" aria-live="polite">
@@ -348,13 +167,13 @@
                   </div>
                   <div>
                     <label class="lj-label" for="analisisUserSelect">Usuario para guardar</label>
-                    <sl-select id="analisisUserSelect"></sl-select>
+                    <sl-select id="analisisUserSelect" placeholder="Seleccioná un usuario" hoist></sl-select>
                   </div>
                 </div>
 
                 <!-- Tipo de análisis -->
-                <div style="margin-top:14px;">
-                  <label class="lj-label" style="font-weight:700;color:#3d4f7c;">Tipo de análisis *</label>
+                <div class="analisis-type-field">
+                  <label class="lj-label">Tipo de análisis *</label>
                   <div class="analisis-type-select-wrap" id="analisisTypeSelector">
                     <div class="analisis-type-option" data-type="agua"><i class="fa-solid fa-droplet type-icon"></i><span>Agua</span></div>
                     <div class="analisis-type-option" data-type="alimentos"><i class="fa-solid fa-utensils type-icon"></i><span>Alimentos</span></div>
@@ -376,21 +195,21 @@
                   </div>
                   <div>
                     <label for="analisisLab">Laboratorio (opcional)</label>
-                    <sl-select id="analisisLab" placeholder="Sin laboratorio"><sl-option value="__nuevo__">+ Agregar nuevo...</sl-option></sl-select>
+                    <sl-select id="analisisLab" placeholder="Sin laboratorio" clearable hoist><sl-option value="__nuevo__">+ Agregar nuevo...</sl-option></sl-select>
                     <sl-input id="analisisLabNew" type="text" class="mt-1 d-none" placeholder="Nombre del laboratorio"></sl-input>
                   </div>
                 </div>
 
                 <!-- Editor con botón IA -->
-                <div class="editor-wrap" style="margin-top:14px;">
+                <div class="editor-wrap">
                   <div class="editor-toolbar-scroll">
                     <div class="editor-toolbar" role="toolbar" aria-label="Herramientas de edición">
                       <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="bold" title="Negrita"><i class="fa-solid fa-bold"></i></sl-button>
                       <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="italic" title="Cursiva"><i class="fa-solid fa-italic"></i></sl-button>
                       <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="underline" title="Subrayado"><i class="fa-solid fa-underline"></i></sl-button>
                       <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="strikeThrough" title="Tachado"><i class="fa-solid fa-strikethrough"></i></sl-button>
-                      <sl-select id="analisisFormatBlockSelect" class="editor-select" aria-label="Tipo de texto"><sl-option value="P">Normal</sl-option><sl-option value="H3">Título</sl-option><sl-option value="H4">Subtítulo</sl-option><sl-option value="BLOCKQUOTE">Cita</sl-option></sl-select>
-                      <sl-select id="analisisFontSizeSelect" class="editor-select"><sl-option value="3">Normal</sl-option><sl-option value="2">Pequeño</sl-option><sl-option value="4">Grande</sl-option><sl-option value="5">Muy grande</sl-option></sl-select>
+                      <sl-select id="analisisFormatBlockSelect" class="editor-select" value="P" hoist aria-label="Tipo de texto"><sl-option value="P">Normal</sl-option><sl-option value="H3">Título</sl-option><sl-option value="H4">Subtítulo</sl-option><sl-option value="BLOCKQUOTE">Cita</sl-option></sl-select>
+                      <sl-select id="analisisFontSizeSelect" class="editor-select" value="3" hoist aria-label="Tamaño de texto"><sl-option value="3">Normal</sl-option><sl-option value="2">Pequeño</sl-option><sl-option value="4">Grande</sl-option><sl-option value="5">Muy grande</sl-option></sl-select>
                       <label class="editor-color-wrap" title="Color de texto">
                         <i class="fa-solid fa-font"></i>
                         <input id="analisisTextColorInput" type="color" class="editor-color-input" value="#000000" aria-label="Color de texto">
@@ -415,9 +234,9 @@
 
                   <!-- Botón IA justo debajo del toolbar -->
                   <div class="ai-format-btn-wrap">
-                    <sl-button variant="default" id="analisisFormatIABtn" type="button">
-                      <img src="./IMG/ia-unscreen.gif" alt="IA" class="ia-icon-btn">
-                      <span>Arreglar con IA</span>
+                    <sl-button variant="default" id="analisisFormatIABtn" class="ai-format-btn" type="button">
+                      <img slot="prefix" src="./IMG/ia-unscreen.gif" alt="IA" class="ia-icon-btn">
+                      Arreglar con IA
                     </sl-button>
                     <span class="ai-hint">DeepSeek estructura el texto con títulos, subtítulos y resalta hallazgos importantes</span>
                   </div>
@@ -485,7 +304,7 @@
                 <sl-button variant="default" id="analisisViewerNextBtn" type="button"><i class="fa-solid fa-chevron-right"></i></sl-button>
               </div>
               <div id="analisisViewerStage" class="viewer-stage">
-                <span id="analisisViewerStageSpinner" class="thumb-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"></span>
+                <span id="analisisViewerStageSpinner" class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span>
                 <img id="analisisViewerImage" src="" alt="Imagen adjunta">
               </div>
         </div>

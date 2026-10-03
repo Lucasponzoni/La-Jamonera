@@ -79,9 +79,10 @@
   let initialLoadPromise = null;
   let boardRenderSeq = 0;
 
+  // Visor propio sobre sl-dialog: se apila sobre el modal/alerta abiertos por orden de apertura.
   const ensureImageViewerModal = () => {
-    if (!imageViewerModal && window.bootstrap && imageViewerModalEl) {
-      imageViewerModal = new bootstrap.Modal(imageViewerModalEl);
+    if (!imageViewerModal && imageViewerModalEl) {
+      imageViewerModal = { show: () => LJModal.open(imageViewerModalEl), hide: () => LJModal.close(imageViewerModalEl) };
     }
   };
 
@@ -89,21 +90,18 @@
   const normalizeLower = (value) => normalizeValue(value).toLowerCase();
   const makeId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-  const getSwalTarget = () => (informesModal && informesModal.classList.contains('show') ? informesModal : document.body);
-
+  // LJAlert (sl-dialog) se apila solo sobre el modal abierto: sin target ni manejo de foco manual.
   const openIosSwal = (options) => Swal.fire({
-    target: getSwalTarget(),
     ...options,
     customClass: {
       popup: `ios-alert informes-alert ${options?.customClass?.popup || ''}`.trim(),
       title: 'ios-alert-title',
       htmlContainer: 'ios-alert-text',
-      confirmButton: 'ios-btn ios-btn-primary',
-      denyButton: 'ios-btn ios-btn-secondary',
-      cancelButton: 'ios-btn ios-btn-secondary',
+      confirmButton: 'primary',
+      denyButton: 'secondary',
+      cancelButton: 'secondary',
       ...options.customClass
-    },
-    buttonsStyling: false
+    }
   });
 
   const initialsFromName = (fullName) => {
@@ -139,18 +137,18 @@
 
   const fileIcon = (file) => {
     const name = normalizeLower(file.name);
-    if (name.endsWith('.pdf')) return 'bi-file-earmark-pdf';
-    if (name.endsWith('.doc') || name.endsWith('.docx')) return 'bi-file-earmark-word';
-    if (name.endsWith('.xls') || name.endsWith('.xlsx') || name.endsWith('.csv')) return 'bi-file-earmark-excel';
-    return 'bi-file-earmark-text';
+    if (name.endsWith('.pdf')) return 'file-earmark-pdf';
+    if (name.endsWith('.doc') || name.endsWith('.docx')) return 'file-earmark-word';
+    if (name.endsWith('.xls') || name.endsWith('.xlsx') || name.endsWith('.csv')) return 'file-earmark-excel';
+    return 'file-earmark-text';
   };
 
   const renderUserAvatar = (user) => {
     if (user.photoUrl) {
-      return `<span class="user-avatar-thumb"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-user-photo" src="${user.photoUrl}" alt="${user.fullName}"></span>`;
+      return `<span class="user-avatar-thumb"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-user-photo" src="${user.photoUrl}" alt="${user.fullName}"></span>`;
     }
     const initials = initialsFromName(user.fullName);
-    return `<span class="user-avatar-thumb user-avatar-initials">${initials || '<i class=\"bi bi-person-fill\"></i>'}</span>`;
+    return `<span class="user-avatar-thumb user-avatar-initials">${initials || '<sl-icon name="person-fill"></sl-icon>'}</span>`;
   };
 
   const prepareThumbLoaders = (selector) => {
@@ -405,9 +403,8 @@
 
   const openProcessingAlert = (message) => {
     Swal.fire({
-      target: getSwalTarget(),
       title: 'Procesando informe',
-      html: `<div class="d-flex flex-column align-items-center gap-2"><img src="./IMG/Meta-ai-logo.webp" alt="Procesando" class="meta-spinner-login"><p class="mb-0">${escapeHtml(message)}</p></div>`,
+      html: `<div class="d-flex flex-column align-items-center gap-2"><sl-spinner class="meta-spinner-login" aria-label="Procesando"></sl-spinner><p class="mb-0">${escapeHtml(message)}</p></div>`,
       allowEscapeKey: false,
       allowOutsideClick: false,
       showConfirmButton: false,
@@ -415,8 +412,7 @@
         popup: 'ios-alert informes-alert informes-saving-alert',
         title: 'ios-alert-title',
         htmlContainer: 'ios-alert-text'
-      },
-      buttonsStyling: false
+      }
     });
   };
 
@@ -565,9 +561,9 @@
       scrollbarPadding: false, scrollBehavior: 'inside',
       customClass: {
         popup: 'informes-print-choice-alert',
-        confirmButton: 'ios-btn ios-btn-primary',
-        denyButton: 'ios-btn ios-btn-success',
-        cancelButton: 'ios-btn ios-btn-secondary'
+        confirmButton: 'primary',
+        denyButton: 'success',
+        cancelButton: 'secondary'
       }
     });
 
@@ -584,9 +580,9 @@
       denyButtonText: 'No incluir',
       cancelButtonText: 'Cancelar',
       customClass: {
-        confirmButton: 'ios-btn ios-btn-success',
-        denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical',
-        cancelButton: 'ios-btn ios-btn-secondary'
+        confirmButton: 'success',
+        denyButton: 'danger',
+        cancelButton: 'secondary'
       }
     });
 
@@ -727,8 +723,8 @@
           </div>
         </article>
         <div class="informe-user-actions">
-          <button class="family-manage-btn" type="button" data-user-edit="${user.id}" title="Editar usuario"><i class="fa-solid fa-pen"></i></button>
-          <button class="family-manage-btn" type="button" data-user-delete="${user.id}" title="Eliminar usuario"><i class="fa-solid fa-trash"></i></button>
+          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" type="button" data-user-edit="${user.id}" title="Editar usuario"><i class="fa-solid fa-pen"></i></sl-button>
+          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" type="button" data-user-delete="${user.id}" title="Eliminar usuario"><i class="fa-solid fa-trash"></i></sl-button>
         </div>
       </div>
     `).join('');
@@ -741,14 +737,13 @@
 
   const renderUserSelect = () => {
     const users = Object.values(state.users).sort((a, b) => String(a.fullName).localeCompare(String(b.fullName)));
-    const current = informeUserSelect.value;
+    const current = ljSelectValue(informeUserSelect);
 
-    const options = users.map((user) => `<option value="${user.id}">${user.fullName} (${user.position})</option>`).join('');
-    informeUserSelect.innerHTML = `<option value="">Seleccioná un usuario</option>${options}<option value="create">Crear nuevo usuario</option>`;
+    // "Seleccioná un usuario" es el placeholder del sl-select.
+    const options = users.map((user) => `<sl-option value="${ljOptionValue(user.id)}">${user.fullName} (${user.position})</sl-option>`).join('');
+    informeUserSelect.innerHTML = `${options}<sl-option value="create">Crear nuevo usuario</sl-option>`;
 
-    if (current && state.users[current]) {
-      informeUserSelect.value = current;
-    }
+    ljSetSelectValue(informeUserSelect, current && state.users[current] ? current : '');
   };
 
   const readEmailPreferences = (userId) => {
@@ -767,7 +762,7 @@
 
     if (userId && typeof userId === 'object' && !prefs) {
       payload = userId;
-      selectedId = normalizeValue(informeUserSelect?.value);
+      selectedId = normalizeValue(ljSelectValue(informeUserSelect));
     }
 
     if (!selectedId || !payload || typeof payload !== 'object') return;
@@ -812,7 +807,7 @@
     const selectedSet = new Set(state.notifySpecificUserIds);
 
     notifySpecificUsersList.innerHTML = users.map((user) => `
-      <label class="notify-user-card">
+      <div class="notify-user-card">
         <div class="notify-user-main">
           ${renderUserAvatar(user)}
           <div class="notify-user-text">
@@ -820,11 +815,21 @@
             <small>${escapeHtml(user.email || '')}</small>
           </div>
         </div>
-        <input type="checkbox" data-notify-user-id="${user.id}" ${selectedSet.has(user.id) ? 'checked' : ''}>
-      </label>
+        <sl-checkbox data-notify-user-id="${user.id}" ${selectedSet.has(user.id) ? 'checked' : ''} aria-label="${escapeHtml(user.fullName || 'Usuario')}"></sl-checkbox>
+      </div>
     `).join('');
 
     prepareThumbLoaders('#notifySpecificUsersList .js-user-photo');
+  };
+
+  // Las tarjetas eran <label> de un checkbox nativo: con sl-checkbox reenviamos a mano el clic en la tarjeta.
+  const bindCardCheckboxes = (container) => {
+    if (!container || container.dataset.cardToggleBound) return;
+    container.dataset.cardToggleBound = '1';
+    container.addEventListener('click', (event) => {
+      if (event.target.closest('sl-checkbox')) return;
+      event.target.closest('.notify-user-card')?.querySelector('sl-checkbox')?.click();
+    });
   };
 
   const getSelectedNotificationUsers = () => {
@@ -885,7 +890,7 @@
 
     const usersHtml = usersWithEmail.length
       ? usersWithEmail.map((user) => `
-        <label class="notify-user-card">
+        <div class="notify-user-card">
           <div class="notify-user-main">
             ${renderUserAvatar(user)}
             <div class="notify-user-text">
@@ -893,8 +898,8 @@
               <small>${escapeHtml(user.email || '')}</small>
             </div>
           </div>
-          <input type="checkbox" data-resend-user-email="${escapeHtml(user.email || '')}" data-resend-user-name="${escapeHtml(user.fullName || '')}">
-        </label>
+          <sl-checkbox data-resend-user-email="${escapeHtml(user.email || '')}" data-resend-user-name="${escapeHtml(user.fullName || '')}" aria-label="${escapeHtml(user.fullName || 'Usuario')}"></sl-checkbox>
+        </div>
       `).join('')
       : '<div class="informes-empty">No hay usuarios con email cargado.</div>';
 
@@ -908,15 +913,15 @@
         <div class="text-start report-resend-wrap">
           <p class="mb-2">Seleccioná usuarios del listado o escribí emails nuevos (separados por coma).</p>
           <div id="resendUsersList" class="notify-specific-users-list">${usersHtml}</div>
-          <label class="form-label mt-3" for="resendExtraEmails">Emails adicionales</label>
-          <textarea id="resendExtraEmails" class="swal2-textarea ios-input" placeholder="ejemplo@dominio.com, otro@dominio.com"></textarea>
+          <sl-textarea id="resendExtraEmails" class="mt-3" label="Emails adicionales" resize="auto" placeholder="ejemplo@dominio.com, otro@dominio.com"></sl-textarea>
         </div>
       `,
       didOpen: () => {
         prepareThumbLoaders('#resendUsersList .js-user-photo');
+        bindCardCheckboxes(document.getElementById('resendUsersList'));
       },
       preConfirm: () => {
-        const selectedNodes = Array.from(document.querySelectorAll('[data-resend-user-email]:checked'));
+        const selectedNodes = Array.from(document.querySelectorAll('sl-checkbox[data-resend-user-email]')).filter((node) => node.checked);
         const selected = selectedNodes.map((node) => ({
           email: normalizeValue(node.dataset.resendUserEmail),
           name: normalizeValue(node.dataset.resendUserName) || 'Usuario'
@@ -1021,8 +1026,8 @@
     attachmentsGrid.innerHTML = state.attachments.map((item, idx) => {
       if (item.type === 'image') {
         return `
-          <button type="button" class="attachment-card" data-view-image="${idx}">
-            <span class="attachment-loader"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"></span>
+          <button type="button" class="lj-tile attachment-card" data-view-image="${idx}">
+            <span class="attachment-loader"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span>
             <img src="${item.previewUrl}" alt="${item.file.name}" class="attachment-image js-attachment-preview">
           </button>
         `;
@@ -1030,7 +1035,7 @@
 
       return `
         <div class="attachment-card attachment-doc">
-          <i class="bi ${fileIcon(item.file)}"></i>
+          <sl-icon name="${fileIcon(item.file)}"></sl-icon>
           <span>${item.file.name}</span>
         </div>
       `;
@@ -1110,13 +1115,13 @@
     }
     const cur = state.currentPage;
     const pages = Array.from({ length: totalPages }, (_, i) => i + 1)
-      .map((p) => `<li class="page-item${p === cur ? ' active' : ''}"><button class="page-link" data-page="${p}">${p}</button></li>`)
+      .map((p) => `<sl-button size="small" variant="${p === cur ? 'primary' : 'default'}" class="informes-page-btn" data-page="${p}">${p}</sl-button>`)
       .join('');
-    informesPagination.innerHTML = `<nav aria-label="Paginación de informes"><ul class="pagination pagination-sm justify-content-center mb-0">
-      <li class="page-item${cur === 1 ? ' disabled' : ''}"><button class="page-link" data-page="${Math.max(1, cur - 1)}">‹</button></li>
+    informesPagination.innerHTML = `<nav class="informes-page-nav" aria-label="Paginación de informes">
+      <sl-button size="small" variant="default" class="informes-page-btn" data-page="${Math.max(1, cur - 1)}"${cur === 1 ? ' disabled' : ''}>‹</sl-button>
       ${pages}
-      <li class="page-item${cur === totalPages ? ' disabled' : ''}"><button class="page-link" data-page="${Math.min(totalPages, cur + 1)}">›</button></li>
-    </ul></nav>`;
+      <sl-button size="small" variant="default" class="informes-page-btn" data-page="${Math.min(totalPages, cur + 1)}"${cur === totalPages ? ' disabled' : ''}>›</sl-button>
+    </nav>`;
   };
 
   const needsReportDetailForCard = (report = {}) => Boolean(
@@ -1175,7 +1180,7 @@
             <span class="informe-attach-chip"><i class="fa-regular fa-image"></i> ${imageCount}</span>
             <span class="informe-attach-chip"><i class="fa-regular fa-file-lines"></i> ${docCount}</span>
             <span class="importance-chip importance-${importance.tone}">${normalizeImportance(report.importance, 50)}% · ${importance.label}</span>
-            <button class="btn informe-print-chip" type="button" data-print-report="${report.id}" title="Imprimir informe"><i class="fa-solid fa-print"></i></button>
+            <sl-button variant="default" size="small" class="lj-icon-btn informe-print-chip" type="button" data-print-report="${report.id}" title="Imprimir informe"><i class="fa-solid fa-print"></i></sl-button>
           </div>
 
           <div class="informe-card-user">
@@ -1187,10 +1192,10 @@
           </div>
 
           <div class="informe-card-actions">
-            <button class="btn ios-btn ios-btn-primary" type="button" data-view-report="${report.id}">Ver informe completo</button>
-            <button class="btn informe-icon-btn" type="button" data-comment-report="${report.id}" title="Comentar"><i class="fa-regular fa-message"></i></button>
-            <button class="btn informe-icon-btn" type="button" data-edit-report="${report.id}" title="Editar"><i class="fa-solid fa-pen"></i></button>
-            <button class="btn informe-icon-btn danger" type="button" data-delete-report="${report.id}" title="Borrar"><i class="fa-solid fa-trash"></i></button>
+            <sl-button variant="primary" class="informe-view-btn" type="button" data-view-report="${report.id}">Ver informe completo</sl-button>
+            <sl-button variant="default" class="lj-icon-btn informe-icon-btn" type="button" data-comment-report="${report.id}" title="Comentar"><i class="fa-regular fa-message"></i></sl-button>
+            <sl-button variant="default" class="lj-icon-btn informe-icon-btn" type="button" data-edit-report="${report.id}" title="Editar"><i class="fa-solid fa-pen"></i></sl-button>
+            <sl-button variant="default" class="lj-icon-btn informe-icon-btn danger" type="button" data-delete-report="${report.id}" title="Borrar"><i class="fa-solid fa-trash"></i></sl-button>
           </div>
         </article>
       `;
@@ -1296,7 +1301,7 @@
 
     initialLoadPromise = (async () => {
       await loadData();
-      applyEmailPreferencesToUi(readEmailPreferences(informeUserSelect.value));
+      applyEmailPreferencesToUi(readEmailPreferences(ljSelectValue(informeUserSelect)));
       await restoreDraft();
       state.reportsLoaded = true;
       updateMainScrollHint();
@@ -1321,7 +1326,7 @@
     const keyCheck = await openIosSwal({
       title: 'Verificar clave',
       input: 'password',
-      inputClass: 'ios-input informes-key-input',
+      inputClass: 'informes-key-input',
       inputLabel: 'Ingresá la clave de 4 dígitos',
       inputAttributes: { maxlength: 4, inputmode: 'numeric', autocomplete: 'new-password' },
       confirmButtonText: 'Validar',
@@ -1363,24 +1368,18 @@
           <section class="step-block">
             <h6 class="step-title">1) Datos personales</h6>
             <div class="step-content">
-              <label for="userFullName">Nombre y apellido *</label>
-              <input id="userFullName" class="swal2-input ios-input" autocomplete="off" placeholder="Ej: Juan Pérez" value="${initial ? initial.fullName : ''}">
-              <label for="userPosition">Puesto en la empresa *</label>
-              <input id="userPosition" class="swal2-input ios-input" autocomplete="off" placeholder="Ej: Bromatólogo" value="${initial ? initial.position : ''}">
-              <label for="userEmail">Email *</label>
-              <input id="userEmail" class="swal2-input ios-input" autocomplete="off" type="email" placeholder="Ej: usuario@empresa.com" value="${initial ? (initial.email || '') : ''}">
-              <label for="userPin">Clave de 4 dígitos *</label>
-              <div class="ios-input-group d-flex align-items-center px-2">
-                <input id="userPin" class="swal2-input ios-input border-0 bg-transparent flex-grow-1" type="password" maxlength="4" inputmode="numeric" autocomplete="new-password" placeholder="4 dígitos" value="${initial ? initial.pin : ''}">
-                <button id="toggleUserPin" type="button" class="btn ios-toggle-pass" aria-label="Ver u ocultar clave"><i class="fa-solid fa-eye"></i></button>
-              </div>
+              <sl-input id="userFullName" label="Nombre y apellido *" autocomplete="off" placeholder="Ej: Juan Pérez" value="${initial ? escapeHtml(initial.fullName) : ''}"></sl-input>
+              <sl-input id="userPosition" label="Puesto en la empresa *" autocomplete="off" placeholder="Ej: Bromatólogo" value="${initial ? escapeHtml(initial.position) : ''}"></sl-input>
+              <sl-input id="userEmail" label="Email *" autocomplete="off" type="email" placeholder="Ej: usuario@empresa.com" value="${initial ? escapeHtml(initial.email || '') : ''}"></sl-input>
+              <sl-input id="userPin" label="Clave de 4 dígitos *" type="password" password-toggle maxlength="4" inputmode="numeric" autocomplete="new-password" placeholder="4 dígitos" value="${initial ? escapeHtml(initial.pin) : ''}"></sl-input>
             </div>
           </section>
           <section class="step-block">
             <h6 class="step-title">2) Fotografía (opcional)</h6>
             <div class="step-content">
-              <div id="userPhotoPreview" class="image-preview-circle">${initial?.photoUrl ? `<img src="${initial.photoUrl}" alt="Foto">` : '<span class="image-placeholder-circle-2 user-initials-preview"><i class="bi bi-person-fill"></i></span>'}</div>
-              <input id="userPhotoInput" type="file" class="form-control image-file-input" accept="image/*">
+              <div id="userPhotoPreview" class="image-preview-circle">${initial?.photoUrl ? `<img src="${initial.photoUrl}" alt="Foto">` : '<span class="image-placeholder-circle-2 user-initials-preview"><sl-icon name="person-fill"></sl-icon></span>'}</div>
+              <input id="userPhotoInput" type="file" class="image-file-input" accept="image/*" hidden>
+              <sl-button id="userPhotoPickBtn" type="button" variant="default" class="users-photo-pick"><i slot="prefix" class="fa-solid fa-camera"></i>Elegir foto</sl-button>
             </div>
           </section>
         </div>
@@ -1389,8 +1388,7 @@
         const fullNameInput = document.getElementById('userFullName');
         const photoInput = document.getElementById('userPhotoInput');
         const preview = document.getElementById('userPhotoPreview');
-        const userPinInput = document.getElementById('userPin');
-        const toggleUserPin = document.getElementById('toggleUserPin');
+        document.getElementById('userPhotoPickBtn')?.addEventListener('click', () => photoInput.click());
 
         const updateInitials = () => {
           if (pendingUpload || (initial && initial.photoUrl)) {
@@ -1399,15 +1397,10 @@
           const initials = initialsFromName(fullNameInput.value);
           preview.innerHTML = initials
             ? `<span class="image-placeholder-circle-2 user-initials-preview">${initials}</span>`
-            : '<span class="image-placeholder-circle-2 user-initials-preview"><i class="bi bi-person-fill"></i></span>';
+            : '<span class="image-placeholder-circle-2 user-initials-preview"><sl-icon name="person-fill"></sl-icon></span>';
         };
 
         fullNameInput.addEventListener('input', updateInitials);
-        toggleUserPin.addEventListener('click', () => {
-          const hidden = userPinInput.type === 'password';
-          userPinInput.type = hidden ? 'text' : 'password';
-          toggleUserPin.innerHTML = hidden ? '<i class="fa-solid fa-eye-slash"></i>' : '<i class="fa-solid fa-eye"></i>';
-        });
         updateInitials();
 
         photoInput.addEventListener('change', async () => {
@@ -1418,7 +1411,7 @@
             return;
           }
           pendingUpload = file;
-          preview.innerHTML = `<span class="image-preview-overlay"><img src="./IMG/Meta-ai-logo.webp" alt="Subiendo" class="meta-spinner-login"></span>`;
+          preview.innerHTML = `<span class="image-preview-overlay"><sl-spinner class="meta-spinner-login" aria-label="Subiendo"></sl-spinner></span>`;
           const tmp = URL.createObjectURL(file);
           setTimeout(() => {
             preview.innerHTML = `<img src="${tmp}" alt="Vista previa">`;
@@ -1478,7 +1471,7 @@
   };
 
   const saveInforme = async () => {
-    const selectedUserId = normalizeValue(informeUserSelect.value);
+    const selectedUserId = normalizeValue(ljSelectValue(informeUserSelect));
     const editorHtml = normalizeValue(informeEditor.innerHTML);
 
     if (!selectedUserId || !state.users[selectedUserId]) {
@@ -1504,7 +1497,7 @@
 
     Swal.fire({
       title: 'Guardando informe...',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner-login"></div>',
+      html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Guardando"></sl-spinner></div>',
       allowOutsideClick: false,
       allowEscapeKey: false,
       showConfirmButton: false,
@@ -1638,7 +1631,7 @@
     const originalHtml = btn ? btn.innerHTML : '';
     if (btn) {
       btn.disabled = true;
-      btn.innerHTML = '<img src="./IMG/Meta-ai-logo.webp" class="meta-spinner-login" style="width:20px;height:20px;object-fit:contain;"> Procesando...';
+      btn.innerHTML = '<sl-spinner class="meta-spinner-login" aria-label="Procesando"></sl-spinner> Procesando...';
     }
     try {
       const tempDiv = document.createElement('div');
@@ -1756,9 +1749,9 @@ REGLAS:
         </header>
         <p class="report-comment-text">${text}</p>
         <div class="report-comment-actions">
-          <button type="button" class="btn report-comment-reply-btn" data-reply-comment="${comment.id}">Responder</button>
-          <button type="button" class="btn report-comment-reply-btn" data-edit-comment="${comment.id}">Editar</button>
-          <button type="button" class="btn report-comment-reply-btn is-danger" data-delete-comment="${comment.id}">Eliminar</button>
+          <sl-button variant="default" size="small" type="button" class="report-comment-reply-btn" data-reply-comment="${comment.id}">Responder</sl-button>
+          <sl-button variant="default" size="small" type="button" class="report-comment-reply-btn" data-edit-comment="${comment.id}">Editar</sl-button>
+          <sl-button variant="default" size="small" type="button" class="report-comment-reply-btn is-danger" data-delete-comment="${comment.id}">Eliminar</sl-button>
         </div>
         ${replies.length ? `<div class="report-comment-replies">${renderCommentTree(replies, level + 1)}</div>` : ''}
       </article>
@@ -1780,14 +1773,14 @@ REGLAS:
     const imageAttachments = attachments.filter((item) => item.type === 'image');
     const lastUpdatedAt = Number(report.updatedAt || 0);
     const users = Object.values(state.users).sort((a, b) => String(a.fullName).localeCompare(String(b.fullName)));
-    const commentUserOptions = ['<option value="">Seleccioná un usuario</option>', ...users.map((user) => `<option value="${user.id}">${escapeHtml(user.fullName)}</option>`), '<option value="create">Crear nuevo usuario</option>'].join('');
+    const commentUserOptions = [...users.map((user) => `<sl-option value="${ljOptionValue(user.id)}">${escapeHtml(user.fullName)}</sl-option>`), '<sl-option value="create">Crear nuevo usuario</sl-option>'].join('');
 
     const attachmentHtml = attachments.length
       ? attachments.map((item, index) => {
         if (item.type === 'image') {
-          return `<button type="button" class="attachment-card" data-open-report-image="${index}"><span class="attachment-loader"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"></span><img src="${item.url}" alt="${escapeHtml(item.name)}" class="attachment-image js-informe-viewer-image"></button>`;
+          return `<button type="button" class="lj-tile attachment-card" data-open-report-image="${index}"><span class="attachment-loader"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img src="${item.url}" alt="${escapeHtml(item.name)}" class="attachment-image js-informe-viewer-image"></button>`;
         }
-        return `<a href="${item.url}" target="_blank" rel="noopener noreferrer" class="attachment-card attachment-doc"><i class="bi bi-file-earmark"></i><span>${escapeHtml(item.name)}</span></a>`;
+        return `<a href="${item.url}" target="_blank" rel="noopener noreferrer" class="attachment-card attachment-doc"><sl-icon name="file-earmark"></sl-icon><span>${escapeHtml(item.name)}</span></a>`;
       }).join('')
       : '<div class="informes-empty">Sin adjuntos</div>';
 
@@ -1805,7 +1798,7 @@ REGLAS:
             <p><strong>Fecha:</strong> ${getDateLabel(report.createdAt)}</p>
             <p><strong>Última actualización:</strong> ${lastUpdatedAt ? getDateLabel(lastUpdatedAt) : 'Sin actualizaciones'}</p>
             <div class="report-viewer-meta-actions">
-              <button type="button" class="btn ios-btn ios-btn-warning report-resend-btn" data-resend-report-email="1"><i class="fa-regular fa-paper-plane"></i><span>Reenviar email</span></button>
+              <sl-button variant="warning" size="small" type="button" class="report-resend-btn" data-resend-report-email="1"><i slot="prefix" class="fa-regular fa-paper-plane"></i>Reenviar email</sl-button>
             </div>
           </div>
           <div class="report-viewer-content-wrap"><div class="report-viewer-content">${report.html || ''}</div></div>
@@ -1817,16 +1810,16 @@ REGLAS:
 
             <div class="report-inline-comment-form">
               <div class="report-inline-comment-reply d-none" id="inlineReplyLabel"></div>
-              <select id="inlineCommentUser" class="form-select ios-input mb-2">${commentUserOptions}</select>
-              <textarea id="inlineCommentText" class="swal2-textarea ios-input" placeholder="Escribí un comentario"></textarea>
-              <input id="inlineCommentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false">
+              <sl-select id="inlineCommentUser" placeholder="Seleccioná un usuario" hoist>${commentUserOptions}</sl-select>
+              <sl-textarea id="inlineCommentText" resize="auto" placeholder="Escribí un comentario"></sl-textarea>
+              <sl-input id="inlineCommentPin" type="password" password-toggle inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"></sl-input>
               <div class="d-flex justify-content-end gap-2">
-                <button type="button" class="btn ios-btn ios-btn-secondary d-none" id="inlineCancelReplyBtn">Cancelar respuesta</button>
-                <button type="button" class="btn ios-btn ios-btn-primary" id="inlineSendCommentBtn">
-                  <img src="./IMG/Meta-ai-logo.webp" alt="Enviando" class="meta-spinner-login d-none" id="inlineSendCommentSpinner">
-                  <i class="fa-solid fa-paper-plane" id="inlineSendCommentIcon"></i>
-                  <span>Enviar comentario</span>
-                </button>
+                <sl-button variant="default" type="button" class="d-none" id="inlineCancelReplyBtn">Cancelar respuesta</sl-button>
+                <sl-button variant="primary" type="button" id="inlineSendCommentBtn">
+                  <sl-spinner id="inlineSendCommentSpinner" slot="prefix" class="meta-spinner-login d-none" aria-label="Enviando"></sl-spinner>
+                  <i slot="prefix" class="fa-solid fa-paper-plane" id="inlineSendCommentIcon"></i>
+                  Enviar comentario
+                </sl-button>
               </div>
             </div>
 
@@ -1876,17 +1869,18 @@ REGLAS:
         });
 
         userSelect?.addEventListener('change', async (event) => {
-          if (event.target.value !== 'create') return;
+          const select = event.currentTarget;
+          if (ljSelectValue(select) !== 'create') return;
           const id = await openUserForm();
           if (!id) {
-            event.target.value = '';
+            ljSetSelectValue(select, '');
             return;
           }
-          const extra = document.createElement('option');
-          extra.value = id;
+          const extra = document.createElement('sl-option');
+          extra.value = ljOptionValue(id);
           extra.textContent = state.users[id] ? state.users[id].fullName : 'Usuario';
-          event.target.insertBefore(extra, event.target.querySelector('option[value="create"]'));
-          event.target.value = id;
+          select.insertBefore(extra, select.querySelector('sl-option[value="create"]'));
+          ljSetSelectValue(select, id);
           renderUsers();
         });
 
@@ -1898,7 +1892,7 @@ REGLAS:
         });
 
         sendBtn?.addEventListener('click', async () => {
-          const userId = normalizeValue(userSelect?.value);
+          const userId = normalizeValue(ljSelectValue(userSelect));
           const text = normalizeValue(textArea?.value);
           const pin = normalizeValue(pinInput?.value);
 
@@ -2007,41 +2001,41 @@ REGLAS:
       title: 'Editar informe',
       html: `
         <div class="text-start report-edit-wrap">
-          <label class="mb-2">Contenido del informe</label>
+          <label class="lj-label mb-2">Contenido del informe</label>
           <div class="editor-toolbar report-edit-toolbar" role="toolbar" aria-label="Herramientas de edición">
-            <button type="button" class="editor-btn" data-edit-cmd="bold"><i class="fa-solid fa-bold"></i></button>
-            <button type="button" class="editor-btn" data-edit-cmd="italic"><i class="fa-solid fa-italic"></i></button>
-            <button type="button" class="editor-btn" data-edit-cmd="underline"><i class="fa-solid fa-underline"></i></button>
-            <button type="button" class="editor-btn" data-edit-cmd="insertUnorderedList"><i class="fa-solid fa-list-ul"></i></button>
-            <button type="button" class="editor-btn" data-edit-cmd="justifyLeft"><i class="fa-solid fa-align-left"></i></button>
-            <button type="button" class="editor-btn" data-edit-cmd="justifyCenter"><i class="fa-solid fa-align-center"></i></button>
+            <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-edit-cmd="bold" title="Negrita"><i class="fa-solid fa-bold"></i></sl-button>
+            <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-edit-cmd="italic" title="Cursiva"><i class="fa-solid fa-italic"></i></sl-button>
+            <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-edit-cmd="underline" title="Subrayado"><i class="fa-solid fa-underline"></i></sl-button>
+            <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-edit-cmd="insertUnorderedList" title="Lista con viñetas"><i class="fa-solid fa-list-ul"></i></sl-button>
+            <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-edit-cmd="justifyLeft" title="Alinear a izquierda"><i class="fa-solid fa-align-left"></i></sl-button>
+            <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-edit-cmd="justifyCenter" title="Alinear al centro"><i class="fa-solid fa-align-center"></i></sl-button>
           </div>
-          <div style="display:flex;align-items:center;gap:10px;margin:8px 0;padding:10px 14px;border-radius:14px;background:linear-gradient(135deg,#f0f4ff,#f5f0ff);border:1.5px solid #c7d4f5;">
-            <button type="button" id="editFormatIABtn" class="btn ios-btn" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border:none;">
-              <img src="./IMG/ia-unscreen.gif" alt="IA" style="width:22px;height:22px;object-fit:contain;">
-              <span>Arreglar con IA</span>
-            </button>
-            <span style="font-size:0.78rem;color:#5a6a9a;flex:1;">Estructura el texto con títulos, subtítulos y resalta hallazgos importantes</span>
+          <div class="ai-format-btn-wrap">
+            <sl-button variant="default" type="button" id="editFormatIABtn" class="ai-format-btn">
+              <img slot="prefix" src="./IMG/ia-unscreen.gif" alt="IA" class="ia-icon-btn">
+              Arreglar con IA
+            </sl-button>
+            <span class="ai-hint">Estructura el texto con títulos, subtítulos y resalta hallazgos importantes</span>
           </div>
           <div class="report-editor-scroll"><div id="editReportHtml" class="informe-editor" contenteditable="true">${report.html || ''}</div></div>
           <div class="importance-wrap mt-3">
-            <label class="form-label" for="editImportanceRange">Importancia sanitaria</label>
+            <label class="lj-label" for="editImportanceRange">Importancia sanitaria</label>
             <input id="editImportanceRange" type="range" min="0" max="100" value="${normalizeImportance(report.importance, 50)}" class="importance-range">
             <div id="editImportanceLabel" class="importance-label"></div>
           </div>
-          <label class="mt-3 mb-2">Adjuntos actuales</label>
+          <label class="lj-label mt-3 mb-2">Adjuntos actuales</label>
           <div id="editAttachmentsGrid" class="attachments-grid report-edit-attachments">
             ${currentAttachments.length ? currentAttachments.map((item, idx) => `
               <article class="attachment-card ${item.type !== 'image' ? 'attachment-doc' : ''}" data-edit-attachment="${idx}">
                 ${item.type === 'image'
                   ? `<img src="${item.url}" alt="${escapeHtml(item.name)}" class="attachment-image is-loaded">`
-                  : `<i class="bi bi-file-earmark"></i><span>${escapeHtml(item.name)}</span>`}
-                <button type="button" class="btn remove-attachment-btn is-danger" data-remove-edit-attachment="${idx}" title="Quitar adjunto"><i class="fa-solid fa-circle-xmark"></i></button>
+                  : `<sl-icon name="file-earmark"></sl-icon><span>${escapeHtml(item.name)}</span>`}
+                <sl-button variant="text" size="small" type="button" class="lj-icon-btn remove-attachment-btn is-danger" data-remove-edit-attachment="${idx}" title="Quitar adjunto"><i class="fa-solid fa-circle-xmark"></i></sl-button>
               </article>
             `).join('') : '<div class="informes-empty">Sin adjuntos</div>'}
           </div>
           <div class="mt-2 d-flex justify-content-end">
-            <button type="button" id="editAddAttachmentsBtn" class="btn ios-btn ios-btn-secondary report-edit-add-btn"><i class="fa-solid fa-paperclip"></i> Agregar adjuntos</button>
+            <sl-button variant="default" type="button" id="editAddAttachmentsBtn" class="report-edit-add-btn"><i slot="prefix" class="fa-solid fa-paperclip"></i>Agregar adjuntos</sl-button>
             <input id="editAttachmentsInput" type="file" class="d-none" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt">
           </div>
         </div>
@@ -2066,6 +2060,8 @@ REGLAS:
         };
 
         popup.querySelectorAll('[data-edit-cmd]').forEach((button) => {
+          // Sin robar el foco: la selección del editor se conserva al aplicar el comando.
+          button.addEventListener('mousedown', (event) => event.preventDefault());
           button.addEventListener('click', () => {
             editEditor?.focus();
             document.execCommand(button.dataset.editCmd, false, null);
@@ -2079,7 +2075,7 @@ REGLAS:
           const originalHtml = btn ? btn.innerHTML : '';
           if (btn) {
             btn.disabled = true;
-            btn.innerHTML = '<img src="./IMG/Meta-ai-logo.webp" class="meta-spinner-login" style="width:20px;height:20px;object-fit:contain;"> Procesando...';
+            btn.innerHTML = '<sl-spinner class="meta-spinner-login" aria-label="Procesando"></sl-spinner> Procesando...';
           }
           try {
             const tempDiv = document.createElement('div');
@@ -2128,8 +2124,8 @@ REGLAS:
               <article class="attachment-card ${item.type !== 'image' ? 'attachment-doc' : ''}" data-edit-attachment="${idx}">
                 ${item.type === 'image'
                   ? `<img src="${item.url}" alt="${escapeHtml(item.name)}" class="attachment-image is-loaded">`
-                  : `<i class="bi bi-file-earmark"></i><span>${escapeHtml(item.name)}</span>`}
-                <button type="button" class="btn remove-attachment-btn is-danger" data-remove-edit-attachment="${idx}" title="Quitar adjunto"><i class="fa-solid fa-circle-xmark"></i></button>
+                  : `<sl-icon name="file-earmark"></sl-icon><span>${escapeHtml(item.name)}</span>`}
+                <sl-button variant="text" size="small" type="button" class="lj-icon-btn remove-attachment-btn is-danger" data-remove-edit-attachment="${idx}" title="Quitar adjunto"><i class="fa-solid fa-circle-xmark"></i></sl-button>
               </article>
             `).join('')
             : '<div class="informes-empty">Sin adjuntos</div>';
@@ -2171,7 +2167,7 @@ REGLAS:
           }
           const confirm = document.createElement('div');
           confirm.className = 'attachment-delete-confirm';
-          confirm.innerHTML = '<button type="button" class="btn attachment-delete-btn yes" data-attachment-confirm="yes">Eliminar</button><button type="button" class="btn attachment-delete-btn no" data-attachment-confirm="no">Cancelar</button>';
+          confirm.innerHTML = '<sl-button variant="danger" size="small" type="button" class="attachment-delete-btn yes" data-attachment-confirm="yes">Eliminar</sl-button><sl-button variant="default" size="small" type="button" class="attachment-delete-btn no" data-attachment-confirm="no">Cancelar</sl-button>';
           card.appendChild(confirm);
         };
 
@@ -2227,7 +2223,7 @@ REGLAS:
 
     Swal.fire({
       title: 'Guardando cambios...',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner-login"></div>',
+      html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Guardando"></sl-spinner></div>',
       allowOutsideClick: false,
       allowEscapeKey: false,
       showConfirmButton: false,
@@ -2384,7 +2380,7 @@ REGLAS:
 
     const response = await openIosSwal({
       title: 'Editar comentario',
-      html: `<div class="text-start report-comment-form"><label>Comentario</label><textarea id="editCommentText" class="swal2-textarea ios-input" placeholder="Escribí tu comentario">${escapeHtml(target.text || '')}</textarea></div>`,
+      html: `<div class="text-start report-comment-form"><sl-textarea id="editCommentText" label="Comentario" resize="auto" placeholder="Escribí tu comentario" value="${escapeHtml(target.text || '')}"></sl-textarea></div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
@@ -2473,35 +2469,35 @@ REGLAS:
       if (!canContinue) return null;
       const users = Object.values(state.users);
       const optionsHtml = [
-        '<option value="">Seleccioná un usuario</option>',
-        ...users.map((user) => `<option value="${user.id}">${escapeHtml(user.fullName)}</option>`),
-        '<option value="create">Crear nuevo usuario</option>'
+        ...users.map((user) => `<sl-option value="${ljOptionValue(user.id)}">${escapeHtml(user.fullName)}</sl-option>`),
+        '<sl-option value="create">Crear nuevo usuario</sl-option>'
       ].join('');
 
       const commentPrompt = await openIosSwal({
         title: parentCommentId ? 'Responder comentario' : 'Nuevo comentario',
-        html: `<div class="text-start report-comment-form"><label>Usuario</label><select id="commentUser" class="form-select ios-input mb-2">${optionsHtml}</select><label>Comentario</label><textarea id="commentText" class="swal2-textarea ios-input" placeholder="Escribí tu comentario"></textarea><label>Clave</label><input id="commentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"></div>`,
+        html: `<div class="text-start report-comment-form"><sl-select id="commentUser" label="Usuario" placeholder="Seleccioná un usuario" hoist>${optionsHtml}</sl-select><sl-textarea id="commentText" label="Comentario" resize="auto" placeholder="Escribí tu comentario"></sl-textarea><sl-input id="commentPin" label="Clave" type="password" password-toggle inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"></sl-input></div>`,
         showCancelButton: true,
         confirmButtonText: 'Continuar',
         cancelButtonText: 'Cancelar',
         didOpen: (popup) => {
           const userSelect = popup.querySelector('#commentUser');
           userSelect?.addEventListener('change', async (event) => {
-            if (event.target.value !== 'create') return;
+            const select = event.currentTarget;
+            if (ljSelectValue(select) !== 'create') return;
             const id = await openUserForm();
             if (!id) {
-              event.target.value = '';
+              ljSetSelectValue(select, '');
               return;
             }
-            const extra = document.createElement('option');
-            extra.value = id;
+            const extra = document.createElement('sl-option');
+            extra.value = ljOptionValue(id);
             extra.textContent = state.users[id] ? state.users[id].fullName : 'Usuario';
-            event.target.insertBefore(extra, event.target.querySelector('option[value="create"]'));
-            event.target.value = id;
+            select.insertBefore(extra, select.querySelector('sl-option[value="create"]'));
+            ljSetSelectValue(select, id);
           });
         },
         preConfirm: () => {
-          const localUserId = normalizeValue(document.getElementById('commentUser').value);
+          const localUserId = normalizeValue(ljSelectValue(document.getElementById('commentUser')));
           const localText = normalizeValue(document.getElementById('commentText').value);
           const pin = normalizeValue(document.getElementById('commentPin').value);
           if (!localUserId || !state.users[localUserId]) {
@@ -2655,8 +2651,8 @@ REGLAS:
   };
 
   const resetEditorControls = () => {
-    fontSizeSelect.value = '3';
-    formatBlockSelect.value = 'P';
+    ljSetSelectValue(fontSizeSelect, '3');
+    ljSetSelectValue(formatBlockSelect, 'P');
     textColorInput.value = '#000000';
     highlightColorInput.value = '#ffffff';
   };
@@ -2672,6 +2668,21 @@ REGLAS:
     document.execCommand('justifyLeft', false, null);
   };
 
+  // Última selección dentro del editor: el sl-select / input color se llevan el foco y la sacan.
+  let editorRange = null;
+  document.addEventListener('selectionchange', () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount && informeEditor.contains(sel.anchorNode)) editorRange = sel.getRangeAt(0).cloneRange();
+  });
+  const restoreEditorSelection = () => {
+    const sel = window.getSelection();
+    if (!editorRange || !sel || !editorRange.startContainer.isConnected) return;
+    if (sel.rangeCount && informeEditor.contains(sel.anchorNode)) return;
+    informeEditor.focus();
+    sel.removeAllRanges();
+    sel.addRange(editorRange);
+  };
+
   const applyEditorCommand = (cmd, value = null) => {
     const selection = window.getSelection();
     const hasSelection =
@@ -2681,6 +2692,7 @@ REGLAS:
       && informeEditor.contains(selection.anchorNode)
       && informeEditor.contains(selection.focusNode);
 
+    restoreEditorSelection();
     informeEditor.focus();
     if (cmd === 'removeFormat') {
       if (hasSelection && selection.rangeCount) {
@@ -2722,7 +2734,7 @@ REGLAS:
   const EMOJIS = ['😀', '😁', '😂', '🤣', '😊', '🙂', '😉', '😍', '😘', '😎', '🤔', '😐', '😶', '🙄', '😢', '😭', '😡', '🤯', '🥳', '👍', '👎', '👏', '🙏', '💡', '🔥', '⚠️', '🚨', '✅', '❌', '🧪', '📌', '📎', '📅', '🧼', '🧫'];
 
   const renderEmojiPanel = () => {
-    emojiPanel.innerHTML = EMOJIS.map((emoji) => `<button type="button" class="emoji-btn" data-emoji="${emoji}">${emoji}</button>`).join('');
+    emojiPanel.innerHTML = EMOJIS.map((emoji) => `<button type="button" class="lj-tile emoji-btn" data-emoji="${emoji}">${emoji}</button>`).join('');
   };
 
 
@@ -2743,11 +2755,11 @@ REGLAS:
       })));
       const draft = {
         editorHtml: informeEditor.innerHTML,
-        userId: informeUserSelect.value,
+        userId: ljSelectValue(informeUserSelect),
         importance: getImportanceValue(),
         date: informeDateInput.value,
-        fontSize: fontSizeSelect.value,
-        formatBlock: formatBlockSelect.value,
+        fontSize: ljSelectValue(fontSizeSelect),
+        formatBlock: ljSelectValue(formatBlockSelect),
         textColor: textColorInput.value,
         highlightColor: highlightColorInput.value,
         attachments,
@@ -2774,11 +2786,11 @@ REGLAS:
       const draft = JSON.parse(raw);
       informeEditor.innerHTML = draft.editorHtml || '';
       importanceRange.value = String(normalizeImportance(draft.importance, 50));
-      if (draft.userId && state.users[draft.userId]) informeUserSelect.value = draft.userId;
-      applyEmailPreferencesToUi(readEmailPreferences(informeUserSelect.value));
+      if (draft.userId && state.users[draft.userId]) ljSetSelectValue(informeUserSelect, draft.userId);
+      applyEmailPreferencesToUi(readEmailPreferences(ljSelectValue(informeUserSelect)));
       if (draft.date && datePicker) datePicker.setDate(draft.date, true, 'd/m/Y');
-      if (draft.fontSize) fontSizeSelect.value = draft.fontSize;
-      if (draft.formatBlock) formatBlockSelect.value = draft.formatBlock;
+      if (draft.fontSize) ljSetSelectValue(fontSizeSelect, draft.fontSize);
+      if (draft.formatBlock) ljSetSelectValue(formatBlockSelect, draft.formatBlock);
       if (draft.textColor) textColorInput.value = draft.textColor;
       if (draft.highlightColor) highlightColorInput.value = draft.highlightColor;
 
@@ -2878,17 +2890,17 @@ REGLAS:
     }
   });
 
-  informeUserSelect.addEventListener('change', async (event) => {
-    if (event.target.value === 'create') {
+  informeUserSelect.addEventListener('change', async () => {
+    if (ljSelectValue(informeUserSelect) === 'create') {
       const id = await openUserForm();
       if (id) {
-        informeUserSelect.value = id;
+        ljSetSelectValue(informeUserSelect, id);
       } else {
-        informeUserSelect.value = '';
+        ljSetSelectValue(informeUserSelect, '');
       }
     }
 
-    applyEmailPreferencesToUi(readEmailPreferences(informeUserSelect.value));
+    applyEmailPreferencesToUi(readEmailPreferences(ljSelectValue(informeUserSelect)));
   });
 
   notifyAllUsersCheckbox?.addEventListener('change', () => {
@@ -2905,6 +2917,7 @@ REGLAS:
     updateNotifySpecificVisibility();
   });
 
+  bindCardCheckboxes(notifySpecificUsersList);
   notifySpecificUsersList?.addEventListener('change', (event) => {
     const input = event.target.closest('[data-notify-user-id]');
     if (!input) return;
@@ -2917,7 +2930,7 @@ REGLAS:
   });
 
   saveNotifyPreferenceBtn?.addEventListener('click', async () => {
-    const selectedUserId = normalizeValue(informeUserSelect.value);
+    const selectedUserId = normalizeValue(ljSelectValue(informeUserSelect));
     if (!selectedUserId || !state.users[selectedUserId]) {
       window.laJamoneraNotify?.show({ type: 'warning', title: 'Seleccioná un usuario', message: 'Primero elegí un usuario para guardar su preferencia.' });
       return;
@@ -2940,12 +2953,20 @@ REGLAS:
     window.laJamoneraNotify?.show({ type: 'success', title: 'Preferencia guardada', message: `Se guardó la configuración para ${state.users[selectedUserId].fullName}.` });
   });
 
+  // Los botones del editor no toman el foco: así la selección del contenteditable se conserva.
+  [...document.querySelectorAll('.editor-btn[data-cmd]'), applyHighlightBtn, toggleEmojiPanel].forEach((button) => {
+    button?.addEventListener('mousedown', (event) => event.preventDefault());
+  });
+  emojiPanel.addEventListener('mousedown', (event) => {
+    if (event.target.closest('[data-emoji]')) event.preventDefault();
+  });
+
   document.querySelectorAll('.editor-btn[data-cmd]').forEach((button) => {
     button.addEventListener('click', () => applyEditorCommand(button.dataset.cmd, button.dataset.value || null));
   });
 
-  fontSizeSelect.addEventListener('change', () => applyEditorCommand('fontSize', fontSizeSelect.value));
-  formatBlockSelect.addEventListener('change', () => applyEditorCommand('formatBlock', formatBlockSelect.value));
+  fontSizeSelect.addEventListener('change', () => applyEditorCommand('fontSize', ljSelectValue(fontSizeSelect)));
+  formatBlockSelect.addEventListener('change', () => applyEditorCommand('formatBlock', ljSelectValue(formatBlockSelect)));
   textColorInput.addEventListener('input', () => applyEditorCommand('foreColor', textColorInput.value));
   highlightColorInput.addEventListener('input', updatePreview);
   applyHighlightBtn.addEventListener('click', () => applyEditorCommand('hiliteColor', highlightColorInput.value));
@@ -3055,7 +3076,7 @@ REGLAS:
   viewerNextBtn.addEventListener('click', () => updateViewerImage(1));
   viewerZoomInBtn.addEventListener('click', () => setViewerScale(state.viewerScale + 0.25));
   viewerZoomOutBtn.addEventListener('click', () => setViewerScale(state.viewerScale - 0.25));
-  imageViewerModalEl?.addEventListener('hidden.bs.modal', async () => {
+  LJModal.on(imageViewerModalEl, 'hidden', async () => {
     if (!state.reopenViewerReportId) return;
     const report = findReportById(state.reopenViewerReportId);
     state.reopenViewerReportId = '';
@@ -3100,7 +3121,7 @@ REGLAS:
   }, { passive: true });
 
   window.addEventListener('beforeunload', persistDraft);
-  informesModal.addEventListener('hidden.bs.modal', persistDraft);
+  LJModal.on(informesModal, 'hidden', persistDraft);
   informeUserSelect.addEventListener('change', persistDraft);
   fontSizeSelect.addEventListener('change', persistDraft);
   formatBlockSelect.addEventListener('change', persistDraft);
@@ -3206,7 +3227,7 @@ REGLAS:
 
   document.getElementById('informeFormatIABtn')?.addEventListener('click', formatInformeWithIA);
 
-  informesModal.addEventListener('show.bs.modal', async () => {
+  LJModal.on(informesModal, 'show', async () => {
     if (!datePicker && window.flatpickr) {
       datePicker = flatpickr(informeDateInput, {
         dateFormat: 'd/m/Y',

@@ -109,19 +109,17 @@
     .replaceAll('&', '&amp;').replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
 
-  const getSwalTarget = () => (analisisModal.classList.contains('show') ? analisisModal : document.body);
-
+  // LJAlert (sl-dialog) se apila solo sobre el modal abierto: sin target ni manejo de foco manual.
   const openSwal = (opts) => Swal.fire({
-    target: getSwalTarget(), ...opts,
+    ...opts,
     customClass: {
       popup: `ios-alert informes-alert ${opts?.customClass?.popup || ''}`.trim(),
       title: 'ios-alert-title', htmlContainer: 'ios-alert-text',
-      confirmButton: 'ios-btn ios-btn-primary',
-      denyButton:    'ios-btn ios-btn-secondary',
-      cancelButton:  'ios-btn ios-btn-secondary',
+      confirmButton: 'primary',
+      denyButton:    'secondary',
+      cancelButton:  'secondary',
       ...opts?.customClass
-    },
-    buttonsStyling: false
+    }
   });
 
   const initialsFromName = (name) =>
@@ -150,10 +148,10 @@
 
   const fileIcon = (file) => {
     const n = normalizeLower(file?.name || file?.filename || '');
-    if (n.endsWith('.pdf'))  return 'bi-file-earmark-pdf';
-    if (n.endsWith('.doc') || n.endsWith('.docx')) return 'bi-file-earmark-word';
-    if (n.endsWith('.xls') || n.endsWith('.xlsx') || n.endsWith('.csv')) return 'bi-file-earmark-excel';
-    return 'bi-file-earmark-text';
+    if (n.endsWith('.pdf'))  return 'file-earmark-pdf';
+    if (n.endsWith('.doc') || n.endsWith('.docx')) return 'file-earmark-word';
+    if (n.endsWith('.xls') || n.endsWith('.xlsx') || n.endsWith('.csv')) return 'file-earmark-excel';
+    return 'file-earmark-text';
   };
 
   const getAttachmentName = (item) => item?.file?.name || item?.name || 'Adjunto';
@@ -174,9 +172,9 @@
   });
 
   const renderUserAvatar = (user) => {
-    if (user.photoUrl) return `<span class="user-avatar-thumb"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-user-photo" src="${user.photoUrl}" alt="${escapeHtml(user.fullName)}"></span>`;
+    if (user.photoUrl) return `<span class="user-avatar-thumb"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-user-photo" src="${user.photoUrl}" alt="${escapeHtml(user.fullName)}"></span>`;
     const ini = initialsFromName(user.fullName);
-    return `<span class="user-avatar-thumb user-avatar-initials">${ini || '<i class="bi bi-person-fill"></i>'}</span>`;
+    return `<span class="user-avatar-thumb user-avatar-initials">${ini || '<sl-icon name="person-fill"></sl-icon>'}</span>`;
   };
 
   const prepareThumbLoaders = (selector) => {
@@ -210,21 +208,22 @@
 
   const getLabValue = () => {
     if (!analisisLabSelect) return '';
-    if (analisisLabSelect.value === '__nuevo__') return normalizeValue(analisisLabNew?.value);
-    return analisisLabSelect.value;
+    const value = ljSelectValue(analisisLabSelect);
+    if (value === '__nuevo__') return normalizeValue(analisisLabNew?.value);
+    return value;
   };
 
+  // "Sin laboratorio" es el placeholder del sl-select (clearable para volver a vacío).
   const renderLabSelect = (currentValue = '') => {
     if (!analisisLabSelect) return;
     const labs = getUniqueLabs();
-    analisisLabSelect.innerHTML = `<option value="">Sin laboratorio</option>
-      ${labs.map((l) => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('')}
-      <option value="__nuevo__">+ Agregar nuevo...</option>`;
-    if (currentValue && currentValue !== '__nuevo__') analisisLabSelect.value = currentValue;
+    analisisLabSelect.innerHTML = `${labs.map((l) => `<sl-option value="${ljOptionValue(l)}">${escapeHtml(l)}</sl-option>`).join('')}
+      <sl-option value="__nuevo__">+ Agregar nuevo...</sl-option>`;
+    ljSetSelectValue(analisisLabSelect, currentValue && currentValue !== '__nuevo__' ? currentValue : '');
   };
 
   analisisLabSelect?.addEventListener('change', () => {
-    const isNew = analisisLabSelect.value === '__nuevo__';
+    const isNew = ljSelectValue(analisisLabSelect) === '__nuevo__';
     analisisLabNew?.classList.toggle('d-none', !isNew);
     if (isNew) analisisLabNew?.focus();
     else if (analisisLabNew) analisisLabNew.value = '';
@@ -248,8 +247,8 @@
           </div>
         </article>
         <div class="informe-user-actions">
-          <button class="family-manage-btn" type="button" data-user-edit="${u.id}" title="Editar"><i class="fa-solid fa-pen"></i></button>
-          <button class="family-manage-btn" type="button" data-user-delete="${u.id}" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" type="button" data-user-edit="${u.id}" title="Editar"><i class="fa-solid fa-pen"></i></sl-button>
+          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" type="button" data-user-delete="${u.id}" title="Eliminar"><i class="fa-solid fa-trash"></i></sl-button>
         </div>
       </div>`).join('');
     renderUserSelect();
@@ -258,12 +257,12 @@
 
   const renderUserSelect = () => {
     const users = Object.values(state.users).sort((a, b) => String(a.fullName).localeCompare(String(b.fullName)));
-    const cur = analisisUserSelect?.value;
+    const cur = ljSelectValue(analisisUserSelect);
     if (analisisUserSelect) {
-      analisisUserSelect.innerHTML = `<option value="">Seleccioná un usuario</option>
-        ${users.map((u) => `<option value="${u.id}">${escapeHtml(u.fullName)} (${escapeHtml(u.position)})</option>`).join('')}
-        <option value="create">Crear nuevo usuario</option>`;
-      if (cur && state.users[cur]) analisisUserSelect.value = cur;
+      // "Seleccioná un usuario" es el placeholder del sl-select.
+      analisisUserSelect.innerHTML = `${users.map((u) => `<sl-option value="${ljOptionValue(u.id)}">${escapeHtml(u.fullName)} (${escapeHtml(u.position)})</sl-option>`).join('')}
+        <sl-option value="create">Crear nuevo usuario</sl-option>`;
+      ljSetSelectValue(analisisUserSelect, cur && state.users[cur] ? cur : '');
     }
   };
 
@@ -289,24 +288,18 @@
           <section class="step-block">
             <h6 class="step-title">1) Datos personales</h6>
             <div class="step-content">
-              <label for="aqUserFullName">Nombre y apellido *</label>
-              <input id="aqUserFullName" class="swal2-input ios-input" autocomplete="off" placeholder="Ej: Juan Pérez" value="${initial ? escapeHtml(initial.fullName) : ''}">
-              <label for="aqUserPosition">Puesto en la empresa *</label>
-              <input id="aqUserPosition" class="swal2-input ios-input" autocomplete="off" placeholder="Ej: Bromatólogo" value="${initial ? escapeHtml(initial.position) : ''}">
-              <label for="aqUserEmail">Email *</label>
-              <input id="aqUserEmail" class="swal2-input ios-input" type="email" autocomplete="off" placeholder="usuario@empresa.com" value="${initial ? escapeHtml(initial.email || '') : ''}">
-              <label for="aqUserPin">Clave de 4 dígitos *</label>
-              <div class="ios-input-group d-flex align-items-center px-2">
-                <input id="aqUserPin" class="swal2-input ios-input border-0 bg-transparent flex-grow-1" type="password" maxlength="4" inputmode="numeric" autocomplete="new-password" placeholder="4 dígitos" value="${initial ? escapeHtml(initial.pin) : ''}">
-                <button id="aqTogglePin" type="button" class="btn ios-toggle-pass" aria-label="Ver/ocultar"><i class="fa-solid fa-eye"></i></button>
-              </div>
+              <sl-input id="aqUserFullName" label="Nombre y apellido *" autocomplete="off" placeholder="Ej: Juan Pérez" value="${initial ? escapeHtml(initial.fullName) : ''}"></sl-input>
+              <sl-input id="aqUserPosition" label="Puesto en la empresa *" autocomplete="off" placeholder="Ej: Bromatólogo" value="${initial ? escapeHtml(initial.position) : ''}"></sl-input>
+              <sl-input id="aqUserEmail" label="Email *" type="email" autocomplete="off" placeholder="usuario@empresa.com" value="${initial ? escapeHtml(initial.email || '') : ''}"></sl-input>
+              <sl-input id="aqUserPin" label="Clave de 4 dígitos *" type="password" password-toggle maxlength="4" inputmode="numeric" autocomplete="new-password" placeholder="4 dígitos" value="${initial ? escapeHtml(initial.pin) : ''}"></sl-input>
             </div>
           </section>
           <section class="step-block">
             <h6 class="step-title">2) Fotografía (opcional)</h6>
             <div class="step-content">
-              <div id="aqPhotoPreview" class="image-preview-circle">${initial?.photoUrl ? `<img src="${escapeHtml(initial.photoUrl)}" alt="Foto">` : '<span class="image-placeholder-circle-2 user-initials-preview"><i class="bi bi-person-fill"></i></span>'}</div>
-              <input id="aqPhotoInput" type="file" class="form-control image-file-input" accept="image/*">
+              <div id="aqPhotoPreview" class="image-preview-circle">${initial?.photoUrl ? `<img src="${escapeHtml(initial.photoUrl)}" alt="Foto">` : '<span class="image-placeholder-circle-2 user-initials-preview"><sl-icon name="person-fill"></sl-icon></span>'}</div>
+              <input id="aqPhotoInput" type="file" class="image-file-input" accept="image/*" hidden>
+              <sl-button id="aqPhotoPickBtn" type="button" variant="default" class="users-photo-pick"><i slot="prefix" class="fa-solid fa-camera"></i>Elegir foto</sl-button>
             </div>
           </section>
         </div>`,
@@ -314,21 +307,15 @@
         const nameInput  = document.getElementById('aqUserFullName');
         const photoInput = document.getElementById('aqPhotoInput');
         const preview    = document.getElementById('aqPhotoPreview');
-        const pinInput   = document.getElementById('aqUserPin');
-        const togglePin  = document.getElementById('aqTogglePin');
+        document.getElementById('aqPhotoPickBtn')?.addEventListener('click', () => photoInput.click());
         const updateInitials = () => {
           if (pendingUpload || initial?.photoUrl) return;
           const ini = initialsFromName(nameInput.value);
           preview.innerHTML = ini
             ? `<span class="image-placeholder-circle-2 user-initials-preview">${ini}</span>`
-            : '<span class="image-placeholder-circle-2 user-initials-preview"><i class="bi bi-person-fill"></i></span>';
+            : '<span class="image-placeholder-circle-2 user-initials-preview"><sl-icon name="person-fill"></sl-icon></span>';
         };
         nameInput.addEventListener('input', updateInitials);
-        togglePin.addEventListener('click', () => {
-          const hidden = pinInput.type === 'password';
-          pinInput.type = hidden ? 'text' : 'password';
-          togglePin.innerHTML = hidden ? '<i class="fa-solid fa-eye-slash"></i>' : '<i class="fa-solid fa-eye"></i>';
-        });
         updateInitials();
         photoInput.addEventListener('change', () => {
           const file = photoInput.files?.[0];
@@ -373,16 +360,16 @@
       const itemName = getAttachmentName(item);
       const itemUrl = getAttachmentPreviewUrl(item);
       if (itemType === 'image') {
-        return `<button type="button" class="attachment-card" data-view-image="${idx}">
-          <span class="attachment-loader"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"></span>
+        return `<button type="button" class="lj-tile attachment-card" data-view-image="${idx}">
+          <span class="attachment-loader"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span>
           <img src="${escapeHtml(itemUrl)}" alt="${escapeHtml(itemName)}" class="attachment-image js-attachment-preview">
         </button>`;
       }
       const isPdf = normalizeLower(itemName).endsWith('.pdf');
       return `<div class="attachment-card attachment-doc${isPdf ? ' attachment-pdf' : ''}">
-        <i class="bi ${fileIcon(item.file || { name: itemName })}"${isPdf ? ' style="color:#e74c3c;"' : ''}></i>
+        <sl-icon name="${fileIcon(item.file || { name: itemName })}"></sl-icon>
         <span>${escapeHtml(itemName)}</span>
-        <button type="button" class="btn-close btn-close-sm" data-remove-attachment="${idx}" title="Quitar" style="margin-left:auto;"></button>
+        <sl-button variant="text" size="small" class="lj-icon-btn remove-attachment-btn is-danger" type="button" data-remove-attachment="${idx}" title="Quitar"><i class="fa-solid fa-xmark"></i></sl-button>
       </div>`;
     }).join('');
     analisisAttachmentsGrid.querySelectorAll('.js-attachment-preview').forEach((img) => {
@@ -446,6 +433,21 @@
   };
 
   // ── editor toolbar ─────────────────────────────────────────────────────────
+  // Última selección dentro del editor (los sl-select/sl-button pueden sacarla al tomar el foco).
+  let editorRange = null;
+  document.addEventListener('selectionchange', () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount && analisisEditor?.contains(sel.anchorNode)) editorRange = sel.getRangeAt(0).cloneRange();
+  });
+  const restoreEditorSelection = () => {
+    const sel = window.getSelection();
+    if (!analisisEditor || !editorRange || !sel || !editorRange.startContainer.isConnected) return;
+    if (sel.rangeCount && analisisEditor.contains(sel.anchorNode)) return;
+    analisisEditor.focus();
+    sel.removeAllRanges();
+    sel.addRange(editorRange);
+  };
+
   const setupEditorToolbar = () => {
     analisisData?.querySelectorAll('.editor-btn[data-cmd]').forEach((btn) => {
       btn.addEventListener('mousedown', (e) => {
@@ -456,22 +458,28 @@
       });
     });
 
+    // El sl-select se lleva el foco: restauramos la selección del editor antes de aplicar el formato.
     analisisFormatBlockSelect?.addEventListener('change', () => {
-      document.execCommand('formatBlock', false, analisisFormatBlockSelect.value);
+      restoreEditorSelection();
+      document.execCommand('formatBlock', false, ljSelectValue(analisisFormatBlockSelect));
       analisisEditor?.focus(); updatePreview(); saveDraft();
     });
 
     analisisFontSizeSelect?.addEventListener('change', () => {
-      document.execCommand('fontSize', false, analisisFontSizeSelect.value);
+      restoreEditorSelection();
+      document.execCommand('fontSize', false, ljSelectValue(analisisFontSizeSelect));
       analisisEditor?.focus(); updatePreview(); saveDraft();
     });
 
     analisisTextColorInput?.addEventListener('input', () => {
+      restoreEditorSelection();
       document.execCommand('foreColor', false, analisisTextColorInput.value);
       analisisEditor?.focus();
     });
 
+    analisisApplyHighlightBtn?.addEventListener('mousedown', (e) => e.preventDefault());
     analisisApplyHighlightBtn?.addEventListener('click', () => {
+      restoreEditorSelection();
       document.execCommand('hiliteColor', false, analisisHighlightColorInput?.value || '#ffff00');
       analisisEditor?.focus(); updatePreview(); saveDraft();
     });
@@ -481,10 +489,11 @@
 
     const EMOJIS = ['😊','😄','😐','😶','⚠️','🚨','✅','❌','📋','🔬','💧','🍖','🧴','🧽','🌬️','🌾','🥤','📊','📈','📉','🔴','🟡','🟢','⚡','🧪','💉','🌡️','⚗️','🏭'];
     if (analisisEmojiPanel) {
-      analisisEmojiPanel.innerHTML = EMOJIS.map((e) => `<button type="button" class="emoji-btn" data-emoji="${e}">${e}</button>`).join('');
+      analisisEmojiPanel.innerHTML = EMOJIS.map((e) => `<button type="button" class="lj-tile emoji-btn" data-emoji="${e}">${e}</button>`).join('');
       analisisEmojiPanel.addEventListener('click', (e) => {
         const btn = e.target.closest('.emoji-btn');
         if (!btn) return;
+        restoreEditorSelection();
         analisisEditor?.focus();
         document.execCommand('insertText', false, btn.dataset.emoji);
         analisisEmojiPanel.classList.remove('is-open');
@@ -535,7 +544,7 @@
     const originalHtml = btn ? btn.innerHTML : '';
     if (btn) {
       btn.disabled = true;
-      btn.innerHTML = '<img src="./IMG/Meta-ai-logo.webp" class="meta-spinner-login" style="width:20px;height:20px;object-fit:contain;"> Procesando...';
+      btn.innerHTML = '<sl-spinner class="meta-spinner-login" aria-label="Procesando"></sl-spinner> Procesando...';
     }
     try {
       const tempDiv   = document.createElement('div');
@@ -594,7 +603,7 @@ REGLAS:
   const promptUserKey = () => openSwal({
     title: 'Verificar clave',
     input: 'password',
-    inputClass: 'ios-input informes-key-input',
+    inputClass: 'informes-key-input',
     inputLabel: 'Ingresá la clave de 4 dígitos',
     inputAttributes: { maxlength: 4, inputmode: 'numeric', autocomplete: 'new-password' },
     confirmButtonText: 'Validar', showCancelButton: true, cancelButtonText: 'Cancelar',
@@ -611,7 +620,7 @@ REGLAS:
 
   // ── save ───────────────────────────────────────────────────────────────────
   const saveAnalisis = async () => {
-    const userId  = normalizeValue(analisisUserSelect?.value);
+    const userId  = normalizeValue(ljSelectValue(analisisUserSelect));
     const html    = normalizeValue(analisisEditor?.innerHTML);
     const typeVal = normalizeValue(analisisTypeHidden?.value);
 
@@ -631,8 +640,8 @@ REGLAS:
     const recordId  = state.editingId || makeId('aqr');
 
     Swal.fire({
-      target: getSwalTarget(), title: 'Guardando análisis...',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner-login"></div>',
+      title: 'Guardando análisis...',
+      html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Guardando"></sl-spinner></div>',
       allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false,
       customClass: { popup: 'ios-alert informes-alert informes-saving-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' }
     });
@@ -702,7 +711,7 @@ REGLAS:
       await loadRecordsBoard();
       renderLabSelect();
       Swal.close();
-      bootstrap.Modal.getOrCreateInstance(analisisModal).hide();
+      LJModal.close(analisisModal);
       await openSwal({ title: 'Análisis guardado', html: '<p>El análisis fue almacenado correctamente.</p>', icon: 'success', confirmButtonText: 'Cerrar' });
     } catch (err) {
       Swal.close();
@@ -768,13 +777,13 @@ REGLAS:
     if (total <= 1) { analisisPagination.innerHTML = ''; return; }
     const cur = state.currentPage;
     const pages = Array.from({ length: total }, (_, i) => i + 1)
-      .map((p) => `<li class="page-item${p === cur ? ' active' : ''}"><button class="page-link" data-page="${p}">${p}</button></li>`)
+      .map((p) => `<sl-button size="small" variant="${p === cur ? 'primary' : 'default'}" class="informes-page-btn" data-page="${p}">${p}</sl-button>`)
       .join('');
-    analisisPagination.innerHTML = `<nav aria-label="Paginación de análisis"><ul class="pagination pagination-sm justify-content-center mb-0">
-      <li class="page-item${cur === 1 ? ' disabled' : ''}"><button class="page-link" data-page="${Math.max(1, cur - 1)}">‹</button></li>
+    analisisPagination.innerHTML = `<nav class="informes-page-nav" aria-label="Paginación de análisis">
+      <sl-button size="small" variant="default" class="informes-page-btn" data-page="${Math.max(1, cur - 1)}"${cur === 1 ? ' disabled' : ''}>‹</sl-button>
       ${pages}
-      <li class="page-item${cur === total ? ' disabled' : ''}"><button class="page-link" data-page="${Math.min(total, cur + 1)}">›</button></li>
-    </ul></nav>`;
+      <sl-button size="small" variant="default" class="informes-page-btn" data-page="${Math.min(total, cur + 1)}"${cur === total ? ' disabled' : ''}>›</sl-button>
+    </nav>`;
   };
 
   const renderRecordsBoard = async () => {
@@ -812,10 +821,10 @@ REGLAS:
         <td style="text-align:center;white-space:nowrap;">${attachments.length ? `<span class="informe-attach-chip"><i class="fa-solid fa-paperclip"></i> ${attachments.length}</span>` : '<span class="analisis-td-empty">—</span>'}</td>
         <td>
           <div class="analisis-table-actions">
-            <button class="btn informe-icon-btn" type="button" data-view-record="${record.id}" title="Ver análisis"><i class="fa-solid fa-eye"></i></button>
-            <button class="btn informe-icon-btn" type="button" data-edit-record="${record.id}" title="Editar"><i class="fa-solid fa-pen"></i></button>
-            <button class="btn informe-icon-btn danger" type="button" data-delete-record="${record.id}" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
-            <button class="btn informe-icon-btn" type="button" data-print-record="${record.id}" title="Imprimir"><i class="fa-solid fa-print"></i></button>
+            <sl-button variant="default" size="small" class="lj-icon-btn informe-icon-btn" type="button" data-view-record="${record.id}" title="Ver análisis"><i class="fa-solid fa-eye"></i></sl-button>
+            <sl-button variant="default" size="small" class="lj-icon-btn informe-icon-btn" type="button" data-edit-record="${record.id}" title="Editar"><i class="fa-solid fa-pen"></i></sl-button>
+            <sl-button variant="default" size="small" class="lj-icon-btn informe-icon-btn danger" type="button" data-delete-record="${record.id}" title="Eliminar"><i class="fa-solid fa-trash"></i></sl-button>
+            <sl-button variant="default" size="small" class="lj-icon-btn informe-icon-btn" type="button" data-print-record="${record.id}" title="Imprimir"><i class="fa-solid fa-print"></i></sl-button>
           </div>
         </td>
       </tr>`;
@@ -865,38 +874,38 @@ REGLAS:
     const docs    = attachments.filter((a) => a.type !== 'image');
 
     const imgsHtml = images.length
-      ? `<div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));margin-top:8px;">
-          ${images.map((a, i) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:10px;padding:8px;background:#fff;cursor:pointer;" data-view-detail-image="${i}">
-            <img src="${escapeHtml(a.url)}" alt="${escapeHtml(a.name)}" style="width:100%;max-height:180px;object-fit:contain;border-radius:8px;">
-            <figcaption style="font-size:11px;color:#4b5f8e;margin-top:4px;">${escapeHtml(a.name)}</figcaption>
+      ? `<div class="aq-detail-images">
+          ${images.map((a, i) => `<figure class="aq-detail-figure" data-view-detail-image="${i}">
+            <img src="${escapeHtml(a.url)}" alt="${escapeHtml(a.name)}">
+            <figcaption>${escapeHtml(a.name)}</figcaption>
           </figure>`).join('')}
         </div>`
-      : '<p style="color:#5a6482;font-size:0.85rem;">Sin imágenes.</p>';
+      : '<p class="aq-detail-empty">Sin imágenes.</p>';
 
     const docsHtml = docs.length
-      ? `<ul style="margin:6px 0 0;padding-left:18px;">${docs.map((a) => `<li style="margin-bottom:5px;"><a href="${escapeHtml(a.url)}" target="_blank" rel="noopener" style="color:#1d4ed8;">${escapeHtml(a.name)}</a></li>`).join('')}</ul>`
-      : '<p style="color:#5a6482;font-size:0.85rem;">Sin documentos.</p>';
+      ? `<ul class="aq-detail-docs">${docs.map((a) => `<li><a href="${escapeHtml(a.url)}" target="_blank" rel="noopener">${escapeHtml(a.name)}</a></li>`).join('')}</ul>`
+      : '<p class="aq-detail-empty">Sin documentos.</p>';
 
     await openSwal({
       title: '', width: 860,
-      html: `<div style="font-family:Inter,Arial,sans-serif;text-align:left;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
-          <span style="font-size:1.6rem;color:#4b78e8;">${typeIcon(typeMeta)}</span>
-          <div><h4 style="margin:0;font-size:1rem;color:#1f2a44;">${escapeHtml(typeMeta.label)}</h4><small style="color:#5a6482;">${getDateLabel(full.createdAt)}</small></div>
-          <span class="importance-chip importance-${imp.tone}" style="margin-left:auto;">${imp.label}</span>
+      html: `<div class="aq-detail">
+        <div class="aq-detail-head">
+          <span class="aq-detail-icon">${typeIcon(typeMeta)}</span>
+          <div><h4 class="aq-detail-title">${escapeHtml(typeMeta.label)}</h4><small class="aq-detail-date">${getDateLabel(full.createdAt)}</small></div>
+          <span class="importance-chip importance-${imp.tone}">${imp.label}</span>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <div class="aq-detail-chips">
           ${full.sampleId  ? `<span class="sample-chip">Muestra: ${escapeHtml(full.sampleId)}</span>` : ''}
           ${full.laboratory ? `<span class="sample-chip">Lab: ${escapeHtml(full.laboratory)}</span>` : ''}
           <span class="sample-chip">Por: ${escapeHtml(displayName)}</span>
         </div>
-        <div style="border:1px solid #dce5fb;border-radius:14px;padding:14px;background:#fbfdff;margin-bottom:10px;">${full.html || '<p>Sin contenido</p>'}</div>
-        ${full.observations ? `<div style="background:#fffbea;border:1px solid #f0d060;border-radius:12px;padding:10px 14px;margin-bottom:10px;"><strong style="font-size:0.85rem;color:#7a6000;">Observaciones</strong><p style="margin:4px 0 0;font-size:0.88rem;color:#5a4a00;">${escapeHtml(full.observations)}</p></div>` : ''}
-        <div style="margin-top:10px;"><h5 style="font-size:0.9rem;font-weight:700;color:#2d4f8a;margin:0 0 6px;">Imágenes adjuntas</h5>${imgsHtml}</div>
-        <div style="margin-top:10px;"><h5 style="font-size:0.9rem;font-weight:700;color:#2d4f8a;margin:0 0 4px;">Documentos y PDFs</h5>${docsHtml}</div>
+        <div class="aq-detail-content">${full.html || '<p>Sin contenido</p>'}</div>
+        ${full.observations ? `<div class="aq-detail-obs"><strong>Observaciones</strong><p>${escapeHtml(full.observations)}</p></div>` : ''}
+        <div class="aq-detail-section"><h5>Imágenes adjuntas</h5>${imgsHtml}</div>
+        <div class="aq-detail-section"><h5>Documentos y PDFs</h5>${docsHtml}</div>
       </div>`,
       showCancelButton: false, confirmButtonText: 'Cerrar',
-      customClass: { popup: 'informes-detail-alert', confirmButton: 'ios-btn ios-btn-secondary' },
+      customClass: { popup: 'informes-detail-alert', confirmButton: 'secondary' },
       didOpen: () => {
         document.querySelectorAll('[data-view-detail-image]').forEach((fig) => {
           fig.addEventListener('click', () => openViewerWithImages(images, parseInt(fig.dataset.viewDetailImage, 10)));
@@ -921,8 +930,7 @@ REGLAS:
     state.editingOriginal = full;
     state.editingOriginalPath = `/analisis_quimicos/${full.year}/${full.month}/${full.day}/${recordId}`;
 
-    const modal = bootstrap.Modal.getOrCreateInstance(analisisModal);
-    modal.show();
+    LJModal.open(analisisModal);
     await new Promise((res) => setTimeout(res, 400));
 
     if (analisisEditor)         analisisEditor.innerHTML = full.html || '';
@@ -930,7 +938,7 @@ REGLAS:
     if (analisisSampleId)       analisisSampleId.value = full.sampleId || '';
     if (analisisImportanceRange) { analisisImportanceRange.value = full.importance || 50; updateImportanceLabel(); }
     if (full.analysisType) selectAnalysisType(full.analysisType);
-    if (analisisUserSelect) analisisUserSelect.value = full.userId || '';
+    if (analisisUserSelect) ljSetSelectValue(analisisUserSelect, full.userId || '');
     renderLabSelect(full.laboratory || '');
     state.attachments.forEach((a) => { if (shouldRevokeAttachmentPreview(a)) URL.revokeObjectURL(a.previewUrl); });
     state.attachments = (Array.isArray(full.attachments) ? full.attachments : []).map(toExistingAttachmentItem);
@@ -948,7 +956,7 @@ REGLAS:
     const confirm = await openSwal({
       title: 'Eliminar análisis', html: '<p>Esta acción no se puede deshacer.</p>', icon: 'warning',
       showCancelButton: true, confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar',
-      customClass: { confirmButton: 'ios-btn ios-btn-danger' }
+      customClass: { confirmButton: 'danger' }
     });
     if (!confirm.isConfirmed) return;
     await loadUsers({ force: true });
@@ -984,7 +992,7 @@ REGLAS:
       showDenyButton: true, showCancelButton: true,
       confirmButtonText: 'Con imágenes', denyButtonText: 'Sin imágenes', cancelButtonText: 'Cancelar',
       scrollbarPadding: false, scrollBehavior: 'inside',
-      customClass: { confirmButton: 'ios-btn ios-btn-success', denyButton: 'ios-btn ios-btn-secondary', cancelButton: 'ios-btn ios-btn-secondary' }
+      customClass: { confirmButton: 'success', denyButton: 'secondary', cancelButton: 'secondary' }
     });
     if (!choice.isConfirmed && !choice.isDenied) return;
 
@@ -1019,9 +1027,11 @@ REGLAS:
   };
 
   // ── image viewer ───────────────────────────────────────────────────────────
+  // Visor propio sobre sl-dialog: se apila sobre el modal/alerta abiertos por orden de apertura.
   const ensureImageViewer = () => {
-    if (!imageViewerModal && window.bootstrap && imageViewerModalEl)
-      imageViewerModal = new bootstrap.Modal(imageViewerModalEl);
+    if (!imageViewerModal && imageViewerModalEl) {
+      imageViewerModal = { show: () => LJModal.open(imageViewerModalEl), hide: () => LJModal.close(imageViewerModalEl) };
+    }
   };
 
   const openViewerWithImages = (images, startIndex = 0) => {
@@ -1128,7 +1138,7 @@ REGLAS:
     }
     if (e.target.closest('[data-user-delete]')) {
       const uid = e.target.closest('[data-user-delete]').dataset.userDelete;
-      const ok  = await openSwal({ title: 'Eliminar usuario', html: '<p>¿Seguro?</p>', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar', customClass: { confirmButton: 'ios-btn ios-btn-danger' } });
+      const ok  = await openSwal({ title: 'Eliminar usuario', html: '<p>¿Seguro?</p>', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar', customClass: { confirmButton: 'danger' } });
       if (!ok.isConfirmed) return;
       delete state.users[uid];
       await window.dbLaJamoneraRest.write('/informes/users', state.users);
@@ -1144,10 +1154,10 @@ REGLAS:
   });
 
   analisisUserSelect?.addEventListener('change', async () => {
-    if (analisisUserSelect.value === 'create') {
-      analisisUserSelect.value = '';
+    if (ljSelectValue(analisisUserSelect) === 'create') {
+      ljSetSelectValue(analisisUserSelect, '');
       const id = await openUserForm();
-      if (id) analisisUserSelect.value = id;
+      if (id) ljSetSelectValue(analisisUserSelect, id);
     }
   });
 
@@ -1230,7 +1240,7 @@ REGLAS:
   setupDateFilter();
   setupTypeFilter();
 
-  analisisModal.addEventListener('show.bs.modal', () => {
+  LJModal.on(analisisModal, 'show', () => {
     if (!datePicker && window.flatpickr) {
       datePicker = flatpickr(analisisDateInput, { dateFormat: 'd/m/Y', defaultDate: new Date(), locale: window.flatpickr?.l10ns?.es || undefined });
     }

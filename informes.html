@@ -127,7 +127,7 @@
         </div>
         <div class="home-content informes-home-content">
           <div id="informesBoardLoading" class="informes-board-loading" aria-live="polite">
-            <img src="./IMG/Meta-ai-logo.webp" alt="Cargando informes" class="meta-spinner-login informes-board-spinner">
+            <sl-spinner class="meta-spinner-login informes-board-spinner" aria-label="Cargando informes"></sl-spinner>
           </div>
           <div id="informesBoardEmpty" class="informes-board-empty d-none">No hay informes para cargar</div>
           <div id="informesCardsGrid" class="informes-cards-grid d-none"></div>
@@ -141,7 +141,7 @@
         </div>
         <div class="lj-dialog-body">
               <div id="informesLoading" class="informes-loading" aria-live="polite">
-                <img src="./IMG/Meta-ai-logo.webp" alt="Cargando informes" class="meta-spinner-login">
+                <sl-spinner class="meta-spinner-login" aria-label="Cargando informes"></sl-spinner>
               </div>
 
               <div id="informesData" class="informes-data d-none" aria-live="polite">
@@ -161,7 +161,7 @@
                   </div>
                   <div>
                     <label class="lj-label" for="informeUserSelect">Usuario para guardar</label>
-                    <sl-select id="informeUserSelect"></sl-select>
+                    <sl-select id="informeUserSelect" placeholder="Seleccioná un usuario" hoist></sl-select>
                   </div>
                 </div>
 
@@ -170,21 +170,15 @@
                   <div class="report-notify-head">
                     <h6 class="report-notify-title">Notificaciones por email</h6>
                     <sl-button variant="default" id="saveNotifyPreferenceBtn" type="button" class="report-notify-save-btn">
-                      <img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner-login d-none" id="saveNotifyPreferenceSpinner">
-                      <i class="fa-solid fa-floppy-disk" id="saveNotifyPreferenceIcon"></i>
+                      <sl-spinner id="saveNotifyPreferenceSpinner" slot="prefix" class="meta-spinner-login d-none" aria-label="Guardando"></sl-spinner>
+                      <i slot="prefix" class="fa-solid fa-floppy-disk" id="saveNotifyPreferenceIcon"></i>
                       <span>Guardar preferencia</span>
                     </sl-button>
                   </div>
 
-                  <label class="report-notify-check">
-                    <sl-checkbox id="notifyAllUsersCheckbox"></sl-checkbox>
-                    <span>Notificar nuevo informe a todos los usuarios</span>
-                  </label>
+                  <sl-checkbox id="notifyAllUsersCheckbox" class="report-notify-check">Notificar nuevo informe a todos los usuarios</sl-checkbox>
 
-                  <label class="report-notify-check">
-                    <sl-checkbox id="notifySpecificUsersCheckbox"></sl-checkbox>
-                    <span>Notificar a usuarios específicos</span>
-                  </label>
+                  <sl-checkbox id="notifySpecificUsersCheckbox" class="report-notify-check">Notificar a usuarios específicos</sl-checkbox>
 
                   <div id="notifySpecificUsersList" class="notify-specific-users-list d-none"></div>
                 </div>
@@ -197,9 +191,9 @@
                     <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="underline" title="Subrayado"><i class="fa-solid fa-underline"></i></sl-button>
                     <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="strikeThrough" title="Tachado"><i class="fa-solid fa-strikethrough"></i></sl-button>
 
-                    <sl-select id="formatBlockSelect" class="editor-select" aria-label="Tipo de texto"><sl-option value="P">Normal</sl-option><sl-option value="H3">Título</sl-option><sl-option value="H4">Subtítulo</sl-option><sl-option value="BLOCKQUOTE">Cita</sl-option></sl-select>
+                    <sl-select id="formatBlockSelect" class="editor-select" value="P" hoist aria-label="Tipo de texto"><sl-option value="P">Normal</sl-option><sl-option value="H3">Título</sl-option><sl-option value="H4">Subtítulo</sl-option><sl-option value="BLOCKQUOTE">Cita</sl-option></sl-select>
 
-                    <sl-select id="fontSizeSelect" class="editor-select"><sl-option value="3">Normal</sl-option><sl-option value="2">Pequeño</sl-option><sl-option value="4">Grande</sl-option><sl-option value="5">Muy grande</sl-option></sl-select>
+                    <sl-select id="fontSizeSelect" class="editor-select" value="3" hoist aria-label="Tamaño de texto"><sl-option value="3">Normal</sl-option><sl-option value="2">Pequeño</sl-option><sl-option value="4">Grande</sl-option><sl-option value="5">Muy grande</sl-option></sl-select>
 
                     <label class="editor-color-wrap" title="Color de texto">
                       <i class="fa-solid fa-font"></i>
@@ -225,12 +219,12 @@
                     </div>
                   </div>
                   <!-- Botón IA -->
-                  <div class="ai-format-btn-wrap" style="display:flex;align-items:center;gap:10px;margin:8px 0;padding:10px 14px;background:linear-gradient(135deg,#f0f4ff,#f5f0ff);">
-                    <sl-button variant="default" id="informeFormatIABtn" type="button" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border:none;">
-                      <img src="./IMG/ia-unscreen.gif" alt="IA" style="width:22px;height:22px;object-fit:contain;">
-                      <span>Arreglar con IA</span>
+                  <div class="ai-format-btn-wrap">
+                    <sl-button variant="default" id="informeFormatIABtn" class="ai-format-btn" type="button">
+                      <img slot="prefix" src="./IMG/ia-unscreen.gif" alt="IA" class="ia-icon-btn">
+                      Arreglar con IA
                     </sl-button>
-                    <span style="font-size:0.78rem;color:#5a6a9a;flex:1;">Estructura el texto con títulos, subtítulos y resalta hallazgos importantes</span>
+                    <span class="ai-hint">Estructura el texto con títulos, subtítulos y resalta hallazgos importantes</span>
                   </div>
 
                   <div id="informeEditor" class="informe-editor" contenteditable="true" aria-label="Editor de texto enriquecido" data-placeholder="Escribí el informe acá..."></div>
@@ -286,7 +280,7 @@
                 <sl-button variant="default" id="viewerNextBtn" type="button"><i class="fa-solid fa-chevron-right"></i></sl-button>
               </div>
               <div id="viewerStage" class="viewer-stage">
-                <span id="viewerStageSpinner" class="thumb-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"></span>
+                <span id="viewerStageSpinner" class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span>
                 <img id="viewerImage" src="" alt="Imagen adjunta">
               </div>
         </div>
