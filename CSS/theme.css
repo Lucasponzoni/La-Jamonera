@@ -151,3 +151,9 @@ sl-button > [slot="suffix"] { margin-inline-start: 2px; }
 sl-menu-item > [slot="prefix"] { margin-inline-end: 8px; }
 sl-menu-item > [slot="suffix"] { margin-inline-start: 8px; }
 sl-tab > i, sl-tag > i, sl-badge > i { margin-inline-end: 4px; }
+
+/* Menús: ícono alineado en columna fija y separado del texto, esté o no en el slot prefix. */
+sl-menu-item > i, sl-menu-item > sl-icon, sl-menu-item > img { width: 16px; margin-inline-end: 10px; text-align: center; font-size: 14px; color: var(--lj-muted); flex-shrink: 0; }
+sl-menu-item::part(label) { display: inline-flex; align-items: center; font-size: 13px; }
+sl-menu-item[variant="danger"]::part(base), sl-menu-item.is-danger::part(base), sl-menu-item.is-danger > i { color: var(--lj-danger); }
+sl-menu-item::part(checked-icon) { width: 8px; }
