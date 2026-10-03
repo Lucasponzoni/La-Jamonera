@@ -228,7 +228,7 @@ end $$;
 -- ---------- Personas (/informes/users) — el PIN nunca se guarda ni se devuelve en claro ----------
 create or replace function private.lj_up_personas(p_id text, r jsonb) returns void language plpgsql
 set search_path = public, extensions as $$
-declare v_pin text := private.lj_txt(r->'pin'); v_raw jsonb := r - 'pin'; v_hash text;
+declare v_pin text := private.lj_txt(r->'pin'); v_raw jsonb := r - 'pin' - 'hasPin'; v_hash text;
 begin
   select pin_hash into v_hash from personas where id = p_id;
   if v_pin is not null and v_pin ~ '^\d{4}$' and (v_hash is null or v_hash <> crypt(v_pin, v_hash)) then
