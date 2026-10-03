@@ -180,7 +180,17 @@
     parts.forEach((part) => Object.assign(out, part || {}));
     return out;
   };
+  // Reservas de stock: sólo importan las activas (las liberadas son historial y ya son miles).
+  const readActiveReservations = async () => {
+    await clientReady;
+    const { data, error } = await client.from('produccion_reservas').select('id, raw').eq('estado', 'active');
+    if (error) return readChunked('/produccion/reservas', CHUNKED_READS['/produccion/reservas']);
+    const out = {};
+    (data || []).forEach((row) => { if (row.raw) out[row.id] = row.raw; });
+    return Object.keys(out).length ? out : null;
+  };
   const readRemote = async (key) => {
+    if (key === '/produccion/reservas') return readActiveReservations();
     if (CHUNKED_READS[key]) return readChunked(key, CHUNKED_READS[key]);
     if (key === '/inventario') {
       const [config, items, indexes] = await Promise.all([readRemote('/inventario/config'), readRemote('/inventario/items'), readRemote('/inventario/indexes')]);

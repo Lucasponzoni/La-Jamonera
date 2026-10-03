@@ -175,7 +175,7 @@
   });
 
   const renderUserAvatar = (user) => {
-    if (user.photoUrl) return `<span class="user-avatar-thumb"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-user-photo" src="${user.photoUrl}" alt="${escapeHtml(user.fullName)}"></span>`;
+    if (user.photoUrl) return `<span class="user-avatar-thumb"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-user-photo" src="${(window.ljThumb || String)(user.photoUrl)}" alt="${escapeHtml(user.fullName)}"></span>`;
     const ini = initialsFromName(user.fullName);
     return `<span class="user-avatar-thumb user-avatar-initials">${ini || '<sl-icon name="person-fill"></sl-icon>'}</span>`;
   };

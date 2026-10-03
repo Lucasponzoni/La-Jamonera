@@ -60,9 +60,10 @@
     }
   }
 
-  async function image(prompt, options) {
+  // request: { referenceUrls, aspectRatio } opcionales (imágenes de referencia de estilo del propio storage).
+  async function image(prompt, options, request = {}) {
     await ready();
-    const res = await proxy().postJson('/ia/image', { prompt: String(prompt || '') });
+    const res = await proxy().postJson('/ia/image', { prompt: String(prompt || ''), ...request });
     if (!res.ok) throw await readError(res);
     const data = await res.json();
     if (!data || !data.data) throw new Error('La IA no devolvió una imagen.');

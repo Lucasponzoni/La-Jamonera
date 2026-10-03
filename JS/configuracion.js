@@ -263,8 +263,9 @@
   const revealForAdmins = async () => {
     try {
       if (window.laJamoneraReady) await window.laJamoneraReady;
-      const me = await api('GET', '/me');
-      if (!me.admin) return;
+      // Reusa el /me que ya pidió authz.js (antes se pedía dos veces al entrar).
+      const me = (window.LJMe && await window.LJMe) || await api('GET', '/me');
+      if (!me?.admin) return;
       document.querySelectorAll('.js-open-config').forEach((el) => { el.hidden = false; });
     } catch (_) { /* sin servidor o sin sesión: queda oculto */ }
   };

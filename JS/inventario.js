@@ -141,6 +141,7 @@
     inventoryLoadedFromIndex: false,
     fullInventoryLoaded: false,
     inventoryDetailLoaded: {},
+    periodLots: null,
     inventoryExpiryExpanded: false
   };
 
@@ -645,7 +646,7 @@
     const photoUrl = sanitizeImageUrl(provider?.photoUrl);
     const initials = escapeHtml(providerInitials(provider?.name));
     if (photoUrl) {
-      return `<div class="${sizeClass}" data-provider-initials="${initials}" style="${providerAvatarStyle(provider?.name)}"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-inventario-thumb" src="${escapeHtml(photoUrl)}" alt="${escapeHtml(provider?.name || 'Proveedor')}"></div>`;
+      return `<div class="${sizeClass}" data-provider-initials="${initials}" style="${providerAvatarStyle(provider?.name)}"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-inventario-thumb" src="${(window.ljThumb || String)(escapeHtml(photoUrl))}" alt="${escapeHtml(provider?.name || 'Proveedor')}"></div>`;
     }
     return `<div class="${sizeClass}" style="${providerAvatarStyle(provider?.name)}">${initials}</div>`;
   };
@@ -814,7 +815,7 @@
   };
 
   const ingredientAvatar = (item) => item?.imageUrl
-    ? `<div class="ingrediente-avatar"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-inventario-thumb" src="${item.imageUrl}" alt="${capitalize(item.name)}"></div>`
+    ? `<div class="ingrediente-avatar"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-inventario-thumb" src="${(window.ljThumb || String)(item.imageUrl)}" alt="${capitalize(item.name)}"></div>`
     : '<div class="ingrediente-avatar ingrediente-avatar-placeholder"><i class="fa-solid fa-carrot"></i></div>';
 
   const uploadImageToStorage = async (file, folder) => {
@@ -1285,6 +1286,37 @@
   const ensureFullInventoryLoaded = async () => {
     if (state.fullInventoryLoaded) return;
     await loadData({ forceFull: true });
+  };
+
+  // Ingresos por período: con Supabase se listan los lotes "livianos" (sin los historiales de consumo, que
+  // pesan ~50 MB) y el detalle de un ingrediente se pide recién al desplegar una de sus filas.
+  // Se guardan aparte (state.periodLots) para que ningún guardado use un registro incompleto.
+  const ensurePeriodLotsLoaded = async () => {
+    if (state.fullInventoryLoaded) return;
+    const client = window.LJ_BACKEND === 'supabase' ? window.supabaseLaJamonera : null;
+    if (!client) { await ensureFullInventoryLoaded(); return; }
+    const { data, error } = await client.rpc('lj_inventario_lotes_lite');
+    if (error) { console.warn('[Inventario] lotes livianos', error); await ensureFullInventoryLoaded(); return; }
+    state.periodLots = safeObject(data);
+  };
+  const periodEntriesFor = (ingredientId) => {
+    const record = getRecord(ingredientId);
+    if (state.fullInventoryLoaded || state.inventoryDetailLoaded[ingredientId] || !state.periodLots) {
+      return Array.isArray(record.entries) ? record.entries : [];
+    }
+    return Array.isArray(state.periodLots[ingredientId]) ? state.periodLots[ingredientId] : [];
+  };
+  const periodDetailLoading = new Set();
+  const loadPeriodDetailsFor = async (ingredientIds) => {
+    const ids = [...new Set(ingredientIds)].filter((id) => id && !state.inventoryDetailLoaded[id] && !periodDetailLoading.has(id));
+    if (!ids.length) return;
+    ids.forEach((id) => periodDetailLoading.add(id));
+    try {
+      await Promise.all(ids.map((id) => ensureInventoryRecordDetail(id)));
+    } finally {
+      ids.forEach((id) => periodDetailLoading.delete(id));
+    }
+    if (state.periodMode) renderGlobalPeriodTable();
   };
 
   // loadData() sin forceFull relee /inventario_index, cuyos records vienen
@@ -2093,7 +2125,7 @@
       : `${soonRows.length} lote(s) de inventario proximo(s) a vencer`;
     const rowHtml = rows.map((row) => `<div class="produccion-expiry-row ${row.expired ? 'is-expired' : 'is-soon'}">
       <sl-checkbox class="produccion-expiry-select" data-inventory-expiry-select="${escapeHtml(row.id)}" ${row.expired ? '' : 'disabled'}><span class="visually-hidden">Seleccionar lote</span></sl-checkbox>
-      <span class="produccion-expiry-thumb">${row.imageUrl ? `<img src="${escapeHtml(row.imageUrl)}" alt="${escapeHtml(row.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span>
+      <span class="produccion-expiry-thumb">${row.imageUrl ? `<img src="${(window.ljThumb || String)(escapeHtml(row.imageUrl))}" alt="${escapeHtml(row.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span>
       <span class="produccion-expiry-info"><strong>${escapeHtml(row.ingredientName)}</strong><small>Lote ${escapeHtml(row.lotNumber || row.entryId)} · ${escapeHtml(inventoryExpiryWhenLabel(row))} · ${escapeHtml(formatIsoDateEs(row.expiryDate))}</small></span>
       <span class="produccion-expiry-qty">${escapeHtml(formatQtyUnit(row.qty, row.unit))}${row.packageQty ? ` x${row.packageQty}` : ''}</span>
       ${row.expired ? `<sl-button variant="danger" size="small" type="button" class="inventario-threshold-btn" data-inventory-expiry-resolve-one="${escapeHtml(row.id)}"><i slot="prefix" class="fa-solid fa-check"></i><span>Resolver</span></sl-button>` : ''}
@@ -2475,7 +2507,7 @@
     const rows = [];
     Object.values(state.ingredientes).forEach((ingredient) => {
       const record = getRecord(ingredient.id);
-      (Array.isArray(record.entries) ? record.entries : []).forEach((entry) => {
+      periodEntriesFor(ingredient.id).forEach((entry) => {
         if (!ignoreRange && (range.from || range.to) && !inDateRange(entry.entryDate, range.from, range.to)) return;
         rows.push({
           ingredientId: ingredient.id,
@@ -2507,7 +2539,9 @@
           invoiceImageUrl: entryImageUrls(entry)[0] || '',
           expiryResolutions: Array.isArray(entry.expiryResolutions) ? entry.expiryResolutions : [],
           expiryResolutionStatus: normalizeValue(entry.expiryResolutionStatus),
-          status: normalizeValue(entry.status)
+          status: normalizeValue(entry.status),
+          isLite: Boolean(entry.__lite),
+          liteUsageCount: entry.__lite ? Number(entry.__usageCount || 0) : 0
         });
       });
     });
@@ -2590,7 +2624,9 @@
       const resolutionLabel = resolutionMeta.badge;
       const resolutionRow = getEntryResolutionRowData(row);
       const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
-      const detailHtml = (!isCollapsed && (traces.length || resolutionRow)) ? buildGlobalDetailHtml(row, traces, resolutionRow) : '';
+      const detailHtml = (!isCollapsed && row.isLite && row.liteUsageCount)
+        ? `<tr data-global-detail-of="${escapeHtml(row.entryId)}"><td colspan="7" class="text-center text-muted"><sl-spinner style="font-size:14px;vertical-align:-2px"></sl-spinner> Cargando consumos…</td></tr>`
+        : ((!isCollapsed && (traces.length || resolutionRow)) ? buildGlobalDetailHtml(row, traces, resolutionRow) : '');
 
       const availableClass = Number(row.availableQty || 0) <= 0 ? 'is-zero' : '';
       
@@ -2601,7 +2637,7 @@
         <td>${escapeHtml(formatExpiryForUi(row))} </td>
         <td class="is-code">${escapeHtml(`${row.invoiceNumber}${normalizeValue(row.remitoNumber) ? ` | ${row.remitoNumber}` : ''}`)}</td>
         <td class="inventario-provider-cell">${escapeHtml(row.provider)}</td>
-        <td><div class="inventario-entry-actions">${(traces.length || resolutionRow) ? `<sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-icon-only-btn" data-toggle-global-collapse="${row.entryId}" aria-label="Ver detalle" title="Ver detalle"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></sl-button>` : ''}${row.invoiceImageUrls.length ? `<sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-open-global-images="${encodeURIComponent(JSON.stringify(row.invoiceImageUrls))}"><i slot="prefix" class="fa-regular fa-image"></i><span>Ver (${row.invoiceImageUrls.length})</span></sl-button>` : '<span class="recetas-tag tone-neu">Sin foto</span>'}</div></td>
+        <td><div class="inventario-entry-actions">${(traces.length || resolutionRow || row.liteUsageCount) ? `<sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-icon-only-btn" data-toggle-global-collapse="${row.entryId}" aria-label="Ver detalle" title="Ver detalle"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></sl-button>` : ''}${row.invoiceImageUrls.length ? `<sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-open-global-images="${encodeURIComponent(JSON.stringify(row.invoiceImageUrls))}"><i slot="prefix" class="fa-regular fa-image"></i><span>Ver (${row.invoiceImageUrls.length})</span></sl-button>` : '<span class="recetas-tag tone-neu">Sin foto</span>'}</div></td>
       </tr>${detailHtml}`;
     }).join('') : '<tr><td colspan="7" class="text-center">Sin ingresos en ese rango.</td></tr>';
 
@@ -2621,6 +2657,8 @@
         <span>Página ${state.globalTablePage} de ${pages}</span>
         <sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-global-page="next" ${state.globalTablePage >= pages ? 'disabled' : ''} aria-label="Página siguiente" title="Página siguiente"><i class="fa-solid fa-chevron-right"></i></sl-button>
       </div>`;
+    const pendingDetail = pageRows.filter((row) => row.isLite && row.liteUsageCount && state.globalEntryCollapse[row.entryId] === false);
+    if (pendingDetail.length) loadPeriodDetailsFor(pendingDetail.map((row) => row.ingredientId));
   };
 
   const openGlobalConfig = async () => {
@@ -3308,7 +3346,7 @@
     ? `<span class="inventario-resolution-badge inventario-auto-egreso-badge ${getAutoGeneratedTraceLabel(trace) === 'Reparto a domicilio' ? 'is-home-delivery' : ''}"><i class="fa-solid ${getAutoGeneratedTraceLabel(trace) === 'Reparto a domicilio' ? 'fa-truck' : 'fa-robot'}"></i>${escapeHtml(getAutoGeneratedTraceLabel(trace))}</span>`
     : (trace.internalUse ? '<span class="inventario-resolution-badge">Uso interno en empresa</span>' : escapeHtml(trace.expiryDateAtProduction || 'No perecedero'));
 
-  const hasEntryDetailRows = (entry) => getEntryTraceRows(entry).length > 0 || Boolean(getEntryResolutionRowData(entry));
+  const hasEntryDetailRows = (entry) => getEntryTraceRows(entry).length > 0 || Boolean(getEntryResolutionRowData(entry)) || Boolean(entry?.isLite && entry.liteUsageCount);
 
   const canExpandAnyRows = (entries = [], collapseMap = {}) => entries.some((entry) => {
     if (!hasEntryDetailRows(entry)) return false;
@@ -3963,7 +4001,7 @@
               const productUp = String(row.ingredientName || '-').toUpperCase();
               const productDescription = normalizeValue(row.ingredientDescription || 'SIN DESCRIPCIÓN');
               const productImage = row.ingredientImageUrl
-                ? `<span class="sheet-mini-avatar"><img src="${escapeHtml(row.ingredientImageUrl)}" alt="${escapeHtml(productUp)}"></span>`
+                ? `<span class="sheet-mini-avatar"><img src="${(window.ljThumb || String)(escapeHtml(row.ingredientImageUrl))}" alt="${escapeHtml(productUp)}"></span>`
                 : '';
               const qtyLabel = `${Number(row.qty || 0).toFixed(2)} ${String(row.unit || '').toUpperCase()}${row.packageQty ? ` X${row.packageQty}` : ''}`;
               const provider = resolveProvider(row.provider);
@@ -3973,7 +4011,7 @@
               const providerPhoto = sanitizeImageUrl(provider?.photoUrl);
               const providerInitial = providerInitials(providerName);
               const providerAvatarHtml = providerPhoto
-                ? `<span class="sheet-provider-avatar"><img src="${escapeHtml(providerPhoto)}" alt="${escapeHtml(providerName)}"></span>`
+                ? `<span class="sheet-provider-avatar"><img src="${(window.ljThumb || String)(escapeHtml(providerPhoto))}" alt="${escapeHtml(providerName)}"></span>`
                 : `<span class="sheet-provider-avatar sheet-provider-avatar-fallback">${escapeHtml(providerInitial)}</span>`;
               const facturaUp = `${String(row.invoiceNumber || '-').toUpperCase()}${normalizeValue(row.remitoNumber) ? ` | ${String(row.remitoNumber).toUpperCase()}` : ''}`;
               const loteUp = String(row.lotNumber || row.invoiceNumber || '-').toUpperCase();
@@ -4998,7 +5036,7 @@
             const packageLocked = isUnit && Number(extraRecord?.packageQty) > 0;
             const packageVal = normalizeValue(extra.packageQty || (packageLocked ? extraRecord.packageQty : ''));
             const avatarHtml = extraIngredient?.imageUrl
-              ? `<span class="recipe-inline-avatar-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="recipe-inline-avatar js-inventario-thumb" src="${escapeHtml(extraIngredient.imageUrl)}" alt="${escapeHtml(capitalize(extraIngredient.name))}" loading="lazy"></span>`
+              ? `<span class="recipe-inline-avatar-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="recipe-inline-avatar js-inventario-thumb" src="${(window.ljThumb || String)(escapeHtml(extraIngredient.imageUrl))}" alt="${escapeHtml(capitalize(extraIngredient.name))}" loading="lazy"></span>`
               : '<span class="recipe-inline-avatar-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-bowl-food"></i></span></span>';
             return `<tr data-bulk-index="${idx}" class="inventario-bulk-main-row">
               <td><i class="fa-solid fa-grip-lines"></i></td>
@@ -5436,7 +5474,7 @@
       dropdown.className = 'recipe-suggest-floating';
       dropdown.innerHTML = `${source.map((provider) => {
         const avatar = sanitizeImageUrl(provider?.photoUrl)
-          ? `<span class="recipe-suggest-avatar-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="recipe-suggest-avatar js-inventario-thumb" src="${escapeHtml(sanitizeImageUrl(provider.photoUrl))}" alt="${escapeHtml(provider.name)}" loading="lazy"></span>`
+          ? `<span class="recipe-suggest-avatar-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="recipe-suggest-avatar js-inventario-thumb" src="${(window.ljThumb || String)(escapeHtml(sanitizeImageUrl(provider.photoUrl)))}" alt="${escapeHtml(provider.name)}" loading="lazy"></span>`
           : '<span class="recipe-suggest-avatar-wrap"><span class="image-placeholder-circle-2 inventario-provider-suggest-placeholder"><i class="fa-solid fa-truck-field inventario-provider-suggest-icon"></i></span></span>';
         return `<button type="button" class="lj-tile recipe-suggest-item" data-provider-pick="${escapeHtml(provider.id)}">${avatar}<span>${escapeHtml(provider.name)}</span></button>`;
       }).join('')}<button type="button" class="lj-tile recipe-suggest-item recipe-suggest-create" data-provider-create="1"><i class="fa-solid fa-plus"></i><span>nuevo proveedor</span></button>`;
@@ -5735,7 +5773,7 @@
       dropdown.innerHTML = `${source.map((item) => `
         <button type="button" class="lj-tile recipe-suggest-item" data-bulk-pick="${idx}" data-ing-id="${item.id}">
           <span class="recipe-suggest-avatar-wrap">${item.imageUrl
-            ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="recipe-suggest-avatar js-inventario-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(capitalize(item.name))}" loading="lazy">`
+            ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="recipe-suggest-avatar js-inventario-thumb" src="${(window.ljThumb || String)(escapeHtml(item.imageUrl))}" alt="${escapeHtml(capitalize(item.name))}" loading="lazy">`
             : '<span class="image-placeholder-circle-2"><i class="fa-solid fa-bowl-food"></i></span>'}</span>
           <span>${escapeHtml(capitalize(item.name))}</span>
         </button>`).join('')}
@@ -8146,7 +8184,7 @@
     state.globalTablePage = 1;
     setPeriodMode(true);
     nodes.globalLoading?.classList.remove('d-none');
-    await ensureFullInventoryLoaded();
+    await ensurePeriodLotsLoaded();
     nodes.globalLoading?.classList.add('d-none');
     renderGlobalPeriodTable();
   });
@@ -8165,8 +8203,7 @@
     state.globalTablePage = 1;
     nodes.globalLoading?.classList.remove('d-none');
     nodes.globalTableWrap?.classList.add('d-none');
-    await ensureFullInventoryLoaded();
-    await new Promise((resolve) => setTimeout(resolve, 450));
+    if (!state.periodLots) await ensurePeriodLotsLoaded();
     renderGlobalPeriodTable();
     nodes.globalLoading?.classList.add('d-none');
     nodes.globalTableWrap?.classList.remove('d-none');
@@ -8351,7 +8388,7 @@
         state.globalEntryCollapse[entryId] = !nowCollapsed;
         const mainRow = toggleBtn.closest('tr');
         const row = state.globalPageRowsById?.[entryId];
-        if (!mainRow || !row) { renderGlobalPeriodTable(); return; }
+        if (!mainRow || !row || (row.isLite && nowCollapsed)) { renderGlobalPeriodTable(); return; }
         nodes.globalTableWrap.querySelectorAll(`tr[data-global-detail-of="${CSS.escape(entryId)}"]`).forEach((tr) => tr.remove());
         if (nowCollapsed) mainRow.insertAdjacentHTML('afterend', buildGlobalDetailHtml(row));
         const icon = toggleBtn.querySelector('i');

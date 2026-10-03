@@ -2,7 +2,7 @@
 // La Jamonera · Edge Function `api` (reemplaza a la Cloud Function de Firebase con las mismas rutas).
 //   GET  /me                       → { ok, uid, email, admin, role, puede_editar, puede_borrar, persona_id, activo, theme }
 //   POST /ia                       → chat/completions (Gemini)               (usuario activo)
-//   POST /ia/image                 → { ok, mimeType, data }                   (usuario activo)
+//   POST /ia/image { prompt, referenceUrls?, aspectRatio? } → { ok, mimeType, data }  (usuario activo)
 //   POST /email                    → { ok, id }  (Resend)                     (usuario activo)
 //   GET/POST /config/ai, POST /config/ai/test, GET /config/ai/models         (admin)
 //   GET/POST /config/email, POST /config/email/test                          (admin)
@@ -40,6 +40,28 @@ const publicEmailConfig = (cfg) => ({
 });
 const readBody = async (req) => { try { return await req.json(); } catch { return {}; } };
 
+// Imágenes de referencia para /ia/image (ej. carátulas existentes): sólo del bucket público propio,
+// máx. 3, bajadas en versión reducida (768 px) para no mandar originales de varios MB a Gemini.
+const ASPECT_RATIOS = new Set(['1:1', '2:3', '3:2', '3:4', '4:3', '9:16', '16:9']);
+async function readReferenceImages(urls) {
+  const base = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/archivos/`;
+  const list = (Array.isArray(urls) ? urls : []).map(str).filter((u) => u.startsWith(base) && !u.includes('..')).slice(0, 3);
+  const out = [];
+  for (const url of list) {
+    const path = url.slice(base.length).split('?')[0];
+    const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/storage/v1/render/image/public/archivos/${path}?width=768&resize=contain`, { headers: { Accept: 'image/jpeg' } });
+    if (!res.ok) continue;
+    const mimeType = (res.headers.get('content-type') || 'image/jpeg').split(';')[0];
+    if (!/^image\/(png|jpeg|webp)$/.test(mimeType)) continue;
+    const buf = new Uint8Array(await res.arrayBuffer());
+    if (buf.length > 4_000_000) continue;
+    let bin = '';
+    for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+    out.push({ mimeType, data: btoa(bin) });
+  }
+  return out;
+}
+
 async function route(req: Request, path: string) {
   const method = req.method;
 
@@ -67,7 +89,9 @@ async function route(req: Request, path: string) {
     if (!prompt) throw new HttpError(400, 'prompt_required');
     const cfg = await readAiConfig();
     if (!cfg.apiKey) throw new HttpError(500, 'ia_key_missing');
-    const out = await gemini.image({ apiKey: cfg.apiKey, model: cfg.imageModel, prompt });
+    const references = await readReferenceImages(body.referenceUrls);
+    const aspectRatio = ASPECT_RATIOS.has(str(body.aspectRatio)) ? str(body.aspectRatio) : '';
+    const out = await gemini.image({ apiKey: cfg.apiKey, model: cfg.imageModel, prompt, references, aspectRatio });
     return { ok: true, mimeType: out.mimeType, data: out.data };
   }
 

@@ -537,6 +537,30 @@
   };
 
   // Imagen con Google Gemini (window.LJAI): webp comprimido, mismo estilo de ícono que antes.
+  // Carátula de producto: foto macro + cartel de madera con el nombre, con el mismo estilo que las carátulas
+  // existentes (se mandan dos como referencia de estilo). Si se borran del storage, sólo cuenta el prompt.
+  const COVER_REFERENCE_PATHS = ['recetas/uploads/1778420480856_ujnt0c.png', 'recetas/uploads/1784761419786_lvbsx3.png'];
+  const buildCoverPrompt = (name) => `Las imágenes adjuntas son carátulas de productos de nuestra fiambrería. Usalas SOLO como guía de estilo del cartel y de la fotografía; no copies su producto ni su texto.
+Generá una carátula nueva, cuadrada, para el producto: "${name}".
+- Fondo: fotografía macro hiperrealista del producto "${name}" (crudo / tal como se vende en carnicería-fiambrería) ocupando todo el cuadro, apetitosa, luz natural cálida, poca profundidad de campo.
+- En el centro, un único cartel horizontal con el MISMO estilo que las referencias: placa de madera oscura envejecida con borde de madera, ancho casi completo del cuadro.
+- Dentro del cartel, el texto "${name.toLocaleUpperCase('es-AR')}" en tipografía sans serif condensada, negrita, mayúsculas, color blanco hueso con textura gastada; centrado, en una o dos líneas, grande y COMPLETO dentro del cartel (ninguna letra cortada), con la ortografía exacta incluidos los acentos.
+- Sin ningún otro texto, logo, marca de agua ni borde blanco.`;
+  const generateCoverWithIA = async (name) => {
+    const base = `${window.LJ_SUPABASE?.url || ''}/storage/v1/object/public/archivos/`;
+    let blob;
+    try {
+      blob = await window.LJAI.image(buildCoverPrompt(name), { maxSize: 1024, quality: 0.86 }, {
+        referenceUrls: window.LJ_SUPABASE ? COVER_REFERENCE_PATHS.map((p) => base + p) : [],
+        aspectRatio: '1:1'
+      });
+    } catch (error) {
+      throw new Error(`No se pudo generar la carátula con IA (${error?.message || error}).`);
+    }
+    if (!blob?.size) throw new Error('La IA no devolvió una imagen válida.');
+    const type = blob.type || 'image/webp';
+    return new File([blob], `caratula_${Date.now()}.${type === 'image/png' ? 'png' : 'webp'}`, { type });
+  };
   const generateImageWithIA = async (prompt) => {
     let blob;
     try {
@@ -580,18 +604,18 @@
     // receta se sobrescribía /recetas con los placeholders, destruyendo las
     // tablas nutricionales reales. Para listar rápido podríamos usar el index
     // pero en este modal donde el usuario edita, necesitamos datos completos.
-    state.recetas = safeObject(await window.dbLaJamoneraRest.read('/recetas'));
-    let indexed = null;
-    try {
-      indexed = await window.dbLaJamoneraRest.read('/recetas_index');
-    } catch (error) {
-      indexed = null;
-    }
+    // Las tres lecturas van en paralelo (antes se encadenaban: ~1 s más al abrir).
+    const [recetas, indexed, cfgRaw] = await Promise.all([
+      window.dbLaJamoneraRest.read('/recetas'),
+      window.dbLaJamoneraRest.read('/recetas_index').catch(() => null),
+      window.dbLaJamoneraRest.read('/recetas_config')
+    ]);
+    state.recetas = safeObject(recetas);
     // Mismos grupos que comparte el modal Producción (Embutidos, Picadas, etc.).
     state.recipeGroups = indexed?.groups
       ? safeObject(indexed.groups)
       : safeObject(await window.dbLaJamoneraRest.read('/recetas_groups'));
-    const cfg = safeObject(await window.dbLaJamoneraRest.read('/recetas_config'));
+    const cfg = safeObject(cfgRaw);
     const cities = Array.isArray(cfg.cities) ? cfg.cities.map((item) => normalizeValue(item)).filter(Boolean) : [];
     const brands = Array.isArray(cfg.brands) ? cfg.brands.map((item) => normalizeValue(item)).filter(Boolean) : [];
     const businessNames = Array.isArray(cfg.businessNames) ? cfg.businessNames.map((item) => normalizeValue(item)).filter(Boolean) : [];
@@ -1096,7 +1120,7 @@
           const inThis = normalizeValue(r.recipeGroupId) === groupId;
           const otherGroup = !inThis && r.recipeGroupId ? safeObject(state.recipeGroups[r.recipeGroupId])?.name : '';
           return `<sl-checkbox class="produccion-group-assign-row" data-assign-recipe="${escapeHtml(r.id)}" ${inThis ? 'checked' : ''}>
-            <span class="produccion-group-assign-thumb">${r.imageUrl ? `<img src="${escapeHtml(r.imageUrl)}" alt="">` : '<i class="fa-solid fa-egg-fried"></i>'}</span>
+            <span class="produccion-group-assign-thumb">${r.imageUrl ? `<img src="${(window.ljThumb || String)(escapeHtml(r.imageUrl))}" alt="">` : '<i class="fa-solid fa-egg-fried"></i>'}</span>
             <span class="produccion-group-assign-name"><strong>${escapeHtml(capitalize(r.title || '-'))}</strong>${otherGroup ? `<small> · actualmente en <em>${escapeHtml(capitalize(otherGroup))}</em></small>` : ''}</span>
           </sl-checkbox>`;
         }).join('')}
@@ -1157,7 +1181,7 @@
   };
 
   const getRecipeThumbHtml = (item, extraClass = '') => `<span class="receta-thumb-wrap recetas-thumb ${extraClass}">${item.imageUrl
-    ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="receta-thumb js-receta-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(capitalize(item.title || 'Receta'))}" loading="lazy">`
+    ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="receta-thumb js-receta-thumb" src="${(window.ljThumb || String)(escapeHtml(item.imageUrl))}" alt="${escapeHtml(capitalize(item.title || 'Receta'))}" loading="lazy">`
     : getPlaceholderCircle()}</span>`;
 
   const prepareRecipeThumbs = (root) => {
@@ -2291,16 +2315,23 @@
 
         <div id="${prefix}_aiWrap" class="d-none image-field-block">
           <sl-input id="${prefix}_aiPrompt" class="recipe-ai-input" label="Prompt corto para IA" placeholder="Ej: carne de cerdo"></sl-input>
-          <sl-button variant="default" id="${prefix}_aiGenerate" type="button" class="ai-generate-btn mt-2">
-            <img slot="prefix" src="${IA_ICON_SRC}" alt="" aria-hidden="true">
-            <span>Generar imagen con IA</span>
-          </sl-button>
+          <div class="ai-generate-actions mt-2">
+            <sl-button variant="default" id="${prefix}_aiGenerate" type="button" class="ai-generate-btn">
+              <img slot="prefix" src="${IA_ICON_SRC}" alt="" aria-hidden="true">
+              <span>Generar imagen con IA</span>
+            </sl-button>
+            ${prefix === 'recipeImage' ? `<sl-button variant="default" id="${prefix}_aiCover" type="button" class="ai-generate-btn" title="Foto del producto con el cartel de madera de La Jamonera">
+              <i slot="prefix" class="fa-solid fa-sign-hanging" aria-hidden="true"></i>
+              <span>Carátula con IA</span>
+            </sl-button>` : ''}
+          </div>
+          ${prefix === 'recipeImage' ? '<small class="ai-generate-hint">Carátula: usa el prompt o, si está vacío, el título de la receta como texto del cartel.</small>' : ''}
           <div id="${prefix}_aiError" class="ai-alert-note d-none mt-2"></div>
         </div>
       </div>
     </section>`;
 
-  const wireImageStep = (prefix, stateImage) => {
+  const wireImageStep = (prefix, stateImage, getTitle = () => '') => {
     const methodInput = document.getElementById(`${prefix}_method`);
     const methodButtons = Array.from(document.querySelectorAll(`#${prefix}_methodButtons [data-image-method]`));
     const urlWrap = document.getElementById(`${prefix}_urlWrap`);
@@ -2374,6 +2405,33 @@
         aiError.textContent = error.message || 'No se pudo generar la imagen con IA.';
         aiError.classList.remove('d-none');
       } finally {
+        aiGenerateBtn.disabled = false;
+      }
+    });
+
+    const aiCoverBtn = document.getElementById(`${prefix}_aiCover`);
+    aiCoverBtn?.addEventListener('click', async () => {
+      const name = normalizeValue(aiPromptInput.value) || normalizeValue(getTitle());
+      if (!name) {
+        aiError.textContent = 'Escribí el título de la receta o un prompt para el texto del cartel.';
+        aiError.classList.remove('d-none');
+        return;
+      }
+      aiCoverBtn.disabled = true;
+      aiGenerateBtn.disabled = true;
+      aiError.classList.add('d-none');
+      preview.innerHTML = '<span class="image-preview-overlay"><sl-spinner class="meta-spinner-login" aria-label="Generando"></sl-spinner></span>';
+      try {
+        const file = await generateCoverWithIA(name);
+        stateImage.generatedFile = file;
+        stateImage.prompt = name;
+        setPreview(URL.createObjectURL(file));
+      } catch (error) {
+        aiError.textContent = error.message || 'No se pudo generar la carátula con IA.';
+        aiError.classList.remove('d-none');
+        setPreview('');
+      } finally {
+        aiCoverBtn.disabled = false;
         aiGenerateBtn.disabled = false;
       }
     });
@@ -3040,7 +3098,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
   };
 
   const ingredientAvatarHtml = (ingredient) => ingredient?.imageUrl
-    ? `<span class="recipe-inline-avatar-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="recipe-inline-avatar js-recipe-inline-thumb" src="${ingredient.imageUrl}" alt="${capitalize(ingredient.name)}" loading="lazy"></span>`
+    ? `<span class="recipe-inline-avatar-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="recipe-inline-avatar js-recipe-inline-thumb" src="${(window.ljThumb || String)(ingredient.imageUrl)}" alt="${capitalize(ingredient.name)}" loading="lazy"></span>`
     : `<span class="recipe-inline-avatar-wrap recipe-inline-avatar-fallback">${getSmallPlaceholder('fa-solid fa-bowl-food')}</span>`;
 
   const prepareInlineThumbLoaders = () => {
@@ -3064,7 +3122,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
   };
 
   const renderRelatedIngredientAvatar = (ingredient) => ingredient?.imageUrl
-    ? `<span class="recipe-inline-avatar-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="recipe-inline-avatar js-recipe-inline-thumb" src="${ingredient.imageUrl}" alt="${capitalize(ingredient.name)}" loading="lazy"></span>`
+    ? `<span class="recipe-inline-avatar-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="recipe-inline-avatar js-recipe-inline-thumb" src="${(window.ljThumb || String)(ingredient.imageUrl)}" alt="${capitalize(ingredient.name)}" loading="lazy"></span>`
     : `<span class="recipe-inline-avatar-wrap recipe-inline-avatar-fallback">${getSmallPlaceholder('fa-solid fa-link')}</span>`;
 
   const buildRecipeRelatedSummaryHtml = (row) => {
@@ -3307,7 +3365,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     dropdown.innerHTML = `${source.map((item) => `
       <button type="button" class="lj-tile recipe-suggest-item" data-pick-ingredient="${rowId}" data-ing-id="${item.id}">
         <span class="recipe-suggest-avatar-wrap">${item.imageUrl
-          ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="recipe-suggest-avatar js-recipe-suggest-thumb" src="${item.imageUrl}" alt="${capitalize(item.name)}" loading="lazy">`
+          ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="recipe-suggest-avatar js-recipe-suggest-thumb" src="${(window.ljThumb || String)(item.imageUrl)}" alt="${capitalize(item.name)}" loading="lazy">`
           : getSmallPlaceholder('fa-solid fa-bowl-food')}</span>
         <span>${capitalize(item.name)}</span>
       </button>`).join('')}
@@ -4140,7 +4198,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     renderRows();
     // Los sl-* recién creados no exponen value hasta definirse y renderizar.
     await ljReady(recipeEditorForm);
-    wireImageStep('recipeImage', state.editor.image);
+    wireImageStep('recipeImage', state.editor.image, () => recipeEditorForm.querySelector('#recipeTitle')?.value || state.editor?.title || '');
     renderNutritionSubcategories(state.editor.nutrition.subcategory);
     renderHouseholdMeasureOptions();
     renderNutritionAiPreview();

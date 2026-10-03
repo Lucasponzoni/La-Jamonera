@@ -235,7 +235,7 @@
   };
 
   const ingredientAvatar = (url, alt) => url
-    ? `<div class="ingrediente-avatar"><span class="thumb-loading"><sl-spinner class="meta-spinner" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-ingrediente-thumb" src="${url}" alt="${alt}" loading="lazy"></div>`
+    ? `<div class="ingrediente-avatar"><span class="thumb-loading"><sl-spinner class="meta-spinner" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-ingrediente-thumb" src="${(window.ljThumb || String)(url)}" alt="${alt}" loading="lazy"></div>`
     : `<div class="ingrediente-avatar ingrediente-avatar-placeholder">${PLACEHOLDER_ICON}</div>`;
 
   const prepareThumbLoaders = (selector) => {
@@ -539,8 +539,8 @@
         </sl-radio-group>
       </div>
       <div id="ingredientPrintProductsScope" class="notify-specific-users-list d-none">
-        <div class="step-block"><strong>Familias</strong>${getFamiliasArray().map((family) => `<sl-checkbox class="ingredientes-print-check" data-ingredient-print-family value="${family.id}"><span class="ingredientes-print-check-label">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${escapeHtml(family.imageUrl)}" alt="${escapeHtml(capitalizeLabel(family.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<span>${escapeHtml(capitalizeLabel(family.name))}</span></span></sl-checkbox>`).join('')}</div>
-        <div class="step-block"><strong>Productos</strong>${getIngredientesArray().map((item) => `<sl-checkbox class="ingredientes-print-check" data-ingredient-print-product data-family-id="${item.familyId || ''}" value="${item.id}"><span class="ingredientes-print-check-label">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(capitalizeLabel(item.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<span>${escapeHtml(capitalizeLabel(item.name))}</span></span></sl-checkbox>`).join('')}</div>
+        <div class="step-block"><strong>Familias</strong>${getFamiliasArray().map((family) => `<sl-checkbox class="ingredientes-print-check" data-ingredient-print-family value="${family.id}"><span class="ingredientes-print-check-label">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${(window.ljThumb || String)(escapeHtml(family.imageUrl))}" alt="${escapeHtml(capitalizeLabel(family.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<span>${escapeHtml(capitalizeLabel(family.name))}</span></span></sl-checkbox>`).join('')}</div>
+        <div class="step-block"><strong>Productos</strong>${getIngredientesArray().map((item) => `<sl-checkbox class="ingredientes-print-check" data-ingredient-print-product data-family-id="${item.familyId || ''}" value="${item.id}"><span class="ingredientes-print-check-label">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${(window.ljThumb || String)(escapeHtml(item.imageUrl))}" alt="${escapeHtml(capitalizeLabel(item.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<span>${escapeHtml(capitalizeLabel(item.name))}</span></span></sl-checkbox>`).join('')}</div>
       </div>
     </div>`,
     showCancelButton: true,
@@ -661,7 +661,7 @@
     const content = filtered.map((item) => `
       <article style="display:flex;align-items:center;gap:12px;border:1px solid #d7def2;border-radius:16px;padding:12px;background:#fff;break-inside:avoid;page-break-inside:avoid;">
         <div style="width:74px;height:74px;border-radius:999px;overflow:hidden;border:1px solid #d7def2;background:#eff2fb;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:6px;">
-          ${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" style="width:100%;height:100%;object-fit:contain;object-position:center;border-radius:999px;display:block;" alt="${escapeHtml(capitalizeLabel(item.name))}">` : '<i class="fa-solid fa-carrot" style="color:#5f6a89;font-size:28px;"></i>'}
+          ${item.imageUrl ? `<img src="${(window.ljThumb || String)(escapeHtml(item.imageUrl))}" style="width:100%;height:100%;object-fit:contain;object-position:center;border-radius:999px;display:block;" alt="${escapeHtml(capitalizeLabel(item.name))}">` : '<i class="fa-solid fa-carrot" style="color:#5f6a89;font-size:28px;"></i>'}
         </div>
         <div style="min-width:0;">
           <h2 style="margin:0 0 4px;font-size:18px;color:#1f2a44;">${escapeHtml(capitalizeLabel(item.name))}</h2>

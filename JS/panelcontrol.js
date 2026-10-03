@@ -129,7 +129,7 @@
 
   const renderUserAvatar = (user) => {
     if (user.photoUrl) {
-      return `<span class="user-avatar-thumb panel-user-avatar"><span class="thumb-loading">${AVATAR_SKELETON}</span><img class="thumb-image js-panel-thumb" src="${escapeHtml(user.photoUrl)}" alt="${escapeHtml(user.name)}"></span>`;
+      return `<span class="user-avatar-thumb panel-user-avatar"><span class="thumb-loading">${AVATAR_SKELETON}</span><img class="thumb-image js-panel-thumb" src="${(window.ljThumb || String)(escapeHtml(user.photoUrl))}" alt="${escapeHtml(user.name)}"></span>`;
     }
     return `<span class="user-avatar-thumb">${escapeHtml(initials(user.name))}</span>`;
   };
@@ -663,7 +663,7 @@ const printReport = async (report) => {
     const scoreTone = { ok: 'success', normal: 'info', warn: 'warning', high: 'warning', critical: 'danger' }[importance.tone] || 'info';
     const date = new Date(Number(report.createdAt || Date.now())).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const avatar = user.photoUrl
-      ? `<span class="panel-informe-avatar"><img class="js-panel-thumb" src="${escapeHtml(user.photoUrl)}" alt=""></span>`
+      ? `<span class="panel-informe-avatar"><img class="js-panel-thumb" src="${(window.ljThumb || String)(escapeHtml(user.photoUrl))}" alt=""></span>`
       : `<span class="panel-informe-avatar">${escapeHtml(initials(user.name))}</span>`;
     const countTag = (n, icon, label) => (n > 0 ? `<span class="panel-tag" title="${label}"><i class="fa-regular ${icon}" aria-hidden="true"></i>${n}</span>` : '');
 
@@ -743,7 +743,7 @@ const printReport = async (report) => {
 
   const pendingAvatar = (item) => {
     const photo = normalize(item.photo);
-    if (photo) return `<span class="panel-avatar"><span class="thumb-loading">${AVATAR_SKELETON}</span><img class="js-panel-thumb" src="${escapeHtml(photo)}" alt=""></span>`;
+    if (photo) return `<span class="panel-avatar"><span class="thumb-loading">${AVATAR_SKELETON}</span><img class="js-panel-thumb" src="${escapeHtml((window.ljThumb || String)(photo))}" alt=""></span>`;
     return `<span class="panel-avatar is-icon is-${item.tone}"><i class="fa-solid ${item.icon}" aria-hidden="true"></i></span>`;
   };
 

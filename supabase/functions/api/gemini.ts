@@ -62,21 +62,23 @@ async function chat({ apiKey, model = DEFAULT_TEXT_MODEL, body, fetchImpl }) {
   return toChatResponse(json, model);
 }
 
-async function image({ apiKey, model = DEFAULT_IMAGE_MODEL, prompt, fetchImpl }) {
-  const request = {
-    contents: [{ role: 'user', parts: [{ text: str(prompt) }] }],
-    generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
-  };
+// references: [{ mimeType, data(base64) }] → imágenes de referencia de estilo (van antes del texto).
+async function image({ apiKey, model = DEFAULT_IMAGE_MODEL, prompt, references = [], aspectRatio = '', fetchImpl }) {
+  const parts = references.map((r) => ({ inlineData: { mimeType: r.mimeType, data: r.data } }));
+  parts.push({ text: str(prompt) });
+  const generationConfig = { responseModalities: ['IMAGE', 'TEXT'] };
+  if (aspectRatio) generationConfig.imageConfig = { aspectRatio };
+  const request = { contents: [{ role: 'user', parts }], generationConfig };
   const json = await callGemini({ apiKey, model, request, fetchImpl });
-  const parts = (((json.candidates || [])[0] || {}).content || {}).parts || [];
-  const img = parts.find((p) => p.inlineData && p.inlineData.data);
+  const out = (((json.candidates || [])[0] || {}).content || {}).parts || [];
+  const img = out.find((p) => p.inlineData && p.inlineData.data);
   if (!img) {
-    const text = parts.map((p) => p.text || '').join(' ').trim();
+    const text = out.map((p) => p.text || '').join(' ').trim();
     const error = new Error(text || 'gemini_no_image');
     error.status = 422;
     throw error;
   }
-  return { mimeType: img.inlineData.mimeType || 'image/png', data: img.inlineData.data, text: parts.map((p) => p.text || '').join(' ').trim() };
+  return { mimeType: img.inlineData.mimeType || 'image/png', data: img.inlineData.data, text: out.map((p) => p.text || '').join(' ').trim() };
 }
 
 const EXCLUDE_TEXT = /(image|tts|transcribe|robotics|computer-use|omni|customtools|latest|embedding|aqa)/;

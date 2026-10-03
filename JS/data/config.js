@@ -20,4 +20,21 @@
     sdkIntegrity: 'sha384-WgXwGL6fUsYJWNaKJgVbrJKGRQwc1vieh2oy4kw9nXqpNDz3tdSsqEYUgeHD/NuF'
   };
   document.documentElement.dataset.ljBackend = backend;
+  // Miniaturas: las portadas originales pesan 1-3 MB. Para listas y avatares se pide a Supabase
+  // una versión redimensionada (webp, ~10 KB). Impresiones y visores siguen usando la URL original.
+  const PUBLIC_PREFIX = `${window.LJ_SUPABASE.url}/storage/v1/object/public/`;
+  window.ljThumb = (url, px = 160) => {
+    const src = String(url || '');
+    if (!src.startsWith(PUBLIC_PREFIX) || /\.(svg|gif|pdf)(\?|$)/i.test(src)) return src;
+    const [pathPart] = src.slice(PUBLIC_PREFIX.length).split('?');
+    return `${window.LJ_SUPABASE.url}/storage/v1/render/image/public/${pathPart}?width=${Math.round(px)}&resize=contain`;
+  };
+  // Si la versión redimensionada falla, se vuelve a la original antes de que el sitio muestre el placeholder.
+  const RENDER_PREFIX = `${window.LJ_SUPABASE.url}/storage/v1/render/image/public/`;
+  document.addEventListener('error', (event) => {
+    const img = event.target;
+    if (!(img instanceof HTMLImageElement) || !img.src.startsWith(RENDER_PREFIX)) return;
+    event.stopPropagation();
+    img.src = PUBLIC_PREFIX + img.src.slice(RENDER_PREFIX.length).split('?')[0];
+  }, true);
 })();

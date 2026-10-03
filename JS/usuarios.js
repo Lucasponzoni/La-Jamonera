@@ -72,7 +72,7 @@
   const avatarHtml = (user, size = 'sm') => {
     const cls = `users-avatar is-${size}`;
     if (normalizeValue(user.photoUrl)) {
-      return `<span class="${cls}"><sl-skeleton effect="sheen" class="users-avatar-sk"></sl-skeleton><img class="js-user-photo" src="${escapeHtml(user.photoUrl)}" alt="" loading="lazy"></span>`;
+      return `<span class="${cls}"><sl-skeleton effect="sheen" class="users-avatar-sk"></sl-skeleton><img class="js-user-photo" src="${(window.ljThumb || String)(escapeHtml(user.photoUrl))}" alt="" loading="lazy"></span>`;
     }
     return `<span class="${cls} is-initials" style="--users-avatar-bg:${colorFor(user.id || user.fullName)}" aria-hidden="true">${escapeHtml(initialsFromName(user.fullName) || 'U')}</span>`;
   };
@@ -162,13 +162,14 @@
     return json;
   };
   const loadAccess = async () => {
-    state.access = {};
-    if (!SUPABASE) return;
+    if (!SUPABASE) { state.access = {}; return; }
     state.me = await window.LJMe;
     if (nodes.templateBtn) nodes.templateBtn.hidden = !isAdmin();
-    if (!isAdmin()) return;
+    if (!isAdmin()) { state.access = {}; return; }
     const out = await adminApi('list');
-    (out.personas || []).forEach((p) => { state.access[p.id] = p; });
+    const next = {};
+    (out.personas || []).forEach((p) => { next[p.id] = p; });
+    state.access = next;
   };
   const ROLE_LABEL = { admin: 'Administrador', empleado: 'Empleado' };
   const accessOf = (user) => state.access[user.id] || null;
@@ -811,15 +812,15 @@
     nodes.loading.classList.remove('d-none');
     nodes.data.classList.add('d-none');
     await window.laJamoneraReady;
-    const [users] = await Promise.all([
-      window.dbLaJamoneraRest.read(USERS_PATH),
-      loadAccess().catch((error) => { console.warn('[usuarios] acceso', error); })
-    ]);
-    state.users = safeObject(users);
+    // La lista se muestra apenas llegan las personas; el estado de acceso (función admin-users, ~1,5 s)
+    // se completa después sin bloquear. Mientras tanto se usa el de la apertura anterior.
+    const access = loadAccess().catch((error) => { console.warn('[usuarios] acceso', error); });
+    state.users = safeObject(await window.dbLaJamoneraRest.read(USERS_PATH));
     nodes.loading.classList.add('d-none');
     nodes.data.classList.remove('d-none');
     renderFilter();
     render();
+    access.then(() => { render(); renderDetail(); });
     loadUsage().then(() => renderDetail());
   };
 
