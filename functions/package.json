@@ -1,6 +1,6 @@
 {
   "name": "la-jamonera-functions",
-  "description": "Proxy Cloud Functions para La Jamonera (MailUp, DeepSeek IA, imagenes Storage)",
+  "description": "Proxy Cloud Functions para La Jamonera (MailUp, IA Gemini, imagenes Storage)",
   "private": true,
   "main": "index.js",
   "engines": {

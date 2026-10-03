@@ -3,12 +3,14 @@
  *
  * Una sola function HTTP (Express) con 3 rutas:
  *   POST /email   -> envia mail via MailUp SMTP+ (credenciales server-side)
- *   POST /ia      -> proxy a DeepSeek chat/completions (API key server-side)
+ *   POST /ia          -> chat con Google Gemini (formato chat/completions; API key server-side)
+ *   POST /ia/image    -> genera una imagen con Gemini (base64)
+ *   GET/POST /config/ai, POST /config/ai/test -> configuración de IA (clave enmascarada)
  *   GET  /image   -> descarga una imagen de Firebase Storage con cabeceras CORS
  *
  * Seguridad:
  *   - Todas las rutas exigen un Firebase ID token valido (Authorization: Bearer ...).
- *   - Las credenciales (MailUp / DeepSeek) se leen de RTDB con el Admin SDK,
+ *   - Las credenciales (MailUp / Gemini) se leen de RTDB con el Admin SDK,
  *     nunca viajan al navegador.
  *   - /image solo acepta URLs de Firebase Storage (evita open-proxy / SSRF).
  */
@@ -18,6 +20,7 @@ const { setGlobalOptions } = require('firebase-functions/v2');
 const admin = require('firebase-admin');
 const express = require('express');
 const cors = require('cors');
+const gemini = require('./gemini');
 
 admin.initializeApp({
   databaseURL: 'https://fg-lj-d6325-default-rtdb.firebaseio.com'
@@ -119,25 +122,96 @@ app.post('/email', requireAuth, async (req, res) => {
   }
 });
 
-// --- POST /ia : DeepSeek chat/completions ---
+// --- IA: Google Gemini ---
+// La configuración vive en RTDB /_secure/ai (sólo la lee/escribe esta function con el Admin SDK;
+// el navegador nunca recibe la clave). Fallback: variable de entorno GEMINI_API_KEY.
+const AI_PATH = '/_secure/ai';
+const readAiConfig = async () => {
+  const cfg = (await db().ref(AI_PATH).once('value')).val() || {};
+  return {
+    apiKey: str(cfg.apiKey) || str(process.env.GEMINI_API_KEY),
+    textModel: str(cfg.textModel) || gemini.DEFAULT_TEXT_MODEL,
+    imageModel: str(cfg.imageModel) || gemini.DEFAULT_IMAGE_MODEL,
+    updatedAt: Number(cfg.updatedAt || 0),
+    updatedBy: str(cfg.updatedBy)
+  };
+};
+const publicAiConfig = (cfg) => ({
+  ok: true,
+  provider: 'gemini',
+  configured: Boolean(cfg.apiKey),
+  keyMasked: gemini.maskKey(cfg.apiKey),
+  textModel: cfg.textModel,
+  imageModel: cfg.imageModel,
+  updatedAt: cfg.updatedAt,
+  updatedBy: cfg.updatedBy
+});
+const aiError = (res, error, label) => {
+  console.error(`${label} error:`, error.message);
+  const status = error.status && error.status >= 400 && error.status < 600 ? error.status : 500;
+  return res.status(status).json({ ok: false, error: error.message });
+};
+
+// POST /ia : chat (mismo formato chat/completions que usaban los módulos)
 app.post('/ia', requireAuth, async (req, res) => {
   try {
-    const node = (await db().ref('/deepseek/apiKey').once('value')).val();
-    const apiKey = typeof node === 'string' ? str(node) : str(node && node.apiKey);
-    if (!apiKey) return res.status(500).json({ ok: false, error: 'ia_key_missing' });
-
-    const upstream = await fetch('https://api.deepseek.com/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify(req.body || {})
-    });
-    const text = await upstream.text();
-    res.status(upstream.status);
-    res.set('Content-Type', upstream.headers.get('content-type') || 'application/json');
-    return res.send(text);
+    const cfg = await readAiConfig();
+    if (!cfg.apiKey) return res.status(500).json({ ok: false, error: 'ia_key_missing' });
+    const model = str(req.body && req.body.model).startsWith('gemini') ? str(req.body.model) : cfg.textModel;
+    return res.json(await gemini.chat({ apiKey: cfg.apiKey, model, body: req.body || {} }));
   } catch (error) {
-    console.error('ia error:', error);
-    return res.status(500).json({ ok: false, error: error.message });
+    return aiError(res, error, 'ia');
+  }
+});
+
+// POST /ia/image : { prompt } → { ok, mimeType, data (base64) }
+app.post('/ia/image', requireAuth, async (req, res) => {
+  try {
+    const prompt = str(req.body && req.body.prompt).slice(0, 2000);
+    if (!prompt) return res.status(400).json({ ok: false, error: 'prompt_required' });
+    const cfg = await readAiConfig();
+    if (!cfg.apiKey) return res.status(500).json({ ok: false, error: 'ia_key_missing' });
+    const out = await gemini.image({ apiKey: cfg.apiKey, model: cfg.imageModel, prompt });
+    return res.json({ ok: true, mimeType: out.mimeType, data: out.data });
+  } catch (error) {
+    return aiError(res, error, 'ia/image');
+  }
+});
+
+// GET /config/ai : estado de la configuración (clave enmascarada)
+app.get('/config/ai', requireAuth, async (req, res) => {
+  try {
+    return res.json(publicAiConfig(await readAiConfig()));
+  } catch (error) {
+    return aiError(res, error, 'config/ai');
+  }
+});
+
+// POST /config/ai : { apiKey?, textModel?, imageModel? } (apiKey vacío = no cambiar)
+app.post('/config/ai', requireAuth, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const patch = { updatedAt: Date.now(), updatedBy: str(req.user && (req.user.email || req.user.uid)) };
+    if (str(body.apiKey)) patch.apiKey = str(body.apiKey).trim();
+    if (/^gemini-[w.-]+$/.test(str(body.textModel))) patch.textModel = str(body.textModel);
+    if (/^gemini-[w.-]+$/.test(str(body.imageModel))) patch.imageModel = str(body.imageModel);
+    await db().ref(AI_PATH).update(patch);
+    return res.json(publicAiConfig(await readAiConfig()));
+  } catch (error) {
+    return aiError(res, error, 'config/ai');
+  }
+});
+
+// POST /config/ai/test : prueba de conexión con un pedido mínimo
+app.post('/config/ai/test', requireAuth, async (req, res) => {
+  try {
+    const cfg = await readAiConfig();
+    if (!cfg.apiKey) return res.status(400).json({ ok: false, error: 'ia_key_missing' });
+    const t0 = Date.now();
+    const out = await gemini.chat({ apiKey: cfg.apiKey, model: cfg.textModel, body: { messages: [{ role: 'user', content: 'Respondé sólo: OK' }], temperature: 0, max_tokens: 5 } });
+    return res.json({ ok: true, ms: Date.now() - t0, model: cfg.textModel, reply: out.choices[0].message.content });
+  } catch (error) {
+    return aiError(res, error, 'config/ai/test');
   }
 });
 
@@ -166,4 +240,4 @@ app.get('/image', requireAuth, async (req, res) => {
 // --- healthcheck ---
 app.get('/', (req, res) => res.json({ ok: true, service: 'la-jamonera-proxy' }));
 
-exports.api = onRequest({ timeoutSeconds: 60, memory: '512MiB' }, app);
+exports.api = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, app);
