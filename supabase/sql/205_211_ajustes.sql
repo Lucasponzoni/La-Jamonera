@@ -144,3 +144,6 @@ select cron.schedule('lj-inventario-cache', '*/5 * * * *', $$select private.lj_i
 -- También: timeout de sentencias para usuarios autenticados (lecturas grandes) + recargar PostgREST.
 alter role authenticated set statement_timeout = '60s';
 notify pgrst, 'reload config';
+
+-- 212–213 · Realtime para los índices del dashboard (rtdb_raw). personas NO (tiene pin_hash).
+alter publication supabase_realtime add table public.rtdb_raw;

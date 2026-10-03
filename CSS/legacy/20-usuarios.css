@@ -399,3 +399,5 @@ sl-alert.lj-notify.type-info::part(icon) { color: var(--lj-accent); }
   .users-tpl-code::part(textarea) { min-height: 220px; }
   .users-tpl-frame { min-height: 320px; }
 }
+.users-editor-access sl-radio-group::part(form-control-label),
+.users-grant-form sl-radio-group::part(form-control-label) { font-size: 12px; font-weight: 600; color: var(--lj-muted); margin-bottom: 6px; }

@@ -290,8 +290,8 @@
 
   // ---------- ref(path) estilo Firebase (subconjunto usado por el sitio) ----------
   const snapshotOf = (key, value) => ({ key: key.split('/').pop() || null, val: () => clone(value), exists: () => value !== null && value !== undefined });
+  // personas no se publica en Realtime (tiene pin_hash): sólo los índices.
   const REALTIME = [
-    { re: /^\/informes\/users(\/|$)/, table: 'personas' },
     { re: /^\/(ingredientes_index|inventario_index|recetas_index|reparto_index|produccion_index|informes_index|analisis_quimicos_index|_index_meta)(\/|$)/, table: 'rtdb_raw' }
   ];
   const listeners = new Map();
