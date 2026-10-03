@@ -198,3 +198,28 @@ sl-dialog.lj-viewer-dialog::part(footer) { display: block; }
   .lj-viewer-label .lj-alert-title { font-size: 15px; flex: 1 1 100%; }
   .lj-viewer-tags { font-size: 12px; }
 }
+
+/* ===== Alertas con botones: estilo formulario =====
+   Título a la izquierda (con ícono de estado) + X, contenido a la izquierda, acciones abajo a la derecha. */
+sl-dialog.lj-alert-form { --width: 30rem; }
+sl-dialog.lj-alert-form::part(header) { border-bottom: 0; }
+sl-dialog.lj-alert-form::part(title) { padding: 18px 8px 6px 22px; }
+sl-dialog.lj-alert-form::part(header-actions) { padding: 12px 12px 0 0; }
+sl-dialog.lj-alert-form::part(body) { padding: 4px 22px 6px; }
+sl-dialog.lj-alert-form::part(footer) { padding: 14px 22px 18px; }
+sl-dialog.lj-alert-form.is-locked::part(close-button) { display: none; }
+.lj-alert-form-label { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.lj-alert-form-label .lj-alert-title { font-size: 17px; font-weight: 600; line-height: 1.3; color: var(--lj-text); text-align: left; }
+.lj-alert-form-label .lj-alert-icon { font-size: 20px; flex: 0 0 auto; }
+.lj-alert-form .lj-alert { text-align: left; gap: 12px; }
+.lj-alert-form .lj-alert-html,
+.lj-alert-form .lj-alert-html:has(> p:only-child),
+.lj-alert-form .lj-alert-html:not(:has(*)) { text-align: left; color: var(--lj-muted); font-size: 14px; }
+.lj-alert-form .lj-alert-html :is(label, .lj-label) { color: var(--lj-text); }
+.lj-alert-footer { display: flex; justify-content: flex-end; gap: 8px; margin: 0; flex-wrap: wrap; }
+.lj-alert-footer sl-button { min-width: 96px; }
+@media (max-width: 575.98px) {
+  sl-dialog.lj-alert-form { --width: calc(100vw - 24px) !important; }
+  .lj-alert-footer sl-button { flex: 1 1 0; }
+}
+sl-dialog.lj-alert-form::part(footer) { border-top: 0; }
