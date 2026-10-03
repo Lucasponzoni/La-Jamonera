@@ -107,7 +107,7 @@
   const FROZEN_INFO_HTML = `
     <div class="frozen-info-content">
       <header class="frozen-info-hero">
-        <div class="frozen-info-hero-icon"><i class="bi bi-snow2"></i></div>
+        <div class="frozen-info-hero-icon"><sl-icon name="snow2"></sl-icon></div>
         <div>
           <p class="frozen-info-kicker">Procedimiento interno</p>
           <h3 class="frozen-info-hero-title">Congelamiento y descongelado seguro de alimentos</h3>
@@ -115,38 +115,38 @@
         </div>
       </header>
       <article class="frozen-info-card frozen-info-card--blue">
-        <header class="frozen-info-card-head"><span class="frozen-info-step">1</span><h4><i class="bi bi-clipboard2-check-fill"></i> Condición previa</h4></header>
+        <header class="frozen-info-card-head"><span class="frozen-info-step">1</span><h4><sl-icon name="clipboard2-check-fill"></sl-icon> Condición previa</h4></header>
         <ul class="frozen-info-list">
-          <li><i class="bi bi-check-circle-fill"></i> Congelar solamente alimentos aptos, identificados, dentro de vida útil y con trazabilidad de lote/proveedor.</li>
-          <li><i class="bi bi-check-circle-fill"></i> Registrar fecha/hora de ingreso, fecha/hora de congelamiento, responsable, lote y temperatura de cámara.</li>
-          <li><i class="bi bi-check-circle-fill"></i> Mantener separación entre crudos/listos para consumir y evitar contaminación cruzada.</li>
+          <li><sl-icon name="check-circle-fill"></sl-icon> Congelar solamente alimentos aptos, identificados, dentro de vida útil y con trazabilidad de lote/proveedor.</li>
+          <li><sl-icon name="check-circle-fill"></sl-icon> Registrar fecha/hora de ingreso, fecha/hora de congelamiento, responsable, lote y temperatura de cámara.</li>
+          <li><sl-icon name="check-circle-fill"></sl-icon> Mantener separación entre crudos/listos para consumir y evitar contaminación cruzada.</li>
         </ul>
       </article>
       <article class="frozen-info-card frozen-info-card--ice">
-        <header class="frozen-info-card-head"><span class="frozen-info-step">2</span><h4><i class="bi bi-snow"></i> Congelamiento en cámara a -18&nbsp;°C</h4></header>
+        <header class="frozen-info-card-head"><span class="frozen-info-step">2</span><h4><sl-icon name="snow"></sl-icon> Congelamiento en cámara a -18&nbsp;°C</h4></header>
         <div class="frozen-info-temp-grid"><div class="frozen-info-temp"><strong>-18&nbsp;°C</strong><span>temperatura objetivo de cámara/freezer</span></div></div>
         <ul class="frozen-info-list">
-          <li><i class="bi bi-check-circle-fill"></i> Colocar el alimento protegido, rotulado y en envase apto para freezer.</li>
-          <li><i class="bi bi-check-circle-fill"></i> Controlar y documentar la temperatura de cámara durante el almacenamiento.</li>
-          <li><i class="bi bi-x-circle-fill"></i> Evitar aperturas prolongadas, fluctuaciones de temperatura y descongelamientos parciales.</li>
+          <li><sl-icon name="check-circle-fill"></sl-icon> Colocar el alimento protegido, rotulado y en envase apto para freezer.</li>
+          <li><sl-icon name="check-circle-fill"></sl-icon> Controlar y documentar la temperatura de cámara durante el almacenamiento.</li>
+          <li><sl-icon name="x-circle-fill"></sl-icon> Evitar aperturas prolongadas, fluctuaciones de temperatura y descongelamientos parciales.</li>
         </ul>
-        <div class="frozen-info-callout frozen-info-callout--warn"><i class="bi bi-exclamation-triangle-fill"></i><p><strong>Importante:</strong> congelar no elimina peligros microbiológicos ni vuelve indefinida la vida útil. La fecha extendida debe estar definida por procedimiento, rotulado/trazabilidad y respaldo técnico del establecimiento.</p></div>
+        <div class="frozen-info-callout frozen-info-callout--warn"><sl-icon name="exclamation-triangle-fill"></sl-icon><p><strong>Importante:</strong> congelar no elimina peligros microbiológicos ni vuelve indefinida la vida útil. La fecha extendida debe estar definida por procedimiento, rotulado/trazabilidad y respaldo técnico del establecimiento.</p></div>
       </article>
       <article class="frozen-info-card frozen-info-card--mint">
-        <header class="frozen-info-card-head"><span class="frozen-info-step">3</span><h4><i class="bi bi-droplet-half"></i> Descongelado en cámara de 0 a 5&nbsp;°C</h4></header>
+        <header class="frozen-info-card-head"><span class="frozen-info-step">3</span><h4><sl-icon name="droplet-half"></sl-icon> Descongelado en cámara de 0 a 5&nbsp;°C</h4></header>
         <ul class="frozen-info-list">
-          <li><i class="bi bi-check-circle-fill"></i> Pasar el alimento a cámara refrigerada entre <strong>0&nbsp;°C y 5&nbsp;°C</strong>, protegido e identificado.</li>
-          <li><i class="bi bi-check-circle-fill"></i> Registrar inicio/fin de descongelado, lote, responsable y temperatura de cámara.</li>
-          <li><i class="bi bi-x-circle-fill"></i> No descongelar a temperatura ambiente, cerca de fuentes de calor ni bajo canilla.</li>
-          <li><i class="bi bi-x-circle-fill"></i> No volver a congelar un alimento descongelado salvo que exista proceso validado y documentado.</li>
+          <li><sl-icon name="check-circle-fill"></sl-icon> Pasar el alimento a cámara refrigerada entre <strong>0&nbsp;°C y 5&nbsp;°C</strong>, protegido e identificado.</li>
+          <li><sl-icon name="check-circle-fill"></sl-icon> Registrar inicio/fin de descongelado, lote, responsable y temperatura de cámara.</li>
+          <li><sl-icon name="x-circle-fill"></sl-icon> No descongelar a temperatura ambiente, cerca de fuentes de calor ni bajo canilla.</li>
+          <li><sl-icon name="x-circle-fill"></sl-icon> No volver a congelar un alimento descongelado salvo que exista proceso validado y documentado.</li>
         </ul>
       </article>
       <article class="frozen-info-card frozen-info-card--rose">
-        <header class="frozen-info-card-head"><span class="frozen-info-step">4</span><h4><i class="bi bi-calendar2-check"></i> Vencimiento extendido</h4></header>
+        <header class="frozen-info-card-head"><span class="frozen-info-step">4</span><h4><sl-icon name="calendar2-check"></sl-icon> Vencimiento extendido</h4></header>
         <p class="frozen-info-text">El vencimiento extendido por congelamiento a -18&nbsp;°C debe usarse como criterio interno documentado. No es automático: depende del producto, proceso, envase, cadena de frío, rotulado y validación sanitaria.</p>
-        <div class="frozen-info-callout frozen-info-callout--info"><i class="bi bi-info-circle-fill"></i><p><strong>CAA:</strong> para alimentos cuya duración varía por temperatura, debe indicarse la condición de conservación, por ejemplo duración a -18&nbsp;°C, y las instrucciones necesarias de uso/descongelación cuando correspondan.</p></div>
+        <div class="frozen-info-callout frozen-info-callout--info"><sl-icon name="info-circle-fill"></sl-icon><p><strong>CAA:</strong> para alimentos cuya duración varía por temperatura, debe indicarse la condición de conservación, por ejemplo duración a -18&nbsp;°C, y las instrucciones necesarias de uso/descongelación cuando correspondan.</p></div>
       </article>
-      <footer class="frozen-info-conclusion"><i class="bi bi-patch-check-fill"></i><p>El criterio correcto es: congelar en cámara a <strong>-18&nbsp;°C</strong>, conservar cadena de frío, documentar todo el proceso y descongelar en cámara de <strong>0 a 5&nbsp;°C</strong>. La vida útil extendida debe estar respaldada por el procedimiento y los controles del establecimiento.</p></footer>
+      <footer class="frozen-info-conclusion"><sl-icon name="patch-check-fill"></sl-icon><p>El criterio correcto es: congelar en cámara a <strong>-18&nbsp;°C</strong>, conservar cadena de frío, documentar todo el proceso y descongelar en cámara de <strong>0 a 5&nbsp;°C</strong>. La vida útil extendida debe estar respaldada por el procedimiento y los controles del establecimiento.</p></footer>
     </div>`;
   const ARGENTINA_PROVINCES = ['Buenos Aires','CABA','Catamarca','Chaco','Chubut','Córdoba','Corrientes','Entre Ríos','Formosa','Jujuy','La Pampa','La Rioja','Mendoza','Misiones','Neuquén','Río Negro','Salta','San Juan','San Luis','Santa Cruz','Santa Fe','Santiago del Estero','Tierra del Fuego','Tucumán'];
 
@@ -174,25 +174,18 @@
   const blurActiveElement = () => document.activeElement?.blur?.();
   const openIosSwal = (options) => {
     blurActiveElement();
-    recetasModal.setAttribute('inert', '');
     return Swal.fire({
-    ...options,
-    returnFocus: false,
-    willClose: () => {
-      recetasModal.removeAttribute('inert');
-      if (typeof options.willClose === 'function') options.willClose();
-    },
-    customClass: {
-      popup: `ios-alert ingredientes-alert ${options?.customClass?.popup || ''}`.trim(),
-      title: 'ios-alert-title',
-      htmlContainer: 'ios-alert-text',
-      confirmButton: 'ios-btn ios-btn-primary',
-      cancelButton: 'ios-btn ios-btn-secondary',
-      denyButton: 'ios-btn ios-btn-secondary',
-      ...options.customClass
-    },
-    buttonsStyling: false
-  });
+      ...options,
+      customClass: {
+        popup: `ios-alert ingredientes-alert ${options?.customClass?.popup || ''}`.trim(),
+        title: 'ios-alert-title',
+        htmlContainer: 'ios-alert-text',
+        confirmButton: 'ios-btn-primary',
+        cancelButton: 'ios-btn-secondary',
+        denyButton: 'ios-btn-secondary',
+        ...options.customClass
+      }
+    });
   };
 
   const FROZEN_INFO_PDF_SECTIONS = [
@@ -299,7 +292,7 @@
   });
 
   const runWithModalSpinner = async (task) => {
-    const modalContent = recetasModal?.querySelector('.modal-content');
+    const modalContent = LJModal.body(recetasModal);
     if (!modalContent) {
       await task();
       return;
@@ -309,7 +302,11 @@
     }
     const overlay = document.createElement('div');
     overlay.className = 'modal-local-overlay';
-    overlay.innerHTML = '<div class="modal-local-overlay-card"><img src="./IMG/Meta-ai-logo.webp" alt="Actualizando" class="meta-spinner-login"></div>';
+    // El cuerpo del dialog tiene scroll propio: el overlay cubre la zona visible, no el inicio del contenido.
+    overlay.style.top = `${modalContent.scrollTop}px`;
+    overlay.style.bottom = 'auto';
+    overlay.style.height = `${modalContent.clientHeight}px`;
+    overlay.innerHTML = '<div class="modal-local-overlay-card"><sl-spinner class="meta-spinner-login" aria-label="Actualizando"></sl-spinner></div>';
     modalContent.appendChild(overlay);
     try {
       await task();
@@ -364,13 +361,14 @@
     separator.className = 'barra-separadora ingredientes-toolbar-separator';
     separator.setAttribute('aria-hidden', 'true');
 
-    printRecipesBtn = document.createElement('button');
-    printRecipesBtn.type = 'button';
+    printRecipesBtn = document.createElement('sl-button');
+    printRecipesBtn.setAttribute('variant', 'default');
+    printRecipesBtn.setAttribute('type', 'button');
     printRecipesBtn.id = 'printRecipesBtn';
-    printRecipesBtn.className = 'btn ios-btn ios-btn-secondary produccion-toolbar-icon-btn boton-fc';
+    printRecipesBtn.className = 'produccion-toolbar-icon-btn boton-fc';
     printRecipesBtn.title = 'Imprimir recetas';
     printRecipesBtn.setAttribute('aria-label', 'Imprimir recetas');
-    printRecipesBtn.innerHTML = '<i class="fa-solid fa-print"></i><span>Imprimir</span>';
+    printRecipesBtn.innerHTML = '<i slot="prefix" class="fa-solid fa-print"></i><span>Imprimir</span>';
 
     actionsWrap.insertBefore(separator, createRecipeBtn);
     actionsWrap.insertBefore(printRecipesBtn, separator);
@@ -430,9 +428,9 @@
     const selectedNorm = normalizeLower(selected);
     const hasSelectedInOptions = selectedNorm && opts.some((item) => item.value === selectedNorm);
     const selectedFallbackOption = selectedNorm && !hasSelectedInOptions
-      ? `<option value="${selectedNorm}" selected>${capitalize(selectedNorm)}</option>`
+      ? `<sl-option value="${ljOptionValue(selectedNorm)}">${capitalize(selectedNorm)}</sl-option>`
       : '';
-    return `${selectedFallbackOption}${opts.map((item) => `<option value="${item.value}" ${selectedNorm === item.value ? 'selected' : ''} ${item.disabled ? 'disabled' : ''}>${item.label}${item.disabled ? ' (no disponible)' : ''}</option>`).join('')}<option value="${NEW_MEASURE_VALUE}">+ Agregar nueva medida</option>`;
+    return `${selectedFallbackOption}${opts.map((item) => `<sl-option value="${ljOptionValue(item.value)}" ${item.disabled ? 'disabled' : ''}>${item.label}${item.disabled ? ' (no disponible)' : ''}</sl-option>`).join('')}<sl-option value="${ljOptionValue(NEW_MEASURE_VALUE)}">+ Agregar nueva medida</sl-option>`;
   };
 
   const getPreferredUnitForIngredient = (ingredient) => {
@@ -823,6 +821,7 @@
       }
     }
     const textarea = document.createElement('textarea');
+    textarea.className = 'lj-raw';
     textarea.value = text;
     textarea.setAttribute('readonly', '');
     textarea.style.position = 'fixed';
@@ -903,8 +902,8 @@
     const alertMessage = dangerRows.length ? 'Hay RNPA críticos por vencer.' : 'Hay RNPA próximos a vencer.';
 
     recetasRnpaAlert.classList.remove('d-none');
-    recetasRnpaAlert.innerHTML = `<button type="button" class="produccion-rne-expiry-alert ${dangerRows.length ? 'is-danger' : 'is-ok'} is-collapsible" data-rnpa-alert-toggle aria-expanded="false">
-        <span class="produccion-rne-expiry-text"><i class="bi ${dangerRows.length ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill'}"></i><span>${alertMessage}</span></span>
+    recetasRnpaAlert.innerHTML = `<button type="button" class="lj-tile produccion-rne-expiry-alert ${dangerRows.length ? 'is-danger' : 'is-ok'} is-collapsible" data-rnpa-alert-toggle aria-expanded="false">
+        <span class="produccion-rne-expiry-text"><sl-icon name="${dangerRows.length ? 'exclamation-octagon-fill' : 'exclamation-triangle-fill'}"></sl-icon><span>${alertMessage}</span></span>
         <span class="produccion-rne-expiry-collapse-meta"><strong>${detailsCount}</strong><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
       </button>
       <div class="inventario-rne-expiry-board" data-rnpa-alert-details hidden>
@@ -923,17 +922,25 @@
     });
   };
 
-  const getRnpaSelectOptions = (list, selected = '', fieldLabel = 'opción') => {
+  // sl-select: la opción vacía pasa a ser el placeholder del select (fieldLabel) y la selección va en su atributo value.
+  const getRnpaSelectOptions = (list, selected = '') => {
     const chosen = normalizeValue(selected);
     const merged = Array.from(new Set([...(Array.isArray(list) ? list.map((item) => normalizeValue(item)).filter(Boolean) : []), chosen].filter(Boolean))).sort((a, b) => a.localeCompare(b, 'es'));
-    return `<option value="">${fieldLabel}</option>${merged.map((item) => `<option value="${escapeHtml(item)}" ${normalizeLower(item) === normalizeLower(chosen) ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}<option value="__new_value__">+ Agregar</option>`;
+    return `${merged.map((item) => `<sl-option value="${ljOptionValue(item)}">${escapeHtml(item)}</sl-option>`).join('')}<sl-option value="${ljOptionValue('__new_value__')}">+ Agregar</sl-option>`;
   };
 
-  const getRnpaCityOptions = (selected = '') => {
+  // Valor para el atributo value del sl-select: el ítem de la lista que coincide sin importar mayúsculas
+  // (si no hay coincidencia queda vacío, como el select nativo que caía en la opción vacía).
+  const getRnpaSelectedValue = (list, selected = '') => {
     const chosen = normalizeValue(selected);
-    const merged = Array.from(new Set(['Rosario', ...(Array.isArray(state.recipeCities) ? state.recipeCities : [])])).sort((a, b) => a.localeCompare(b, 'es'));
-    return `${merged.map((city) => `<option value="${escapeHtml(city)}" ${normalizeLower(city) === normalizeLower(chosen) ? 'selected' : ''}>${escapeHtml(city)}</option>`).join('')}<option value="__new_city__">+ Agregar ciudad</option>`;
+    if (!chosen) return '';
+    const match = (Array.isArray(list) ? list : []).map((item) => normalizeValue(item)).find((item) => normalizeLower(item) === normalizeLower(chosen));
+    return match ? ljOptionValue(match) : '';
   };
+
+  const getRnpaCityList = () => Array.from(new Set(['Rosario', ...(Array.isArray(state.recipeCities) ? state.recipeCities : [])])).sort((a, b) => a.localeCompare(b, 'es'));
+
+  const getRnpaCityOptions = () => `${getRnpaCityList().map((city) => `<sl-option value="${ljOptionValue(city)}">${escapeHtml(city)}</sl-option>`).join('')}<sl-option value="${ljOptionValue('__new_city__')}">+ Agregar ciudad</sl-option>`;
 
   // === Grupos de recetas (compartidos con el modal Producción) ================
   // Schema en Firebase: /recetas_groups/{groupId} = { id, name, imageUrl, order, ... }
@@ -996,7 +1003,7 @@
     const totalRecipes = Object.keys(safeObject(state.recetas)).length;
     const allButton = `
       <div class="family-circle-wrap">
-        <button type="button" class="family-circle-item ${active === 'all' ? 'is-active' : ''}" data-recipe-group-filter="all">
+        <button type="button" class="lj-tile family-circle-item ${active === 'all' ? 'is-active' : ''}" data-recipe-group-filter="all">
           <span class="family-circle-thumb family-circle-thumb-placeholder"><i class="fa-solid fa-table-cells-large"></i>${totalRecipes > 0 ? `<span class="family-circle-count">${Math.min(99, totalRecipes)}</span>` : ''}</span>
           <span class="family-circle-name">Todas</span>
         </button>
@@ -1004,20 +1011,20 @@
 
     const groupButtons = groups.map((g) => `
       <div class="family-circle-wrap">
-        <button type="button" class="family-circle-item ${active === g.id ? 'is-active' : ''}" data-recipe-group-filter="${escapeHtml(g.id)}">
+        <button type="button" class="lj-tile family-circle-item ${active === g.id ? 'is-active' : ''}" data-recipe-group-filter="${escapeHtml(g.id)}">
           ${renderThumb(g.imageUrl, g.name || 'Grupo', counts[g.id] || 0)}
           <span class="family-circle-name">${escapeHtml(g.name || 'Grupo')}</span>
         </button>
         <div class="family-circle-actions">
-          <button class="family-manage-btn" data-recipe-group-manage="${escapeHtml(g.id)}" type="button" title="Administrar recetas del grupo"><i class="fa-solid fa-list-check"></i></button>
-          <button class="family-manage-btn" data-recipe-group-edit="${escapeHtml(g.id)}" type="button" title="Editar grupo"><i class="fa-solid fa-pen"></i></button>
-          <button class="family-manage-btn" data-recipe-group-delete="${escapeHtml(g.id)}" type="button" title="Eliminar grupo"><i class="fa-solid fa-trash"></i></button>
+          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" data-recipe-group-manage="${escapeHtml(g.id)}" type="button" title="Administrar recetas del grupo" aria-label="Administrar recetas del grupo"><i class="fa-solid fa-list-check"></i></sl-button>
+          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" data-recipe-group-edit="${escapeHtml(g.id)}" type="button" title="Editar grupo" aria-label="Editar grupo"><i class="fa-solid fa-pen"></i></sl-button>
+          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn is-danger" data-recipe-group-delete="${escapeHtml(g.id)}" type="button" title="Eliminar grupo" aria-label="Eliminar grupo"><i class="fa-solid fa-trash"></i></sl-button>
         </div>
       </div>`).join('');
 
     const createButton = `
       <div class="family-circle-wrap">
-        <button type="button" class="family-circle-item family-circle-create" data-recipe-group-create>
+        <button type="button" class="lj-tile family-circle-item family-circle-create" data-recipe-group-create>
           <span class="family-circle-thumb family-circle-thumb-placeholder family-circle-thumb-create"><i class="fa-solid fa-plus"></i></span>
           <span class="family-circle-name">Nuevo grupo</span>
         </button>
@@ -1026,7 +1033,7 @@
     recetasGroups.innerHTML = `
       <div class="family-circle-section ${collapsed ? 'is-collapsed' : ''}">
         <div class="family-circle-section-head">
-          <button type="button" class="family-circle-toggle" data-recipe-groups-toggle aria-expanded="${!collapsed}">
+          <button type="button" class="lj-tile family-circle-toggle" data-recipe-groups-toggle aria-expanded="${!collapsed}">
             <i class="fa-solid ${collapsed ? 'fa-chevron-right' : 'fa-chevron-down'}"></i>
             <span>Grupos de recetas</span>
             <small>${groups.length} ${groups.length === 1 ? 'grupo' : 'grupos'}${active !== 'all' ? ` · filtrando: ${escapeHtml(safeObject(state.recipeGroups[active]).name || '')}` : ''}${hasSearch ? ' · oculto por búsqueda' : ''}</small>
@@ -1053,8 +1060,7 @@
           <section class="step-block">
             <h6 class="step-title">1) Datos del grupo</h6>
             <div class="step-content">
-              <label for="recipeGroupNameInput">Nombre del grupo *</label>
-              <input id="recipeGroupNameInput" class="swal2-input ios-input" placeholder="Ej: Embutidos" value="${escapeHtml(existing?.name || '')}">
+              <sl-input id="recipeGroupNameInput" label="Nombre del grupo *" placeholder="Ej: Embutidos" value="${escapeHtml(existing?.name || '')}"></sl-input>
             </div>
           </section>
           ${imageStep.buildHtml('recipeGroupImage', existing?.imageUrl || '')}
@@ -1062,8 +1068,7 @@
       showCancelButton: true,
       confirmButtonText: existing ? 'Guardar cambios' : 'Crear grupo',
       cancelButtonText: 'Cancelar',
-      buttonsStyling: false,
-      customClass: { popup: 'ios-alert', confirmButton: 'ios-btn ios-btn-primary', cancelButton: 'ios-btn ios-btn-secondary' },
+      customClass: { popup: 'ios-alert', confirmButton: 'ios-btn-primary', cancelButton: 'ios-btn-secondary' },
       didOpen: () => {
         resolveImage = imageStep.attach('recipeGroupImage', {
           uploadFolder: 'recetas/grupos/uploads',
@@ -1110,8 +1115,7 @@
       showCancelButton: true,
       confirmButtonText: 'Eliminar',
       cancelButtonText: 'Cancelar',
-      buttonsStyling: false,
-      customClass: { popup: 'ios-alert', confirmButton: 'ios-btn ios-btn-danger', cancelButton: 'ios-btn ios-btn-secondary' }
+      customClass: { popup: 'ios-alert', confirmButton: 'ios-btn-danger', cancelButton: 'ios-btn-secondary' }
     });
     if (!ok.isConfirmed) return;
     delete state.recipeGroups[groupId];
@@ -1136,7 +1140,7 @@
       .filter((r) => r && r.id)
       .sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'es'));
     if (!allRecipes.length) {
-      await Swal.fire({ title: 'Sin recetas', html: '<p>No hay recetas creadas todavía.</p>', icon: 'info', buttonsStyling: false, customClass: { popup: 'ios-alert', confirmButton: 'ios-btn ios-btn-primary' } });
+      await Swal.fire({ title: 'Sin recetas', html: '<p>No hay recetas creadas todavía.</p>', icon: 'info', customClass: { popup: 'ios-alert', confirmButton: 'ios-btn-primary' } });
       return;
     }
     const html = `
@@ -1145,11 +1149,10 @@
         ${allRecipes.map((r) => {
           const inThis = normalizeValue(r.recipeGroupId) === groupId;
           const otherGroup = !inThis && r.recipeGroupId ? safeObject(state.recipeGroups[r.recipeGroupId])?.name : '';
-          return `<label class="produccion-group-assign-row">
-            <input type="checkbox" data-assign-recipe="${escapeHtml(r.id)}" ${inThis ? 'checked' : ''}>
+          return `<sl-checkbox class="produccion-group-assign-row" data-assign-recipe="${escapeHtml(r.id)}" ${inThis ? 'checked' : ''}>
             <span class="produccion-group-assign-thumb">${r.imageUrl ? `<img src="${escapeHtml(r.imageUrl)}" alt="">` : '<i class="fa-solid fa-egg-fried"></i>'}</span>
             <span class="produccion-group-assign-name"><strong>${escapeHtml(capitalize(r.title || '-'))}</strong>${otherGroup ? `<small> · actualmente en <em>${escapeHtml(capitalize(otherGroup))}</em></small>` : ''}</span>
-          </label>`;
+          </sl-checkbox>`;
         }).join('')}
       </div>`;
     const result = await Swal.fire({
@@ -1159,9 +1162,8 @@
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
-      buttonsStyling: false,
-      customClass: { popup: 'ios-alert produccion-group-assign-alert', confirmButton: 'ios-btn ios-btn-primary', cancelButton: 'ios-btn ios-btn-secondary' },
-      preConfirm: () => Array.from(document.querySelectorAll('[data-assign-recipe]'))
+      customClass: { popup: 'ios-alert produccion-group-assign-alert', confirmButton: 'ios-btn-primary', cancelButton: 'ios-btn-secondary' },
+      preConfirm: () => Array.from(document.querySelectorAll('sl-checkbox[data-assign-recipe]'))
         .filter((el) => el.checked)
         .map((el) => normalizeValue(el.dataset.assignRecipe))
     });
@@ -1224,7 +1226,7 @@
     let baseSource = inGroup;
     if (!inGroup.length && outsideGroup.length && query) {
       const groupName = state.recipeGroups?.[activeGroup]?.name || '';
-      helperHtml = `<div class="ingrediente-empty-list with-illustration"><p class="ingrediente-empty-title">No hay recetas en "${escapeHtml(capitalize(groupName))}" con esa búsqueda.</p><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-search-all><i class="bi bi-lightning-charge"></i><span>Buscar en toda la base</span></button></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del grupo</strong> seleccionado</p>`;
+      helperHtml = `<div class="ingrediente-empty-list with-illustration"><p class="ingrediente-empty-title">No hay recetas en "${escapeHtml(capitalize(groupName))}" con esa búsqueda.</p><sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-recipe-search-all><sl-icon slot="prefix" name="lightning-charge"></sl-icon><span>Buscar en toda la base</span></sl-button></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del grupo</strong> seleccionado</p>`;
       baseSource = outsideGroup;
     }
     updateRnpaFilterButtons(baseSource);
@@ -1255,7 +1257,7 @@
       const hasFrontLabels = frontLabels.length > 0;
       const groupLabel = getRecipeGroupLabel(item);
       const rnpaStatus = getRnpaStatus(item);
-      const daysHtml = rnpaStatus.days == null ? '' : `<span class="receta-rnpa-days ${rnpaStatus.daysTone || 'is-neutral'}"><i class="bi bi-clock-history"></i>${rnpaStatus.days} días</span>`;
+      const daysHtml = rnpaStatus.days == null ? '' : `<span class="receta-rnpa-days ${rnpaStatus.daysTone || 'is-neutral'}"><sl-icon name="clock-history"></sl-icon>${rnpaStatus.days} días</span>`;
       const ingredientsCount = recipeIngredients.length;
       const hasDescription = Boolean(normalizeValue(item.description));
       const hasEtiquetado = hasFrontLabels || hasNutritionLabel;
@@ -1266,7 +1268,7 @@
               <div class="receta-card-titles">
                 <div class="produccion-card-avatar receta-card-avatar ingrediente-avatar receta-thumb-wrap">
                   ${item.imageUrl
-                    ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="receta-thumb js-receta-thumb" src="${item.imageUrl}" alt="${capitalize(item.title || 'Receta')}" loading="lazy">`
+                    ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="receta-thumb js-receta-thumb" src="${item.imageUrl}" alt="${capitalize(item.title || 'Receta')}" loading="lazy">`
                     : getPlaceholderCircle()}
                 </div>
                 <div class="receta-card-title-copy">
@@ -1284,13 +1286,13 @@
                 </div>
                 <div class="receta-card-quick-stats">
                   <span class="receta-quick-stat"><small>Rinde</small><strong>${item.yieldQuantity || '0'} ${label || ''}</strong></span>
-                  ${item.frozenShelfLifeExtension ? `<span class="receta-quick-stat is-info"><small>Conservación</small><strong><i class="bi bi-snow2"></i> -18°C</strong></span>` : ''}
+                  ${item.frozenShelfLifeExtension ? `<span class="receta-quick-stat is-info"><small>Conservación</small><strong><sl-icon name="snow2"></sl-icon> -18°C</strong></span>` : ''}
                 </div>
               </div>
             </header>
 
             <section class="receta-zone receta-zone-ingredientes" data-collapsed="true">
-              <button type="button" class="receta-zone-toggle" data-toggle-receta-ingredientes="${item.id}">
+              <button type="button" class="lj-tile receta-zone-toggle" data-toggle-receta-ingredientes="${item.id}">
                 <span class="receta-zone-toggle-left">
                   <i class="fa-solid fa-flask"></i>
                   <span class="receta-zone-toggle-label">Ingredientes</span>
@@ -1305,7 +1307,7 @@
 
             ${hasDescription ? `
             <section class="receta-zone receta-zone-descripcion" data-collapsed="true">
-              <button type="button" class="receta-zone-toggle" data-toggle-receta-descripcion="${item.id}">
+              <button type="button" class="lj-tile receta-zone-toggle" data-toggle-receta-descripcion="${item.id}">
                 <span class="receta-zone-toggle-left">
                   <i class="fa-solid fa-align-left"></i>
                   <span class="receta-zone-toggle-label">Descripción</span>
@@ -1321,14 +1323,14 @@
             <section class="receta-zone receta-zone-etiquetado">
               <h4 class="receta-zone-title"><i class="fa-solid fa-tag"></i><span>Etiquetado</span></h4>
               <div class="receta-print-actions">
-                <button type="button" class="btn ios-btn ios-btn-secondary receta-print-btn" data-receta-print="nutrition" data-receta-id="${item.id}" ${hasNutritionLabel ? '' : 'disabled'}>
-                  <i class="fa-solid fa-print"></i>
+                <sl-button variant="default" size="small" type="button" class="receta-print-btn" data-receta-print="nutrition" data-receta-id="${item.id}" ${hasNutritionLabel ? '' : 'disabled'}>
+                  <i slot="prefix" class="fa-solid fa-print"></i>
                   <span>Tabla nutricional</span>
-                </button>
-                <button type="button" class="btn ios-btn ios-btn-secondary receta-print-btn" data-receta-print="front" data-receta-id="${item.id}" ${hasFrontLabels ? '' : 'disabled'}>
-                  <i class="fa-solid fa-print"></i>
+                </sl-button>
+                <sl-button variant="default" size="small" type="button" class="receta-print-btn" data-receta-print="front" data-receta-id="${item.id}" ${hasFrontLabels ? '' : 'disabled'}>
+                  <i slot="prefix" class="fa-solid fa-print"></i>
                   <span>Etiquetado frontal</span>
-                </button>
+                </sl-button>
               </div>
               ${frontLabels.length ? `<div class="receta-front-inline">${buildFrontLabelsHtml(frontLabels, { compact: true })}</div>` : ''}
             </section>` : ''}
@@ -1341,13 +1343,13 @@
             </footer>
           </div>
           <div class="ingrediente-actions recipe-row-actions">
-            <button type="button" class="btn family-manage-btn" data-receta-image-view="${item.id}" title="Ver imagen" ${normalizeValue(item.imageUrl) ? '' : 'disabled'}><i class="fa-regular fa-image"></i></button>
-            <button type="button" class="btn family-manage-btn" data-receta-rnpa-view="${item.id}" title="Ver RNPA" ${normalizeValue(item?.rnpa?.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i></button>
-            <button type="button" class="btn family-manage-btn receta-card-print-action" data-receta-full-print="${item.id}" title="Imprimir receta" aria-label="Imprimir receta"><i class="fa-solid fa-print"></i></button>
-            <button type="button" class="btn family-manage-btn" data-receta-manual-view="${item.id}" title="Ver manual" ${Array.isArray(item?.rows) && item.rows.some((row) => row.type === MONOGRAPHY_ROW_TYPE && normalizeValue(row.manualUrl)) ? '' : 'disabled'}><i class="fa-solid fa-book-open"></i></button>
-            <button type="button" class="btn family-manage-btn" data-receta-duplicate="${item.id}" title="Duplicar"><i class="fa-regular fa-copy"></i></button>
-            <button type="button" class="btn family-manage-btn" data-receta-edit="${item.id}" title="Editar"><i class="fa-solid fa-pen"></i></button>
-            <button type="button" class="btn family-manage-btn" data-receta-delete="${item.id}" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+            <sl-button variant="default" size="small" type="button" class="lj-icon-btn family-manage-btn" data-receta-image-view="${item.id}" title="Ver imagen" aria-label="Ver imagen" ${normalizeValue(item.imageUrl) ? '' : 'disabled'}><i class="fa-regular fa-image"></i></sl-button>
+            <sl-button variant="default" size="small" type="button" class="lj-icon-btn family-manage-btn" data-receta-rnpa-view="${item.id}" title="Ver RNPA" aria-label="Ver RNPA" ${normalizeValue(item?.rnpa?.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i></sl-button>
+            <sl-button variant="default" size="small" type="button" class="lj-icon-btn family-manage-btn receta-card-print-action" data-receta-full-print="${item.id}" title="Imprimir receta" aria-label="Imprimir receta"><i class="fa-solid fa-print"></i></sl-button>
+            <sl-button variant="default" size="small" type="button" class="lj-icon-btn family-manage-btn" data-receta-manual-view="${item.id}" title="Ver manual" aria-label="Ver manual" ${Array.isArray(item?.rows) && item.rows.some((row) => row.type === MONOGRAPHY_ROW_TYPE && normalizeValue(row.manualUrl)) ? '' : 'disabled'}><i class="fa-solid fa-book-open"></i></sl-button>
+            <sl-button variant="default" size="small" type="button" class="lj-icon-btn family-manage-btn" data-receta-duplicate="${item.id}" title="Duplicar" aria-label="Duplicar"><i class="fa-regular fa-copy"></i></sl-button>
+            <sl-button variant="default" size="small" type="button" class="lj-icon-btn family-manage-btn" data-receta-edit="${item.id}" title="Editar" aria-label="Editar"><i class="fa-solid fa-pen"></i></sl-button>
+            <sl-button variant="default" size="small" type="button" class="lj-icon-btn family-manage-btn is-danger" data-receta-delete="${item.id}" title="Eliminar" aria-label="Eliminar"><i class="fa-solid fa-trash"></i></sl-button>
           </div>
         </article>`;
     }).join('');
@@ -1680,7 +1682,7 @@
       html: `
         <div class="recipe-print-loading">
           <p>Estamos armando la hoja de impresion.</p>
-          <img src="./IMG/Meta-ai-logo.webp" alt="Procesando" class="meta-spinner-login recipe-print-loader">
+          <sl-spinner class="meta-spinner-login recipe-print-loader" aria-label="Procesando"></sl-spinner>
         </div>
       `,
       allowOutsideClick: false,
@@ -1712,28 +1714,28 @@
     return openIosSwal({
       title: 'Imprimir recetas',
       html: `<div class="swal-stack-fields text-start">
-        <label class="inventario-check-row"><input type="radio" name="recipePrintScope" value="all" checked><span>Todas las recetas</span></label>
-        <label class="inventario-check-row"><input type="radio" name="recipePrintScope" value="manual"><span>Seleccion manual</span></label>
+        <sl-radio-group name="recipePrintScope" value="all" class="recipe-print-scope-group">
+          <sl-radio class="inventario-check-row" value="all">Todas las recetas</sl-radio>
+          <sl-radio class="inventario-check-row" value="manual">Seleccion manual</sl-radio>
+        </sl-radio-group>
         <div id="recipePrintManualScope" class="notify-specific-users-list d-none">
-          <div class="step-block"><strong>Recetas</strong>${recipes.map((recipe) => `<label class="inventario-check-row inventario-selector-row">${normalizeValue(recipe.imageUrl) ? `<span class="inventario-print-photo-wrap receta-print-selector-thumb"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-recetas-print-thumb receta-print-thumb-fit" src="${escapeHtml(recipe.imageUrl)}" alt="${escapeHtml(capitalize(recipe.title || 'Receta'))}"></span>` : '<span class="inventario-print-photo-wrap receta-print-selector-thumb"><span class="image-placeholder-circle-2"><i class="fa-solid fa-bowl-food"></i></span></span>'}<input type="checkbox" data-recipe-print-select value="${escapeHtml(recipe.id)}"><span>${escapeHtml(capitalize(recipe.title || 'Receta sin titulo'))}</span></label>`).join('')}</div>
+          <div class="step-block"><strong>Recetas</strong>${recipes.map((recipe) => `<sl-checkbox class="inventario-check-row inventario-selector-row" data-recipe-print-select value="${escapeHtml(recipe.id)}">${normalizeValue(recipe.imageUrl) ? `<span class="inventario-print-photo-wrap receta-print-selector-thumb"><span class="thumb-loading"><sl-spinner class="meta-spinner" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-recetas-print-thumb receta-print-thumb-fit" src="${escapeHtml(recipe.imageUrl)}" alt="${escapeHtml(capitalize(recipe.title || 'Receta'))}"></span>` : '<span class="inventario-print-photo-wrap receta-print-selector-thumb"><span class="image-placeholder-circle-2"><i class="fa-solid fa-bowl-food"></i></span></span>'}<span>${escapeHtml(capitalize(recipe.title || 'Receta sin titulo'))}</span></sl-checkbox>`).join('')}</div>
         </div>
       </div>`,
       showCancelButton: true,
       confirmButtonText: 'Continuar',
       cancelButtonText: 'Cancelar',
       didOpen: () => {
-        const all = document.querySelector('input[name="recipePrintScope"][value="all"]');
-        const manual = document.querySelector('input[name="recipePrintScope"][value="manual"]');
+        const scopeGroup = document.querySelector('sl-radio-group[name="recipePrintScope"]');
         const manualScope = document.getElementById('recipePrintManualScope');
-        const toggle = () => manualScope?.classList.toggle('d-none', !manual?.checked);
-        all?.addEventListener('change', toggle);
-        manual?.addEventListener('change', toggle);
+        const toggle = () => manualScope?.classList.toggle('d-none', scopeGroup?.value !== 'manual');
+        scopeGroup?.addEventListener('change', toggle);
         toggle();
         prepareRecipePrintThumbLoaders('.js-recetas-print-thumb');
       },
       preConfirm: () => {
-        const mode = document.querySelector('input[name="recipePrintScope"]:checked')?.value || 'all';
-        const selected = [...document.querySelectorAll('[data-recipe-print-select]:checked')].map((node) => node.value);
+        const mode = document.querySelector('sl-radio-group[name="recipePrintScope"]')?.value || 'all';
+        const selected = [...document.querySelectorAll('sl-checkbox[data-recipe-print-select]')].filter((node) => node.checked).map((node) => node.value);
         if (mode === 'manual' && !selected.length) {
           Swal.showValidationMessage('Selecciona al menos una receta para imprimir.');
           return false;
@@ -1900,7 +1902,10 @@
           useCORS: true,
           allowTaint: true,
           imageTimeout: 12000,
-          logging: false
+          logging: false,
+          // html2canvas clona todo el documento (y los shadow roots de cada sl-*): con el modal abierto
+          // tardaba >20 s. Sólo hace falta el host de impresión y las hojas de estilo.
+          ignoreElements: (el) => !(el.contains(host) || host.contains(el) || el.closest('head') || ['STYLE', 'LINK'].includes(el.tagName))
         }),
         18000,
         'Tiempo de espera agotado al generar la imagen de impresión.'
@@ -2049,7 +2054,7 @@
       html: `
         <div class="recipe-print-loading">
           <p>Estamos preparando la base de impresión.</p>
-          <img src="./IMG/Meta-ai-logo.webp" alt="Procesando" class="meta-spinner-login recipe-print-loader">
+          <sl-spinner class="meta-spinner-login recipe-print-loader" aria-label="Procesando"></sl-spinner>
         </div>
       `,
       allowOutsideClick: false,
@@ -2087,26 +2092,26 @@
       width: 820,
       customClass: {
         popup: 'recipe-print-alert',
-        denyButton: 'ios-btn ios-btn-success'
+        denyButton: 'ios-btn-success'
       },
       html: `
         <div class="recipe-print-panel">
           <div class="recipe-print-controls">
-            <label class="recipe-print-field">
+            <div class="recipe-print-field">
               <span>Tipo de hoja</span>
-              <select id="printSheetType" class="form-select ios-input">
-                <option value="zebra">Zebra 10x15</option>
-                <option value="a4">A4</option>
-              </select>
-            </label>
-            <label class="recipe-print-field">
+              <sl-select id="printSheetType" value="zebra" hoist>
+                <sl-option value="zebra">Zebra 10x15</sl-option>
+                <sl-option value="a4">A4</sl-option>
+              </sl-select>
+            </div>
+            <div class="recipe-print-field">
               <span>Cantidad por hoja</span>
-              <input id="printPerSheet" type="number" min="1" step="1" value="${mode === 'front' ? 6 : 1}" class="form-control ios-input">
-            </label>
-            <label class="recipe-print-field">
+              <sl-input id="printPerSheet" type="number" min="1" step="1" value="${mode === 'front' ? 6 : 1}"></sl-input>
+            </div>
+            <div class="recipe-print-field">
               <span>Cantidad de hojas</span>
-              <input id="printSheetCount" type="number" min="1" step="1" value="1" class="form-control ios-input">
-            </label>
+              <sl-input id="printSheetCount" type="number" min="1" step="1" value="1"></sl-input>
+            </div>
           </div>
           <div class="recipe-print-meta" id="printLayoutMeta"></div>
           <div class="recipe-print-preview-wrap">
@@ -2136,7 +2141,7 @@
         };
 
         const normalizePanel = () => {
-          panelState.sheet = sheetTypeNode.value === 'a4' ? 'a4' : 'zebra';
+          panelState.sheet = ljSelectValue(sheetTypeNode) === 'a4' ? 'a4' : 'zebra';
           const max = panelState.sheet === 'zebra' ? (mode === 'front' ? 6 : 4) : Number.MAX_SAFE_INTEGER;
           panelState.perSheet = Math.min(max, Math.max(1, Math.floor(Number(perSheetNode.value) || 1)));
           panelState.sheetCount = Math.max(1, Math.floor(Number(sheetCountNode.value) || 1));
@@ -2145,6 +2150,7 @@
             perSheetNode.max = mode === 'front' ? '6' : '4';
           } else {
             perSheetNode.removeAttribute('max');
+            perSheetNode.max = undefined;
           }
 
           perSheetNode.value = String(panelState.perSheet);
@@ -2180,7 +2186,7 @@
         };
 
         sheetTypeNode.addEventListener('change', () => {
-          perSheetNode.value = sheetTypeNode.value === 'a4' ? (mode === 'front' ? '12' : '4') : (mode === 'front' ? '6' : '1');
+          perSheetNode.value = ljSelectValue(sheetTypeNode) === 'a4' ? (mode === 'front' ? '12' : '4') : (mode === 'front' ? '6' : '1');
           normalizePanel();
           drawPreview().catch(() => {});
         });
@@ -2261,32 +2267,34 @@
     <section class="step-block recipe-step-card">
       <h6 class="step-title"><span class="recipe-step-number">${stepNumber}</span> Imagen</h6>
       <div class="step-content">
-        <div class="image-method-buttons" id="${prefix}_methodButtons">
-          <button type="button" class="btn image-method-btn" data-image-method="url"><i class="fa-solid fa-link"></i>Link</button>
-          <button type="button" class="btn image-method-btn" data-image-method="upload"><i class="fa-solid fa-upload"></i>Subir</button>
-          <button type="button" class="btn image-method-btn is-active" data-image-method="ai"><img src="${IA_ICON_SRC}" alt="" aria-hidden="true"> IA</button>
+        <div class="image-method-buttons lj-btn-group" id="${prefix}_methodButtons" role="group" aria-label="Origen de la imagen">
+          <sl-button variant="default" type="button" class="image-method-btn" data-image-method="url"><i slot="prefix" class="fa-solid fa-link"></i>Link</sl-button>
+          <sl-button variant="default" type="button" class="image-method-btn" data-image-method="upload"><i slot="prefix" class="fa-solid fa-upload"></i>Subir</sl-button>
+          <sl-button variant="default" type="button" class="image-method-btn is-active" data-image-method="ai"><img slot="prefix" src="${IA_ICON_SRC}" alt="" aria-hidden="true">IA</sl-button>
         </div>
         <input type="hidden" id="${prefix}_method" value="ai">
 
         <div id="${prefix}_preview" class="image-preview-circle">${initialImage ? `<img src="${initialImage}" alt="Vista previa">` : getPlaceholderCircle()}</div>
 
         <div id="${prefix}_urlWrap" class="image-field-block">
-          <label for="${prefix}_imageUrl">Link de imagen</label>
-          <input id="${prefix}_imageUrl" class="form-control ios-input" placeholder="https://..." value="${initialImage || ''}">
+          <sl-input id="${prefix}_imageUrl" label="Link de imagen" placeholder="https://..." value="${escapeHtml(initialImage || '')}"></sl-input>
         </div>
 
         <div id="${prefix}_uploadWrap" class="d-none image-field-block">
-          <label for="${prefix}_imageFile">Subir imagen</label>
-          <input id="${prefix}_imageFile" type="file" class="form-control image-file-input" accept="image/*">
+          <label class="lj-label" for="${prefix}_imageFile">Subir imagen</label>
+          <div class="image-file-picker">
+            <input id="${prefix}_imageFile" type="file" class="image-file-input" accept="image/*" hidden>
+            <sl-button variant="default" type="button" id="${prefix}_imageFilePick"><i slot="prefix" class="fa-solid fa-upload"></i>Elegir archivo</sl-button>
+            <span id="${prefix}_imageFileName" class="image-file-name">Ningún archivo seleccionado</span>
+          </div>
         </div>
 
         <div id="${prefix}_aiWrap" class="d-none image-field-block">
-          <label for="${prefix}_aiPrompt">Prompt corto para IA</label>
-          <input id="${prefix}_aiPrompt" class="form-control ios-input recipe-ai-input" placeholder="Ej: carne de cerdo">
-          <button id="${prefix}_aiGenerate" type="button" class="ai-generate-btn mt-2">
-            <img src="${IA_ICON_SRC}" alt="" aria-hidden="true">
+          <sl-input id="${prefix}_aiPrompt" class="recipe-ai-input" label="Prompt corto para IA" placeholder="Ej: carne de cerdo"></sl-input>
+          <sl-button variant="default" id="${prefix}_aiGenerate" type="button" class="ai-generate-btn mt-2">
+            <img slot="prefix" src="${IA_ICON_SRC}" alt="" aria-hidden="true">
             <span>Generar imagen con IA</span>
-          </button>
+          </sl-button>
           <div id="${prefix}_aiError" class="ai-alert-note d-none mt-2"></div>
         </div>
       </div>
@@ -2301,6 +2309,8 @@
     const preview = document.getElementById(`${prefix}_preview`);
     const imageUrlInput = document.getElementById(`${prefix}_imageUrl`);
     const imageFileInput = document.getElementById(`${prefix}_imageFile`);
+    const imageFilePick = document.getElementById(`${prefix}_imageFilePick`);
+    const imageFileName = document.getElementById(`${prefix}_imageFileName`);
     const aiPromptInput = document.getElementById(`${prefix}_aiPrompt`);
     const aiGenerateBtn = document.getElementById(`${prefix}_aiGenerate`);
     const aiError = document.getElementById(`${prefix}_aiError`);
@@ -2320,6 +2330,12 @@
     toggleMethod(normalizeValue(imageUrlInput.value) ? 'url' : (stateImage.method || 'ai'));
 
     imageUrlInput.addEventListener('input', () => { stateImage.url = imageUrlInput.value; if (methodInput.value === 'url') setPreview(normalizeValue(imageUrlInput.value)); });
+    const showFileName = () => {
+      if (!imageFileName) return;
+      const file = imageFileInput.files?.[0];
+      imageFileName.textContent = file ? file.name : 'Ningún archivo seleccionado';
+    };
+    imageFilePick?.addEventListener('click', () => imageFileInput.click());
     imageFileInput.addEventListener('change', () => {
       const file = imageFileInput.files?.[0];
       const msg = validateImageFile(file);
@@ -2327,11 +2343,13 @@
         aiError.textContent = `Archivo no admitido: ${msg}`;
         aiError.classList.remove('d-none');
         imageFileInput.value = '';
+        showFileName();
         setPreview('');
         stateImage.file = null;
         return;
       }
       stateImage.file = file;
+      showFileName();
       aiError.classList.add('d-none');
       setPreview(URL.createObjectURL(file));
       stateImage.generatedFile = null;
@@ -2446,12 +2464,12 @@
     const selectedNorm = normalizeLower(selected);
     const qty = Number(String(amount || '1').replace(',', '.'));
     const singular = Number.isFinite(qty) && qty <= 1;
-    return HOUSEHOLD_MEASURES.map((item) => `<option value="${item.value}" ${selectedNorm === item.value ? 'selected' : ''}>${singular ? item.singular : item.plural}</option>`).join('');
+    return HOUSEHOLD_MEASURES.map((item) => `<sl-option value="${ljOptionValue(item.value)}">${singular ? item.singular : item.plural}</sl-option>`).join('');
   };
 
   const getCategoryOptionsHtml = (selected = '') => {
     const selectedNorm = normalizeLower(selected);
-    return Object.keys(FOOD_CATEGORIES_AR).map((key) => `<option value="${key}" ${selectedNorm === key ? 'selected' : ''}>${capitalize(key.replaceAll('-', ' '))}</option>`).join('');
+    return Object.keys(FOOD_CATEGORIES_AR).map((key) => `<sl-option value="${ljOptionValue(key)}">${capitalize(key.replaceAll('-', ' '))}</sl-option>`).join('');
   };
 
   const getSubcategoryOptionsHtml = (category = '', selected = '') => {
@@ -2461,9 +2479,9 @@
     return list.length
       ? list.map((item) => {
         const value = normalizeLower(item);
-        return `<option value="${value}" ${value === selectedNorm ? 'selected' : ''}>${item}</option>`;
+        return `<sl-option value="${ljOptionValue(value)}">${item}</sl-option>`;
       }).join('')
-      : '<option value="">Seleccioná una categoría primero</option>';
+      : '';
   };
 
   const renderNutritionSubcategories = (selected = '') => {
@@ -2471,20 +2489,22 @@
     const subcategorySelect = recipeEditorForm.querySelector('#recipeNutritionSubcategory');
     if (!categorySelect || !subcategorySelect) return;
     const nextValue = normalizeLower(selected || state.editor?.nutrition?.subcategory || '');
-    subcategorySelect.innerHTML = getSubcategoryOptionsHtml(categorySelect.value, nextValue);
-    if (nextValue) {
-      subcategorySelect.value = nextValue;
-    }
+    const categoryKey = normalizeLower(ljSelectValue(categorySelect) || state.editor?.nutrition?.category || '');
+    subcategorySelect.innerHTML = getSubcategoryOptionsHtml(categoryKey, nextValue);
+    const subcategories = (FOOD_CATEGORIES_AR[categoryKey] || []).map((item) => normalizeLower(item));
+    // Igual que el select nativo: sin valor elegido queda seleccionada la primera subcategoría.
+    const effective = nextValue ? (subcategories.includes(nextValue) ? nextValue : '') : (subcategories[0] || '');
+    ljSetSelectValue(subcategorySelect, effective);
   };
 
   const renderHouseholdMeasureOptions = () => {
     const measureSelect = recipeEditorForm.querySelector('#recipeNutritionHouseholdMeasure');
     const amountInput = recipeEditorForm.querySelector('#recipeNutritionHouseholdAmount');
     if (!measureSelect || !amountInput) return;
-    const currentValue = normalizeLower(measureSelect.value || state.editor?.nutrition?.householdMeasure || 'unidad');
-    const amount = amountInput.value || '1';
+    const currentValue = normalizeLower(ljSelectValue(measureSelect) || state.editor?.nutrition?.householdMeasure || 'unidad');
+    const amount = (amountInput.value ?? state.editor?.nutrition?.householdAmount) || '1';
     measureSelect.innerHTML = getHouseholdMeasureOptionsHtml(currentValue, amount);
-    measureSelect.value = currentValue;
+    ljSetSelectValue(measureSelect, currentValue);
   };
 
   const showNutritionAutofillRecommendation = (message, tone = 'info') => {
@@ -2541,13 +2561,13 @@
   const getNutritionGenerationSnapshot = () => {
     const title = normalizeValue(recipeEditorForm.querySelector('#recipeTitle')?.value || state.editor?.title || '');
     const description = normalizeValue(recipeEditorForm.querySelector('#recipeDescription')?.value || state.editor?.description || '');
-    const declarationUnit = normalizeLower(recipeEditorForm.querySelector('#recipeNutritionDeclarationUnit')?.value || state.editor?.nutrition?.declarationUnit || '');
+    const declarationUnit = normalizeLower(ljSelectValue(recipeEditorForm.querySelector('#recipeNutritionDeclarationUnit')) || state.editor?.nutrition?.declarationUnit || '');
     const declarationAmount = normalizeValue(recipeEditorForm.querySelector('#recipeNutritionDeclarationAmount')?.value || state.editor?.nutrition?.declarationAmount || '');
     const servingsPerPackage = normalizeValue(recipeEditorForm.querySelector('#recipeNutritionServingsPerPackage')?.value || state.editor?.nutrition?.servingsPerPackage || '');
-    const productType = normalizeLower(recipeEditorForm.querySelector('#recipeNutritionProductType')?.value || state.editor?.nutrition?.productType || '');
-    const category = normalizeLower(recipeEditorForm.querySelector('#recipeNutritionCategory')?.value || state.editor?.nutrition?.category || '');
-    const subcategory = normalizeLower(recipeEditorForm.querySelector('#recipeNutritionSubcategory')?.value || state.editor?.nutrition?.subcategory || '');
-    const householdMeasure = normalizeLower(recipeEditorForm.querySelector('#recipeNutritionHouseholdMeasure')?.value || state.editor?.nutrition?.householdMeasure || '');
+    const productType = normalizeLower(ljSelectValue(recipeEditorForm.querySelector('#recipeNutritionProductType')) || state.editor?.nutrition?.productType || '');
+    const category = normalizeLower(ljSelectValue(recipeEditorForm.querySelector('#recipeNutritionCategory')) || state.editor?.nutrition?.category || '');
+    const subcategory = normalizeLower(ljSelectValue(recipeEditorForm.querySelector('#recipeNutritionSubcategory')) || state.editor?.nutrition?.subcategory || '');
+    const householdMeasure = normalizeLower(ljSelectValue(recipeEditorForm.querySelector('#recipeNutritionHouseholdMeasure')) || state.editor?.nutrition?.householdMeasure || '');
     const householdAmount = normalizeValue(recipeEditorForm.querySelector('#recipeNutritionHouseholdAmount')?.value || state.editor?.nutrition?.householdAmount || '');
     const rnpaSource = safeObject(state.editor?.rnpa);
 
@@ -2654,7 +2674,7 @@
   };
 
   const syncSaveButtonWithNutritionState = () => {
-    const submitButton = recipeEditorForm.querySelector('.recipe-editor-actions button[type="submit"]');
+    const submitButton = recipeEditorForm.querySelector('.recipe-editor-actions sl-button[type="submit"]');
     if (!submitButton) return;
     const stale = isNutritionAiStale();
     submitButton.toggleAttribute('disabled', stale);
@@ -2990,16 +3010,16 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
       const householdAmountInput = recipeEditorForm.querySelector('#recipeNutritionHouseholdAmount');
       const householdMeasureSelect = recipeEditorForm.querySelector('#recipeNutritionHouseholdMeasure');
 
-      if (productTypeSelect) productTypeSelect.value = safeProductType;
-      if (categorySelect) categorySelect.value = safeCategory;
+      if (productTypeSelect) ljSetSelectValue(productTypeSelect, safeProductType);
+      if (categorySelect) ljSetSelectValue(categorySelect, safeCategory);
       renderNutritionSubcategories(safeSubcategory);
-      if (subcategorySelect) subcategorySelect.value = safeSubcategory;
-      if (declarationUnitSelect) declarationUnitSelect.value = safeDeclarationUnit;
+      if (subcategorySelect) ljSetSelectValue(subcategorySelect, safeSubcategory);
+      if (declarationUnitSelect) ljSetSelectValue(declarationUnitSelect, safeDeclarationUnit);
       if (declarationAmountInput) declarationAmountInput.value = state.editor.nutrition.declarationAmount;
       if (servingsInput) servingsInput.value = state.editor.nutrition.servingsPerPackage;
       if (householdAmountInput) householdAmountInput.value = state.editor.nutrition.householdAmount;
       renderHouseholdMeasureOptions();
-      if (householdMeasureSelect) householdMeasureSelect.value = safeHouseholdMeasure;
+      if (householdMeasureSelect) ljSetSelectValue(householdMeasureSelect, safeHouseholdMeasure);
 
       const warnings = [];
       if (!safeProductType) warnings.push('tipo de producto');
@@ -3060,7 +3080,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
   };
 
   const ingredientAvatarHtml = (ingredient) => ingredient?.imageUrl
-    ? `<span class="recipe-inline-avatar-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-recipe-inline-thumb" src="${ingredient.imageUrl}" alt="${capitalize(ingredient.name)}" loading="lazy"></span>`
+    ? `<span class="recipe-inline-avatar-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="recipe-inline-avatar js-recipe-inline-thumb" src="${ingredient.imageUrl}" alt="${capitalize(ingredient.name)}" loading="lazy"></span>`
     : `<span class="recipe-inline-avatar-wrap recipe-inline-avatar-fallback">${getSmallPlaceholder('fa-solid fa-bowl-food')}</span>`;
 
   const prepareInlineThumbLoaders = () => {
@@ -3084,7 +3104,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
   };
 
   const renderRelatedIngredientAvatar = (ingredient) => ingredient?.imageUrl
-    ? `<span class="recipe-inline-avatar-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-recipe-inline-thumb" src="${ingredient.imageUrl}" alt="${capitalize(ingredient.name)}" loading="lazy"></span>`
+    ? `<span class="recipe-inline-avatar-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="recipe-inline-avatar js-recipe-inline-thumb" src="${ingredient.imageUrl}" alt="${capitalize(ingredient.name)}" loading="lazy"></span>`
     : `<span class="recipe-inline-avatar-wrap recipe-inline-avatar-fallback">${getSmallPlaceholder('fa-solid fa-link')}</span>`;
 
   const buildRecipeRelatedSummaryHtml = (row) => {
@@ -3125,15 +3145,15 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     const renderSelectedEditor = () => selected.length
       ? `<div class="recipe-related-picker-selected">${selected.map((item) => {
         const ingredient = state.ingredientes[item.ingredientId];
-        return `<label class="recipe-related-picker-chip">
+        return `<div class="recipe-related-picker-chip">
           ${renderRelatedIngredientAvatar(ingredient)}
           <span class="recipe-related-picker-copy">
             <strong>${escapeHtml(capitalize(item.ingredientName || ingredient?.name || 'Ingrediente'))}</strong>
-            <input type="number" min="0" max="100" step="0.01" class="form-control ios-input recipe-related-percent-input" data-related-percent="${escapeHtml(item.ingredientId)}" placeholder="% máximo (opcional)" value="${escapeHtml(item.maxPercent || '')}">
+            <sl-input type="number" min="0" max="100" step="0.01" size="small" class="recipe-related-percent-input" data-related-percent="${escapeHtml(item.ingredientId)}" placeholder="% máximo (opcional)" value="${escapeHtml(item.maxPercent || '')}"></sl-input>
             <small>Vacío = puede sustituir el total faltante.</small>
           </span>
-          <button type="button" class="btn ios-btn ios-btn-secondary recipe-related-remove-btn" data-related-remove="${escapeHtml(item.ingredientId)}"><i class="fa-solid fa-xmark"></i></button>
-        </label>`;
+          <sl-button variant="default" size="small" type="button" class="lj-icon-btn recipe-related-remove-btn" data-related-remove="${escapeHtml(item.ingredientId)}" title="Quitar" aria-label="Quitar"><i class="fa-solid fa-xmark"></i></sl-button>
+        </div>`;
       }).join('')}</div>`
       : '<p class="recipe-related-empty">Todavía no agregaste sustitutos para este ingrediente.</p>';
 
@@ -3149,14 +3169,13 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
 
       return list.map((ingredient) => {
         const checked = selected.some((item) => item.ingredientId === ingredient.id);
-        return `<label class="inventario-check-row inventario-selector-row recipe-related-picker-row">
-          <input type="checkbox" data-related-pick="${escapeHtml(ingredient.id)}" ${checked ? 'checked' : ''}>
+        return `<sl-checkbox class="inventario-check-row inventario-selector-row recipe-related-picker-row" data-related-pick="${escapeHtml(ingredient.id)}" ${checked ? 'checked' : ''}>
           ${renderRelatedIngredientAvatar(ingredient)}
           <span class="recipe-related-picker-label">
             <strong>${escapeHtml(capitalize(ingredient.name || 'Ingrediente'))}</strong>
             <small>${escapeHtml(capitalize(ingredient.description || ingredient.category || 'Ingrediente relacionado'))}</small>
           </span>
-        </label>`;
+        </sl-checkbox>`;
       }).join('') || '<p class="recipe-related-empty">No encontramos ingredientes para ese filtro.</p>';
     };
 
@@ -3167,10 +3186,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
         <div class="recipe-related-picker">
           <div class="recipe-related-picker-head">
             <div class="recipe-related-primary">${renderRelatedIngredientAvatar(primary)}<div><strong>${escapeHtml(capitalize(primary.name || row.ingredientName || 'Ingrediente'))}</strong><small>Elegí uno o varios sustitutos posibles para producción.</small></div></div>
-            <div class="input-group ios-input-group ingredientes-search-group">
-              <span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
-              <input id="recipeRelatedSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar ingrediente relacionado">
-            </div>
+            <sl-input id="recipeRelatedSearch" type="search" class="ingredientes-search-input ingredientes-search-group" placeholder="Buscar ingrediente relacionado"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input>
           </div>
           <div id="recipeRelatedSelected" class="recipe-related-selected-wrap"></div>
           <div id="recipeRelatedList" class="recipe-related-picker-list"></div>
@@ -3269,8 +3285,8 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
         return `
           <tr class="is-comment" data-row-id="${row.id}" draggable="${state.editor.orderMode === 'custom'}">
             <td><i class="fa-solid fa-grip-lines"></i></td>
-            <td colspan="3"><input class="form-control ios-input" data-comment-input="${row.id}" value="${row.comment || ''}" placeholder="Comentario visual (no afecta receta)"></td>
-            <td><button type="button" class="btn family-manage-btn" data-remove-row="${row.id}"><i class="fa-solid fa-trash"></i></button></td>
+            <td colspan="3"><sl-input data-comment-input="${row.id}" value="${escapeHtml(row.comment || '')}" placeholder="Comentario visual (no afecta receta)"></sl-input></td>
+            <td><sl-button variant="default" size="small" type="button" class="lj-icon-btn family-manage-btn is-danger" data-remove-row="${row.id}" title="Quitar fila" aria-label="Quitar fila"><i class="fa-solid fa-trash"></i></sl-button></td>
           </tr>`;
       }
       if (row.type === MONOGRAPHY_ROW_TYPE) {
@@ -3278,22 +3294,22 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
           <tr class="is-monography" data-row-id="${row.id}" draggable="false">
             <td colspan="4">
               <div class="editor-toolbar report-edit-toolbar recipe-monography-toolbar" role="toolbar" aria-label="Herramientas de monografía">
-                <button type="button" class="editor-btn" data-mono-cmd="bold" data-mono-row="${row.id}"><i class="fa-solid fa-bold"></i></button>
-                <button type="button" class="editor-btn" data-mono-cmd="italic" data-mono-row="${row.id}"><i class="fa-solid fa-italic"></i></button>
-                <button type="button" class="editor-btn" data-mono-cmd="underline" data-mono-row="${row.id}"><i class="fa-solid fa-underline"></i></button>
-                <button type="button" class="editor-btn" data-mono-cmd="insertUnorderedList" data-mono-row="${row.id}"><i class="fa-solid fa-list-ul"></i></button>
-                <button type="button" class="editor-btn" data-mono-cmd="justifyLeft" data-mono-row="${row.id}"><i class="fa-solid fa-align-left"></i></button>
-                <button type="button" class="editor-btn" data-mono-cmd="justifyCenter" data-mono-row="${row.id}"><i class="fa-solid fa-align-center"></i></button>
+                <sl-button variant="text" size="small" type="button" class="lj-icon-btn editor-btn" data-mono-cmd="bold" data-mono-row="${row.id}" title="Negrita" aria-label="Negrita"><i class="fa-solid fa-bold"></i></sl-button>
+                <sl-button variant="text" size="small" type="button" class="lj-icon-btn editor-btn" data-mono-cmd="italic" data-mono-row="${row.id}" title="Cursiva" aria-label="Cursiva"><i class="fa-solid fa-italic"></i></sl-button>
+                <sl-button variant="text" size="small" type="button" class="lj-icon-btn editor-btn" data-mono-cmd="underline" data-mono-row="${row.id}" title="Subrayado" aria-label="Subrayado"><i class="fa-solid fa-underline"></i></sl-button>
+                <sl-button variant="text" size="small" type="button" class="lj-icon-btn editor-btn" data-mono-cmd="insertUnorderedList" data-mono-row="${row.id}" title="Lista" aria-label="Lista"><i class="fa-solid fa-list-ul"></i></sl-button>
+                <sl-button variant="text" size="small" type="button" class="lj-icon-btn editor-btn" data-mono-cmd="justifyLeft" data-mono-row="${row.id}" title="Alinear a la izquierda" aria-label="Alinear a la izquierda"><i class="fa-solid fa-align-left"></i></sl-button>
+                <sl-button variant="text" size="small" type="button" class="lj-icon-btn editor-btn" data-mono-cmd="justifyCenter" data-mono-row="${row.id}" title="Centrar" aria-label="Centrar"><i class="fa-solid fa-align-center"></i></sl-button>
               </div>
               <div class="recipe-monography-editor informe-editor" data-monography-input="${row.id}" contenteditable="true" data-placeholder="Proceso de fabricación / monografía">${row.html || ''}</div>
               <div class="recipe-monography-manual-row">
-                <input type="file" class="d-none" data-monography-manual-file="${row.id}" accept="image/*,application/pdf">
-                <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-monography-manual-upload="${row.id}"><i class="fa-solid fa-paperclip"></i><span>Adjuntar manual</span></button>
-                <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-monography-manual-view="${row.id}" ${normalizeValue(row.manualUrl) ? '' : 'disabled'}><i class="fa-solid fa-book-open"></i><span>Ver manual</span></button>
+                <input type="file" class="d-none" data-monography-manual-file="${row.id}" accept="image/*,application/pdf" hidden>
+                <sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-monography-manual-upload="${row.id}"><i slot="prefix" class="fa-solid fa-paperclip"></i><span>Adjuntar manual</span></sl-button>
+                <sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-monography-manual-view="${row.id}" ${normalizeValue(row.manualUrl) ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-book-open"></i><span>Ver manual</span></sl-button>
                 ${normalizeValue(row.manualName) ? `<span class="recipe-monography-manual-name">${escapeHtml(row.manualName)}</span>` : ''}
               </div>
             </td>
-            <td><button type="button" class="btn family-manage-btn" data-remove-row="${row.id}"><i class="fa-solid fa-trash"></i></button></td>
+            <td><sl-button variant="default" size="small" type="button" class="lj-icon-btn family-manage-btn is-danger" data-remove-row="${row.id}" title="Quitar fila" aria-label="Quitar fila"><i class="fa-solid fa-trash"></i></sl-button></td>
           </tr>`;
       }
       return `
@@ -3303,14 +3319,14 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
             <div class="recipe-ing-autocomplete">
               <div class="recipe-ing-input-wrap">
                 ${ingredientAvatarHtml(state.ingredientes[row.ingredientId])}
-                <input class="form-control ios-input" data-ing-input="${row.id}" value="${row.ingredientName || ''}" placeholder="Buscar ingrediente...">
+                <sl-input data-ing-input="${row.id}" value="${escapeHtml(row.ingredientName || '')}" placeholder="Buscar ingrediente..." autocomplete="off"></sl-input>
               </div>
               ${buildRecipeRelatedRowNoteHtml(row)}
             </div>
           </td>
-          <td><input class="form-control ios-input" data-qty-input="${row.id}" value="${row.quantity || ''}" placeholder="0,00"></td>
-          <td><select class="form-select ios-input" data-unit-input="${row.id}">${getMeasureSelectOptionsHtml(row.unit, row.ingredientId)}</select></td>
-          <td><div class="recipe-row-actions"><button type="button" class="btn family-manage-btn" data-row-relations="${row.id}" title="Relacionar sustitutos" ${row.ingredientId ? '' : 'disabled'}><i class="fa-solid fa-link"></i></button><button type="button" class="btn family-manage-btn" data-remove-row="${row.id}"><i class="fa-solid fa-trash"></i></button></div></td>
+          <td><sl-input data-qty-input="${row.id}" value="${escapeHtml(row.quantity || '')}" placeholder="0,00" inputmode="decimal"></sl-input></td>
+          <td><sl-select hoist data-unit-input="${row.id}" value="${ljOptionValue(normalizeLower(row.unit))}">${getMeasureSelectOptionsHtml(row.unit, row.ingredientId)}</sl-select></td>
+          <td><div class="recipe-row-actions"><sl-button variant="default" size="small" type="button" class="lj-icon-btn family-manage-btn" data-row-relations="${row.id}" title="Relacionar sustitutos" aria-label="Relacionar sustitutos" ${row.ingredientId ? '' : 'disabled'}><i class="fa-solid fa-link"></i></sl-button><sl-button variant="default" size="small" type="button" class="lj-icon-btn family-manage-btn is-danger" data-remove-row="${row.id}" title="Quitar fila" aria-label="Quitar fila"><i class="fa-solid fa-trash"></i></sl-button></div></td>
         </tr>`;
     }).join('');
     prepareInlineThumbLoaders();
@@ -3329,16 +3345,18 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     const dropdown = document.createElement('div');
     dropdown.className = 'recipe-suggest-floating';
     dropdown.innerHTML = `${source.map((item) => `
-      <button type="button" class="recipe-suggest-item" data-pick-ingredient="${rowId}" data-ing-id="${item.id}">
+      <button type="button" class="lj-tile recipe-suggest-item" data-pick-ingredient="${rowId}" data-ing-id="${item.id}">
         <span class="recipe-suggest-avatar-wrap">${item.imageUrl
-          ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-suggest-avatar js-recipe-suggest-thumb" src="${item.imageUrl}" alt="${capitalize(item.name)}" loading="lazy">`
+          ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="recipe-suggest-avatar js-recipe-suggest-thumb" src="${item.imageUrl}" alt="${capitalize(item.name)}" loading="lazy">`
           : getSmallPlaceholder('fa-solid fa-bowl-food')}</span>
         <span>${capitalize(item.name)}</span>
       </button>`).join('')}
-      <button type="button" class="recipe-suggest-item recipe-suggest-create" data-create-ingredient-inline="${rowId}">
+      <button type="button" class="lj-tile recipe-suggest-item recipe-suggest-create" data-create-ingredient-inline="${rowId}">
         <i class="fa-solid fa-plus"></i><span>Crear ingrediente</span>
       </button>`;
 
+    // Sin foco en los ítems: el dialog (sl-dialog) atrapa el foco y lo devolvería al primer control, moviendo el scroll.
+    dropdown.addEventListener('mousedown', (event) => event.preventDefault());
     document.body.appendChild(dropdown);
     positionSuggestionDropdown(dropdown, input);
     state.editor.activeSuggestRowId = rowId;
@@ -3532,13 +3550,13 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
         if (select.matches('[data-unit-input]')) {
           const row = state.editor.rows.find((item) => item.id === select.dataset.unitInput);
           if (!row) return;
-          if (select.value === NEW_MEASURE_VALUE) {
+          if (ljSelectValue(select) === NEW_MEASURE_VALUE) {
             const res = await openIosSwal({
               title: 'Nueva medida',
               showCancelButton: true,
               confirmButtonText: 'Guardar medida',
               cancelButtonText: 'Cancelar',
-              html: '<div class="swal-stack-fields"><input id="recipeNewMeasureName" class="swal2-input ios-input" placeholder="Nombre (ej: cucharadas)"><input id="recipeNewMeasureAbbr" class="swal2-input ios-input" placeholder="Abreviatura (ej: cdas)"></div>',
+              html: '<div class="swal-stack-fields"><sl-input id="recipeNewMeasureName" class="swal2-input" placeholder="Nombre (ej: cucharadas)"></sl-input><sl-input id="recipeNewMeasureAbbr" class="swal2-input" placeholder="Abreviatura (ej: cdas)"></sl-input></div>',
               preConfirm: () => {
                 const name = normalizeValue(document.getElementById('recipeNewMeasureName')?.value);
                 const abbr = normalizeValue(document.getElementById('recipeNewMeasureAbbr')?.value);
@@ -3556,27 +3574,28 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
               renderRows();
               const yieldSelect = recipeEditorForm.querySelector('#recipeYieldUnit');
               if (yieldSelect) {
-                const current = yieldSelect.value;
+                const current = ljSelectValue(yieldSelect);
                 yieldSelect.innerHTML = getMeasureSelectOptionsHtml(current);
+                ljSetSelectValue(yieldSelect, normalizeLower(current));
               }
             } else {
-              select.value = row.unit || '';
+              ljSetSelectValue(select, normalizeLower(row.unit || ''));
             }
             return;
           }
-          row.unit = select.value;
+          row.unit = ljSelectValue(select);
           markEditorDirty();
           markNutritionAiAsStaleIfNeeded();
           return;
         }
-        if (select.id === 'recipeYieldUnit' && select.value === NEW_MEASURE_VALUE) {
-          select.value = '';
+        if (select.id === 'recipeYieldUnit' && ljSelectValue(select) === NEW_MEASURE_VALUE) {
+          ljSetSelectValue(select, '');
           const res = await openIosSwal({
             title: 'Nueva medida',
             showCancelButton: true,
             confirmButtonText: 'Guardar medida',
             cancelButtonText: 'Cancelar',
-            html: '<div class="swal-stack-fields"><input id="recipeNewMeasureNameY" class="swal2-input ios-input" placeholder="Nombre (ej: litros)"><input id="recipeNewMeasureAbbrY" class="swal2-input ios-input" placeholder="Abreviatura (ej: l)"></div>',
+            html: '<div class="swal-stack-fields"><sl-input id="recipeNewMeasureNameY" class="swal2-input" placeholder="Nombre (ej: litros)"></sl-input><sl-input id="recipeNewMeasureAbbrY" class="swal2-input" placeholder="Abreviatura (ej: l)"></sl-input></div>',
             preConfirm: () => {
               const name = normalizeValue(document.getElementById('recipeNewMeasureNameY')?.value);
               const abbr = normalizeValue(document.getElementById('recipeNewMeasureAbbrY')?.value);
@@ -3590,19 +3609,19 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
           if (res.isConfirmed && res.value) {
             const val = await persistNewMeasure(res.value.name, res.value.abbr);
             select.innerHTML = getMeasureSelectOptionsHtml(val);
-            select.value = val;
+            ljSetSelectValue(select, val);
             markEditorDirty();
             renderRows();
           }
         }
 
-        if (select.id === 'recipeRnpaCity' && select.value === '__new_city__') {
+        if (select.id === 'recipeRnpaCity' && ljSelectValue(select) === '__new_city__') {
           const res = await openIosSwal({
             title: 'Agregar localidad',
             showCancelButton: true,
             confirmButtonText: 'Guardar',
             cancelButtonText: 'Cancelar',
-            html: '<input id="recipeNewCityInput" class="swal2-input ios-input" placeholder="Ej: Venado Tuerto">',
+            html: '<sl-input id="recipeNewCityInput" class="swal2-input" placeholder="Ej: Venado Tuerto"></sl-input>',
             preConfirm: () => {
               const city = normalizeValue(document.getElementById('recipeNewCityInput')?.value);
               if (!city) {
@@ -3615,24 +3634,24 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
           if (res.isConfirmed && res.value) {
             state.recipeCities = Array.from(new Set([...(state.recipeCities || []), res.value])).sort((a, b) => a.localeCompare(b, 'es'));
             await persistRecetasConfig();
-            select.innerHTML = `<option value="">Localidad</option>${getRnpaCityOptions(res.value)}`;
-            select.value = res.value;
+            select.innerHTML = getRnpaCityOptions();
+            ljSetSelectValue(select, res.value);
             state.editor.rnpa = state.editor.rnpa || {};
             state.editor.rnpa.city = res.value;
             markEditorDirty();
           } else {
-            select.value = state.editor?.rnpa?.city || '';
+            select.value = getRnpaSelectedValue(getRnpaCityList(), state.editor?.rnpa?.city);
           }
           return;
         }
-        if ((select.id === 'recipeRnpaBrand' || select.id === 'recipeRnpaBusinessName') && select.value === '__new_value__') {
+        if ((select.id === 'recipeRnpaBrand' || select.id === 'recipeRnpaBusinessName') && ljSelectValue(select) === '__new_value__') {
           const isBrand = select.id === 'recipeRnpaBrand';
           const res = await openIosSwal({
             title: isBrand ? 'Agregar marca' : 'Agregar razón social',
             showCancelButton: true,
             confirmButtonText: 'Guardar',
             cancelButtonText: 'Cancelar',
-            html: `<input id="recipeRnpaNewValueInput" class="swal2-input ios-input" placeholder="${isBrand ? 'Ej: La Jamonera' : 'Ej: La Jamonera SRL'}">`,
+            html: `<sl-input id="recipeRnpaNewValueInput" class="swal2-input" placeholder="${isBrand ? 'Ej: La Jamonera' : 'Ej: La Jamonera SRL'}"></sl-input>`,
             preConfirm: () => {
               const value = normalizeValue(document.getElementById('recipeRnpaNewValueInput')?.value);
               if (!value) {
@@ -3645,33 +3664,33 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
           if (res.isConfirmed && res.value) {
             if (isBrand) {
               state.recipeBrands = Array.from(new Set([...(state.recipeBrands || []), res.value])).sort((a, b) => a.localeCompare(b, 'es'));
-              select.innerHTML = getRnpaSelectOptions(state.recipeBrands, res.value, 'Marca');
+              select.innerHTML = getRnpaSelectOptions(state.recipeBrands, res.value);
               state.editor.rnpa.brand = res.value;
             } else {
               state.recipeBusinessNames = Array.from(new Set([...(state.recipeBusinessNames || []), res.value])).sort((a, b) => a.localeCompare(b, 'es'));
-              select.innerHTML = getRnpaSelectOptions(state.recipeBusinessNames, res.value, 'Razón social');
+              select.innerHTML = getRnpaSelectOptions(state.recipeBusinessNames, res.value);
               state.editor.rnpa.businessName = res.value;
             }
-            select.value = res.value;
+            ljSetSelectValue(select, res.value);
             await persistRecetasConfig();
             markEditorDirty();
           } else {
-            select.value = isBrand ? (state.editor?.rnpa?.brand || '') : (state.editor?.rnpa?.businessName || '');
+            ljSetSelectValue(select, isBrand ? (state.editor?.rnpa?.brand || '') : (state.editor?.rnpa?.businessName || ''));
           }
           return;
         }
         if (['recipeRnpaProvince', 'recipeRnpaCity', 'recipeRnpaCountry', 'recipeRnpaBrand', 'recipeRnpaBusinessName'].includes(select.id)) {
           state.editor.rnpa = state.editor.rnpa || {};
-          if (select.id === 'recipeRnpaProvince') state.editor.rnpa.province = normalizeValue(select.value);
-          if (select.id === 'recipeRnpaCity') state.editor.rnpa.city = normalizeValue(select.value);
-          if (select.id === 'recipeRnpaCountry') state.editor.rnpa.country = normalizeValue(select.value);
-          if (select.id === 'recipeRnpaBrand') state.editor.rnpa.brand = normalizeValue(select.value);
-          if (select.id === 'recipeRnpaBusinessName') state.editor.rnpa.businessName = normalizeValue(select.value);
+          if (select.id === 'recipeRnpaProvince') state.editor.rnpa.province = normalizeValue(ljSelectValue(select));
+          if (select.id === 'recipeRnpaCity') state.editor.rnpa.city = normalizeValue(ljSelectValue(select));
+          if (select.id === 'recipeRnpaCountry') state.editor.rnpa.country = normalizeValue(ljSelectValue(select));
+          if (select.id === 'recipeRnpaBrand') state.editor.rnpa.brand = normalizeValue(ljSelectValue(select));
+          if (select.id === 'recipeRnpaBusinessName') state.editor.rnpa.businessName = normalizeValue(ljSelectValue(select));
           markEditorDirty();
           return;
         }
         if (select.id === 'recipeOrderModeEditor') {
-          state.editor.orderMode = normalizeLower(select.value);
+          state.editor.orderMode = normalizeLower(ljSelectValue(select));
           markEditorDirty();
           renderRows();
           return;
@@ -3690,7 +3709,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
         }
         if (select.id === 'recipeNutritionCategory') {
           state.editor.nutrition = state.editor.nutrition || {};
-          state.editor.nutrition.category = normalizeLower(select.value);
+          state.editor.nutrition.category = normalizeLower(ljSelectValue(select));
           state.editor.nutrition.subcategory = '';
           renderNutritionSubcategories('');
           markEditorDirty();
@@ -3699,28 +3718,28 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
         }
         if (select.id === 'recipeNutritionSubcategory') {
           state.editor.nutrition = state.editor.nutrition || {};
-          state.editor.nutrition.subcategory = normalizeLower(select.value);
+          state.editor.nutrition.subcategory = normalizeLower(ljSelectValue(select));
           markEditorDirty();
           markNutritionAiAsStaleIfNeeded();
           return;
         }
         if (select.id === 'recipeNutritionProductType') {
           state.editor.nutrition = state.editor.nutrition || {};
-          state.editor.nutrition.productType = normalizeLower(select.value);
+          state.editor.nutrition.productType = normalizeLower(ljSelectValue(select));
           markEditorDirty();
           markNutritionAiAsStaleIfNeeded();
           return;
         }
         if (select.id === 'recipeNutritionDeclarationUnit') {
           state.editor.nutrition = state.editor.nutrition || {};
-          state.editor.nutrition.declarationUnit = normalizeLower(select.value);
+          state.editor.nutrition.declarationUnit = normalizeLower(ljSelectValue(select));
           markEditorDirty();
           markNutritionAiAsStaleIfNeeded();
           return;
         }
         if (select.id === 'recipeNutritionHouseholdMeasure') {
           state.editor.nutrition = state.editor.nutrition || {};
-          state.editor.nutrition.householdMeasure = normalizeLower(select.value);
+          state.editor.nutrition.householdMeasure = normalizeLower(ljSelectValue(select));
           markEditorDirty();
           markNutritionAiAsStaleIfNeeded();
         }
@@ -3825,18 +3844,11 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
           const draft = row ? { name: row.ingredientName } : null;
           clearSuggestions();
           blurActiveElement();
-          recetasModal.setAttribute('inert', '');
-          document.querySelectorAll('.modal[aria-hidden="true"]').forEach((node) => {
-            if (node.contains(document.activeElement)) {
-              document.activeElement?.blur?.();
-            }
-          });
           let ingredientId = '';
           try {
             await new Promise((resolve) => setTimeout(resolve, 0));
             ingredientId = await window.laJamoneraIngredientesAPI?.openIngredientForm?.(null, draft);
           } finally {
-            recetasModal.removeAttribute('inert');
             blurActiveElement();
           }
           await fetchIngredientesData();
@@ -3874,7 +3886,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
         }
       });
 
-      const modalBody = recetasModal.querySelector('.modal-body');
+      const modalBody = LJModal.body(recetasModal);
       modalBody?.addEventListener('scroll', repositionActiveSuggestions);
       window.addEventListener('resize', repositionActiveSuggestions);
       window.addEventListener('scroll', repositionActiveSuggestions, true);
@@ -4016,62 +4028,65 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
         <h6 class="step-title"><span class="recipe-step-number">1</span> Datos generales</h6>
         <div class="step-content recipe-fields-flex">
           <div class="recipe-field recipe-field-full">
-            <label class="form-label" for="recipeTitle">Título *</label>
-            <input id="recipeTitle" class="form-control ios-input" value="${escapeHtml(formInitial.title || '')}" placeholder="Ej: Chorizo parrillero">
+            <label class="lj-label" for="recipeTitle">Título *</label>
+            <sl-input id="recipeTitle" value="${escapeHtml(formInitial.title || '')}" placeholder="Ej: Chorizo parrillero"></sl-input>
           </div>
           <div class="recipe-field recipe-field-full">
-            <label class="form-label" for="recipeNombreComercial">Nombre comercial (opcional)</label>
-            <input id="recipeNombreComercial" class="form-control ios-input" value="${escapeHtml(formInitial.nombreComercial || '')}" placeholder="Ej: Jamón cocido artesanal La Jamonera">
+            <label class="lj-label" for="recipeNombreComercial">Nombre comercial (opcional)</label>
+            <sl-input id="recipeNombreComercial" value="${escapeHtml(formInitial.nombreComercial || '')}" placeholder="Ej: Jamón cocido artesanal La Jamonera"></sl-input>
           </div>
           <div class="recipe-field recipe-field-full">
-            <label class="form-label" for="recipeDescription">Descripción (opcional)</label>
-            <textarea id="recipeDescription" class="form-control ios-input recipe-description-lg" placeholder="Detalle amplio de la receta">${escapeHtml(formInitial.description || '')}</textarea>
+            <label class="lj-label" for="recipeDescription">Descripción (opcional)</label>
+            <sl-textarea id="recipeDescription" class="recipe-description-lg" resize="auto" rows="3" placeholder="Detalle amplio de la receta" value="${escapeHtml(formInitial.description || '')}"></sl-textarea>
           </div>
           <div class="recipe-field recipe-field-full recipe-rnpa-block"><p class="recipe-subsection-title">RNPA (opcional)</p>
-            <label class="inventario-check-row inventario-check-row-compact recipe-rnpa-exempt-row">
-              <input type="checkbox" id="recipeRnpaExempt" ${state.editor.rnpaExempt ? 'checked' : ''}>
-              <span>Subproducto - No requiere RNPA (Solo mostrador)</span>
-            </label>
+            <sl-checkbox id="recipeRnpaExempt" class="inventario-check-row inventario-check-row-compact recipe-rnpa-exempt-row" ${state.editor.rnpaExempt ? 'checked' : ''}>Subproducto - No requiere RNPA (Solo mostrador)</sl-checkbox>
             <div class="recipe-rnpa-grid" id="recipeRnpaFields">
-              <input id="recipeRnpaNumber" class="form-control ios-input" placeholder="Número RNPA (ej: 02-123456)" value="${escapeHtml(state.editor.rnpa?.number || '')}">
-              <input id="recipeRnpaDenomination" class="form-control ios-input" placeholder="Denominación" value="${escapeHtml(state.editor.rnpa?.denomination || '')}">
-              <select id="recipeRnpaBrand" class="form-select ios-input">${getRnpaSelectOptions(state.recipeBrands, state.editor.rnpa?.brand, 'Marca')}</select>
-              <select id="recipeRnpaBusinessName" class="form-select ios-input">${getRnpaSelectOptions(state.recipeBusinessNames, state.editor.rnpa?.businessName, 'Razón social')}</select>
-              <select id="recipeRnpaProvince" class="form-select ios-input"><option value="">Provincia</option>${ARGENTINA_PROVINCES.map((province) => `<option value="${escapeHtml(province)}" ${normalizeLower(state.editor.rnpa?.province) === normalizeLower(province) ? 'selected' : ''}>${escapeHtml(province)}</option>`).join('')}</select>
-              <select id="recipeRnpaCity" class="form-select ios-input"><option value="">Localidad</option>${getRnpaCityOptions(state.editor.rnpa?.city)}</select>
-              <select id="recipeRnpaCountry" class="form-select ios-input"><option value="Argentina" selected>Argentina</option></select>
-              <input id="recipeRnpaExpiryDate" class="form-control ios-input" placeholder="Vencimiento RNPA" value="${escapeHtml(state.editor.rnpa?.expiryDate || '')}">
-              <input id="recipeRnpaAttachment" class="form-control ios-input image-file-input" type="file" accept="image/*,application/pdf">
-              <div class="recipe-rnpa-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="recipeRnpaViewAttachmentBtn" ${normalizeValue(state.editor.rnpa?.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i><span>Ver adjunto</span></button></div>
+              <sl-input id="recipeRnpaNumber" placeholder="Número RNPA (ej: 02-123456)" value="${escapeHtml(state.editor.rnpa?.number || '')}"></sl-input>
+              <sl-input id="recipeRnpaDenomination" placeholder="Denominación" value="${escapeHtml(state.editor.rnpa?.denomination || '')}"></sl-input>
+              <sl-select id="recipeRnpaBrand" hoist clearable placeholder="Marca" value="${ljOptionValue(normalizeValue(state.editor.rnpa?.brand))}">${getRnpaSelectOptions(state.recipeBrands, state.editor.rnpa?.brand)}</sl-select>
+              <sl-select id="recipeRnpaBusinessName" hoist clearable placeholder="Razón social" value="${ljOptionValue(normalizeValue(state.editor.rnpa?.businessName))}">${getRnpaSelectOptions(state.recipeBusinessNames, state.editor.rnpa?.businessName)}</sl-select>
+              <sl-select id="recipeRnpaProvince" hoist clearable placeholder="Provincia" value="${getRnpaSelectedValue(ARGENTINA_PROVINCES, state.editor.rnpa?.province)}">${ARGENTINA_PROVINCES.map((province) => `<sl-option value="${ljOptionValue(province)}">${escapeHtml(province)}</sl-option>`).join('')}</sl-select>
+              <sl-select id="recipeRnpaCity" hoist clearable placeholder="Localidad" value="${getRnpaSelectedValue(getRnpaCityList(), state.editor.rnpa?.city)}">${getRnpaCityOptions()}</sl-select>
+              <sl-select id="recipeRnpaCountry" hoist value="${ljOptionValue('Argentina')}"><sl-option value="${ljOptionValue('Argentina')}">Argentina</sl-option></sl-select>
+              <input id="recipeRnpaExpiryDate" class="lj-input recipe-rnpa-date" placeholder="Vencimiento RNPA" value="${escapeHtml(state.editor.rnpa?.expiryDate || '')}">
+              <div class="recipe-rnpa-file image-file-picker">
+                <input id="recipeRnpaAttachment" class="image-file-input" type="file" accept="image/*,application/pdf" hidden>
+                <sl-button variant="default" type="button" id="recipeRnpaAttachmentPick"><i slot="prefix" class="fa-solid fa-paperclip"></i>Elegir archivo</sl-button>
+                <span id="recipeRnpaAttachmentName" class="image-file-name">Ningún archivo seleccionado</span>
+              </div>
+              <div class="recipe-rnpa-actions"><sl-button variant="default" type="button" class="inventario-threshold-btn" id="recipeRnpaViewAttachmentBtn" ${normalizeValue(state.editor.rnpa?.attachmentUrl) ? '' : 'disabled'}><i slot="prefix" class="fa-regular fa-eye"></i><span>Ver adjunto</span></sl-button></div>
             </div>
           </div>
           <div class="recipe-field recipe-field-full"><p class="recipe-subsection-title">Rendimiento / producción</p></div>
           <div class="recipe-field recipe-field-half recipe-highlight-field">
-            <label class="form-label" for="recipeYieldQty"><i class="fa-solid fa-weight-hanging"></i> Cantidad final obtenida *</label>
-            <input id="recipeYieldQty" class="form-control ios-input" value="${escapeHtml(formInitial.yieldQuantity || '')}" placeholder="Ej: 10,50">
+            <label class="lj-label" for="recipeYieldQty"><i class="fa-solid fa-weight-hanging"></i> Cantidad final obtenida *</label>
+            <sl-input id="recipeYieldQty" value="${escapeHtml(formInitial.yieldQuantity || '')}" placeholder="Ej: 10,50" inputmode="decimal"></sl-input>
           </div>
           <div class="recipe-field recipe-field-half recipe-highlight-field">
-            <label class="form-label" for="recipeYieldUnit">Unidad de medida *</label>
-              <select id="recipeYieldUnit" class="form-select ios-input">${getMeasureSelectOptionsHtml(initial?.yieldUnit)}</select>
+            <label class="lj-label" for="recipeYieldUnit">Unidad de medida *</label>
+            <sl-select id="recipeYieldUnit" hoist value="${ljOptionValue(normalizeLower(initial?.yieldUnit) || getMeasureOptions()[0]?.value || '')}">${getMeasureSelectOptionsHtml(initial?.yieldUnit)}</sl-select>
           </div>
           <div class="recipe-field recipe-field-half recipe-highlight-field">
-            <label class="form-label" for="recipeShelfLifeDays"><i class="fa-regular fa-calendar-days"></i> Caducidad (días) *</label>
-            <input id="recipeShelfLifeDays" type="number" min="1" step="1" class="form-control ios-input" value="${escapeHtml(formInitial.shelfLifeDays || '')}" placeholder="Ej: 3">
-            <label class="inventario-check-row inventario-check-row-compact mt-2"><input type="checkbox" id="recipeFrozenShelfLifeExtension" ${state.editor.frozenShelfLifeExtension ? 'checked' : ''}><span>Vencimiento extendido por congelamiento a -18°C</span></label>
-            <button type="button" class="frozen-info-icon mt-1" data-frozen-info aria-label="Información sobre vencimiento extendido por congelamiento" title="¿Qué significa vencimiento extendido por congelamiento?"><i class="bi bi-info-circle-fill"></i></button>
+            <label class="lj-label" for="recipeShelfLifeDays"><i class="fa-regular fa-calendar-days"></i> Caducidad (días) *</label>
+            <sl-input id="recipeShelfLifeDays" type="number" min="1" step="1" value="${escapeHtml(formInitial.shelfLifeDays || '')}" placeholder="Ej: 3"></sl-input>
+            <div class="recipe-check-with-info mt-2">
+              <sl-checkbox id="recipeFrozenShelfLifeExtension" class="inventario-check-row inventario-check-row-compact" ${state.editor.frozenShelfLifeExtension ? 'checked' : ''}>Vencimiento extendido por congelamiento a -18°C</sl-checkbox>
+              <sl-button variant="text" size="small" type="button" class="lj-icon-btn frozen-info-icon" data-frozen-info aria-label="Información sobre vencimiento extendido por congelamiento" title="¿Qué significa vencimiento extendido por congelamiento?"><sl-icon name="info-circle-fill"></sl-icon></sl-button>
+            </div>
           </div>
           <div class="recipe-field recipe-field-half recipe-highlight-field">
-            <label class="form-label" for="recipeAgingDays"><i class="fa-solid fa-hourglass-half"></i> <span id="recipeAgingDaysLabel">${escapeHtml(state.editor.packagingDelayType === PACKAGING_DELAY_FREEZE ? 'Días de congelado previo a envasado' : 'Días de estacionado')}</span></label>
-            <input id="recipeAgingDays" type="number" min="0" step="1" class="form-control ios-input" value="${state.editor.agingDays || ''}" placeholder="Ej: 15">
-            <label class="inventario-check-row inventario-check-row-compact mt-2"><input type="checkbox" id="recipeFreezeBeforePackaging" ${state.editor.packagingDelayType === PACKAGING_DELAY_FREEZE ? 'checked' : ''}><span>Usar como días de congelado previo a envasado</span></label>
+            <label class="lj-label" for="recipeAgingDays"><i class="fa-solid fa-hourglass-half"></i> <span id="recipeAgingDaysLabel">${escapeHtml(state.editor.packagingDelayType === PACKAGING_DELAY_FREEZE ? 'Días de congelado previo a envasado' : 'Días de estacionado')}</span></label>
+            <sl-input id="recipeAgingDays" type="number" min="0" step="1" value="${state.editor.agingDays || ''}" placeholder="Ej: 15"></sl-input>
+            <sl-checkbox id="recipeFreezeBeforePackaging" class="inventario-check-row inventario-check-row-compact mt-2" ${state.editor.packagingDelayType === PACKAGING_DELAY_FREEZE ? 'checked' : ''}>Usar como días de congelado previo a envasado</sl-checkbox>
           </div>
           <div class="recipe-field recipe-field-half recipe-highlight-field">
-            <label class="form-label" for="recipeOrderModeEditor"><i class="fa-solid fa-arrow-down-short-wide"></i> Orden de ingredientes</label>
-            <select id="recipeOrderModeEditor" class="form-select ios-input">
-              <option value="desc" ${state.editor.orderMode === 'desc' ? 'selected' : ''}>De mayor a menor</option>
-              <option value="asc" ${state.editor.orderMode === 'asc' ? 'selected' : ''}>De menor a mayor</option>
-              <option value="custom" ${state.editor.orderMode === 'custom' ? 'selected' : ''}>Personalizado</option>
-            </select>
+            <label class="lj-label" for="recipeOrderModeEditor"><i class="fa-solid fa-arrow-down-short-wide"></i> Orden de ingredientes</label>
+            <sl-select id="recipeOrderModeEditor" hoist value="${ljOptionValue(['desc', 'asc', 'custom'].includes(state.editor.orderMode) ? state.editor.orderMode : 'desc')}">
+              <sl-option value="desc">De mayor a menor</sl-option>
+              <sl-option value="asc">De menor a mayor</sl-option>
+              <sl-option value="custom">Personalizado</sl-option>
+            </sl-select>
           </div>
         </div>
       </section>
@@ -4088,9 +4103,9 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
             </div>
           </div>
           <div class="recipe-table-actions">
-            <button type="button" class="btn recipe-table-action-btn recipe-table-action-btn-primary" data-add-ingredient-row><i class="fa-solid fa-plus"></i><span>Agregar fila</span></button>
-            <button type="button" class="btn recipe-table-action-btn recipe-table-action-btn-neutral" data-add-comment-row><i class="fa-regular fa-message"></i><span>Comentario</span></button>
-            <button type="button" class="btn recipe-table-action-btn recipe-table-action-btn-monography" data-add-monography-row><i class="fa-solid fa-scroll"></i><span>Monografía</span></button>
+            <sl-button variant="primary" type="button" class="recipe-table-action-btn recipe-table-action-btn-primary" data-add-ingredient-row><i slot="prefix" class="fa-solid fa-plus"></i><span>Agregar fila</span></sl-button>
+            <sl-button variant="default" type="button" class="recipe-table-action-btn recipe-table-action-btn-neutral" data-add-comment-row><i slot="prefix" class="fa-regular fa-message"></i><span>Comentario</span></sl-button>
+            <sl-button variant="default" type="button" class="recipe-table-action-btn recipe-table-action-btn-monography" data-add-monography-row><i slot="prefix" class="fa-solid fa-scroll"></i><span>Monografía</span></sl-button>
           </div>
         </div>
       </section>
@@ -4098,60 +4113,58 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
       <section class="step-block recipe-step-card recipe-nutrition-step">
         <h6 class="step-title"><span class="recipe-step-number">3</span> Información nutricional (opcional)</h6>
         <div class="recipe-nutrition-head-actions">
-          <button id="autofillNutritionAiBtn" type="button" class="btn ios-btn ios-btn-secondary recipe-nutrition-ai-btn">
-            <img src="${IA_ICON_SRC}" alt="" aria-hidden="true">
+          <sl-button variant="default" id="autofillNutritionAiBtn" type="button" class="recipe-nutrition-ai-btn">
+            <img slot="prefix" src="${IA_ICON_SRC}" alt="" aria-hidden="true">
             <span>Completar con IA</span>
-          </button>
+          </sl-button>
         </div>
         <div class="step-content recipe-fields-flex">
           <div class="recipe-field recipe-field-half recipe-highlight-field recipe-highlight-field-nutrition">
-            <label class="form-label" for="recipeNutritionProductType">Tipo de producto</label>
-            <select id="recipeNutritionProductType" class="form-select ios-input">
-              <option value="">Seleccionar</option>
-              ${PRODUCT_TYPES.map((item) => `<option value="${item.value}" ${state.editor.nutrition.productType === item.value ? 'selected' : ''}>${item.label}</option>`).join('')}
-            </select>
+            <label class="lj-label" for="recipeNutritionProductType">Tipo de producto</label>
+            <sl-select id="recipeNutritionProductType" hoist clearable placeholder="Seleccionar" value="${PRODUCT_TYPES.some((item) => item.value === state.editor.nutrition.productType) ? ljOptionValue(state.editor.nutrition.productType) : ''}">
+              ${PRODUCT_TYPES.map((item) => `<sl-option value="${ljOptionValue(item.value)}">${item.label}</sl-option>`).join('')}
+            </sl-select>
           </div>
           <div class="recipe-field recipe-field-half recipe-highlight-field recipe-highlight-field-nutrition">
-            <label class="form-label" for="recipeNutritionCategory">Categoría de alimento (Argentina)</label>
-            <select id="recipeNutritionCategory" class="form-select ios-input">
-              <option value="">Seleccionar</option>
+            <label class="lj-label" for="recipeNutritionCategory">Categoría de alimento (Argentina)</label>
+            <sl-select id="recipeNutritionCategory" hoist clearable placeholder="Seleccionar" value="${Object.keys(FOOD_CATEGORIES_AR).includes(state.editor.nutrition.category) ? ljOptionValue(state.editor.nutrition.category) : ''}">
               ${getCategoryOptionsHtml(state.editor.nutrition.category)}
-            </select>
+            </sl-select>
           </div>
           <div class="recipe-field recipe-field-half recipe-highlight-field recipe-highlight-field-nutrition">
-            <label class="form-label" for="recipeNutritionSubcategory">Subcategoría</label>
-            <select id="recipeNutritionSubcategory" class="form-select ios-input">${getSubcategoryOptionsHtml(state.editor.nutrition.category, state.editor.nutrition.subcategory)}</select>
+            <label class="lj-label" for="recipeNutritionSubcategory">Subcategoría</label>
+            <sl-select id="recipeNutritionSubcategory" hoist placeholder="Seleccioná una categoría primero">${getSubcategoryOptionsHtml(state.editor.nutrition.category, state.editor.nutrition.subcategory)}</sl-select>
           </div>
           <div class="recipe-field recipe-field-half recipe-highlight-field recipe-highlight-field-nutrition">
-            <label class="form-label" for="recipeNutritionDeclarationUnit">Unidad de declaración + Porcion Sugerida</label>
+            <label class="lj-label" for="recipeNutritionDeclarationUnit">Unidad de declaración + Porcion Sugerida</label>
             <div class="recipe-nutrition-declaration-grid">
-              <select id="recipeNutritionDeclarationUnit" class="form-select ios-input">
-                ${DECLARATION_UNITS.map((item) => `<option value="${item.value}" ${state.editor.nutrition.declarationUnit === item.value ? 'selected' : ''}>${item.label}</option>`).join('')}
-              </select>
-              <input id="recipeNutritionDeclarationAmount" type="number" min="0" step="0.01" class="form-control ios-input" value="${state.editor.nutrition.declarationAmount || ''}" placeholder="Cantidad">
+              <sl-select id="recipeNutritionDeclarationUnit" hoist value="${ljOptionValue(DECLARATION_UNITS.some((item) => item.value === state.editor.nutrition.declarationUnit) ? state.editor.nutrition.declarationUnit : DECLARATION_UNITS[0].value)}">
+                ${DECLARATION_UNITS.map((item) => `<sl-option value="${ljOptionValue(item.value)}">${item.label}</sl-option>`).join('')}
+              </sl-select>
+              <sl-input id="recipeNutritionDeclarationAmount" type="number" min="0" step="0.01" value="${state.editor.nutrition.declarationAmount || ''}" placeholder="Cantidad"></sl-input>
             </div>
           </div>
           <div class="recipe-field recipe-field-half recipe-highlight-field recipe-highlight-field-nutrition">
-            <label class="form-label" for="recipeNutritionServingsPerPackage">Porciones por envase</label>
-            <input id="recipeNutritionServingsPerPackage" type="number" min="0" step="0.01" class="form-control ios-input" value="${state.editor.nutrition.servingsPerPackage || ''}" placeholder="Ej: 3">
+            <label class="lj-label" for="recipeNutritionServingsPerPackage">Porciones por envase</label>
+            <sl-input id="recipeNutritionServingsPerPackage" type="number" min="0" step="0.01" value="${state.editor.nutrition.servingsPerPackage || ''}" placeholder="Ej: 3"></sl-input>
           </div>
           <div class="recipe-field recipe-field-full recipe-highlight-field recipe-highlight-field-nutrition">
-            <label class="form-label" for="recipeNutritionHouseholdMeasure">Medida casera</label>
+            <label class="lj-label" for="recipeNutritionHouseholdMeasure">Medida casera</label>
             <div class="recipe-nutrition-household-grid">
-              <input id="recipeNutritionHouseholdAmount" type="number" min="0" step="0.01" class="form-control ios-input" value="${state.editor.nutrition.householdAmount || '1'}" placeholder="Ej: 0,5">
-              <select id="recipeNutritionHouseholdMeasure" class="form-select ios-input">${getHouseholdMeasureOptionsHtml(state.editor.nutrition.householdMeasure, state.editor.nutrition.householdAmount || 1)}</select>
+              <sl-input id="recipeNutritionHouseholdAmount" type="number" min="0" step="0.01" value="${state.editor.nutrition.householdAmount || '1'}" placeholder="Ej: 0,5"></sl-input>
+              <sl-select id="recipeNutritionHouseholdMeasure" hoist value="${ljOptionValue(state.editor.nutrition.householdMeasure)}">${getHouseholdMeasureOptionsHtml(state.editor.nutrition.householdMeasure, state.editor.nutrition.householdAmount || 1)}</sl-select>
             </div>
           </div>
           <div class="recipe-field recipe-field-full recipe-highlight-field recipe-highlight-field-nutrition">
             <div class="recipe-nutrition-ai-actions">
-              <button id="generateNutritionAiBtn" type="button" class="btn ios-btn ios-btn-secondary recipe-nutrition-ai-btn" disabled>
-                <img src="${IA_ICON_SRC}" alt="" aria-hidden="true">
+              <sl-button variant="default" id="generateNutritionAiBtn" type="button" class="recipe-nutrition-ai-btn" disabled>
+                <img slot="prefix" src="${IA_ICON_SRC}" alt="" aria-hidden="true">
                 <span class="js-generate-label">Generar tabla nutricional con IA</span>
-              </button>
-              <button id="autofillNutritionAiBtn" type="button" class="btn ios-btn ios-btn-secondary recipe-nutrition-ai-btn">
-                <img src="${IA_ICON_SRC}" alt="" aria-hidden="true">
+              </sl-button>
+              <sl-button variant="default" id="autofillNutritionAiBtn" type="button" class="recipe-nutrition-ai-btn">
+                <img slot="prefix" src="${IA_ICON_SRC}" alt="" aria-hidden="true">
                 <span>Completar con IA</span>
-              </button>
+              </sl-button>
               <p class="recipe-nutrition-ai-disclaimer">La IA trabaja sobre tus datos reales de receta. No inventa información nutricional: genera una propuesta de diseño editable para la gráfica.</p>
               <span id="recipeNutritionAiStale" class="recipe-nutrition-ai-stale d-none">⚠️ Cambiaron datos: rehacé la tabla nutricional.</span>
               <div id="recipeNutritionAutofillRecommendation" class="recipe-nutrition-autofill-recommendation d-none" aria-live="polite"></div>
@@ -4162,9 +4175,11 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
       </section>
 
       ${buildImageStepHtml('recipeImage', formInitial.imageUrl || '', 4)}
-      <div class="recipe-editor-actions"><button type="submit" class="btn ios-btn ios-btn-success"><i class="fa-solid fa-floppy-disk"></i><span>${isNewRecipe ? 'Crear receta' : 'Guardar receta'}</span></button></div>`;
+      <div class="recipe-editor-actions"><sl-button variant="success" type="submit"><i slot="prefix" class="fa-solid fa-floppy-disk"></i><span>${isNewRecipe ? 'Crear receta' : 'Guardar receta'}</span></sl-button></div>`;
 
     renderRows();
+    // Los sl-* recién creados no exponen value hasta definirse y renderizar.
+    await ljReady(recipeEditorForm);
     wireImageStep('recipeImage', state.editor.image);
     renderNutritionSubcategories(state.editor.nutrition.subcategory);
     renderHouseholdMeasureOptions();
@@ -4177,17 +4192,25 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
         dateFormat: 'Y-m-d',
         altInput: true,
         altFormat: 'd/m/Y',
+        altInputClass: 'lj-input recipe-rnpa-date',
         allowInput: true,
         disableMobile: true,
         defaultDate: normalizeValue(state.editor?.rnpa?.expiryDate) || undefined
       });
     }
+    const rnpaAttachmentInput = recipeEditorForm.querySelector('#recipeRnpaAttachment');
+    const rnpaAttachmentName = recipeEditorForm.querySelector('#recipeRnpaAttachmentName');
+    recipeEditorForm.querySelector('#recipeRnpaAttachmentPick')?.addEventListener('click', () => rnpaAttachmentInput?.click());
+    rnpaAttachmentInput?.addEventListener('change', () => {
+      const file = rnpaAttachmentInput.files?.[0];
+      if (rnpaAttachmentName) rnpaAttachmentName.textContent = file ? file.name : 'Ningún archivo seleccionado';
+    });
     const syncRnpaExemptUi = () => {
       const checked = Boolean(recipeEditorForm.querySelector('#recipeRnpaExempt')?.checked);
       state.editor.rnpaExempt = checked;
       const fields = recipeEditorForm.querySelector('#recipeRnpaFields');
       fields?.classList.toggle('is-disabled', checked);
-      fields?.querySelectorAll('input, select, button').forEach((control) => {
+      fields?.querySelectorAll('sl-input, sl-select, sl-button, input.lj-input, input.image-file-input').forEach((control) => {
         control.disabled = checked;
       });
     };
@@ -4210,14 +4233,14 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     const nombreComercial = normalizeValue(recipeEditorForm.querySelector('#recipeNombreComercial')?.value);
     const description = normalizeValue(recipeEditorForm.querySelector('#recipeDescription')?.value);
     const yieldQuantity = normalizeValue(recipeEditorForm.querySelector('#recipeYieldQty')?.value).replaceAll('.', ',');
-    const yieldUnit = normalizeLower(recipeEditorForm.querySelector('#recipeYieldUnit')?.value);
+    const yieldUnit = normalizeLower(ljSelectValue(recipeEditorForm.querySelector('#recipeYieldUnit')));
     const shelfLifeDays = Number(normalizeValue(recipeEditorForm.querySelector('#recipeShelfLifeDays')?.value));
     const frozenShelfLifeExtension = Boolean(recipeEditorForm.querySelector('#recipeFrozenShelfLifeExtension')?.checked);
     const agingDaysRaw = normalizeValue(recipeEditorForm.querySelector('#recipeAgingDays')?.value);
     const agingDays = agingDaysRaw ? Number(agingDaysRaw) : 0;
     const packagingDelayType = recipeEditorForm.querySelector('#recipeFreezeBeforePackaging')?.checked ? PACKAGING_DELAY_FREEZE : PACKAGING_DELAY_AGING;
     const prePackagingFreeze = packagingDelayType === PACKAGING_DELAY_FREEZE;
-    const orderMode = normalizeLower(recipeEditorForm.querySelector('#recipeOrderModeEditor')?.value);
+    const orderMode = normalizeLower(ljSelectValue(recipeEditorForm.querySelector('#recipeOrderModeEditor')));
     const rnpaExempt = Boolean(recipeEditorForm.querySelector('#recipeRnpaExempt')?.checked);
 
     if (!title) throw new Error('El título es obligatorio.');
@@ -4265,10 +4288,10 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     let rnpa = {
       number: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaNumber')?.value),
       denomination: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaDenomination')?.value),
-      brand: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaBrand')?.value) === '__new_value__' ? '' : normalizeValue(recipeEditorForm.querySelector('#recipeRnpaBrand')?.value),
-      businessName: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaBusinessName')?.value) === '__new_value__' ? '' : normalizeValue(recipeEditorForm.querySelector('#recipeRnpaBusinessName')?.value),
-      city: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaCity')?.value),
-      province: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaProvince')?.value),
+      brand: normalizeValue(ljSelectValue(recipeEditorForm.querySelector('#recipeRnpaBrand'))) === '__new_value__' ? '' : normalizeValue(ljSelectValue(recipeEditorForm.querySelector('#recipeRnpaBrand'))),
+      businessName: normalizeValue(ljSelectValue(recipeEditorForm.querySelector('#recipeRnpaBusinessName'))) === '__new_value__' ? '' : normalizeValue(ljSelectValue(recipeEditorForm.querySelector('#recipeRnpaBusinessName'))),
+      city: normalizeValue(ljSelectValue(recipeEditorForm.querySelector('#recipeRnpaCity'))),
+      province: normalizeValue(ljSelectValue(recipeEditorForm.querySelector('#recipeRnpaProvince'))),
       country: RNPA_COUNTRY,
       expiryDate: normalizeValue(recipeEditorForm.querySelector('#recipeRnpaExpiryDate')?.value),
       attachmentUrl: normalizeValue(state.editor?.rnpa?.attachmentUrl),
@@ -4307,13 +4330,13 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     }
 
     const nutrition = {
-      productType: normalizeLower(recipeEditorForm.querySelector('#recipeNutritionProductType')?.value),
-      category: normalizeLower(recipeEditorForm.querySelector('#recipeNutritionCategory')?.value),
-      subcategory: normalizeLower(recipeEditorForm.querySelector('#recipeNutritionSubcategory')?.value),
-      declarationUnit: normalizeLower(recipeEditorForm.querySelector('#recipeNutritionDeclarationUnit')?.value),
+      productType: normalizeLower(ljSelectValue(recipeEditorForm.querySelector('#recipeNutritionProductType'))),
+      category: normalizeLower(ljSelectValue(recipeEditorForm.querySelector('#recipeNutritionCategory'))),
+      subcategory: normalizeLower(ljSelectValue(recipeEditorForm.querySelector('#recipeNutritionSubcategory'))),
+      declarationUnit: normalizeLower(ljSelectValue(recipeEditorForm.querySelector('#recipeNutritionDeclarationUnit'))),
       declarationAmount: normalizeValue(recipeEditorForm.querySelector('#recipeNutritionDeclarationAmount')?.value),
       servingsPerPackage: normalizeValue(recipeEditorForm.querySelector('#recipeNutritionServingsPerPackage')?.value),
-      householdMeasure: normalizeLower(recipeEditorForm.querySelector('#recipeNutritionHouseholdMeasure')?.value),
+      householdMeasure: normalizeLower(ljSelectValue(recipeEditorForm.querySelector('#recipeNutritionHouseholdMeasure'))),
       householdAmount: normalizeValue(recipeEditorForm.querySelector('#recipeNutritionHouseholdAmount')?.value),
       ai: safeObject(state.editor?.nutrition?.ai)
     };
@@ -4400,14 +4423,14 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
       confirmButtonText: 'Duplicar',
       cancelButtonText: 'Cancelar',
       customClass: {
-        confirmButton: 'ios-btn ios-btn-success',
-        cancelButton: 'ios-btn ios-btn-secondary'
+        confirmButton: 'ios-btn-success',
+        cancelButton: 'ios-btn-secondary'
       }
     });
     if (!result.isConfirmed) return;
     await renderEditor(buildDuplicateRecipeDraft(item), null, { forceNew: true });
     state.editorDirty = true;
-    recetasModal.querySelector('.modal-body')?.scrollTo({ top: 0, behavior: 'smooth' });
+    LJModal.body(recetasModal)?.scrollTo({ top: 0, behavior: 'smooth' });
     setTimeout(() => recipeEditorForm.querySelector('#recipeTitle')?.focus(), 120);
   };
 
@@ -4455,7 +4478,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
 
     Swal.fire({
       title: 'Guardando receta...',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner-login"></div>',
+      html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Guardando"></sl-spinner></div>',
       allowOutsideClick: false,
       allowEscapeKey: false,
       showConfirmButton: false,
@@ -4505,18 +4528,17 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     });
   });
 
-  recetasModal.addEventListener('hide.bs.modal', () => {
+  LJModal.on(recetasModal, 'hide', () => {
     snapshotEditorDraft();
     blurActiveElement();
     state.editorDirty = false;
   });
-  recetasModal.addEventListener('hidden.bs.modal', () => {
+  LJModal.on(recetasModal, 'hidden', () => {
     clearSuggestions();
     blurActiveElement();
-    recetasModal.removeAttribute('inert');
   });
   ensurePrintRecipesButton();
-  recetasModal.addEventListener('show.bs.modal', loadRecetas);
+  LJModal.on(recetasModal, 'show', loadRecetas);
 
   recetasList?.addEventListener('scroll', updateListScrollHint);
 
