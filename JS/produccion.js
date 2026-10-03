@@ -510,13 +510,20 @@
     const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
     return `${map.year}-${map.month}-${map.day}`;
   };
+  // Fecha de producción del registro (YYYY-MM-DD); si falta, la de carga. Calendarios y filtros usan ésta.
+  const getRegistroProductionIso = (item) => {
+    const direct = normalizeValue(item?.productionDate).slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(direct)) return direct;
+    const createdAt = Number(item?.createdAt || 0);
+    return createdAt ? getArgentinaIsoDate(new Date(createdAt)) : '';
+  };
   const getProductionDayMap = () => getRegistrosList().reduce((acc, item) => {
-    const iso = getArgentinaIsoDate(new Date(Number(item?.createdAt || 0)));
+    const iso = getRegistroProductionIso(item);
     if (iso) acc[iso] = (acc[iso] || 0) + 1;
     return acc;
   }, {});
   const getProductionKgDayMap = (rows = []) => (Array.isArray(rows) ? rows : []).reduce((acc, item) => {
-    const iso = getArgentinaIsoDate(new Date(Number(item?.createdAt || 0)));
+    const iso = getRegistroProductionIso(item);
     if (!iso) return acc;
     acc[iso] = Number((Number(acc[iso] || 0) + Number(item?.quantityKg || 0)).toFixed(3));
     return acc;
@@ -2861,18 +2868,18 @@
   const getHistoryRows = () => {
     const [from, to] = normalizeValue(state.historyRange).split(' a ').map((item) => normalizeValue(item));
     const query = normalizeLower(state.historySearch);
-    const fromTs = from ? new Date(`${from}T00:00:00`).getTime() : 0;
-    const toTs = to ? new Date(`${to}T23:59:59`).getTime() : 0;
+    // El rango filtra por fecha de PRODUCCIÓN (no de carga); un solo día = desde y hasta iguales.
+    const toIso = to || from;
     return getRegistrosList()
       .filter((item) => {
-        const createdAt = Number(item?.createdAt || 0);
-        if (fromTs && createdAt < fromTs) return false;
-        if (toTs && createdAt > toTs) return false;
+        const iso = getRegistroProductionIso(item);
+        if (from && (!iso || iso < from)) return false;
+        if (toIso && (!iso || iso > toIso)) return false;
         if (!query) return true;
         const blob = [item?.id, item?.recipeTitle, item?.productionDate, item?.status].map(normalizeLower).join(' ');
         return blob.includes(query);
       })
-      .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+      .sort((a, b) => getRegistroProductionIso(b).localeCompare(getRegistroProductionIso(a)) || Number(b.createdAt || 0) - Number(a.createdAt || 0));
   };
   const getTraceRowsFromRegistro = (registro) => (Array.isArray(registro?.lots) ? registro.lots : [])
     .flatMap((ingredientPlan) => (Array.isArray(ingredientPlan?.lots) ? ingredientPlan.lots : [])
@@ -3274,6 +3281,7 @@
     const qrImage = await loadImageFromDataUrl(qrDataUrl);
 
     const result = await openIosSwal({
+      ljModal: true,
       title: `Impresión · QR ${escapeHtml(registro.id || '')}`,
       width: 820,
       customClass: {
@@ -3718,12 +3726,12 @@
         // Mostrar el paso de descongelado para todo lote marcado como congelado.
         const showThaw = lotIsFrozen;
         const mergedEntriesLabel = Number(lot?.mergedEntries || 1) > 1 ? `<br/><b>Ingresos del lote:</b> ${Number(lot.mergedEntries)}` : '';
-        lines.push(`${lotNodeId}["<b>LOTE ${lotIndex + 1}</b>${lotIsFrozen ? ' ❄' : ''}<br/>${esc(lot?.lotNumber || lot?.entryId || '-')}<br/><b>Usado:</b> ${esc(formatCompactQty(lotQty, lot?.unit || item?.unit || item?.ingredientUnit || ''))}${mergedEntriesLabel}<br/><b>Ingreso:</b> ${esc(formatIsoEs(lot?.entryDate || ''))}<br/><b>VTO:</b> ${esc(formatIsoEs(lot?.expiryDate || ''))}<br/><b>Proveedor:</b> ${esc(lot?.provider || '-')}"]:::toneLot`);
+        lines.push(`${lotNodeId}["<b>LOTE ${lotIndex + 1}</b>${lotIsFrozen ? ' fa:fa-snowflake' : ''}<br/>${esc(lot?.lotNumber || lot?.entryId || '-')}<br/><b>Usado:</b> ${esc(formatCompactQty(lotQty, lot?.unit || item?.unit || item?.ingredientUnit || ''))}${mergedEntriesLabel}<br/><b>Ingreso:</b> ${esc(formatIsoEs(lot?.entryDate || ''))}<br/><b>VTO:</b> ${esc(formatIsoEs(lot?.expiryDate || ''))}<br/><b>Proveedor:</b> ${esc(lot?.provider || '-')}"]:::toneLot`);
         lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${esc(getTraceRneDisplay(providerRne))}${providerRneObservation ? `<br/><b>Obs:</b> ${esc(providerRneObservation)}` : ''}"]:::toneRegistry`);
         // El nodo de DESCONGELADO va ANTES del LOTE: ingrediente -> DESCONGELADO -> LOTE -> RNE.
         if (showThaw) {
           const thawNodeId = `${lotNodeId}_THAW`;
-          lines.push(`${thawNodeId}["<b>❄ DESCONGELADO DE PRODUCTO</b><br/>(Descongelado en camara de 0 a 5 grados)<br/>${esc(formatIsoEs(productionDate))}"]:::toneThaw`);
+          lines.push(`${thawNodeId}["<b>fa:fa-snowflake DESCONGELADO DE PRODUCTO</b><br/>(Descongelado en camara de 0 a 5 grados)<br/>${esc(formatIsoEs(productionDate))}"]:::toneThaw`);
           lines.push(`${planNodeId} -.->|DESCONGELADO| ${thawNodeId}`);
           lines.push(`${thawNodeId} -.->|LOTE ${lotIndex + 1}| ${lotNodeId}`);
         } else {
@@ -4163,6 +4171,7 @@
       registro = await ensureRegistroDetail(registro.id) || registro;
     }
     Swal.fire({
+      ljModal: true,
       title: 'Cargando trazabilidad...',
       html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Cargando trazabilidad"></sl-spinner></div>',
       allowOutsideClick: false,
@@ -4182,6 +4191,7 @@
     }
     Swal.close();
     await openIosSwal({
+      ljModal: true,
       title: `Trazabilidad ${traceRegistro.id}`,
       html: renderTraceabilityTree(traceRegistro),
       width: '94vw',
@@ -4475,6 +4485,7 @@
       if (nextBtn) nextBtn.disabled = page >= pages;
     };
     await openIosSwal({
+      ljModal: true,
       title: `Historial rápido · ${escapeHtml(capitalize(recipe.title || 'Producto'))}`,
       width: 'min(720px,96vw)',
       customClass: { popup: 'produccion-recipe-history-alert' },
@@ -4651,9 +4662,9 @@
   };
   const formatDispatchPlanillaExpiry = (value) => {
     const normalized = normalizeValue(value);
-    if (!normalized) return '✗';
+    if (!normalized) return '—';
     const formatted = escapeHtml(formatIsoEs(normalized) || normalized);
-    return formatted || '✗';
+    return formatted || '—';
   };
   const isDispatchPlaceholderAddress = (value = '') => {
     const normalized = normalizeLower(value);
@@ -4813,6 +4824,7 @@
     await new Promise((resolve) => setTimeout(resolve, 140));
     Swal.close();
     await openIosSwal({
+      ljModal: true,
       title: `Planilla ${escapeHtml(dispatchRow.code || dispatchRow.id)}`,
       html: `<div class="planilla-toolbar"><sl-button variant="default" type="button" id="dispatchPlanillaPrintBtn"><i slot="prefix" class="fa-solid fa-print"></i><span>Imprimir</span></sl-button></div><div class="planilla-card">${html}</div>`,
       width: '98vw',
@@ -4928,6 +4940,7 @@
         </tr>`).join('')
       : '<tr><td colspan="5" class="text-center">Sin producciones con stock disponible.</td></tr>';
     await openIosSwal({
+      ljModal: true,
       title: `Stock de ${capitalize(recipe.title || 'producto')}`,
       html: `<div class="produccion-stock-alert">
         <div class="produccion-stock-alert-summary">
@@ -6173,6 +6186,7 @@
       host.innerHTML = `<div class="table-responsive dispatch-xlsx-history-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Archivo</th><th>Fecha / hora</th><th>Tamaño</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div><div class="inventario-pagination enhanced"><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-dispatch-xlsx-history-page="prev" ${page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></sl-button><span>Página ${page} de ${pages}</span><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-dispatch-xlsx-history-page="next" ${page >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></sl-button></div>`;
     };
     await openIosSwal({
+      ljModal: true,
       title: 'Historial de Archivos',
       width: 'min(980px,96vw)',
       html: '<div class="dispatch-xlsx-history-filters"><sl-input id="dispatchXlsxHistorySearch" placeholder="Buscar por nombre de archivo"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input><input id="dispatchXlsxHistoryRange" class="lj-input" placeholder="Rango de fechas"></div><div id="dispatchXlsxHistoryHost"></div>',
@@ -6962,7 +6976,7 @@
           : `<span class="dispatch-xlsx-qty-main">${multiplierLabel} → <span class="dispatch-xlsx-mapped-kg ${qtyClass}">${escapeHtml(formatDispatchXlsxQtyWithUnit(Number(row.mappedQty || 0), stockUnit))}</span></span>`)
         : escapeHtml(formatDispatchXlsxQtyWithUnit(Number(row.sourceQty || 0), stockUnit));
       const relationMeta = row.mappedTargetTitle
-        ? `<small class="dispatch-xlsx-map-link">🔗 ${escapeHtml(capitalize(row.mappedTargetTitle))}</small>`
+        ? `<small class="dispatch-xlsx-map-link"><i class="fa-solid fa-link" aria-hidden="true"></i>${escapeHtml(capitalize(row.mappedTargetTitle))}</small>`
         : '';
       const ingredientDetail = mappedIngredients.length
         ? `<div class="dispatch-xlsx-ingredient-breakdown">${mappedIngredients.map((item) => {
@@ -7376,6 +7390,7 @@
       syncPreview();
     };
     await openIosSwal({
+      ljModal: true,
       title: 'Clientes de reparto',
       width: 'min(860px,96vw)',
       html: '<div data-dispatch-clients-host></div>',
@@ -7605,6 +7620,7 @@
       }).join('')}</div>`
       : '<p>No hay unidades cargadas.</p>';
     const result = await openIosSwal({
+      ljModal: true,
       title: 'Gestionar UTA/URA',
       html,
       width: 'min(980px,96vw)',
@@ -8039,62 +8055,32 @@
     const hasSearch = Boolean(normalizeValue(state.search));
     const collapsed = Boolean(state.recipeGroupsCollapsed) || hasSearch;
 
-    // Reusa exactamente las clases de inventario para mantener idéntico look.
-    const renderThumb = (url, alt, count) => {
-      const countBadge = Number(count) > 0 ? `<span class="family-circle-count">${Math.min(99, Number(count))}</span>` : '';
-      if (url) {
-        // onload: marcamos como is-loaded (la clase .thumb-image arranca con opacity:0).
-        // onerror: si la URL falla, mutamos el span al placeholder con folder.
-        const onLoad = "this.classList.add('is-loaded');";
-        const onError = "this.parentNode.classList.add('family-circle-thumb-placeholder');this.outerHTML='&lt;i class=\\'fa-solid fa-folder\\'&gt;&lt;/i&gt;';";
-        return `<span class="family-circle-thumb"><img class="thumb-image" src="${escapeHtml(url)}" alt="${escapeHtml(alt)}" loading="lazy" onload="${onLoad}" onerror="${onError}">${countBadge}</span>`;
-      }
-      return `<span class="family-circle-thumb family-circle-thumb-placeholder"><i class="fa-solid fa-folder"></i>${countBadge}</span>`;
-    };
-
+    // Mismo patrón que Recetas: selector de grupo (con cantidades) + menú "Grupos".
+    if (active !== 'all' && !state.recipeGroups?.[active]) state.activeRecipeGroupId = 'all';
+    const current = state.activeRecipeGroupId || 'all';
     const totalRecipes = Object.keys(safeObject(state.recetas)).length;
-    const allButton = `
-      <div class="family-circle-wrap">
-        <button type="button" class="lj-tile family-circle-item ${active === 'all' ? 'is-active' : ''}" data-recipe-group-filter="all">
-          <span class="family-circle-thumb family-circle-thumb-placeholder"><i class="fa-solid fa-table-cells-large"></i>${totalRecipes > 0 ? `<span class="family-circle-count">${Math.min(99, totalRecipes)}</span>` : ''}</span>
-          <span class="family-circle-name">Todas</span>
-        </button>
-      </div>`;
-
-    const groupButtons = groups.map((g) => `
-      <div class="family-circle-wrap">
-        <button type="button" class="lj-tile family-circle-item ${active === g.id ? 'is-active' : ''}" data-recipe-group-filter="${escapeHtml(g.id)}">
-          ${renderThumb(g.imageUrl, g.name || 'Grupo', counts[g.id] || 0)}
-          <span class="family-circle-name">${escapeHtml(g.name || 'Grupo')}</span>
-        </button>
-        <div class="family-circle-actions">
-          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" data-recipe-group-manage="${escapeHtml(g.id)}" type="button" title="Administrar recetas del grupo" aria-label="Administrar recetas del grupo"><i class="fa-solid fa-list-check"></i></sl-button>
-          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" data-recipe-group-edit="${escapeHtml(g.id)}" type="button" title="Editar grupo" aria-label="Editar grupo"><i class="fa-solid fa-pen"></i></sl-button>
-          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn is-danger" data-recipe-group-delete="${escapeHtml(g.id)}" type="button" title="Eliminar grupo" aria-label="Eliminar grupo"><i class="fa-solid fa-trash"></i></sl-button>
-        </div>
-      </div>`).join('');
-
-    const createButton = `
-      <div class="family-circle-wrap">
-        <button type="button" class="lj-tile family-circle-item family-circle-create" data-recipe-group-create>
-          <span class="family-circle-thumb family-circle-thumb-placeholder family-circle-thumb-create"><i class="fa-solid fa-plus"></i></span>
-          <span class="family-circle-name">Nuevo grupo</span>
-        </button>
-      </div>`;
-
+    const groupId = current === 'all' ? '' : current;
+    const disabledAttr = groupId ? '' : 'disabled';
     nodes.recipeGroups.innerHTML = `
-      <div class="family-circle-section ${collapsed ? 'is-collapsed' : ''}">
-        <div class="family-circle-section-head">
-          <button type="button" class="lj-tile family-circle-toggle" data-recipe-groups-toggle aria-expanded="${!collapsed}" aria-controls="produccionRecipeGroupsBody">
-            <i class="fa-solid ${collapsed ? 'fa-chevron-right' : 'fa-chevron-down'}"></i>
-            <span>Grupos de recetas</span>
-            <small>${groups.length} ${groups.length === 1 ? 'grupo' : 'grupos'}${active !== 'all' ? ` · filtrando: ${escapeHtml(safeObject(state.recipeGroups[active]).name || '')}` : ''}${hasSearch ? ' · oculto por búsqueda' : ''}</small>
-          </button>
-        </div>
-        <div id="produccionRecipeGroupsBody" class="family-circle-section-body ${collapsed ? 'd-none' : ''}">
-          <div class="family-circles-row">${allButton}${groupButtons}${createButton}</div>
-        </div>
+      <div class="recetas-group-filter produccion-group-filter">
+        <sl-select class="recetas-group-select" data-produccion-group-select value="${ljOptionValue(current)}" hoist aria-label="Filtrar por grupo">
+          <i slot="prefix" class="fa-regular fa-folder"></i>
+          <sl-option value="all">Todos los grupos (${totalRecipes})</sl-option>
+          ${groups.map((g) => `<sl-option value="${ljOptionValue(g.id)}">${escapeHtml(capitalize(g.name || 'Grupo'))} (${Number(counts[g.id] || 0)})</sl-option>`).join('')}
+        </sl-select>
+        <sl-dropdown class="recetas-group-menu" hoist placement="bottom-end">
+          <sl-button slot="trigger" variant="default" caret title="Gestionar grupos de recetas"><i slot="prefix" class="fa-solid fa-layer-group"></i>Grupos</sl-button>
+          <sl-menu>
+            <sl-menu-item data-recipe-group-create><i slot="prefix" class="fa-solid fa-plus"></i>Nuevo grupo</sl-menu-item>
+            <sl-divider></sl-divider>
+            <sl-menu-item data-recipe-group-edit="${escapeHtml(groupId)}" ${disabledAttr}><i slot="prefix" class="fa-solid fa-pen"></i>Editar grupo seleccionado</sl-menu-item>
+            <sl-menu-item data-recipe-group-manage="${escapeHtml(groupId)}" ${disabledAttr}><i slot="prefix" class="fa-solid fa-list-check"></i>Asignar recetas al grupo</sl-menu-item>
+            <sl-menu-item data-recipe-group-delete="${escapeHtml(groupId)}" ${disabledAttr} class="is-danger"><i slot="prefix" class="fa-solid fa-trash"></i>Eliminar grupo seleccionado</sl-menu-item>
+          </sl-menu>
+        </sl-dropdown>
+        ${hasSearch ? '<small class="produccion-group-note">Buscando en todos los grupos</small>' : ''}
       </div>`;
+    void collapsed;
   };
 
   const openRecipeGroupForm = async (existingId = '') => {
@@ -8212,6 +8198,7 @@
         }).join('')}
       </div>`;
     const result = await Swal.fire({
+      ljModal: true,
       title: `Recetas en "${group.name}"`,
       html,
       width: 640,
@@ -8354,11 +8341,11 @@
           <span class="produccion-semaforo" aria-hidden="true"></span>
           <span class="produccion-compact-name">
             <strong>${capitalize(recipe.title || 'Sin título')}</strong>
-            ${recipe.nombreComercial ? `<small>${escapeHtml(capitalize(recipe.nombreComercial))}</small>` : ''}
+            <small>${[recipe.nombreComercial ? escapeHtml(capitalize(recipe.nombreComercial)) : '', escapeHtml(capitalize(getRecipeGroupLabel(recipe) || ''))].filter(Boolean).join(' · ') || escapeHtml(statusLabel)}</small>
           </span>
-          <span class="produccion-compact-uses" title="Producciones registradas"><i class="fa-solid fa-industry"></i>${usageCount}</span>
-          ${maxHtml}
-          <sl-button variant="${analysis.canProduce ? 'success' : 'danger'}" size="small" type="button" class="lj-icon-btn ${canOpenProduction ? '' : 'is-disabled'} produccion-compact-produce-btn" data-open-produccion="${recipe.id}" data-open-produccion-mode="produce" ${canOpenProduction ? '' : 'disabled'} title="${hasStockToday ? 'Producir' : 'Sin stock para hoy: entrá y probá otra fecha'}"><sl-icon name="plus-lg"></sl-icon></sl-button>
+          <span class="produccion-compact-uses" title="Producciones registradas" aria-label="${usageCount} producciones registradas"><i class="fa-solid fa-industry" aria-hidden="true"></i>${usageCount}</span>
+          <span class="produccion-compact-max-wrap" title="Máximo producible hoy"><small>Máx. hoy</small>${maxHtml}</span>
+          <sl-button variant="${analysis.canProduce ? 'success' : 'danger'}" size="small" type="button" class="${canOpenProduction ? '' : 'is-disabled'} produccion-compact-produce-btn" data-open-produccion="${recipe.id}" data-open-produccion-mode="produce" ${canOpenProduction ? '' : 'disabled'} title="${hasStockToday ? 'Producir' : 'Sin stock para hoy: entrá y probá otra fecha'}"><sl-icon slot="prefix" name="plus-lg"></sl-icon>Producir</sl-button>
           ${buildMoreMenuHtml(recipe)}
         </article>`;
     };
@@ -8450,7 +8437,7 @@
                 </div>
                 <h6 class="ingrediente-name receta-name">${capitalize(recipe.title || 'Sin título')}</h6>
                 ${recipe.nombreComercial ? `<p class="produccion-nombre-comercial">${escapeHtml(capitalize(recipe.nombreComercial))}</p>` : ''}
-                <p class="produccion-recipe-folder"><span aria-hidden="true">📁</span>${escapeHtml(groupLabel ? capitalize(groupLabel) : 'Sin carpeta')}</p>
+                <p class="produccion-recipe-folder"><i class="fa-regular fa-folder" aria-hidden="true"></i>${escapeHtml(groupLabel ? capitalize(groupLabel) : 'Sin carpeta')}</p>
               </div>
               <span class="produccion-chip ${statusClass}"><span class="produccion-semaforo"></span>${isExpiredOnlyAvailable ? 'Disponible con expirados' : analysis.statusText}</span>
             </header>
@@ -9572,6 +9559,7 @@
           prepareThumbLoaders('.js-produccion-thumb');
         };
         await openIosSwal({
+          ljModal: true,
           title: 'Historial de producción (ampliado)',
           html: '<div id="produccionRecipeExpandedHistoryHost" class="inventario-expand-wrap"></div>',
           width: '92vw',
@@ -10376,7 +10364,15 @@
   // Listener delegado del strip de grupos: filtrar, crear, editar, eliminar,
   // administrar recetas asignadas. Es delegado porque el HTML se reescribe
   // en cada renderRecipeGroups().
+  nodes.recipeGroups?.addEventListener('change', (event) => {
+    const select = event.target.closest?.('[data-produccion-group-select]');
+    if (!select) return;
+    state.activeRecipeGroupId = normalizeValue(ljSelectValue(select)) || 'all';
+    renderRecipeGroups();
+    renderList();
+  });
   nodes.recipeGroups?.addEventListener('click', async (event) => {
+    if (event.target.closest('sl-menu-item[disabled]')) return;
     if (event.target.closest('[data-recipe-groups-toggle]')) {
       state.recipeGroupsCollapsed = !state.recipeGroupsCollapsed;
       try { localStorage.setItem('produccion_recipe_groups_collapsed', state.recipeGroupsCollapsed ? '1' : '0'); } catch (_) {}
@@ -10810,6 +10806,7 @@
     };
     nodes.recipeGroups?.classList.add('d-none');
     await openIosSwal({
+      ljModal: true,
       title: 'Producciones guardadas • La Jamonera',
       html: '<div id="produccionExpandedHistoryHost" class="inventario-expand-wrap"></div>',
       width: '92vw',
@@ -11580,6 +11577,7 @@
     }).join('')}</div>`;
 
     await openIosSwal({
+      ljModal: true,
       title: 'Planilla de Producción Semanal',
       width: 'min(1400px,98vw)',
       html: `<div class="planilla-toolbar"><sl-button variant="default" type="button" id="weeklyProductionPrintBtn"><i slot="prefix" class="fa-solid fa-print"></i><span>Imprimir</span></sl-button></div><div class="planilla-card">${html}</div>`,
@@ -12243,7 +12241,7 @@
         const expiryLabel = expiries.length === 1 ? formatIsoEs(expiries[0]) : (expiries.length ? 'Ver detalle' : '-');
         const locationText = getDispatchLocationLabel(row, client);
         const { groups, standalone } = getDispatchGroupedProducts(row);
-        const repartoHead = `<tr class="is-dispatch-head-row"><td colspan="6"><div class="dispatch-print-head"><span class="dispatch-print-truck">🚚</span><div><h3>${escapeHtml(row.code || '-')}</h3><p>${escapeHtml(locationText)}</p></div></div></td></tr>`;
+        const repartoHead = `<tr class="is-dispatch-head-row"><td colspan="6"><div class="dispatch-print-head"><span class="dispatch-print-truck"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path d="M0 3.5A1.5 1.5 0 0 1 1.5 2h9A1.5 1.5 0 0 1 12 3.5V5h1.02a1.5 1.5 0 0 1 1.17.563l1.481 1.85a1.5 1.5 0 0 1 .329.938V10.5a1.5 1.5 0 0 1-1.5 1.5H14a2 2 0 1 1-4 0H5a2 2 0 1 1-3.998-.085A1.5 1.5 0 0 1 0 10.5zm1.294 7.456A2 2 0 0 1 4.732 11h5.536a2 2 0 0 1 .732-.732V3.5a.5.5 0 0 0-.5-.5h-9a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .294.456M12 10a2 2 0 0 1 1.732 1h.768a.5.5 0 0 0 .5-.5V8.35a.5.5 0 0 0-.11-.312l-1.48-1.85A.5.5 0 0 0 13.02 6H12zm-9 1a1 1 0 1 0 0 2 1 1 0 0 0 0-2m9 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2"/></svg></span><div><h3>${escapeHtml(row.code || '-')}</h3><p>${escapeHtml(locationText)}</p></div></div></td></tr>`;
         const summary = `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${products.length === 1 ? '1 producto' : `${products.length} productos`}</td><td>${products.map((item) => escapeHtml(getDispatchProductSummaryLabel(item))).join('<br>')}</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || '-')}</td><td>${escapeHtml(client.name || '-')}</td></tr>`;
         if (!includeDetail) return [repartoHead, summary];
         const groupedRows = groups.flatMap((group) => {
@@ -12271,7 +12269,7 @@
           });
         });
         const locationRow = locationText
-          ? `<tr class="is-dispatch-internal-row"><td colspan="6">🏠 ${escapeHtml(locationText)}</td></tr>`
+          ? `<tr class="is-dispatch-internal-row"><td colspan="6"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" style="vertical-align:-1px;margin-right:6px"><path d="M8.707 1.5a1 1 0 0 0-1.414 0L.646 8.146a.5.5 0 0 0 .708.708L2 8.207V13.5A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5V8.207l.646.647a.5.5 0 0 0 .708-.708L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293zM13 7.207V13.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5V7.207l5-5z"/></svg>${escapeHtml(locationText)}</td></tr>`
           : '';
         return [repartoHead, summary, ...groupedRows, ...detailRows, locationRow].filter(Boolean);
       }).join('');
@@ -12372,7 +12370,7 @@
         const locationLabel = getDispatchLocationLabel(row, client);
         const locationRow = locationLabel
           ? [{
-            FECHA: `↳ 🏠 ${locationLabel.toUpperCase()}`,
+            FECHA: `↳ USO INTERNO · ${locationLabel.toUpperCase()}`,
             PRODUCTOS: '',
             'CANTIDAD (KG)': '',
             LOTE: '',
@@ -12405,6 +12403,7 @@
     if (event.target.closest('#produccionDispatchExpandBtn')) {
       const rows = getDispatchRows();
       await openIosSwal({
+        ljModal: true,
         title: 'Salida de Productos · Vista ampliada',
         width: '92vw',
         html: '<div id="dispatchExpandedWrap"></div>',

@@ -101,9 +101,11 @@
         <div class="users-manager-card-main">
           ${userAvatarHtml(user)}
           <div class="users-manager-card-info">
-            <h6>${escapeHtml(user.fullName || 'Sin nombre')}</h6>
-            <p class="users-manager-card-position">${escapeHtml(user.position || 'Sin puesto')}</p>
-            ${user.email ? `<p class="users-manager-card-email"><i class="fa-regular fa-envelope" aria-hidden="true"></i>${escapeHtml(user.email)}</p>` : ''}
+            <div class="users-manager-card-head">
+              <h6>${escapeHtml(user.fullName || 'Sin nombre')}</h6>
+              <span class="users-manager-card-position users-role-tag"><i class="fa-solid fa-id-badge" aria-hidden="true"></i>${escapeHtml(user.position || 'Sin puesto')}</span>
+            </div>
+            <p class="users-manager-card-email">${user.email ? `<i class="fa-regular fa-envelope" aria-hidden="true"></i>${escapeHtml(user.email)}` : '<span class="users-manager-card-noemail">Sin email</span>'}</p>
           </div>
         </div>
         <div class="users-manager-card-actions">

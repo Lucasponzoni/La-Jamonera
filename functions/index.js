@@ -6,7 +6,7 @@
  *   GET/POST /config/email, POST /config/email/test -> configuración de correo (clave enmascarada)
  *   POST /ia          -> chat con Google Gemini (formato chat/completions; API key server-side)
  *   POST /ia/image    -> genera una imagen con Gemini (base64)
- *   GET/POST /config/ai, POST /config/ai/test -> configuración de IA (clave enmascarada)
+ *   GET/POST /config/ai, POST /config/ai/test, GET /config/ai/models -> configuración de IA (clave enmascarada)
  *   GET  /image   -> descarga una imagen de Firebase Storage con cabeceras CORS
  *   GET  /me      -> uid, email y si es administrador
  *   POST /auto-egresos/run -> corrida manual de auto-egresos (admin; dryRun por defecto)
@@ -309,6 +309,18 @@ app.post('/config/ai/test', requireAuth, requireAdmin, async (req, res) => {
     return res.json({ ok: true, ms: Date.now() - t0, model: cfg.textModel, reply: out.choices[0].message.content });
   } catch (error) {
     return aiError(res, error, 'config/ai/test');
+  }
+});
+
+// GET /config/ai/models : modelos disponibles para la clave guardada (texto e imágenes, más nuevos primero)
+app.get('/config/ai/models', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const cfg = await readAiConfig();
+    if (!cfg.apiKey) return res.status(400).json({ ok: false, error: 'ia_key_missing' });
+    const out = await gemini.listModels({ apiKey: cfg.apiKey });
+    return res.json({ ok: true, ...out, current: { textModel: cfg.textModel, imageModel: cfg.imageModel } });
+  } catch (error) {
+    return aiError(res, error, 'config/ai/models');
   }
 });
 

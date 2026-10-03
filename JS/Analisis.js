@@ -19,14 +19,16 @@
   ];
 
   const IMPORTANCE_LEVELS = [
-    { max: 14,  label: 'Sin observaciones 😄', tone: 'ok'       },
-    { max: 28,  label: 'Conforme 🙂',          tone: 'ok'       },
-    { max: 42,  label: 'Aceptable 😊',         tone: 'normal'   },
-    { max: 56,  label: 'Normal 😐',            tone: 'normal'   },
-    { max: 70,  label: 'Atención 😶',          tone: 'warn'     },
-    { max: 84,  label: 'No conforme ⚠️',       tone: 'high'     },
-    { max: 100, label: 'Crítico 🚨',           tone: 'critical' }
+    { max: 14,  label: 'Sin observaciones', icon: 'fa-circle-check',         tone: 'ok'       },
+    { max: 28,  label: 'Conforme',          icon: 'fa-thumbs-up',            tone: 'ok'       },
+    { max: 42,  label: 'Aceptable',         icon: 'fa-thumbs-up',            tone: 'normal'   },
+    { max: 56,  label: 'Normal',            icon: 'fa-circle-minus',         tone: 'normal'   },
+    { max: 70,  label: 'Atención',          icon: 'fa-circle-exclamation',   tone: 'warn'     },
+    { max: 84,  label: 'No conforme',       icon: 'fa-triangle-exclamation', tone: 'high'     },
+    { max: 100, label: 'Crítico',           icon: 'fa-bell',                 tone: 'critical' }
   ];
+  // Ícono + texto del nivel (sin emojis).
+  const importanceLabelHtml = (meta) => `<span class="importance-label-inner"><i class="fa-solid ${meta.icon}" aria-hidden="true"></i><span>${meta.label}</span></span>`;
 
   // DOM refs
   const analisisLoading           = document.getElementById('analisisLoading');
@@ -427,7 +429,7 @@
   const updateImportanceLabel = () => {
     if (!analisisImportanceRange || !analisisImportanceLabel) return;
     const meta = getImportanceMeta(analisisImportanceRange.value);
-    analisisImportanceLabel.textContent = meta.label;
+    analisisImportanceLabel.innerHTML = importanceLabelHtml(meta);
     analisisImportanceLabel.className = `importance-label tone-${meta.tone}`;
   };
 
@@ -827,7 +829,7 @@ REGLAS:
         <div class="informe-row-main">
           <div class="informe-row-head">
             <h3 class="informe-row-title">${escapeHtml(typeMeta.label)}${record.sampleId ? ` · <span class="analisis-row-sample">${escapeHtml(record.sampleId)}</span>` : ''}</h3>
-            <span class="importance-chip importance-${importance.tone}">${importance.label}</span>
+            <span class="importance-chip importance-${importance.tone}">${importanceLabelHtml(importance)}</span>
           </div>
           <p class="informe-row-sub">${escapeHtml(displayName)} · ${escapeHtml(user.position || record.userPosition || 'Sin puesto')}</p>
           <div class="informe-row-meta">
@@ -886,17 +888,21 @@ REGLAS:
       : '<p class="aq-detail-empty">Sin documentos.</p>';
 
     await openSwal({
-      title: '', width: 860,
+      ljModal: true,
+      title: `${escapeHtml(typeMeta.label)}${full.sampleId ? ` · N° ${escapeHtml(full.sampleId)}` : ''}`,
+      tags: `<span class="importance-chip importance-${imp.tone}">${importanceLabelHtml(imp)}</span>`,
+      width: 860,
       html: `<div class="aq-detail">
-        <div class="aq-detail-head">
-          <span class="aq-detail-icon">${typeIcon(typeMeta)}</span>
-          <div><h4 class="aq-detail-title">${escapeHtml(typeMeta.label)}</h4><small class="aq-detail-date">${getDateLabel(full.createdAt)}</small></div>
-          <span class="importance-chip importance-${imp.tone}">${imp.label}</span>
-        </div>
-        <div class="aq-detail-chips">
-          ${full.sampleId  ? `<div class="informe-data-block"><span>Muestra</span><strong>${escapeHtml(full.sampleId)}</strong></div>` : ''}
-          ${full.laboratory ? `<div class="informe-data-block"><span>Laboratorio</span><strong>${escapeHtml(full.laboratory)}</strong></div>` : ''}
-          <div class="informe-data-block"><span>Por</span><strong>${escapeHtml(displayName)}</strong></div>
+        <div class="report-author-row">
+          ${renderUserAvatar({ ...user, fullName: displayName })}
+          <div class="report-author-text">
+            <strong>${escapeHtml(displayName)}</strong>
+            <small>${[user.position ? `<span>${escapeHtml(user.position)}</span>` : '', full.laboratory ? `<span><i class="fa-solid fa-flask" aria-hidden="true"></i> ${escapeHtml(full.laboratory)}</span>` : ''].filter(Boolean).join('<span class="report-author-dot" aria-hidden="true">·</span>') || '<span>Sin puesto</span>'}</small>
+          </div>
+          <div class="report-author-meta">
+            <span>${typeIcon(typeMeta)}${escapeHtml(typeMeta.label)}${full.sampleId ? ` · Muestra ${escapeHtml(full.sampleId)}` : ''}</span>
+            <span><i class="fa-regular fa-calendar" aria-hidden="true"></i>${getDateLabel(full.createdAt)}</span>
+          </div>
         </div>
         <div class="aq-detail-content">${full.html || '<p>Sin contenido</p>'}</div>
         ${full.observations ? `<div class="aq-detail-obs"><strong>Observaciones</strong><p>${escapeHtml(full.observations)}</p></div>` : ''}
@@ -906,6 +912,7 @@ REGLAS:
       showCancelButton: false, confirmButtonText: 'Cerrar',
       customClass: { popup: 'informes-detail-alert', confirmButton: 'secondary' },
       didOpen: () => {
+        prepareThumbLoaders('.report-author-row .js-user-photo');
         document.querySelectorAll('[data-view-detail-image]').forEach((fig) => {
           fig.addEventListener('click', () => openViewerWithImages(images, parseInt(fig.dataset.viewDetailImage, 10)));
         });

@@ -553,3 +553,77 @@
   }
 }
 
+
+/* =========================================
+   Producir · mismo lenguaje visual que Recetas
+   (filtro de grupo + filas compactas con datos clave)
+========================================= */
+#produccionModal .produccion-group-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 2px 0 12px;
+}
+#produccionModal .produccion-group-filter .recetas-group-select { flex: 0 1 340px; width: auto; min-width: 0; }
+#produccionModal .produccion-group-note { font-size: 12px; color: var(--lj-muted); }
+
+#produccionModal .produccion-compact-row {
+  grid-template-columns: 36px 8px minmax(0, 1fr) auto auto auto auto;
+  gap: 12px;
+  min-height: 58px;
+  padding: 8px 12px;
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius-lg);
+  background: var(--lj-surface);
+}
+#produccionModal .produccion-compact-row:hover { border-color: var(--lj-border-strong); background: var(--lj-surface); }
+#produccionModal .produccion-compact-row:focus-within { border-color: var(--lj-accent); }
+#produccionModal .produccion-compact-thumb { width: 36px; height: 36px; }
+#produccionModal .produccion-compact-row .produccion-semaforo { width: 8px; height: 8px; border-radius: 50%; }
+#produccionModal .produccion-compact-name strong { font-size: 14.5px; font-weight: 700; color: var(--lj-text); }
+#produccionModal .produccion-compact-name small { font-size: 12.5px; margin-top: 2px; }
+#produccionModal .produccion-compact-uses {
+  height: 22px;
+  padding: 0 8px;
+  gap: 6px;
+  font-size: 12px;
+  background: var(--lj-surface-2);
+  color: var(--lj-muted);
+}
+#produccionModal .produccion-compact-max-wrap {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.1;
+  min-width: 92px;
+}
+#produccionModal .produccion-compact-max-wrap > small {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--lj-muted);
+}
+#produccionModal .produccion-compact-max { font-size: 15px; font-weight: 700; }
+#produccionModal .produccion-compact-produce-btn { width: auto; height: auto; padding: 0; border-radius: 0; }
+#produccionModal .produccion-compact-produce-btn::part(base) { min-width: 96px; }
+
+@media (max-width: 767.98px) {
+  #produccionModal .produccion-compact-row {
+    grid-template-columns: 34px minmax(0, 1fr) auto auto;
+    grid-template-areas: "thumb name max more" "thumb name btn more";
+    row-gap: 6px;
+    padding: 8px 10px;
+  }
+  #produccionModal .produccion-compact-thumb { grid-area: thumb; width: 34px; height: 34px; }
+  #produccionModal .produccion-compact-row .produccion-semaforo,
+  #produccionModal .produccion-compact-uses { display: none; }
+  #produccionModal .produccion-compact-name { grid-area: name; }
+  #produccionModal .produccion-compact-max-wrap { grid-area: max; min-width: 0; }
+  #produccionModal .produccion-compact-produce-btn { grid-area: btn; justify-self: end; }
+  #produccionModal .produccion-compact-produce-btn::part(base) { min-width: 0; }
+  #produccionModal .produccion-compact-row > .produccion-more-wrap,
+  #produccionModal .produccion-compact-row > :last-child { grid-area: more; }
+  #produccionModal .produccion-group-filter .recetas-group-select { flex: 1 1 200px; }
+}

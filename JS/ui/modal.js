@@ -106,6 +106,22 @@
     if (closer) window.LJModal.close(closer.closest('sl-dialog'));
   });
 
+  // Al abrir, Shoelace enfoca el primer control (p.ej. el campo de comentarios al pie) y el cuerpo
+  // baja hasta él. Los modales abren arriba de todo: foco en el panel sin scroll, salvo [autofocus].
+  document.addEventListener('sl-initial-focus', (event) => {
+    const dialog = event.target;
+    if (dialog?.tagName !== 'SL-DIALOG' || !dialog.classList.contains('lj-modal')) return;
+    if (dialog.querySelector('[autofocus]')) return;
+    event.preventDefault();
+    dialog.shadowRoot?.querySelector('[part~="panel"]')?.focus({ preventScroll: true });
+    const toTop = () => {
+      dialog.shadowRoot?.querySelector('[part~="body"]')?.scrollTo?.(0, 0);
+      dialog.querySelectorAll('.lj-dialog-body').forEach((el) => { el.scrollTop = 0; });
+    };
+    toTop();
+    requestAnimationFrame(toTop);
+  });
+
   // Clic fuera del modal: lo cierra, pero sólo al de arriba de la pila (y nunca si el modal
   // pide quedarse abierto con data-lj-static, p.ej. mientras guarda).
   document.addEventListener('sl-request-close', (event) => {

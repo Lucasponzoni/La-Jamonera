@@ -6,7 +6,7 @@
   <title>Trazabilidad pública | La Jamonera</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Viga&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
   <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202608282255">
   <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202608282255">
@@ -73,50 +73,35 @@
     </div>
   </sl-dialog>
 
-  <footer class="app-footer app-footer-white">
-    <div
-      class="footer-main"
-      style="width: min(1200px, 100%); display: flex !important; justify-content: center; align-items: center; gap: 18px; flex-wrap: wrap;"
-    >
-      <div class="footer-brand-block">
-        <img src="./IMG/La Jamonera Cerdito.webp" alt="Logo La Jamonera" class="footer-brand-logo">
-        <div>
-          <h3 class="footer-brand-title">La Jamonera</h3>
-          <p class="footer-brand-text">Back Office</p>
+  <footer class="lj-footer lj-footer-public">
+    <div class="lj-footer-inner">
+      <section class="lj-footer-col lj-footer-brand" aria-label="La Jamonera">
+        <div class="lj-footer-brand-row">
+          <img src="./IMG/La Jamonera Cerdito.webp" alt="Logo La Jamonera" class="lj-footer-logo">
+          <div>
+            <p class="lj-footer-title"><span class="brand-light">La</span> <span class="brand-bold">Jamonera</span></p>
+            <p class="lj-footer-subtitle">Trazabilidad de producción</p>
+          </div>
         </div>
-      </div>
+      </section>
     </div>
-
-    <div class="footer-divider" aria-hidden="true"></div>
-
-    <p class="footer-legal">
-      El uso de este sitio web implica la aceptación de los términos, condiciones y políticas de privacidad de
-      <a href="https://asesoriabromatologicaros.com.ar/index.html" target="_blank" rel="noopener noreferrer">
-        Asesoria Bromatologica Rosario
-      </a>.
-      Las imagenes son a modo ilustrativo.
-    </p>
-
-    <p class="lj-footer-maker">
-      <span>Software de</span>
-      <img class="ns-light" src="./IMG/ninja-soft-light.webp" alt="Ninja Soft" width="80" height="22">
-    </p>
-    <p class="footer-copy">
-      © Copyright <span id="currentYear"></span> - Back Office para empresas, powered by
-      <a href="https://asesoriabromatologicaros.com.ar/index.html" target="_blank" rel="noopener noreferrer">
-        ABR
-      </a>
-      - Author: Ponzoni Lucas
-      <a
-        class="footer-mail"
-        href="mailto:pablomanuelscalise@gmail.com"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Enviar email"
-      >
-        <i class="fa-regular fa-envelope"></i>
-      </a>
-    </p>
+    <div class="lj-footer-bottom">
+      <p class="lj-footer-copy">
+        © <span id="currentYear">2026</span> La Jamonera · Back Office para empresas · powered by
+        <a href="https://asesoriabromatologicaros.com.ar/index.html" target="_blank" rel="noopener noreferrer">ABR</a>
+        · Ponzoni Lucas
+      </p>
+      <p class="lj-footer-maker">
+        <span>Software de</span>
+        <img class="ns-light" src="./IMG/ninja-soft-light.webp" alt="Ninja Soft" width="80" height="22">
+        <img class="ns-dark" src="./IMG/ninja-soft-dark.webp" alt="Ninja Soft" width="80" height="22">
+      </p>
+      <p class="lj-footer-legal">
+        El uso de este sitio implica la aceptación de los términos, condiciones y políticas de privacidad de
+        <a href="https://asesoriabromatologicaros.com.ar/index.html" target="_blank" rel="noopener noreferrer">Asesoría Bromatológica Rosario</a>.
+        Las imágenes son a modo ilustrativo.
+      </p>
+    </div>
   </footer>
 
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>

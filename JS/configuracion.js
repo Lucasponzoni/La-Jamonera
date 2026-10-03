@@ -3,12 +3,13 @@
 // recibe el estado y la clave enmascarada, nunca la clave completa.
 (function configuracionModule() {
   const DIALOG_ID = 'configuracionModal';
-  const TEXT_MODELS = [
-    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash · rápido (recomendado)' },
-    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro · más preciso, más lento' },
-    { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite · el más económico' }
+  // Valores iniciales; "Obtener modelos" trae la lista real de la cuenta de Google.
+  let TEXT_MODELS = [
+    { value: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash' },
+    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' }
   ];
-  const IMAGE_MODELS = [
+  let IMAGE_MODELS = [
+    { value: 'gemini-3.1-flash-image', label: 'Gemini 3.1 Flash Image (Nano Banana 2)' },
     { value: 'gemini-2.5-flash-image', label: 'Gemini 2.5 Flash Image' }
   ];
 
@@ -72,6 +73,7 @@
             </div>
             <p class="config-result" data-result hidden></p>
             <footer class="config-actions">
+              <sl-button variant="default" data-action="models"><i slot="prefix" class="fa-solid fa-arrows-rotate"></i>Obtener modelos</sl-button>
               <sl-button variant="default" data-action="test"><i slot="prefix" class="fa-solid fa-plug-circle-check"></i>Probar conexión</sl-button>
               <sl-button variant="primary" data-action="save"><i slot="prefix" class="fa-solid fa-floppy-disk"></i>Guardar</sl-button>
             </footer>
@@ -113,6 +115,14 @@
 
   const field = (card, name) => card.querySelector(`[data-field="${name}"]`);
 
+  // Rehace las opciones de un select manteniendo (o agregando) el valor actual.
+  const fillSelect = (el, list, value) => {
+    const items = list.some((m) => m.value === value) || !value ? list : [{ value, label: value }, ...list];
+    el.innerHTML = optionsHtml(items);
+    setSelect(el, value || (items[0] && items[0].value) || '');
+  };
+  const modelLabel = (m, latestId) => `${m.name}${m.preview ? ' · preview' : ''}${m.id === latestId ? ' · más nuevo' : ''}`;
+
   const setResult = (card, type, text) => {
     const el = card.querySelector('[data-result]');
     el.hidden = !text;
@@ -130,8 +140,8 @@
     card.querySelector('[data-updated]').textContent = cfg.updatedAt ? `${fmtDate(cfg.updatedAt)}${by}` : '—';
     field(card, 'apiKey').value = '';
     if (card.dataset.config === 'ai') {
-      setSelect(field(card, 'textModel'), cfg.textModel || TEXT_MODELS[0].value);
-      setSelect(field(card, 'imageModel'), cfg.imageModel || IMAGE_MODELS[0].value);
+      fillSelect(field(card, 'textModel'), TEXT_MODELS, cfg.textModel || TEXT_MODELS[0].value);
+      fillSelect(field(card, 'imageModel'), IMAGE_MODELS, cfg.imageModel || IMAGE_MODELS[0].value);
     } else {
       field(card, 'fromEmail').value = cfg.fromEmail || '';
       field(card, 'fromName').value = cfg.fromName || '';
@@ -189,6 +199,24 @@
           paint(card, cfg);
           setResult(card, 'ok', 'Configuración guardada.');
           notify('success', 'Configuración guardada', kind === 'ai' ? 'Gemini quedó listo para usar.' : 'Resend quedó listo para enviar correos.');
+        } catch (error) {
+          setResult(card, 'error', error.message);
+        }
+      });
+      return;
+    }
+    if (action === 'models') {
+      await withBusy(button, async () => {
+        try {
+          const out = await api('GET', '/config/ai/models');
+          TEXT_MODELS = out.text.map((m) => ({ value: m.id, label: modelLabel(m, out.latestText) }));
+          IMAGE_MODELS = out.image.map((m) => ({ value: m.id, label: modelLabel(m, out.latestImage) }));
+          fillSelect(field(card, 'textModel'), TEXT_MODELS, out.latestText);
+          fillSelect(field(card, 'imageModel'), IMAGE_MODELS, out.latestImage);
+          const same = out.current && out.current.textModel === out.latestText && out.current.imageModel === out.latestImage;
+          setResult(card, 'ok', same
+            ? `Ya usás los más nuevos: ${out.latestText} e ${out.latestImage}.`
+            : `Encontré ${out.text.length} modelos de texto y ${out.image.length} de imágenes. Seleccioné los más nuevos (${out.latestText} e ${out.latestImage}); tocá Guardar para aplicarlos.`);
         } catch (error) {
           setResult(card, 'error', error.message);
         }

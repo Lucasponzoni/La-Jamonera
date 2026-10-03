@@ -220,29 +220,11 @@
 /* =========================================
    CARGA Y VACÍO
 ========================================= */
-.panel-spinner-wrap {
-  min-height: 150px;
-  display: grid;
-  place-items: center;
-}
-
-.panel-spinner {
+.informes-saving-spinner sl-spinner.meta-spinner-login {
   font-size: 40px;
   --indicator-color: var(--lj-accent);
   --track-color: var(--lj-border);
 }
-
-/* Spinners chicos dentro de avatares, adjuntos y alertas del panel */
-.panel-user-avatar sl-spinner.meta-spinner-login,
-.attachment-loader sl-spinner.meta-spinner-login,
-.informes-saving-spinner sl-spinner.meta-spinner-login {
-  width: auto;
-  height: auto;
-  font-size: 22px;
-  --indicator-color: var(--lj-accent);
-  --track-color: var(--lj-border);
-}
-.informes-saving-spinner sl-spinner.meta-spinner-login { font-size: 40px; }
 
 .panel-empty {
   min-height: 130px;
@@ -423,7 +405,6 @@
   justify-content: center;
 }
 
-.panel-avatar .panel-spinner { font-size: 16px; }
 
 /* =========================================
    RESPONSIVE
@@ -528,7 +509,6 @@ sl-dialog.panel-informe-modal { --width: min(920px, 96vw); }
 
 .panel-informe { grid-column: span 12; }
 .panel-informe > .panel-card-body { padding: 0; min-height: 64px; display: grid; align-items: center; }
-.panel-spinner.is-inline { font-size: 24px; margin: 0 auto; }
 
 .panel-informe-row {
   display: grid;
@@ -619,37 +599,54 @@ sl-dialog.panel-informe-modal { --width: min(920px, 96vw); }
   .panel-informe-actions sl-button[data-view-report]::part(label) { padding: 0 2px; }
 }
 
-/* ===== Esqueletos de carga ===== */
+/* ===== Esqueletos de carga =====
+   Usan las mismas clases que el contenido final (panel-metric, panel-informe-row, panel-pend-row,
+   panel-chart-canvas-wrap): mismas medidas, sin saltos cuando llegan los datos. */
 .panel-grid sl-skeleton,
 #ultimoInformeModal sl-skeleton {
   --border-radius: 4px;
-  --color: var(--lj-surface-2);
-  --sheen-color: var(--lj-border);
+  --color: color-mix(in srgb, var(--lj-text) 7%, var(--lj-surface));
+  --sheen-color: color-mix(in srgb, var(--lj-text) 13%, var(--lj-surface));
+  display: block;
 }
-.sk-line { height: 10px; }
-.sk-w30 { width: 30%; } .sk-w40 { width: 40%; } .sk-w50 { width: 50%; } .sk-w60 { width: 60%; } .sk-w70 { width: 70%; }
-.sk-num { width: 56px; height: 26px; }
-.sk-square { width: 36px; height: 36px; flex-shrink: 0; }
-.sk-circle { width: 32px; height: 32px; flex-shrink: 0; --border-radius: 50%; }
-.sk-btn { width: 112px; height: 30px; flex-shrink: 0; }
-.sk-tag { width: 42px; height: 18px; flex-shrink: 0; }
+.is-skeleton { pointer-events: none; }
+.sk-text { height: 11px; }
+.sk-text.sk-small { height: 9px; }
+.sk-icon { width: 26px; height: 26px; flex: 0 0 auto; }
+.sk-icon-lg { width: 36px; height: 36px; }
+.sk-value { width: 64px; height: 28px; margin: 2px 0; }
+.sk-tag { width: 58px; height: 20px; flex: 0 0 auto; }
+.sk-btn { width: 112px; height: 30px; }
+.sk-icon-btn { width: 30px; height: 30px; }
+.panel-grid sl-skeleton.sk-avatar-static { width: 34px; height: 34px; flex: 0 0 auto; --border-radius: 50%; }
 .sk-avatar, .sk-fill { position: absolute; inset: 0; width: 100%; height: 100%; }
-.sk-avatar { --border-radius: 50%; }
+.panel-grid sl-skeleton.sk-avatar { --border-radius: 50%; }
+.panel-metric.is-skeleton .panel-metric-top { min-height: 26px; }
+.panel-informe-text > sl-skeleton + sl-skeleton { margin-top: 5px; }
+.panel-pend-text > sl-skeleton + sl-skeleton { margin-top: 6px; }
+.panel-sk-tags { display: inline-flex; align-items: center; gap: 6px; }
+.panel-pend-row.is-skeleton { cursor: default; }
 
-.panel-sk-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.panel-sk-card {
-  display: grid; gap: 10px; padding: 14px;
-  background: var(--lj-surface); border: 1px solid var(--lj-border); border-radius: var(--lj-radius-lg);
+/* Gráfico: etiquetas a la izquierda, barras decrecientes y eje, como las barras horizontales reales. */
+.panel-sk-chart {
+  display: grid;
+  grid-template-rows: repeat(10, 1fr) 18px;
+  padding: 18px 28px 8px 8px;
+  row-gap: 10px;
 }
-.panel-sk-row { display: flex; align-items: center; gap: 12px; padding: 4px 0; }
-.panel-sk-text { flex: 1; display: grid; gap: 8px; min-width: 0; }
-.panel-sk-list { display: grid; gap: 12px; padding: 4px 0; }
-.panel-sk-bars { display: grid; gap: 14px; padding: 12px 4px; }
-.panel-sk-bar { display: grid; grid-template-columns: 120px 1fr; gap: 12px; align-items: center; }
-.sk-label { width: 100%; }
-.sk-bar { height: 18px; }
+.panel-sk-bar { display: grid; grid-template-columns: 150px 1fr; gap: 12px; align-items: center; }
+.panel-sk-bar > .sk-small { justify-self: end; }
+.panel-grid sl-skeleton.sk-bar { height: 100%; max-height: 22px; min-width: 6px; --border-radius: 2px; }
+.panel-sk-axis { margin-left: 162px; border-top: 1px solid var(--lj-border); }
 
 @media (max-width: 991px) {
-  .panel-sk-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .panel-sk-bar { grid-template-columns: 80px 1fr; }
+  .panel-sk-bar { grid-template-columns: 90px 1fr; }
+  .panel-sk-axis { margin-left: 102px; }
 }
+@media (max-width: 600px) {
+  .panel-informe-row.is-skeleton { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: none; }
+  .panel-informe-row.is-skeleton > .sk-tags-group { display: none; }
+  .panel-informe-row.is-skeleton > * { grid-area: auto; }
+  .panel-informe-row.is-skeleton .sk-btn { width: 84px; }
+}
+.panel-tag { gap: 5px; }

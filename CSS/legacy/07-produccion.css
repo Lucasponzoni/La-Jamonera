@@ -32,18 +32,7 @@
   white-space: nowrap;
 }
 
-/* Salida de Productos = acción principal (primary); el resto, default como en Ingredientes. */
-sl-button.produccion-dispatch-btn::part(base) {
-  background: var(--sl-color-primary-600);
-  border-color: var(--sl-color-primary-600);
-  color: #fff;
-}
-
-sl-button.produccion-dispatch-btn::part(base):hover {
-  background: var(--sl-color-primary-700);
-  border-color: var(--sl-color-primary-700);
-  color: #fff;
-}
+/* Salida de Productos = acción principal: variant="primary" en el HTML, al final de la barra. */
 
 .produccion-dispatch-head-actions {
   margin-left: auto;
@@ -847,8 +836,8 @@ sl-dialog.lj-alert-dialog:has(.produccion-recipe-history-alert.is-expanded) {
   line-height: 1.25;
 }
 
-.produccion-recipe-folder span {
-  margin-right: 5px;
+.produccion-recipe-folder > i {
+  margin-right: 6px;
 }
 
 .produccion-row-head {
@@ -1011,7 +1000,7 @@ sl-dialog.lj-alert-dialog:has(.produccion-recipe-history-alert.is-expanded) {
 
 
 
-.weekly-range-alert :is(.swal2-input, .swal2-select, .swal2-file) {
+.weekly-range-alert :is(.swal2-input, .swal2-select) {
   margin: 0 0 10px !important;
   width: 100% !important;
   max-width: 100% !important;
@@ -1047,8 +1036,8 @@ sl-dialog.lj-alert-dialog:has(.produccion-recipe-history-alert.is-expanded) {
   font-weight: 800;
 }
 
-.dispatch-client-alert :is(.swal2-input, .swal2-select, .swal2-file),
-.dispatch-vehicle-alert :is(.swal2-input, .swal2-select, .swal2-file) {
+.dispatch-client-alert :is(.swal2-input, .swal2-select),
+.dispatch-vehicle-alert :is(.swal2-input, .swal2-select) {
   margin: 0 0 10px !important;
   width: 100% !important;
   max-width: 100% !important;
@@ -1497,4 +1486,3 @@ sl-dialog.lj-alert-dialog:has(.produccion-recipe-history-alert.is-expanded) {
 
 
 /* La regla vieja pintaba caja sobre el host del sl-button: el color va en ::part(base). */
-sl-button.produccion-history-btn { background: none; border: 0; box-shadow: none; padding: 0; }

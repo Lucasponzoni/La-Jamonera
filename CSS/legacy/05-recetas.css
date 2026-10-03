@@ -497,6 +497,8 @@
   color: var(--lj-danger);
 }
 
+.recipe-nutrition-ai-stale > i { margin-right: 6px; }
+
 .recipe-nutrition-ai-stale {
   color: var(--lj-danger);
   font-weight: 700;
@@ -743,12 +745,6 @@
   color: var(--lj-muted);
 }
 
-.recipe-ai-static-gif {
-  width: 80px;
-  height: 80px;
-  object-fit: contain;
-  animation: none !important;
-}
 
 /* =========================================
    RECETAS · TARJETA NUTRICIONAL
@@ -1209,7 +1205,7 @@ sl-checkbox.recipe-related-picker-row::part(label) {
   gap: 10px;
 }
 
-.swal2-popup.produccion-secure-alert :is(.swal2-input, .swal2-file, .swal2-textarea, .swal2-select) {
+.swal2-popup.produccion-secure-alert :is(.swal2-input, .swal2-textarea, .swal2-select) {
   margin: 0;
   width: 100%;
 }

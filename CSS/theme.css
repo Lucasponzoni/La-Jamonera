@@ -1,17 +1,19 @@
 :root, .sl-theme-light {
-  --lj-bg: #f5f3ef; --lj-surface: #fffefc; --lj-surface-2: #f8f6f2; --lj-border: #e7e2d9; --lj-border-strong: #d8d1c4;
+  --lj-bg: #f5f3ef; --lj-surface: #ffffff; --lj-surface-2: #f4f6f9; --lj-border: #e1e5ec; --lj-border-strong: #cfd6e0;
   --lj-text: #1f2a44; --lj-muted: #55607f; --lj-brand: #173d73; --lj-accent: #1f5fbf; --lj-accent-soft: #eef3fc;
   --lj-success: #1f7a4c; --lj-success-soft: #e3f5ec; --lj-warning: #9a6200; --lj-warning-soft: #fff3dd;
   --lj-danger: #b42338; --lj-danger-soft: #ffecef; --lj-overlay: rgba(23, 34, 58, .35); --lj-shadow: 0 1px 2px rgba(23, 34, 58, .06);
   --lj-radius: 5px; --lj-radius-lg: 6px;
-  --lj-bg-tint: #f5f3ef; --lj-bg-dot: rgba(87, 72, 52, .17);
+  --lj-bg-grid: rgba(87, 72, 52, .07);
+  --lj-app-bg: #eef1f5; --lj-app-blob-1: rgba(31, 95, 191, .20); --lj-app-blob-2: rgba(120, 132, 152, .26); --lj-app-blob-3: rgba(70, 130, 220, .16); --lj-app-blob-4: rgba(150, 160, 178, .22);
 }
 .sl-theme-dark {
-  --lj-bg: #14120f; --lj-surface: #1d1a16; --lj-surface-2: #24201b; --lj-border: #2f2a23; --lj-border-strong: #3d362d;
+  --lj-bg: #121418; --lj-surface: #161a21; --lj-surface-2: #1c212a; --lj-border: #2a303b; --lj-border-strong: #374050;
   --lj-text: #e3e9f5; --lj-muted: #93a0bb; --lj-brand: #cddcff; --lj-accent: #6ea0ff; --lj-accent-soft: #16233d;
   --lj-success: #5fd39a; --lj-success-soft: #12301f; --lj-warning: #f2b75a; --lj-warning-soft: #33260f;
   --lj-danger: #ff8a9a; --lj-danger-soft: #3a1820; --lj-overlay: rgba(0, 0, 0, .55); --lj-shadow: none;
-  --lj-bg-tint: #14120f; --lj-bg-dot: rgba(255, 240, 220, .08);
+  --lj-bg-grid: rgba(255, 240, 220, .045);
+  --lj-app-bg: #0e1116; --lj-app-blob-1: rgba(60, 110, 210, .22); --lj-app-blob-2: rgba(120, 130, 150, .10); --lj-app-blob-3: rgba(40, 90, 180, .18); --lj-app-blob-4: rgba(100, 110, 130, .10);
 }
 :root {
   --sl-font-sans: Inter, "Segoe UI", Arial, sans-serif;
@@ -66,14 +68,14 @@ sl-dialog.lj-modal { --width: min(1140px, 96vw); }
 .sl-theme-dark .flatpickr-day.flatpickr-disabled { color: #4a5671; }
 
 /* Alertas (LJAlert / Swal) */
-sl-dialog.lj-alert-dialog { --width: 32rem; }
-sl-dialog.lj-alert-dialog::part(body) { padding: 20px 20px 18px; }
+sl-dialog.lj-alert-dialog { --width: 28rem; }
+sl-dialog.lj-alert-dialog::part(body) { padding: 20px 20px 16px; }
 .lj-alert { display: grid; gap: 12px; text-align: center; color: var(--lj-text); }
-.lj-alert-icon { display: flex; justify-content: center; font-size: 44px; line-height: 1; color: var(--lj-accent); }
+.lj-alert-icon { display: flex; justify-content: center; font-size: 36px; line-height: 1; color: var(--lj-accent); }
 .lj-alert-icon.is-success { color: var(--lj-success); }
 .lj-alert-icon.is-error { color: var(--lj-danger); }
 .lj-alert-icon.is-warning { color: var(--lj-warning); }
-.lj-alert-title { margin: 0; font-size: 18px; font-weight: 700; color: var(--lj-brand); }
+.lj-alert-title { margin: 0; font-size: 16px; line-height: 1.35; font-weight: 700; color: var(--lj-brand); }
 .lj-alert-html { text-align: left; font-size: 14px; line-height: 1.5; color: var(--lj-text); }
 .lj-alert-html:has(> p:only-child), .lj-alert-html:not(:has(*)) { text-align: center; }
 .lj-alert-validation { background: var(--lj-danger-soft); color: var(--lj-danger); padding: 8px 10px; border-radius: var(--lj-radius); text-align: left; font-size: 13px; }
@@ -123,8 +125,19 @@ sl-spinner.meta-spinner { font-size: 20px; }
 .thumb-loading sl-spinner, .attachment-loader sl-spinner { font-size: 22px; --track-width: 2px; }
 .modal-local-overlay sl-spinner { font-size: 48px; }
 sl-button sl-spinner, .report-notify-save-btn sl-spinner, .ai-format-btn sl-spinner { font-size: 18px; --track-width: 2px; }
-.lj-alert sl-spinner.meta-spinner-login, .informes-saving-spinner sl-spinner { font-size: 48px; }
-.informes-saving-spinner { display: flex; justify-content: center; padding: 8px 0; }
+.lj-alert sl-spinner.meta-spinner-login, .informes-saving-spinner sl-spinner { font-size: 32px; }
+.informes-saving-spinner { display: flex; justify-content: center; align-items: center; padding: 4px 0; }
+
+/* Alertas de "cargando" (sólo spinner + texto, sin botones): compactas y todo centrado. */
+sl-dialog.lj-alert-dialog:has(.informes-saving-spinner, .lj-alert-spinner):not(:has(.lj-alert-actions sl-button:not([hidden]))) { --width: 22rem; }
+.lj-alert-html:has(.informes-saving-spinner, > sl-spinner) {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+}
+.lj-alert-html:has(.informes-saving-spinner, > sl-spinner) p { margin: 0; font-size: 13px; color: var(--lj-muted); }
+.lj-alert-spinner { font-size: 32px; }
 
 /* El reset global "* { margin: 0 }" pisa el margen que Shoelace da a prefijos/sufijos vía ::slotted. */
 sl-input > [slot="prefix"], sl-select > [slot="prefix"] { margin-inline-start: var(--sl-input-spacing-medium); color: var(--lj-muted); }
@@ -160,3 +173,28 @@ sl-menu-item::part(checked-icon) { width: 8px; }
 
 /* Inputs nativos deshabilitados (flatpickr, datalist) con el mismo aspecto que sl-input disabled. */
 .lj-input:disabled { opacity: .6; cursor: not-allowed; background: var(--lj-surface-2); }
+
+/* Visores (LJAlert con ljModal): mismo aspecto que los modales del sitio */
+sl-dialog.lj-viewer-dialog { --width: min(960px, 96vw); }
+sl-dialog.lj-viewer-dialog::part(body) { padding: 16px 20px; overflow: auto; display: block; }
+sl-dialog.lj-viewer-dialog::part(footer) { display: block; }
+.lj-viewer-label { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.lj-viewer-label .lj-alert-title { font-size: 16px; text-align: left; line-height: 1.3; }
+.lj-viewer-tags { display: inline-flex; gap: 6px; flex-wrap: wrap; font-weight: 600; }
+.lj-alert.is-modal { text-align: left; gap: 14px; }
+.lj-alert.is-modal .lj-alert-html { text-align: left; }
+.lj-viewer-footer { justify-content: flex-end; margin: 0; }
+@media (max-width: 767.98px) {
+  sl-dialog.lj-viewer-dialog { --width: 100vw !important; }
+  sl-dialog.lj-viewer-dialog::part(body) { padding: 12px; }
+  .lj-viewer-footer sl-button { flex: 1 1 auto; }
+}
+.lj-doc-frame { display: block; width: 100%; height: min(72dvh, 900px); border: 1px solid var(--lj-border); border-radius: var(--lj-radius); background: #fff; }
+.lj-doc-image { display: block; max-width: 100%; max-height: 72dvh; margin: 0 auto; border-radius: var(--lj-radius); }
+.lj-doc-actions { display: flex; justify-content: flex-end; }
+.lj-alert-actions:empty { display: none; }
+.lj-alert .informes-saving-spinner { min-height: 0; padding: 6px 0 2px; }
+@media (max-width: 767.98px) {
+  .lj-viewer-label .lj-alert-title { font-size: 15px; flex: 1 1 100%; }
+  .lj-viewer-tags { font-size: 12px; }
+}

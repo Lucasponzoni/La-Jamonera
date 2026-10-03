@@ -251,14 +251,17 @@
   };
 
   const IMPORTANCE_LEVELS = [
-    { max: 14, label: 'Excelente 😄', tone: 'ok' },
-    { max: 28, label: 'Muy bueno 🙂', tone: 'ok' },
-    { max: 42, label: 'Bueno 😊', tone: 'normal' },
-    { max: 56, label: 'Normal 😐', tone: 'normal' },
-    { max: 70, label: 'Atención 😶', tone: 'warn' },
-    { max: 84, label: 'Importante ⚠️', tone: 'high' },
-    { max: 100, label: 'Muy importante 🚨', tone: 'critical' }
+    { max: 14, label: 'Excelente', icon: 'fa-circle-check', tone: 'ok' },
+    { max: 28, label: 'Muy bueno', icon: 'fa-thumbs-up', tone: 'ok' },
+    { max: 42, label: 'Bueno', icon: 'fa-thumbs-up', tone: 'normal' },
+    { max: 56, label: 'Normal', icon: 'fa-circle-minus', tone: 'normal' },
+    { max: 70, label: 'Atención', icon: 'fa-circle-exclamation', tone: 'warn' },
+    { max: 84, label: 'Importante', icon: 'fa-triangle-exclamation', tone: 'high' },
+    { max: 100, label: 'Muy importante', icon: 'fa-bell', tone: 'critical' }
   ];
+
+  // Ícono + texto del nivel (sin emojis), con separación propia.
+  const importanceLabelHtml = (meta) => `<span class="importance-label-inner"><i class="fa-solid ${meta.icon}" aria-hidden="true"></i><span>${meta.label}</span></span>`;
 
   const getImportanceMeta = (importanceValue) => {
     const value = normalizeImportance(importanceValue, 50);
@@ -1201,7 +1204,7 @@
           <div class="informe-row-main">
             <div class="informe-row-head">
               <h3 class="informe-row-title">${escapeHtml(title)}</h3>
-              <span class="importance-chip importance-${importance.tone}">${normalizeImportance(report.importance, 50)}% · ${importance.label}</span>
+              <span class="importance-chip importance-${importance.tone}">${normalizeImportance(report.importance, 50)}% · ${importanceLabelHtml(importance)}</span>
             </div>
             <p class="informe-row-sub">${escapeHtml(displayName)} · ${escapeHtml(user.position || report.userPosition || 'Sin puesto')}</p>
             ${excerpt ? `<p class="informe-row-excerpt">${escapeHtml(excerpt)}</p>` : ''}
@@ -1792,20 +1795,31 @@ REGLAS:
     let hasViewerChanges = false;
 
     await openIosSwal({
+      ljModal: true,
       title: 'Informe completo',
+      tags: (() => { const imp = getImportanceMeta(report.importance); return `<span class="importance-chip importance-${imp.tone}">${normalizeImportance(report.importance, 50)}% · ${importanceLabelHtml(imp)}</span><span class="informe-date-tag"><i class="fa-regular fa-calendar" aria-hidden="true"></i>${getDateLabel(report.createdAt)}</span>`; })(),
       width: 980,
       html: `
         <div class="report-viewer">
-          <div class="report-viewer-meta">
-            <div class="informe-data-block"><span>Creador</span><strong>${escapeHtml(report.userName || '')}</strong></div>
-            <div class="informe-data-block"><span>Puesto</span><strong>${escapeHtml(report.userPosition || '-')}</strong></div>
-            <div class="informe-data-block"><span>Email</span><strong>${escapeHtml(report.userEmail || '-')}</strong></div>
-            <div class="informe-data-block"><span>Fecha</span><strong>${getDateLabel(report.createdAt)}</strong></div>
-            <div class="informe-data-block"><span>Última actualización</span><strong>${lastUpdatedAt ? getDateLabel(lastUpdatedAt) : 'Sin actualizaciones'}</strong></div>
-            <div class="report-viewer-meta-actions">
-              <sl-button variant="warning" size="small" type="button" class="report-resend-btn" data-resend-report-email="1"><i slot="prefix" class="fa-regular fa-paper-plane"></i>Reenviar email</sl-button>
-            </div>
-          </div>
+          ${(() => {
+            const author = { ...(state.users[report.userId] || {}) };
+            author.fullName = author.fullName || report.userName || 'Usuario';
+            const position = author.position || report.userPosition || '';
+            const email = author.email || report.userEmail || '';
+            const sub = [position ? `<span>${escapeHtml(position)}</span>` : '', email ? `<a href="mailto:${escapeHtml(email)}" class="report-author-mail">${escapeHtml(email)}</a>` : ''].filter(Boolean).join('<span class="report-author-dot" aria-hidden="true">·</span>');
+            return `<div class="report-author-row">
+              ${renderUserAvatar(author)}
+              <div class="report-author-text">
+                <strong>${escapeHtml(author.fullName)}</strong>
+                <small>${sub || '<span>Sin puesto</span>'}</small>
+              </div>
+              <div class="report-author-meta">
+                <span><i class="fa-regular fa-calendar" aria-hidden="true"></i>Creado ${getDateLabel(report.createdAt)}</span>
+                <span><i class="fa-solid fa-pen" aria-hidden="true"></i>${lastUpdatedAt ? `Actualizado ${getDateLabel(lastUpdatedAt)}` : 'Sin actualizaciones'}</span>
+              </div>
+              <sl-button variant="default" size="small" type="button" class="report-resend-btn" data-resend-report-email="1" title="Reenviar informe por email" aria-label="Reenviar informe por email"><i slot="prefix" class="fa-regular fa-paper-plane"></i><span class="report-resend-label">Reenviar email</span></sl-button>
+            </div>`;
+          })()}
           <div class="report-viewer-content-wrap"><div class="report-viewer-content">${report.html || ''}</div></div>
           <div class="attachments-grid">${attachmentHtml}</div>
           <section class="report-comments-wrap">
@@ -1834,6 +1848,7 @@ REGLAS:
       `,
       confirmButtonText: 'Cerrar',
       didOpen: (popup) => {
+        prepareThumbLoaders('.report-author-row .js-user-photo');
         popup.querySelectorAll('.js-informe-viewer-image').forEach((img) => {
           const stop = () => {
             img.classList.add('is-loaded');
@@ -2060,7 +2075,7 @@ REGLAS:
         const updateEditImportanceLabel = () => {
           const meta = getImportanceMeta(editImportanceRange?.value);
           if (editImportanceLabel) {
-            editImportanceLabel.textContent = `${normalizeImportance(editImportanceRange?.value, 50)}% · ${meta.label}`;
+            editImportanceLabel.innerHTML = `${normalizeImportance(editImportanceRange?.value, 50)}% · ${importanceLabelHtml(meta)}`;
           }
         };
 
@@ -2732,7 +2747,7 @@ REGLAS:
 
   const updateImportanceLabel = () => {
     const meta = getImportanceMeta(getImportanceValue());
-    importanceLabel.textContent = meta.label;
+    importanceLabel.innerHTML = importanceLabelHtml(meta);
   };
 
   const EMOJIS = ['😀', '😁', '😂', '🤣', '😊', '🙂', '😉', '😍', '😘', '😎', '🤔', '😐', '😶', '🙄', '😢', '😭', '😡', '🤯', '🥳', '👍', '👎', '👏', '🙏', '💡', '🔥', '⚠️', '🚨', '✅', '❌', '🧪', '📌', '📎', '📅', '🧼', '🧫'];

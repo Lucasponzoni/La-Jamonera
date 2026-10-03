@@ -1102,6 +1102,7 @@
         }).join('')}
       </div>`;
     const result = await Swal.fire({
+      ljModal: true,
       title: `Recetas en "${group.name}"`,
       html,
       width: 640,
@@ -1424,7 +1425,7 @@
     const yieldLabel = [normalizeValue(recipe?.yieldQuantity), getPrintMeasureLabel(recipe?.yieldUnit)].filter(Boolean).join(' ');
     const metaItems = [
       ['Nombre comercial', commercialName || '-'],
-      ['Carpeta', groupLabel ? `📁 ${capitalize(groupLabel)}` : '📁 Sin carpeta'],
+      ['Carpeta', groupLabel ? capitalize(groupLabel) : 'Sin carpeta'],
       ['Rinde', yieldLabel || '-'],
       ['Vida util', normalizeValue(recipe?.shelfLifeDays) ? `${recipe.shelfLifeDays} dias` : '-'],
       ['Vencimiento extendido', recipe?.frozenShelfLifeExtension ? 'Por congelamiento a -18 grados' : 'No'],
@@ -2086,6 +2087,7 @@
     const sourceCanvasImage = await loadCanvasImage(sourceImage.dataUrl);
 
     const result = await openIosSwal({
+      ljModal: true,
       title: `Impresión · ${mode === 'nutrition' ? 'Tabla nutricional' : 'Etiquetado frontal'}`,
       width: 820,
       customClass: {
@@ -3415,7 +3417,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
         if (manualViewBtn) {
           const row = state.editor.rows.find((item) => item.id === manualViewBtn.dataset.monographyManualView);
           const manualUrl = normalizeValue(row?.manualUrl);
-          if (manualUrl) window.open(manualUrl, '_blank', 'noopener,noreferrer');
+          if (manualUrl) Swal.viewDocument(manualUrl, 'Manual (monografía)');
           return;
         }
 
@@ -4124,7 +4126,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
                 <span>Completar con IA</span>
               </sl-button>
               <p class="recipe-nutrition-ai-disclaimer">La IA trabaja sobre tus datos reales de receta. No inventa información nutricional: genera una propuesta de diseño editable para la gráfica.</p>
-              <span id="recipeNutritionAiStale" class="recipe-nutrition-ai-stale d-none">⚠️ Cambiaron datos: rehacé la tabla nutricional.</span>
+              <span id="recipeNutritionAiStale" class="recipe-nutrition-ai-stale d-none"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>Cambiaron datos: rehacé la tabla nutricional.</span>
               <div id="recipeNutritionAutofillRecommendation" class="recipe-nutrition-autofill-recommendation d-none" aria-live="polite"></div>
             </div>
             <div id="recipeNutritionAiPreview" class="recipe-nutrition-ai-preview"></div>
@@ -4585,7 +4587,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
     if (manualViewBtn) {
       const recipe = await ensureRecipeDetail(manualViewBtn.dataset.recetaManualView);
       const manualUrl = normalizeValue((Array.isArray(recipe?.rows) ? recipe.rows : []).find((row) => row.type === MONOGRAPHY_ROW_TYPE && normalizeValue(row.manualUrl))?.manualUrl);
-      if (manualUrl) window.open(manualUrl, '_blank', 'noopener,noreferrer');
+      if (manualUrl) await Swal.viewDocument(manualUrl, `Manual · ${capitalize(recipe?.title || 'Receta')}`);
       return;
     }
     const duplicateBtn = event.target.closest('[data-receta-duplicate]');

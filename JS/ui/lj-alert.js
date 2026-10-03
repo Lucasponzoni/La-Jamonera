@@ -1,6 +1,8 @@
 // Alertas sobre <sl-dialog> con la misma API de SweetAlert2 que usa el sitio.
 // window.Swal y window.LJAlert apuntan al mismo objeto, así las ~330 llamadas existentes
 // (Swal.fire / openIosSwal / openSwal / openPlanillaSwal) siguen funcionando sin reescribir su lógica.
+// Con { ljModal: true } el mismo fire() se muestra como modal (visor): encabezado con título,
+// tags y X, cuerpo con scroll, acciones en el pie a la derecha, cierre con clic afuera.
 (function ljAlert() {
   const ICONS = { success: 'check-circle', error: 'x-circle', warning: 'exclamation-triangle', info: 'info-circle', question: 'question-circle' };
   const DismissReason = Object.freeze({ cancel: 'cancel', backdrop: 'backdrop', close: 'close', esc: 'esc', timer: 'timer' });
@@ -37,10 +39,13 @@
     const { opts, popup } = state;
     const cc = opts.customClass || {};
     // Clases swal2-* además de las propias: el CSS de los módulos sigue apuntando a esa estructura.
-    popup.className = ['lj-alert', 'swal2-popup', ...String(cc.popup || '').split(/\s+/).filter(Boolean)].join(' ');
+    popup.className = ['lj-alert', 'swal2-popup', state.modal ? 'is-modal' : '', ...String(cc.popup || '').split(/\s+/).filter(Boolean)].filter(Boolean).join(' ');
     popup.replaceChildren();
+    state.labelEl?.remove();
+    state.footerEl?.remove();
+    state.labelEl = state.footerEl = null;
 
-    if (opts.icon && ICONS[opts.icon]) {
+    if (!state.modal && opts.icon && ICONS[opts.icon]) {
       const icon = document.createElement('div');
       icon.className = `lj-alert-icon swal2-icon is-${opts.icon}`;
       icon.innerHTML = `<sl-icon name="${ICONS[opts.icon]}"></sl-icon>`;
@@ -51,8 +56,21 @@
       title.className = ['lj-alert-title', 'swal2-title', cc.title].filter(Boolean).join(' ');
       title.id = `lj-alert-title-${state.id}`;
       setContent(title, opts.title);
-      popup.append(title);
       state.title = title;
+      if (state.modal) {
+        const label = document.createElement('div');
+        label.slot = 'label';
+        label.className = 'lj-viewer-label';
+        label.append(title);
+        if (opts.tags) {
+          const tags = document.createElement('span');
+          tags.className = 'lj-viewer-tags';
+          setContent(tags, opts.tags);
+          label.append(tags);
+        }
+        state.dialog.append(label);
+        state.labelEl = label;
+      } else popup.append(title);
     } else state.title = null;
 
     const html = document.createElement('div');
@@ -88,7 +106,10 @@
     const buttons = [];
     state.confirm = state.deny = state.cancel = null;
     if (opts.showConfirmButton !== false) {
-      state.confirm = makeButton('confirm', opts.confirmButtonText ?? 'OK', variantFrom(cc.confirmButton, 'primary'), extraClasses(cc.confirmButton));
+      const confirmText = opts.confirmButtonText ?? 'OK';
+      // En un visor, "Cerrar/OK" sólo cierra: botón neutro, no acción principal.
+      const closeOnly = state.modal && /^(cerrar|ok|aceptar|listo|volver)$/i.test(String(confirmText).trim());
+      state.confirm = makeButton('confirm', confirmText, closeOnly ? 'default' : variantFrom(cc.confirmButton, 'primary'), extraClasses(cc.confirmButton));
       buttons.push(state.confirm);
     }
     if (opts.showDenyButton) {
@@ -101,7 +122,14 @@
     }
     if (opts.reverseButtons) buttons.reverse();
     actions.append(...buttons);
-    if (buttons.length) popup.append(actions);
+    if (buttons.length && state.modal) {
+      // Pie fijo del modal: acciones a la derecha, la principal al final.
+      actions.slot = 'footer';
+      actions.classList.add('lj-viewer-footer');
+      if (!opts.reverseButtons) actions.append(...buttons.slice().reverse());
+      state.dialog.append(actions);
+      state.footerEl = actions;
+    } else if (buttons.length) popup.append(actions);
     state.actions = actions;
   };
 
@@ -178,18 +206,22 @@
 
     return new Promise((resolve) => {
       const dialog = document.createElement('sl-dialog');
-      dialog.className = 'lj-alert-dialog';
-      dialog.noHeader = true;
-      dialog.setAttribute('no-header', '');
+      const modal = Boolean(opts.ljModal);
+      dialog.className = modal ? 'lj-alert-dialog lj-modal lj-viewer-dialog' : 'lj-alert-dialog';
+      if (!modal) {
+        dialog.noHeader = true;
+        dialog.setAttribute('no-header', '');
+      }
       const width = opts.width;
       if (width != null && width !== '') dialog.style.setProperty('--width', typeof width === 'number' ? `${width}px` : String(width));
       const popup = document.createElement('div');
       dialog.append(popup);
-      const state = { id: Math.random().toString(36).slice(2, 8), dialog, popup, opts, resolve, done: false, loading: false };
+      const state = { id: Math.random().toString(36).slice(2, 8), dialog, popup, opts, resolve, done: false, loading: false, modal };
       render(state);
       if (state.title) dialog.label = state.title.textContent.trim();
 
-      popup.addEventListener('click', (event) => {
+      // En el dialog (no en el popup): en modo modal los botones viven en el slot footer.
+      dialog.addEventListener('click', (event) => {
         const btn = event.target.closest?.('[data-lj-alert-role]');
         if (!btn || btn.disabled) return;
         const role = btn.dataset.ljAlertRole;
@@ -285,6 +317,24 @@
     mixin(defaults = {}) {
       return { ...api, fire: (opts = {}) => fire({ ...defaults, ...opts, customClass: { ...(defaults.customClass || {}), ...(opts.customClass || {}) } }) };
     }
+  };
+
+  // Visor de documentos (PDF/manuales) en modal, con opción de abrir en pestaña nueva.
+  api.viewDocument = (url, title = 'Documento') => {
+    const safe = String(url || '').replace(/"/g, '&quot;');
+    const isImage = /\.(png|jpe?g|webp|gif)(\?|$)/i.test(String(url || ''));
+    const body = isImage
+      ? `<img class="lj-doc-image" src="${safe}" alt="">`
+      : `<iframe class="lj-doc-frame" src="${safe}" title="${String(title).replace(/"/g, '&quot;')}"></iframe>`;
+    return fire({
+      ljModal: true,
+      title,
+      width: 'min(1100px, 96vw)',
+      html: `${body}<div class="lj-doc-actions"><sl-button size="small" href="${safe}" target="_blank" rel="noopener noreferrer"><i slot="prefix" class="fa-solid fa-up-right-from-square" aria-hidden="true"></i>Abrir en pestaña nueva</sl-button></div>`,
+      showConfirmButton: true,
+      confirmButtonText: 'Cerrar',
+      customClass: { confirmButton: 'default' }
+    });
   };
 
   window.LJAlert = api;

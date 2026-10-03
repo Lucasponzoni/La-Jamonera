@@ -25,8 +25,7 @@
 }
 
 .swal2-popup.ios-alert.informes-alert sl-select,
-.swal2-popup.ios-alert.informes-alert sl-input,
-.swal2-popup.ios-alert.informes-alert .swal2-file {
+.swal2-popup.ios-alert.informes-alert sl-input {
   width: 100%;
   margin: 0 0 10px;
 }

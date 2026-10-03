@@ -1092,6 +1092,7 @@
     }
 
     await Swal.fire({
+      ljModal: true,
       title: `Planilla ${escapeHtml(registro.id || '')}`,
       html: `<div class="planilla-toolbar"><sl-button variant="default" type="button" id="planillaPrintBtn"><i slot="prefix" class="fa-solid fa-print"></i>Imprimir</sl-button></div>${printable.outerHTML}`,
       width: '98vw',

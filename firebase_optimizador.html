@@ -36,7 +36,7 @@
   <meta name="apple-mobile-web-app-title" content="La Jamonera">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Viga&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202608282255">
   <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202608282255">
@@ -108,8 +108,10 @@
       flex: 0 0 auto;
     }
     .optimizer-brand span {
-      font-family: "Viga", "Inter", sans-serif;
+      font-family: "Inter", sans-serif;
       font-size: 1.25rem;
+      color: var(--lj-brand);
+      letter-spacing: -0.01em;
       white-space: nowrap;
     }
     .optimizer-actions {
@@ -292,7 +294,7 @@
     <div class="optimizer-header-inner">
       <a class="optimizer-brand" href="./index.html" aria-label="Volver al panel">
         <img src="./IMG/La Jamonera Cerdito.webp" alt="La Jamonera">
-        <span>La Jamonera</span>
+        <span><span style="font-weight:400">La</span> <span style="font-weight:800">Jamonera</span></span>
       </a>
       <div class="optimizer-actions">
         <sl-button variant="default" href="./index.html">

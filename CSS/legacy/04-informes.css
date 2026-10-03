@@ -1015,32 +1015,6 @@ sl-button.informe-icon-btn.danger::part(base):hover {
   gap: 12px;
 }
 
-.report-viewer-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-  padding: 10px 12px;
-  border: 1px solid var(--lj-border);
-  border-radius: var(--lj-radius-lg);
-  background: var(--lj-surface-2);
-  font-size: 13px;
-}
-
-.report-viewer-meta p {
-  margin: 0;
-  color: var(--lj-text);
-}
-
-.report-viewer-meta strong {
-  color: var(--lj-muted);
-  font-weight: 600;
-}
-
-.report-viewer-meta-actions {
-  width: 100%;
-  display: flex;
-  justify-content: flex-end;
-}
 
 .report-viewer-content-wrap {
   overflow-x: auto;
@@ -1350,29 +1324,6 @@ sl-button.analisis-type-chip.active::part(base) {
   text-align: left;
 }
 
-.aq-detail-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.aq-detail-head .importance-chip {
-  margin-left: auto;
-}
-
-.aq-detail-icon {
-  font-size: 24px;
-  color: var(--lj-accent);
-}
-
-.aq-detail-title {
-  margin: 0;
-  font-size: 16px;
-  color: var(--lj-text);
-}
-
-.aq-detail-date,
 .aq-detail-empty {
   color: var(--lj-muted);
   font-size: 13px;
@@ -1380,12 +1331,6 @@ sl-button.analisis-type-chip.active::part(base) {
 
 .aq-detail-empty {
   margin: 0;
-}
-
-.aq-detail-chips {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
 }
 
 .aq-detail-content {
@@ -1844,24 +1789,6 @@ sl-button.informe-icon-btn.is-edit::part(base) {
   overflow-wrap: anywhere;
 }
 
-.report-viewer-meta {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 8px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.report-viewer-meta-actions {
-  grid-column: 1 / -1;
-}
-
-.aq-detail-chips {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 8px;
-}
 
 /* Modal: cabecera de usuarios plegable + acción principal */
 .informes-data > .informes-toolbar {
@@ -2002,4 +1929,45 @@ sl-button.analisis-type-chip[disabled] {
 
 sl-button.analisis-type-chip::part(prefix) {
   margin-right: 2px;
+}
+
+/* Nivel de importancia: ícono + texto (sin emojis) */
+.importance-label-inner { display: inline-flex; align-items: center; gap: 6px; }
+.importance-label-inner i { font-size: .95em; }
+.informe-date-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 22px; padding: 0 8px; border-radius: 4px;
+  background: var(--lj-surface-2); color: var(--lj-muted);
+  font-size: 12px; font-weight: 600;
+}
+
+/* Visor de informe: fila de autor compacta (como el modal del dashboard) */
+.report-author-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius-lg);
+  background: var(--lj-surface-2);
+  min-width: 0;
+}
+.report-author-row .user-avatar-thumb { width: 40px; height: 40px; min-width: 40px; font-size: 13px; }
+.report-author-text { display: grid; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.report-author-text strong { font-size: 14px; font-weight: 700; color: var(--lj-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.report-author-text small { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12.5px; color: var(--lj-muted); white-space: nowrap; overflow: hidden; }
+.report-author-text small > span { flex-shrink: 0; }
+.report-author-mail { color: var(--lj-accent); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.report-author-mail:hover { text-decoration: underline; }
+.report-author-meta { display: grid; gap: 2px; justify-items: end; flex-shrink: 0; font-size: 12px; color: var(--lj-muted); }
+.report-author-meta span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.report-author-meta i { font-size: 11px; }
+.report-author-dot { color: var(--lj-border-strong); }
+.report-author-row .report-resend-btn { flex-shrink: 0; }
+@media (max-width: 767.98px) {
+  .report-author-row { flex-wrap: wrap; }
+  .report-author-text { flex: 1 1 calc(100% - 56px); }
+  .report-author-meta { order: 3; flex: 1 1 100%; justify-items: start; gap: 4px; padding-left: 52px; }
+  .report-author-meta span { white-space: normal; }
+  .report-author-row .report-resend-btn { order: 4; flex: 1 1 100%; }
 }

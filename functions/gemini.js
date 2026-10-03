@@ -3,8 +3,8 @@
 // así el front no cambia de forma.
 const API = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-const DEFAULT_TEXT_MODEL = 'gemini-2.5-flash';
-const DEFAULT_IMAGE_MODEL = 'gemini-2.5-flash-image';
+const DEFAULT_TEXT_MODEL = 'gemini-3.8-flash';
+const DEFAULT_IMAGE_MODEL = 'gemini-3.1-flash-image';
 
 const str = (v) => String(v == null ? '' : v).trim();
 
@@ -58,8 +58,11 @@ async function callGemini({ apiKey, model, request, fetchImpl = fetch }) {
 
 async function chat({ apiKey, model = DEFAULT_TEXT_MODEL, body, fetchImpl }) {
   const request = toGeminiRequest(body);
-  // En Flash el "razonamiento" consume del límite de tokens y suma latencia: lo apagamos por defecto.
-  if (/flash/.test(model)) request.generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  // El "razonamiento" consume del límite de tokens y suma latencia: lo dejamos al mínimo.
+  // Gemini 3+ usa thinkingLevel (Flash no acepta 'minimal'); 2.5 Flash usa thinkingBudget 0.
+  const generation = Number((/^gemini-(\d+)/.exec(model) || [])[1] || 0);
+  if (generation >= 3) request.generationConfig.thinkingConfig = { thinkingLevel: 'low' };
+  else if (/flash/.test(model)) request.generationConfig.thinkingConfig = { thinkingBudget: 0 };
   const json = await callGemini({ apiKey, model, request, fetchImpl });
   return toChatResponse(json, model);
 }
@@ -82,10 +85,38 @@ async function image({ apiKey, model = DEFAULT_IMAGE_MODEL, prompt, fetchImpl })
   return { mimeType: img.inlineData.mimeType || 'image/png', data: img.inlineData.data, text: parts.map((p) => p.text || '').join(' ').trim() };
 }
 
+// Lista los modelos de la cuenta y los separa en texto e imágenes, del más nuevo al más viejo.
+// latest = el Flash estable (sin preview/lite) más nuevo de cada tipo.
+const EXCLUDE_TEXT = /(image|tts|transcribe|robotics|computer-use|omni|customtools|latest|embedding|aqa)/;
+const versionOf = (id) => Number((/^gemini-(\d+(?:\.\d+)?)/.exec(id) || [])[1] || 0);
+const byNewest = (a, b) => (b.version - a.version) || (a.preview - b.preview) || a.id.localeCompare(b.id);
+
+async function listModels({ apiKey, fetchImpl = fetch }) {
+  const res = await fetchImpl(`${API}?pageSize=200`, { headers: { 'x-goog-api-key': apiKey } });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const error = new Error((json.error && json.error.message) || `gemini_${res.status}`);
+    error.status = res.status;
+    throw error;
+  }
+  const all = (json.models || [])
+    .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
+    .map((m) => {
+      const id = str(m.name).replace(/^models\//, '');
+      return { id, name: str(m.displayName) || id, version: versionOf(id), preview: /preview|exp/.test(id) ? 1 : 0 };
+    })
+    .filter((m) => m.id.startsWith('gemini-'));
+  const text = all.filter((m) => !EXCLUDE_TEXT.test(m.id)).sort(byNewest);
+  const image = all.filter((m) => /-image/.test(m.id)).sort(byNewest);
+  const latestText = (text.find((m) => /^gemini-[\d.]+-flash$/.test(m.id)) || text[0] || {}).id || '';
+  const latestImage = (image.find((m) => /^gemini-[\d.]+-flash-image$/.test(m.id)) || image[0] || {}).id || '';
+  return { text, image, latestText, latestImage };
+}
+
 const maskKey = (key) => {
   const k = str(key);
   if (!k) return '';
   return k.length <= 8 ? '••••' : `${k.slice(0, 4)}••••••${k.slice(-4)}`;
 };
 
-module.exports = { DEFAULT_TEXT_MODEL, DEFAULT_IMAGE_MODEL, toGeminiRequest, toChatResponse, chat, image, maskKey };
+module.exports = { DEFAULT_TEXT_MODEL, DEFAULT_IMAGE_MODEL, toGeminiRequest, toChatResponse, chat, image, listModels, maskKey };

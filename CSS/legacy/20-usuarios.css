@@ -310,3 +310,26 @@ sl-alert.lj-notify.type-info::part(icon) { color: var(--lj-accent); }
     max-width: none !important;
   }
 }
+
+/* =========================================
+   Usuarios · filas compactas como Recetas
+========================================= */
+#usersManagerModal .users-manager-card { padding: 10px 12px; gap: 12px; min-height: 64px; }
+#usersManagerModal .users-manager-card-main { grid-template-columns: 44px minmax(0, 1fr); gap: 12px; align-items: center; }
+#usersManagerModal .users-manager-card .user-avatar-thumb { width: 44px; height: 44px; min-width: 44px; font-size: 14px; }
+#usersManagerModal .users-manager-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+#usersManagerModal .users-manager-card-info h6 { margin: 0; font-size: 14.5px; font-weight: 700; color: var(--lj-text); }
+#usersManagerModal .users-role-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 22px; margin: 0; padding: 0 8px;
+  border-radius: 4px; background: var(--lj-accent-soft); color: var(--lj-accent);
+  font-size: 12px; font-weight: 600; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+}
+#usersManagerModal .users-role-tag i { font-size: 11px; }
+#usersManagerModal .users-manager-card-email { margin: 4px 0 0; display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--lj-muted); min-width: 0; }
+#usersManagerModal .users-manager-card-noemail { font-style: italic; }
+#usersManagerModal .users-manager-card-actions { flex-direction: row; gap: 6px; }
+@media (max-width: 575.98px) {
+  #usersManagerModal .users-manager-card { grid-template-columns: minmax(0, 1fr); }
+  #usersManagerModal .users-manager-card-actions { justify-content: flex-end; }
+}

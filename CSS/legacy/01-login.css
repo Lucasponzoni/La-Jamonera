@@ -2,16 +2,18 @@
    LOGIN · panel de marca + formulario
 ========================================= */
 .view-login {
-  --login-panel-bg: #173d73;
+  --login-panel-bg: #1b4785;
+  --login-panel-hi: rgba(110, 160, 255, .35);
+  --login-panel-lo: #0f2a52;
   position: relative;
   min-height: 100dvh;
   padding: 56px 16px 64px;
   display: grid;
   place-items: center;
-  background: transparent; /* se ve el fondo con puntos del body */
+  background: transparent; /* se ve el cuadriculado del body */
 }
 
-.sl-theme-dark .view-login { --login-panel-bg: #13233f; }
+.sl-theme-dark .view-login { --login-panel-bg: #172c4f; --login-panel-hi: rgba(110, 160, 255, .18); --login-panel-lo: #0a1426; }
 
 .login-theme { position: absolute; top: 14px; right: 16px; }
 
@@ -36,8 +38,10 @@
   padding: 40px 36px 28px;
   color: #fff;
   background-color: var(--login-panel-bg);
-  background-image: radial-gradient(circle, rgba(255, 255, 255, .09) 1.1px, transparent 1.6px);
-  background-size: 16px 16px;
+  /* Degradado azul (sin cuadriculado): más claro arriba a la izquierda, profundo abajo. */
+  background-image:
+    radial-gradient(120% 90% at 0% 0%, var(--login-panel-hi) 0%, transparent 60%),
+    linear-gradient(160deg, var(--login-panel-bg) 0%, var(--login-panel-lo) 100%);
 }
 
 .login-panel-brand { display: grid; gap: 6px; }
