@@ -17,12 +17,16 @@
     search: document.getElementById('usersManagerSearch'),
     filter: document.getElementById('usersManagerPositionFilter'),
     count: document.getElementById('usersManagerCount'),
-    createBtn: document.getElementById('usersManagerCreateBtn')
+    createBtn: document.getElementById('usersManagerCreateBtn'),
+    templateBtn: document.getElementById('usersManagerTemplateBtn')
   };
 
   const USER_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
-  const state = { users: {}, search: '', position: '', selectedId: '', usage: null, mobileDetail: false };
+  const state = { users: {}, search: '', position: '', selectedId: '', usage: null, mobileDetail: false, me: null, access: {} };
+  // Acceso al sistema (login, rol y permisos): sólo con backend Supabase y para administradores.
+  const SUPABASE = window.LJ_BACKEND === 'supabase';
+  const isAdmin = () => SUPABASE && Boolean(state.me?.admin);
 
   const safeObject = (value) => (value && typeof value === 'object' ? value : {});
   const normalizeValue = (value) => String(value || '').trim();
@@ -137,6 +141,277 @@
     }
   };
 
+  // --- Acceso al sistema (Supabase) ---
+  const ADMIN_ERRORS = {
+    ya_tiene_acceso: 'Esta persona ya tiene acceso al sistema.',
+    email_invalido: 'La persona necesita un email válido para tener login.',
+    email_de_otra_persona: 'Ese email ya es el login de otra persona.',
+    ultimo_admin: 'No se puede: es el único administrador activo.',
+    no_podes_quitarte_admin: 'No podés quitarte el rol de administrador a vos mismo.',
+    no_podes_desactivarte: 'No podés desactivar tu propio usuario.',
+    email_key_missing: 'Falta configurar Resend (Configuración → Correo) para enviar invitaciones.',
+    email_config_incomplete: 'Falta el remitente de Resend (Configuración → Correo).',
+    password_corta: 'La contraseña temporal tiene que tener al menos 8 caracteres.',
+    admin_required: 'Sólo un administrador puede hacer esto.'
+  };
+  const adminApi = async (action, body = {}) => {
+    const redirectTo = `${location.origin}${location.pathname.replace(/[^/]*$/, '')}login.html`;
+    const res = await window.laJamoneraProxy.postJson('/admin-users', { action, redirectTo, ...body });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.ok === false) throw new Error(ADMIN_ERRORS[json.error] || json.error || `Error ${res.status}`);
+    return json;
+  };
+  const loadAccess = async () => {
+    state.access = {};
+    if (!SUPABASE) return;
+    state.me = await window.LJMe;
+    if (nodes.templateBtn) nodes.templateBtn.hidden = !isAdmin();
+    if (!isAdmin()) return;
+    const out = await adminApi('list');
+    (out.personas || []).forEach((p) => { state.access[p.id] = p; });
+  };
+  const ROLE_LABEL = { admin: 'Administrador', empleado: 'Empleado' };
+  const accessOf = (user) => state.access[user.id] || null;
+  const accessState = (a) => {
+    if (!a || a.acceso !== 'login' || !a.login) return { kind: 'interno', label: 'Uso interno', tone: 'tone-neu' };
+    if (!a.login.activo || a.login.baneado) return { kind: 'off', label: 'Desactivado', tone: 'tone-danger' };
+    if (a.invitacion_estado === 'pendiente' && !a.login.lastSignInAt) return { kind: 'pending', label: 'Invitación pendiente', tone: 'tone-warn' };
+    return { kind: 'on', label: 'Activo', tone: 'tone-ok' };
+  };
+  const listAccessTag = (user) => {
+    if (!isAdmin()) return '';
+    const a = accessOf(user);
+    if (!a || a.acceso !== 'login' || !a.login) return '';
+    const role = ROLE_LABEL[a.login.role] || 'Empleado';
+    return `<span class="users-login-dot" title="Login · ${escapeHtml(role)}" aria-label="Tiene login (${escapeHtml(role)})"><i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i></span>`;
+  };
+  const fmtDateTime = (iso) => (iso ? new Date(iso).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '');
+  const accessSectionHtml = (user) => {
+    if (!isAdmin()) return '';
+    const a = accessOf(user);
+    const st = accessState(a);
+    if (st.kind === 'interno') {
+      return `<section class="recetas-detail-section users-access">
+        <h4 class="recetas-detail-title"><i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i>Acceso al sistema</h4>
+        <div class="users-access-row">
+          <span class="recetas-tag tone-neu">Uso interno</span>
+          <p class="users-muted">Aparece en planillas y firma con su clave, pero no entra al sistema.</p>
+          <sl-button size="small" variant="primary" data-access-grant><i slot="prefix" class="fa-solid fa-key"></i>Dar acceso al sistema</sl-button>
+        </div>
+      </section>`;
+    }
+    const l = a.login;
+    const isAdminRole = l.role === 'admin';
+    const self = l.userId === state.me?.uid;
+    return `<section class="recetas-detail-section users-access">
+      <h4 class="recetas-detail-title"><i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i>Acceso al sistema</h4>
+      <div class="users-access-head">
+        <span class="recetas-tag tone-info">Login · ${escapeHtml(ROLE_LABEL[l.role] || 'Empleado')}</span>
+        <span class="recetas-tag ${st.tone}">${escapeHtml(st.label)}</span>
+        <small class="users-muted">${l.lastSignInAt ? `Último ingreso ${escapeHtml(fmtDateTime(l.lastSignInAt))}` : 'Todavía no ingresó'}${l.email ? ` · ${escapeHtml(l.email)}` : ''}</small>
+      </div>
+      <div class="users-access-grid">
+        <sl-select size="small" label="Rol" data-access-role value="${escapeHtml(l.role || 'empleado')}" ${self ? 'disabled help-text="No podés cambiar tu propio rol."' : ''} hoist>
+          <sl-option value="empleado">Empleado</sl-option>
+          <sl-option value="admin">Administrador</sl-option>
+        </sl-select>
+        <div class="users-access-perms">
+          <sl-switch size="small" data-access-perm="editar" ${l.puedeEditar ? 'checked' : ''} ${isAdminRole ? 'disabled' : ''}>Puede editar registros guardados</sl-switch>
+          <sl-switch size="small" data-access-perm="borrar" ${l.puedeBorrar ? 'checked' : ''} ${isAdminRole ? 'disabled' : ''}>Puede borrar registros</sl-switch>
+          <small class="users-muted">${isAdminRole ? 'El administrador tiene todos los permisos.' : 'Siempre puede ver y crear (producir, ingresar stock, repartos, informes).'}</small>
+        </div>
+      </div>
+      <div class="users-access-actions">
+        ${st.kind === 'pending' ? '<sl-button size="small" variant="default" data-access-resend><i slot="prefix" class="fa-solid fa-paper-plane"></i>Reenviar invitación</sl-button>' : ''}
+        <sl-dropdown hoist placement="bottom-start">
+          <sl-button slot="trigger" size="small" variant="default" caret><i slot="prefix" class="fa-solid fa-unlock-keyhole"></i>Contraseña</sl-button>
+          <sl-menu>
+            <sl-menu-item value="reset-link"><i slot="prefix" class="fa-solid fa-envelope"></i>Enviar link para cambiarla</sl-menu-item>
+            <sl-menu-item value="reset-temp"><i slot="prefix" class="fa-solid fa-key"></i>Generar contraseña temporal</sl-menu-item>
+          </sl-menu>
+        </sl-dropdown>
+        ${self ? '' : (st.kind === 'off'
+          ? '<sl-button size="small" variant="success" data-access-active="true"><i slot="prefix" class="fa-solid fa-user-check"></i>Reactivar acceso</sl-button>'
+          : '<sl-button size="small" variant="default" class="users-access-off" data-access-active="false"><i slot="prefix" class="fa-solid fa-user-slash"></i>Quitar acceso</sl-button>')}
+      </div>
+    </section>`;
+  };
+
+  const showTempPassword = (pass, nombre) => openIosSwal({
+    title: 'Contraseña temporal',
+    html: `<p>Pasale esta contraseña a <strong>${escapeHtml(nombre)}</strong>. Se muestra una sola vez; al entrar va a tener que elegir una nueva.</p>
+      <sl-input readonly value="${escapeHtml(pass)}" class="users-temp-pass"><sl-copy-button slot="suffix" value="${escapeHtml(pass)}"></sl-copy-button></sl-input>`,
+    confirmButtonText: 'Listo'
+  });
+
+  const grantAccessDialog = async (user) => {
+    if (!normalizeValue(user.email)) {
+      await openIosSwal({ title: 'Falta el email', html: '<p>Cargá el email de la persona antes de darle acceso.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
+      return;
+    }
+    const res = await openIosSwal({
+      title: 'Dar acceso al sistema',
+      html: `<div class="users-grant-form">
+        <p>${escapeHtml(user.fullName)} va a entrar con <strong>${escapeHtml(user.email)}</strong>.</p>
+        <sl-select id="grantRole" label="Rol" value="empleado" hoist>
+          <sl-option value="empleado">Empleado: usa los módulos, sin claves ni usuarios</sl-option>
+          <sl-option value="admin">Administrador: todo, incluidas claves y usuarios</sl-option>
+        </sl-select>
+        <div class="users-access-perms" id="grantPerms">
+          <sl-switch id="grantEdit" checked>Puede editar registros guardados</sl-switch>
+          <sl-switch id="grantDelete">Puede borrar registros</sl-switch>
+        </div>
+        <sl-radio-group id="grantMode" label="Forma de alta" value="invite">
+          <sl-radio value="invite">Invitación por email (elige su contraseña)</sl-radio>
+          <sl-radio value="password">Contraseña temporal (se la pasás vos)</sl-radio>
+        </sl-radio-group>
+      </div>`,
+      showCancelButton: true,
+      confirmButtonText: 'Dar acceso',
+      cancelButtonText: 'Cancelar',
+      didOpen: () => {
+        const role = document.getElementById('grantRole');
+        role.addEventListener('sl-change', () => { document.getElementById('grantPerms').hidden = role.value === 'admin'; });
+      },
+      preConfirm: async () => {
+        const body = {
+          personaId: user.id,
+          role: document.getElementById('grantRole').value || 'empleado',
+          puedeEditar: document.getElementById('grantEdit').checked,
+          puedeBorrar: document.getElementById('grantDelete').checked,
+          mode: document.getElementById('grantMode').value || 'invite'
+        };
+        try { return await adminApi('grantAccess', body); } catch (error) { Swal.showValidationMessage(error.message); return false; }
+      }
+    });
+    if (!res.isConfirmed) return;
+    if (res.value?.tempPassword) await showTempPassword(res.value.tempPassword, user.fullName);
+    else notify('success', 'Invitación enviada', `${user.fullName} va a recibir un email para activar su cuenta.`);
+    await loadAccess();
+    renderList();
+    renderDetail();
+  };
+
+  const runAccessAction = async (user, fn, okTitle) => {
+    try {
+      const out = await fn();
+      if (okTitle) notify('success', okTitle, user.fullName);
+      await loadAccess();
+      renderList();
+      renderDetail();
+      return out;
+    } catch (error) {
+      notify('error', 'No se pudo completar', error.message);
+      renderDetail();
+      return null;
+    }
+  };
+
+  // --- Plantilla de invitación (vista interna, sólo admin) ---
+  const SAMPLE_VARS = { nombre: 'Juan Pérez', email: 'juan@empresa.com', rol: 'Empleado', empresa: 'La Jamonera', link: '#', vence: 'mañana 18:00', remitente: 'La Jamonera' };
+  const renderSample = (tpl) => String(tpl || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => escapeHtml(SAMPLE_VARS[k] ?? m));
+  const openTemplateEditor = async () => {
+    nodes.editor.innerHTML = '<div class="informes-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando plantilla"></sl-spinner></div>';
+    showEditor(true);
+    let tpl;
+    try { tpl = await adminApi('getTemplate'); } catch (error) { notify('error', 'No se pudo cargar la plantilla', error.message); closeEditor(); return; }
+    const vars = tpl.variables || Object.keys(SAMPLE_VARS);
+    nodes.editor.innerHTML = `
+      <header class="users-editor-head">
+        <sl-button variant="default" size="small" data-editor-back><i slot="prefix" class="fa-solid fa-arrow-left"></i>Volver</sl-button>
+        <div><h3>Plantilla de invitación</h3><p>El correo que reciben las personas a las que les das acceso.</p></div>
+      </header>
+      <div class="users-tpl">
+        <div class="users-tpl-edit">
+          <sl-input name="asunto" label="Asunto" value="${escapeHtml(tpl.asunto || '')}"></sl-input>
+          <div class="users-tpl-vars"><span class="users-muted">Variables</span>${vars.map((v) => `<sl-button size="small" variant="default" data-tpl-var="${escapeHtml(v)}">{{${escapeHtml(v)}}}</sl-button>`).join('')}</div>
+          <label class="lj-label" for="usersTplHtml">HTML del correo</label>
+          <textarea id="usersTplHtml" class="users-tpl-code" spellcheck="false"></textarea>
+          <p class="users-editor-error" role="alert" hidden></p>
+        </div>
+        <div class="users-tpl-preview">
+          <span class="lj-label">Vista previa</span>
+          <p class="users-tpl-subject" data-tpl-subject></p>
+          <iframe class="users-tpl-frame" sandbox="" title="Vista previa del correo"></iframe>
+        </div>
+      </div>
+      <footer class="users-editor-footer">
+        <sl-button variant="default" data-tpl-restore><i slot="prefix" class="fa-solid fa-rotate-left"></i>Restaurar por defecto</sl-button>
+        <sl-button variant="default" data-tpl-test><i slot="prefix" class="fa-solid fa-paper-plane"></i>Enviar prueba</sl-button>
+        <sl-button variant="primary" data-tpl-save><i slot="prefix" class="fa-solid fa-floppy-disk"></i>Guardar</sl-button>
+      </footer>`;
+    const code = nodes.editor.querySelector('#usersTplHtml');
+    code.value = tpl.html || '';
+    const subject = nodes.editor.querySelector('[name="asunto"]');
+    const frame = nodes.editor.querySelector('.users-tpl-frame');
+    const subjectOut = nodes.editor.querySelector('[data-tpl-subject]');
+    const errorEl = nodes.editor.querySelector('.users-editor-error');
+    const setError = (msg) => { errorEl.hidden = !msg; errorEl.textContent = msg || ''; };
+    let timer = null;
+    const paint = () => {
+      frame.srcdoc = renderSample(code.value);
+      subjectOut.textContent = renderSample(subject.value).replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+    };
+    const schedule = () => { clearTimeout(timer); timer = setTimeout(paint, 200); };
+    code.addEventListener('input', schedule);
+    subject.addEventListener('sl-input', schedule);
+    paint();
+    let lastFocus = code;
+    code.addEventListener('focus', () => { lastFocus = code; });
+    subject.addEventListener('sl-focus', () => { lastFocus = subject; });
+    nodes.editor.querySelectorAll('[data-tpl-var]').forEach((b) => b.addEventListener('click', () => {
+      const token = `{{${b.dataset.tplVar}}}`;
+      if (lastFocus === code) {
+        const { selectionStart: a, selectionEnd: z, value } = code;
+        code.value = value.slice(0, a) + token + value.slice(z);
+        code.selectionStart = a + token.length;
+        code.selectionEnd = a + token.length;
+        code.focus();
+      } else {
+        subject.value = `${subject.value}${token}`;
+      }
+      schedule();
+    }));
+    const validate = () => {
+      if (!normalizeValue(subject.value)) return 'Escribí el asunto.';
+      if (!/\{\{\s*link\s*\}\}/.test(code.value)) return 'La plantilla tiene que incluir {{link}} (el botón para activar la cuenta).';
+      return '';
+    };
+    const withBusy = async (btn, fn) => { btn.loading = true; try { await fn(); } finally { btn.loading = false; } };
+    nodes.editor.querySelectorAll('[data-editor-back]').forEach((b) => b.addEventListener('click', () => closeEditor(state.selectedId)));
+    nodes.editor.querySelector('[data-tpl-save]').addEventListener('click', (e) => withBusy(e.currentTarget, async () => {
+      const msg = validate(); setError(msg); if (msg) return;
+      try {
+        const out = await adminApi('saveTemplate', { asunto: subject.value, html: code.value });
+        code.value = out.html;
+        paint();
+        notify('success', 'Plantilla guardada', 'Las próximas invitaciones usan este diseño.');
+      } catch (error) { setError(error.message); }
+    }));
+    nodes.editor.querySelector('[data-tpl-test]').addEventListener('click', (e) => withBusy(e.currentTarget, async () => {
+      const msg = validate(); setError(msg); if (msg) return;
+      try {
+        const out = await adminApi('testTemplate', { asunto: subject.value, html: code.value });
+        notify('success', 'Prueba enviada', `Revisá ${out.to || 'tu correo'}.`);
+      } catch (error) { setError(error.message); }
+    }));
+    nodes.editor.querySelector('[data-tpl-restore]').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      const ok = await openIosSwal({ title: 'Restaurar plantilla', html: '<p>Se vuelve al diseño original y se pierden los cambios guardados.</p>', icon: 'warning', showCancelButton: true, confirmButtonText: 'Restaurar', cancelButtonText: 'Cancelar' });
+      if (!ok.isConfirmed) return;
+      await withBusy(btn, async () => {
+        try {
+          const out = await adminApi('restoreTemplate');
+          subject.value = out.asunto;
+          code.value = out.html;
+          paint();
+          setError('');
+          notify('success', 'Plantilla restaurada', '');
+        } catch (error) { setError(error.message); }
+      });
+    });
+  };
+
   // --- Render ---
   const renderFilter = () => {
     if (!nodes.filter) return;
@@ -171,6 +446,7 @@
           <small title="${escapeHtml(u.email || '')}">${u.email ? escapeHtml(u.email) : 'Sin email'}</small>
         </span>
         <span class="recetas-tag tone-neu users-item-tag">${escapeHtml(u.position || 'Sin puesto')}</span>
+        ${listAccessTag(u)}
       </button>`;
     }).join('');
     initPhotos(nodes.list);
@@ -221,12 +497,13 @@
       <dl class="users-facts">
         <div><dt><i class="fa-regular fa-envelope" aria-hidden="true"></i>Email</dt><dd>${email ? `<a href="mailto:${escapeHtml(email)}" title="${escapeHtml(email)}">${escapeHtml(email)}</a>` : '<span class="users-muted">Sin email</span>'}</dd></div>
         <div><dt><i class="fa-solid fa-phone" aria-hidden="true"></i>Teléfono</dt><dd>${phone ? `<a href="tel:${escapeHtml(phone.replace(/[^\d+]/g, ''))}">${escapeHtml(phone)}</a>` : '<span class="users-muted">Sin teléfono</span>'}</dd></div>
-        <div><dt><i class="fa-solid fa-lock" aria-hidden="true"></i>Clave</dt><dd>${user.pin ? 'Configurada (4 dígitos)' : '<span class="users-muted">Sin clave</span>'}</dd></div>
+        <div><dt><i class="fa-solid fa-lock" aria-hidden="true"></i>Clave</dt><dd>${window.ljPinIsSet(user) ? 'Configurada (4 dígitos)' : '<span class="users-muted">Sin clave</span>'}</dd></div>
       </dl>
       <section class="recetas-detail-section">
         <h4 class="recetas-detail-title"><i class="fa-solid fa-chart-simple" aria-hidden="true"></i>Uso</h4>
         ${usageHtml(user)}
-      </section>`;
+      </section>
+      ${accessSectionHtml(user)}`;
     initPhotos(nodes.detail);
   };
 
@@ -251,16 +528,16 @@
   };
 
   const askPin = async (user, title) => {
-    if (!normalizeValue(user.pin)) return true;
+    if (!window.ljPinIsSet(user)) return true;
     const auth = await openIosSwal({
       title,
       html: `<p>Ingresá la clave de 4 dígitos de <strong>${escapeHtml(user.fullName)}</strong>.</p><sl-input id="usersPinCheck" type="password" password-toggle inputmode="numeric" maxlength="4" autocomplete="off" placeholder="Clave" label="Clave"></sl-input>`,
       showCancelButton: true,
       confirmButtonText: 'Continuar',
       cancelButtonText: 'Cancelar',
-      preConfirm: () => {
+      preConfirm: async () => {
         const pin = normalizeValue(document.getElementById('usersPinCheck')?.value);
-        if (pin !== String(user.pin || '')) return Swal.showValidationMessage('Clave incorrecta.');
+        if (!(await window.ljVerifyPin(user, pin))) return Swal.showValidationMessage('Clave incorrecta.');
         return true;
       }
     });
@@ -298,8 +575,29 @@
           </div>
           <sl-input name="email" type="email" label="Email" required autocomplete="off" placeholder="usuario@empresa.com" value="${escapeHtml(initial?.email || '')}"></sl-input>
           <sl-input name="phone" type="tel" label="Teléfono (opcional)" autocomplete="off" placeholder="Ej: 341 555-1234" value="${escapeHtml(initial?.phone || '')}"></sl-input>
-          <sl-input name="pin" type="password" password-toggle label="Clave de 4 dígitos" required inputmode="numeric" maxlength="4" autocomplete="new-password" placeholder="4 dígitos" help-text="Se pide para editar o eliminar este usuario." value="${escapeHtml(initial?.pin || '')}"></sl-input>
+          <sl-input name="pin" type="password" password-toggle label="Clave de 4 dígitos" required inputmode="numeric" maxlength="4" autocomplete="new-password" placeholder="${escapeHtml(window.ljPinPlaceholder(initial))}" help-text="Se pide para editar o eliminar este usuario." value="${escapeHtml(window.ljPinFieldValue(initial))}"></sl-input>
         </div>
+        ${!initial && isAdmin() ? `<fieldset class="users-editor-access">
+          <legend>Acceso al sistema</legend>
+          <sl-radio-group name="acceso" value="interno">
+            <sl-radio value="interno">Uso interno (no entra al sistema)</sl-radio>
+            <sl-radio value="login">Con login</sl-radio>
+          </sl-radio-group>
+          <div class="users-editor-login" hidden>
+            <sl-select name="role" label="Rol" value="empleado" hoist>
+              <sl-option value="empleado">Empleado</sl-option>
+              <sl-option value="admin">Administrador</sl-option>
+            </sl-select>
+            <div class="users-access-perms" data-perms>
+              <sl-switch name="puedeEditar" checked>Puede editar registros guardados</sl-switch>
+              <sl-switch name="puedeBorrar">Puede borrar registros</sl-switch>
+            </div>
+            <sl-radio-group name="mode" label="Forma de alta" value="invite">
+              <sl-radio value="invite">Invitación por email</sl-radio>
+              <sl-radio value="password">Contraseña temporal</sl-radio>
+            </sl-radio-group>
+          </div>
+        </fieldset>` : ''}
         <p class="users-editor-error" role="alert" hidden></p>
         <footer class="users-editor-footer">
           <sl-button variant="default" data-editor-back>Cancelar</sl-button>
@@ -326,6 +624,13 @@
       preview.innerHTML = initialsFromName(name) ? escapeHtml(initialsFromName(name)) : '<i class="fa-solid fa-user" aria-hidden="true"></i>';
     };
     paintPreview(photoUrl);
+    const accesoGroup = form.querySelector('[name="acceso"]');
+    if (accesoGroup) {
+      const loginBox = form.querySelector('.users-editor-login');
+      const roleSel = form.querySelector('[name="role"]');
+      accesoGroup.addEventListener('sl-change', () => { loginBox.hidden = accesoGroup.value !== 'login'; });
+      roleSel.addEventListener('sl-change', () => { form.querySelector('[data-perms]').hidden = roleSel.value === 'admin'; });
+    }
     const setError = (msg) => { errorEl.hidden = !msg; errorEl.textContent = msg || ''; };
 
     field('fullName').addEventListener('sl-input', () => { if (!pendingFile && !photoUrl) paintPreview(''); });
@@ -358,11 +663,13 @@
         position: normalizeValue(field('position').value),
         email: normalizeValue(field('email').value),
         phone: normalizeValue(field('phone').value),
-        pin: normalizeValue(field('pin').value)
+        pin: window.ljPinResolve(field('pin').value, initial)
       };
       if (!value.fullName || !value.position || !value.email) return setError('Completá nombre, puesto y email.');
       if (!/^\S+@\S+\.\S+$/.test(value.email)) return setError('Ingresá un email válido.');
-      if (!/^\d{4}$/.test(value.pin)) return setError('La clave tiene que tener 4 dígitos.');
+      if (!value.pin) return setError('La clave tiene que tener 4 dígitos.');
+      const accesoField = form.querySelector('[name="acceso"]');
+      const wantsLogin = Boolean(accesoField) && accesoField.value === 'login';
       setError('');
       const saveBtn = form.querySelector('[data-editor-save]');
       saveBtn.loading = true;
@@ -375,6 +682,22 @@
         const next = { ...state.users, [id]: record };
         await window.dbLaJamoneraRest.write(USERS_PATH, next);
         state.users = next;
+        if (wantsLogin) {
+          try {
+            const out = await adminApi('grantAccess', {
+              personaId: id,
+              role: form.querySelector('[name="role"]').value || 'empleado',
+              puedeEditar: form.querySelector('[name="puedeEditar"]').checked,
+              puedeBorrar: form.querySelector('[name="puedeBorrar"]').checked,
+              mode: form.querySelector('[name="mode"]').value || 'invite'
+            });
+            await loadAccess();
+            if (out.tempPassword) await showTempPassword(out.tempPassword, record.fullName);
+            else notify('success', 'Invitación enviada', `${record.fullName} va a recibir un email para activar su cuenta.`);
+          } catch (error) {
+            notify('error', 'La persona se creó, pero no se pudo dar el acceso', error.message);
+          }
+        }
         notify('success', initial ? 'Usuario actualizado' : 'Usuario creado', record.fullName);
         renderFilter();
         closeEditor(id);
@@ -414,6 +737,7 @@
   nodes.search?.addEventListener('sl-clear', onSearch);
   nodes.filter?.addEventListener('sl-change', () => { state.position = normalizeValue(selectValue(nodes.filter)); render(); });
   nodes.createBtn?.addEventListener('click', () => openEditor(null));
+  nodes.templateBtn?.addEventListener('click', () => { if (isAdmin()) openTemplateEditor(); });
 
   nodes.list.addEventListener('click', (event) => {
     if (event.target.closest('[data-user-create]')) { openEditor(null); return; }
@@ -434,16 +758,46 @@
 
   nodes.detail.addEventListener('click', async (event) => {
     if (event.target.closest('[data-user-back]')) { state.mobileDetail = false; renderDetail(); return; }
+    const current = state.users[state.selectedId];
+    if (current && event.target.closest('[data-access-grant]')) { grantAccessDialog(current); return; }
+    if (current && event.target.closest('[data-access-resend]')) { runAccessAction(current, () => adminApi('resendInvite', { personaId: current.id }), 'Invitación reenviada'); return; }
+    const activeBtn = event.target.closest('[data-access-active]');
+    if (current && activeBtn) {
+      const activo = activeBtn.dataset.accessActive === 'true';
+      if (!activo) {
+        const ok = await openIosSwal({ title: 'Quitar acceso', icon: 'warning', html: `<p>${escapeHtml(current.fullName)} no va a poder entrar al sistema. Sigue disponible como persona de uso interno y se puede reactivar.</p>`, showCancelButton: true, confirmButtonText: 'Quitar acceso', cancelButtonText: 'Cancelar', customClass: { confirmButton: 'danger' } });
+        if (!ok.isConfirmed) return;
+      }
+      runAccessAction(current, () => adminApi('setActive', { personaId: current.id, activo }), activo ? 'Acceso reactivado' : 'Acceso quitado');
+      return;
+    }
     const editBtn = event.target.closest('[data-user-edit]');
     if (editBtn) {
       const user = state.users[editBtn.dataset.userEdit];
       if (user && (await askPin(user, 'Editar usuario'))) openEditor(user);
     }
   });
+  nodes.detail.addEventListener('sl-change', (event) => {
+    const user = state.users[state.selectedId];
+    if (!user || !isAdmin()) return;
+    const roleSel = event.target.closest?.('[data-access-role]');
+    if (roleSel) { runAccessAction(user, () => adminApi('setRole', { personaId: user.id, role: roleSel.value }), 'Rol actualizado'); return; }
+    const perm = event.target.closest?.('[data-access-perm]');
+    if (perm) {
+      const sw = (k) => nodes.detail.querySelector(`[data-access-perm="${k}"]`)?.checked;
+      runAccessAction(user, () => adminApi('setPermisos', { personaId: user.id, puedeEditar: Boolean(sw('editar')), puedeBorrar: Boolean(sw('borrar')) }), 'Permisos actualizados');
+    }
+  });
   nodes.detail.addEventListener('sl-select', async (event) => {
     const user = state.users[state.selectedId];
     if (!user) return;
     const action = event.detail?.item?.value;
+    if (action === 'reset-link') { runAccessAction(user, () => adminApi('resetPassword', { personaId: user.id, mode: 'link' }), 'Link enviado por email'); return; }
+    if (action === 'reset-temp') {
+      const out = await runAccessAction(user, () => adminApi('resetPassword', { personaId: user.id, mode: 'temp' }), '');
+      if (out?.tempPassword) showTempPassword(out.tempPassword, user.fullName);
+      return;
+    }
     if (action === 'copy' && user.email) {
       try { await navigator.clipboard.writeText(user.email); notify('success', 'Email copiado', user.email); } catch (e) { notify('error', 'No se pudo copiar', user.email); }
     }
@@ -454,7 +808,10 @@
     nodes.loading.classList.remove('d-none');
     nodes.data.classList.add('d-none');
     await window.laJamoneraReady;
-    const users = await window.dbLaJamoneraRest.read(USERS_PATH);
+    const [users] = await Promise.all([
+      window.dbLaJamoneraRest.read(USERS_PATH),
+      loadAccess().catch((error) => { console.warn('[usuarios] acceso', error); })
+    ]);
     state.users = safeObject(users);
     nodes.loading.classList.add('d-none');
     nodes.data.classList.remove('d-none');

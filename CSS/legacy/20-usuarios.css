@@ -358,3 +358,48 @@ sl-alert.lj-notify.type-info::part(icon) { color: var(--lj-accent); }
   #usersManagerModal .users-manager-card { grid-template-columns: minmax(0, 1fr); }
   #usersManagerModal .users-manager-card-actions { justify-content: flex-end; }
 }
+
+/* ===== Acceso al sistema (backend Supabase, sólo administradores) ===== */
+.users-login-dot {
+  display: inline-grid; place-items: center; flex: 0 0 auto;
+  width: 22px; height: 22px; border-radius: 4px;
+  background: var(--lj-accent-soft); color: var(--lj-accent); font-size: 11px;
+}
+.users-access-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.users-access-row p { margin: 0; flex: 1 1 220px; font-size: 13px; }
+.users-access-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.users-access-grid { display: grid; grid-template-columns: minmax(160px, 220px) 1fr; gap: 16px; align-items: start; }
+.users-access-perms { display: grid; gap: 8px; }
+.users-access-perms small { font-size: 12px; }
+.users-access-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.users-access-off::part(base) { color: var(--lj-danger); }
+.recetas-tag.tone-ok { background: var(--lj-success-soft); color: var(--lj-success); }
+.recetas-tag.tone-warn { background: var(--lj-warning-soft); color: var(--lj-warning); }
+.recetas-tag.tone-danger { background: var(--lj-danger-soft); color: var(--lj-danger); }
+.users-editor-access { grid-column: 1 / -1; border: 1px solid var(--lj-border); border-radius: var(--lj-radius-lg); padding: 12px 14px; margin: 4px 0 0; display: grid; gap: 12px; }
+.users-editor-access legend { padding: 0 6px; font-size: 13px; font-weight: 600; color: var(--lj-text); }
+.users-editor-login { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+.users-editor-login[hidden] { display: none; }
+.users-grant-form { display: grid; gap: 14px; text-align: left; }
+.users-grant-form p { margin: 0; }
+.users-temp-pass::part(input) { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .04em; }
+
+/* Plantilla de invitación */
+.users-tpl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.users-tpl-edit, .users-tpl-preview { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.users-tpl-vars { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.users-tpl-vars .users-muted { font-size: 12px; margin-right: 2px; }
+.users-tpl-vars sl-button::part(base) { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; }
+.users-tpl-code {
+  width: 100%; min-height: 360px; resize: vertical; padding: 10px 12px;
+  font: 12.5px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; tab-size: 2;
+  color: var(--lj-text); background: var(--lj-surface-2); border: 1px solid var(--lj-border-strong); border-radius: var(--lj-radius);
+}
+.users-tpl-code:focus { outline: 2px solid var(--lj-accent); outline-offset: -1px; }
+.users-tpl-subject { margin: 0; padding: 8px 10px; border: 1px solid var(--lj-border); border-radius: var(--lj-radius); background: var(--lj-surface-2); font-size: 13px; font-weight: 600; }
+.users-tpl-frame { width: 100%; min-height: 420px; border: 1px solid var(--lj-border); border-radius: var(--lj-radius-lg); background: #fff; }
+@media (max-width: 767.98px) {
+  .users-access-grid, .users-editor-login, .users-tpl { grid-template-columns: 1fr; }
+  .users-tpl-code { min-height: 240px; }
+  .users-tpl-frame { min-height: 320px; }
+}
