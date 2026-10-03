@@ -35,20 +35,17 @@
   const initials = (name) => normalize(name).split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() || '').join('') || 'PS';
   const formatDateTime = (ts) => new Date(Number(ts || Date.now())).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   const getDateLabel = formatDateTime;
-  const getSwalTarget = () => document.body;
   const openIosSwal = (options) => Swal.fire({
-    target: getSwalTarget(),
     ...options,
     customClass: {
       popup: `ios-alert informes-alert ${options?.customClass?.popup || ''}`.trim(),
       title: 'ios-alert-title',
       htmlContainer: 'ios-alert-text',
-      confirmButton: 'ios-btn ios-btn-primary',
-      denyButton: 'ios-btn ios-btn-secondary',
-      cancelButton: 'ios-btn ios-btn-secondary',
+      confirmButton: 'primary',
+      denyButton: 'secondary',
+      cancelButton: 'secondary',
       ...options.customClass
-    },
-    buttonsStyling: false
+    }
   });
 
   const commentsList = (report) => {
@@ -186,7 +183,7 @@
     <article class="report-comment-item ${level > 0 ? 'is-reply' : ''}" style="--comment-accent:${commentAccentFromUserId(comment.userId || comment.userName || 'anon')};" data-comment-id="${escapeHtml(comment.id || '')}" data-comment-level="${level}">
       <header class="report-comment-head"><strong>${escapeHtml(comment.userName || 'Usuario')}</strong><small>${escapeHtml(getDateLabel(comment.createdAt))}</small></header>
       <p class="report-comment-text">${escapeHtml(comment.text || '').replaceAll('\n', '<br>')}</p>
-      <div class="report-comment-actions"><button type="button" class="btn report-comment-reply-btn" data-reply-comment="${escapeHtml(comment.id || '')}">Responder</button></div>
+      <div class="report-comment-actions"><sl-button variant="text" size="small" type="button" class="report-comment-reply-btn" data-reply-comment="${escapeHtml(comment.id || '')}">Responder</sl-button></div>
       ${Array.isArray(comment.replies) && comment.replies.length ? `<div class="report-comment-replies">${renderCommentTree(comment.replies, level + 1)}</div>` : ''}
     </article>
   `).join('');
@@ -282,9 +279,9 @@ const printReport = async (report) => {
     denyButtonText: 'No incluir',
     cancelButtonText: 'Cancelar',
     customClass: {
-      confirmButton: 'ios-btn ios-btn-success',
-      denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical',
-      cancelButton: 'ios-btn ios-btn-secondary'
+      confirmButton: 'success',
+      denyButton: 'danger deny-critical',
+      cancelButton: 'secondary'
     }
   });
 
@@ -347,9 +344,19 @@ const printReport = async (report) => {
 
   const openResendReportEmailPrompt = async (report) => {
     const usersWithEmail = Object.values(state.usersMap || {}).filter((user) => normalize(user.email)).sort((a, b) => String(a.fullName || '').localeCompare(String(b.fullName || '')));
-    const usersHtml = usersWithEmail.length ? usersWithEmail.map((user) => `<label class="notify-user-card"><div class="notify-user-main">${renderUserAvatar(user)}<div class="notify-user-text"><strong>${escapeHtml(user.fullName || 'Usuario')}</strong><small>${escapeHtml(user.email || '')}</small></div></div><input type="checkbox" data-resend-user-email="${escapeHtml(user.email || '')}" data-resend-user-name="${escapeHtml(user.fullName || '')}"></label>`).join('') : '<div class="informes-empty">No hay usuarios con email cargado.</div>';
-    const response = await openIosSwal({ title: 'Reenviar informe por email', width: 760, showCancelButton: true, confirmButtonText: 'Reenviar', cancelButtonText: 'Cancelar', html: `<div class="text-start report-resend-wrap"><p class="mb-2">Seleccioná usuarios del listado o escribí emails nuevos (separados por coma).</p><div id="resendUsersList" class="notify-specific-users-list">${usersHtml}</div><label class="form-label mt-3" for="resendExtraEmails">Emails adicionales</label><textarea id="resendExtraEmails" class="swal2-textarea ios-input" placeholder="ejemplo@dominio.com, otro@dominio.com"></textarea></div>`, didOpen: bindThumbs, preConfirm: () => {
-      const selectedNodes = Array.from(document.querySelectorAll('[data-resend-user-email]:checked'));
+    const usersHtml = usersWithEmail.length ? usersWithEmail.map((user) => `<label class="notify-user-card"><div class="notify-user-main">${renderUserAvatar(user)}<div class="notify-user-text"><strong>${escapeHtml(user.fullName || 'Usuario')}</strong><small>${escapeHtml(user.email || '')}</small></div></div><sl-checkbox data-resend-user-email="${escapeHtml(user.email || '')}" data-resend-user-name="${escapeHtml(user.fullName || '')}" aria-label="${escapeHtml(user.fullName || user.email || 'Usuario')}"></sl-checkbox></label>`).join('') : '<div class="informes-empty">No hay usuarios con email cargado.</div>';
+    const response = await openIosSwal({ title: 'Reenviar informe por email', width: 760, showCancelButton: true, confirmButtonText: 'Reenviar', cancelButtonText: 'Cancelar', html: `<div class="text-start report-resend-wrap"><p class="mb-2">Seleccioná usuarios del listado o escribí emails nuevos (separados por coma).</p><div id="resendUsersList" class="notify-specific-users-list">${usersHtml}</div><label class="lj-label mt-3" for="resendExtraEmails">Emails adicionales</label><sl-textarea id="resendExtraEmails" class="swal2-textarea" resize="auto" placeholder="ejemplo@dominio.com, otro@dominio.com"></sl-textarea></div>`, didOpen: (popup) => {
+      bindThumbs();
+      // sl-checkbox no es "labelable": el click en el resto de la tarjeta lo alterna a mano.
+      popup.querySelector('#resendUsersList')?.addEventListener('click', (event) => {
+        const card = event.target.closest('.notify-user-card');
+        if (!card || event.target.closest('sl-checkbox')) return;
+        event.preventDefault();
+        const box = card.querySelector('sl-checkbox[data-resend-user-email]');
+        if (box) box.checked = !box.checked;
+      });
+    }, preConfirm: () => {
+      const selectedNodes = [...document.querySelectorAll('sl-checkbox[data-resend-user-email]')].filter((node) => node.checked);
       const selected = selectedNodes.map((node) => ({ email: normalize(node.dataset.resendUserEmail), name: normalize(node.dataset.resendUserName) || 'Usuario' })).filter((item) => item.email);
       const extraRaw = normalize(document.getElementById('resendExtraEmails')?.value || '');
       const extraEmails = extraRaw ? extraRaw.split(',').map((item) => normalize(item)).filter(Boolean) : [];
@@ -387,7 +394,7 @@ const printReport = async (report) => {
     if (!user?.pin) return true;
     const result = await openIosSwal({
       title: 'Clave de usuario',
-      html: '<input id="panelCreatorPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos">',
+      html: '<sl-input id="panelCreatorPin" class="swal2-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos"></sl-input>',
       showCancelButton: true,
       confirmButtonText: 'Validar',
       cancelButtonText: 'Cancelar',
@@ -409,13 +416,13 @@ const printReport = async (report) => {
     const attachmentHtml = attachments.length
       ? attachments.map((item, index) => {
         if (item?.type === 'image') {
-          return `<button type="button" class="attachment-card" data-open-report-image="${index}"><span class="attachment-loader"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"></span><img src="${escapeHtml(item.url || '')}" alt="${escapeHtml(item.name || 'Adjunto')}" class="attachment-image js-report-attachment-image"></button>`;
+          return `<button type="button" class="lj-tile attachment-card" data-open-report-image="${index}"><span class="attachment-loader"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"></span><img src="${escapeHtml(item.url || '')}" alt="${escapeHtml(item.name || 'Adjunto')}" class="attachment-image js-report-attachment-image"></button>`;
         }
-        return `<a href="${escapeHtml(item?.url || '#')}" target="_blank" rel="noopener noreferrer" class="attachment-card attachment-doc"><i class="bi bi-file-earmark"></i><span>${escapeHtml(item?.name || 'Documento')}</span></a>`;
+        return `<a href="${escapeHtml(item?.url || '#')}" target="_blank" rel="noopener noreferrer" class="attachment-card attachment-doc"><sl-icon name="file-earmark"></sl-icon><span>${escapeHtml(item?.name || 'Documento')}</span></a>`;
       }).join('')
       : '<div class="informes-empty">Sin adjuntos</div>';
     const users = Object.values(state.usersMap || {}).sort((a, b) => String(a.fullName || '').localeCompare(String(b.fullName || '')));
-    const commentUserOptions = ['<option value="">Seleccioná un usuario</option>', ...users.map((user) => `<option value="${escapeHtml(user.id || '')}">${escapeHtml(user.fullName || 'Usuario')}</option>`)].join('');
+    const commentUserOptions = users.map((user) => `<sl-option value="${ljOptionValue(user.id || '')}">${escapeHtml(user.fullName || 'Usuario')}</sl-option>`).join('');
     const comments = getCommentList(report);
     const commentsHtml = comments.length
       ? `<div class="report-comments-thread">${renderCommentTree(comments)}</div>`
@@ -424,7 +431,7 @@ const printReport = async (report) => {
     await openIosSwal({
       title: 'Informe completo',
       width: 980,
-      html: `<div class="report-viewer"><div class="report-viewer-meta"><p><strong>Creador:</strong> ${escapeHtml(user.name || '-')}</p><p><strong>Puesto:</strong> ${escapeHtml(user.position || '-')}</p><p><strong>Fecha:</strong> ${escapeHtml(getDateLabel(report.createdAt))}</p><p><strong>Última actualización:</strong> ${escapeHtml(getDateLabel(report.updatedAt || report.createdAt))}</p><div class="report-viewer-meta-actions"><button type="button" class="btn ios-btn ios-btn-warning report-resend-btn" data-resend-report-email="1"><i class="fa-regular fa-paper-plane"></i><span>Reenviar email</span></button></div></div><div class="report-viewer-content-wrap"><div class="report-viewer-content">${report.html || ''}</div></div><div class="attachments-grid">${attachmentHtml}</div><section class="report-comments-wrap"><div class="report-comments-head"><h6><i class="fa-regular fa-comments"></i> <span class="report-comments-title-text">Comentarios</span></h6></div><div class="report-inline-comment-form"><div class="report-inline-comment-reply d-none" id="inlineReplyLabel"></div><select id="inlineCommentUser" class="form-select ios-input mb-2">${commentUserOptions}</select><textarea id="inlineCommentText" class="swal2-textarea ios-input" placeholder="Escribí un comentario"></textarea><input id="inlineCommentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos"><div class="d-flex justify-content-end gap-2"><button type="button" class="btn ios-btn ios-btn-secondary d-none" id="inlineCancelReplyBtn">Cancelar respuesta</button><button type="button" class="btn ios-btn ios-btn-primary" id="inlineSendCommentBtn"><i class="fa-solid fa-paper-plane"></i><span>Enviar comentario</span></button></div></div><div id="reportCommentsBody">${commentsHtml}</div></section></div>`,
+      html: `<div class="report-viewer"><div class="report-viewer-meta"><p><strong>Creador:</strong> ${escapeHtml(user.name || '-')}</p><p><strong>Puesto:</strong> ${escapeHtml(user.position || '-')}</p><p><strong>Fecha:</strong> ${escapeHtml(getDateLabel(report.createdAt))}</p><p><strong>Última actualización:</strong> ${escapeHtml(getDateLabel(report.updatedAt || report.createdAt))}</p><div class="report-viewer-meta-actions"><sl-button variant="warning" type="button" class="report-resend-btn" data-resend-report-email="1"><i slot="prefix" class="fa-regular fa-paper-plane"></i>Reenviar email</sl-button></div></div><div class="report-viewer-content-wrap"><div class="report-viewer-content">${report.html || ''}</div></div><div class="attachments-grid">${attachmentHtml}</div><section class="report-comments-wrap"><div class="report-comments-head"><h6><i class="fa-regular fa-comments"></i> <span class="report-comments-title-text">Comentarios</span></h6></div><div class="report-inline-comment-form"><div class="report-inline-comment-reply d-none" id="inlineReplyLabel"></div><sl-select id="inlineCommentUser" class="mb-2" placeholder="Seleccioná un usuario" hoist>${commentUserOptions}</sl-select><sl-textarea id="inlineCommentText" class="swal2-textarea mb-2" resize="auto" placeholder="Escribí un comentario"></sl-textarea><sl-input id="inlineCommentPin" class="swal2-input mb-2" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos"></sl-input><div class="d-flex justify-content-end gap-2"><sl-button variant="default" type="button" class="d-none" id="inlineCancelReplyBtn">Cancelar respuesta</sl-button><sl-button variant="primary" type="button" id="inlineSendCommentBtn"><i slot="prefix" class="fa-solid fa-paper-plane"></i>Enviar comentario</sl-button></div></div><div id="reportCommentsBody">${commentsHtml}</div></section></div>`,
       customClass: { popup: 'panel-report-alert' },
       confirmButtonText: 'Cerrar',
       didOpen: (popup) => {
@@ -469,7 +476,7 @@ const printReport = async (report) => {
         });
 
         sendBtn?.addEventListener('click', async () => {
-          const userId = normalize(popup.querySelector('#inlineCommentUser')?.value);
+          const userId = normalize(ljSelectValue(popup.querySelector('#inlineCommentUser')));
           const text = normalize(popup.querySelector('#inlineCommentText')?.value);
           const pin = normalize(popup.querySelector('#inlineCommentPin')?.value);
           if (!userId || !text) return;
@@ -500,15 +507,15 @@ const printReport = async (report) => {
 
   const promptComment = async (report) => {
     const users = Object.values(state.usersMap || {}).sort((a, b) => String(a.fullName || '').localeCompare(String(b.fullName || '')));
-    const options = ['<option value="">Seleccioná un usuario</option>', ...users.map((user) => `<option value="${escapeHtml(user.id)}">${escapeHtml(user.fullName || 'Usuario')}</option>`)].join('');
+    const options = users.map((user) => `<sl-option value="${ljOptionValue(user.id)}">${escapeHtml(user.fullName || 'Usuario')}</sl-option>`).join('');
     const result = await openIosSwal({
       title: 'Agregar comentario',
-      html: `<select id="panelCommentUser" class="form-select ios-input mb-2">${options}</select><textarea id="panelCommentText" class="swal2-textarea ios-input" maxlength="500" placeholder="Escribí un comentario"></textarea><input id="panelCommentPin" class="swal2-input ios-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos">`,
+      html: `<sl-select id="panelCommentUser" class="mb-2" placeholder="Seleccioná un usuario" hoist>${options}</sl-select><sl-textarea id="panelCommentText" class="swal2-textarea mb-2" resize="auto" maxlength="500" placeholder="Escribí un comentario"></sl-textarea><sl-input id="panelCommentPin" class="swal2-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos"></sl-input>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
       preConfirm: () => ({
-        userId: normalize(document.getElementById('panelCommentUser')?.value),
+        userId: normalize(ljSelectValue(document.getElementById('panelCommentUser'))),
         text: normalize(document.getElementById('panelCommentText')?.value),
         pin: normalize(document.getElementById('panelCommentPin')?.value)
       })
@@ -547,7 +554,7 @@ const printReport = async (report) => {
 
     const result = await openIosSwal({
       title: 'Editar informe',
-      html: `<textarea id="panelEditReportHtml" class="swal2-textarea ios-input" style="min-height:220px;">${(report.html || '').replace(/<[^>]+>/g, '')}</textarea>`,
+      html: `<sl-textarea id="panelEditReportHtml" class="swal2-textarea" rows="10" resize="auto" value="${(report.html || '').replace(/<[^>]+>/g, '').replace(/"/g, '&quot;')}"></sl-textarea>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar cambios',
       cancelButtonText: 'Cancelar',
@@ -607,14 +614,14 @@ const printReport = async (report) => {
           <span class="informe-attach-chip"><i class="fa-regular fa-file-lines"></i> ${Math.max(0, attachments.length - attachments.filter((x) => x?.type === 'image').length)}</span>
           <span class="importance-chip importance-${importance.tone}">${Math.max(0, Math.min(100, Number(report.importance || 0)))}% · ${importance.label}</span>
           <span class="informe-attach-chip panel-report-age-chip"><i class="fa-regular fa-clock"></i> ${agoDaysLabel(report.createdAt)}</span>
-          <button class="btn informe-print-chip" type="button" data-print-report="${escapeHtml(report.id)}" title="Imprimir informe"><i class="fa-solid fa-print"></i></button>
+          <sl-button variant="default" size="small" class="lj-icon-btn informe-print-chip" type="button" data-print-report="${escapeHtml(report.id)}" title="Imprimir informe" aria-label="Imprimir informe"><i class="fa-solid fa-print"></i></sl-button>
         </div>
         <div class="informe-card-user">
           ${renderUserAvatar(user)}
           <div class="informe-card-user-text"><strong>${escapeHtml(user.name)}</strong><small>${escapeHtml(user.position)}</small></div>
         </div>
         <div class="informe-card-actions">
-          <button class="btn ios-btn ios-btn-primary" type="button" data-view-report="${escapeHtml(report.id)}">Ver informe completo</button>
+          <sl-button variant="primary" type="button" data-view-report="${escapeHtml(report.id)}">Ver informe completo</sl-button>
         </div>
       </article>`;
 
@@ -645,12 +652,12 @@ const printReport = async (report) => {
 
   const renderSummary = () => {
     const cards = [
-      { key: 'rne', icon: 'bi-shield-exclamation', value: state.providers.length, title: 'RNE pendientes', note: 'proveedores sin completar', unit: 'proveedores' },
-      { key: 'rnpa', icon: 'bi-clipboard2-check', value: state.recipes.length, title: 'RNPA críticos', note: 'recetas a revisar', unit: 'recetas' },
-      { key: 'transport', icon: 'bi-truck-front', value: state.vehicles.length, title: 'UTA/URA', note: 'unidades por vencer', unit: 'unidades' },
-      { key: 'reports', icon: 'bi-file-earmark-medical', value: state.reports.length, title: 'Informes', note: 'registros disponibles', unit: 'cargados' }
+      { key: 'rne', icon: 'shield-exclamation', value: state.providers.length, title: 'RNE pendientes', note: 'proveedores sin completar', unit: 'proveedores' },
+      { key: 'rnpa', icon: 'clipboard2-check', value: state.recipes.length, title: 'RNPA críticos', note: 'recetas a revisar', unit: 'recetas' },
+      { key: 'transport', icon: 'truck-front', value: state.vehicles.length, title: 'UTA/URA', note: 'unidades por vencer', unit: 'unidades' },
+      { key: 'reports', icon: 'file-earmark-medical', value: state.reports.length, title: 'Informes', note: 'registros disponibles', unit: 'cargados' }
     ];
-    nodes.resumen.innerHTML = `<div class="panel-kpi-row">${cards.map((card) => `<article class="panel-metric panel-metric-${card.key}"><div class="panel-metric-top"><span class="panel-metric-icon"><i class="bi ${card.icon}"></i></span><div class="panel-metric-copy"><strong>${escapeHtml(card.title)}</strong><small>${escapeHtml(card.note)}</small></div></div><div class="panel-metric-bottom"><span class="panel-metric-value">${card.value}</span><span class="panel-metric-unit">${escapeHtml(card.unit)}</span></div></article>`).join('')}</div>`;
+    nodes.resumen.innerHTML = `<div class="panel-kpi-row">${cards.map((card) => `<article class="panel-metric panel-metric-${card.key}"><div class="panel-metric-top"><span class="panel-metric-icon"><sl-icon name="${card.icon}"></sl-icon></span><div class="panel-metric-copy"><strong>${escapeHtml(card.title)}</strong><small>${escapeHtml(card.note)}</small></div></div><div class="panel-metric-bottom"><span class="panel-metric-value">${card.value}</span><span class="panel-metric-unit">${escapeHtml(card.unit)}</span></div></article>`).join('')}</div>`;
   };
 
   const renderProviders = () => {
@@ -688,128 +695,293 @@ const printReport = async (report) => {
     nodes.transporte.innerHTML = makeMarquee(rows, 3, 7);
   };
 
-  const chartPalette = [
-    '#ff7b54', '#2a9d8f', '#3f7eff', '#9d4edd', '#f4a261',
-    '#e63946', '#f72585', '#4ea8de', '#52b69a', '#7400b8'
-  ];
+  // Gráfico de producción con Apache ECharts 5. Colores tomados de los tokens --lj-* (claro/oscuro).
+  // Barras y línea son una sola serie (kilos por receta) → un solo color (acento).
+  // La dona necesita identidad por categoría → paleta categórica validada (orden fijo, máx. 8; el resto va a "Otros").
+  const CATEGORICAL = {
+    light: ['', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'],
+    dark: ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767']
+  };
+  const DONUT_MAX_SLICES = CATEGORICAL.light.length;
 
-  const chartState = { instance: null, type: 'horizontalBar', lastSignature: '' };
+  const chartState = { instance: null, type: 'horizontalBar', lastSignature: '', lastTop: null, observer: null };
 
-  const ensureChartDom = () => {
-    if (nodes.produccion.querySelector('#produccionChart')) return;
-    nodes.produccion.innerHTML = '<div class="panel-chart-canvas-wrap"><canvas id="produccionChart" aria-label="Producción en kilos"></canvas></div>';
+  const readChartTheme = () => {
+    const rootStyle = getComputedStyle(document.documentElement);
+    const token = (name, fallback) => rootStyle.getPropertyValue(name).trim() || fallback;
+    const dark = document.documentElement.classList.contains('sl-theme-dark');
+    const accent = token('--lj-accent', dark ? '#6ea0ff' : '#1f5fbf');
+    const categorical = (dark ? CATEGORICAL.dark : CATEGORICAL.light).slice();
+    if (!dark) categorical[0] = accent;
+    return {
+      dark,
+      accent,
+      categorical,
+      surface: token('--lj-surface', dark ? '#161e2e' : '#ffffff'),
+      surface2: token('--lj-surface-2', dark ? '#1c2638' : '#f2f5fb'),
+      text: token('--lj-text', dark ? '#e3e9f5' : '#1f2a44'),
+      muted: token('--lj-muted', dark ? '#93a0bb' : '#55607f'),
+      border: token('--lj-border', dark ? '#26324a' : '#dfe5f0'),
+      borderStrong: token('--lj-border-strong', dark ? '#334262' : '#cfd8e8'),
+      font: getComputedStyle(document.body).fontFamily || 'Inter, system-ui, sans-serif'
+    };
   };
 
-  const buildChartData = (top, type) => {
+  const formatKg = (value) => `${Number(value || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })} kg`;
+  const formatAxis = (value) => Number(value || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 });
+
+  // Tooltip: el valor manda (fuerte), el nombre acompaña. Textos escapados (vienen de la base).
+  const tooltipHtml = (theme, name, value, color, extra = '') => `<div style="display:grid;gap:2px;min-width:120px;">
+      <strong style="font-size:14px;color:${theme.text};font-variant-numeric:tabular-nums;">${escapeHtml(formatKg(value))}${extra ? ` <span style="font-weight:500;color:${theme.muted};">· ${escapeHtml(extra)}</span>` : ''}</strong>
+      <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:${theme.muted};"><span style="width:12px;height:2px;background:${color};border-radius:1px;flex:0 0 auto;"></span>${escapeHtml(name)}</span>
+    </div>`;
+
+  const ensureChartDom = () => {
+    let el = nodes.produccion.querySelector('#produccionChart');
+    if (el) return el;
+    nodes.produccion.innerHTML = '<div class="panel-chart-canvas-wrap"><div id="produccionChart" class="panel-chart" role="img" aria-label="Producción en kilos"></div><table class="visually-hidden" id="produccionChartTable"><caption>Producción en kilos por receta</caption><thead><tr><th scope="col">Receta</th><th scope="col">Kilos</th></tr></thead><tbody></tbody></table></div>';
+    el = nodes.produccion.querySelector('#produccionChart');
+    return el;
+  };
+
+  const fillChartTable = (top) => {
+    const body = nodes.produccion.querySelector('#produccionChartTable tbody');
+    if (!body) return;
+    body.innerHTML = top.map((item) => `<tr><td>${escapeHtml(String(item.name || '').toUpperCase())}</td><td>${escapeHtml(formatKg(item.kg))}</td></tr>`).join('');
+  };
+
+  // Ancho máximo de las etiquetas de categoría según el ancho disponible (truncadas con "…").
+  const categoryLabelWidth = (el, type) => {
+    const width = el?.clientWidth || 600;
+    if (type === 'horizontalBar') return Math.max(90, Math.min(230, Math.round(width * 0.3)));
+    const count = Math.max(1, chartState.lastTop?.length || 1);
+    const slot = Math.round((width - 70) / count) - 6;
+    if (width < 520) return 96;
+    return slot < 130 ? 140 : Math.min(160, slot);
+  };
+
+  // Etiquetas de barras verticales/línea: rotadas cuando no entran derechas (más en pantallas angostas).
+  const verticalRotate = (el) => {
+    const width = el?.clientWidth || 600;
+    if (width < 520) return 45;
+    return width / Math.max(1, chartState.lastTop?.length || 1) < 136 ? 30 : 0;
+  };
+
+  const buildChartOption = (top, type, theme, el) => {
     const labels = top.map((x) => String(x.name || '').toUpperCase());
-    const values = top.map((x) => Number(x.kg.toFixed(2)));
-    const colors = top.map((_, i) => chartPalette[i % chartPalette.length]);
+    const values = top.map((x) => Number(Number(x.kg || 0).toFixed(2)));
+    const base = {
+      animationDuration: 450,
+      animationDurationUpdate: 300,
+      textStyle: { fontFamily: theme.font, color: theme.muted },
+      tooltip: {
+        confine: true,
+        backgroundColor: theme.surface,
+        borderColor: theme.border,
+        borderWidth: 1,
+        padding: [8, 10],
+        textStyle: { color: theme.text, fontFamily: theme.font, fontSize: 12 },
+        extraCssText: `border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,${theme.dark ? 0.4 : 0.12});`
+      }
+    };
+
     if (type === 'doughnut') {
+      // Nombres repetidos (dos recetas homónimas) se desambiguan con espacios de ancho cero: ECharts agrupa leyenda y color por nombre.
+      const seen = {};
+      const items = top.map((item, index) => {
+        const label = labels[index];
+        seen[label] = (seen[label] || 0) + 1;
+        return { name: seen[label] > 1 ? label + String.fromCharCode(0x200b).repeat(seen[label] - 1) : label, value: values[index] };
+      });
+      let slices = items;
+      if (items.length > DONUT_MAX_SLICES) {
+        const head = items.slice(0, DONUT_MAX_SLICES - 1);
+        const rest = items.slice(DONUT_MAX_SLICES - 1);
+        const restValue = Number(rest.reduce((sum, item) => sum + item.value, 0).toFixed(2));
+        slices = [...head, { name: `OTROS (${rest.length})`, value: restValue, others: rest.map((item) => item.name).join(', ') }];
+      }
+      const colors = slices.map((slice, index) => (slice.others ? theme.muted : theme.categorical[index % theme.categorical.length]));
+      const total = values.reduce((sum, v) => sum + v, 0) || 1;
+      // Estimación de filas de leyenda (texto ~7 px por carácter + muestra) para dejarle lugar abajo.
+      const legendWidth = slices.reduce((sum, slice) => sum + slice.name.length * 7 + 30, 0);
+      const legendRows = Math.ceil(legendWidth / Math.max(200, (el?.clientWidth || 600) * 0.94 - 20));
       return {
-        labels,
-        datasets: [{
-          data: values,
-          backgroundColor: colors,
-          borderColor: '#ffffff',
-          borderWidth: 2,
-          hoverOffset: 8
+        ...base,
+        color: colors,
+        tooltip: {
+          ...base.tooltip,
+          trigger: 'item',
+          formatter: (p) => tooltipHtml(theme, p.data?.others ? `${p.name}: ${p.data.others}` : p.name, p.value, p.color, `${((Number(p.value) / total) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })}%`)
+        },
+        legend: {
+          type: 'plain',
+          bottom: 0,
+          left: 'center',
+          width: '94%',
+          icon: 'rect',
+          itemWidth: 10,
+          itemHeight: 10,
+          itemGap: 14,
+          textStyle: { color: theme.text, fontSize: 12, fontFamily: theme.font },
+          pageTextStyle: { color: theme.muted },
+          pageIconColor: theme.accent,
+          pageIconInactiveColor: theme.border
+        },
+        series: [{
+          type: 'pie',
+          name: 'Kilos',
+          radius: ['50%', '75%'],
+          // Caja del anillo: arriba de la leyenda (los % del radio se calculan sobre esta caja).
+          top: 8,
+          bottom: legendRows * 24 + 12,
+          center: ['50%', '50%'],
+          avoidLabelOverlap: true,
+          label: { show: false },
+          labelLine: { show: false },
+          itemStyle: { borderColor: theme.surface, borderWidth: 2 },
+          emphasis: { scale: true, scaleSize: 5, label: { show: false } },
+          data: slices.map(({ name, value, others }, index) => ({ name, value, others, itemStyle: { color: colors[index] } }))
         }]
       };
     }
+
+    const isHorizontal = type === 'horizontalBar';
+    const labelWidth = categoryLabelWidth(el, type);
+    const categoryAxis = {
+      type: 'category',
+      data: labels,
+      inverse: isHorizontal,
+      axisTick: { show: false },
+      axisLine: { show: true, lineStyle: { color: theme.borderStrong } },
+      axisLabel: {
+        color: theme.muted,
+        fontSize: 11,
+        interval: 0,
+        width: labelWidth,
+        overflow: 'truncate',
+        rotate: isHorizontal ? 0 : verticalRotate(el),
+        hideOverlap: false
+      },
+      boundaryGap: type !== 'line' ? true : ['4%', '4%']
+    };
+    const narrow = (el?.clientWidth || 600) < 520;
+    const valueAxis = {
+      type: 'value',
+      min: 0,
+      splitNumber: narrow ? 3 : 5,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      splitLine: { lineStyle: { color: theme.border, width: 1, type: 'solid' } },
+      axisLabel: { color: theme.muted, fontSize: 11, formatter: formatAxis }
+    };
+    const grid = { left: isHorizontal ? 8 : (narrow ? 28 : 16), right: isHorizontal ? 48 : 16, top: 16, bottom: 8, containLabel: true };
+
     if (type === 'line') {
       return {
-        labels,
-        datasets: [{
-          label: 'Kilos',
+        ...base,
+        grid,
+        xAxis: categoryAxis,
+        yAxis: valueAxis,
+        tooltip: {
+          ...base.tooltip,
+          trigger: 'axis',
+          axisPointer: { type: 'line', lineStyle: { color: theme.borderStrong, width: 1, type: 'solid' } },
+          formatter: (params) => {
+            const p = Array.isArray(params) ? params[0] : params;
+            return p ? tooltipHtml(theme, p.name, p.value, theme.accent) : '';
+          }
+        },
+        series: [{
+          type: 'line',
+          name: 'Kilos',
           data: values,
-          borderColor: '#4b78e8',
-          backgroundColor: 'rgba(75, 120, 232, 0.14)',
-          fill: true,
-          tension: 0.35,
-          pointRadius: 5,
-          pointHoverRadius: 7,
-          pointBackgroundColor: colors,
-          pointBorderColor: '#ffffff',
-          pointBorderWidth: 2,
-          borderWidth: 3
+          smooth: 0.35,
+          symbol: 'circle',
+          symbolSize: 9,
+          lineStyle: { width: 2, color: theme.accent, cap: 'round', join: 'round' },
+          itemStyle: { color: theme.accent, borderColor: theme.surface, borderWidth: 2 },
+          areaStyle: { color: theme.accent, opacity: 0.1 },
+          emphasis: { scale: 1.4, focus: 'none' }
         }]
       };
     }
+
     return {
-      labels,
-      datasets: [{
-        label: 'Kilos',
+      ...base,
+      grid,
+      xAxis: isHorizontal ? valueAxis : categoryAxis,
+      yAxis: isHorizontal ? categoryAxis : valueAxis,
+      tooltip: {
+        ...base.tooltip,
+        trigger: 'item',
+        formatter: (p) => tooltipHtml(theme, p.name, p.value, theme.accent)
+      },
+      series: [{
+        type: 'bar',
+        name: 'Kilos',
         data: values,
-        backgroundColor: colors,
-        borderRadius: 0,
-        borderSkipped: false,
-        maxBarThickness: 48
+        barMaxWidth: 24,
+        barCategoryGap: '30%',
+        itemStyle: { color: theme.accent, borderRadius: isHorizontal ? [0, 4, 4, 0] : [4, 4, 0, 0] },
+        emphasis: { itemStyle: { color: theme.accent, opacity: 0.85 } },
+        label: isHorizontal
+          ? { show: true, position: 'right', distance: 6, color: theme.muted, fontSize: 11, formatter: (p) => formatAxis(p.value) }
+          : { show: false }
       }]
     };
   };
 
-  const buildChartOptions = (type) => {
-    const base = {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 500 },
-      plugins: {
-        legend: { display: type === 'doughnut', position: 'bottom', labels: { color: '#55607f', boxWidth: 12, padding: 12 } },
-        tooltip: {
-          backgroundColor: '#1f2a44',
-          titleColor: '#ffffff',
-          bodyColor: '#e8ecf7',
-          cornerRadius: 10,
-          padding: 10,
-          callbacks: { label: (ctx) => `${ctx.parsed?.y ?? ctx.parsed} kg` }
-        }
-      }
-    };
-    if (type === 'doughnut') {
-      base.cutout = '60%';
-      base.plugins.tooltip.callbacks = { label: (ctx) => `${ctx.label}: ${ctx.parsed} kg` };
-      return base;
-    }
-    const isHorizontal = type === 'horizontalBar';
-    base.indexAxis = isHorizontal ? 'y' : 'x';
-    base.scales = {
-      x: {
-        grid: { color: 'rgba(31, 59, 116, 0.06)', drawBorder: false },
-        ticks: { color: '#55607f', font: { size: 11 }, maxRotation: isHorizontal ? 0 : 30, minRotation: 0, autoSkip: true }
-      },
-      y: {
-        grid: { color: 'rgba(31, 59, 116, 0.06)', drawBorder: false },
-        ticks: { color: '#55607f', font: { size: 11 } },
-        beginAtZero: true
-      }
-    };
-    if (isHorizontal) {
-      base.plugins.tooltip.callbacks = { label: (ctx) => `${ctx.parsed?.x ?? ctx.parsed} kg` };
-    } else if (type === 'line') {
-      base.plugins.tooltip.callbacks = { label: (ctx) => `${ctx.label}: ${ctx.parsed.y} kg` };
-    }
-    return base;
+  const disposeChart = () => {
+    chartState.observer?.disconnect();
+    chartState.observer = null;
+    if (chartState.instance && !chartState.instance.isDisposed()) chartState.instance.dispose();
+    chartState.instance = null;
+    chartState.lastSignature = '';
   };
 
-  const drawChart = (top, type) => {
-    if (typeof Chart === 'undefined') {
+  const drawChart = (top, type, { force = false } = {}) => {
+    if (!window.echarts) {
       nodes.produccion.innerHTML = '<div class="panel-empty">No se pudo cargar la librería de gráficos.</div>';
       return;
     }
-    ensureChartDom();
-    const canvas = nodes.produccion.querySelector('#produccionChart');
-    if (!canvas) return;
+    const el = ensureChartDom();
+    if (!el) return;
+    if (chartState.instance && (chartState.instance.isDisposed() || chartState.instance.getDom() !== el)) disposeChart();
     const signature = JSON.stringify({ type, top: top.map((item) => [item.id, item.name, item.kg]) });
-    if (chartState.instance && chartState.lastSignature === signature) return;
+    if (!force && chartState.instance && chartState.lastSignature === signature) return;
     chartState.lastSignature = signature;
-    if (chartState.instance) { chartState.instance.destroy(); chartState.instance = null; }
-    const chartType = type === 'horizontalBar' ? 'bar' : type;
-    chartState.instance = new Chart(canvas.getContext('2d'), {
-      type: chartType,
-      data: buildChartData(top, type),
-      options: buildChartOptions(type)
-    });
+    if (!chartState.instance) {
+      chartState.instance = window.echarts.init(el, null, { renderer: 'canvas' });
+      if ('ResizeObserver' in window) {
+        let raf = 0;
+        let lastWidth = el.clientWidth;
+        chartState.observer = new ResizeObserver(() => {
+          cancelAnimationFrame(raf);
+          raf = requestAnimationFrame(() => {
+            const inst = chartState.instance;
+            if (!inst || inst.isDisposed()) return;
+            inst.resize();
+            if (el.clientWidth === lastWidth) return;
+            lastWidth = el.clientWidth;
+            // Etiquetas, rotación, divisiones y filas de leyenda dependen del ancho: se recalculan sin animar.
+            if (chartState.lastTop?.length) {
+              inst.setOption({ ...buildChartOption(chartState.lastTop, chartState.type, readChartTheme(), el), animation: false }, { notMerge: true });
+            }
+          });
+        });
+        chartState.observer.observe(el);
+      }
+    }
+    chartState.instance.setOption(buildChartOption(top, type, readChartTheme(), el), { notMerge: true });
+    fillChartTable(top);
   };
+
+  // Cambio de tema: se descarta la instancia y se vuelve a crear con los colores nuevos.
+  document.addEventListener('lj-theme-change', () => {
+    if (!chartState.instance) return;
+    disposeChart();
+    if (chartState.lastTop && chartState.lastTop.length) drawChart(chartState.lastTop, chartState.type, { force: true });
+  });
 
   const renderChart = () => {
     const [start, end] = state.range;
@@ -834,7 +1006,7 @@ const printReport = async (report) => {
     }).sort((a, b) => b.kg - a.kg).slice(0, 10);
 
     if (!top.length) {
-      if (chartState.instance) { chartState.instance.destroy(); chartState.instance = null; }
+      disposeChart();
       nodes.produccion.innerHTML = '<div class="panel-empty">No hay produccion en el rango seleccionado.</div>';
       return;
     }
