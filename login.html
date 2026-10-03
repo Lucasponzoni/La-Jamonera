@@ -7,6 +7,11 @@
   <script>
     (function earlyLoginGuard() {
       const SESSION_KEY = 'laJamoneraSession';
+      // Links de invitación / recuperación y cambio obligatorio de contraseña: quedarse en el login.
+      if (/[?&]cambiar=1/.test(location.search) || /(access_token|type=|error_description)/.test(location.hash) || /[?&](code|type)=/.test(location.search)) {
+        document.documentElement.classList.add('auth-ok');
+        return;
+      }
       const raw = localStorage.getItem(SESSION_KEY);
       if (!raw) {
         document.documentElement.classList.add('auth-ok');
@@ -134,7 +139,7 @@
               </sl-button>
               <sl-button variant="text" size="small" id="forgotPasswordBtn" type="button" class="login-forgot" hidden>¿Olvidaste tu contraseña?</sl-button>
             </form>
-            <form id="newPasswordForm" class="login-form" autocomplete="off" hidden>
+            <form id="newPasswordForm" class="login-form" autocomplete="off" novalidate hidden>
               <div class="login-field">
                 <label class="lj-label" for="newPasswordInput">Contraseña nueva</label>
                 <sl-input id="newPasswordInput" type="password" placeholder="Mínimo 8 caracteres" autocomplete="new-password" password-toggle required minlength="8">
