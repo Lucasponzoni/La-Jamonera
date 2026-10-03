@@ -11,7 +11,7 @@
 
   const USER_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
-  const state = { users: {} };
+  const state = { users: {}, search: '' };
 
   const safeObject = (value) => (value && typeof value === 'object' ? value : {});
   const normalizeValue = (value) => String(value || '').trim();
@@ -63,10 +63,37 @@
     });
   };
 
+  // Buscador en la barra de herramientas (diseño de modales tipo Ingredientes).
+  const toolbar = nodes.createBtn?.closest('.informes-toolbar');
+  if (toolbar && !toolbar.querySelector('#usersManagerSearch')) {
+    toolbar.classList.add('users-manager-toolbar');
+    const search = document.createElement('sl-input');
+    search.id = 'usersManagerSearch';
+    search.className = 'users-manager-search';
+    search.setAttribute('placeholder', 'Buscar usuario, puesto o email');
+    search.setAttribute('autocomplete', 'off');
+    search.setAttribute('clearable', '');
+    search.innerHTML = '<i slot="prefix" class="fa-solid fa-magnifying-glass"></i>';
+    toolbar.prepend(search);
+    const onSearch = () => {
+      state.search = normalizeValue(search.value).toLowerCase();
+      render();
+    };
+    search.addEventListener('sl-input', onSearch);
+    search.addEventListener('sl-clear', onSearch);
+  }
+
+  const matchesSearch = (user) => {
+    if (!state.search) return true;
+    return [user.fullName, user.position, user.email].some((value) => String(value || '').toLowerCase().includes(state.search));
+  };
+
   const render = () => {
-    const users = Object.values(state.users).sort((a, b) => String(a.fullName || '').localeCompare(String(b.fullName || ''), 'es'));
+    const allUsers = Object.values(state.users).sort((a, b) => String(a.fullName || '').localeCompare(String(b.fullName || ''), 'es'));
+    const users = allUsers.filter(matchesSearch);
     if (!users.length) {
-      nodes.list.innerHTML = '<div class="ingrediente-empty-list">No hay usuarios cargados.</div>';
+      const text = allUsers.length ? 'No hay usuarios que coincidan con la búsqueda.' : 'No hay usuarios cargados.';
+      nodes.list.innerHTML = `<div class="ingrediente-empty-list users-manager-empty"><i class="fa-solid fa-users" aria-hidden="true"></i><span>${text}</span></div>`;
       return;
     }
     nodes.list.innerHTML = users.map((user) => `
@@ -76,12 +103,12 @@
           <div class="users-manager-card-info">
             <h6>${escapeHtml(user.fullName || 'Sin nombre')}</h6>
             <p class="users-manager-card-position">${escapeHtml(user.position || 'Sin puesto')}</p>
-            <p class="users-manager-card-email">${escapeHtml(user.email || '')}</p>
+            ${user.email ? `<p class="users-manager-card-email"><i class="fa-regular fa-envelope" aria-hidden="true"></i>${escapeHtml(user.email)}</p>` : ''}
           </div>
         </div>
         <div class="users-manager-card-actions">
-          <sl-button variant="default" size="small" class="lj-icon-btn users-manager-card-btn" type="button" data-user-edit="${escapeHtml(user.id)}" title="Editar usuario" aria-label="Editar usuario"><sl-icon name="pencil"></sl-icon></sl-button>
-          <sl-button variant="default" size="small" class="lj-icon-btn users-manager-card-btn is-danger" type="button" data-user-delete="${escapeHtml(user.id)}" title="Eliminar usuario" aria-label="Eliminar usuario"><sl-icon name="trash"></sl-icon></sl-button>
+          <sl-button variant="default" size="small" class="lj-icon-btn users-manager-card-btn" type="button" data-user-edit="${escapeHtml(user.id)}" title="Editar usuario" aria-label="Editar usuario"><i class="fa-solid fa-pen"></i></sl-button>
+          <sl-button variant="default" size="small" class="lj-icon-btn users-manager-card-btn is-danger" type="button" data-user-delete="${escapeHtml(user.id)}" title="Eliminar usuario" aria-label="Eliminar usuario"><i class="fa-solid fa-trash"></i></sl-button>
         </div>
       </article>
     `).join('');
@@ -108,10 +135,12 @@
         <section class="step-block">
           <h6 class="step-title">1) Datos personales</h6>
           <div class="step-content">
+            <div class="users-form-fields">
             <sl-input id="userFullName" label="Nombre y apellido *" autocomplete="off" placeholder="Ej: Juan Pérez" value="${escapeHtml(initial?.fullName || '')}"></sl-input>
             <sl-input id="userPosition" label="Puesto en la empresa *" autocomplete="off" placeholder="Ej: Bromatólogo" value="${escapeHtml(initial?.position || '')}"></sl-input>
             <sl-input id="userEmail" label="Email *" autocomplete="off" type="email" placeholder="Ej: usuario@empresa.com" value="${escapeHtml(initial?.email || '')}"></sl-input>
             <sl-input id="userPin" label="Clave de 4 dígitos *" type="password" password-toggle maxlength="4" inputmode="numeric" autocomplete="new-password" placeholder="4 dígitos" value="${escapeHtml(initial?.pin || '')}"></sl-input>
+            </div>
           </div>
         </section>
         <section class="step-block">

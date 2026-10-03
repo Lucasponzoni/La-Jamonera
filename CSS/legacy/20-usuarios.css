@@ -3,14 +3,13 @@
 ========================================= */
 #usersManagerList.informes-users-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   flex-wrap: initial;
-  gap: 10px;
-  margin-bottom: 4px;
-  overflow-x: hidden;
-  overflow-y: auto;
+  gap: 8px;
+  margin-bottom: 0;
+  overflow: visible;
   max-height: none;
-  padding: 2px;
+  padding: 0;
 }
 
 #usersManagerList.informes-users-list::after {
@@ -18,41 +17,61 @@
   display: none;
 }
 
+/* Barra de herramientas: buscador a la izquierda, alta a la derecha */
+#usersManagerModal .informes-toolbar.users-manager-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.users-manager-search {
+  flex: 1 1 260px;
+  max-width: 420px;
+}
+
+.users-manager-search i[slot="prefix"] {
+  color: var(--lj-muted);
+  font-size: 13px;
+}
+
+/* Filas de usuario */
 .users-manager-card {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   border: 1px solid var(--lj-border);
   background: var(--lj-surface);
   border-radius: var(--lj-radius-lg);
-  padding: 10px 12px;
+  padding: 12px;
   min-width: 0;
-  transition: border-color .2s ease, background-color .2s ease;
+  transition: border-color .2s ease;
 }
 
 .users-manager-card:hover {
   border-color: var(--lj-border-strong);
-  background: var(--lj-surface-2);
 }
 
 .users-manager-card-main {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: 64px minmax(0, 1fr);
   gap: 12px;
   align-items: center;
   min-width: 0;
 }
 
 .users-manager-card .user-avatar-thumb {
-  width: 44px;
-  height: 44px;
+  width: 64px;
+  height: 64px;
   flex: 0 0 auto;
   border-radius: 50%;
   border: 1px solid var(--lj-border);
   background: var(--lj-accent-soft);
   color: var(--lj-accent);
-  font-size: 14px;
+  font-size: 18px;
 }
 
 .users-manager-card-info {
@@ -63,7 +82,7 @@
 
 .users-manager-card-info h6 {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--lj-text);
   white-space: nowrap;
@@ -76,13 +95,12 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1.3;
+  line-height: 1.35;
 }
 
 .users-manager-card-position {
   font-size: 13px;
   color: var(--lj-muted);
-  font-weight: 500;
 }
 
 .users-manager-card-email {
@@ -90,8 +108,13 @@
   color: var(--lj-muted);
 }
 
+.users-manager-card-email i {
+  margin-right: 6px;
+}
+
 .users-manager-card-actions {
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 6px;
   flex: 0 0 auto;
@@ -111,10 +134,44 @@ sl-button.users-manager-card-btn.is-danger::part(base):hover {
   color: var(--lj-danger);
 }
 
-#usersManagerModal .informes-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 0;
+.users-manager-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 24px 12px;
+  font-size: 14px;
+  color: var(--lj-muted);
+}
+
+.users-manager-empty i {
+  font-size: 32px;
+}
+
+@media (max-width: 575.98px) {
+  .users-manager-search {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
+  #usersManagerModal .informes-toolbar.users-manager-toolbar sl-button {
+    flex: 1 1 100%;
+  }
+
+  .users-manager-card {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .users-manager-card-main {
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .users-manager-card .user-avatar-thumb {
+    width: 48px;
+    height: 48px;
+    font-size: 15px;
+  }
 }
 
 /* Alta / edición de usuario (LJAlert) */
@@ -146,6 +203,22 @@ sl-dialog.lj-alert-dialog:has(.informes-user-form-alert) {
 
 .lj-alert.informes-user-form-alert sl-input {
   width: 100%;
+}
+
+.lj-alert.informes-user-form-alert .users-form-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.lj-alert.informes-user-form-alert .users-form-fields sl-input {
+  margin: 0;
+}
+
+@media (max-width: 575.98px) {
+  .lj-alert.informes-user-form-alert .users-form-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .lj-alert.informes-user-form-alert .image-preview-circle {
