@@ -1,1 +1,5 @@
 .superpowers/
+
+# Documentación interna de carga de facturas (no publicar)
+docs/carga-facturas-proveedores.md
+tools/facturas/

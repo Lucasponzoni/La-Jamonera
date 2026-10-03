@@ -106,11 +106,11 @@
     if (closer) window.LJModal.close(closer.closest('sl-dialog'));
   });
 
-  // Igual que con Bootstrap no se pierden borradores por un clic accidental fuera del modal.
+  // Clic fuera del modal: lo cierra, pero sólo al de arriba de la pila (y nunca si el modal
+  // pide quedarse abierto con data-lj-static, p.ej. mientras guarda).
   document.addEventListener('sl-request-close', (event) => {
     const dialog = event.target;
-    if (dialog?.tagName === 'SL-DIALOG' && dialog.classList.contains('lj-modal') && event.detail?.source === 'overlay') {
-      event.preventDefault();
-    }
+    if (dialog?.tagName !== 'SL-DIALOG' || !dialog.classList.contains('lj-modal') || event.detail?.source !== 'overlay') return;
+    if (dialog.hasAttribute('data-lj-static') || (top() && top() !== dialog)) event.preventDefault();
   });
 })();
