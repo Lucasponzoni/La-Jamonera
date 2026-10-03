@@ -483,7 +483,7 @@
       </sl-dialog>
       <!-- // FIN MODAL PRODUCCIÓN -->
 
-      <sl-dialog id="usersManagerModal" class="lj-modal informes-modal" label="Usuarios">
+      <sl-dialog id="usersManagerModal" class="lj-modal informes-modal users-modal" label="Usuarios">
         <div slot="label" class="lj-dialog-title">
               <h5 class="lj-dialog-heading" id="usersManagerModalLabel">Usuarios</h5>
         </div>
@@ -491,11 +491,22 @@
               <div id="usersManagerLoading" class="informes-loading" aria-live="polite">
                 <sl-spinner class="meta-spinner-login" aria-label="Cargando usuarios"></sl-spinner>
               </div>
-              <div id="usersManagerData" class="informes-data d-none" aria-live="polite">
-                <div class="informes-toolbar">
-                  <sl-button variant="success" id="usersManagerCreateBtn" type="button"><i slot="prefix" class="fa-solid fa-user-plus"></i><span>Crear usuario</span></sl-button>
+              <div id="usersManagerData" class="informes-data users-data d-none" aria-live="polite">
+                <div class="users-toolbar" id="usersManagerToolbar">
+                  <sl-input id="usersManagerSearch" type="search" class="users-search" placeholder="Buscar usuario, puesto o email" autocomplete="off" clearable aria-label="Buscar usuario">
+                    <i slot="prefix" class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                  </sl-input>
+                  <sl-select id="usersManagerPositionFilter" class="users-filter" placeholder="Todos los puestos" clearable hoist aria-label="Filtrar por puesto">
+                    <i slot="prefix" class="fa-solid fa-id-badge" aria-hidden="true"></i>
+                  </sl-select>
+                  <span class="users-toolbar-spacer" aria-hidden="true"></span>
+                  <sl-button variant="success" id="usersManagerCreateBtn" type="button"><i slot="prefix" class="fa-solid fa-user-plus"></i>Nuevo usuario</sl-button>
                 </div>
-                <div id="usersManagerList" class="informes-users-list"></div>
+                <div class="users-md" id="usersManagerMaster">
+                  <div id="usersManagerList" class="users-list" role="listbox" aria-label="Usuarios"></div>
+                  <section id="usersManagerDetail" class="users-detail" aria-live="polite"></section>
+                </div>
+                <section id="usersManagerEditor" class="users-editor" hidden></section>
               </div>
         </div>
       </sl-dialog>
@@ -504,6 +515,7 @@
         <div class="lj-footer-inner">
           <section class="lj-footer-col lj-footer-brand" aria-label="La Jamonera">
             <div class="lj-footer-brand-row">
+              <span class="recetas-tag tone-neu users-count-tag" id="usersManagerCount" hidden></span>
               <img src="./IMG/La Jamonera Cerdito.webp" alt="Logo La Jamonera" class="lj-footer-logo">
               <div>
                 <p class="lj-footer-title"><span class="brand-light">La</span> <span class="brand-bold">Jamonera</span></p>
