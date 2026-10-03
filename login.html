@@ -132,6 +132,25 @@
               <sl-button variant="primary" id="loginButton" type="submit" class="login-submit">
                 <span class="button-text">Ingresar</span>
               </sl-button>
+              <sl-button variant="text" size="small" id="forgotPasswordBtn" type="button" class="login-forgot" hidden>¿Olvidaste tu contraseña?</sl-button>
+            </form>
+            <form id="newPasswordForm" class="login-form" autocomplete="off" hidden>
+              <div class="login-field">
+                <label class="lj-label" for="newPasswordInput">Contraseña nueva</label>
+                <sl-input id="newPasswordInput" type="password" placeholder="Mínimo 8 caracteres" autocomplete="new-password" password-toggle required minlength="8">
+                  <sl-icon name="lock" slot="prefix"></sl-icon>
+                </sl-input>
+              </div>
+              <div class="login-field">
+                <label class="lj-label" for="newPasswordRepeat">Repetila</label>
+                <sl-input id="newPasswordRepeat" type="password" placeholder="Repetí la contraseña" autocomplete="new-password" password-toggle required minlength="8">
+                  <sl-icon name="lock" slot="prefix"></sl-icon>
+                </sl-input>
+              </div>
+              <p class="login-error" id="newPasswordError" role="alert" hidden></p>
+              <sl-button variant="primary" id="newPasswordButton" type="submit" class="login-submit">
+                <span class="button-text">Guardar y entrar</span>
+              </sl-button>
             </form>
             <a class="support-link" href="https://wa.me/543416292861?text=Nos%20contactamos%20de%20Frigorifico%20la%20Jamonera%20desde%20el%20back%20office." target="_blank" rel="noopener noreferrer">
               <img src="./IMG/WhatsApp Logo.webp" alt="" class="support-icon">
@@ -161,7 +180,10 @@
   <script src="./JS/ui/modal.js?v=202610030446"></script>
   <script src="./JS/ui/header.js?v=202610030446"></script>
   <script src="./JS/ui/lj-alert.js?v=202610030446"></script>
+  <script src="./JS/data/config.js?v=202610030446"></script>
+  <script src="./JS/data/supabase-init.js?v=202610030446"></script>
   <script src="./JS/firebase-init.js?v=202610030446"></script>
+  <script src="./JS/data/security.js?v=202610030446"></script>
   <script src="./JS/login.js?v=202610030446"></script>
 </body>
 </html>

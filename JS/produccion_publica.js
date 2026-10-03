@@ -83,7 +83,48 @@
     const rnpa = safeObject(source);
     return Boolean(rnpa.exempt || normalize(rnpa.number) || normalize(rnpa.denomination) || normalize(rnpa.brand) || normalize(rnpa.businessName));
   };
+  // Backend Supabase: una sola llamada pública (rpc traza_publica, sin login) con las mismas formas
+  // que las lecturas de Firebase; publicRead/readNode responden desde ese resultado.
+  const SUPABASE = window.LJ_BACKEND === 'supabase';
+  let publicBundle = null;
+  const loadPublicBundle = async (id, recipeId = '') => {
+    const cfg = window.LJ_SUPABASE;
+    const res = await fetch(`${cfg.url}/rest/v1/rpc/traza_publica`, {
+      method: 'POST',
+      headers: { apikey: cfg.key, Authorization: `Bearer ${cfg.key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_id: id, p_recipe: recipeId || null })
+    });
+    if (!res.ok) throw new Error(`traza_publica ${res.status}`);
+    return safeObject(await res.json());
+  };
+  const bundleRead = async (path) => {
+    const parts = String(path || '').split('/').filter(Boolean);
+    if (parts[0] === 'produccion' && parts[1] === 'config' && parts[2] === 'rne') return publicBundle?.rne ?? null;
+    if (parts[0] === 'recetas' && parts.length === 3) {
+      publicBundle.recipeLoads = publicBundle.recipeLoads || {};
+      if (!publicBundle.recipeLoads[parts[1]]) {
+        publicBundle.recipeLoads[parts[1]] = loadPublicBundle(publicBundle.id || '', parts[1]).then((extra) => safeObject(extra.recipe));
+      }
+      return (await publicBundle.recipeLoads[parts[1]])[parts[2]] ?? null;
+    }
+    if (parts[0] === 'public_traces') return publicBundle?.trace ?? null;
+    if (parts[0] === 'produccion' && parts[1] === 'registros') return publicBundle?.registro ?? null;
+    return null;
+  };
+  const readNode = async (path) => {
+    if (SUPABASE) return bundleRead(path);
+    const snapshot = await window.dbLaJamonera.ref(path).once('value');
+    return snapshot.val();
+  };
   const publicRead = async (path, fallback = null) => {
+    if (SUPABASE) {
+      try {
+        const value = await bundleRead(path);
+        return value === undefined || value === null ? fallback : value;
+      } catch (error) {
+        return fallback;
+      }
+    }
     try {
       const snapshot = await window.dbLaJamonera.ref(path).once('value');
       const value = snapshot.val();
@@ -769,12 +810,15 @@
       return;
     }
     try {
-      await window.laJamoneraReady;
-      const publicSnapshot = await window.dbLaJamonera.ref(`/public_traces/${id}`).once('value');
-      let publicTrace = safeObject(publicSnapshot.val());
+      if (SUPABASE) {
+        const bundle = await loadPublicBundle(id);
+        publicBundle = { ...bundle, id };
+      } else {
+        await window.laJamoneraReady;
+      }
+      let publicTrace = safeObject(await readNode(`/public_traces/${id}`));
       if (!Object.keys(publicTrace).length) {
-        const legacySnapshot = await window.dbLaJamonera.ref(`/produccion/registros/${id}`).once('value');
-        const legacyRegistro = safeObject(legacySnapshot.val());
+        const legacyRegistro = safeObject(await readNode(`/produccion/registros/${id}`));
         publicTrace = Object.keys(legacyRegistro).length
           ? { registro: legacyRegistro, config: {} }
           : {};

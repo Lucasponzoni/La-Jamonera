@@ -184,3 +184,9 @@
 .login-card.is-loading .login-overlay {
   display: flex;
 }
+
+/* Olvidé mi contraseña / Elegí tu contraseña (backend Supabase) */
+.login-forgot { justify-self: center; margin-top: 4px; }
+.login-forgot::part(base) { font-size: 13px; color: var(--lj-accent); }
+.login-error { margin: 0; padding: 8px 10px; border-radius: var(--lj-radius); background: var(--lj-danger-soft); color: var(--lj-danger); font-size: 13px; }
+.login-error.is-ok { background: var(--lj-success-soft); color: var(--lj-success); }

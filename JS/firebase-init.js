@@ -1,4 +1,6 @@
 (function () {
+  // Con el backend Supabase la capa de datos la arma JS/data/supabase-init.js.
+  if (window.LJ_BACKEND === 'supabase') return;
   if (!window.firebase) {
     throw new Error('Firebase SDK no cargado');
   }
