@@ -81,3 +81,31 @@ sl-dialog.lj-alert-dialog::part(body) { padding: 20px 20px 18px; }
 @media (max-width: 575.98px) {
   .lj-alert-actions sl-button { flex: 1 1 100%; }
 }
+
+/* Modales: título y cuerpo con scroll propio */
+.lj-dialog-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lj-dialog-heading { margin: 0; font-size: 16px; font-weight: 700; color: var(--lj-brand); }
+sl-dialog.lj-modal::part(body) { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+sl-dialog.lj-modal::part(panel) { max-height: calc(100dvh - 32px); }
+.lj-dialog-body { padding: 16px; overflow: auto; max-height: calc(100dvh - 32px - 58px); position: relative; }
+@media (max-width: 767.98px) { .lj-dialog-body { max-height: calc(100dvh - 58px); padding: 12px; } }
+
+/* Botones sólo-ícono con Font Awesome y grupos */
+sl-button.lj-icon-btn::part(base) { min-width: var(--sl-input-height-medium); padding: 0; justify-content: center; }
+sl-button.lj-icon-btn::part(label) { padding: 0 10px; }
+sl-button.lj-icon-btn[size="small"]::part(base) { min-width: var(--sl-input-height-small); }
+sl-button.lj-icon-btn[size="small"]::part(label) { padding: 0 8px; }
+.lj-btn-group { display: inline-flex; border: 1px solid var(--lj-border-strong); border-radius: var(--lj-radius); overflow: hidden; }
+.lj-btn-group > sl-button::part(base) { border: 0; border-radius: 0; }
+.lj-btn-group > sl-button + sl-button { border-left: 1px solid var(--lj-border-strong); }
+.lj-btn-group > sl-button.is-active::part(base) { background: var(--lj-accent-soft); color: var(--lj-accent); }
+
+/* Etiquetas de formulario */
+.lj-label { display: block; margin-bottom: 4px; font-size: 12px; font-weight: 600; color: var(--lj-muted); }
+sl-input::part(form-control-label), sl-select::part(form-control-label), sl-textarea::part(form-control-label) { font-size: 12px; font-weight: 600; color: var(--lj-muted); }
+
+/* Botones Shoelace: peso de fuente y texto */
+sl-button::part(base) { font-weight: 600; }
+sl-button[variant="default"]::part(base) { background: var(--lj-surface); border-color: var(--lj-border-strong); color: var(--lj-text); }
+sl-button[variant="default"]::part(base):hover { background: var(--lj-accent-soft); border-color: var(--lj-border-strong); color: var(--lj-accent); }
+sl-button[variant="text"]::part(base) { color: var(--lj-accent); }

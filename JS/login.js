@@ -13,7 +13,6 @@
 
   const usernameInput = document.getElementById('usernameInput');
   const passwordInput = document.getElementById('passwordInput');
-  const togglePasswordButton = document.getElementById('togglePassword');
   const loginButton = document.getElementById('loginButton');
   const loginCard = document.getElementById('loginCard');
 
@@ -58,14 +57,6 @@
       confirmButtonText: 'Entendido'
     });
   };
-
-  togglePasswordButton.addEventListener('click', () => {
-    const hidden = passwordInput.type === 'password';
-    passwordInput.type = hidden ? 'text' : 'password';
-    togglePasswordButton.innerHTML = hidden
-      ? '<i class="fa-solid fa-eye-slash"></i>'
-      : '<i class="fa-solid fa-eye"></i>';
-  });
 
   loginForm.addEventListener('submit', async (event) => {
     event.preventDefault();
