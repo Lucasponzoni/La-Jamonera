@@ -855,13 +855,13 @@
       <table class="planilla-proto-head-table">
         <tbody>
           <tr>
-            <td class="planilla-proto-brand">Frigor\u00edfico<br><strong>La Jamonera</strong></td>
+            <td class="planilla-proto-brand"><div class="planilla-proto-brand-inner"><img class="planilla-proto-logo" src="./IMG/La%20Jamonera%20Cerdito.webp" alt=""><span>Frigor\u00edfico<strong>La Jamonera</strong></span></div></td>
             <td class="planilla-proto-doc-title">REGISTRO PROTOCOLO DE PRODUCCI\u00d3N</td>
-            <td class="planilla-proto-version"><span>Versi\u00f3n <strong>004</strong></span><span>F. Elaboraci\u00f3n <strong>${escapeHtml(elaborationMonthLabel)}</strong></span></td>
+            <td class="planilla-proto-version"><span><small>Versi\u00f3n</small><strong>004</strong></span><span><small>F. Elaboraci\u00f3n</small><strong>${escapeHtml(elaborationMonthLabel)}</strong></span></td>
           </tr>
           <tr>
             <td class="planilla-proto-format-label">FORMATO</td>
-            <td colspan="2" class="planilla-proto-format-value">${escapeHtml(registro?.id || '-')} &bull; EMITIDO: ${escapeHtml(formatDateTime(registro?.createdAt))} &bull; RNE EMPRESA ${escapeHtml(registro?.traceability?.company?.rne?.number || '-')}</td>
+            <td colspan="2" class="planilla-proto-format-value"><span class="planilla-proto-code">${escapeHtml(registro?.id || '-')}</span><span class="planilla-proto-dot">&bull;</span>EMITIDO: ${escapeHtml(formatDateTime(registro?.createdAt))}<span class="planilla-proto-dot">&bull;</span>RNE EMPRESA ${escapeHtml(registro?.traceability?.company?.rne?.number || '-')}</td>
           </tr>
         </tbody>
       </table>
@@ -933,12 +933,45 @@
 
   // Mismo orden de cascada que el viejo CSS/style.css (partido en CSS/legacy/).
   const PLANILLA_PRINT_CSS = ["00-base", "01-login", "02-modal-ingredientes", "03-componentes", "04-informes", "05-recetas", "06-inventario", "07-produccion", "08-produccion-card", "09-recetas-card", "10-inventario-card", "11-produccion-2", "12-trazabilidad-ui", "13-trazabilidad-diagrama", "14-inventario-rne", "15-planilla", "16-trazabilidad-publica", "17-inventario-3", "18-produccion-qr", "19-reparto", "20-usuarios", "21-misc-2026", "22-planilla-protocolo"];
+  // El popup armado con document.write no siempre baja los <link> de arriba y la
+  // planilla salía sin estilos: se copian embebidas las reglas de planilla que la
+  // página ya tiene cargadas (los <link> quedan de respaldo).
+  const PLANILLA_INLINE_CSS = ['15-planilla', '22-planilla-protocolo'];
+  const collectPlanillaCssText = () => [...document.styleSheets].map((sheet) => {
+    const name = (String(sheet.href || '').match(/CSS\/legacy\/([\w-]+)\.css/) || [])[1];
+    if (!PLANILLA_INLINE_CSS.includes(name)) return '';
+    try { return [...sheet.cssRules].map((rule) => rule.cssText).join('\n'); } catch (e) { return ''; }
+  }).join('\n').replace(/<\/style/gi, '<\\/style');
+  // El logo viaja embebido (data URL) a la ventana de impresion: si la imagen no
+  // bajaba, waitImages quedaba esperando y nunca se ajustaba ni se imprimia.
+  const PLANILLA_LOGO_SRC = './IMG/La%20Jamonera%20Cerdito.webp';
+  let planillaLogoDataUrl = null;
+  const getPlanillaLogoDataUrl = async () => {
+    if (planillaLogoDataUrl !== null) return planillaLogoDataUrl;
+    try {
+      const blob = await (await fetch(PLANILLA_LOGO_SRC)).blob();
+      planillaLogoDataUrl = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(/^data:image\//.test(String(reader.result)) ? String(reader.result) : '');
+        reader.onerror = () => resolve('');
+        reader.readAsDataURL(blob);
+      });
+    } catch (e) {
+      planillaLogoDataUrl = '';
+    }
+    return planillaLogoDataUrl;
+  };
+  const inlinePlanillaLogo = async (html) => {
+    const dataUrl = await getPlanillaLogoDataUrl();
+    return dataUrl ? html.split(`src="${PLANILLA_LOGO_SRC}"`).join(`src="${dataUrl}"`) : html;
+  };
   const buildPlanillaHeadHtml = (title) => `<title>${title}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
     ${PLANILLA_PRINT_CSS.map((name) => `<link rel="stylesheet" href="./CSS/legacy/${name}.css">`).join('')}
+    <style>${collectPlanillaCssText()}</style>
     <style>body{font-family:"Inter","Segoe UI",Arial,sans-serif;padding:8px;background:#ffffff;}</style>`;
 
   const printPlanilla = async (root, registro, options = {}) => {
@@ -969,7 +1002,8 @@
       return;
     }
     const documentTitle = escapeHtml(getPlanillaDocumentTitle(registro));
-    win.document.write(`<html><head>${buildPlanillaHeadHtml(documentTitle)}${INVOICE_PRINT_STYLE}</head><body>${root.outerHTML}${invoicesHtml}</body></html>`);
+    const planillaHtml = await inlinePlanillaLogo(root.outerHTML);
+    win.document.write(`<html><head>${buildPlanillaHeadHtml(documentTitle)}${INVOICE_PRINT_STYLE}</head><body>${planillaHtml}${invoicesHtml}</body></html>`);
     win.document.close();
     await waitWindowLoad(win);
     // CSS primero, después la impresora: sin esto el diálogo podía abrirse con
@@ -1040,7 +1074,7 @@
         }
         doneSteps += 1;
       }
-      if (node) printNodes.push(`${node.outerHTML}${invoicesHtml}`);
+      if (node) printNodes.push(`${await inlinePlanillaLogo(node.outerHTML)}${invoicesHtml}`);
       report(`Planilla ${index + 1} de ${rows.length} lista`);
       // Respiro para el hilo principal: sin esto un rango largo congela la UI y
       // la barra de progreso no se pinta.

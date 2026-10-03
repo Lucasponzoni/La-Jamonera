@@ -1,9 +1,26 @@
 /* ============================================================
    Planilla protocolo de producción (formato registro oficial)
+   Todo va acotado a .planilla-proto para pisar 15-planilla.css.
+   Hoja con un solo marco (radio sólo afuera) y filetes finos adentro.
    ============================================================ */
-.planilla-proto {
+.planilla-card.planilla-proto {
+  --proto-ink: #1a2238;
+  --proto-label: #55607f;
+  --proto-muted: #6b7590;
+  --proto-line: #cfd6e0;
+  --proto-tint: #f4f6f9;
+  --proto-navy: #173d73;
+  --proto-frame: rgba(31, 42, 68, 0.6);
   display: grid;
   gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--proto-frame);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--proto-ink);
+  font-family: "Inter", "Segoe UI", Arial, sans-serif;
+  line-height: 1.3;
+  text-transform: none;
 }
 
 .planilla-proto-head-table,
@@ -16,68 +33,180 @@
 .planilla-proto-head-table td,
 .planilla-proto-fields-table th,
 .planilla-proto-fields-table td {
-  border: 1px solid #13233c;
+  border: 1px solid var(--proto-line);
   padding: 6px 10px;
-  font-size: 0.72rem;
-  color: #14233d;
+  height: 28px;
+  box-sizing: border-box;
+  font-size: 12.5px;
+  color: var(--proto-ink);
   background: #fff;
   text-align: left;
   vertical-align: middle;
 }
 
+/* Encabezado: logo + marca | título | versión */
 .planilla-proto-brand {
-  width: 22%;
-  font-size: 0.7rem;
-  line-height: 1.2;
+  width: 24%;
+}
+
+.planilla-proto-brand-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.planilla-proto-logo {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  object-fit: contain;
+}
+
+.planilla-proto-brand-inner span {
+  display: grid;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.25;
   text-transform: uppercase;
+  color: var(--proto-label);
 }
 
-.planilla-proto-brand strong {
-  font-size: 0.8rem;
-  font-weight: 900;
+.planilla-proto-brand-inner strong {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--proto-ink);
 }
 
-.planilla-proto-doc-title {
-  text-align: center !important;
-  font-weight: 900;
-  font-size: 0.86rem !important;
-  letter-spacing: 0.04em;
+.planilla-proto-head-table td.planilla-proto-doc-title {
+  text-align: center;
+  font-size: 15.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #13233c;
 }
 
 .planilla-proto-version {
-  width: 20%;
-  font-size: 0.62rem !important;
+  width: 24%;
 }
 
 .planilla-proto-version span {
-  display: block;
-  line-height: 1.35;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  line-height: 1.5;
 }
 
-.planilla-proto-format-label {
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  background: #eef3ff !important;
-  width: 22%;
+.planilla-proto-version small,
+.planilla-proto-format-label,
+.planilla-proto-fields-table th {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--proto-label);
 }
 
-.planilla-proto-format-value {
-  font-size: 0.62rem !important;
-  color: #44557c !important;
+.planilla-proto-version small {
+  font-size: 10px;
+  white-space: nowrap;
 }
 
+.planilla-proto-version strong {
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Franja FORMATO: metadatos del documento */
+.planilla-proto-head-table td.planilla-proto-format-label {
+  background: var(--proto-tint);
+  font-size: 10.5px;
+  color: var(--proto-label);
+  height: 24px;
+}
+
+.planilla-proto-head-table td.planilla-proto-format-value {
+  font-size: 11px;
+  color: var(--proto-label);
+  height: 24px;
+}
+
+.planilla-proto-code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--proto-ink);
+}
+
+.planilla-proto-dot {
+  margin: 0 8px;
+  color: #a3acbd;
+}
+
+/* Tabla clave / valor */
 .planilla-proto-fields-table th {
   width: 38%;
-  background: #eef3ff;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  font-size: 0.66rem;
-  text-transform: uppercase;
+  background: var(--proto-tint);
+}
+
+.planilla-proto-fields-table td {
+  font-weight: 500;
+}
+
+.planilla-proto-fields-table td strong {
+  font-weight: 700;
 }
 
 .planilla-proto-fields-table td small {
-  color: #5d6f96;
-  font-weight: 700;
+  color: var(--proto-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Materia prima */
+.planilla-proto .planilla-table-scroll {
+  overflow-x: auto;
+}
+
+.planilla-proto .planilla-table {
+  border: 1px solid var(--proto-line);
+  border-collapse: collapse;
+}
+
+.planilla-proto .planilla-table th,
+.planilla-proto .planilla-table td {
+  border: 1px solid var(--proto-line);
+  padding: 6px 8px;
+  font-size: 12.5px;
+  line-height: 1.3;
+  vertical-align: middle;
+  color: var(--proto-ink);
+  background: #fff;
+}
+
+.planilla-proto .planilla-table th {
+  background: var(--proto-navy);
+  border-color: var(--proto-navy);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 7px 8px;
+}
+
+.planilla-proto .planilla-table th:nth-child(4),
+.planilla-proto .planilla-table td:nth-child(4) {
+  font-variant-numeric: tabular-nums;
+}
+
+.planilla-proto .planilla-table th:nth-child(5) {
+  text-align: right;
 }
 
 .planilla-proto-formula th:nth-child(1),
@@ -106,56 +235,313 @@
 }
 
 .planilla-proto-ing strong {
-  font-weight: 800;
-  color: #14233d;
+  font-weight: 600;
+  color: var(--proto-ink);
 }
 
-.planilla-proto-total-row td {
-  background: #eef3ff;
-  font-weight: 900;
+.planilla-proto .planilla-substitute-note {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  color: var(--proto-muted);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
-.planilla-proto-aptitud {
-  margin: 0;
-  font-size: 0.62rem;
+.planilla-proto .planilla-substitute-note i {
+  font-size: 9px;
+}
+
+.planilla-proto .planilla-qty-cell {
+  color: var(--proto-ink);
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Fila de grupo (ingrediente cubierto con sustitutos) */
+.planilla-proto .planilla-source-row td {
+  background: #fdf7ec !important;
+  border-color: var(--proto-line) !important;
+  box-shadow: inset 3px 0 0 #c8892f;
+  padding: 6px 10px 6px 12px;
+}
+
+.planilla-proto .planilla-source-head {
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.planilla-proto .planilla-source-head strong {
+  color: var(--proto-ink);
+  font-size: 12.5px;
   font-weight: 700;
-  color: #44557c;
-  line-height: 1.4;
 }
 
+.planilla-proto .planilla-source-head span {
+  border: 1px solid #e3c08a;
+  border-radius: 4px;
+  background: #fbecd2;
+  color: #7a4510;
+  padding: 1px 6px;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.planilla-proto .planilla-source-meta {
+  color: var(--proto-label);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  margin-top: 3px;
+}
+
+.planilla-proto .planilla-source-meta b {
+  color: var(--proto-ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.planilla-proto .planilla-substitute-row td {
+  background: #fff;
+  border-top: 1px solid var(--proto-line);
+}
+
+.planilla-proto .planilla-substitute-row td:first-child {
+  box-shadow: inset 3px 0 0 #ecd3a8;
+  padding-left: 12px;
+}
+
+.planilla-proto .planilla-proto-total-row td {
+  background: var(--proto-tint);
+  border-top: 1.5px solid #1f2a44;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.planilla-proto .planilla-proto-total-row .planilla-qty-cell {
+  color: #0f5f39;
+  font-weight: 800;
+}
+
+/* Notas */
+.planilla-proto-aptitud {
+  margin: -2px 0 0;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--proto-muted);
+  line-height: 1.45;
+  letter-spacing: 0.02em;
+}
+
+/* Pie: observaciones + QR */
 .planilla-proto-bottom {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .planilla-proto-observations {
-  border: 1px solid #13233c;
-  padding: 8px 10px;
+  border: 1px solid var(--proto-line);
+  padding: 10px 12px;
   display: grid;
+  align-content: start;
   gap: 6px;
 }
 
 .planilla-proto-observations p {
   margin: 0;
-  font-size: 0.66rem;
-  line-height: 1.4;
-  color: #14233d;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--proto-ink);
+}
+
+.planilla-proto-observations p strong {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--proto-label);
+}
+
+.planilla-proto .planilla-qr-card {
+  border: 1px solid var(--proto-line);
+  min-height: 0;
+  padding: 8px 10px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+}
+
+.planilla-proto .planilla-qr-card canvas,
+.planilla-proto .planilla-qr-card img {
+  width: 84px !important;
+  height: 84px !important;
+}
+
+.planilla-proto .planilla-qr-note {
+  color: var(--proto-label);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 @media (max-width: 640px) {
+  .planilla-card.planilla-proto {
+    padding: 10px;
+  }
+
+  .planilla-proto .planilla-table {
+    min-width: 560px;
+  }
+
   .planilla-proto-bottom {
     grid-template-columns: 1fr;
   }
 }
 
+/* Impresión: medidas en pt/mm para A4 vertical (body de 190mm). */
 @media print {
+  .planilla-card.planilla-proto {
+    width: 100% !important;
+    box-sizing: border-box;
+    padding: 4mm !important;
+    gap: 2.6mm !important;
+    border: 1px solid rgba(31, 42, 68, 0.6) !important;
+    border-radius: 6px !important;
+  }
+
+  .planilla-proto,
+  .planilla-proto * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
   .planilla-proto-head-table td,
   .planilla-proto-fields-table th,
   .planilla-proto-fields-table td {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    padding: 1.4mm 2.6mm;
+    height: 7mm;
+    font-size: 9.5pt;
+  }
+
+  .planilla-proto-logo {
+    width: 9mm;
+    height: 9mm;
+    flex-basis: 9mm;
+  }
+
+  .planilla-proto-brand-inner span,
+  .planilla-proto-version small {
+    font-size: 7pt;
+  }
+
+  .planilla-proto-brand-inner strong {
+    font-size: 10pt;
+  }
+
+  .planilla-proto-head-table td.planilla-proto-doc-title {
+    font-size: 12pt;
+  }
+
+  .planilla-proto-version strong {
+    font-size: 9pt;
+  }
+
+  .planilla-proto-fields-table th,
+  .planilla-proto-head-table td.planilla-proto-format-label {
+    font-size: 8pt;
+  }
+
+  .planilla-proto-head-table td.planilla-proto-format-label,
+  .planilla-proto-head-table td.planilla-proto-format-value {
+    height: 6mm;
+  }
+
+  .planilla-proto-head-table td.planilla-proto-format-value,
+  .planilla-proto-code {
+    font-size: 8pt;
+  }
+
+  .planilla-proto-fields-table td small {
+    font-size: 8pt;
+  }
+
+  .planilla-proto .planilla-table th,
+  .planilla-proto .planilla-table td {
+    font-size: 9.5pt !important;
+    padding: 1.4mm 2mm !important;
+    line-height: 1.3 !important;
+    border: 1px solid #cfd6e0 !important;
+  }
+
+  .planilla-proto .planilla-table th {
+    font-size: 8pt !important;
+    padding: 1.8mm 2mm !important;
+    border-color: #173d73 !important;
+  }
+
+  .planilla-proto .planilla-source-row td {
+    padding: 1.4mm 2.6mm 1.4mm 3mm !important;
+    border-color: #cfd6e0 !important;
+  }
+
+  .planilla-proto .planilla-substitute-row td:first-child {
+    padding-left: 3mm !important;
+  }
+
+  .planilla-proto .planilla-proto-total-row td {
+    border-top: 1.5px solid #1f2a44 !important;
+  }
+
+  .planilla-proto .planilla-source-head strong {
+    font-size: 9.5pt !important;
+  }
+
+  .planilla-proto .planilla-source-head span {
+    font-size: 7pt !important;
+  }
+
+  .planilla-proto .planilla-source-meta,
+  .planilla-proto .planilla-substitute-note {
+    font-size: 8pt !important;
+  }
+
+  .planilla-proto-aptitud {
+    font-size: 8pt;
+  }
+
+  .planilla-proto-observations {
+    padding: 2.4mm 3mm;
+  }
+
+  .planilla-proto-observations p {
+    font-size: 9pt;
+  }
+
+  .planilla-proto-observations p strong {
+    font-size: 8pt;
+  }
+
+  .planilla-proto .planilla-qr-card {
+    min-height: 0 !important;
+    padding: 2mm 3mm !important;
+  }
+
+  .planilla-proto .planilla-qr-card canvas,
+  .planilla-proto .planilla-qr-card img {
+    width: 24mm !important;
+    height: 24mm !important;
+  }
+
+  .planilla-proto .planilla-qr-note {
+    font-size: 7pt !important;
   }
 }
 
