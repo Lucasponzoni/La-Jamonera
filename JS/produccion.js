@@ -745,15 +745,10 @@
       });
     return true;
   };
-  const getGeneralPassword = async () => {
-    await window.laJamoneraReady;
-    const value = await window.dbLaJamoneraRest.read('/passGeneral/pass');
-    return normalizeValue(value);
-  };
   const askSensitivePassword = async (title, html, withReason = false) => {
     const result = await openIosSwal({
       title,
-      html: `<div class="swal-stack-fields"><sl-input id="produccionSecurePass" type="password" class="swal2-input" placeholder="Clave general" autocomplete="new-password" name="produccion-secure-pass" autocapitalize="off" autocorrect="off" spellcheck="false" password-toggle></sl-input>${withReason ? '<sl-textarea id="produccionSecureReason" class="swal2-textarea" placeholder="Motivo" resize="auto"></sl-textarea><div class="d-flex flex-wrap gap-2 mt-2"><sl-button variant="default" type="button" class="inventario-threshold-btn" data-quick-reason="error de produccion">Error de producción</sl-button></div>' : ''}${html || ''}</div>`,
+      html: `<div class="swal-stack-fields"><sl-input id="produccionSecurePass" type="password" class="swal2-input" placeholder="${window.ljSensitivePasswordLabel}" autocomplete="new-password" name="produccion-secure-pass" autocapitalize="off" autocorrect="off" spellcheck="false" password-toggle></sl-input>${withReason ? '<sl-textarea id="produccionSecureReason" class="swal2-textarea" placeholder="Motivo" resize="auto"></sl-textarea><div class="d-flex flex-wrap gap-2 mt-2"><sl-button variant="default" type="button" class="inventario-threshold-btn" data-quick-reason="error de produccion">Error de producción</sl-button></div>' : ''}${html || ''}</div>`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Validar',
@@ -778,8 +773,7 @@
       },
       preConfirm: async () => {
         const entered = normalizeValue(document.getElementById('produccionSecurePass')?.value);
-        const remote = await getGeneralPassword();
-        if (!entered || !remote || entered !== remote) {
+        if (!entered || !(await window.ljVerifySensitivePassword(entered))) {
           Swal.showValidationMessage('Clave incorrecta.');
           return false;
         }
@@ -7746,7 +7740,7 @@
       cancelButtonText: 'Cancelar'
     });
     if (!confirmDelete.isConfirmed) return;
-    const auth = await askSensitivePassword('Clave general requerida', '<p>Confirmá para eliminar la producción y revertir su impacto.</p>', true);
+    const auth = await askSensitivePassword(window.LJ_BACKEND === 'supabase' ? 'Confirmá con tu contraseña' : 'Clave general requerida', '<p>Confirmá para eliminar la producción y revertir su impacto.</p>', true);
     if (!auth.isConfirmed) return;
     showRestoringStockOverlay(isLoteAntiguo ? 'Eliminando producción...' : 'Restaurando stock...');
     try {
@@ -7823,7 +7817,7 @@
       cancelButtonText: 'Cancelar'
     });
     if (!confirmDelete.isConfirmed) return;
-    const auth = await askSensitivePassword('Clave general requerida', '<p>Confirmá para eliminar la salida de productos.</p>', true);
+    const auth = await askSensitivePassword(window.LJ_BACKEND === 'supabase' ? 'Confirmá con tu contraseña' : 'Clave general requerida', '<p>Confirmá para eliminar la salida de productos.</p>', true);
     if (!auth.isConfirmed) return;
     showRestoringStockOverlay();
     try {

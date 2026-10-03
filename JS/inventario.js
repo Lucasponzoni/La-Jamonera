@@ -1354,12 +1354,6 @@
       }
     });
   };
-  const getGeneralPassword = async () => {
-    await window.laJamoneraReady;
-    const value = await window.dbLaJamoneraRest.read('/passGeneral/pass');
-    return normalizeValue(value);
-  };
-
   const requestDeleteConfirmation = async ({ title, text, subtext }) => {
     const result = await openIosSwal({
       title,
@@ -4078,7 +4072,7 @@
 
     const auth = await openIosSwal({
       title: 'Confirmación de seguridad',
-      html: '<sl-input id="entryDeletePass" type="password" password-toggle class="swal2-input" placeholder="Contraseña general"></sl-input>',
+      html: `<sl-input id="entryDeletePass" type="password" password-toggle class="swal2-input" placeholder="${window.ljSensitivePasswordLabel}"></sl-input>`,
       showCancelButton: true,
       confirmButtonText: 'Eliminar',
       cancelButtonText: 'Cancelar',
@@ -4092,8 +4086,7 @@
           Swal.showValidationMessage('Ingresá la contraseña.');
           return false;
         }
-        const firebasePass = await getGeneralPassword();
-        if (!firebasePass || enteredPass !== firebasePass) {
+        if (!(await window.ljVerifySensitivePassword(enteredPass))) {
           Swal.showValidationMessage('Contraseña incorrecta.');
           return false;
         }
@@ -4136,7 +4129,7 @@
     const entry = { ...entries[idx] };
     await window.laJamoneraReady;
     const usersMap = safeObject(await window.dbLaJamoneraRest.read('/informes/users'));
-    const users = Object.values(usersMap).filter((user) => normalizeValue(user?.id) && normalizeValue(user?.pin));
+    const users = Object.values(usersMap).filter((user) => normalizeValue(user?.id) && window.ljPinIsSet(user));
     if (!users.length) {
       await openIosSwal({ title: 'Sin usuarios', html: '<p>No hay usuarios con clave para autorizar la edición.</p>', icon: 'warning', confirmButtonText: 'Entendido' });
       return false;
@@ -4222,7 +4215,7 @@
         if (!noPerecedero && !expiryDate) return Swal.showValidationMessage('Fecha de caducidad obligatoria.');
         if (!provider) return Swal.showValidationMessage('Proveedor obligatorio.');
         if (!userId || !usersMap[userId]) return Swal.showValidationMessage('Seleccioná usuario.');
-        if (pin !== String(usersMap[userId].pin || '')) return Swal.showValidationMessage('Clave incorrecta.');
+        if (!(await window.ljVerifyPin({ ...usersMap[userId], id: usersMap[userId]?.id || userId }, pin))) return Swal.showValidationMessage('Clave incorrecta.');
         const urls = [...entryImageUrls(entry)];
         for (const file of files) {
           const message = validateInvoiceFile(file);

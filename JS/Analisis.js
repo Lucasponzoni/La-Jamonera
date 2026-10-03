@@ -296,7 +296,7 @@
               <sl-input id="aqUserFullName" label="Nombre y apellido *" autocomplete="off" placeholder="Ej: Juan Pérez" value="${initial ? escapeHtml(initial.fullName) : ''}"></sl-input>
               <sl-input id="aqUserPosition" label="Puesto en la empresa *" autocomplete="off" placeholder="Ej: Bromatólogo" value="${initial ? escapeHtml(initial.position) : ''}"></sl-input>
               <sl-input id="aqUserEmail" label="Email *" type="email" autocomplete="off" placeholder="usuario@empresa.com" value="${initial ? escapeHtml(initial.email || '') : ''}"></sl-input>
-              <sl-input id="aqUserPin" label="Clave de 4 dígitos *" type="password" password-toggle maxlength="4" inputmode="numeric" autocomplete="new-password" placeholder="4 dígitos" value="${initial ? escapeHtml(initial.pin) : ''}"></sl-input>
+              <sl-input id="aqUserPin" label="Clave de 4 dígitos *" type="password" password-toggle maxlength="4" inputmode="numeric" autocomplete="new-password" placeholder="${escapeHtml(window.ljPinPlaceholder(initial))}" value="${escapeHtml(window.ljPinFieldValue(initial))}"></sl-input>
             </div>
           </section>
           <section class="step-block">
@@ -333,10 +333,10 @@
         const fullName = normalizeValue(document.getElementById('aqUserFullName').value);
         const position = normalizeValue(document.getElementById('aqUserPosition').value);
         const email    = normalizeLower(document.getElementById('aqUserEmail').value);
-        const pin      = normalizeValue(document.getElementById('aqUserPin').value);
+        const pin      = window.ljPinResolve(document.getElementById('aqUserPin').value, initial);
         if (!fullName || !position || !email) { Swal.showValidationMessage('Completá nombre, puesto e email.'); return false; }
         if (!/^\S+@\S+\.\S+$/.test(email))   { Swal.showValidationMessage('Email inválido.'); return false; }
-        if (!/^\d{4}$/.test(pin))             { Swal.showValidationMessage('La clave debe tener 4 dígitos.'); return false; }
+        if (!pin)                             { Swal.showValidationMessage('La clave debe tener 4 dígitos.'); return false; }
         let photoUrl = initial?.photoUrl || '';
         if (pendingUpload) {
           try { await window.laJamoneraReady; photoUrl = await uploadToStorage(pendingUpload, 'analisis_quimicos/users'); }
@@ -617,7 +617,7 @@ REGLAS:
 
     const keyCheck = await promptUserKey();
     if (keyCheck.isConfirmed) await loadUsers({ force: true });
-    if (!keyCheck.isConfirmed || !pinsMatch(keyCheck.value, state.users[userId]?.pin)) {
+    if (!keyCheck.isConfirmed || !(await window.ljVerifyPin({ ...state.users[userId], id: state.users[userId]?.id || userId }, keyCheck.value))) {
       if (keyCheck.isConfirmed) await openSwal({ title: 'Clave incorrecta', html: '<p>No coincide la clave del usuario.</p>', icon: 'error', confirmButtonText: 'Entendido' });
       return;
     }
@@ -929,7 +929,7 @@ REGLAS:
     const keyCheck = await promptUserKey();
     if (!keyCheck.isConfirmed) return;
     const user = state.users[full.userId];
-    if (!user || !pinsMatch(keyCheck.value, user.pin)) {
+    if (!user || !(await window.ljVerifyPin({ ...user, id: user.id || full.userId }, keyCheck.value))) {
       await openSwal({ title: 'Clave incorrecta', html: '<p>No coincide la clave.</p>', icon: 'error', confirmButtonText: 'Entendido' }); return;
     }
     state.editingId = recordId;
@@ -969,7 +969,7 @@ REGLAS:
     const keyCheck = await promptUserKey();
     if (!keyCheck.isConfirmed) return;
     const user = state.users[record.userId];
-    if (!user || !pinsMatch(keyCheck.value, user.pin)) {
+    if (!user || !(await window.ljVerifyPin({ ...user, id: user.id || record.userId }, keyCheck.value))) {
       await openSwal({ title: 'Clave incorrecta', html: '<p>No coincide la clave.</p>', icon: 'error', confirmButtonText: 'Entendido' }); return;
     }
     try {

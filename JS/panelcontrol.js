@@ -378,7 +378,7 @@ const printReport = async (report) => {
 
   const verifyReportCreatorPin = async (report) => {
     const user = safeObject(state.usersMap[report?.userId]);
-    if (!user?.pin) return true;
+    if (!window.ljPinIsSet(user)) return true;
     const result = await openIosSwal({
       title: 'Clave de usuario',
       html: '<sl-input id="panelCreatorPin" class="swal2-input" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos"></sl-input>',
@@ -388,7 +388,7 @@ const printReport = async (report) => {
       preConfirm: () => normalize(document.getElementById('panelCreatorPin')?.value)
     });
     if (!result.isConfirmed) return false;
-    if (String(result.value || '') !== String(user.pin || '')) {
+    if (!(await window.ljVerifyPin({ ...user, id: user.id || report?.userId }, result.value))) {
       await openIosSwal({ title: 'Clave incorrecta', html: '<p>La clave no coincide con el creador del informe.</p>', icon: 'error', confirmButtonText: 'Entendido' });
       return false;
     }
@@ -522,7 +522,7 @@ const printReport = async (report) => {
       if (!userId || !text) return;
       const author = safeObject(state.usersMap[userId]);
       const authorId = normalize(author.id || userId);
-      if (!authorId || String(author.pin || '') !== String(pin || '')) {
+      if (!authorId || (window.ljPinIsSet(author) ? !(await window.ljVerifyPin({ ...author, id: authorId }, pin)) : Boolean(pin))) {
         await openIosSwal({ title: 'Clave incorrecta', html: '<p>La clave no coincide con el usuario seleccionado.</p>', icon: 'error', confirmButtonText: 'Entendido' });
         return;
       }
@@ -566,7 +566,7 @@ const printReport = async (report) => {
     if (!payload.userId || !payload.text) return;
     const author = safeObject(state.usersMap[payload.userId]);
     const authorId = normalize(author.id || payload.userId);
-    if (!authorId || String(author.pin || '') !== String(payload.pin || '')) {
+    if (!authorId || (window.ljPinIsSet(author) ? !(await window.ljVerifyPin({ ...author, id: authorId }, payload.pin)) : Boolean(payload.pin))) {
       await openIosSwal({ title: 'Clave incorrecta', html: '<p>La clave no coincide con el usuario seleccionado.</p>', icon: 'error', confirmButtonText: 'Entendido' });
       return;
     }
