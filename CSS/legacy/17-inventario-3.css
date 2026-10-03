@@ -13,7 +13,7 @@
 }
 
 .inventario-provider-suggest-placeholder {
-  background: #edf2ff;
+  background: var(--lj-surface-2);
 }
 
 .inventario-provider-suggest-icon {
@@ -28,9 +28,9 @@
 }
 
 .inventario-bulk-row {
-  border: 1px solid #dbe0ef;
-  border-radius: 14px;
-  background: #fdfdff;
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius-lg);
+  background: var(--lj-surface);
   padding: 10px;
   display: grid;
   gap: 8px;
@@ -55,10 +55,10 @@
 }
 
 .weekly-sheet-block {
-  border: 1px solid #1f2937;
+  border: 1px solid var(--lj-border-strong);
   border-radius: 0;
   overflow: hidden;
-  background: #fff;
+  background: var(--lj-surface);
 }
 
 .weekly-sheet-block h3,
@@ -70,15 +70,15 @@
 }
 
 .weekly-sheet-block h3 {
-  background: #0f172a;
-  color: #fff;
-  border-bottom: 1px solid #1f2937;
+  background: var(--lj-brand);
+  color: var(--lj-surface);
+  border-bottom: 1px solid var(--lj-border-strong);
 }
 
 .weekly-sheet-block h4 {
-  background: #f1f5f9;
-  color: #1e3a5f;
-  border-bottom: 1px solid #1f2937;
+  background: var(--lj-surface-2);
+  color: var(--lj-brand);
+  border-bottom: 1px solid var(--lj-border-strong);
 }
 
 .weekly-sheet-table {
@@ -86,7 +86,7 @@
   border-collapse: collapse;
   border-spacing: 0;
   table-layout: fixed;
-  background: #ffffff;
+  background: var(--lj-surface);
   border-radius: 0;
   overflow: visible;
   box-shadow: 0 2px 12px -6px rgba(15, 23, 42, 0.15);
@@ -109,8 +109,8 @@
 
 .weekly-sheet-table th,
 .weekly-sheet-table td {
-  border-bottom: 1px solid #e3ebf6;
-  border-right: 1px solid #e3ebf6;
+  border-bottom: 1px solid var(--lj-border);
+  border-right: 1px solid var(--lj-border);
   padding: 8px 6px;
   text-align: center;
   vertical-align: middle;
@@ -132,8 +132,8 @@
 
 /* Headers: dos tonos (verde para cat/sub/producto, azul para días, gris para total). */
 .weekly-sheet-table th.th-cat {
-  background: #134e4a;
-  color: #ffffff;
+  background: var(--lj-brand);
+  color: var(--lj-surface);
   font-weight: 800;
   font-size: 0.78rem;
   letter-spacing: 0.02em;
@@ -141,8 +141,8 @@
 }
 
 .weekly-sheet-table th.th-day {
-  background: #1e3a8a;
-  color: #ffffff;
+  background: var(--lj-accent);
+  color: var(--lj-surface);
   font-weight: 800;
   font-size: 0.78rem;
   letter-spacing: 0.02em;
@@ -150,8 +150,8 @@
 }
 
 .weekly-sheet-table th.th-total {
-  background: #0f172a;
-  color: #ffffff;
+  background: var(--lj-brand);
+  color: var(--lj-surface);
   font-weight: 800;
   font-size: 0.78rem;
   letter-spacing: 0.02em;
@@ -165,14 +165,14 @@
   line-height: 1.2;
   overflow-wrap: anywhere;
   word-break: normal;
-  color: #2c5e58;
-  background: #f0fdf4;
+  color: var(--lj-text);
+  background: var(--lj-success-soft);
   text-transform: uppercase !important;
 }
 
 .weekly-sheet-table td.weekly-cat-cell:nth-child(2) {
-  color: #4a5b78;
-  background: #f4f7fb;
+  color: var(--lj-muted);
+  background: var(--lj-surface-2);
 }
 
 /* Producto: alineado izquierda con foto + texto. */
@@ -195,7 +195,7 @@
   height: 32px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid #e3ebf6;
+  border: 2px solid var(--lj-border);
   flex-shrink: 0;
 }
 
@@ -212,7 +212,7 @@
   font-weight: 700;
   font-size: 0.84rem;
   letter-spacing: 0;
-  color: #0f172a;
+  color: var(--lj-brand);
   text-transform: uppercase !important;
   overflow-wrap: anywhere;
   word-break: normal;
@@ -222,7 +222,7 @@
   font-size: 0.7rem;
   font-weight: 500;
   font-style: italic;
-  color: #7b5ea7;
+  color: var(--lj-muted);
   text-transform: none !important;
   letter-spacing: 0;
   line-height: 1.2;
@@ -230,13 +230,13 @@
 
 /* Filas alternadas con un tinte muy suave para legibilidad. */
 .weekly-sheet-table tbody tr:nth-child(even) td:not(.weekly-cat-cell):not(.weekly-total):not(.is-ok):not(.is-missing) {
-  background: #fafbfc;
+  background: var(--lj-surface-2);
 }
 
 /* Celdas de días sin producción: tinte ámbar muy claro. */
 .weekly-sheet-table td.is-missing {
-  background: #fff8f1;
-  color: #b85c00;
+  background: var(--lj-warning-soft);
+  color: var(--lj-warning);
   font-weight: 500;
   font-size: 0.75rem;
   letter-spacing: 0;
@@ -245,8 +245,8 @@
 
 /* Celdas con producción: verde fuerte. */
 .weekly-sheet-table td.is-ok {
-  background: #ecfdf5;
-  color: #065f46;
+  background: var(--lj-success-soft);
+  color: var(--lj-success);
   font-weight: 800;
   font-size: 0.85rem;
 }
@@ -254,8 +254,8 @@
 /* Total a la derecha: destacado azul. */
 .weekly-sheet-table .weekly-total {
   font-weight: 800;
-  background: #dbeafe;
-  color: #1e3a8a;
+  background: var(--lj-accent-soft);
+  color: var(--lj-accent);
   font-size: 0.92rem;
   letter-spacing: -0.01em;
 }
@@ -276,16 +276,16 @@
 }
 
 .weekly-sheet-block h3 {
-  background: #0f172a;
-  color: #ffffff;
+  background: var(--lj-brand);
+  color: var(--lj-surface);
   font-weight: 800;
   letter-spacing: 0.04em;
   font-size: 1rem;
 }
 
 .weekly-sheet-block h4 {
-  background: #eef4ff;
-  color: #1e3a8a;
+  background: var(--lj-surface-2);
+  color: var(--lj-accent);
   font-weight: 700;
   font-size: 0.95rem;
   letter-spacing: 0.02em;
@@ -310,21 +310,21 @@
   line-height: 1.1;
   letter-spacing: -0.02em;
   margin: 4px 0 6px;
-  color: #173d73;
+  color: var(--lj-brand);
 }
 
 .produccion-editor-header .produccion-nombre-comercial-editor {
   font-size: 1.05rem;
   font-weight: 700;
-  color: #7e5dbb;
+  color: var(--lj-muted);
   margin: 0 0 8px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 4px 12px;
-  background: #f3ecff;
-  border: 1px solid #ddd5ee;
-  border-radius: 999px;
+  background: var(--lj-surface-2);
+  border: 1px solid var(--lj-border);
+  border-radius: 4px;
   width: fit-content;
 }
 
@@ -336,12 +336,12 @@
   opacity: 0.85;
 }
 
-.weekly-sheet-table th.th-cat { background: #14532d; color: #fff; }
-.weekly-sheet-table th.th-day { background: #1d4ed8; color: #fff; }
-.weekly-sheet-table th.th-total { background: #0f172a; color: #fff; }
-.weekly-sheet-table td.is-missing { background: #fff7ed; color: #9a3412; }
-.weekly-sheet-table td.is-ok { background: #ecfdf5; color: #14532d; font-weight: 800; }
-.weekly-sheet-table .weekly-total { font-weight: 900; background: #e0f2fe; color: #0f3f63; }
+.weekly-sheet-table th.th-cat { background: var(--lj-success); color: var(--lj-surface); }
+.weekly-sheet-table th.th-day { background: var(--lj-accent); color: var(--lj-surface); }
+.weekly-sheet-table th.th-total { background: var(--lj-brand); color: var(--lj-surface); }
+.weekly-sheet-table td.is-missing { background: var(--lj-warning-soft); color: var(--lj-warning); }
+.weekly-sheet-table td.is-ok { background: var(--lj-success-soft); color: var(--lj-success); font-weight: 800; }
+.weekly-sheet-table .weekly-total { font-weight: 900; background: var(--lj-accent-soft); color: var(--lj-brand); }
 
 .weekly-product-cell {
   display: inline-flex;
@@ -365,34 +365,30 @@
    INVENTARIO · AUTO EGRESOS
 ========================================= */
 .inventario-auto-egreso-row td {
-  background: #fff6dc !important;
-  border-bottom: 1px dashed #d99b18 !important;
+  background: var(--lj-warning-soft) !important;
+  border-bottom: 1px dashed var(--lj-warning) !important;
 }
 
 .inventario-auto-egreso-home-row td {
-  background: #ffe8ed !important;
-  border-bottom: 1px dashed #d94b68 !important;
+  background: var(--lj-danger-soft) !important;
+  border-bottom: 1px dashed var(--lj-danger) !important;
 }
 
 .inventario-auto-egreso-badge {
-  background: #fff0bf;
-  border-color: #d99b18;
-  color: #8a4f00;
+  background: var(--lj-warning-soft);
+  border-color: var(--lj-warning);
+  color: var(--lj-warning);
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
 .inventario-auto-egreso-badge.is-home-delivery {
-  background: #ffd9e1;
-  border-color: #cc5b73;
-  color: #8f1231;
+  background: var(--lj-danger-soft);
+  border-color: var(--lj-danger);
+  color: var(--lj-danger);
 }
 
-.swal2-popup.inventario-expand-alert {
-  width: 96vw !important;
-  max-width: 96vw !important;
-}
 
 .swal2-popup.inventario-expand-alert .swal2-html-container {
   max-height: 78vh;
@@ -404,7 +400,7 @@
 }
 
 .produccion-expired-max-help {
-  color: #b45309;
+  color: var(--lj-warning);
   font-weight: 700;
   font-size: 0.85rem;
 }
@@ -421,21 +417,21 @@
 }
 
 .produccion-max-adjusted {
-  color: #ff8a2a !important;
+  color: var(--lj-warning) !important;
   margin-top: 0 !important;
   line-height: 1.05;
 }
 
 
 .produccion-card.tone-expired {
-  border-color: #f1cf9a;
-  background: #fff8ee;
+  border-color: color-mix(in srgb, var(--lj-warning) 35%, var(--lj-surface));
+  background: var(--lj-warning-soft);
 }
 
 .produccion-chip.tone-expired {
-  color: #a86409;
-  background: #fff1df;
-  border-color: #f3d2a5;
+  color: var(--lj-warning);
+  background: var(--lj-warning-soft);
+  border-color: color-mix(in srgb, var(--lj-warning) 35%, var(--lj-surface));
 }
 
 /* ── three-dots more menu ── */
@@ -454,14 +450,14 @@
   align-items: center;
   justify-content: center;
   font-size: 1.05rem;
-  color: #64748b;
-  border-color: #dde3ef;
+  color: var(--lj-muted);
+  border-color: var(--lj-border);
   background: transparent;
   transition: background 0.14s, color 0.14s, transform 0.12s;
 }
 .produccion-more-btn:hover {
-  background: #f0f4fb !important;
-  color: #334155;
+  background: var(--lj-surface-2) !important;
+  color: var(--lj-text);
   transform: scale(1.08);
 }
 .produccion-more-btn:active { transform: scale(0.93); }
@@ -470,9 +466,9 @@
   position: absolute;
   bottom: calc(100% + 10px);
   right: 0;
-  background: #fff;
+  background: var(--lj-surface);
   border: 1px solid rgba(99,120,177,0.13);
-  border-radius: 18px;
+  border-radius: var(--lj-radius-lg);
   box-shadow: 0 4px 6px -2px rgba(0,0,0,0.06), 0 16px 48px -8px rgba(0,0,0,0.13), inset 0 0 0 1px rgba(255,255,255,0.7);
   min-width: 246px;
   z-index: 300;
@@ -492,12 +488,12 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #94a3b8;
+  color: var(--lj-muted);
 }
 
 .produccion-more-divider {
   height: 1px;
-  background: #f1f5f9;
+  background: var(--lj-surface-2);
   margin: 0 12px 4px;
 }
 
@@ -513,21 +509,21 @@
   cursor: pointer;
   transition: background 0.12s;
 }
-.produccion-more-item:hover { background: #fffaf3; }
-.produccion-more-item:disabled{opacity:.48;cursor:not-allowed;}
-.produccion-more-item:disabled:hover{background:none;}
+.produccion-more-item:hover { background: var(--lj-warning-soft); }
+.produccion-more-item:disabled{opacity: .48;cursor: not-allowed;}
+.produccion-more-item:disabled:hover{background: none;}
 
 .produccion-more-item-icon {
   width: 34px;
   height: 34px;
-  border-radius: 10px;
-  background: #fef3c7;
-  border: 1px solid #fde68a;
+  border-radius: var(--lj-radius-lg);
+  background: var(--lj-warning-soft);
+  border: 1px solid color-mix(in srgb, var(--lj-warning) 35%, var(--lj-surface));
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 0.9rem;
-  color: #b45309;
+  color: var(--lj-warning);
   flex-shrink: 0;
 }
 
@@ -540,13 +536,13 @@
 .produccion-more-item-label {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #92400e;
+  color: var(--lj-warning);
   line-height: 1.2;
 }
 
 .produccion-more-item-desc {
   font-size: 0.72rem;
-  color: #a16207;
+  color: var(--lj-warning);
   line-height: 1.3;
 }
 
@@ -555,18 +551,18 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #fff8e1;
-  border: 1px solid #ffe0a0;
-  border-radius: 10px;
+  background: var(--lj-warning-soft);
+  border: 1px solid color-mix(in srgb, var(--lj-warning) 35%, var(--lj-surface));
+  border-radius: var(--lj-radius-lg);
   padding: 10px 14px;
   font-size: 0.82rem;
-  color: #8a6000;
+  color: var(--lj-warning);
   margin-bottom: 14px;
 }
 
 .produccion-sin-traz-banner i {
   font-size: 1rem;
-  color: #e07a00;
+  color: var(--lj-warning);
   flex-shrink: 0;
 }
 
@@ -578,20 +574,20 @@
 
 /* --- Lote antiguo (producción retroactiva) --- */
 .produccion-lote-antiguo-banner {
-  background: #eef3ff;
-  border-color: #c3d4ff;
-  color: #2a4d8f;
+  background: var(--lj-surface-2);
+  border-color: var(--lj-border);
+  color: var(--lj-accent);
 }
 
 .produccion-lote-antiguo-banner i {
-  color: #3a6bd6;
+  color: var(--lj-accent);
 }
 
 /* --- Producción: vista compacta --- */
 .produccion-view-toggle-btn.is-active {
-  background: #eef2fb;
-  border-color: #b9cdf0;
-  color: #1f4ea5;
+  background: var(--lj-accent-soft);
+  border-color: var(--lj-border-strong);
+  color: var(--lj-accent);
 }
 
 .produccion-list.is-compact {
@@ -606,32 +602,32 @@
   align-items: center;
   gap: 10px;
   padding: 5px 10px;
-  border: 1px solid #dbe4f3;
+  border: 1px solid var(--lj-border);
   border-left-width: 4px;
-  border-radius: 0 10px 10px 0;
-  background: #ffffff;
+  border-radius: 0 var(--lj-radius-lg) var(--lj-radius-lg) 0;
+  background: var(--lj-surface);
   cursor: pointer;
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .produccion-compact-row:hover {
-  background: #f4f8ff;
-  border-color: #b9cdf0;
+  background: var(--lj-surface-2);
+  border-color: var(--lj-border-strong);
 }
 
-.produccion-compact-row.tone-success { border-left-color: #2fae63; }
-.produccion-compact-row.tone-warning { border-left-color: #e8a13c; }
-.produccion-compact-row.tone-danger { border-left-color: #d84a63; }
-.produccion-compact-row.tone-expired { border-left-color: #8a5be0; }
+.produccion-compact-row.tone-success { border-left-color: var(--lj-success); }
+.produccion-compact-row.tone-warning { border-left-color: var(--lj-warning); }
+.produccion-compact-row.tone-danger { border-left-color: var(--lj-danger); }
+.produccion-compact-row.tone-expired { border-left-color: var(--lj-accent); }
 
 .produccion-compact-row .produccion-semaforo {
   justify-self: center;
 }
 
-.produccion-compact-row.tone-success .produccion-semaforo { background: #2fae63; }
-.produccion-compact-row.tone-warning .produccion-semaforo { background: #e8a13c; }
-.produccion-compact-row.tone-danger .produccion-semaforo { background: #d84a63; }
-.produccion-compact-row.tone-expired .produccion-semaforo { background: #8a5be0; }
+.produccion-compact-row.tone-success .produccion-semaforo { background: var(--lj-success); }
+.produccion-compact-row.tone-warning .produccion-semaforo { background: var(--lj-warning); }
+.produccion-compact-row.tone-danger .produccion-semaforo { background: var(--lj-danger); }
+.produccion-compact-row.tone-expired .produccion-semaforo { background: var(--lj-accent); }
 
 .produccion-compact-thumb {
   position: relative;
@@ -642,7 +638,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #eef2fb;
+  background: var(--lj-accent-soft);
   flex-shrink: 0;
 }
 
@@ -680,7 +676,7 @@
 
 .produccion-compact-name small {
   font-size: 0.72rem;
-  color: #687895;
+  color: var(--lj-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -692,10 +688,10 @@
   gap: 4px;
   font-size: 0.72rem;
   font-weight: 700;
-  color: #4a5f8f;
-  background: #eef2fb;
-  border: 1px solid #d3ddf3;
-  border-radius: 999px;
+  color: var(--lj-muted);
+  background: var(--lj-accent-soft);
+  border: 1px solid var(--lj-border);
+  border-radius: 4px;
   padding: 2px 8px;
   white-space: nowrap;
 }
@@ -706,18 +702,18 @@
 
 .produccion-compact-max {
   font-size: 0.88rem;
-  color: #1f4ea5;
+  color: var(--lj-accent);
   white-space: nowrap;
 }
 
 .produccion-compact-max span {
   font-size: 0.7rem;
   font-weight: 600;
-  color: #60739f;
+  color: var(--lj-muted);
 }
 
 .produccion-compact-max.is-zero {
-  color: #b42338;
+  color: var(--lj-danger);
 }
 
 .produccion-compact-produce-btn {
@@ -728,7 +724,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: var(--lj-radius-lg);
 }
 
 .produccion-compact-produce-btn i {
@@ -775,10 +771,10 @@
   width: fit-content;
   margin-top: 2px;
   padding: 1px 8px;
-  border-radius: 999px;
-  background: #eef3ff;
-  border: 1px solid #c3d4ff;
-  color: #2a4d8f;
+  border-radius: 4px;
+  background: var(--lj-surface-2);
+  border: 1px solid var(--lj-border);
+  color: var(--lj-accent);
   font-size: 0.68rem;
   font-weight: 600;
 }
@@ -791,19 +787,533 @@
 .produccion-nombre-comercial-editor {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #7b5ea7;
+  color: var(--lj-muted);
   margin: 2px 0 0;
 }
 
 .produccion-progress-wrap.is-expired-only small {
-  color: #9f5b00;
+  color: var(--lj-warning);
 }
 
 .produccion-progress-bar span.is-expired {
-  background: linear-gradient(90deg, #ffb85c 0%, #ff8a00 100%);
+  background: var(--lj-warning);
 }
 
 .produccion-max-expired-only {
-  color: #c4314f !important;
+  color: var(--lj-danger) !important;
 }
 
+
+/* =========================================
+   INVENTARIO · controles Shoelace (sl-button / sl-input / sl-checkbox)
+   Las clases heredadas de los botones ahora viven en el host del sl-button:
+   se neutraliza la caja del host y el aspecto se define en ::part(base).
+========================================= */
+#inventarioModal [hidden],
+.lj-alert [hidden] {
+  display: none !important;
+}
+
+sl-button.inventario-status-btn,
+sl-button.inventory-production-action-btn,
+sl-button.inventario-threshold-btn,
+sl-button.inventario-head-action,
+sl-button.inventario-expand-btn,
+sl-button.inventario-delete-btn,
+sl-button.inventario-no-photo-btn,
+sl-button.inventario-page-btn,
+sl-button.inventario-icon-only-btn,
+sl-button.inventario-add-bulk-btn,
+sl-button.inventario-weekly-config-btn,
+#inventarioModal sl-button.recipe-table-action-btn,
+#inventarioModal sl-button.produccion-history-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  min-height: 0;
+  min-width: 0;
+  width: auto;
+  border-radius: 0;
+  box-shadow: none;
+  outline: 0;
+  color: inherit;
+  font-size: inherit;
+  transform: none;
+}
+
+/* Filtros de estado (chips, guía modal Ingredientes): neutros, activo en acento; el contador toma el color del estado */
+sl-button.inventario-status-btn { flex: 0 0 auto; }
+sl-button.inventario-status-btn::part(base) {
+  height: 30px;
+  min-height: 30px;
+  line-height: 28px;
+  border-radius: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: var(--lj-surface);
+  border-color: var(--lj-border-strong);
+  color: var(--lj-text);
+}
+sl-button.inventario-status-btn::part(label) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+}
+sl-button.inventario-status-btn::part(prefix) { padding-left: 10px; }
+sl-button.inventario-status-btn strong {
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 18px;
+  min-width: 20px;
+  padding: 0 5px;
+  border-radius: 4px;
+  text-align: center;
+  background: var(--lj-surface-2);
+  color: var(--lj-text);
+}
+sl-button.inventario-status-btn::part(prefix) { font-size: 12px; color: var(--lj-muted); }
+sl-button.inventario-status-btn.is-active::part(prefix) { color: var(--lj-accent); }
+sl-button.inventario-status-btn.is-active strong { background: var(--lj-accent); color: var(--lj-surface); }
+sl-button.inventario-status-btn::part(base):hover { border-color: var(--lj-accent); color: var(--lj-accent); background: var(--lj-surface); }
+sl-button.inventario-status-btn.is-active::part(base) {
+  background: var(--lj-accent-soft);
+  border-color: var(--lj-accent);
+  color: var(--lj-accent);
+}
+sl-button.inventario-status-btn[disabled]::part(base) { opacity: .55; }
+.inventario-status-divider { align-self: center; height: 22px; }
+
+/* Acciones de la tarjeta de inventario */
+.inventario-actions-row.inventory-production-actions { gap: 8px; align-items: center; }
+
+/* Botones con identidad propia */
+sl-button.inventario-expand-btn::part(base) {
+  background: var(--lj-warning-soft);
+  color: var(--lj-warning);
+  border-color: color-mix(in srgb, var(--lj-warning) 35%, var(--lj-surface));
+}
+sl-button.inventario-expand-btn::part(base):hover { border-color: var(--lj-warning); }
+sl-button.inventario-delete-btn[variant="default"]::part(base) {
+  background: var(--lj-danger-soft);
+  color: var(--lj-danger);
+  border-color: color-mix(in srgb, var(--lj-danger) 35%, var(--lj-surface));
+}
+sl-button.inventario-delete-btn[variant="default"]::part(base):hover { border-color: var(--lj-danger); }
+#inventarioModal sl-button.recipe-table-action-btn { min-width: 0; }
+
+/* Botón RNE de la barra: contador como sufijo */
+#inventarioProvidersRneBtn .inventario-rne-alert-badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--lj-danger);
+  color: var(--lj-surface);
+  font-size: 11px;
+  line-height: 20px;
+  text-align: center;
+}
+
+/* Paginación */
+.inventario-pagination.enhanced { align-items: center; }
+.inventario-pagination.enhanced > span { font-size: 13px; color: var(--lj-muted); }
+
+/* Tablas: acciones compactas alineadas */
+.inventario-entry-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+.inventario-entry-more-menu sl-button { width: 100%; }
+.inventario-entry-more-menu sl-button::part(base) { justify-content: flex-start; color: var(--lj-danger); }
+
+/* Campos del editor de ingreso */
+#inventarioEditorForm sl-input,
+#inventarioEditorForm sl-select,
+#inventarioEditorForm sl-textarea,
+#inventarioEditorForm input.lj-input {
+  width: 100%;
+}
+#inventarioEditorForm .lj-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+}
+#inventarioEditorForm .lj-label .inventario-step-icon { color: var(--lj-accent); }
+#inventarioEditorForm .inventario-table-head sl-input { flex: 1 1 260px; }
+.inventario-lot-separator sl-select,
+sl-select#lotSeparator { max-width: 140px; }
+#inventarioEditorForm .recipe-ing-input-wrap sl-input { flex: 1 1 auto; min-width: 0; }
+#inventarioEditorForm .inventario-bulk-unit-cell { display: grid; gap: 6px; }
+
+/* Checkboxes (sl-checkbox) con la clase de fila heredada */
+sl-checkbox.inventario-check-row {
+  display: flex;
+  padding: 2px 0;
+  font-size: 13px;
+}
+sl-checkbox.inventario-check-row::part(base) { align-items: center; }
+sl-checkbox.inventario-check-row::part(label) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--lj-text);
+  font-weight: 600;
+}
+sl-checkbox.inventario-selector-row { width: 100%; padding: 6px 0; }
+.inventario-frozen-row { display: inline-flex; align-items: center; gap: 6px; }
+.inventario-bulk-row-extras { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
+.inventario-infinite-toggle { display: inline-flex; align-items: center; gap: 8px; }
+.inventario-infinite-toggle sl-switch::part(label) { font-size: 13px; font-weight: 600; color: var(--lj-text); }
+.inventario-radio-group sl-radio + sl-radio { margin-top: 6px; }
+.inventario-radio-group sl-radio::part(label) { font-size: 13px; font-weight: 600; color: var(--lj-text); }
+
+/* Tarjetas "Tipo de producto": el sl-checkbox real va oculto */
+.inventario-flag-tile > sl-checkbox.inventario-flag-tile-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+#inventarioEditorForm .inventario-flags-block {
+  background: var(--lj-surface-2);
+  border-color: var(--lj-border);
+  border-radius: var(--lj-radius-lg);
+}
+#inventarioEditorForm .inventario-flags-head { color: var(--lj-brand); border-bottom-color: var(--lj-border); }
+#inventarioEditorForm .inventario-flags-head sl-icon { color: var(--lj-accent); }
+#inventarioEditorForm .inventario-flag-tile {
+  background: var(--lj-surface);
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius-lg);
+  box-shadow: none;
+}
+#inventarioEditorForm .inventario-flag-tile:hover { border-color: var(--lj-border-strong); background: var(--lj-surface); }
+#inventarioEditorForm .inventario-flag-tile.is-checked {
+  border-color: var(--lj-accent);
+  background: var(--lj-accent-soft);
+}
+#inventarioEditorForm .inventario-flag-tile-title { color: var(--lj-text); }
+#inventarioEditorForm .inventario-flag-tile-desc { color: var(--lj-muted); }
+#inventarioEditorForm .inventario-flag-tile-icon {
+  background: var(--lj-surface-2);
+  color: var(--lj-accent);
+  border-radius: var(--lj-radius-lg);
+  font-size: 18px;
+}
+#inventarioEditorForm .inventario-flag-tile.is-checked .inventario-flag-tile-icon { background: var(--lj-surface); }
+#inventarioEditorForm .inventario-flag-tile-check {
+  background: var(--lj-surface);
+  border-color: var(--lj-border-strong);
+  color: transparent;
+}
+#inventarioEditorForm .inventario-flag-tile-check sl-icon { font-size: 14px; }
+#inventarioEditorForm .inventario-flag-tile.is-checked .inventario-flag-tile-check {
+  background: var(--lj-accent);
+  border-color: var(--lj-accent);
+  color: var(--lj-surface);
+}
+#inventarioEditorForm .inventario-flag-tile[data-flag="autoegreso"].is-checked { border-color: var(--lj-success); background: var(--lj-success-soft); }
+#inventarioEditorForm .inventario-flag-tile[data-flag="autoegreso"].is-checked .inventario-flag-tile-check { background: var(--lj-success); border-color: var(--lj-success); }
+#inventarioEditorForm .inventario-flag-tile[data-flag="noperecedero"].is-checked { border-color: var(--lj-warning); background: var(--lj-warning-soft); }
+#inventarioEditorForm .inventario-flag-tile[data-flag="noperecedero"].is-checked .inventario-flag-tile-check { background: var(--lj-warning); border-color: var(--lj-warning); }
+#inventarioEditorForm .inventario-flag-tile.is-from-pref { box-shadow: none; }
+#inventarioEditorForm .inventario-flag-tile-pref { color: var(--lj-warning); background: var(--lj-warning-soft); border-color: color-mix(in srgb, var(--lj-warning) 30%, var(--lj-surface)); }
+
+/* Botón de información "congelado" (sl-icon-button) */
+sl-icon-button.frozen-info-icon {
+  width: auto;
+  height: auto;
+  border: 0;
+  background: none;
+  font-size: 16px;
+  color: var(--lj-accent);
+}
+sl-icon-button.frozen-info-icon:hover { background: none; }
+sl-icon-button.frozen-info-icon::part(base) { padding: 4px; color: var(--lj-accent); }
+sl-icon-button.inventario-flag-tile-info-btn,
+sl-icon-button.inventario-flag-tile-info-btn:hover { transform: translateY(-50%); }
+
+/* Encabezados colapsables y tiles (button.lj-tile) */
+button.lj-tile.inventario-collapse-head,
+button.lj-tile.inventario-zone-toggle { border-radius: var(--lj-radius-lg); }
+button.lj-tile.family-circle-toggle { border-color: transparent; background: none; }
+button.lj-tile.family-circle-item { border: 0; background: none; }
+button.lj-tile.produccion-rne-expiry-alert { width: 100%; }
+
+/* Badges de sugerencia de vencimiento (sl-badge) */
+sl-badge.inventario-suggest-badge::part(base) { font-size: 11px; font-weight: 600; padding: 3px 8px; }
+sl-badge.inventario-suggest-badge.is-empty::part(base) { font-weight: 500; }
+
+/* Inputs nativos de archivo visibles */
+input[type="file"].inventario-native-file {
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  color: var(--lj-muted);
+}
+input[type="file"].inventario-native-file::file-selector-button {
+  height: 30px;
+  margin-right: 10px;
+  padding: 0 12px;
+  border: 1px solid var(--lj-border-strong);
+  border-radius: var(--lj-radius);
+  background: var(--lj-surface);
+  color: var(--lj-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Alertas de inventario (LJAlert): campos y controles */
+.lj-alert .inventario-inline-field { display: flex; gap: 8px; align-items: center; }
+.lj-alert .inventario-inline-field sl-input { flex: 1 1 auto; }
+.lj-alert .swal-stack-fields { display: grid; gap: 8px; }
+.lj-alert .lj-label { margin-top: 8px; margin-bottom: 4px; }
+.lj-alert sl-input.swal2-input,
+.lj-alert sl-select.swal2-select,
+.lj-alert sl-select.swal2-input,
+.lj-alert sl-textarea.swal2-textarea,
+.lj-alert input.lj-input.swal2-input { width: 100%; margin: 0; }
+.lj-alert .inventario-weekly-family-dropdown sl-button::part(label) { display: inline-flex; gap: 6px; align-items: center; }
+
+/* Planilla semanal (gestor masivo) */
+sl-dialog.lj-alert-dialog:has(.inventario-weekly-bulk-alert) { --width: min(1100px, 96vw); }
+sl-dialog.lj-alert-dialog:has(.inventario-expand-alert) { --width: 96vw; }
+sl-dialog.lj-alert-dialog:has(.inventario-provider-rne-alert) { --width: min(960px, 94vw); }
+.inventario-weekly-toolbar-v2 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.inventario-weekly-toolbar-v2 sl-input.inventario-weekly-search { flex: 1 1 240px; max-width: 360px; }
+.inventario-weekly-field { display: grid; gap: 4px; }
+.inventario-weekly-field .lj-label { margin: 0; }
+.inventario-weekly-family-menu { max-height: 320px; overflow: auto; }
+
+/* Centro de proveedores RNE */
+.inventario-provider-manager sl-input.inventario-provider-search { margin-bottom: 8px; }
+.inventario-provider-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Visor de imágenes compartido */
+.image-viewer-modal .lj-dialog-body { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 12px; }
+
+/* Historial por período: el input de rango es un .lj-input nativo (flatpickr) */
+#inventarioGlobalRange,
+#produccionGlobalRange {
+  flex: 0 0 auto;
+  width: 100%;
+  height: var(--sl-input-height-medium);
+}
+.inventario-period-filters .inventario-period-actions-scroll { padding-bottom: 2px; }
+#inventarioEntriesRange { width: 100%; }
+
+/* Planilla semanal: filas */
+.inventario-weekly-grid.inventario-weekly-grid-v2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); align-items: end; }
+.inventario-weekly-checks { display: grid; gap: 6px; }
+.inventario-weekly-inputs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.inventario-weekly-product-head h6 { font-size: 14px; font-weight: 700; }
+.inventario-weekly-thumb-wrap { width: 40px; height: 40px; flex: 0 0 auto; }
+@media (max-width: 768px) {
+  .inventario-weekly-grid.inventario-weekly-grid-v2 { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Alertas de inventario: que el contenido se adapte al ancho del diálogo (celular) */
+.lj-alert.ingredientes-alert > * { min-width: 0; }
+.lj-alert.ingredientes-alert .lj-alert-title { overflow-wrap: anywhere; }
+.lj-alert .inventario-provider-manager-head { flex-wrap: wrap; }
+.lj-alert .inventario-provider-manager-head .produccion-config-actions { flex-wrap: wrap; }
+.lj-alert .inventario-provider-actions sl-button { flex: 0 0 auto; }
+.lj-alert .inventario-status-filters { flex-wrap: wrap; overflow-x: visible; }
+.inventario-weekly-field, .inventario-weekly-field sl-input, .inventario-weekly-checks { min-width: 0; }
+.inventario-weekly-field .lj-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* =========================================
+   INVENTARIO · diseño unificado (guía de modales, referencia: Ingredientes)
+   Sólo presentación. Va al final para ganar a las capas v2/v3 anteriores.
+========================================= */
+/* Barra de herramientas */
+#inventarioModal .inventario-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+#inventarioModal .inventario-toolbar > sl-input { flex: 1 1 260px; max-width: 420px; }
+#inventarioModal .inventario-toolbar-actions { margin-left: auto; gap: 8px; flex-wrap: nowrap; padding-bottom: 0; }
+#inventarioModal .inventario-toolbar .barra-separadora {
+  display: inline-block;
+  width: 1px;
+  height: 24px;
+  margin: 0 2px;
+  background: var(--lj-border);
+  flex: 0 0 1px;
+}
+@media (max-width: 767.98px) {
+  #inventarioModal .inventario-toolbar > sl-input { flex-basis: 100%; max-width: none; }
+  #inventarioModal .inventario-toolbar-actions { margin-left: 0; width: 100%; overflow-x: auto; }
+}
+
+/* Avisos (vencidos / RNE) */
+#inventarioModal .produccion-rne-expiry-alert {
+  min-height: 0;
+  padding: 10px 12px;
+  border-radius: var(--lj-radius-lg);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: none;
+}
+#inventarioModal .produccion-expiry-alert-card { border-radius: var(--lj-radius-lg); }
+#inventarioModal .inventario-rne-alert,
+#inventarioModal .inventario-expiry-alert-host { margin-bottom: 10px; }
+
+/* Chips de estado */
+#inventarioModal .inventario-status-filters { gap: 6px; padding: 2px 0 10px; align-items: center; }
+
+/* Indicador de scroll */
+#inventarioModal .inventario-list.has-scroll-hint::after {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lj-accent);
+  background: var(--lj-surface);
+}
+
+/* Lista: tarjetas de ingrediente */
+#inventarioList { display: grid; gap: 8px; }
+#inventarioList .inventario-card.inventario-card-v2,
+#inventarioList .inventario-card.inventario-card-v2[class*="status-"] {
+  background: var(--lj-surface);
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius-lg);
+  padding: 12px;
+  gap: 12px;
+  box-shadow: none;
+}
+#inventarioList .inventario-card.inventario-card-v2:hover { border-color: var(--lj-border-strong); }
+#inventarioList .inventario-card-v2 .ingrediente-avatar { width: 64px; height: 64px; border-radius: 50%; }
+#inventarioList .inventario-card-v2 .ingrediente-main { gap: 10px; flex: 1 1 auto; }
+#inventarioList .inventario-card-v2 .inventario-card-header { padding-bottom: 0; border-bottom: 0; gap: 8px; }
+#inventarioList .inventario-card-v2 .ingrediente-name { margin: 0; font-size: 15px; font-weight: 700; color: var(--lj-text); }
+#inventarioList .inventario-card-v2 .inventario-card-titles .ingrediente-meta { font-size: 13px; font-weight: 400; color: var(--lj-muted); }
+#inventarioList .inventario-card-v2 .inventario-card-titles .ingrediente-description { font-size: 12px; color: var(--lj-muted); }
+#inventarioList .inventario-card-v2 .inventario-status-badge {
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  line-height: 18px;
+}
+#inventarioList .inventario-card-v2 .inventario-zone { padding: 0; }
+#inventarioList .inventario-card-v2 .inventario-hero-grid { gap: 8px; }
+#inventarioList .inventario-card-v2 .inventario-hero-main,
+#inventarioList .inventario-card-v2 .inventario-datum {
+  background: var(--lj-surface);
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius);
+  padding: 8px 10px;
+  gap: 2px;
+}
+#inventarioList .inventario-card-v2 .inventario-hero-main > small,
+#inventarioList .inventario-card-v2 .inventario-datum small {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--lj-muted);
+}
+#inventarioList .inventario-card-v2 .inventario-hero-value {
+  font-family: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0;
+  color: var(--lj-text);
+}
+#inventarioList .inventario-card-v2.status-empty .inventario-hero-value,
+#inventarioList .inventario-card-v2.status-expired .inventario-hero-value { color: var(--lj-danger); }
+#inventarioList .inventario-card-v2.status-low .inventario-hero-value { color: var(--lj-warning); }
+#inventarioList .inventario-card-v2.status-good .inventario-hero-value { color: var(--lj-success); }
+#inventarioList .inventario-card-v2 .inventario-hero-value > span.inventario-hero-unit-suffix {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lj-muted);
+}
+#inventarioList .inventario-card-v2 .inventario-hero-value.inventario-infinity-symbol { font-size: 24px; }
+#inventarioList .inventario-card-v2 .inventario-hero-unit { font-size: 12px; }
+#inventarioList .inventario-card-v2 .inventario-datum strong {
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--lj-text);
+}
+#inventarioList .inventario-card-v2 .inventario-zone-lotes {
+  background: var(--lj-warning-soft);
+  border: 1px solid color-mix(in srgb, var(--lj-warning) 35%, var(--lj-surface));
+  border-radius: var(--lj-radius);
+  padding: 4px 10px;
+}
+#inventarioList .inventario-card-v2 .inventario-zone-toggle { background: none; border: 0; padding: 4px 0; }
+#inventarioList .inventario-card-v2 .inventario-zone-toggle-label { font-size: 12px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+#inventarioList .inventario-card-v2 .inventario-zone-body { border-top-color: color-mix(in srgb, var(--lj-warning) 30%, var(--lj-surface)); }
+#inventarioList .inventario-card-v2 .inventario-zone-acciones { border-top: 0; padding-top: 0; }
+#inventarioList .inventario-card-v2 .inventario-actions-row { gap: 6px; margin-top: 0; }
+#inventarioList .inventario-card-expired-banner { border-radius: var(--lj-radius); padding: 8px 10px; margin: 0; font-size: 13px; }
+#inventarioList .inventario-infinite-stock-note { border-radius: var(--lj-radius); font-size: 12.5px; }
+@media (max-width: 767.98px) {
+  #inventarioList .inventario-card-v2 .ingrediente-avatar { width: 48px; height: 48px; }
+}
+
+/* Vistas internas: editor de ingreso / historial */
+#inventarioEditorForm .lj-label { font-size: 12px; font-weight: 600; color: var(--lj-muted); }
+#inventarioEditorForm .recipe-step-card { border-radius: var(--lj-radius-lg); }
+#inventarioEditorForm .step-title { font-size: 15px; }
+#inventarioModal .inventario-table-compact { font-size: 13px; }
+#inventarioModal .inventario-table-compact thead th {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--lj-muted);
+  background: var(--lj-surface-2);
+}
+#inventarioModal .inventario-table-compact tbody td {
+  font-size: 13px;
+  font-weight: 400;
+  padding: 8px;
+  vertical-align: middle;
+}
+#inventarioModal .inventario-table-compact tbody td:first-child { font-weight: 600; color: var(--lj-text); }
+#inventarioModal .inventario-table-compact tbody td strong { font-weight: 700; }
+#inventarioModal .inventario-period-board { background: var(--lj-surface); }
+#inventarioModal .inventario-period-head .step-title { font-size: 15px; color: var(--lj-brand); }
+
+/* Alertas de inventario con listas (RNE, planilla semanal): filas como tarjetas de la guía */
+.lj-alert .inventario-provider-card {
+  background: var(--lj-surface);
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius-lg);
+  padding: 12px;
+  gap: 12px;
+}
+.lj-alert .inventario-provider-card:hover { border-color: var(--lj-border-strong); }
+.lj-alert .inventario-provider-head strong { font-size: 15px; font-weight: 700; color: var(--lj-text); }
+.lj-alert .inventario-provider-state,
+.lj-alert .inventario-provider-line { font-size: 13px; color: var(--lj-muted); }
+.lj-alert .inventario-provider-line strong { color: var(--lj-text); font-weight: 600; }
+.lj-alert .inventario-provider-avatar { width: 56px; height: 56px; }
+.lj-alert .inventario-weekly-row,
+.lj-alert .inventario-weekly-row.is-perishable,
+.lj-alert .inventario-weekly-row.is-non-perishable {
+  background: var(--lj-surface);
+  border: 1px solid var(--lj-border);
+  border-left: 3px solid var(--lj-border-strong);
+  border-radius: var(--lj-radius-lg);
+  padding: 10px 12px;
+}
+.lj-alert .inventario-weekly-row.is-perishable { border-left-color: var(--lj-success); }
+.lj-alert .inventario-weekly-product-head p { font-size: 12px; }
+.lj-alert .inventario-provider-manager-kicker { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--lj-muted); margin: 0; }
+.lj-alert .inventario-provider-manager-copy { font-size: 13px; color: var(--lj-muted); margin: 0; }

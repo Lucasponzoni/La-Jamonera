@@ -1786,3 +1786,16 @@ sl-button.produccion-zone-link::part(base) {
     flex-wrap: wrap;
   }
 }
+
+/* Badges de inventario a 4 px (pedido del dueño) e íconos sl-icon en el aviso de congelamiento. */
+.inventario-expiry-days-badge,
+.inventario-resolution-badge,
+.inventario-frozen-badge,
+.inventario-frozen-pill { border-radius: 4px; }
+.frozen-info-list li :is(i, sl-icon),
+.frozen-info-card-head h4 :is(i, sl-icon),
+.frozen-info-callout :is(i, sl-icon),
+.frozen-info-conclusion :is(i, sl-icon),
+.inventario-frozen-pill :is(i, sl-icon) { flex-shrink: 0; margin-inline-end: 6px; vertical-align: -0.125em; }
+.frozen-info-list li sl-icon[name="x-circle-fill"] { color: var(--lj-danger); }
+.frozen-info-list li sl-icon[name="check-circle-fill"] { color: var(--lj-success); }

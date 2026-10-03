@@ -89,6 +89,22 @@
     viewerDownloadBtn: $('viewerDownloadBtn')
   };
 
+  // El autoloader define cada sl-* recién cuando aparece en el DOM. Varios renders de este
+  // módulo leen .value/.checked en el mismo tick del innerHTML: precargamos los componentes
+  // que usa inventario para que ya estén definidos (la mejora es sincrónica una vez definidos).
+  (() => {
+    const tags = ['sl-input', 'sl-select', 'sl-option', 'sl-textarea', 'sl-checkbox', 'sl-switch', 'sl-radio-group', 'sl-radio',
+      'sl-button', 'sl-icon-button', 'sl-icon', 'sl-badge', 'sl-dropdown', 'sl-menu', 'sl-menu-item', 'sl-divider', 'sl-spinner'];
+    const pending = tags.filter((tag) => !customElements.get(tag));
+    if (!pending.length || !document.body) return;
+    const holder = document.createElement('div');
+    holder.hidden = true;
+    holder.setAttribute('aria-hidden', 'true');
+    holder.innerHTML = pending.map((tag) => `<${tag}></${tag}>`).join('');
+    document.body.append(holder);
+    Promise.all(pending.map((tag) => customElements.whenDefined(tag))).finally(() => holder.remove());
+  })();
+
   const state = {
     ingredientes: {},
     familias: {},
@@ -233,7 +249,7 @@
   const FROZEN_INFO_HTML = `
     <div class="frozen-info-content">
       <header class="frozen-info-hero">
-        <div class="frozen-info-hero-icon"><i class="bi bi-snow2"></i></div>
+        <div class="frozen-info-hero-icon"><sl-icon name="snow2"></sl-icon></div>
         <div>
           <p class="frozen-info-kicker">Procedimiento interno</p>
           <h3 class="frozen-info-hero-title">Congelamiento y descongelado seguro de alimentos</h3>
@@ -244,20 +260,20 @@
       <article class="frozen-info-card frozen-info-card--blue">
         <header class="frozen-info-card-head">
           <span class="frozen-info-step">1</span>
-          <h4><i class="bi bi-clipboard2-check-fill"></i> Condición previa</h4>
+          <h4><sl-icon name="clipboard2-check-fill"></sl-icon> Condición previa</h4>
         </header>
         <ul class="frozen-info-list">
-          <li><i class="bi bi-check-circle-fill"></i> Congelar solamente alimentos aptos, identificados, dentro de vida útil y con trazabilidad de lote/proveedor.</li>
-          <li><i class="bi bi-check-circle-fill"></i> Verificar integridad del envase, condiciones higiénico-sanitarias y ausencia de signos de alteración.</li>
-          <li><i class="bi bi-check-circle-fill"></i> Registrar fecha/hora de ingreso, fecha/hora de congelamiento, responsable, lote y temperatura de cámara.</li>
-          <li><i class="bi bi-check-circle-fill"></i> Mantener separación entre crudos/listos para consumir y evitar contaminación cruzada.</li>
+          <li><sl-icon name="check-circle-fill"></sl-icon> Congelar solamente alimentos aptos, identificados, dentro de vida útil y con trazabilidad de lote/proveedor.</li>
+          <li><sl-icon name="check-circle-fill"></sl-icon> Verificar integridad del envase, condiciones higiénico-sanitarias y ausencia de signos de alteración.</li>
+          <li><sl-icon name="check-circle-fill"></sl-icon> Registrar fecha/hora de ingreso, fecha/hora de congelamiento, responsable, lote y temperatura de cámara.</li>
+          <li><sl-icon name="check-circle-fill"></sl-icon> Mantener separación entre crudos/listos para consumir y evitar contaminación cruzada.</li>
         </ul>
       </article>
 
       <article class="frozen-info-card frozen-info-card--ice">
         <header class="frozen-info-card-head">
           <span class="frozen-info-step">2</span>
-          <h4><i class="bi bi-snow"></i> Congelamiento en cámara a -18&nbsp;°C</h4>
+          <h4><sl-icon name="snow"></sl-icon> Congelamiento en cámara a -18&nbsp;°C</h4>
         </header>
         <div class="frozen-info-temp-grid">
           <div class="frozen-info-temp">
@@ -266,13 +282,13 @@
           </div>
         </div>
         <ul class="frozen-info-list">
-          <li><i class="bi bi-check-circle-fill"></i> Colocar el alimento protegido, rotulado y en envase apto para freezer.</li>
-          <li><i class="bi bi-check-circle-fill"></i> Disponerlo de forma que el frío circule y el descenso de temperatura sea uniforme.</li>
-          <li><i class="bi bi-check-circle-fill"></i> Controlar y documentar la temperatura de cámara durante el almacenamiento.</li>
-          <li><i class="bi bi-x-circle-fill"></i> Evitar aperturas prolongadas, fluctuaciones de temperatura y descongelamientos parciales.</li>
+          <li><sl-icon name="check-circle-fill"></sl-icon> Colocar el alimento protegido, rotulado y en envase apto para freezer.</li>
+          <li><sl-icon name="check-circle-fill"></sl-icon> Disponerlo de forma que el frío circule y el descenso de temperatura sea uniforme.</li>
+          <li><sl-icon name="check-circle-fill"></sl-icon> Controlar y documentar la temperatura de cámara durante el almacenamiento.</li>
+          <li><sl-icon name="x-circle-fill"></sl-icon> Evitar aperturas prolongadas, fluctuaciones de temperatura y descongelamientos parciales.</li>
         </ul>
         <div class="frozen-info-callout frozen-info-callout--warn">
-          <i class="bi bi-exclamation-triangle-fill"></i>
+          <sl-icon name="exclamation-triangle-fill"></sl-icon>
           <p><strong>Importante:</strong> congelar no elimina peligros microbiológicos ni vuelve indefinida la vida útil. La fecha extendida debe estar definida por procedimiento, rotulado/trazabilidad y respaldo técnico del establecimiento.</p>
         </div>
       </article>
@@ -280,30 +296,30 @@
       <article class="frozen-info-card frozen-info-card--mint">
         <header class="frozen-info-card-head">
           <span class="frozen-info-step">3</span>
-          <h4><i class="bi bi-droplet-half"></i> Descongelado en cámara de 0 a 5&nbsp;°C</h4>
+          <h4><sl-icon name="droplet-half"></sl-icon> Descongelado en cámara de 0 a 5&nbsp;°C</h4>
         </header>
         <ul class="frozen-info-list">
-          <li><i class="bi bi-check-circle-fill"></i> Pasar el alimento a cámara refrigerada entre <strong>0&nbsp;°C y 5&nbsp;°C</strong>, protegido e identificado.</li>
-          <li><i class="bi bi-check-circle-fill"></i> Registrar inicio/fin de descongelado, lote, responsable y temperatura de cámara.</li>
-          <li><i class="bi bi-check-circle-fill"></i> Mantenerlo separado de alimentos listos para consumir y contener posibles exudados.</li>
-          <li><i class="bi bi-x-circle-fill"></i> No descongelar a temperatura ambiente, cerca de fuentes de calor ni bajo canilla.</li>
-          <li><i class="bi bi-x-circle-fill"></i> No volver a congelar un alimento descongelado salvo que exista proceso validado y documentado.</li>
+          <li><sl-icon name="check-circle-fill"></sl-icon> Pasar el alimento a cámara refrigerada entre <strong>0&nbsp;°C y 5&nbsp;°C</strong>, protegido e identificado.</li>
+          <li><sl-icon name="check-circle-fill"></sl-icon> Registrar inicio/fin de descongelado, lote, responsable y temperatura de cámara.</li>
+          <li><sl-icon name="check-circle-fill"></sl-icon> Mantenerlo separado de alimentos listos para consumir y contener posibles exudados.</li>
+          <li><sl-icon name="x-circle-fill"></sl-icon> No descongelar a temperatura ambiente, cerca de fuentes de calor ni bajo canilla.</li>
+          <li><sl-icon name="x-circle-fill"></sl-icon> No volver a congelar un alimento descongelado salvo que exista proceso validado y documentado.</li>
         </ul>
       </article>
 
       <article class="frozen-info-card frozen-info-card--rose">
         <header class="frozen-info-card-head">
           <span class="frozen-info-step">4</span>
-          <h4><i class="bi bi-calendar2-check"></i> Vencimiento extendido</h4>
+          <h4><sl-icon name="calendar2-check"></sl-icon> Vencimiento extendido</h4>
         </header>
         <p class="frozen-info-text">El vencimiento extendido por congelamiento a -18&nbsp;°C debe usarse como criterio interno documentado. No es automático: depende del producto, proceso, envase, cadena de frío, rotulado y validación sanitaria.</p>
         <ul class="frozen-info-list">
-          <li><i class="bi bi-check-circle-fill"></i> Definir la duración a -18&nbsp;°C y las instrucciones de conservación/descongelado cuando correspondan.</li>
-          <li><i class="bi bi-check-circle-fill"></i> Mantener registros de temperaturas, lotes, fechas y responsables.</li>
-          <li><i class="bi bi-check-circle-fill"></i> Respaldar la vida útil con procedimiento BPM/POES, evaluación de riesgo y controles aplicables.</li>
+          <li><sl-icon name="check-circle-fill"></sl-icon> Definir la duración a -18&nbsp;°C y las instrucciones de conservación/descongelado cuando correspondan.</li>
+          <li><sl-icon name="check-circle-fill"></sl-icon> Mantener registros de temperaturas, lotes, fechas y responsables.</li>
+          <li><sl-icon name="check-circle-fill"></sl-icon> Respaldar la vida útil con procedimiento BPM/POES, evaluación de riesgo y controles aplicables.</li>
         </ul>
         <div class="frozen-info-callout frozen-info-callout--info">
-          <i class="bi bi-info-circle-fill"></i>
+          <sl-icon name="info-circle-fill"></sl-icon>
           <p><strong>CAA:</strong> para alimentos cuya duración varía por temperatura, debe indicarse la condición de conservación, por ejemplo duración a -18&nbsp;°C, y las instrucciones necesarias de uso/descongelación cuando correspondan.</p>
         </div>
       </article>
@@ -311,20 +327,20 @@
       <article class="frozen-info-card frozen-info-card--violet">
         <header class="frozen-info-card-head">
           <span class="frozen-info-step">5</span>
-          <h4><i class="bi bi-folder-check"></i> Documentación mínima</h4>
+          <h4><sl-icon name="folder-check"></sl-icon> Documentación mínima</h4>
         </header>
         <ul class="frozen-info-list frozen-info-list--two-col">
-          <li><i class="bi bi-check2-square"></i> Procedimiento escrito de congelamiento y descongelado.</li>
-          <li><i class="bi bi-check2-square"></i> Registros de temperatura de cámara/freezer.</li>
-          <li><i class="bi bi-check2-square"></i> Identificación de lote y fecha de congelamiento.</li>
-          <li><i class="bi bi-check2-square"></i> Registro de descongelado en cámara 0 a 5&nbsp;°C.</li>
-          <li><i class="bi bi-check2-square"></i> Trazabilidad de proveedor, ingreso, elaboración y egreso.</li>
-          <li><i class="bi bi-check2-square"></i> Verificación sanitaria según el producto y proceso.</li>
+          <li><sl-icon name="check2-square"></sl-icon> Procedimiento escrito de congelamiento y descongelado.</li>
+          <li><sl-icon name="check2-square"></sl-icon> Registros de temperatura de cámara/freezer.</li>
+          <li><sl-icon name="check2-square"></sl-icon> Identificación de lote y fecha de congelamiento.</li>
+          <li><sl-icon name="check2-square"></sl-icon> Registro de descongelado en cámara 0 a 5&nbsp;°C.</li>
+          <li><sl-icon name="check2-square"></sl-icon> Trazabilidad de proveedor, ingreso, elaboración y egreso.</li>
+          <li><sl-icon name="check2-square"></sl-icon> Verificación sanitaria según el producto y proceso.</li>
         </ul>
       </article>
 
       <footer class="frozen-info-conclusion">
-        <i class="bi bi-patch-check-fill"></i>
+        <sl-icon name="patch-check-fill"></sl-icon>
         <p>El criterio correcto es: congelar en cámara a <strong>-18&nbsp;°C</strong>, conservar cadena de frío, documentar todo el proceso y descongelar en cámara de <strong>0 a 5&nbsp;°C</strong>. La vida útil extendida debe estar respaldada por el procedimiento y los controles del establecimiento.</p>
       </footer>
     </div>`;
@@ -434,7 +450,7 @@
   });
 
   const frozenInfoIconHtml = (extraClass = '') =>
-    `<button type="button" class="frozen-info-icon ${extraClass}" data-frozen-info aria-label="Información sobre producto congelado" title="¿Qué significa congelado?"><i class="bi bi-info-circle-fill"></i></button>`;
+    `<sl-icon-button name="info-circle-fill" class="frozen-info-icon ${extraClass}" data-frozen-info label="Información sobre producto congelado" title="¿Qué significa congelado?"></sl-icon-button>`;
 
   const frozenBadgeHtml = (entry) => {
     if (!isEntryFrozen(entry)) return '';
@@ -442,7 +458,7 @@
     const frozenAtHtml = frozenAt
       ? `<span class="inventario-frozen-since">desde ${escapeHtml(formatIsoDateEs(frozenAt))}</span>`
       : '';
-    return `<span class="inventario-frozen-badge" title="Producto congelado al ingreso (vto. 60 días)"><i class="bi bi-snow2"></i><span>Congelado</span>${frozenAtHtml}</span>`;
+    return `<span class="inventario-frozen-badge" title="Producto congelado al ingreso (vto. 60 días)"><sl-icon name="snow2"></sl-icon><span>Congelado</span>${frozenAtHtml}</span>`;
   };
 
   const recordHasFrozenEntries = (record) =>
@@ -629,7 +645,7 @@
     const photoUrl = sanitizeImageUrl(provider?.photoUrl);
     const initials = escapeHtml(providerInitials(provider?.name));
     if (photoUrl) {
-      return `<div class="${sizeClass}" data-provider-initials="${initials}" style="${providerAvatarStyle(provider?.name)}"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb" src="${escapeHtml(photoUrl)}" alt="${escapeHtml(provider?.name || 'Proveedor')}"></div>`;
+      return `<div class="${sizeClass}" data-provider-initials="${initials}" style="${providerAvatarStyle(provider?.name)}"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-inventario-thumb" src="${escapeHtml(photoUrl)}" alt="${escapeHtml(provider?.name || 'Proveedor')}"></div>`;
     }
     return `<div class="${sizeClass}" style="${providerAvatarStyle(provider?.name)}">${initials}</div>`;
   };
@@ -751,21 +767,19 @@
 
     return Swal.fire({
       ...options,
-      returnFocus: false,
       customClass: {
         ...passthroughCustomClass,
         popup: joinClass('ios-alert ingredientes-alert', incomingCustomClass.popup),
         title: joinClass('ios-alert-title', incomingCustomClass.title),
         htmlContainer: joinClass('ios-alert-text', incomingCustomClass.htmlContainer),
-        confirmButton: joinClass('ios-btn ios-btn-primary', incomingCustomClass.confirmButton),
-        cancelButton: joinClass('ios-btn ios-btn-secondary', incomingCustomClass.cancelButton)
-      },
-      buttonsStyling: false
+        confirmButton: joinClass('ios-btn-primary', incomingCustomClass.confirmButton),
+        cancelButton: joinClass('ios-btn-secondary', incomingCustomClass.cancelButton)
+      }
     });
   };
 
   const runWithBackSpinner = async (task) => {
-    const modalContent = inventarioModal?.querySelector('.modal-content');
+    const modalContent = LJModal.body(inventarioModal);
     if (!modalContent) {
       await task();
       return;
@@ -775,7 +789,7 @@
     }
     const overlay = document.createElement('div');
     overlay.className = 'modal-local-overlay';
-    overlay.innerHTML = '<div class="modal-local-overlay-card"><img src="./IMG/Meta-ai-logo.webp" alt="Actualizando" class="meta-spinner-login"></div>';
+    overlay.innerHTML = '<div class="modal-local-overlay-card"><sl-spinner class="meta-spinner-login" aria-label="Actualizando"></sl-spinner></div>';
     modalContent.appendChild(overlay);
     try {
       await task();
@@ -800,7 +814,7 @@
   };
 
   const ingredientAvatar = (item) => item?.imageUrl
-    ? `<div class="ingrediente-avatar"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb" src="${item.imageUrl}" alt="${capitalize(item.name)}"></div>`
+    ? `<div class="ingrediente-avatar"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-inventario-thumb" src="${item.imageUrl}" alt="${capitalize(item.name)}"></div>`
     : '<div class="ingrediente-avatar ingrediente-avatar-placeholder"><i class="fa-solid fa-carrot"></i></div>';
 
   const uploadImageToStorage = async (file, folder) => {
@@ -1365,8 +1379,8 @@
       <small>También se eliminará su RNE, historial, foto y referencias guardadas para futuras cargas.</small>
     </div>
     <div class="inventario-provider-inline-confirm-actions">
-      <button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-provider-delete-accept="${escapeHtml(provider.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar proveedor</span></button>
-      <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-delete-cancel="${escapeHtml(provider.id)}"><i class="fa-solid fa-xmark"></i><span>Cancelar</span></button>
+      <sl-button variant="danger" type="button" class="inventario-threshold-btn" data-provider-delete-accept="${escapeHtml(provider.id)}"><i slot="prefix" class="fa-solid fa-trash"></i><span>Eliminar proveedor</span></sl-button>
+      <sl-button variant="default" type="button" class="inventario-threshold-btn" data-provider-delete-cancel="${escapeHtml(provider.id)}"><i slot="prefix" class="fa-solid fa-xmark"></i><span>Cancelar</span></sl-button>
     </div>
   </div>`;
 
@@ -1451,14 +1465,16 @@
   const openProductsScopeSelector = async (title = 'Selector de productos', options = {}) => openIosSwal({
     title,
     html: `<div class="swal-stack-fields text-start">
-      <label class="inventario-check-row"><input type="radio" name="printScope" value="all" checked><span>Incluir todos los productos</span></label>
-      <label class="inventario-check-row"><input type="radio" name="printScope" value="exclude"><span>Excluir algunos productos</span></label>
+      <sl-radio-group name="printScope" value="all" class="inventario-radio-group">
+        <sl-radio value="all">Incluir todos los productos</sl-radio>
+        <sl-radio value="exclude">Excluir algunos productos</sl-radio>
+      </sl-radio-group>
       <div id="printProductsScope" class="notify-specific-users-list d-none">
-        <div class="step-block"><strong>Familias</strong>${Object.values(state.familias).map((family) => `<label class="inventario-check-row inventario-selector-row">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb inventario-print-photo" src="${family.imageUrl}" alt="${escapeHtml(capitalize(family.name))}"></span>` : ''}<input type="checkbox" data-print-family value="${family.id}"><span>${escapeHtml(capitalize(family.name))}</span></label>`).join('')}</div>
+        <div class="step-block"><strong>Familias</strong>${Object.values(state.familias).map((family) => `<sl-checkbox class="inventario-check-row inventario-selector-row" data-print-family value="${family.id}">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-inventario-thumb inventario-print-photo" src="${family.imageUrl}" alt="${escapeHtml(capitalize(family.name))}"></span>` : ''}<span>${escapeHtml(capitalize(family.name))}</span></sl-checkbox>`).join('')}</div>
         <div class="step-block"><strong>Productos</strong>${Object.values(state.ingredientes).map((item) => {
           const perishable = resolveIngredientPerishableFlag(item.id);
           const disabledByType = typeof options.targetPerishable === 'boolean' ? perishable !== options.targetPerishable : false;
-          return `<label class="inventario-check-row inventario-selector-row ${disabledByType ? 'is-disabled-by-perishable' : ''}" style="${disabledByType ? 'opacity:.55;text-decoration:line-through;' : ''}">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb inventario-print-photo" src="${item.imageUrl}" alt="${escapeHtml(capitalize(item.name))}"></span>` : ''}<input type="checkbox" data-print-product data-family-id="${item.familyId || ''}" value="${item.id}" ${disabledByType ? 'disabled' : ''}><span>${escapeHtml(capitalize(item.name))}${disabledByType ? ` <small>(${options.targetPerishable ? 'No perecedero' : 'Perecedero'})</small>` : ''}</span></label>`;
+          return `<sl-checkbox class="inventario-check-row inventario-selector-row ${disabledByType ? 'is-disabled-by-perishable' : ''}" style="${disabledByType ? 'opacity:.55;text-decoration:line-through;' : ''}" data-print-product data-family-id="${item.familyId || ''}" value="${item.id}" ${disabledByType ? 'disabled' : ''}>${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-inventario-thumb inventario-print-photo" src="${item.imageUrl}" alt="${escapeHtml(capitalize(item.name))}"></span>` : ''}<span>${escapeHtml(capitalize(item.name))}${disabledByType ? ` <small>(${options.targetPerishable ? 'No perecedero' : 'Perecedero'})</small>` : ''}</span></sl-checkbox>`;
         }).join('')}</div>
       </div>
     </div>`,
@@ -1466,12 +1482,10 @@
     confirmButtonText: 'Continuar',
     cancelButtonText: 'Cancelar',
     didOpen: () => {
-      const all = document.querySelector('input[name="printScope"][value="all"]');
-      const exclude = document.querySelector('input[name="printScope"][value="exclude"]');
+      const scopeGroup = document.querySelector('sl-radio-group[name="printScope"]');
       const list = document.getElementById('printProductsScope');
-      const toggle = () => list?.classList.toggle('d-none', !exclude?.checked);
-      all?.addEventListener('change', toggle);
-      exclude?.addEventListener('change', toggle);
+      const toggle = () => list?.classList.toggle('d-none', scopeGroup?.value !== 'exclude');
+      scopeGroup?.addEventListener('sl-change', toggle);
       document.querySelectorAll('[data-print-family]').forEach((familyCheckbox) => {
         familyCheckbox.addEventListener('change', () => {
           const familyId = familyCheckbox.value;
@@ -1483,8 +1497,8 @@
       initThumbLoading(Swal.getHtmlContainer() || document);
     },
     preConfirm: () => {
-      const mode = document.querySelector('input[name="printScope"]:checked')?.value || 'all';
-      const selected = [...document.querySelectorAll('[data-print-product]:checked')].map((node) => node.value);
+      const mode = document.querySelector('sl-radio-group[name="printScope"]')?.value || 'all';
+      const selected = [...document.querySelectorAll('sl-checkbox[data-print-product]')].filter((node) => node.checked).map((node) => node.value);
       if (mode === 'exclude' && !selected.length) {
         Swal.showValidationMessage('Seleccioná al menos un producto para excluir.');
         return false;
@@ -1508,8 +1522,8 @@
     const selector = await openIosSwal({
       title: 'Seleccionar encargados',
       html: `<div class="swal-stack-fields text-start">
-        <input id="ingresosManagersSearch" class="swal2-input ios-input" placeholder="Buscar encargado...">
-        <div id="ingresosManagersList" class="notify-specific-users-list" style="max-height:300px;overflow:auto;padding-right:4px;">${users.map((user) => `<label class="inventario-check-row inventario-selector-row" data-ingreso-user-row><input type="checkbox" data-ingreso-user value="${escapeHtml(user.id)}"><span style="display:inline-flex;align-items:center;gap:8px;">${user.photoUrl ? `<span class="user-avatar-thumb" style="width:30px;height:30px;"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb" src="${escapeHtml(user.photoUrl)}" alt="${escapeHtml(user.fullName)}"></span>` : `<span class="user-avatar-fallback" style="width:30px;height:30px;border-radius:999px;border:1px solid #d7def2;display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:#3b4b73;background:#eef3ff;">${escapeHtml((user.fullName.split(' ').filter(Boolean).map((p) => p[0]).join('').slice(0, 2) || 'US').toUpperCase())}</span>`}<span><strong>${escapeHtml(user.fullName)}</strong><small style="display:block;color:#6d7b9a;">${escapeHtml(user.role)}</small></span></span></label>`).join('') || '<p class="text-muted">No hay usuarios cargados.</p>'}</div>
+        <sl-input id="ingresosManagersSearch" class="swal2-input" placeholder="Buscar encargado..."></sl-input>
+        <div id="ingresosManagersList" class="notify-specific-users-list" style="max-height:300px;overflow:auto;padding-right:4px;">${users.map((user) => `<sl-checkbox class="inventario-check-row inventario-selector-row" data-ingreso-user-row data-ingreso-user value="${escapeHtml(user.id)}"><span style="display:inline-flex;align-items:center;gap:8px;">${user.photoUrl ? `<span class="user-avatar-thumb" style="width:30px;height:30px;"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-inventario-thumb" src="${escapeHtml(user.photoUrl)}" alt="${escapeHtml(user.fullName)}"></span>` : `<span class="user-avatar-fallback" style="width:30px;height:30px;border-radius:999px;border:1px solid var(--lj-border-strong);display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:var(--lj-accent);background:var(--lj-accent-soft);">${escapeHtml((user.fullName.split(' ').filter(Boolean).map((p) => p[0]).join('').slice(0, 2) || 'US').toUpperCase())}</span>`}<span><strong>${escapeHtml(user.fullName)}</strong><small style="display:block;color:var(--lj-muted);">${escapeHtml(user.role)}</small></span></span></sl-checkbox>`).join('') || '<p class="text-muted">No hay usuarios cargados.</p>'}</div>
       </div>`,
       showCancelButton: true,
       confirmButtonText: 'Continuar',
@@ -1526,7 +1540,7 @@
         });
       },
       preConfirm: () => {
-        const ids = [...document.querySelectorAll('[data-ingreso-user]:checked')].map((node) => node.value);
+        const ids = [...document.querySelectorAll('sl-checkbox[data-ingreso-user]')].filter((node) => node.checked).map((node) => node.value);
         return { users, ids };
       }
     });
@@ -1619,7 +1633,7 @@
     const description = normalizeValue(options.description) || 'Para evitar procesar datos infinitos, seleccioná un rango de fechas antes de continuar.';
     const picker = await openIosSwal({
       title,
-      html: `<p>${escapeHtml(description)}</p><input id="sheetRangeInput" class="swal2-input ios-input" placeholder="Seleccionar rango">`,
+      html: `<p>${escapeHtml(description)}</p><input id="sheetRangeInput" class="lj-input swal2-input" placeholder="Seleccionar rango">`,
       showCancelButton: true,
       confirmButtonText: 'Continuar',
       cancelButtonText: 'Cancelar',
@@ -1716,11 +1730,11 @@
     }
     return `<div class="inventario-file-upload-list">${items.map((item) => {
       const statusHtml = item.status === 'uploading'
-        ? '<span class="inventario-file-upload-status is-uploading"><img src="./IMG/Meta-ai-logo.webp" alt="Subiendo" class="meta-spinner"><span>Subiendo</span></span>'
+        ? '<span class="inventario-file-upload-status is-uploading"><sl-spinner class="meta-spinner" aria-label="Subiendo"></sl-spinner><span>Subiendo</span></span>'
         : item.status === 'error'
           ? `<span class="inventario-file-upload-status is-error"><i class="fa-solid fa-circle-exclamation"></i><span>${escapeHtml(item.error || 'Error al subir')}</span></span>`
           : `<span class="inventario-file-upload-status is-done"><i class="fa-solid fa-circle-check"></i><span>${item.existing ? 'Cargado' : 'Subido'}</span></span>`;
-      return `<span class="inventario-file-upload-row"><span class="inventario-file-upload-name">${escapeHtml(item.name || 'Adjunto')}</span><span class="inventario-file-upload-actions">${statusHtml}<button type="button" class="inventario-file-upload-remove" data-invoice-upload-remove="${escapeHtml(item.id)}" aria-label="Quitar adjunto"><i class="fa-solid fa-xmark"></i></button></span></span>`;
+      return `<span class="inventario-file-upload-row"><span class="inventario-file-upload-name">${escapeHtml(item.name || 'Adjunto')}</span><span class="inventario-file-upload-actions">${statusHtml}<sl-button variant="text" size="small" type="button" class="lj-icon-btn inventario-file-upload-remove" data-invoice-upload-remove="${escapeHtml(item.id)}" aria-label="Quitar adjunto" title="Quitar adjunto"><i class="fa-solid fa-xmark"></i></sl-button></span></span>`;
     }).join('')}</div>`;
   };
 
@@ -1818,9 +1832,9 @@
   const providerIdFromEntry = (entry) => resolveProvider(entry?.provider)?.id || '';
 
   const rerenderEditorKeepViewport = (ingredientId, draft, focusSelector = '') => {
-    const modalBody = inventarioModal.querySelector('.modal-body');
+    const modalBody = LJModal.body(inventarioModal);
     const scrollTop = modalBody?.scrollTop || 0;
-    const active = focusSelector ? nodes.editorForm?.querySelector(focusSelector) : null;
+    const active = focusSelector ? ljNativeInput(nodes.editorForm?.querySelector(focusSelector)) : null;
     const selStart = active && typeof active.selectionStart === 'number' ? active.selectionStart : null;
     const selEnd = active && typeof active.selectionEnd === 'number' ? active.selectionEnd : null;
     renderEditor(ingredientId, draft);
@@ -1858,18 +1872,18 @@
     });
 
     const statusOptions = [
-      { key: 'all', label: 'Todos', tone: 'neutral', count: allIngredients.length },
-      { key: 'status-empty', label: 'Sin stock', tone: 'danger', count: counts['status-empty'] },
-      { key: 'status-low', label: 'Stock bajo', tone: 'warning', count: counts['status-low'] },
-      { key: 'status-good', label: 'Con stock', tone: 'success', count: counts['status-good'] },
-      { key: 'status-never', label: 'Nunca ingresó', tone: 'info', count: counts['status-never'] }
+      { key: 'all', label: 'Todos', tone: 'neutral', count: allIngredients.length, icon: 'fa-list' },
+      { key: 'status-empty', label: 'Sin stock', tone: 'danger', count: counts['status-empty'], icon: 'fa-box-open' },
+      { key: 'status-low', label: 'Stock bajo', tone: 'warning', count: counts['status-low'], icon: 'fa-arrow-trend-down' },
+      { key: 'status-good', label: 'Con stock', tone: 'success', count: counts['status-good'], icon: 'fa-boxes-stacked' },
+      { key: 'status-never', label: 'Nunca ingresó', tone: 'info', count: counts['status-never'], icon: 'fa-circle-question' }
     ];
     const dynamicOptions = [
-      { key: 'expired', label: 'Expirados', tone: 'danger', count: counts.expired },
-      { key: 'expiring', label: 'Próximos a expirar', tone: 'warning', count: counts.expiring }
+      { key: 'expired', label: 'Expirados', tone: 'danger', count: counts.expired, icon: 'fa-calendar-xmark' },
+      { key: 'expiring', label: 'Próximos a expirar', tone: 'warning', count: counts.expiring, icon: 'fa-hourglass-half' }
     ].filter((option) => option.count > 0);
 
-    const renderOption = (option) => `<button type="button" class="inventario-status-btn tone-${option.tone} ${state.activeStockStatus === option.key ? 'is-active' : ''}" data-inv-status-filter="${option.key}"><span>${option.label}</span><strong>${option.count}</strong></button>`;
+    const renderOption = (option) => `<sl-button variant="default" size="small" type="button" class="inventario-status-btn tone-${option.tone} ${state.activeStockStatus === option.key ? 'is-active' : ''}" data-inv-status-filter="${option.key}"><i slot="prefix" class="fa-solid ${option.icon}"></i><span>${option.label}</span><strong>${option.count}</strong></sl-button>`;
 
     nodes.statusFilters.innerHTML = `${dynamicOptions.map(renderOption).join('')}${dynamicOptions.length ? '<span class="barra-vertical inventario-status-divider" aria-hidden="true"></span>' : ''}${statusOptions.map(renderOption).join('')}`;
   };
@@ -1884,17 +1898,17 @@
     };
 
     const options = [
-      { key: 'all', label: 'Todos los productos', tone: 'neutral', count: counts.all },
+      { key: 'all', label: 'Todos los productos', tone: 'neutral', count: counts.all, icon: 'fa-list' },
       { key: 'enabled', label: 'Con Autoegreso', tone: 'info', count: counts.enabled, icon: 'fa-robot' },
-      { key: 'disabled', label: 'Sin Autoegreso', tone: 'neutral', count: counts.disabled }
+      { key: 'disabled', label: 'Sin Autoegreso', tone: 'neutral', count: counts.disabled, icon: 'fa-ban' }
     ];
 
     const renderOption = (option) => `
-      <button type="button" class="inventario-status-btn tone-${option.tone} ${state.activeAutoEgresoFilter === option.key ? 'is-active' : ''}" data-inv-auto-egreso-filter="${option.key}">
-        ${option.icon ? `<i class="fa-solid ${option.icon} me-1"></i>` : ''}
+      <sl-button variant="default" size="small" type="button" class="inventario-status-btn tone-${option.tone} ${state.activeAutoEgresoFilter === option.key ? 'is-active' : ''}" data-inv-auto-egreso-filter="${option.key}">
+        ${option.icon ? `<i slot="prefix" class="fa-solid ${option.icon}"></i>` : ''}
         <span>${option.label}</span>
         <strong>${option.count}</strong>
-      </button>`;
+      </sl-button>`;
 
     nodes.autoEgresoFilters.innerHTML = options.map(renderOption).join('');
   };
@@ -1917,7 +1931,7 @@
     const hasIssues = counts.none > 0 || counts.warning > 0 || counts.danger > 0;
 
     if (nodes.providersRneBtn) {
-      nodes.providersRneBtn.innerHTML = `<i class="fa-solid fa-file-shield"></i><span>RNE</span>${hasIssues ? `<strong class="inventario-rne-alert-badge">${counts.none + counts.warning + counts.danger}</strong>` : ''}`;
+      nodes.providersRneBtn.innerHTML = `<i slot="prefix" class="fa-solid fa-file-shield"></i><span>RNE</span>${hasIssues ? `<strong slot="suffix" class="inventario-rne-alert-badge">${counts.none + counts.warning + counts.danger}</strong>` : ''}`;
     }
 
     if (!nodes.providersRneAlert || state.periodMode) {
@@ -1960,8 +1974,8 @@
     const alertMessage = dangerRows.length ? 'Hay RNE críticos por vencer.' : 'Hay RNE próximos a vencer.';
 
     nodes.providersRneAlert.classList.remove('d-none');
-    nodes.providersRneAlert.innerHTML = `<button type="button" class="produccion-rne-expiry-alert ${dangerRows.length ? 'is-danger' : 'is-ok'} is-collapsible" data-rne-alert-toggle aria-expanded="false">
-        <span class="produccion-rne-expiry-text"><i class="bi ${dangerRows.length ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill'}"></i><span>${alertMessage}</span></span>
+    nodes.providersRneAlert.innerHTML = `<button type="button" class="lj-tile produccion-rne-expiry-alert ${dangerRows.length ? 'is-danger' : 'is-ok'} is-collapsible" data-rne-alert-toggle aria-expanded="false">
+        <span class="produccion-rne-expiry-text"><sl-icon name="${dangerRows.length ? 'exclamation-octagon-fill' : 'exclamation-triangle-fill'}"></sl-icon><span>${alertMessage}</span></span>
         <span class="produccion-rne-expiry-collapse-meta"><strong>${detailsCount}</strong><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
       </button>
       <div class="inventario-rne-expiry-board" data-rne-alert-details hidden>
@@ -2028,9 +2042,9 @@
       cancelButtonText: 'Cancelar',
       customClass: {
         popup: 'expiry-resolution-alert',
-        confirmButton: 'ios-btn ios-btn-success',
-        denyButton: 'ios-btn ios-btn-danger',
-        cancelButton: 'ios-btn ios-btn-secondary'
+        confirmButton: 'ios-btn-success',
+        denyButton: 'ios-btn-danger',
+        cancelButton: 'ios-btn-secondary'
       }
     });
     if (result.isConfirmed) return 'sold_counter';
@@ -2044,7 +2058,7 @@
     state.inventoryExpiryExpanded = true;
     Swal.fire({
       title: 'Resolviendo vencidos...',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Resolviendo" class="meta-spinner-login"></div>',
+      html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Resolviendo"></sl-spinner></div>',
       allowOutsideClick: false,
       showConfirmButton: false,
       customClass: { popup: 'ios-alert ingredientes-alert ingredientes-saving-alert' }
@@ -2108,24 +2122,24 @@
       ? `${expiredRows.length} lote(s) de inventario vencido(s) con stock`
       : `${soonRows.length} lote(s) de inventario proximo(s) a vencer`;
     const rowHtml = rows.map((row) => `<div class="produccion-expiry-row ${row.expired ? 'is-expired' : 'is-soon'}">
-      <label class="produccion-expiry-select"><input type="checkbox" data-inventory-expiry-select="${escapeHtml(row.id)}" ${row.expired ? '' : 'disabled'}><span class="visually-hidden">Seleccionar lote</span></label>
+      <sl-checkbox class="produccion-expiry-select" data-inventory-expiry-select="${escapeHtml(row.id)}" ${row.expired ? '' : 'disabled'}><span class="visually-hidden">Seleccionar lote</span></sl-checkbox>
       <span class="produccion-expiry-thumb">${row.imageUrl ? `<img src="${escapeHtml(row.imageUrl)}" alt="${escapeHtml(row.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span>
       <span class="produccion-expiry-info"><strong>${escapeHtml(row.ingredientName)}</strong><small>Lote ${escapeHtml(row.lotNumber || row.entryId)} · ${escapeHtml(inventoryExpiryWhenLabel(row))} · ${escapeHtml(formatIsoDateEs(row.expiryDate))}</small></span>
       <span class="produccion-expiry-qty">${escapeHtml(formatQtyUnit(row.qty, row.unit))}${row.packageQty ? ` x${row.packageQty}` : ''}</span>
-      ${row.expired ? `<button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-inventory-expiry-resolve-one="${escapeHtml(row.id)}"><i class="fa-solid fa-check"></i><span>Resolver</span></button>` : ''}
+      ${row.expired ? `<sl-button variant="danger" size="small" type="button" class="inventario-threshold-btn" data-inventory-expiry-resolve-one="${escapeHtml(row.id)}"><i slot="prefix" class="fa-solid fa-check"></i><span>Resolver</span></sl-button>` : ''}
     </div>`).join('');
     nodes.expiryAlert.classList.remove('d-none');
     nodes.expiryAlert.innerHTML = `<section class="produccion-expiry-alert-card ${tone} ${expanded ? 'is-expanded' : ''}" data-inventory-expiry-alert>
-      <button type="button" class="produccion-rne-expiry-alert ${tone} is-collapsible ${expanded ? 'is-open' : ''}" data-inventory-expiry-toggle aria-expanded="${expanded ? 'true' : 'false'}">
-        <span class="produccion-rne-expiry-text"><i class="bi ${expiredRows.length ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill'}"></i><span>${escapeHtml(title)}</span></span>
+      <button type="button" class="lj-tile produccion-rne-expiry-alert ${tone} is-collapsible ${expanded ? 'is-open' : ''}" data-inventory-expiry-toggle aria-expanded="${expanded ? 'true' : 'false'}">
+        <span class="produccion-rne-expiry-text"><sl-icon name="${expiredRows.length ? 'exclamation-octagon-fill' : 'exclamation-triangle-fill'}"></sl-icon><span>${escapeHtml(title)}</span></span>
         <span class="produccion-rne-expiry-collapse-meta"><strong>${rows.length}</strong><i class="fa-solid fa-chevron-${expanded ? 'up' : 'down'}" aria-hidden="true"></i></span>
       </button>
       <div class="produccion-expiry-alert-details" data-inventory-expiry-details ${expanded ? '' : 'hidden'}>
         <div class="produccion-expiry-toolbar">
-          <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-inventory-expiry-config><i class="fa-solid fa-sliders"></i><span>Configurar dias</span></button>
-          <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-inventory-expiry-select-all ${expiredRows.length ? '' : 'disabled'}><i class="fa-regular fa-square-check"></i><span>Seleccionar vencidos</span></button>
-          <button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-inventory-expiry-resolve-selected ${expiredRows.length ? '' : 'disabled'}><i class="fa-solid fa-list-check"></i><span>Resolver seleccionados</span></button>
-          <button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-inventory-expiry-resolve-all ${expiredRows.length ? '' : 'disabled'}><i class="fa-solid fa-check-double"></i><span>Resolver todos</span></button>
+          <sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-inventory-expiry-config><i slot="prefix" class="fa-solid fa-sliders"></i><span>Configurar dias</span></sl-button>
+          <sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-inventory-expiry-select-all ${expiredRows.length ? '' : 'disabled'}><i slot="prefix" class="fa-regular fa-square-check"></i><span>Seleccionar vencidos</span></sl-button>
+          <sl-button variant="danger" size="small" type="button" class="inventario-threshold-btn" data-inventory-expiry-resolve-selected ${expiredRows.length ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-list-check"></i><span>Resolver seleccionados</span></sl-button>
+          <sl-button variant="danger" size="small" type="button" class="inventario-threshold-btn" data-inventory-expiry-resolve-all ${expiredRows.length ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-check-double"></i><span>Resolver todos</span></sl-button>
         </div>
         <div class="produccion-expiry-list">${rowHtml}</div>
       </div>
@@ -2159,14 +2173,14 @@
       event.preventDefault();
       event.stopPropagation();
       state.inventoryExpiryExpanded = true;
-      nodes.expiryAlert.querySelectorAll('[data-inventory-expiry-select]:not(:disabled)').forEach((checkbox) => {
-        checkbox.checked = true;
+      nodes.expiryAlert.querySelectorAll('sl-checkbox[data-inventory-expiry-select]').forEach((checkbox) => {
+        if (!checkbox.disabled) checkbox.checked = true;
       });
     });
     const resolveRowsFromAlert = async (mode, id = '', sourceElement = nodes.expiryAlert) => {
       const latest = getInventoryExpiryAlertRows().filter((row) => row.expired);
       const scope = sourceElement?.closest?.('[data-inventory-expiry-alert]') || nodes.expiryAlert;
-      const selected = new Set([...scope.querySelectorAll('[data-inventory-expiry-select]:checked')].map((node) => normalizeValue(node.dataset.inventoryExpirySelect)));
+      const selected = new Set([...scope.querySelectorAll('sl-checkbox[data-inventory-expiry-select]')].filter((node) => node.checked).map((node) => normalizeValue(node.dataset.inventoryExpirySelect)));
       const targets = mode === 'all' ? latest : mode === 'one' ? latest.filter((row) => row.id === id) : latest.filter((row) => selected.has(row.id));
       if (!targets.length) {
         await openIosSwal({ title: 'Sin seleccion', html: '<p>Selecciona al menos un lote vencido para resolver.</p>', icon: 'info' });
@@ -2219,15 +2233,15 @@
     }, {});
     const allBtn = `
       <div class="family-circle-wrap">
-        <button type="button" class="family-circle-item ${state.activeFamilyId === 'all' ? 'is-active' : ''}" data-inv-family-filter="all">
+        <button type="button" class="lj-tile family-circle-item ${state.activeFamilyId === 'all' ? 'is-active' : ''}" data-inv-family-filter="all">
           <span class="family-circle-thumb family-circle-thumb-placeholder"><i class="fa-solid fa-carrot"></i></span>
           <span class="family-circle-name">Todas</span>
         </button>
       </div>`;
     const familyCircles = families.map((family) => `
       <div class="family-circle-wrap">
-        <button type="button" class="family-circle-item ${state.activeFamilyId === family.id ? 'is-active' : ''}" data-inv-family-filter="${family.id}">
-          <span class="family-circle-thumb ${family.imageUrl ? '' : 'family-circle-thumb-placeholder'}">${family.imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb" src="${family.imageUrl}" alt="${capitalize(family.name)}">` : '<i class="fa-solid fa-carrot"></i>'}${ingredientCounts[family.id] > 0 ? `<span class="family-circle-count">${Math.min(99, ingredientCounts[family.id])}</span>` : ''}</span>
+        <button type="button" class="lj-tile family-circle-item ${state.activeFamilyId === family.id ? 'is-active' : ''}" data-inv-family-filter="${family.id}">
+          <span class="family-circle-thumb ${family.imageUrl ? '' : 'family-circle-thumb-placeholder'}">${family.imageUrl ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-inventario-thumb" src="${family.imageUrl}" alt="${capitalize(family.name)}">` : '<i class="fa-solid fa-carrot"></i>'}${ingredientCounts[family.id] > 0 ? `<span class="family-circle-count">${Math.min(99, ingredientCounts[family.id])}</span>` : ''}</span>
           <span class="family-circle-name">${capitalize(family.name)}</span>
         </button>
       </div>`).join('');
@@ -2241,7 +2255,7 @@
     nodes.families.innerHTML = `
       <div class="family-circle-section ${collapsed ? 'is-collapsed' : ''}">
         <div class="family-circle-section-head">
-          <button type="button" class="family-circle-toggle" data-inv-families-toggle aria-expanded="${!collapsed}">
+          <button type="button" class="lj-tile family-circle-toggle" data-inv-families-toggle aria-expanded="${!collapsed}">
             <i class="fa-solid ${collapsed ? 'fa-chevron-right' : 'fa-chevron-down'}"></i>
             <span>Familias</span>
             <small>${families.length} ${families.length === 1 ? 'familia' : 'familias'}${activeName ? ` · filtrando: ${escapeHtml(activeName)}` : ''}${hasSearch ? ' · oculto por búsqueda' : ''}</small>
@@ -2284,7 +2298,7 @@
           expired: 'Vencidos'
         };
         const statusLabel = statusLabels[state.activeStockStatus] || 'Todos';
-        helperHtml = `<div class="ingrediente-empty-list with-illustration"><p class="ingrediente-empty-title">No hay resultados con los filtros actuales.</p><div class="ingrediente-empty-image-wrap"><img src="${escapeHtml(NO_DATA_IMAGE_URL)}" alt="Sin resultados" class="ingrediente-empty-image"></div><p class="ingrediente-empty-filters">Usando filtros:</p><div class="ingrediente-empty-tags"><span class="ingrediente-empty-tag">${escapeHtml(familyLabel)}</span><span class="ingrediente-empty-tag">${escapeHtml(statusLabel)}</span></div><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn ingrediente-empty-btn" data-inv-search-all><i class="bi bi-lightning-charge"></i><span>Buscar en toda la base</span></button></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del filtro</strong> seleccionado</p>`;
+        helperHtml = `<div class="ingrediente-empty-list with-illustration"><p class="ingrediente-empty-title">No hay resultados con los filtros actuales.</p><div class="ingrediente-empty-image-wrap"><img src="${escapeHtml(NO_DATA_IMAGE_URL)}" alt="Sin resultados" class="ingrediente-empty-image"></div><p class="ingrediente-empty-filters">Usando filtros:</p><div class="ingrediente-empty-tags"><span class="ingrediente-empty-tag">${escapeHtml(familyLabel)}</span><span class="ingrediente-empty-tag">${escapeHtml(statusLabel)}</span></div><sl-button variant="default" type="button" class="inventario-threshold-btn ingrediente-empty-btn" data-inv-search-all><sl-icon slot="prefix" name="lightning-charge"></sl-icon><span>Buscar en toda la base</span></sl-button></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del filtro</strong> seleccionado</p>`;
       } else {
         nodes.list.innerHTML = '<div class="ingrediente-empty-list">No encontramos ingredientes para inventario.</div>';
         updateListScrollHint();
@@ -2345,7 +2359,7 @@
       // Banner/CTA para resolver lotes vencidos directamente desde la card.
       const expiredCount = expiredRows.length;
       const resolveExpiredBanner = expiredCount > 0
-        ? `<div class="inventario-card-expired-banner"><div class="inventario-card-expired-banner-text"><i class="fa-solid fa-triangle-exclamation"></i><span><strong>${expiredCount}</strong> lote${expiredCount === 1 ? '' : 's'} vencido${expiredCount === 1 ? '' : 's'} con stock (${expiredQtyInStockUnit.toFixed(2)} ${stockAbbr})</span></div><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-inventario-resolve-expired="${item.id}"><i class="fa-solid fa-check"></i><span>Resolver vencidos</span></button></div>`
+        ? `<div class="inventario-card-expired-banner"><div class="inventario-card-expired-banner-text"><i class="fa-solid fa-triangle-exclamation"></i><span><strong>${expiredCount}</strong> lote${expiredCount === 1 ? '' : 's'} vencido${expiredCount === 1 ? '' : 's'} con stock (${expiredQtyInStockUnit.toFixed(2)} ${stockAbbr})</span></div><sl-button variant="danger" size="small" type="button" class="inventario-threshold-btn" data-inventario-resolve-expired="${item.id}"><i slot="prefix" class="fa-solid fa-check"></i><span>Resolver vencidos</span></sl-button></div>`
         : '';
       return `
         <article class="ingrediente-card inventario-card inventario-card-v2 ${effectiveStatus.className}" data-inventario-card="${item.id}">
@@ -2358,7 +2372,7 @@
                 ${item.description ? `<p class="ingrediente-description">${sentenceCase(item.description)}</p>` : ''}
               </div>
               <div class="inventario-card-header-chips">
-                ${recordHasFrozenEntries(record) ? '<span class="inventario-frozen-pill" title="Tiene lotes congelados (vto. 60 días desde el ingreso)"><i class="bi bi-snow2"></i><span>Congelado</span></span>' : ''}
+                ${recordHasFrozenEntries(record) ? '<span class="inventario-frozen-pill" title="Tiene lotes congelados (vto. 60 días desde el ingreso)"><sl-icon name="snow2"></sl-icon><span>Congelado</span></span>' : ''}
                 <span class="inventario-status-badge ${effectiveStatus.className}">${effectiveStatus.label}</span>
               </div>
             </header>
@@ -2382,7 +2396,7 @@
 
             ${hasLotes ? `
             <section class="inventario-zone inventario-zone-lotes" data-collapsed="true">
-              <button type="button" class="inventario-zone-toggle" data-toggle-inventario-lotes="${item.id}">
+              <button type="button" class="lj-tile inventario-zone-toggle" data-toggle-inventario-lotes="${item.id}">
                 <span class="inventario-zone-toggle-left">
                   <i class="fa-solid fa-boxes-stacked"></i>
                   <span class="inventario-zone-toggle-label">Lotes con vencimiento</span>
@@ -2396,9 +2410,9 @@
 
             <footer class="inventario-zone inventario-zone-acciones">
               <div class="inventario-actions-row inventory-production-actions">
-                <button type="button" class="btn ios-btn ios-btn-success inventory-production-action-btn is-main" data-inventario-open-editor="${item.id}" ${infiniteStock ? 'disabled title="Stock infinito sin carga manual"' : ''}><i class="fa-solid fa-plus"></i><span>Ingresar Stock</span></button>
-                <button type="button" class="btn ios-btn inventory-production-action-btn is-view inventario-view-btn" data-inventario-open-editor="${item.id}"><i class="fa-regular fa-eye"></i><span>Visualizar</span></button>
-                <button type="button" class="btn ios-btn inventory-production-action-btn is-threshold inventario-threshold-btn" data-inventario-config-item="${item.id}"><i class="fa-solid fa-sliders"></i><span>Umbral</span></button>
+                <sl-button variant="success" size="small" type="button" class="inventory-production-action-btn is-main" data-inventario-open-editor="${item.id}" ${infiniteStock ? 'disabled title="Stock infinito sin carga manual"' : ''}><i slot="prefix" class="fa-solid fa-plus"></i><span>Ingresar Stock</span></sl-button>
+                <sl-button variant="primary" size="small" type="button" class="inventory-production-action-btn is-view inventario-view-btn" data-inventario-open-editor="${item.id}"><i slot="prefix" class="fa-regular fa-eye"></i><span>Visualizar</span></sl-button>
+                <sl-button variant="default" size="small" type="button" class="inventory-production-action-btn is-threshold inventario-threshold-btn" data-inventario-config-item="${item.id}"><i slot="prefix" class="fa-solid fa-sliders"></i><span>Umbral</span></sl-button>
               </div>
             </footer>
           </div>
@@ -2538,11 +2552,11 @@
         <td>${getTraceTypeLabelHtml(trace)}</td>
         <td>${escapeHtml(trace.ingredientLot)}</td>
         <td>${escapeHtml((trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? row.provider : trace.productionId)}</td>
-        <td>${(trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? '<span class="inventario-internal-no-trace">Sin trazabilidad</span>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td>
+        <td>${(trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? '<span class="inventario-internal-no-trace">Sin trazabilidad</span>' : `<sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i slot="prefix" class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></sl-button>`}</td>
       </tr>`).join('') : '';
 
       const availableClass = Number(row.availableQty || 0) <= 0 ? 'is-zero' : '';
-      const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(resolutionRow.at))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td></tr>` : '';
+      const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(resolutionRow.at))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><sl-button variant="danger" size="small" type="button" class="inventario-no-photo-btn" disabled>Sin trazabilidad</sl-button></td></tr>` : '';
       return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
         <td>${escapeHtml(row.entryDateTime)}${getExpiryBadgeHtml(row) ? `<br><small>${getExpiryBadgeHtml(row)}</small>` : ''}${isEntryFrozen(row) ? `<br><small class="inventario-frozen-meta">${frozenBadgeHtml(row)}</small>` : ''}</td>
         <td>${escapeHtml(row.ingredientName)}</td>
@@ -2550,14 +2564,14 @@
         <td>${escapeHtml(formatExpiryForUi(row))} </td>
         <td>${escapeHtml(`${row.invoiceNumber}${normalizeValue(row.remitoNumber) ? ` | ${row.remitoNumber}` : ''}`)}</td>
         <td class="inventario-provider-cell">${escapeHtml(row.provider)}</td>
-        <td><div class="inventario-entry-actions">${(traces.length || resolutionRow) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-toggle-global-collapse="${row.entryId}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${row.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-global-images="${encodeURIComponent(JSON.stringify(row.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Ver (${row.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>No posee foto</button>'}</div></td>
+        <td><div class="inventario-entry-actions">${(traces.length || resolutionRow) ? `<sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-icon-only-btn" data-toggle-global-collapse="${row.entryId}" aria-label="Ver detalle" title="Ver detalle"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></sl-button>` : ''}${row.invoiceImageUrls.length ? `<sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-open-global-images="${encodeURIComponent(JSON.stringify(row.invoiceImageUrls))}"><i slot="prefix" class="fa-regular fa-image"></i><span>Ver (${row.invoiceImageUrls.length})</span></sl-button>` : '<sl-button variant="danger" size="small" type="button" class="inventario-no-photo-btn" disabled>No posee foto</sl-button>'}</div></td>
       </tr>${resolutionHtml}${traceHtml}`;
     }).join('') : '<tr><td colspan="7" class="text-center">Sin ingresos en ese rango.</td></tr>';
 
     nodes.globalTableWrap.innerHTML = `
       <div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x">
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioGlobalCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar todo</span></button>
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioGlobalExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar todo</span></button>
+        <sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" id="inventarioGlobalCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-compress"></i><span>Colapsar todo</span></sl-button>
+        <sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" id="inventarioGlobalExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-expand"></i><span>Descolapsar todo</span></sl-button>
       </div>
       <div class="table-responsive inventario-global-table inventario-table-compact-wrap">
         <table class="table recipe-table inventario-table-compact mb-0">
@@ -2566,9 +2580,9 @@
         </table>
       </div>
       <div class="inventario-pagination enhanced">
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-global-page="prev" ${state.globalTablePage <= 1 ? 'disabled' : ''} aria-label="Página anterior"><i class="fa-solid fa-chevron-left"></i></button>
+        <sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-global-page="prev" ${state.globalTablePage <= 1 ? 'disabled' : ''} aria-label="Página anterior" title="Página anterior"><i class="fa-solid fa-chevron-left"></i></sl-button>
         <span>Página ${state.globalTablePage} de ${pages}</span>
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-global-page="next" ${state.globalTablePage >= pages ? 'disabled' : ''} aria-label="Página siguiente"><i class="fa-solid fa-chevron-right"></i></button>
+        <sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-global-page="next" ${state.globalTablePage >= pages ? 'disabled' : ''} aria-label="Página siguiente" title="Página siguiente"><i class="fa-solid fa-chevron-right"></i></sl-button>
       </div>`;
   };
 
@@ -2577,12 +2591,12 @@
       title: 'Configuración global de inventario',
       html: `
         <div class="text-start">
-          <label class="form-label" for="globalLowThresholdInput">Umbral global de stock bajo (kg)</label>
-          <input id="globalLowThresholdInput" class="swal2-input ios-input" type="number" min="0" step="0.01" value="${state.inventario.config.globalLowThresholdKg}">
-          <label class="form-label mt-2" for="globalLowThresholdUnitInput">Umbral global de stock bajo (unidades)</label>
-          <input id="globalLowThresholdUnitInput" class="swal2-input ios-input" type="number" min="0" step="0.01" value="${state.inventario.config.globalLowThresholdUnits ?? DEFAULT_LOW_THRESHOLD}">
-          <label class="form-label mt-2" for="globalExpiringSoonInput">Días para considerar “próximo a caducar”</label>
-          <input id="globalExpiringSoonInput" class="swal2-input ios-input" type="number" min="0" step="1" value="${state.inventario.config.expiringSoonDays}">
+          <label class="lj-label" for="globalLowThresholdInput">Umbral global de stock bajo (kg)</label>
+          <sl-input id="globalLowThresholdInput" class="swal2-input" type="number" min="0" step="0.01" value="${state.inventario.config.globalLowThresholdKg}"></sl-input>
+          <label class="lj-label mt-2" for="globalLowThresholdUnitInput">Umbral global de stock bajo (unidades)</label>
+          <sl-input id="globalLowThresholdUnitInput" class="swal2-input" type="number" min="0" step="0.01" value="${state.inventario.config.globalLowThresholdUnits ?? DEFAULT_LOW_THRESHOLD}"></sl-input>
+          <label class="lj-label mt-2" for="globalExpiringSoonInput">Días para considerar “próximo a caducar”</label>
+          <sl-input id="globalExpiringSoonInput" class="swal2-input" type="number" min="0" step="1" value="${state.inventario.config.expiringSoonDays}"></sl-input>
         </div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
@@ -2625,15 +2639,15 @@
       title: 'Umbral por producto',
       html: `
         <div class="text-start">
-          <label class="form-label">Id unico de ingrediente</label>
-          <div class="input-group ios-input-group">
-            <input id="itemIngredientIdInput" class="form-control ios-input" value="${escapeHtml(ingredientId)}" readonly>
-            <button id="copyIngredientIdBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-regular fa-copy"></i><span>Copiar</span></button>
+          <label class="lj-label">Id unico de ingrediente</label>
+          <div class="inventario-inline-field">
+            <sl-input id="itemIngredientIdInput" value="${escapeHtml(ingredientId)}" readonly></sl-input>
+            <sl-button variant="default" id="copyIngredientIdBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-regular fa-copy"></i><span>Copiar</span></sl-button>
           </div>
-          <label class="form-label mt-2" for="itemLowThresholdInput">Umbral de stock (${escapeHtml(unitAbbr)})</label>
-          <input id="itemLowThresholdInput" class="swal2-input ios-input" type="number" min="0" step="0.01" value="${currentLocal ?? ''}" placeholder="Vacío = usar global">
-          <label class="form-label mt-2" for="itemExpiringSoonInput">Próximo a caducar (días)</label>
-          <input id="itemExpiringSoonInput" class="swal2-input ios-input" type="number" min="0" step="1" value="${record.expiringSoonDays ?? ''}" placeholder="Vacío = usar global">
+          <label class="lj-label mt-2" for="itemLowThresholdInput">Umbral de stock (${escapeHtml(unitAbbr)})</label>
+          <sl-input id="itemLowThresholdInput" class="swal2-input" type="number" min="0" step="0.01" value="${currentLocal ?? ''}" placeholder="Vacío = usar global"></sl-input>
+          <label class="lj-label mt-2" for="itemExpiringSoonInput">Próximo a caducar (días)</label>
+          <sl-input id="itemExpiringSoonInput" class="swal2-input" type="number" min="0" step="1" value="${record.expiringSoonDays ?? ''}" placeholder="Vacío = usar global"></sl-input>
         </div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
@@ -2755,10 +2769,10 @@
       title: 'Planilla Semanal',
       html: `<div class="swal-stack-fields text-start">
         <p class="mb-1"><strong>${escapeHtml(capitalize(ingredient.name))}</strong></p>
-        <label class="inventario-check-row"><input type="checkbox" id="invPerishable" ${current.perishable ? 'checked' : ''}><span>Producto perecedero</span></label>
-        <label class="inventario-check-row"><input type="checkbox" id="invEgresoEnabled" ${current.egresoEnabled ? 'checked' : ''}><span><i class="fa-solid fa-robot"></i> Habilitado para egreso</span></label>
-        <label class="form-label mt-2" for="invRotationDays">Días de rotación</label>
-        <input id="invRotationDays" class="swal2-input ios-input" type="number" min="0" step="1" value="${Number(current.rotationDays || 0)}">
+        <sl-checkbox class="inventario-check-row" id="invPerishable" ${current.perishable ? 'checked' : ''}>Producto perecedero</sl-checkbox>
+        <sl-checkbox class="inventario-check-row" id="invEgresoEnabled" ${current.egresoEnabled ? 'checked' : ''}><i class="fa-solid fa-robot"></i> Habilitado para egreso</sl-checkbox>
+        <label class="lj-label mt-2" for="invRotationDays">Días de rotación</label>
+        <sl-input id="invRotationDays" class="swal2-input" type="number" min="0" step="1" value="${Number(current.rotationDays || 0)}"></sl-input>
       </div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
@@ -2816,7 +2830,7 @@
       const suggestedVal = record.suggestedExpiryDays ?? 5;
       return `<article class="inventario-weekly-row ${perishableClass}" data-weekly-row="${escapeHtml(ingredient.id)}" data-weekly-name="${escapeHtml(normalizeLower(ingredient.name))}">
         <div class="inventario-weekly-product-head">
-          <span class="inventario-print-photo-wrap inventario-weekly-thumb-wrap">${ingredient.imageUrl ? `<span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-inventario-thumb" src="${escapeHtml(ingredient.imageUrl)}" alt="${escapeHtml(capitalize(ingredient.name))}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span>
+          <span class="inventario-print-photo-wrap inventario-weekly-thumb-wrap">${ingredient.imageUrl ? `<span class="thumb-loading"><sl-spinner class="meta-spinner" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-inventario-thumb" src="${escapeHtml(ingredient.imageUrl)}" alt="${escapeHtml(capitalize(ingredient.name))}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span>
           <div>
             <h6>${escapeHtml(capitalize(ingredient.name))}</h6>
             <p>${escapeHtml(sentenceCase(ingredient.description || 'Sin descripción'))}</p>
@@ -2824,18 +2838,18 @@
         </div>
         <div class="inventario-weekly-grid inventario-weekly-grid-v2">
           <div class="inventario-weekly-checks">
-            <label class="inventario-check-row"><input type="checkbox" data-weekly-perishable="${escapeHtml(ingredient.id)}" ${cfg.perishable ? 'checked' : ''}><span>Producto perecedero</span></label>
-            <label class="inventario-check-row"><input type="checkbox" data-weekly-egreso="${escapeHtml(ingredient.id)}" ${cfg.egresoEnabled ? 'checked' : ''}><span><i class="fa-solid fa-robot"></i> Habilitado para egreso</span></label>
+            <sl-checkbox class="inventario-check-row" data-weekly-perishable="${escapeHtml(ingredient.id)}" ${cfg.perishable ? 'checked' : ''}>Producto perecedero</sl-checkbox>
+            <sl-checkbox class="inventario-check-row" data-weekly-egreso="${escapeHtml(ingredient.id)}" ${cfg.egresoEnabled ? 'checked' : ''}><i class="fa-solid fa-robot"></i> Habilitado para egreso</sl-checkbox>
           </div>
           <div class="inventario-weekly-inputs">
-            <label class="inventario-weekly-field" for="weeklyRotation_${escapeHtml(ingredient.id)}">
-              <span>Días de rotación</span>
-              <input id="weeklyRotation_${escapeHtml(ingredient.id)}" class="swal2-input ios-input" type="number" min="0" step="1" value="${Number(cfg.rotationDays || 0)}" data-weekly-rotation="${escapeHtml(ingredient.id)}">
-            </label>
-            <label class="inventario-weekly-field" for="weeklySuggested_${escapeHtml(ingredient.id)}">
-              <span>Vencimiento sugerido (días)</span>
-              <input id="weeklySuggested_${escapeHtml(ingredient.id)}" class="swal2-input ios-input" type="number" min="0" step="1" value="${suggestedVal}" data-weekly-suggested="${escapeHtml(ingredient.id)}">
-            </label>
+            <div class="inventario-weekly-field">
+              <label class="lj-label" for="weeklyRotation_${escapeHtml(ingredient.id)}">Días de rotación</label>
+              <sl-input id="weeklyRotation_${escapeHtml(ingredient.id)}" class="swal2-input" type="number" min="0" step="1" value="${Number(cfg.rotationDays || 0)}" data-weekly-rotation="${escapeHtml(ingredient.id)}"></sl-input>
+            </div>
+            <div class="inventario-weekly-field">
+              <label class="lj-label" for="weeklySuggested_${escapeHtml(ingredient.id)}">Vencimiento sugerido (días)</label>
+              <sl-input id="weeklySuggested_${escapeHtml(ingredient.id)}" class="swal2-input" type="number" min="0" step="1" value="${suggestedVal}" data-weekly-suggested="${escapeHtml(ingredient.id)}"></sl-input>
+            </div>
           </div>
         </div>
       </article>`;
@@ -2848,21 +2862,21 @@
       html: `<div class="inventario-weekly-bulk-wrap">
         <p class="inventario-weekly-bulk-intro">Editá en masa la configuración de todos los productos.</p>
         <div class="inventario-weekly-toolbar-v2">
-          <div class="input-group ios-input-group ingredientes-search-group inventario-weekly-search"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="inventarioWeeklySearchInput" type="search" class="form-control ios-input ingredientes-search-input" placeholder="Buscar producto"></div>
-          <div class="dropdown inventario-weekly-family-dropdown">
-            <button class="btn ios-btn ios-btn-secondary dropdown-toggle" type="button" id="inventarioWeeklyFamilyDropBtn" data-bs-toggle="dropdown" aria-expanded="false">
-              <i class="fa-solid fa-layer-group me-1"></i> <span id="inventarioWeeklyFamilyDropLabel">Todas las familias</span>
-            </button>
-            <ul class="dropdown-menu dropdown-menu-dark shadow" aria-labelledby="inventarioWeeklyFamilyDropBtn">
-              <li><button class="dropdown-item active" type="button" data-bulk-family-pick="all">Todas las familias</button></li>
-              <li><hr class="dropdown-divider"></li>
-              ${Object.values(state.familias).sort((a, b) => a.name.localeCompare(b.name)).map(f => `<li><button class="dropdown-item" type="button" data-bulk-family-pick="${f.id}">${escapeHtml(capitalize(f.name))}</button></li>`).join('')}
-            </ul>
-          </div>
+          <sl-input id="inventarioWeeklySearchInput" type="search" class="ingredientes-search-input inventario-weekly-search" placeholder="Buscar producto"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input>
+          <sl-dropdown class="inventario-weekly-family-dropdown" hoist>
+            <sl-button slot="trigger" variant="default" caret id="inventarioWeeklyFamilyDropBtn">
+              <i slot="prefix" class="fa-solid fa-layer-group"></i><span id="inventarioWeeklyFamilyDropLabel">Todas las familias</span>
+            </sl-button>
+            <sl-menu class="inventario-weekly-family-menu">
+              <sl-menu-item type="checkbox" checked class="active" value="all" data-bulk-family-pick="all">Todas las familias</sl-menu-item>
+              <sl-divider></sl-divider>
+              ${Object.values(state.familias).sort((a, b) => a.name.localeCompare(b.name)).map(f => `<sl-menu-item type="checkbox" value="${ljOptionValue(f.id)}" data-bulk-family-pick="${f.id}">${escapeHtml(capitalize(f.name))}</sl-menu-item>`).join('')}
+            </sl-menu>
+          </sl-dropdown>
           <div id="inventarioWeeklyEgresoFilters" class="inventario-status-filters inventario-weekly-filters-row"></div>
         </div>
         <div class="inventario-weekly-bulk-list" id="inventarioWeeklyBulkList">${buildWeeklyConfigBulkRows()}</div>
-        <div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" id="inventarioWeeklyPrevBtn"><i class="fa-solid fa-chevron-left"></i></button><span id="inventarioWeeklyPageText">Página 1</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" id="inventarioWeeklyNextBtn"><i class="fa-solid fa-chevron-right"></i></button></div>
+        <div class="inventario-pagination enhanced"><sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" id="inventarioWeeklyPrevBtn" aria-label="Página anterior" title="Página anterior"><i class="fa-solid fa-chevron-left"></i></sl-button><span id="inventarioWeeklyPageText">Página 1</span><sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" id="inventarioWeeklyNextBtn" aria-label="Página siguiente" title="Página siguiente"><i class="fa-solid fa-chevron-right"></i></sl-button></div>
       </div>`,
       width: 'min(1100px, 96vw)',
       showCancelButton: true,
@@ -2870,8 +2884,8 @@
       cancelButtonText: 'Cancelar',
       customClass: {
         popup: 'ios-alert inventario-weekly-bulk-alert',
-        confirmButton: 'ios-btn ios-btn-primary inventario-weekly-save-btn',
-        cancelButton: 'ios-btn ios-btn-secondary inventario-weekly-cancel-btn'
+        confirmButton: 'ios-btn-primary inventario-weekly-save-btn',
+        cancelButton: 'ios-btn-secondary inventario-weekly-cancel-btn'
       },
       didOpen: (popup) => {
         initThumbLoading(popup);
@@ -2891,11 +2905,11 @@
             disabled: allIngredients.filter(item => !getRecord(item.id).weeklySheetConfig?.egresoEnabled).length
           };
           const options = [
-            { key: 'all', label: 'Todos', tone: 'neutral', count: counts.all },
+            { key: 'all', label: 'Todos', tone: 'neutral', count: counts.all, icon: 'fa-list' },
             { key: 'enabled', label: 'Con Autoegreso', tone: 'success', count: counts.enabled, icon: 'fa-robot' },
-            { key: 'disabled', label: 'Sin Autoegreso', tone: 'danger', count: counts.disabled }
+            { key: 'disabled', label: 'Sin Autoegreso', tone: 'danger', count: counts.disabled, icon: 'fa-ban' }
           ];
-          filterHost.innerHTML = options.map(opt => `<button type="button" class="inventario-status-btn tone-${opt.tone} ${state.activeAutoEgresoFilter === opt.key ? 'is-active' : ''}" data-bulk-auto-egreso-filter="${opt.key}">${opt.icon ? `<i class="fa-solid ${opt.icon} me-1"></i>` : ''}<span>${opt.label}</span><strong>${opt.count}</strong></button>`).join('');
+          filterHost.innerHTML = options.map(opt => `<sl-button variant="default" size="small" type="button" class="inventario-status-btn tone-${opt.tone} ${state.activeAutoEgresoFilter === opt.key ? 'is-active' : ''}" data-bulk-auto-egreso-filter="${opt.key}">${opt.icon ? `<i slot="prefix" class="fa-solid ${opt.icon}"></i>` : ''}<span>${opt.label}</span><strong>${opt.count}</strong></sl-button>`).join('');
         };
 
         const syncPage = () => {
@@ -2932,9 +2946,13 @@
             const dropdownBtn = popup.querySelector('#inventarioWeeklyFamilyDropBtn');
             
             // Update UI
-            popup.querySelectorAll('[data-bulk-family-pick]').forEach(btn => btn.classList.remove('active'));
+            popup.querySelectorAll('[data-bulk-family-pick]').forEach((btn) => {
+              btn.classList.remove('active');
+              btn.checked = false;
+            });
             pick.classList.add('active');
-            if (labelNode) labelNode.textContent = pick.textContent;
+            pick.checked = true;
+            if (labelNode) labelNode.textContent = normalizeValue(pick.textContent);
             
             refreshList();
           }
@@ -3357,13 +3375,6 @@
     return rows;
   };
 
-  let imageViewerModal = null;
-  const ensureImageViewerModal = () => {
-    if (!imageViewerModal && window.bootstrap && nodes.imageViewerModal) {
-      imageViewerModal = new bootstrap.Modal(nodes.imageViewerModal);
-    }
-  };
-
   const clampViewerOffsets = () => {
     if (!nodes.viewerImage || !nodes.viewerStage || state.viewerScale <= 1) return;
     const stageRect = nodes.viewerStage.getBoundingClientRect();
@@ -3407,7 +3418,7 @@
     node.style.gap = '12px';
     node.style.padding = '28px';
     node.style.textAlign = 'center';
-    node.style.color = '#2f4f8f';
+    node.style.color = 'var(--lj-accent)';
     nodes.viewerDocument?.insertAdjacentElement('afterend', node);
     return node;
   };
@@ -3449,7 +3460,7 @@
       pdfPlaceholder?.classList.add('d-none');
       if (pdfPlaceholder) {
         // Igual lo poblamos como fallback por si el iframe se rompe a futuro.
-        pdfPlaceholder.innerHTML = `<i class="fa-regular fa-file-pdf" style="font-size:44px;color:#d92d20;"></i><strong>Documento PDF adjunto</strong><p style="margin:0;color:#6073a1;">Si el visor interno no carga el PDF, abrilo en una pestaña.</p><a class="btn ios-btn ios-btn-primary" href="${escapeHtml(item.src)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-up-right-from-square"></i><span>Abrir PDF</span></a>`;
+        pdfPlaceholder.innerHTML = `<i class="fa-regular fa-file-pdf" style="font-size:44px;color:var(--lj-danger);"></i><strong>Documento PDF adjunto</strong><p style="margin:0;color:var(--lj-muted);">Si el visor interno no carga el PDF, abrilo en una pestaña.</p><sl-button variant="primary" href="${escapeHtml(item.src)}" target="_blank" rel="noopener noreferrer"><i slot="prefix" class="fa-solid fa-up-right-from-square"></i><span>Abrir PDF</span></sl-button>`;
       }
       nodes.viewerImage.src = '';
       return;
@@ -3469,20 +3480,21 @@
 
   const openAttachmentViewer = async (entries, startIndex = 0, title = 'Adjuntos') => {
     const images = entries.flatMap((item) => entryImageUrls(item).map((url) => ({ src: url })));
-    if (!images.length) return;
-    ensureImageViewerModal();
-    if (!imageViewerModal) return;
-    if (nodes.imageViewerModal) nodes.imageViewerModal.style.zIndex = '3200';
-    const latestBackdrop = document.querySelector('.modal-backdrop:last-of-type');
-    latestBackdrop?.classList.add('inventory-image-backdrop');
-    nodes.imageViewerModal.querySelector('.ios-modal-title').textContent = title;
+    if (!images.length || !nodes.imageViewerModal) return;
+    const viewerTitle = nodes.imageViewerModal.querySelector('.lj-dialog-heading');
+    if (viewerTitle) viewerTitle.textContent = title;
     state.viewerImages = images;
     state.viewerIndex = Math.min(Math.max(0, startIndex), images.length - 1);
     state.viewerOffsetX = 0;
     state.viewerOffsetY = 0;
     setViewerScale(1);
     renderViewerImage();
-    imageViewerModal.show();
+    // Los sl-dialog comparten z-index y se apilan por orden en el DOM: lo movemos al final
+    // del body (estando cerrado) para que quede arriba de cualquier modal o alerta abierta.
+    if (!nodes.imageViewerModal.open && nodes.imageViewerModal !== document.body.lastElementChild) {
+      document.body.append(nodes.imageViewerModal);
+    }
+    LJModal.open(nodes.imageViewerModal);
   };
 
   window.laJamoneraOpenImageViewer = openAttachmentViewer;
@@ -3628,7 +3640,7 @@
 
     await openIosSwal({
       title: 'Preparando impresión...',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Preparando impresión" class="meta-spinner-login"></div>',
+      html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Preparando impresión"></sl-spinner></div>',
       allowOutsideClick: false,
       showConfirmButton: false,
       didOpen: async () => {
@@ -3658,9 +3670,9 @@
       denyButtonText: 'No incluir',
       cancelButtonText: 'Cancelar',
       customClass: {
-        confirmButton: 'ios-btn ios-btn-success',
-        denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical',
-        cancelButton: 'ios-btn ios-btn-secondary'
+        confirmButton: 'ios-btn-success',
+        denyButton: 'ios-btn-danger ios-btn-deny-critical',
+        cancelButton: 'ios-btn-secondary'
       }
     });
     if (!ask.isConfirmed && !ask.isDenied) return;
@@ -3676,9 +3688,9 @@
       denyButtonText: 'No incluir',
       cancelButtonText: 'Cancelar',
       customClass: {
-        confirmButton: 'ios-btn ios-btn-success',
-        denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical',
-        cancelButton: 'ios-btn ios-btn-secondary'
+        confirmButton: 'ios-btn-success',
+        denyButton: 'ios-btn-danger ios-btn-deny-critical',
+        cancelButton: 'ios-btn-secondary'
       }
     });
     if (!askTrace.isConfirmed && !askTrace.isDenied) return;
@@ -3753,9 +3765,9 @@
       denyButtonText: 'No incluir',
       cancelButtonText: 'Cancelar',
       customClass: {
-        confirmButton: 'ios-btn ios-btn-success',
-        denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical',
-        cancelButton: 'ios-btn ios-btn-secondary'
+        confirmButton: 'ios-btn-success',
+        denyButton: 'ios-btn-danger ios-btn-deny-critical',
+        cancelButton: 'ios-btn-secondary'
       }
     });
     if (!ask.isConfirmed && !ask.isDenied) return;
@@ -3770,9 +3782,9 @@
       denyButtonText: 'No incluir',
       cancelButtonText: 'Cancelar',
       customClass: {
-        confirmButton: 'ios-btn ios-btn-success',
-        denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical',
-        cancelButton: 'ios-btn ios-btn-secondary'
+        confirmButton: 'ios-btn-success',
+        denyButton: 'ios-btn-danger ios-btn-deny-critical',
+        cancelButton: 'ios-btn-secondary'
       }
     });
     if (!askTrace.isConfirmed && !askTrace.isDenied) return;
@@ -3844,9 +3856,9 @@
       denyButtonText: 'No perecederos',
       cancelButtonText: 'Cancelar',
       customClass: {
-        confirmButton: 'ios-btn ios-btn-success',
-        denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical',
-        cancelButton: 'ios-btn ios-btn-secondary'
+        confirmButton: 'ios-btn-success',
+        denyButton: 'ios-btn-danger ios-btn-deny-critical',
+        cancelButton: 'ios-btn-secondary'
       }
     });
     if (!typeAsk.isConfirmed && !typeAsk.isDenied) return;
@@ -3887,7 +3899,7 @@
 
     await Swal.fire({
       title: 'Generando planilla...',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Generando" class="meta-spinner-login"></div>',
+      html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Generando"></sl-spinner></div>',
       allowOutsideClick: false,
       allowEscapeKey: false,
       showConfirmButton: false,
@@ -4022,13 +4034,13 @@
 
     const auth = await openIosSwal({
       title: 'Confirmación de seguridad',
-      html: '<input id="entryDeletePass" type="password" class="swal2-input ios-input" placeholder="Contraseña general">',
+      html: '<sl-input id="entryDeletePass" type="password" password-toggle class="swal2-input" placeholder="Contraseña general"></sl-input>',
       showCancelButton: true,
       confirmButtonText: 'Eliminar',
       cancelButtonText: 'Cancelar',
       customClass: {
-        confirmButton: 'ios-btn ios-btn-danger',
-        cancelButton: 'ios-btn ios-btn-secondary'
+        confirmButton: 'ios-btn-danger',
+        cancelButton: 'ios-btn-secondary'
       },
       preConfirm: async () => {
         const enteredPass = normalizeValue(document.getElementById('entryDeletePass')?.value);
@@ -4090,17 +4102,17 @@
       title: 'Editar ingreso',
       width: 'min(760px, 96vw)',
       html: `<div class="swal-stack-fields text-start">
-        <div class="inventario-bulk-grid"><input id="editInventoryQty" class="swal2-input ios-input" type="number" min="0" step="0.01" value="${Number(entry.qty || 0)}"><input id="editInventoryInvoice" class="swal2-input ios-input" value="${escapeHtml(entry.invoiceNumber || '')}" placeholder="N° factura"></div>
-        <input id="editInventoryRemito" class="swal2-input ios-input" value="${escapeHtml(entry.remitoNumber || '')}" placeholder="N° remito (opcional)">
-        <div class="inventario-bulk-grid"><input id="editInventoryEntryDate" class="swal2-input ios-input" value="${escapeHtml(entry.entryDate || '')}" placeholder="Fecha ingreso"><input id="editInventoryExpiryDate" class="swal2-input ios-input" value="${escapeHtml(entry.expiryDate || '')}" placeholder="Fecha caducidad"></div>
-        <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="editInventoryNoPerecedero" ${entry.noPerecedero ? 'checked' : ''}><span>No perecedero</span></label>
-        <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="editInventoryUsoInternoEmpresa" ${entry.usoInternoEmpresa ? 'checked' : ''}><span>Envases primarios & más</span></label>
+        <div class="inventario-bulk-grid"><sl-input id="editInventoryQty" class="swal2-input" type="number" min="0" step="0.01" value="${Number(entry.qty || 0)}"></sl-input><sl-input id="editInventoryInvoice" class="swal2-input" value="${escapeHtml(entry.invoiceNumber || '')}" placeholder="N° factura"></sl-input></div>
+        <sl-input id="editInventoryRemito" class="swal2-input" value="${escapeHtml(entry.remitoNumber || '')}" placeholder="N° remito (opcional)"></sl-input>
+        <div class="inventario-bulk-grid"><input id="editInventoryEntryDate" class="lj-input swal2-input" value="${escapeHtml(entry.entryDate || '')}" placeholder="Fecha ingreso"><input id="editInventoryExpiryDate" class="lj-input swal2-input" value="${escapeHtml(entry.expiryDate || '')}" placeholder="Fecha caducidad"></div>
+        <sl-checkbox class="inventario-check-row inventario-check-row-compact" id="editInventoryNoPerecedero" ${entry.noPerecedero ? 'checked' : ''}>No perecedero</sl-checkbox>
+        <sl-checkbox class="inventario-check-row inventario-check-row-compact" id="editInventoryUsoInternoEmpresa" ${entry.usoInternoEmpresa ? 'checked' : ''}>Envases primarios & más</sl-checkbox>
         <small class="text-muted">Auto egreso</small>
-        <select id="editInventoryProvider" class="swal2-select ios-input"><option value="">Seleccionar proveedor</option>${sortedProviders().map((provider) => `<option value="${escapeHtml(provider.id)}" ${normalizeValue(entry.provider) === provider.id || normalizeUpper(entry.provider) === normalizeUpper(provider.name) ? 'selected' : ''}>${escapeHtml(provider.name)}</option>`).join('')}</select>
+        <sl-select id="editInventoryProvider" class="swal2-select" hoist placeholder="Seleccionar proveedor" value="${ljOptionValue((sortedProviders().find((provider) => normalizeValue(entry.provider) === provider.id || normalizeUpper(entry.provider) === normalizeUpper(provider.name)) || {}).id || '')}">${sortedProviders().map((provider) => `<sl-option value="${ljOptionValue(provider.id)}">${escapeHtml(provider.name)}</sl-option>`).join('')}</sl-select>
         <label for="editInventoryFiles" class="inventario-upload-dropzone" id="editInventoryFilesDropzone"><i class="fa-regular fa-file-lines"></i><span>Adjuntar archivos (click o arrastrá)</span></label>
-        <input id="editInventoryFiles" class="form-control image-file-input inventario-hidden-file-input" type="file" accept="image/*,application/pdf" multiple>
+        <input id="editInventoryFiles" class="image-file-input inventario-hidden-file-input" type="file" accept="image/*,application/pdf" multiple>
         <small id="editInventoryFilesFeedback" class="inventario-file-feedback">Sin archivos seleccionados</small>
-        <div class="inventario-bulk-grid"><select id="editInventoryUser" class="swal2-select ios-input"><option value="">Usuario que modifica</option>${users.map((user) => `<option value="${escapeHtml(user.id)}">${escapeHtml(user.fullName || user.email || user.id)}</option>`).join('')}</select><input id="editInventoryPin" class="swal2-input ios-input" type="password" maxlength="4" placeholder="Clave del usuario"></div>
+        <div class="inventario-bulk-grid"><sl-select id="editInventoryUser" class="swal2-select" hoist placeholder="Usuario que modifica">${users.map((user) => `<sl-option value="${ljOptionValue(user.id)}">${escapeHtml(user.fullName || user.email || user.id)}</sl-option>`).join('')}</sl-select><sl-input id="editInventoryPin" class="swal2-input" type="password" maxlength="4" placeholder="Clave del usuario"></sl-input></div>
       </div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar cambios',
@@ -4156,8 +4168,8 @@
         const noPerecedero = Boolean(document.getElementById('editInventoryNoPerecedero')?.checked);
         const usoInternoEmpresa = Boolean(document.getElementById('editInventoryUsoInternoEmpresa')?.checked);
         const expiryDate = noPerecedero ? '' : normalizeValue(document.getElementById('editInventoryExpiryDate')?.value);
-        const provider = providerLabel(normalizeValue(document.getElementById('editInventoryProvider')?.value));
-        const userId = normalizeValue(document.getElementById('editInventoryUser')?.value);
+        const provider = providerLabel(normalizeValue(ljSelectValue(document.getElementById('editInventoryProvider'))));
+        const userId = normalizeValue(ljSelectValue(document.getElementById('editInventoryUser')));
         const pin = normalizeValue(document.getElementById('editInventoryPin')?.value);
         const files = [...(document.getElementById('editInventoryFiles')?.files || [])];
         if (!Number.isFinite(qty) || qty <= 0) return Swal.showValidationMessage('Cantidad inválida.');
@@ -4281,15 +4293,15 @@
       confirmButtonText: 'Eliminar movimientos',
       cancelButtonText: 'Cancelar',
       customClass: {
-        confirmButton: 'ios-btn ios-btn-danger inventario-clear-movements-confirm-btn',
-        cancelButton: 'ios-btn ios-btn-secondary'
+        confirmButton: 'ios-btn-danger inventario-clear-movements-confirm-btn',
+        cancelButton: 'ios-btn-secondary'
       }
     });
     if (!confirm.isConfirmed) return false;
 
     openIosSwal({
       title: 'Eliminando movimientos...',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Procesando" class="meta-spinner-login"></div>',
+      html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Procesando"></sl-spinner></div>',
       allowOutsideClick: false,
       allowEscapeKey: false,
       showConfirmButton: false
@@ -4369,14 +4381,14 @@
           <td></td>
           <td>${escapeHtml(trace.ingredientLot)}</td>
           <td>${escapeHtml((trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? providerLabel(entry.provider) : trace.productionId)}</td>
-          <td>${(trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? '<span class="inventario-internal-no-trace">Sin trazabilidad</span>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td>
+          <td>${(trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? '<span class="inventario-internal-no-trace">Sin trazabilidad</span>' : `<sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i slot="prefix" class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></sl-button>`}</td>
           <td></td>
         </tr>`).join('') : '';
 
       const availableQtyInUnit = getAvailableInUnit(entry, entry.unit || '');
       const availableClass = availableQtyInUnit <= 0.0001 ? 'is-zero' : '';
       const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
-      const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(resolutionRow.at)}</div></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td>${escapeHtml(entry.lotNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td><td></td></tr>` : '';
+      const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(resolutionRow.at)}</div></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td>${escapeHtml(entry.lotNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><sl-button variant="danger" size="small" type="button" class="inventario-no-photo-btn" disabled>Sin trazabilidad</sl-button></td><td></td></tr>` : '';
       const canEditEntry = availableQtyInUnit > 0.0001;
       const hasMovements = getEntryUsages(entry).length > 0;
       return `
@@ -4387,19 +4399,19 @@
         <td>${escapeHtml(entry.invoiceNumber || '-')}</td>
         <td class="inventario-lot-cell">${escapeHtml(entry.lotNumber || '-')}${entry.customLot ? '<br><small class="text-muted">lote propio</small>' : ''}</td>
         <td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td>
-        <td>${entryImageUrls(entry).length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-invoice-image="${entry.id}"><i class="fa-regular fa-image"></i><span>Ver (${entryImageUrls(entry).length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin foto</button>'}</td>
+        <td>${entryImageUrls(entry).length ? `<sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-open-invoice-image="${entry.id}"><i slot="prefix" class="fa-regular fa-image"></i><span>Ver (${entryImageUrls(entry).length})</span></sl-button>` : '<sl-button variant="danger" size="small" type="button" class="inventario-no-photo-btn" disabled>Sin foto</sl-button>'}</td>
         <td>
           <div class="inventario-entry-actions">
-            ${traceRows.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-toggle-entry-collapse="${entry.id}" aria-label="Colapsar desglose"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}
-            <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-print-entry="${entry.id}" aria-label="Imprimir ingreso"><i class="fa-solid fa-print"></i></button>
-            <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn ${canEditEntry ? '' : 'is-disabled'}" data-edit-entry="${entry.id}" aria-label="Editar ingreso" ${canEditEntry ? '' : 'disabled'}><i class="fa-solid fa-pen"></i></button>
+            ${traceRows.length ? `<sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-icon-only-btn" data-toggle-entry-collapse="${entry.id}" aria-label="Colapsar desglose" title="Colapsar desglose"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></sl-button>` : ''}
+            <sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-icon-only-btn" data-print-entry="${entry.id}" aria-label="Imprimir ingreso" title="Imprimir ingreso"><i class="fa-solid fa-print"></i></sl-button>
+            <sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-icon-only-btn ${canEditEntry ? '' : 'is-disabled'}" data-edit-entry="${entry.id}" aria-label="Editar ingreso" title="Editar ingreso" ${canEditEntry ? '' : 'disabled'}><i class="fa-solid fa-pen"></i></sl-button>
             <div class="inventario-entry-more-wrap">
-              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-entry-more="${entry.id}" aria-label="Más opciones"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+              <sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-icon-only-btn" data-entry-more="${entry.id}" aria-label="Más opciones" title="Más opciones"><i class="fa-solid fa-ellipsis-vertical"></i></sl-button>
               <div class="inventario-entry-more-menu d-none" data-entry-more-menu="${entry.id}">
-                <button type="button" data-clear-entry-movements="${entry.id}" ${hasMovements ? '' : 'disabled'}><i class="fa-solid fa-rotate-left"></i><span>Eliminar movimientos</span></button>
+                <sl-button variant="text" size="small" type="button" data-clear-entry-movements="${entry.id}" ${hasMovements ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-rotate-left"></i><span>Eliminar movimientos</span></sl-button>
               </div>
             </div>
-            <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn inventario-icon-only-btn" data-delete-entry="${entry.id}" aria-label="Eliminar ingreso"><i class="fa-solid fa-trash"></i></button>
+            <sl-button variant="danger" outline size="small" type="button" class="lj-icon-btn inventario-delete-btn inventario-threshold-btn inventario-icon-only-btn" data-delete-entry="${entry.id}" aria-label="Eliminar ingreso" title="Eliminar ingreso"><i class="fa-solid fa-trash"></i></sl-button>
           </div>
         </td>
       </tr>${resolutionHtml}${traceHtml}`;
@@ -4411,22 +4423,22 @@
     return `
       <div class="inventario-table-wrap">
         <div class="inventario-table-head enhanced">
-          <input id="inventarioEntriesSearch" type="search" class="form-control ios-input" autocomplete="off" placeholder="Buscar en ingresos" value="${escapeHtml(state.tableSearch)}">
+          <sl-input id="inventarioEntriesSearch" type="search" autocomplete="off" placeholder="Buscar en ingresos" value="${escapeHtml(state.tableSearch)}"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input>
           <div class="inventario-history-toolbar">
             <div class="inventario-table-range">
-              <input id="inventarioEntriesRange" class="form-control ios-input" autocomplete="off" placeholder="Rango de fechas" value="${escapeHtml(state.tableDateRange)}">
+              <input id="inventarioEntriesRange" class="lj-input" autocomplete="off" placeholder="Rango de fechas" value="${escapeHtml(state.tableDateRange)}">
             </div>
             <div class="inventario-print-row toolbar-scroll-x">
-              <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn ${state.tableDateRange ? '' : 'd-none'}" id="inventarioClearFilterBtn"><i class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></button>
-              <button type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn" id="inventarioExpandTableBtn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar</span></button>
-              <button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" id="inventarioExcelBtn"><i class="fa-solid fa-file-excel"></i><span>Excel</span></button>
+              <sl-button variant="default" type="button" class="inventario-delete-btn inventario-threshold-btn ${state.tableDateRange ? '' : 'd-none'}" id="inventarioClearFilterBtn"><i slot="prefix" class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></sl-button>
+              <sl-button variant="default" type="button" class="inventario-expand-btn inventario-threshold-btn" id="inventarioExpandTableBtn"><i slot="prefix" class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar</span></sl-button>
+              <sl-button variant="success" type="button" class="inventario-threshold-btn" id="inventarioExcelBtn"><i slot="prefix" class="fa-solid fa-file-excel"></i><span>Excel</span></sl-button>
               <span class="inventario-period-divider" aria-hidden="true"></span>
-              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioPrintFilteredBtn"><i class="fa-solid fa-print"></i><span>Imprimir filtro</span></button>
-              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioPrintAllBtn"><i class="fa-solid fa-print"></i><span>Imprimir total</span></button>
+              <sl-button variant="default" type="button" class="inventario-threshold-btn" id="inventarioPrintFilteredBtn"><i slot="prefix" class="fa-solid fa-print"></i><span>Imprimir filtro</span></sl-button>
+              <sl-button variant="default" type="button" class="inventario-threshold-btn" id="inventarioPrintAllBtn"><i slot="prefix" class="fa-solid fa-print"></i><span>Imprimir total</span></sl-button>
             </div>
             <div class="inventario-print-row toolbar-scroll-x">
-              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar todo</span></button>
-              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar todo</span></button>
+              <sl-button variant="default" type="button" class="inventario-threshold-btn" id="inventarioCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-compress"></i><span>Colapsar todo</span></sl-button>
+              <sl-button variant="default" type="button" class="inventario-threshold-btn" id="inventarioExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-expand"></i><span>Descolapsar todo</span></sl-button>
             </div>
           </div>
         </div>
@@ -4437,9 +4449,9 @@
           </table>
         </div>
         <div class="inventario-pagination enhanced">
-          <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-entry-page="prev" ${state.tablePage <= 1 ? 'disabled' : ''} aria-label="Página anterior"><i class="fa-solid fa-chevron-left"></i></button>
+          <sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-entry-page="prev" ${state.tablePage <= 1 ? 'disabled' : ''} aria-label="Página anterior" title="Página anterior"><i class="fa-solid fa-chevron-left"></i></sl-button>
           <span>Página ${state.tablePage} de ${pages}</span>
-          <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-entry-page="next" ${state.tablePage >= pages ? 'disabled' : ''} aria-label="Página siguiente"><i class="fa-solid fa-chevron-right"></i></button>
+          <sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-entry-page="next" ${state.tablePage >= pages ? 'disabled' : ''} aria-label="Página siguiente" title="Página siguiente"><i class="fa-solid fa-chevron-right"></i></sl-button>
         </div>
       </div>`;
   };
@@ -4470,7 +4482,7 @@
       },
       customClass: {
         popup: 'ios-alert inventario-expand-alert',
-        confirmButton: 'ios-btn ios-btn-secondary'
+        confirmButton: 'ios-btn-secondary'
       }
     });
   };
@@ -4483,22 +4495,20 @@
 
   const buildExpandedImageCell = (urls = []) => {
     if (!urls.length) return 'Sin foto';
-    return `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn js-open-expanded-image" data-images="${encodeURIComponent(JSON.stringify(urls))}"><i class="fa-regular fa-image"></i><span>Ver (${urls.length})</span></button>`;
+    return `<sl-button variant="default" size="small" type="button" class="inventario-threshold-btn js-open-expanded-image" data-images="${encodeURIComponent(JSON.stringify(urls))}"><i slot="prefix" class="fa-regular fa-image"></i><span>Ver (${urls.length})</span></sl-button>`;
   };
 
   const showExcelPreparing = () => {
     Swal.fire({
       title: 'Exportando Excel...',
-      html: '<img src="./IMG/Meta-ai-logo.webp" alt="Exportando Excel" class="meta-spinner-login">',
+      html: '<sl-spinner class="meta-spinner-login" aria-label="Exportando Excel"></sl-spinner>',
       allowOutsideClick: false,
       showConfirmButton: false,
       customClass: {
         popup: 'ios-alert ingredientes-alert ingredientes-saving-alert',
         title: 'ios-alert-title',
         htmlContainer: 'ios-alert-text ingredientes-saving-html'
-      },
-      buttonsStyling: false,
-      returnFocus: false
+      }
     });
   };
 
@@ -4724,10 +4734,7 @@
       : `<strong class="${expiredQtyInStockUnit > 0.0001 ? 'inventario-expired-strike' : ''}">${formatQtyUnit(stockQty, stockUnit)}${record.packageQty ? ` x${record.packageQty}` : ''}</strong>${expiredQtyInStockUnit > 0.0001 ? `<span class="inventario-stock-real-line">Real ${formatQtyUnit(realAvailableQty, stockUnit)}${record.packageQty ? ` x${record.packageQty}` : ''}</span>` : ''}`;
 
     const lotOptionRows = LOT_TOKEN_OPTIONS.map((option) => `
-      <label class="inventario-check-row">
-        <input type="checkbox" data-lot-check="${option.key}" ${state.editorDraft.tokens.includes(option.key) ? 'checked' : ''}>
-        <span>${option.label}</span>
-      </label>`).join('');
+      <sl-checkbox class="inventario-check-row" data-lot-check="${option.key}" ${state.editorDraft.tokens.includes(option.key) ? 'checked' : ''}>${option.label}</sl-checkbox>`).join('');
 
     const tokensHtml = state.editorDraft.tokens.map((token) => `
       <div class="inventario-token-chip" draggable="true" data-token="${token}">
@@ -4755,10 +4762,10 @@
             ${expiryRows.length ? `<div class="inventario-stat-card is-alert"><small>Lotes con vencimiento (${expiringDays} días)</small>${editorExpiryHtml}</div>` : ''}
           </div>
           <div class="inventario-head-actions-row">
-            <label class="inventario-check-row inventario-check-row-compact inventario-infinite-toggle"><input type="checkbox" id="inventarioInfiniteStockToggle" ${infiniteStock ? 'checked' : ''}><span>Stock infinito</span><img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner d-none" id="inventarioInfiniteStockSpinner"></label>
-            <button type="button" class="btn ios-btn ios-btn-secondary inventario-head-action" id="inventarioProductThresholdBtn"><i class="fa-solid fa-sliders"></i><span>Configurar umbrales</span></button>
-            <button type="button" class="btn ios-btn ios-btn-secondary inventario-head-action" id="inventarioWeeklySheetBtn"><i class="fa-regular fa-file-lines"></i><span>Planilla Semanal</span></button>
-            <button type="button" id="inventarioEditIngredientBtn" class="btn ios-btn ios-btn-success inventario-head-action"><i class="fa-solid fa-pen"></i><span>Editar ingrediente</span></button>
+            <div class="inventario-check-row inventario-check-row-compact inventario-infinite-toggle"><sl-switch id="inventarioInfiniteStockToggle" ${infiniteStock ? 'checked' : ''}>Stock infinito</sl-switch><sl-spinner class="meta-spinner d-none" id="inventarioInfiniteStockSpinner" aria-label="Guardando"></sl-spinner></div>
+            <sl-button variant="default" type="button" class="inventario-head-action" id="inventarioProductThresholdBtn"><i slot="prefix" class="fa-solid fa-sliders"></i><span>Configurar umbrales</span></sl-button>
+            <sl-button variant="default" type="button" class="inventario-head-action" id="inventarioWeeklySheetBtn"><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planilla Semanal</span></sl-button>
+            <sl-button variant="success" type="button" id="inventarioEditIngredientBtn" class="inventario-head-action"><i slot="prefix" class="fa-solid fa-pen"></i><span>Editar ingrediente</span></sl-button>
           </div>
         </div>
       </section>
@@ -4766,53 +4773,53 @@
       ${infiniteStock ? infiniteStockNoticeHtml() : ''}
 
       <section class="recipe-step-card step-block inventario-lot-section">
-        <div class="d-flex flex-wrap gap-2 align-items-center"><button type="button" class="inventario-collapse-head inventario-collapse-head-styled" id="lotConfigToggleBtn" aria-expanded="${state.editorDraft.showLotConfig}">
+        <div class="d-flex flex-wrap gap-2 align-items-center"><button type="button" class="lj-tile inventario-collapse-head inventario-collapse-head-styled" id="lotConfigToggleBtn" aria-expanded="${state.editorDraft.showLotConfig}">
           <span><span class="recipe-step-number">1</span> Configuración de lote</span>
           <span class="inventario-collapse-summary">${buildLotSummaryBadges(state.editorDraft)}</span>
         </div>
         <div id="lotConfigBody" class="step-content ${state.editorDraft.showLotConfig ? '' : 'd-none'}">
           <div class="inventario-check-grid">${lotOptionRows}</div>
           <div class="inventario-inline-fields">
-            <input id="lotCustomAcronym" class="form-control ios-input" placeholder="Ej: JAM" value="${escapeHtml(state.editorDraft.customAcronym)}" ${state.editorDraft.tokens.includes('siglas_personalizadas') ? '' : 'disabled'}>
+            <sl-input id="lotCustomAcronym" placeholder="Ej: JAM" value="${escapeHtml(state.editorDraft.customAcronym)}" ${state.editorDraft.tokens.includes('siglas_personalizadas') ? '' : 'disabled'}></sl-input>
           </div>
-          <label class="inventario-check-row"><input type="checkbox" id="lotIncludeSeparator" ${state.editorDraft.includeSeparator ? 'checked' : ''}><span>Incluir separadores</span></label>
-          <select id="lotSeparator" class="form-select ios-input" ${state.editorDraft.includeSeparator ? '' : 'disabled'}>
-            ${LOT_SEPARATORS.map((sep) => `<option value="${sep}" ${state.editorDraft.separator === sep ? 'selected' : ''}>${sep}</option>`).join('')}
-          </select>
+          <sl-checkbox class="inventario-check-row" id="lotIncludeSeparator" ${state.editorDraft.includeSeparator ? 'checked' : ''}>Incluir separadores</sl-checkbox>
+          <sl-select id="lotSeparator" class="inventario-lot-separator" hoist value="${ljOptionValue(LOT_SEPARATORS.includes(state.editorDraft.separator) ? state.editorDraft.separator : LOT_SEPARATORS[0])}" ${state.editorDraft.includeSeparator ? '' : 'disabled'}>
+            ${LOT_SEPARATORS.map((sep) => `<sl-option value="${ljOptionValue(sep)}">${sep}</sl-option>`).join('')}
+          </sl-select>
           <div class="inventario-lot-order" id="lotTokenOrder">${tokensHtml || '<div class="inventario-token-placeholder">Tildá opciones para generar badges.</div>'}</div>
           <code id="lotPatternPreview" class="inventario-lot-preview"></code>
           <div class="recipe-table-actions inventario-save-inline mt-2">
-            <button type="button" id="saveLotConfigBtn" class="btn ios-btn ios-btn-secondary recipe-table-action-btn">
-              <img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner d-none" id="saveLotConfigSpinner">
-              <i class="fa-solid fa-floppy-disk"></i>
+            <sl-button variant="default" type="button" id="saveLotConfigBtn" class="recipe-table-action-btn">
+              <sl-spinner slot="prefix" class="meta-spinner d-none" id="saveLotConfigSpinner" aria-label="Guardando"></sl-spinner>
+              <i slot="prefix" class="fa-solid fa-floppy-disk"></i>
               <span>Guardar configuración de lote</span>
-            </button>
+            </sl-button>
           </div>
         </div>
       </section>
 
       <section class="recipe-step-card step-block">
         <div class="d-flex flex-wrap gap-2 align-items-center">
-          <button type="button" class="inventario-collapse-head inventario-collapse-head-styled" id="suggestedExpiryToggleBtn" aria-expanded="${!record.suggestedExpiryDays}">
+          <button type="button" class="lj-tile inventario-collapse-head inventario-collapse-head-styled" id="suggestedExpiryToggleBtn" aria-expanded="${!record.suggestedExpiryDays}">
             <span><span class="recipe-step-number">2</span> Días de vencimiento sugeridos</span>
             <span class="inventario-collapse-summary" id="suggestedExpirySummary">
-              ${record.suggestedExpiryDays ? `<span class="badge rounded-pill bg-warning text-dark" style="font-size: 10px; font-weight: 600;"><i class="fa-solid fa-calendar-check me-1"></i> ${record.suggestedExpiryDays} días</span>` : ''}
+              ${record.suggestedExpiryDays ? `<sl-badge variant="warning" pill class="inventario-suggest-badge"><i class="fa-solid fa-calendar-check me-1"></i> ${record.suggestedExpiryDays} días</sl-badge>` : ''}
             </span>
           </button>
         </div>
         <div id="suggestedExpiryBody" class="step-content ${record.suggestedExpiryDays ? 'd-none' : ''}">
           <div class="recipe-fields-flex">
             <div class="recipe-field recipe-field-half">
-              <label class="form-label" for="inventarioSuggestedExpiryDays"><i class="fa-solid fa-hourglass-half inventario-step-icon"></i> Días sugeridos</label>
-              <input id="inventarioSuggestedExpiryDays" class="form-control ios-input" type="number" min="0" step="1" value="${record.suggestedExpiryDays || ''}" placeholder="Ej: 5">
-              ${record.suggestedExpiryDays ? `<div class="mt-2"><span class="badge rounded-pill bg-warning text-dark" style="font-weight: 600; padding: 0.6em 1.2em; border: 1px solid #eab308;"><i class="fa-solid fa-calendar-check me-1"></i> Sugerencia: ${record.suggestedExpiryDays} días</span></div>` : '<div class="mt-2"><span class="badge rounded-pill bg-light text-muted" style="font-weight: 400; padding: 0.5em 1em;">Sin sugerencia (default: 5)</span></div>'}
+              <label class="lj-label" for="inventarioSuggestedExpiryDays"><i class="fa-solid fa-hourglass-half inventario-step-icon"></i> Días sugeridos</label>
+              <sl-input id="inventarioSuggestedExpiryDays" type="number" min="0" step="1" value="${record.suggestedExpiryDays || ''}" placeholder="Ej: 5"></sl-input>
+              ${record.suggestedExpiryDays ? `<div class="mt-2"><sl-badge variant="warning" pill class="inventario-suggest-badge"><i class="fa-solid fa-calendar-check me-1"></i> Sugerencia: ${record.suggestedExpiryDays} días</sl-badge></div>` : '<div class="mt-2"><sl-badge variant="neutral" pill class="inventario-suggest-badge is-empty">Sin sugerencia (default: 5)</sl-badge></div>'}
             </div>
             <div class="recipe-field recipe-field-half d-flex align-items-start pt-2">
                <div class="recipe-table-actions inventario-save-inline w-100 mt-4">
-                <button type="button" id="saveSuggestedExpiryDaysBtn" class="btn ios-btn ios-btn-secondary recipe-table-action-btn w-100">
-                  <img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner d-none" id="saveSuggestedExpiryDaysSpinner">
-                  <i class="fa-solid fa-floppy-disk"></i> <span>Guardar vencimiento</span>
-                </button>
+                <sl-button variant="default" type="button" id="saveSuggestedExpiryDaysBtn" class="recipe-table-action-btn w-100">
+                  <sl-spinner slot="prefix" class="meta-spinner d-none" id="saveSuggestedExpiryDaysSpinner" aria-label="Guardando"></sl-spinner>
+                  <i slot="prefix" class="fa-solid fa-floppy-disk"></i> <span>Guardar vencimiento</span>
+                </sl-button>
               </div>
             </div>
             <div class="recipe-field recipe-field-full">
@@ -4827,61 +4834,57 @@
         ${isEditingEntry ? '<div class="inventario-editing-entry-note"><i class="fa-solid fa-pen"></i><span>Estás editando un ingreso existente. Guardá los cambios desde esta misma sección.</span></div>' : ''}
         <div class="step-content recipe-fields-flex inventario-stock-grid">
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryQty"><i class="fa-solid fa-weight-hanging inventario-step-icon"></i> Cantidad a ingresar</label>
-            <input id="inventoryQty" class="form-control ios-input" type="number" autocomplete="off" min="0" step="0.01" value="${state.editorDraft.qty}" ${stockDisabledAttr}>
+            <label class="lj-label" for="inventoryQty"><i class="fa-solid fa-weight-hanging inventario-step-icon"></i> Cantidad a ingresar</label>
+            <sl-input id="inventoryQty" type="number" autocomplete="off" min="0" step="0.01" value="${escapeHtml(String(state.editorDraft.qty ?? ''))}" ${stockDisabledAttr}></sl-input>
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryUnit"><i class="fa-solid fa-ruler-combined inventario-step-icon"></i> Unidad</label>
-            <select id="inventoryUnit" class="form-select ios-input" autocomplete="off" ${(record.stockUnit || infiniteStock) ? 'disabled' : ''}>
-              ${state.measures.map((m) => `<option value="${escapeHtml(m.name)}" ${measureKey(m.name) === measureKey(state.editorDraft.unit) ? 'selected' : ''}>${escapeHtml(getMeasureLabel(m.name))}</option>`).join('')}
-              <option value="add_measure">+ Agregar medida</option>
-            </select>
-            ${infiniteStock ? '<small class="text-muted">Unidad bloqueada por stock infinito.</small>' : (record.stockUnit ? `<small class="text-muted d-block">Unidad bloqueada según ingresos previos.</small><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn mt-1" data-mass-unit-change><i class="fa-solid fa-right-left"></i><span>Cambiar unidad masivamente</span></button>` : '')}
+            <label class="lj-label" for="inventoryUnit"><i class="fa-solid fa-ruler-combined inventario-step-icon"></i> Unidad</label>
+            <sl-select id="inventoryUnit" hoist value="${ljOptionValue((state.measures.find((m) => measureKey(m.name) === measureKey(state.editorDraft.unit)) || state.measures[0] || { name: 'add_measure' }).name)}" ${(record.stockUnit || infiniteStock) ? 'disabled' : ''}>
+              ${state.measures.map((m) => `<sl-option value="${ljOptionValue(m.name)}">${escapeHtml(getMeasureLabel(m.name))}</sl-option>`).join('')}
+              <sl-option value="add_measure">+ Agregar medida</sl-option>
+            </sl-select>
+            ${infiniteStock ? '<small class="text-muted">Unidad bloqueada por stock infinito.</small>' : (record.stockUnit ? `<small class="text-muted d-block">Unidad bloqueada según ingresos previos.</small><sl-button variant="default" size="small" type="button" class="inventario-threshold-btn mt-1" data-mass-unit-change><i slot="prefix" class="fa-solid fa-right-left"></i><span>Cambiar unidad masivamente</span></sl-button>` : '')}
           </div>
           <div class="recipe-field recipe-field-half ${shouldShowPackageQty ? '' : 'd-none'}" id="inventoryPackageQtyWrap">
-            <label class="form-label" for="inventoryPackageQty"><i class="fa-solid fa-box inventario-step-icon"></i> Cantidad por paquete (opcional)</label>
-            <input id="inventoryPackageQty" class="form-control ios-input" type="number" min="1" step="1" value="${escapeHtml(String(state.editorDraft.packageQty || ''))}" ${(record.packageQty || infiniteStock) ? 'disabled' : ''}>
+            <label class="lj-label" for="inventoryPackageQty"><i class="fa-solid fa-box inventario-step-icon"></i> Cantidad por paquete (opcional)</label>
+            <sl-input id="inventoryPackageQty" type="number" min="1" step="1" value="${escapeHtml(String(state.editorDraft.packageQty || ''))}" ${(record.packageQty || infiniteStock) ? 'disabled' : ''}></sl-input>
             ${record.packageQty ? `<small class="text-muted">Fijado en ${record.packageQty} para este ingrediente.</small>` : ''}
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryEntryDate"><i class="fa-regular fa-calendar-plus inventario-step-icon"></i> Fecha de ingreso</label>
-            <input id="inventoryEntryDate" class="form-control ios-input" autocomplete="off" value="${escapeHtml(state.editorDraft.entryDate)}" placeholder="Seleccionar fecha" ${stockDisabledAttr}>
+            <label class="lj-label" for="inventoryEntryDate"><i class="fa-regular fa-calendar-plus inventario-step-icon"></i> Fecha de ingreso</label>
+            <input id="inventoryEntryDate" class="lj-input" autocomplete="off" value="${escapeHtml(state.editorDraft.entryDate)}" placeholder="Seleccionar fecha" ${stockDisabledAttr}>
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryExpiryDate"><i class="fa-regular fa-calendar-check inventario-step-icon"></i> Fecha de caducidad</label>
-            <input id="inventoryExpiryDate" class="form-control ios-input" autocomplete="off" value="${escapeHtml(state.editorDraft.expiryDate)}" placeholder="Seleccionar fecha" ${(state.editorDraft.noPerecedero || state.editorDraft.isFrozen || infiniteStock) ? 'disabled' : ''}>
-            ${state.editorDraft.isFrozen ? `<small class="text-muted d-block mt-1"><i class="bi bi-info-circle me-1"></i>Vencimiento fijo a <strong>${FROZEN_EXPIRY_DAYS} días</strong> desde la fecha de ingreso.</small>` : ''}
+            <label class="lj-label" for="inventoryExpiryDate"><i class="fa-regular fa-calendar-check inventario-step-icon"></i> Fecha de caducidad</label>
+            <input id="inventoryExpiryDate" class="lj-input" autocomplete="off" value="${escapeHtml(state.editorDraft.expiryDate)}" placeholder="Seleccionar fecha" ${(state.editorDraft.noPerecedero || state.editorDraft.isFrozen || infiniteStock) ? 'disabled' : ''}>
+            ${state.editorDraft.isFrozen ? `<small class="text-muted d-block mt-1"><sl-icon name="info-circle" class="me-1"></sl-icon>Vencimiento fijo a <strong>${FROZEN_EXPIRY_DAYS} días</strong> desde la fecha de ingreso.</small>` : ''}
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryInvoiceNumber"><i class="fa-solid fa-file-invoice inventario-step-icon"></i> Número de factura</label>
-            <textarea id="inventoryInvoiceNumber" name="inventory_code_free" class="form-control ios-input inventario-invoice-textarea" rows="1" placeholder="Ej: A-000123" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" ${stockDisabledAttr}>${escapeHtml(state.editorDraft.invoiceNumber)}</textarea>
+            <label class="lj-label" for="inventoryInvoiceNumber"><i class="fa-solid fa-file-invoice inventario-step-icon"></i> Número de factura</label>
+            <sl-textarea id="inventoryInvoiceNumber" name="inventory_code_free" class="inventario-invoice-textarea" rows="1" resize="none" placeholder="Ej: A-000123" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" value="${escapeHtml(state.editorDraft.invoiceNumber)}" ${stockDisabledAttr}></sl-textarea>
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryRemitoNumber"><i class="fa-regular fa-file-lines inventario-step-icon"></i> Número de remito (opcional)</label>
-            <input id="inventoryRemitoNumber" name="inventory_remito_free" class="form-control ios-input" placeholder="Ej: R-0001-00045678" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" value="${escapeHtml(state.editorDraft.remitoNumber || '')}" ${stockDisabledAttr}>
+            <label class="lj-label" for="inventoryRemitoNumber"><i class="fa-regular fa-file-lines inventario-step-icon"></i> Número de remito (opcional)</label>
+            <sl-input id="inventoryRemitoNumber" name="inventory_remito_free" placeholder="Ej: R-0001-00045678" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" value="${escapeHtml(state.editorDraft.remitoNumber || '')}" ${stockDisabledAttr}></sl-input>
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryCustomLot"><i class="fa-solid fa-barcode inventario-step-icon"></i> Lote propio del producto (opcional)</label>
-            <input id="inventoryCustomLot" class="form-control ios-input" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ej: L4521-A (lote de fábrica)" value="${escapeHtml(state.editorDraft.customLot || '')}" ${stockDisabledAttr}>
+            <label class="lj-label" for="inventoryCustomLot"><i class="fa-solid fa-barcode inventario-step-icon"></i> Lote propio del producto (opcional)</label>
+            <sl-input id="inventoryCustomLot" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ej: L4521-A (lote de fábrica)" value="${escapeHtml(state.editorDraft.customLot || '')}" ${stockDisabledAttr}></sl-input>
             <small class="text-muted">Si el producto trae su propio lote (ej: condimentos), cargalo acá: reemplaza al lote automático sólo para este ingreso.</small>
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="form-label" for="inventoryProviderSearch"><i class="bi bi-box-seam-fill inventario-step-icon"></i> Proveedor</label>
+            <label class="lj-label" for="inventoryProviderSearch"><sl-icon name="box-seam-fill" class="inventario-step-icon"></sl-icon> Proveedor</label>
             <div class="recipe-ing-autocomplete">
               <div class="recipe-ing-input-wrap">
                 <span class="recipe-inline-avatar-wrap recipe-inline-avatar-fallback"><span class="recipe-small-placeholder"><i class="fa-solid fa-truck-field"></i></span></span>
-                <input id="inventoryProviderSearch" type="search" class="form-control ios-input" placeholder="Buscar proveedor..." value="${escapeHtml(providerSearchValue)}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" ${stockDisabledAttr}>
+                <sl-input id="inventoryProviderSearch" type="search" placeholder="Buscar proveedor..." value="${escapeHtml(providerSearchValue)}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" ${stockDisabledAttr}></sl-input>
               </div>
             </div>
-            <select id="inventoryProvider" class="form-select ios-input d-none" autocomplete="off" ${stockDisabledAttr}>
-              <option value="">Seleccionar proveedor (opcional)</option>
-              ${providers.map((provider) => `<option value="${escapeHtml(provider.id)}" ${normalizeValue(state.editorDraft.provider) === provider.id ? 'selected' : ''}>${escapeHtml(provider.name)}</option>`).join('')}
-              <option value="add_provider">nuevo proveedor</option>
-            </select>
+            <input type="hidden" id="inventoryProvider" value="${escapeHtml((providers.some((provider) => provider.id === normalizeValue(state.editorDraft.provider)) || normalizeValue(state.editorDraft.provider) === 'add_provider') ? normalizeValue(state.editorDraft.provider) : '')}" ${stockDisabledAttr}>
           </div>
           <div class="recipe-field recipe-field-full inventario-flags-block">
             <div class="inventario-flags-head">
-              <i class="bi bi-tags-fill"></i>
+              <sl-icon name="tags-fill"></sl-icon>
               <span>Tipo de producto</span>
               <small class="text-muted">Marcá las opciones que correspondan</small>
             </div>
@@ -4892,7 +4895,7 @@
                   inputId: 'inventoryNoPerecedero',
                   checked: state.editorDraft.noPerecedero,
                   fromPref: Boolean(state.editorDraft.flagsFromPreferences?.noPerecedero),
-                  icon: 'bi-infinity',
+                  icon: 'infinity',
                   title: 'No perecedero',
                   desc: 'Sin fecha de vencimiento',
                   hasInfo: false
@@ -4902,7 +4905,7 @@
                   inputId: 'inventoryIsFrozen',
                   checked: state.editorDraft.isFrozen,
                   fromPref: Boolean(state.editorDraft.flagsFromPreferences?.isFrozen),
-                  icon: 'bi-snow2',
+                  icon: 'snow2',
                   title: 'Congelado al ingreso',
                   desc: `Vto. forzado a ${FROZEN_EXPIRY_DAYS} días`,
                   hasInfo: true
@@ -4912,7 +4915,7 @@
                   inputId: 'inventoryUsoInternoEmpresa',
                   checked: state.editorDraft.usoInternoEmpresa,
                   fromPref: Boolean(state.editorDraft.flagsFromPreferences?.usoInternoEmpresa),
-                  icon: 'bi-box-arrow-right',
+                  icon: 'box-arrow-right',
                   title: 'Autoegreso',
                   desc: 'Envases primarios & uso interno',
                   hasInfo: false
@@ -4920,27 +4923,27 @@
               ].map((tile) => `
                 <div class="inventario-flag-tile-wrap ${tile.hasInfo ? 'has-info' : ''}">
                   <label class="inventario-flag-tile ${tile.checked ? 'is-checked' : ''} ${tile.fromPref && tile.checked ? 'is-from-pref' : ''} ${tile.hasInfo ? 'has-info' : ''}" data-flag="${tile.flag}">
-                    <span class="inventario-flag-tile-icon"><i class="bi ${tile.icon}"></i></span>
+                    <span class="inventario-flag-tile-icon"><sl-icon name="${tile.icon}"></sl-icon></span>
                     <div class="inventario-flag-tile-body">
                       <span class="inventario-flag-tile-title">${tile.title}</span>
                       <span class="inventario-flag-tile-desc">${tile.desc}</span>
-                      ${tile.fromPref && tile.checked ? '<span class="inventario-flag-tile-pref"><i class="bi bi-bookmark-star-fill"></i> Tildado por preferencia guardada</span>' : ''}
+                      ${tile.fromPref && tile.checked ? '<span class="inventario-flag-tile-pref"><sl-icon name="bookmark-star-fill"></sl-icon> Tildado por preferencia guardada</span>' : ''}
                     </div>
-                    <input type="checkbox" id="${tile.inputId}" ${tile.checked ? 'checked' : ''} ${stockDisabledAttr}>
-                    <span class="inventario-flag-tile-check" aria-hidden="true"><i class="bi bi-check2"></i></span>
+                    <sl-checkbox class="inventario-flag-tile-input" id="${tile.inputId}" ${tile.checked ? 'checked' : ''} ${stockDisabledAttr}><span class="visually-hidden">${tile.title}</span></sl-checkbox>
+                    <span class="inventario-flag-tile-check" aria-hidden="true"><sl-icon name="check2"></sl-icon></span>
                   </label>
-                  ${tile.hasInfo ? `<button type="button" class="frozen-info-icon inventario-flag-tile-info-btn" data-frozen-info aria-label="Información sobre producto congelado" title="¿Qué significa congelado?"><i class="bi bi-info-circle-fill"></i></button>` : ''}
+                  ${tile.hasInfo ? `<sl-icon-button name="info-circle-fill" class="frozen-info-icon inventario-flag-tile-info-btn" data-frozen-info label="Información sobre producto congelado" title="¿Qué significa congelado?"></sl-icon-button>` : ''}
                 </div>
               `).join('')}
             </div>
           </div>
           <div class="recipe-field recipe-field-full">
-            <label class="form-label" for="inventoryInvoiceImage"><i class="fa-regular fa-images inventario-step-icon"></i> Adjuntar archivos (imagen o PDF)</label>
+            <label class="lj-label" for="inventoryInvoiceImage"><i class="fa-regular fa-images inventario-step-icon"></i> Adjuntar archivos (imagen o PDF)</label>
             <label for="inventoryInvoiceImage" class="inventario-upload-dropzone ${infiniteStock ? 'is-disabled' : ''}">
               <i class="fa-regular fa-images"></i>
               <span>Arrastrá adjuntos o hacé click para seleccionar</span>
             </label>
-            <input id="inventoryInvoiceImage" class="form-control image-file-input inventario-hidden-file-input" autocomplete="off" type="file" accept="image/*,application/pdf" multiple ${stockDisabledAttr}>
+            <input id="inventoryInvoiceImage" class="image-file-input inventario-hidden-file-input" autocomplete="off" type="file" accept="image/*,application/pdf" multiple ${stockDisabledAttr}>
             <small id="inventoryInvoiceImageFeedback" class="inventario-file-feedback">${renderInvoiceUploadFeedbackHtml(state.editorDraft)}</small>
           </div>
         </div>
@@ -4956,35 +4959,35 @@
             const packageLocked = isUnit && Number(extraRecord?.packageQty) > 0;
             const packageVal = normalizeValue(extra.packageQty || (packageLocked ? extraRecord.packageQty : ''));
             const avatarHtml = extraIngredient?.imageUrl
-              ? `<span class="recipe-inline-avatar-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-inventario-thumb" src="${escapeHtml(extraIngredient.imageUrl)}" alt="${escapeHtml(capitalize(extraIngredient.name))}" loading="lazy"></span>`
+              ? `<span class="recipe-inline-avatar-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="recipe-inline-avatar js-inventario-thumb" src="${escapeHtml(extraIngredient.imageUrl)}" alt="${escapeHtml(capitalize(extraIngredient.name))}" loading="lazy"></span>`
               : '<span class="recipe-inline-avatar-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-bowl-food"></i></span></span>';
             return `<tr data-bulk-index="${idx}" class="inventario-bulk-main-row">
               <td><i class="fa-solid fa-grip-lines"></i></td>
               <td>
-                <div class="recipe-ing-autocomplete"><div class="recipe-ing-input-wrap">${avatarHtml}<input type="search" class="form-control ios-input" data-bulk-search="${idx}" placeholder="Buscar producto..." value="${escapeHtml(extraIngredient ? capitalize(extraIngredient.name) : '')}" ${stockDisabledAttr}></div></div>
-                <select class="form-select ios-input d-none" data-bulk-ingredient="${idx}" ${stockDisabledAttr}><option value="">Seleccionar producto</option>${Object.values(state.ingredientes).map((ing) => `<option value="${escapeHtml(ing.id)}" ${ing.id === extra.ingredientId ? 'selected' : ''}>${escapeHtml(capitalize(ing.name))}</option>`).join('')}</select>
+                <div class="recipe-ing-autocomplete"><div class="recipe-ing-input-wrap">${avatarHtml}<sl-input type="search" data-bulk-search="${idx}" placeholder="Buscar producto..." value="${escapeHtml(extraIngredient ? capitalize(extraIngredient.name) : '')}" ${stockDisabledAttr}></sl-input></div></div>
+                <input type="hidden" data-bulk-ingredient="${idx}" value="${escapeHtml(extraIngredient ? extraIngredient.id : '')}" ${stockDisabledAttr}>
               </td>
-              <td><input class="form-control ios-input" type="text" data-bulk-expiry-date="${idx}" value="${escapeHtml(extra.expiryDate || state.editorDraft.expiryDate)}" placeholder="Fecha" ${(extra.noPerecedero || infiniteStock) ? 'disabled' : ''}></td>
-              <td><input class="form-control ios-input" type="number" min="0" step="0.01" data-bulk-qty="${idx}" placeholder="Cantidad" value="${escapeHtml(extra.qty || '')}" ${stockDisabledAttr}></td>
-              <td><div class="inventario-bulk-unit-cell"><select class="form-select ios-input" data-bulk-unit="${idx}" ${(extraRecord?.stockUnit || packageLocked || infiniteStock) ? 'disabled' : ''}>${state.measures.map((m) => `<option value="${escapeHtml(m.name)}" ${measureKey(m.name) === measureKey(defaultUnit) ? 'selected' : ''}>${escapeHtml(getMeasureLabel(m.name))}</option>`).join('')}</select><div class="${isUnit ? '' : 'd-none'}" data-bulk-package-wrap="${idx}"><input class="form-control ios-input" type="number" min="1" step="1" data-bulk-package="${idx}" placeholder="Cant. por paquete" value="${escapeHtml(packageVal)}" ${(packageLocked || infiniteStock) ? 'disabled' : ''}></div></div></td>
-              <td><button type="button" class="btn family-manage-btn" data-bulk-remove="${idx}" ${stockDisabledAttr}><i class="fa-solid fa-trash"></i></button></td>
+              <td><input class="lj-input" type="text" data-bulk-expiry-date="${idx}" value="${escapeHtml(extra.expiryDate || state.editorDraft.expiryDate)}" placeholder="Fecha" ${(extra.noPerecedero || infiniteStock) ? 'disabled' : ''}></td>
+              <td><sl-input type="number" min="0" step="0.01" data-bulk-qty="${idx}" placeholder="Cantidad" value="${escapeHtml(extra.qty || '')}" ${stockDisabledAttr}></sl-input></td>
+              <td><div class="inventario-bulk-unit-cell"><sl-select hoist data-bulk-unit="${idx}" value="${ljOptionValue((state.measures.find((m) => measureKey(m.name) === measureKey(defaultUnit)) || state.measures[0] || { name: '' }).name)}" ${(extraRecord?.stockUnit || packageLocked || infiniteStock) ? 'disabled' : ''}>${state.measures.map((m) => `<sl-option value="${ljOptionValue(m.name)}">${escapeHtml(getMeasureLabel(m.name))}</sl-option>`).join('')}</sl-select><div class="${isUnit ? '' : 'd-none'}" data-bulk-package-wrap="${idx}"><sl-input type="number" min="1" step="1" data-bulk-package="${idx}" placeholder="Cant. por paquete" value="${escapeHtml(packageVal)}" ${(packageLocked || infiniteStock) ? 'disabled' : ''}></sl-input></div></div></td>
+              <td><sl-button variant="default" type="button" class="lj-icon-btn family-manage-btn" data-bulk-remove="${idx}" aria-label="Quitar producto" title="Quitar producto" ${stockDisabledAttr}><i class="fa-solid fa-trash"></i></sl-button></td>
             </tr>
             <tr class="inventario-bulk-secondary-row">
               <td></td>
-              <td colspan="5"><div class="inventario-bulk-row-extras"><label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" data-bulk-no-perecedero="${idx}" ${extra.noPerecedero ? 'checked' : ''} ${stockDisabledAttr}><span>No perecedero</span></label><label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" data-bulk-auto-egreso="${idx}" ${extra.usoInternoEmpresa ? 'checked' : ''} ${stockDisabledAttr}><span>Autoegreso</span></label><label class="inventario-check-row inventario-check-row-compact inventario-frozen-row"><input type="checkbox" data-bulk-frozen="${idx}" ${extra.isFrozen ? 'checked' : ''} ${stockDisabledAttr}><span><i class="bi bi-snow2 me-1"></i>Congelado</span>${frozenInfoIconHtml()}</label></div></td>
+              <td colspan="5"><div class="inventario-bulk-row-extras"><sl-checkbox class="inventario-check-row inventario-check-row-compact" data-bulk-no-perecedero="${idx}" ${extra.noPerecedero ? 'checked' : ''} ${stockDisabledAttr}>No perecedero</sl-checkbox><sl-checkbox class="inventario-check-row inventario-check-row-compact" data-bulk-auto-egreso="${idx}" ${extra.usoInternoEmpresa ? 'checked' : ''} ${stockDisabledAttr}>Autoegreso</sl-checkbox><span class="inventario-check-row inventario-check-row-compact inventario-frozen-row"><sl-checkbox data-bulk-frozen="${idx}" ${extra.isFrozen ? 'checked' : ''} ${stockDisabledAttr}><sl-icon name="snow2" class="me-1"></sl-icon>Congelado</sl-checkbox>${frozenInfoIconHtml()}</span></div></td>
             </tr>`;
           }).join('')}</tbody>
               </table>
             </div>
           </div>
           <div class="recipe-table-actions inventario-save-inline">
-            <button type="button" id="addBulkInventoryBtn" class="btn ios-btn ios-btn-success recipe-table-action-btn inventario-add-bulk-btn ${isEditingEntry ? 'd-none' : ''}" ${isEditingEntry ? 'disabled' : stockDisabledAttr}><i class="fa-solid fa-plus"></i><span>Productos en factura</span></button>
-            ${isEditingEntry ? '<button type="button" id="cancelInventoryEditBtn" class="btn ios-btn ios-btn-secondary recipe-table-action-btn"><i class="fa-solid fa-xmark"></i><span>Cancelar edición</span></button>' : ''}
-            <button type="submit" id="saveInventoryBtn" class="btn ios-btn ios-btn-success recipe-table-action-btn recipe-table-action-btn-primary" ${stockDisabledAttr}>
-              <img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner d-none" id="saveInventorySpinner">
-              <i class="fa-solid fa-floppy-disk" id="saveInventoryIcon"></i>
+            <sl-button variant="success" type="button" id="addBulkInventoryBtn" class="recipe-table-action-btn inventario-add-bulk-btn ${isEditingEntry ? 'd-none' : ''}" ${isEditingEntry ? 'disabled' : stockDisabledAttr}><i slot="prefix" class="fa-solid fa-plus"></i><span>Productos en factura</span></sl-button>
+            ${isEditingEntry ? '<sl-button variant="default" type="button" id="cancelInventoryEditBtn" class="recipe-table-action-btn"><i slot="prefix" class="fa-solid fa-xmark"></i><span>Cancelar edición</span></sl-button>' : ''}
+            <sl-button variant="success" type="submit" id="saveInventoryBtn" class="recipe-table-action-btn recipe-table-action-btn-primary" ${stockDisabledAttr}>
+              <sl-spinner slot="prefix" class="meta-spinner d-none" id="saveInventorySpinner" aria-label="Guardando"></sl-spinner>
+              <i slot="prefix" class="fa-solid fa-floppy-disk" id="saveInventoryIcon"></i>
               <span>${isEditingEntry ? 'Guardar cambios' : 'Guardar ingreso'}</span>
-            </button>
+            </sl-button>
           </div>
         </div>
       </section>
@@ -4996,7 +4999,7 @@
 
     const syncDraft = () => {
       state.editorDraft.qty = nodes.editorForm.querySelector('#inventoryQty')?.value || '';
-      state.editorDraft.unit = nodes.editorForm.querySelector('#inventoryUnit')?.value || 'kilos';
+      state.editorDraft.unit = ljSelectValue(nodes.editorForm.querySelector('#inventoryUnit')) || 'kilos';
       state.editorDraft.packageQty = nodes.editorForm.querySelector('#inventoryPackageQty')?.value || '';
       state.editorDraft.entryDate = nodes.editorForm.querySelector('#inventoryEntryDate')?.value || '';
       state.editorDraft.expiryDate = nodes.editorForm.querySelector('#inventoryExpiryDate')?.value || '';
@@ -5016,7 +5019,7 @@
       state.editorDraft.provider = nodes.editorForm.querySelector('#inventoryProvider')?.value || '';
       state.editorDraft.customAcronym = nodes.editorForm.querySelector('#lotCustomAcronym')?.value || '';
       state.editorDraft.includeSeparator = Boolean(nodes.editorForm.querySelector('#lotIncludeSeparator')?.checked);
-      state.editorDraft.separator = nodes.editorForm.querySelector('#lotSeparator')?.value || '-';
+      state.editorDraft.separator = ljSelectValue(nodes.editorForm.querySelector('#lotSeparator')) || '-';
       state.editorDraft.invoiceImageCountLabel = invoiceUploadSummary(getInvoiceUploadItems());
       state.editorDraft.bulkEntries = isEditingEntry ? [] : [...nodes.editorForm.querySelectorAll('[data-bulk-index]')].map((row) => {
         const idx = row.dataset.bulkIndex;
@@ -5025,7 +5028,7 @@
           id: `bulk_${idx}`,
           ingredientId: normalizeValue(nodes.editorForm.querySelector(`[data-bulk-ingredient="${idx}"]`)?.value),
           qty: normalizeValue(nodes.editorForm.querySelector(`[data-bulk-qty="${idx}"]`)?.value),
-          unit: normalizeValue(nodes.editorForm.querySelector(`[data-bulk-unit="${idx}"]`)?.value),
+          unit: normalizeValue(ljSelectValue(nodes.editorForm.querySelector(`[data-bulk-unit="${idx}"]`))),
           packageQty: normalizeValue(nodes.editorForm.querySelector(`[data-bulk-package="${idx}"]`)?.value),
           noPerecedero: Boolean(nodes.editorForm.querySelector(`[data-bulk-no-perecedero="${idx}"]`)?.checked),
           usoInternoEmpresa: Boolean(nodes.editorForm.querySelector(`[data-bulk-auto-egreso="${idx}"]`)?.checked),
@@ -5296,21 +5299,17 @@
     });
 
     nodes.editorForm.querySelector('#inventarioEditIngredientBtn').addEventListener('click', async () => {
-      inventarioModal.setAttribute('inert', '');
-      try {
-        await window.laJamoneraIngredientesAPI?.openIngredientForm?.(state.ingredientes[ingredientId]);
-      } finally {
-        inventarioModal.removeAttribute('inert');
-      }
+      await window.laJamoneraIngredientesAPI?.openIngredientForm?.(state.ingredientes[ingredientId]);
       await reloadEditorData(ingredientId);
       renderEditor(ingredientId, state.editorDraft);
     });
 
     nodes.editorForm.querySelector('#inventoryUnit').addEventListener('change', async (event) => {
-      if (event.target.value !== 'add_measure') {
+      const selectedUnit = ljSelectValue(event.currentTarget);
+      if (selectedUnit !== 'add_measure') {
         syncDraft();
         const wrap = nodes.editorForm.querySelector('#inventoryPackageQtyWrap');
-        const isUnit = getUnitMeta(event.target.value).category === 'unidad' || Number(record.packageQty) > 0;
+        const isUnit = getUnitMeta(selectedUnit).category === 'unidad' || Number(record.packageQty) > 0;
         wrap?.classList.toggle('d-none', !isUnit);
         if (!isUnit && !record.packageQty) {
           const packageInput = nodes.editorForm.querySelector('#inventoryPackageQty');
@@ -5321,7 +5320,7 @@
       }
       const result = await openIosSwal({
         title: 'Agregar medida',
-        html: '<div class="swal-stack-fields"><input id="newMeasureName" class="swal2-input ios-input" placeholder="Nombre"><input id="newMeasureAbbr" class="swal2-input ios-input" placeholder="Abreviatura"></div>',
+        html: '<div class="swal-stack-fields"><sl-input id="newMeasureName" class="swal2-input" placeholder="Nombre"></sl-input><sl-input id="newMeasureAbbr" class="swal2-input" placeholder="Abreviatura"></sl-input></div>',
         showCancelButton: true,
         confirmButtonText: 'Guardar',
         cancelButtonText: 'Cancelar',
@@ -5398,10 +5397,10 @@
       dropdown.className = 'recipe-suggest-floating';
       dropdown.innerHTML = `${source.map((provider) => {
         const avatar = sanitizeImageUrl(provider?.photoUrl)
-          ? `<span class="recipe-suggest-avatar-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-suggest-avatar js-inventario-thumb" src="${escapeHtml(sanitizeImageUrl(provider.photoUrl))}" alt="${escapeHtml(provider.name)}" loading="lazy"></span>`
+          ? `<span class="recipe-suggest-avatar-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="recipe-suggest-avatar js-inventario-thumb" src="${escapeHtml(sanitizeImageUrl(provider.photoUrl))}" alt="${escapeHtml(provider.name)}" loading="lazy"></span>`
           : '<span class="recipe-suggest-avatar-wrap"><span class="image-placeholder-circle-2 inventario-provider-suggest-placeholder"><i class="fa-solid fa-truck-field inventario-provider-suggest-icon"></i></span></span>';
-        return `<button type="button" class="recipe-suggest-item" data-provider-pick="${escapeHtml(provider.id)}">${avatar}<span>${escapeHtml(provider.name)}</span></button>`;
-      }).join('')}<button type="button" class="recipe-suggest-item recipe-suggest-create" data-provider-create="1"><i class="fa-solid fa-plus"></i><span>nuevo proveedor</span></button>`;
+        return `<button type="button" class="lj-tile recipe-suggest-item" data-provider-pick="${escapeHtml(provider.id)}">${avatar}<span>${escapeHtml(provider.name)}</span></button>`;
+      }).join('')}<button type="button" class="lj-tile recipe-suggest-item recipe-suggest-create" data-provider-create="1"><i class="fa-solid fa-plus"></i><span>nuevo proveedor</span></button>`;
       document.body.appendChild(dropdown);
       positionProviderSuggestions(dropdown, providerSearchInput);
       initThumbLoading(dropdown);
@@ -5435,17 +5434,17 @@
       const result = await openIosSwal({
         title: 'Agregar proveedor',
         html: `<div class="swal-stack-fields">
-          <input id="newProviderName" class="swal2-input ios-input" placeholder="Nombre del proveedor">
-          <input id="newProviderEmail" class="swal2-input ios-input" placeholder="Email (opcional)">
-          <input id="newProviderPhone" class="swal2-input ios-input" placeholder="Teléfono (opcional)">
-          <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="newProviderNonFood"><span>No pertenece al rubro alimentos</span></label>
-          <label for="newProviderPhoto" class="inventario-upload-dropzone"><i class="fa-regular fa-image"></i><span>Foto de perfil: click o arrastrá</span></label><input id="newProviderPhoto" class="form-control image-file-input inventario-hidden-file-input" type="file" accept="image/*"><small id="newProviderPhotoFeedback" class="inventario-file-feedback">Sin foto seleccionada</small>
+          <sl-input id="newProviderName" class="swal2-input" placeholder="Nombre del proveedor"></sl-input>
+          <sl-input id="newProviderEmail" class="swal2-input" placeholder="Email (opcional)"></sl-input>
+          <sl-input id="newProviderPhone" class="swal2-input" placeholder="Teléfono (opcional)"></sl-input>
+          <sl-checkbox class="inventario-check-row inventario-check-row-compact" id="newProviderNonFood">No pertenece al rubro alimentos</sl-checkbox>
+          <label for="newProviderPhoto" class="inventario-upload-dropzone"><i class="fa-regular fa-image"></i><span>Foto de perfil: click o arrastrá</span></label><input id="newProviderPhoto" class="image-file-input inventario-hidden-file-input" type="file" accept="image/*"><small id="newProviderPhotoFeedback" class="inventario-file-feedback">Sin foto seleccionada</small>
           <p class="text-start"><small><strong>Opcional:</strong> podés cargar el RNE ahora o hacerlo más tarde.</small></p>
-          <input id="newProviderRneNumber" class="swal2-input ios-input" placeholder="RNE (opcional, texto libre)">
-          <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="newProviderRneInfinite"><span>Vencimiento infinito (∞)</span></label>
-          <input id="newProviderRneExpiry" class="swal2-input ios-input" placeholder="Vencimiento RNE (opcional)">
-          <textarea id="newProviderRneObservations" class="swal2-textarea ios-input" rows="2" placeholder="Observaciones RNE (opcional)"></textarea>
-          <label for="newProviderRneFile" class="inventario-upload-dropzone"><i class="fa-regular fa-file"></i><span>Adjunto RNE: click o arrastrá</span></label><input id="newProviderRneFile" class="form-control image-file-input inventario-hidden-file-input" type="file" accept="image/*,application/pdf"><small id="newProviderRneFeedback" class="inventario-file-feedback">Sin adjunto seleccionado</small>
+          <sl-input id="newProviderRneNumber" class="swal2-input" placeholder="RNE (opcional, texto libre)"></sl-input>
+          <sl-checkbox class="inventario-check-row inventario-check-row-compact" id="newProviderRneInfinite">Vencimiento infinito (∞)</sl-checkbox>
+          <input id="newProviderRneExpiry" class="lj-input swal2-input" placeholder="Vencimiento RNE (opcional)">
+          <sl-textarea id="newProviderRneObservations" class="swal2-textarea" rows="2" resize="auto" placeholder="Observaciones RNE (opcional)"></sl-textarea>
+          <label for="newProviderRneFile" class="inventario-upload-dropzone"><i class="fa-regular fa-file"></i><span>Adjunto RNE: click o arrastrá</span></label><input id="newProviderRneFile" class="image-file-input inventario-hidden-file-input" type="file" accept="image/*,application/pdf"><small id="newProviderRneFeedback" class="inventario-file-feedback">Sin adjunto seleccionado</small>
         </div>`,
         showCancelButton: true,
         confirmButtonText: 'Guardar',
@@ -5602,11 +5601,11 @@
       renderEditor(ingredientId, state.editorDraft);
     });
 
-    nodes.editorForm.querySelectorAll('input:not([type="file"]),select,textarea').forEach((el) => {
+    nodes.editorForm.querySelectorAll('sl-input, sl-select, sl-textarea, sl-checkbox, sl-switch, input.lj-input, input[type="hidden"]').forEach((el) => {
       el.addEventListener('input', syncDraft);
       el.addEventListener('change', syncDraft);
     });
-    nodes.editorForm.querySelectorAll('input[type="number"]').forEach((input) => {
+    nodes.editorForm.querySelectorAll('sl-input[type="number"]').forEach((input) => {
       input.addEventListener('wheel', (event) => {
         event.preventDefault();
         input.blur();
@@ -5617,6 +5616,19 @@
       syncDraft();
     });
     syncNoPerecederoState();
+
+    // Tarjetas "Tipo de producto": el sl-checkbox va oculto dentro de la tarjeta;
+    // el clic en cualquier parte de la tarjeta lo alterna y la clase is-checked refleja el estado.
+    nodes.editorForm.querySelectorAll('.inventario-flag-tile').forEach((tile) => {
+      const check = tile.querySelector('sl-checkbox');
+      if (!check) return;
+      tile.addEventListener('click', (event) => {
+        if (event.target.closest('sl-checkbox, [data-frozen-info]')) return;
+        event.preventDefault();
+        if (!check.disabled) check.click();
+      });
+      check.addEventListener('sl-change', () => tile.classList.toggle('is-checked', Boolean(check.checked)));
+    });
 
     nodes.editorForm.querySelector('#addBulkInventoryBtn')?.addEventListener('click', () => {
       const currentBulk = Array.isArray(state.editorDraft.bulkEntries) ? state.editorDraft.bulkEntries : [];
@@ -5682,13 +5694,13 @@
       const dropdown = document.createElement('div');
       dropdown.className = 'recipe-suggest-floating';
       dropdown.innerHTML = `${source.map((item) => `
-        <button type="button" class="recipe-suggest-item" data-bulk-pick="${idx}" data-ing-id="${item.id}">
+        <button type="button" class="lj-tile recipe-suggest-item" data-bulk-pick="${idx}" data-ing-id="${item.id}">
           <span class="recipe-suggest-avatar-wrap">${item.imageUrl
-            ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-suggest-avatar js-inventario-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(capitalize(item.name))}" loading="lazy">`
+            ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="recipe-suggest-avatar js-inventario-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(capitalize(item.name))}" loading="lazy">`
             : '<span class="image-placeholder-circle-2"><i class="fa-solid fa-bowl-food"></i></span>'}</span>
           <span>${escapeHtml(capitalize(item.name))}</span>
         </button>`).join('')}
-        <button type="button" class="recipe-suggest-item recipe-suggest-create" data-bulk-create="${idx}"><i class="fa-solid fa-plus"></i><span>Crear ingrediente</span></button>`;
+        <button type="button" class="lj-tile recipe-suggest-item recipe-suggest-create" data-bulk-create="${idx}"><i class="fa-solid fa-plus"></i><span>Crear ingrediente</span></button>`;
       document.body.appendChild(dropdown);
       positionBulkSuggestions(dropdown, input);
       initThumbLoading(dropdown);
@@ -5705,12 +5717,7 @@
         const create = event.target.closest('[data-bulk-create]');
         if (!create) return;
         closeBulkSuggestions();
-        inventarioModal.setAttribute('inert', '');
-        try {
-          await window.laJamoneraIngredientesAPI?.openIngredientForm?.();
-        } finally {
-          inventarioModal.removeAttribute('inert');
-        }
+        await window.laJamoneraIngredientesAPI?.openIngredientForm?.();
         await reloadEditorData(ingredientId);
         renderEditor(ingredientId, state.editorDraft);
       });
@@ -5783,19 +5790,19 @@
         html: `
           <div class="text-start">
             <p>Vas a cambiar la unidad de <strong>${escapeHtml(capitalize(state.ingredientes[itemId]?.name || ''))}</strong> y todos sus ingresos al nuevo formato. Esta operación es <strong>reversible</strong> repitiendo el proceso, pero conviene revisarlo.</p>
-            <label class="form-label mt-2">Unidad actual</label>
-            <input class="swal2-input ios-input" value="${escapeHtml(getMeasureLabel(currentUnit))}" readonly>
-            <label class="form-label mt-2" for="massUnitChangeNewUnit">Nueva unidad</label>
-            <select id="massUnitChangeNewUnit" class="swal2-input ios-input">
-              ${availableMeasures.map((m) => `<option value="${escapeHtml(m.name)}">${escapeHtml(getMeasureLabel(m.name))}</option>`).join('')}
-            </select>
+            <label class="lj-label mt-2">Unidad actual</label>
+            <sl-input class="swal2-input" value="${escapeHtml(getMeasureLabel(currentUnit))}" readonly></sl-input>
+            <label class="lj-label mt-2" for="massUnitChangeNewUnit">Nueva unidad</label>
+            <sl-select id="massUnitChangeNewUnit" class="swal2-input" hoist value="${ljOptionValue(availableMeasures[0]?.name || '')}">
+              ${availableMeasures.map((m) => `<sl-option value="${ljOptionValue(m.name)}">${escapeHtml(getMeasureLabel(m.name))}</sl-option>`).join('')}
+            </sl-select>
             <small class="text-muted d-block mt-2">Podés elegir cualquier unidad cargada. Categoría actual: ${escapeHtml(currentMeta.category)}.</small>
           </div>`,
         showCancelButton: true,
         confirmButtonText: 'Aplicar cambio',
         cancelButtonText: 'Cancelar',
         preConfirm: () => {
-          const v = document.getElementById('massUnitChangeNewUnit')?.value || '';
+          const v = ljSelectValue(document.getElementById('massUnitChangeNewUnit')) || '';
           if (!v) { Swal.showValidationMessage('Seleccioná una unidad'); return false; }
           return v;
         }
@@ -5851,7 +5858,7 @@
         const extraRecord = getRecord(ingredientPick.id);
         const defaultUnit = extraRecord.stockUnit || ingredientPick.measure || 'kilos';
         if (unitSelect) {
-          unitSelect.value = defaultUnit;
+          ljSetSelectValue(unitSelect, defaultUnit);
           unitSelect.disabled = Boolean(extraRecord.stockUnit);
         }
         const isUnit = getUnitMeta(defaultUnit).category === 'unidad';
@@ -5893,7 +5900,7 @@
         const idx = Number(select.dataset.bulkUnit);
         const packageWrap = nodes.editorForm.querySelector(`[data-bulk-package-wrap="${idx}"]`);
         const packageInput = nodes.editorForm.querySelector(`[data-bulk-package="${idx}"]`);
-        const isUnit = getUnitMeta(select.value).category === 'unidad';
+        const isUnit = getUnitMeta(ljSelectValue(select)).category === 'unidad';
         packageWrap?.classList.toggle('d-none', !isUnit);
         if (!isUnit && packageInput) {
           packageInput.value = '';
@@ -6072,13 +6079,13 @@
         const resolutionLabel = resolutionMeta.badge;
         const resolutionRow = getEntryResolutionRowData(entry);
         const traceHtml = (!isCollapsed && traceRows.length)
-          ? traceRows.map((trace) => `<tr class="${getTraceRowClass(trace)}"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(trace.createdAt)}</div></td><td>${getTraceTypeLabelHtml(trace)}</td><td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td></td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml((trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? providerLabel(entry.provider) : trace.productionId)}</td><td>${(trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? '<span class="inventario-internal-no-trace">Sin trazabilidad</span>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td></tr>`).join('')
+          ? traceRows.map((trace) => `<tr class="${getTraceRowClass(trace)}"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(trace.createdAt)}</div></td><td>${getTraceTypeLabelHtml(trace)}</td><td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td></td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml((trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? providerLabel(entry.provider) : trace.productionId)}</td><td>${(trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? '<span class="inventario-internal-no-trace">Sin trazabilidad</span>' : `<sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i slot="prefix" class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></sl-button>`}</td></tr>`).join('')
           : '';
         const availableQtyInUnit = getAvailableInUnit(entry, entry.unit || '');
         const availableClass = availableQtyInUnit <= 0.0001 ? 'is-zero' : '';
         const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
-        const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(resolutionRow.at)}</div></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td>${escapeHtml(entry.lotNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td></tr>` : '';
-        return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${formatEntryDateTime(entry.entryDate, entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}</td><td>${escapeHtml(formatExpiryForUi(entry))} </td><td><strong class="${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</strong><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-lot-cell">${escapeHtml(entry.lotNumber || '-')}${entry.customLot ? '<br><small class="text-muted">lote propio</small>' : ''}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRow) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expanded-entry-collapse="${entry.id}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(entryImageUrls(entry))}</div></td></tr>${resolutionHtml}${traceHtml}`;
+        const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(resolutionRow.at)}</div></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td>${escapeHtml(entry.lotNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><sl-button variant="danger" size="small" type="button" class="inventario-no-photo-btn" disabled>Sin trazabilidad</sl-button></td></tr>` : '';
+        return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${formatEntryDateTime(entry.entryDate, entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}</td><td>${escapeHtml(formatExpiryForUi(entry))} </td><td><strong class="${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</strong><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td><td>${escapeHtml(entry.invoiceNumber || '-')}</td><td class="inventario-lot-cell">${escapeHtml(entry.lotNumber || '-')}${entry.customLot ? '<br><small class="text-muted">lote propio</small>' : ''}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRow) ? `<sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-icon-only-btn" data-expanded-entry-collapse="${entry.id}" aria-label="Ver detalle" title="Ver detalle"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></sl-button>` : ''}${buildExpandedImageCell(entryImageUrls(entry))}</div></td></tr>${resolutionHtml}${traceHtml}`;
       }).join('') : '<tr><td colspan="7" class="text-center">Sin ingresos para mostrar.</td></tr>';
       await openIosSwal({
         title: 'Historial ampliado',
@@ -6095,7 +6102,7 @@
             const pageRows = fullRows.slice(start, start + PAGE_SIZE);
             const canCollapse = fullRows.some((entry) => hasEntryDetailRows(entry) && collapseMap[entry.id] === false);
             const canExpand = fullRows.some((entry) => hasEntryDetailRows(entry) && collapseMap[entry.id] !== false);
-            host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioExpandedEntryCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar todo</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioExpandedEntryExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar todo</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura</th><th>Lote</th><th>Proveedor</th><th>Imagen</th></tr></thead><tbody>${renderRows(pageRows)}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-expanded-entry-page="prev" ${expandedPage <= 1 ? 'disabled' : ''} aria-label="Página anterior"><i class="fa-solid fa-chevron-left"></i></button><span>Página ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-expanded-entry-page="next" ${expandedPage >= pages ? 'disabled' : ''} aria-label="Página siguiente"><i class="fa-solid fa-chevron-right"></i></button></div>`;
+            host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" id="inventarioExpandedEntryCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-compress"></i><span>Colapsar todo</span></sl-button><sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" id="inventarioExpandedEntryExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-expand"></i><span>Descolapsar todo</span></sl-button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha y hora</th><th>Fecha caducidad</th><th>Cantidad</th><th>Nº factura</th><th>Lote</th><th>Proveedor</th><th>Imagen</th></tr></thead><tbody>${renderRows(pageRows)}</tbody></table></div><div class="inventario-pagination enhanced"><sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-expanded-entry-page="prev" ${expandedPage <= 1 ? 'disabled' : ''} aria-label="Página anterior" title="Página anterior"><i class="fa-solid fa-chevron-left"></i></sl-button><span>Página ${expandedPage} de ${pages}</span><sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-expanded-entry-page="next" ${expandedPage >= pages ? 'disabled' : ''} aria-label="Página siguiente"><i class="fa-solid fa-chevron-right"></i></sl-button></div>`;
           };
           renderContent();
           popup.addEventListener('click', async (event) => {
@@ -6145,7 +6152,7 @@
         },
         customClass: {
           popup: 'ios-alert inventario-expand-alert',
-          confirmButton: 'ios-btn ios-btn-secondary'
+          confirmButton: 'ios-btn-secondary'
         }
       });
     });
@@ -6498,7 +6505,7 @@
 
     const qty = parseNumber(nodes.editorForm.querySelector('#inventoryQty')?.value);
     const ingredient = state.ingredientes[ingredientId] || {};
-    const unit = normalizeValue(nodes.editorForm.querySelector('#inventoryUnit')?.value || ingredient.measure || 'kilos');
+    const unit = normalizeValue(ljSelectValue(nodes.editorForm.querySelector('#inventoryUnit')) || ingredient.measure || 'kilos');
     const packageQtyRaw = normalizeValue(nodes.editorForm.querySelector('#inventoryPackageQty')?.value);
     const packageQty = packageQtyRaw ? Number.parseInt(packageQtyRaw, 10) : null;
     const entryDate = normalizeValue(nodes.editorForm.querySelector('#inventoryEntryDate')?.value);
@@ -6945,12 +6952,7 @@
   };
 
   const openCreateIngredient = async () => {
-    inventarioModal.setAttribute('inert', '');
-    try {
-      await window.laJamoneraIngredientesAPI?.openIngredientForm?.();
-    } finally {
-      inventarioModal.removeAttribute('inert');
-    }
+    await window.laJamoneraIngredientesAPI?.openIngredientForm?.();
     await loadData();
     renderProviderRneAlert();
     setStateView(Object.keys(state.ingredientes).length ? 'list' : 'empty');
@@ -6967,17 +6969,17 @@
     const result = await openIosSwal({
       title: existing ? `Proveedor: ${escapeHtml(provider.name)}` : 'Nuevo proveedor',
       html: `<div class="swal-stack-fields text-start">
-        <label class="form-label" for="providerNameInput"><strong>Nombre</strong></label>
-        <input id="providerNameInput" class="swal2-input ios-input" value="${escapeHtml(provider.name)}" placeholder="Nombre del proveedor">
-        <label class="form-label" for="providerRneNumberInput"><strong>RNE</strong></label>
-        <input id="providerRneNumberInput" class="swal2-input ios-input" value="${escapeHtml(currentRne.number || '')}" placeholder="Ej: 21-085083, RUCA N° 69354">
-        <label class="form-label" for="providerRneExpiryInput"><strong>Fecha de caducidad</strong></label>
-        <input id="providerRneExpiryInput" class="swal2-input ios-input" value="${escapeHtml(currentRne.expiryDate || '')}" placeholder="Seleccionar fecha">
-        <label class="inventario-check-row inventario-check-row-compact"><input type="checkbox" id="providerRneInfiniteInput" ${currentRne.infiniteExpiry ? 'checked' : ''}><span>Vencimiento infinito (∞)</span></label>
-        <label class="form-label" for="providerRneObservationsInput"><strong>Observaciones</strong></label>
-        <textarea id="providerRneObservationsInput" class="swal2-textarea ios-input" rows="2" placeholder="Observaciones del registro">${escapeHtml(currentRne.observations || '')}</textarea>
-        <label class="form-label" for="providerRneFileInput"><strong>Adjunto PDF o imagen</strong></label>
-        <input id="providerRneFileInput" class="form-control ios-input image-file-input" type="file" accept="image/*,application/pdf">
+        <label class="lj-label" for="providerNameInput"><strong>Nombre</strong></label>
+        <sl-input id="providerNameInput" class="swal2-input" value="${escapeHtml(provider.name)}" placeholder="Nombre del proveedor"></sl-input>
+        <label class="lj-label" for="providerRneNumberInput"><strong>RNE</strong></label>
+        <sl-input id="providerRneNumberInput" class="swal2-input" value="${escapeHtml(currentRne.number || '')}" placeholder="Ej: 21-085083, RUCA N° 69354"></sl-input>
+        <label class="lj-label" for="providerRneExpiryInput"><strong>Fecha de caducidad</strong></label>
+        <input id="providerRneExpiryInput" class="lj-input swal2-input" value="${escapeHtml(currentRne.expiryDate || '')}" placeholder="Seleccionar fecha">
+        <sl-checkbox class="inventario-check-row inventario-check-row-compact" id="providerRneInfiniteInput" ${currentRne.infiniteExpiry ? 'checked' : ''}>Vencimiento infinito (∞)</sl-checkbox>
+        <label class="lj-label" for="providerRneObservationsInput"><strong>Observaciones</strong></label>
+        <sl-textarea id="providerRneObservationsInput" class="swal2-textarea" rows="2" resize="auto" placeholder="Observaciones del registro" value="${escapeHtml(currentRne.observations || '')}"></sl-textarea>
+        <label class="lj-label" for="providerRneFileInput"><strong>Adjunto PDF o imagen</strong></label>
+        <input id="providerRneFileInput" class="image-file-input inventario-native-file" type="file" accept="image/*,application/pdf">
         ${normalizeValue(currentRne.attachmentUrl) ? '<small>Si subís un nuevo archivo, el actual pasa al historial.</small>' : '<small>Podés cargar el archivo más tarde.</small>'}
       </div>`,
       showCancelButton: true,
@@ -7118,9 +7120,9 @@
           const isInfinite = Boolean(rne.infiniteExpiry);
           const daysTone = getDaysTone(remainingDays);
           const daysBadge = (hasRne && isInfinite)
-            ? '<span class="receta-rnpa-days is-ok"><i class="bi bi-infinity"></i></span>'
+            ? '<span class="receta-rnpa-days is-ok"><sl-icon name="infinity"></sl-icon></span>'
             : (hasRne && Number.isFinite(remainingDays))
-            ? `<span class="receta-rnpa-days ${daysTone}"><i class="bi bi-clock-history"></i>${escapeHtml(String(remainingDays))} días</span>`
+            ? `<span class="receta-rnpa-days ${daysTone}"><sl-icon name="clock-history"></sl-icon>${escapeHtml(String(remainingDays))} días</span>`
             : '';
           const pendingBadge = '<span class="receta-rnpa-badge is-pending"><i class="fa-solid fa-triangle-exclamation"></i>RNE pendiente</span>';
           const okBadge = '<span class="receta-rnpa-badge is-ok"><i class="fa-solid fa-file-shield"></i>RNE adjunto</span>';
@@ -7130,7 +7132,7 @@
             ? `${isInfinite ? `${escapeHtml(formatIsoDateEs(validFrom || ''))} → ∞` : (rne.expiryDate ? `${escapeHtml(formatIsoDateEs(validFrom || rne.expiryDate))} → ${escapeHtml(formatIsoDateEs(rne.expiryDate))}` : `${escapeHtml(formatIsoDateEs(validFrom || ''))} → Sin caducidad`)}`
             : 'Sin vigencia registrada';
 
-          return `<article class="inventario-provider-card ios-card-soft">
+          return `<article class="inventario-provider-card">
             ${providerAvatarHtml(provider)}
             <div class="inventario-provider-main">
               <div class="inventario-provider-head">
@@ -7141,8 +7143,8 @@
               ${(provider.email || provider.phone) ? `<p class="inventario-provider-line"><small>${provider.email ? `<i class="fa-regular fa-envelope"></i> ${escapeHtml(provider.email)}` : ''}${provider.email && provider.phone ? ' · ' : ''}${provider.phone ? `<i class="fa-solid fa-phone"></i> ${escapeHtml(provider.phone)}` : ''}</small></p>` : ''}
               ${hasNoFood ? '<p class="inventario-provider-line"><strong>RNE:</strong> No requerido para este proveedor.</p>' : (hasRne ? `<p class="inventario-provider-line"><strong>N° RNE:</strong> ${escapeHtml(rne.number || 'Sin número')}</p><p class="inventario-provider-line"><strong>Vigencia:</strong> ${validityText}</p>${normalizeValue(rne.observations) ? `<p class="inventario-provider-line"><strong>Observaciones:</strong> ${escapeHtml(rne.observations)}</p>` : ''}` : '')}
               <div class="inventario-provider-actions inventario-provider-actions-top">
-                <button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-provider-delete-request="${provider.id}" aria-label="Eliminar proveedor"><i class="fa-solid fa-trash"></i></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-edit="${provider.id}"><i class="fa-solid fa-file-pen"></i><span>${hasRne ? 'Editar registro' : 'Cargar Registro'}</span></button>
-                <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-photo-view="${provider.id}" ${sanitizeImageUrl(provider.photoUrl) ? '' : 'disabled'}><i class="fa-regular fa-image"></i><span>Ver foto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-view="${provider.id}" ${normalizeValue(rne.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i><span>Visualizar adjunto</span></button>
+                <sl-button variant="danger" size="small" type="button" class="lj-icon-btn inventario-threshold-btn" data-provider-delete-request="${provider.id}" aria-label="Eliminar proveedor" title="Eliminar proveedor"><i class="fa-solid fa-trash"></i></sl-button><sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-provider-rne-edit="${provider.id}"><i slot="prefix" class="fa-solid fa-file-pen"></i><span>${hasRne ? 'Editar registro' : 'Cargar Registro'}</span></sl-button>
+                <sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-provider-photo-view="${provider.id}" ${sanitizeImageUrl(provider.photoUrl) ? '' : 'disabled'}><i slot="prefix" class="fa-regular fa-image"></i><span>Ver foto</span></sl-button><sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-provider-rne-view="${provider.id}" ${normalizeValue(rne.attachmentUrl) ? '' : 'disabled'}><i slot="prefix" class="fa-regular fa-eye"></i><span>Visualizar adjunto</span></sl-button>
               </div>
               ${state.pendingProviderDeleteId === provider.id ? buildProviderDeleteConfirmHtml(provider) : ''}
             </div>
@@ -7151,14 +7153,14 @@
 
         const renderList = () => {
           const activeSearch = document.activeElement?.id === 'inventarioProviderSearchInput';
-          const cursorStart = activeSearch ? document.activeElement.selectionStart : null;
-          const cursorEnd = activeSearch ? document.activeElement.selectionEnd : null;
+          const cursorStart = activeSearch ? ljNativeInput(document.activeElement)?.selectionStart : null;
+          const cursorEnd = activeSearch ? ljNativeInput(document.activeElement)?.selectionEnd : null;
           const counts = getProviderRneCounts();
           const options = [
-            { key: 'all', label: 'Todos', tone: 'neutral', count: counts.all },
-            { key: 'none', label: 'Sin RNE', tone: 'info', count: counts.none },
-            { key: 'warning', label: '< de 6 meses', tone: 'warning', count: counts.warning },
-            { key: 'danger', label: '< de 60 días', tone: 'danger', count: counts.danger }
+            { key: 'all', label: 'Todos', tone: 'neutral', count: counts.all, icon: 'fa-list' },
+            { key: 'none', label: 'Sin RNE', tone: 'info', count: counts.none, icon: 'fa-file-circle-xmark' },
+            { key: 'warning', label: 'Por vencer · 6 meses', tone: 'warning', count: counts.warning, icon: 'fa-hourglass-half' },
+            { key: 'danger', label: 'Vence pronto · 60 días', tone: 'danger', count: counts.danger, icon: 'fa-triangle-exclamation' }
           ];
           const buildPager = () => {
             const providers = sortedProviders().filter((provider) => {
@@ -7179,16 +7181,16 @@
               <p class="inventario-provider-manager-copy">RNE, vencimientos y adjuntos.</p>
             </div>
             <div class="produccion-config-actions">
-              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioProviderExportExcelBtn"><i class="fa-solid fa-file-excel"></i><span>Descargar Excel</span></button>
-              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioProviderImportExcelBtn"><i class="fa-solid fa-file-arrow-up"></i><span>Subir Excel</span></button>
+              <sl-button variant="default" type="button" class="inventario-threshold-btn" id="inventarioProviderExportExcelBtn"><i slot="prefix" class="fa-solid fa-file-excel"></i><span>Descargar Excel</span></sl-button>
+              <sl-button variant="default" type="button" class="inventario-threshold-btn" id="inventarioProviderImportExcelBtn"><i slot="prefix" class="fa-solid fa-file-arrow-up"></i><span>Subir Excel</span></sl-button>
               <input id="inventarioProviderImportExcelInput" class="d-none" type="file" accept=".xlsx,.xlsm,.xls">
-              <button type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn inventario-provider-create-fab" id="inventarioProviderCreateBtn" aria-label="Nuevo proveedor"><i class="fa-solid fa-plus"></i><span>Proveedor</span></button>
+              <sl-button variant="primary" type="button" class="inventario-threshold-btn inventario-provider-create-fab" id="inventarioProviderCreateBtn" aria-label="Nuevo proveedor"><i slot="prefix" class="fa-solid fa-plus"></i><span>Proveedor</span></sl-button>
             </div>
           </div>
-          <div class="input-group ios-input-group ingredientes-search-group inventario-provider-search"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="inventarioProviderSearchInput" type="search" class="form-control ios-input ingredientes-search-input" value="${escapeHtml(state.providerRneSearch)}" placeholder="Buscar proveedor"></div>
-          <div id="inventarioProviderRneFilters" class="inventario-status-filters">${options.map((option) => `<button type="button" class="inventario-status-btn tone-${option.tone} ${state.providerRneFilter === option.key ? 'is-active' : ''}" data-provider-rne-filter="${option.key}" ${option.count === 0 ? "disabled" : ""}><span>${option.label}</span><strong>${option.count}</strong></button>`).join('')}</div>
+          <sl-input id="inventarioProviderSearchInput" type="search" class="ingredientes-search-input inventario-provider-search" value="${escapeHtml(state.providerRneSearch)}" placeholder="Buscar proveedor"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input>
+          <div id="inventarioProviderRneFilters" class="inventario-status-filters">${options.map((option) => `<sl-button variant="default" size="small" type="button" class="inventario-status-btn tone-${option.tone} ${state.providerRneFilter === option.key ? 'is-active' : ''}" data-provider-rne-filter="${option.key}" ${option.count === 0 ? "disabled" : ""}><i slot="prefix" class="fa-solid ${option.icon}"></i><span>${option.label}</span><strong>${option.count}</strong></sl-button>`).join('')}</div>
           <div id="inventarioProviderRneList" class="inventario-provider-rne-list">${pager.rows.length ? pager.rows.map(renderProviderCard).join('') : '<div class="ingrediente-empty-list">No hay proveedores para este filtro.</div>'}</div>
-          <div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-provider-page="prev" ${pager.page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${pager.page} de ${pager.pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-provider-page="next" ${pager.page >= pager.pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+          <div class="inventario-pagination enhanced"><sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-provider-page="prev" aria-label="Página anterior" title="Página anterior" ${pager.page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></sl-button><span>Página ${pager.page} de ${pager.pages}</span><sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-provider-page="next" aria-label="Página siguiente" title="Página siguiente" ${pager.page >= pager.pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></sl-button></div>`;
           const renderProviderRowsOnly = () => {
             const nextPager = buildPager();
             const listNode = root.querySelector('#inventarioProviderRneList');
@@ -7197,7 +7199,7 @@
               listNode.innerHTML = nextPager.rows.length ? nextPager.rows.map(renderProviderCard).join('') : '<div class="ingrediente-empty-list">No hay proveedores para este filtro.</div>';
             }
             if (pagerWrap) {
-              pagerWrap.innerHTML = `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-provider-page="prev" ${nextPager.page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${nextPager.page} de ${nextPager.pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-provider-page="next" ${nextPager.page >= nextPager.pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button>`;
+              pagerWrap.innerHTML = `<sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-provider-page="prev" aria-label="Página anterior" title="Página anterior" ${nextPager.page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></sl-button><span>Página ${nextPager.page} de ${nextPager.pages}</span><sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-provider-page="next" aria-label="Página siguiente" title="Página siguiente" ${nextPager.page >= nextPager.pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></sl-button>`;
             }
             initThumbLoading(root);
           };
@@ -7224,50 +7226,50 @@
           const rne = { ...getDefaultProviderRne(), ...safeObject(provider.rne) };
           const history = Array.isArray(rne.history) ? rne.history : [];
           const historyHtml = history.length
-            ? `<div class="produccion-rne-history">${history.map((item, index) => `<article class="produccion-rne-history-item" data-provider-history-item="${provider.id}|${index}"><div><strong>Versión ${index + 1}</strong><p><strong>N° RNE:</strong> ${escapeHtml(item.number || '-')}</p><p><strong>Vigencia:</strong> ${escapeHtml(formatIsoDateEs(item.validFrom || item.expiryDate || ''))} → ${item.replacedAt || item.savedAt ? escapeHtml(formatDateTime(item.replacedAt || item.savedAt)) : '-'}</p><p><strong>Vencimiento declarado:</strong> ${escapeHtml(item.expiryDate ? formatIsoDateEs(item.expiryDate) : '-')}</p>${normalizeValue(item.observations) ? `<p><strong>Observaciones:</strong> ${escapeHtml(item.observations)}</p>` : ''}</div><div class="produccion-rne-history-actions">${item.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-history-view="${provider.id}|${index}"><i class="bi bi-eye"></i><span>Ver</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjunto</button>'}<button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn" data-provider-rne-history-delete="${provider.id}|${index}"><i class="fa-solid fa-trash"></i><span>Borrar</span></button></div></article>`).join('')}</div>`
+            ? `<div class="produccion-rne-history">${history.map((item, index) => `<article class="produccion-rne-history-item" data-provider-history-item="${provider.id}|${index}"><div><strong>Versión ${index + 1}</strong><p><strong>N° RNE:</strong> ${escapeHtml(item.number || '-')}</p><p><strong>Vigencia:</strong> ${escapeHtml(formatIsoDateEs(item.validFrom || item.expiryDate || ''))} → ${item.replacedAt || item.savedAt ? escapeHtml(formatDateTime(item.replacedAt || item.savedAt)) : '-'}</p><p><strong>Vencimiento declarado:</strong> ${escapeHtml(item.expiryDate ? formatIsoDateEs(item.expiryDate) : '-')}</p>${normalizeValue(item.observations) ? `<p><strong>Observaciones:</strong> ${escapeHtml(item.observations)}</p>` : ''}</div><div class="produccion-rne-history-actions">${item.attachmentUrl ? `<sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-provider-rne-history-view="${provider.id}|${index}"><sl-icon slot="prefix" name="eye"></sl-icon><span>Ver</span></sl-button>` : '<sl-button variant="danger" size="small" type="button" class="inventario-no-photo-btn" disabled>Sin adjunto</sl-button>'}<sl-button variant="danger" outline size="small" type="button" class="inventario-delete-btn inventario-threshold-btn" data-provider-rne-history-delete="${provider.id}|${index}"><i slot="prefix" class="fa-solid fa-trash"></i><span>Borrar</span></sl-button></div></article>`).join('')}</div>`
             : '<p class="produccion-rne-history-empty">Aún no hay historial de RNE.</p>';
 
-          root.innerHTML = `<div class="inventario-provider-editor-top"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-back><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button></div>
+          root.innerHTML = `<div class="inventario-provider-editor-top"><sl-button variant="default" type="button" class="inventario-threshold-btn" data-provider-rne-back><i slot="prefix" class="fa-solid fa-arrow-left"></i><span>Volver</span></sl-button></div>
             <section class="recipe-step-card step-block inventario-lot-section produccion-config-section">
               <div class="step-content">
-                <label class="form-label" for="providerNameInput"><strong>Proveedor</strong></label>
+                <label class="lj-label" for="providerNameInput"><strong>Proveedor</strong></label>
                 <div class="inventario-provider-editor-top mt-2 mb-2">
                   ${providerAvatarHtml(provider, { size: 'editor' })}
                 </div>
-                <label class="form-label mt-2" for="providerPhotoInput"><strong>Foto de perfil</strong> (opcional)</label>
+                <label class="lj-label mt-2" for="providerPhotoInput"><strong>Foto de perfil</strong> (opcional)</label>
                 <div class="produccion-rne-file-row">
-                  <input id="providerPhotoInput" class="form-control ios-input image-file-input" type="file" accept="image/*">
+                  <input id="providerPhotoInput" class="image-file-input inventario-native-file" type="file" accept="image/*">
                 </div>
-                <input id="providerNameInput" type="text" class="form-control ios-input" value="${escapeHtml(provider.name)}" placeholder="Nombre del proveedor">
-                <label class="form-label mt-2" for="providerEmailInput"><strong>Email</strong> (opcional)</label>
-                <input id="providerEmailInput" type="email" class="form-control ios-input" value="${escapeHtml(provider.email || '')}" placeholder="proveedor@email.com">
-                <label class="form-label mt-2" for="providerPhoneInput"><strong>Teléfono</strong> (opcional)</label>
-                <input id="providerPhoneInput" type="text" class="form-control ios-input" value="${escapeHtml(provider.phone || '')}" placeholder="+54 ...">
-                <label class="inventario-check-row inventario-check-row-compact mt-2"><input type="checkbox" id="providerNonFoodInput" ${provider.nonFoodCategory ? 'checked' : ''}><span>No pertenece al rubro alimentos</span></label>
-                <label class="form-label mt-2" for="providerRneNumberInput"><strong>Número de RNE</strong></label>
-                <textarea id="providerRneNumberInput" rows="1" class="form-control ios-input inventario-rne-number-area" placeholder="Ej: 21-085083, RUCA N° 69354">${escapeHtml(rne.number || '')}</textarea>
+                <sl-input id="providerNameInput" type="text" value="${escapeHtml(provider.name)}" placeholder="Nombre del proveedor"></sl-input>
+                <label class="lj-label mt-2" for="providerEmailInput"><strong>Email</strong> (opcional)</label>
+                <sl-input id="providerEmailInput" type="email" value="${escapeHtml(provider.email || '')}" placeholder="proveedor@email.com"></sl-input>
+                <label class="lj-label mt-2" for="providerPhoneInput"><strong>Teléfono</strong> (opcional)</label>
+                <sl-input id="providerPhoneInput" type="text" value="${escapeHtml(provider.phone || '')}" placeholder="+54 ..."></sl-input>
+                <sl-checkbox class="inventario-check-row inventario-check-row-compact mt-2" id="providerNonFoodInput" ${provider.nonFoodCategory ? 'checked' : ''}>No pertenece al rubro alimentos</sl-checkbox>
+                <label class="lj-label mt-2" for="providerRneNumberInput"><strong>Número de RNE</strong></label>
+                <sl-textarea id="providerRneNumberInput" rows="1" resize="auto" class="inventario-rne-number-area" placeholder="Ej: 21-085083, RUCA N° 69354" value="${escapeHtml(rne.number || '')}"></sl-textarea>
                 <small class="text-muted">Se acepta texto libre tal como figura en el registro.</small>
-                <label class="form-label mt-2" for="providerRneExpiryInput"><strong>Fecha de caducidad</strong></label>
-                <input id="providerRneExpiryInput" type="text" class="form-control ios-input" value="${escapeHtml(rne.expiryDate || '')}" placeholder="Seleccionar fecha">
-                <label class="inventario-check-row inventario-check-row-compact mt-2"><input type="checkbox" id="providerRneInfiniteInput" ${rne.infiniteExpiry ? 'checked' : ''}><span>Vencimiento infinito (∞)</span></label>
-                <label class="form-label mt-2" for="providerRneObservationsInput"><strong>Observaciones</strong></label>
-                <textarea id="providerRneObservationsInput" rows="2" class="form-control ios-input" placeholder="Observaciones del RNE">${escapeHtml(rne.observations || '')}</textarea>
-                <label class="form-label mt-2" for="providerRneFileInput"><strong>Archivo adjunto</strong> (PDF o imagen)</label>
+                <label class="lj-label mt-2" for="providerRneExpiryInput"><strong>Fecha de caducidad</strong></label>
+                <input id="providerRneExpiryInput" type="text" class="lj-input" value="${escapeHtml(rne.expiryDate || '')}" placeholder="Seleccionar fecha">
+                <sl-checkbox class="inventario-check-row inventario-check-row-compact mt-2" id="providerRneInfiniteInput" ${rne.infiniteExpiry ? 'checked' : ''}>Vencimiento infinito (∞)</sl-checkbox>
+                <label class="lj-label mt-2" for="providerRneObservationsInput"><strong>Observaciones</strong></label>
+                <sl-textarea id="providerRneObservationsInput" rows="2" resize="auto" placeholder="Observaciones del RNE" value="${escapeHtml(rne.observations || '')}"></sl-textarea>
+                <label class="lj-label mt-2" for="providerRneFileInput"><strong>Archivo adjunto</strong> (PDF o imagen)</label>
                 <div class="produccion-rne-file-row">
-                  <input id="providerRneFileInput" class="form-control ios-input image-file-input" type="file" accept="image/*,application/pdf">
-                  <span id="providerRneFileLoading" class="produccion-rne-upload-loading d-none"><img src="./IMG/Meta-ai-logo.webp" alt="Subiendo RNE" class="meta-spinner-login produccion-rne-spinner"></span>
+                  <input id="providerRneFileInput" class="image-file-input inventario-native-file" type="file" accept="image/*,application/pdf">
+                  <span id="providerRneFileLoading" class="produccion-rne-upload-loading d-none"><sl-spinner class="meta-spinner-login produccion-rne-spinner" aria-label="Subiendo RNE"></sl-spinner></span>
                 </div>
                 <small class="text-muted">Se guarda la versión anterior en el historial.</small>
                 <div class="produccion-config-actions mt-2">
-                  <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-view="${provider.id}" ${normalizeValue(rne.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i><span>Visualizar adjunto actual</span></button>
-                  <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-provider-rne-delete="${provider.id}" ${(normalizeValue(rne.number) || normalizeValue(rne.attachmentUrl)) ? '' : 'disabled'}><i class="fa-solid fa-trash"></i></button>
+                  <sl-button variant="default" type="button" class="inventario-threshold-btn" data-provider-rne-view="${provider.id}" ${normalizeValue(rne.attachmentUrl) ? '' : 'disabled'}><i slot="prefix" class="fa-regular fa-eye"></i><span>Visualizar adjunto actual</span></sl-button>
+                  <sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-provider-rne-delete="${provider.id}" aria-label="Borrar RNE" title="Borrar RNE" ${(normalizeValue(rne.number) || normalizeValue(rne.attachmentUrl)) ? '' : 'disabled'}><i class="fa-solid fa-trash"></i></sl-button>
                 </div>
                 <div class="produccion-rne-history-wrap mt-2">
                   <h6><strong>Historial de RNE</strong></h6>
                   ${historyHtml}
                 </div>
                 <div class="produccion-config-actions mt-3">
-                  <button type="button" class="btn ios-btn ios-btn-success" data-provider-rne-save="${provider.id}"><i class="fa-solid fa-floppy-disk"></i><span>Guardar</span></button>
+                  <sl-button variant="success" type="button" data-provider-rne-save="${provider.id}"><i slot="prefix" class="fa-solid fa-floppy-disk"></i><span>Guardar</span></sl-button>
                 </div>
               </div>
             </section>`;
@@ -7503,7 +7505,7 @@
             const provider = findProviderById(providerId);
             if (!provider) return;
             acceptProviderDeleteBtn.disabled = true;
-            acceptProviderDeleteBtn.innerHTML = '<img src="./IMG/Meta-ai-logo.webp" alt="Eliminando" class="inventario-inline-delete-spinner">';
+            acceptProviderDeleteBtn.innerHTML = '<sl-spinner class="inventario-inline-delete-spinner" aria-label="Eliminando"></sl-spinner>';
             try {
               state.inventario.config = safeObject(state.inventario.config);
               const providers = Array.isArray(state.inventario.config.providers) ? state.inventario.config.providers : [];
@@ -7513,7 +7515,7 @@
               rerenderPreservingScroll();
             } catch (error) {
               acceptProviderDeleteBtn.disabled = false;
-              acceptProviderDeleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i><span>Eliminar proveedor</span>';
+              acceptProviderDeleteBtn.innerHTML = '<i slot="prefix" class="fa-solid fa-trash"></i><span>Eliminar proveedor</span>';
               await openIosSwal({ title: 'No se pudo eliminar', html: '<p>Ocurrió un error al borrar el proveedor. Intentá nuevamente.</p>', icon: 'error', confirmButtonText: 'Entendido' });
             }
             return;
@@ -7523,7 +7525,7 @@
           if (saveBtn) {
             const originalSaveHtml = saveBtn.innerHTML;
             saveBtn.disabled = true;
-            saveBtn.innerHTML = '<img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="inventario-inline-delete-spinner">';
+            saveBtn.innerHTML = '<sl-spinner class="inventario-inline-delete-spinner" aria-label="Guardando"></sl-spinner>';
             const providerId = saveBtn.dataset.providerRneSave || '';
             const existing = findProviderById(providerId);
             const provider = existing || createProviderWithName('');
@@ -7588,7 +7590,7 @@
               }
               if (photoFile) {
                 if (avatarNode) {
-                  avatarNode.innerHTML = '<span class="produccion-company-logo-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Subiendo foto" class="meta-spinner produccion-company-logo-spinner"></span>';
+                  avatarNode.innerHTML = '<span class="produccion-company-logo-loading"><sl-spinner class="meta-spinner produccion-company-logo-spinner" aria-label="Subiendo foto"></sl-spinner></span>';
                 }
                 photoUrl = await uploadImageToStorage(photoFile, 'inventario/proveedores/avatar');
               }
@@ -8110,9 +8112,9 @@
       const resolutionRow = getEntryResolutionRowData(row);
       const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
       const traceHtml = (!isCollapsed && traceRows.length)
-        ? traceRows.map((trace) => `<tr class="${getTraceRowClass(trace)}"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(trace.createdAt))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td>${getTraceTypeLabelHtml(trace)}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml((trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? row.provider : trace.productionId)}</td><td>${(trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? '<span class="inventario-internal-no-trace">Sin trazabilidad</span>' : `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></button>`}</td></tr>`).join('') : '';
-      const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(resolutionRow.at))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin trazabilidad</button></td></tr>` : '';
-      return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(row.entryDateTime)}${getExpiryBadgeHtml(row) ? `<br><small>${getExpiryBadgeHtml(row)}</small>` : ''}</td><td>${escapeHtml(row.ingredientName)}</td><td><span class="${expiredQtyClass}">${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</span></td><td><span class="${expiredQtyClass}">${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</span><br><span class="inventario-available-line ${Number(row.availableQty || 0) <= 0 ? 'is-zero' : ''} ${expiredQtyClass}">disp. ${Number(row.availableQty || 0).toFixed(2)} ${escapeHtml(getMeasureAbbr(row.unit || ''))}${row.packageQty ? ` x${row.packageQty}` : ''}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRow) ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-icon-only-btn" data-expand-toggle-collapse="${row.entryId}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>` : ''}${buildExpandedImageCell(row.invoiceImageUrls)}</div></td></tr>${resolutionHtml}${traceHtml}`;
+        ? traceRows.map((trace) => `<tr class="${getTraceRowClass(trace)}"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(trace.createdAt))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td>${getTraceTypeLabelHtml(trace)}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml((trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? row.provider : trace.productionId)}</td><td>${(trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? '<span class="inventario-internal-no-trace">Sin trazabilidad</span>' : `<sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i slot="prefix" class="fa-solid fa-users-viewfinder"></i><span>trazabilidad</span></sl-button>`}</td></tr>`).join('') : '';
+      const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(resolutionRow.at))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><sl-button variant="danger" size="small" type="button" class="inventario-no-photo-btn" disabled>Sin trazabilidad</sl-button></td></tr>` : '';
+      return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(row.entryDateTime)}${getExpiryBadgeHtml(row) ? `<br><small>${getExpiryBadgeHtml(row)}</small>` : ''}</td><td>${escapeHtml(row.ingredientName)}</td><td><span class="${expiredQtyClass}">${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</span></td><td><span class="${expiredQtyClass}">${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</span><br><span class="inventario-available-line ${Number(row.availableQty || 0) <= 0 ? 'is-zero' : ''} ${expiredQtyClass}">disp. ${Number(row.availableQty || 0).toFixed(2)} ${escapeHtml(getMeasureAbbr(row.unit || ''))}${row.packageQty ? ` x${row.packageQty}` : ''}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRow) ? `<sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-icon-only-btn" data-expand-toggle-collapse="${row.entryId}" aria-label="Ver detalle" title="Ver detalle"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></sl-button>` : ''}${buildExpandedImageCell(row.invoiceImageUrls)}</div></td></tr>${resolutionHtml}${traceHtml}`;
     }).join('') : '<tr><td colspan="7" class="text-center">Sin ingresos en ese rango.</td></tr>';
 
     const renderExpandedContent = (popup) => {
@@ -8124,7 +8126,7 @@
       expandedPage = Math.min(Math.max(1, expandedPage), pages);
       const start = (expandedPage - 1) * PAGE_SIZE;
       const pageRows = rows.slice(start, start + PAGE_SIZE);
-      host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioExpandedCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar todo</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioExpandedExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar todo</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Detalle</th><th>N° factura</th><th>Proveedor</th><th>Imagen / Acción</th></tr></thead><tbody>${renderExpandedRows(pageRows)}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-expanded-global-page="prev" ${expandedPage <= 1 ? 'disabled' : ''} aria-label="Página anterior"><i class="fa-solid fa-chevron-left"></i></button><span>Página ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-expanded-global-page="next" ${expandedPage >= pages ? 'disabled' : ''} aria-label="Página siguiente"><i class="fa-solid fa-chevron-right"></i></button></div>`;
+      host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" id="inventarioExpandedCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-compress"></i><span>Colapsar todo</span></sl-button><sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" id="inventarioExpandedExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-expand"></i><span>Descolapsar todo</span></sl-button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Detalle</th><th>N° factura</th><th>Proveedor</th><th>Imagen / Acción</th></tr></thead><tbody>${renderExpandedRows(pageRows)}</tbody></table></div><div class="inventario-pagination enhanced"><sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-expanded-global-page="prev" ${expandedPage <= 1 ? 'disabled' : ''} aria-label="Página anterior" title="Página anterior"><i class="fa-solid fa-chevron-left"></i></sl-button><span>Página ${expandedPage} de ${pages}</span><sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-expanded-global-page="next" ${expandedPage >= pages ? 'disabled' : ''} aria-label="Página siguiente"><i class="fa-solid fa-chevron-right"></i></sl-button></div>`;
     };
 
     await openIosSwal({
@@ -8180,7 +8182,7 @@
       },
       customClass: {
         popup: 'ios-alert inventario-expand-alert',
-        confirmButton: 'ios-btn ios-btn-secondary'
+        confirmButton: 'ios-btn-secondary'
       }
     });
   });
@@ -8314,7 +8316,7 @@
   });
   nodes.viewerZoomInBtn?.addEventListener('click', () => setViewerScale(state.viewerScale + 0.25));
   nodes.viewerZoomOutBtn?.addEventListener('click', () => setViewerScale(state.viewerScale - 0.25));
-  nodes.viewerBackBtn?.addEventListener('click', () => imageViewerModal?.hide());
+  nodes.viewerBackBtn?.addEventListener('click', () => LJModal.close(nodes.imageViewerModal));
   nodes.viewerImage?.addEventListener('load', () => {
     nodes.viewerImage.classList.add('is-loaded');
     nodes.viewerStageSpinner?.classList.add('d-none');
@@ -8333,16 +8335,12 @@
     }
   };
 
-  inventarioModal.addEventListener('hide.bs.modal', () => {
+  LJModal.on(inventarioModal, 'hide', () => {
     snapshotEditorDraft();
   });
-  inventarioModal.addEventListener('hidden.bs.modal', () => inventarioModal.removeAttribute('inert'));
   window.addEventListener('resize', () => {
     if (state.viewerScale > 1) applyViewerTransform();
   });
 
-  nodes.imageViewerModal?.addEventListener('hidden.bs.modal', () => {
-    document.querySelectorAll('.modal-backdrop.inventory-image-backdrop').forEach((backdrop) => backdrop.classList.remove('inventory-image-backdrop'));
-  });
-  inventarioModal.addEventListener('show.bs.modal', loadInventario);
+  LJModal.on(inventarioModal, 'show', loadInventario);
 })();

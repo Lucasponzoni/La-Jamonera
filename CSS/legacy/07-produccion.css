@@ -1507,3 +1507,6 @@ sl-dialog.lj-alert-dialog:has(.produccion-recipe-history-alert.is-expanded) {
   flex-wrap: wrap;
 }
 
+
+/* La regla vieja pintaba caja sobre el host del sl-button: el color va en ::part(base). */
+sl-button.produccion-history-btn { background: none; border: 0; box-shadow: none; padding: 0; }
