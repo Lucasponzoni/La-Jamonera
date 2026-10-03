@@ -4,8 +4,30 @@
 import { admin, secretGet, str } from './shared.ts';
 import * as gemini from './gemini.ts';
 import {
-  DEFAULTS, EPS, createEngine, collectYearsToFetch, withDefaultWeeklyConfig, safeObj, normalizeText, num
+  DEFAULTS, EPS, createEngine, collectYearsToFetch, withDefaultWeeklyConfig, safeObj, normalizeText, num,
+  summarizeInventoryRecordForIndex, recalcRecordStock
 } from './egresos-engine.ts';
+
+// Como RTDB: sin null, sin arrays/objetos vacíos (así queda igual que el índice que escribía Firebase).
+export const rtdbClean = (v) => {
+  if (Array.isArray(v)) { const a = v.map(rtdbClean).filter((x) => x !== undefined); return a.length ? a : undefined; }
+  if (v && typeof v === 'object') { const o = {}; Object.entries(v).forEach(([k, x]) => { const c = rtdbClean(x); if (c !== undefined) o[k] = c; }); return Object.keys(o).length ? o : undefined; }
+  return v === null || (typeof v === 'number' && !Number.isFinite(v)) ? undefined : v;
+};
+
+// Tras escribir lotes/movimientos: recalcula /inventario_index/items/{id} como la Cloud Function
+// (recalcRecordStock + summarizeInventoryRecordForIndex sobre el registro con forma de Firebase)
+// y toca /_index_meta/inventario_index.
+export async function refreshInventoryIndex(ingredientId, todayIso, version) {
+  const { data: record, error } = await admin.rpc('auto_egreso_record', { p_ing: ingredientId });
+  if (error) throw new Error(error.message);
+  if (!record) return null;
+  recalcRecordStock(record);
+  const summary = rtdbClean(summarizeInventoryRecordForIndex(record, ingredientId, todayIso)) || {};
+  const { error: e2 } = await admin.rpc('auto_egreso_index_set', { p_ing: ingredientId, p_summary: summary, p_version: version });
+  if (e2) throw new Error(e2.message);
+  return summary;
+}
 
 const JOB = 'auto_egresos';
 const LOCK_SECONDS = 9 * 60;
@@ -14,10 +36,18 @@ const EDGE_DEFAULTS = { MAX_RUN_MILLIS: 110000, MAX_PRODUCTS_PER_RUN: 60 };
 const ts = (ms) => (Number.isFinite(Number(ms)) && Number(ms) > 0 ? new Date(Number(ms)).toISOString() : null);
 const isoDate = (v) => (/^\d{4}-\d{2}-\d{2}/.test(str(v)) ? str(v).slice(0, 10) : null);
 const numOrNull = (v) => (v === undefined || v === null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
-const MOV_KNOWN = new Set(['id', 'type', 'createdAt', 'producedAt', 'productionDate', 'productionId', 'usedQty', 'qty', 'usedUnit', 'unit', 'qtyUnit', 'usedBaseQty', 'qtyBase', 'kilosUsed', 'qtyKg', 'reason', 'note', 'observation', 'user', 'generatedAutomatically', 'source', 'runId', 'reference']);
-const extras = (m) => { const o = {}; Object.keys(m || {}).forEach((k) => { if (!MOV_KNOWN.has(k)) o[k] = m[k]; }); return Object.keys(o).length ? o : null; };
 
+// El lote se toma de inventario_lotes.raw (la entrada original de Firebase, sin historiales):
+// así el motor ve exactamente lo mismo que veía la Cloud Function. Sin raw, se arma desde columnas.
 function lotToEntry(l) {
+  if (l.raw && typeof l.raw === 'object') {
+    const e = JSON.parse(JSON.stringify(l.raw));
+    e.productionUsage = []; e.expiryResolutions = []; e.movementHistory = [];
+    return e;
+  }
+  return lotToEntryFromColumns(l);
+}
+function lotToEntryFromColumns(l) {
   const entry = {
     id: l.id, entryDate: str(l.fecha_ingreso), expiryDate: str(l.vencimiento), unit: l.unidad,
     qty: Number(l.cantidad), availableQty: Number(l.disponible), availableKg: Number(l.disponible_kg),
@@ -42,7 +72,7 @@ function movRow(m, origen, lote, ingredienteId, orden, runId) {
     cantidad_base: numOrNull(m.usedBaseQty ?? m.qtyBase), cantidad_kg: numOrNull(m.kilosUsed ?? m.qtyKg),
     motivo: m.reason || null, nota: m.note || m.observation || null, usuario: m.user || null,
     automatico: Boolean(m.generatedAutomatically), source: m.source || null, run_id: m.runId || null,
-    datos: extras(m)
+    datos: JSON.parse(JSON.stringify(m)) // objeto completo, como lo guarda el front (lj_mov_ins)
   };
 }
 
@@ -169,6 +199,10 @@ export async function runAutoEgresos({ dryRun = true, now = new Date(), aiChat, 
         const { data: res, error } = await admin.rpc('auto_egreso_aplicar', { p_lotes: lotRows, p_movs: movRows });
         if (error) { L.error(`${ingredientId}: ${error.message}`); continue; }
         if (res?.conflicts?.length) summary.conflicts.push(...res.conflicts);
+        if (res?.applied?.length) {
+          try { await refreshInventoryIndex(ingredientId, todayIso, Number(cfg.INDEX_VERSION || 4)); }
+          catch (e) { L.error(`índice ${ingredientId}: ${e.message}`); }
+        }
       }
     }
     if (!timedOut) await setCursor(hasMoreByCap ? afterCap : '');

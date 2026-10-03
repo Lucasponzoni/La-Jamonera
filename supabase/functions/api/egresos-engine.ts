@@ -171,6 +171,105 @@ function normalizeLegacyAutoEgresoEntry(entry) {
   return { changed, entry: next };
 }
 
+// Resumen del índice (copia literal de functions/auto-egresos.js).
+function recalcRecordStock(record) {
+  const entries = Array.isArray(record.entries) ? record.entries : [];
+  const stockBase = entries.reduce((acc, e) => acc + getAvailableBase(e, getUnitMeta(e.unit)), 0);
+  record.stockBase = Number(stockBase.toFixed(6));
+  const unit = String(record.stockUnit || (entries[0] && entries[0].unit) || '').toLowerCase();
+  if (getUnitMeta(unit).category === 'peso') {
+    record.stockKg = Number((record.stockBase / 1000).toFixed(4));
+  } else {
+    record.stockKg = Number(entries.reduce((acc, e) => acc + num(e.availableKg), 0).toFixed(4));
+  }
+  record.hasEntries = entries.length > 0;
+}
+
+function entryImageUrlsForIndex(entry) {
+  const urls = [];
+  if (Array.isArray(entry.invoiceImageUrls)) urls.push(...entry.invoiceImageUrls);
+  ['invoiceImageUrl', 'invoiceImage', 'imageUrl', 'attachmentUrl'].forEach((key) => { if (entry[key]) urls.push(entry[key]); });
+  return [...new Set(urls.map(normalizeValue).filter(Boolean))];
+}
+
+function summarizeEntryLiteForIndex(entry) {
+  const unitMeta = getUnitMeta(entry.unit);
+  const availableBase = getAvailableBase(entry, unitMeta);
+  const availableQty = Number.isFinite(Number(entry.availableQty)) ? Number(entry.availableQty) : roundQtyForUnit(fromBase(availableBase, unitMeta), unitMeta);
+  const availableKg = Number.isFinite(Number(entry.availableKg)) ? Number(entry.availableKg) : baseToKg(availableBase, unitMeta);
+  const urls = entryImageUrlsForIndex(entry);
+  return {
+    id: normalizeValue(entry.id),
+    entryDate: normalizeIso(entry.entryDate),
+    createdAt: toFiniteNumber(entry.createdAt, 0),
+    expiryDate: normalizeIso(entry.expiryDate),
+    noPerecedero: Boolean(entry.noPerecedero),
+    usoInternoEmpresa: Boolean(entry.usoInternoEmpresa),
+    isFrozen: Boolean(entry.isFrozen || entry.frozen),
+    frozenAt: normalizeIso(entry.frozenAt),
+    unit: normalizeText(entry.unit),
+    qty: toFiniteNumber(entry.qty, 0),
+    qtyBase: toFiniteNumber(entry.qtyBase, 0),
+    qtyKg: toFiniteNumber(entry.qtyKg, 0),
+    availableQty,
+    availableBase,
+    availableKg,
+    packageQty: Number.isFinite(Number(entry.packageQty)) ? Number(entry.packageQty) : null,
+    invoiceNumber: normalizeValue(entry.invoiceNumber),
+    lotNumber: normalizeValue(entry.lotNumber || entry.invoiceNumber || entry.id),
+    provider: normalizeValue(entry.provider),
+    invoiceImageUrl: urls[0] || '',
+    invoiceImageUrls: urls,
+    status: normalizeValue(entry.status),
+    expiryResolutionStatus: normalizeValue(entry.expiryResolutionStatus),
+    __indexLite: true
+  };
+}
+
+function summarizeInventoryRecordForIndex(record, ingredientId, todayIso) {
+  const entries = Array.isArray(record.entries) ? record.entries : [];
+  const liteEntries = entries.map(summarizeEntryLiteForIndex).filter((entry) => entry.id);
+  const stockBase = Number.isFinite(Number(record.stockBase)) ? Number(record.stockBase) : liteEntries.reduce((s, e) => s + num(e.availableBase), 0);
+  const stockKg = Number.isFinite(Number(record.stockKg)) ? Number(record.stockKg) : liteEntries.reduce((s, e) => s + num(e.availableKg), 0);
+  const today = todayIso;
+  const expiringDays = Number.isFinite(Number(record.expiringSoonDays)) ? Number(record.expiringSoonDays) : 2;
+  const lotRef = (entry, diffDays) => ({
+    entryId: entry.id, qty: entry.availableQty, unit: entry.unit, diffDays, expiryDate: entry.expiryDate, lotNumber: entry.lotNumber, packageQty: entry.packageQty
+  });
+  const expiredEntries = liteEntries
+    .filter((e) => !isNoPerecedero(e) && e.expiryDate && e.expiryDate < today && num(e.availableQty) > 0)
+    .map((e) => lotRef(e, Math.abs(daysBetween(e.expiryDate, today))));
+  const expiringEntries = liteEntries
+    .filter((e) => {
+      if (isNoPerecedero(e) || !e.expiryDate || num(e.availableQty) <= 0) return false;
+      const diff = daysBetween(today, e.expiryDate);
+      return diff >= 0 && diff <= expiringDays;
+    })
+    .map((e) => lotRef(e, daysBetween(today, e.expiryDate)));
+  return {
+    ingredientId: normalizeValue(record.ingredientId || ingredientId),
+    stockKg: Number(stockKg.toFixed(4)),
+    stockBase: Number(stockBase.toFixed(6)),
+    stockUnit: normalizeText(record.stockUnit),
+    infiniteStock: Boolean(record.infiniteStock || record.stockInfinito),
+    hasEntries: Boolean(record.hasEntries || liteEntries.length),
+    entriesCount: liteEntries.length,
+    expiredEntries,
+    expiringEntries,
+    hasFrozenEntries: liteEntries.some((e) => Boolean(e.isFrozen)),
+    lowThresholdKg: record.lowThresholdKg ?? null,
+    lowThresholdBase: record.lowThresholdBase ?? null,
+    lowThresholdMode: normalizeValue(record.lowThresholdMode || 'global'),
+    packageQty: Number.isFinite(Number(record.packageQty)) ? Number(record.packageQty) : null,
+    expiringSoonDays: Number.isFinite(Number(record.expiringSoonDays)) ? Number(record.expiringSoonDays) : null,
+    suggestedExpiryDays: Number.isFinite(Number(record.suggestedExpiryDays)) ? Number(record.suggestedExpiryDays) : null,
+    lotConfig: safeObj(record.lotConfig),
+    weeklySheetConfig: safeObj(record.weeklySheetConfig),
+    flagPreferences: safeObj(record.flagPreferences),
+    __indexLite: true
+  };
+}
+
 function createEngine({ cfg, random = Math.random, tz = TZ, log }) {
   const T = makeTz(tz);
   const rnd = () => random();
@@ -555,4 +654,4 @@ function collectYearsToFetch(items, todayIso) {
   return [...years].filter((n) => Number.isFinite(n));
 }
 
-export { TZ, SOURCE, DEFAULTS, EPS, createEngine, collectYearsToFetch, normalizeLegacyAutoEgresoEntry, withDefaultWeeklyConfig, getUnitMeta, getAvailableBase, safeObj, normalizeText, normalizeValue, normalizeIso, num, parseAiJsonFromText, makeTz, addDays, dayOfWeek };
+export { summarizeInventoryRecordForIndex, recalcRecordStock, TZ, SOURCE, DEFAULTS, EPS, createEngine, collectYearsToFetch, normalizeLegacyAutoEgresoEntry, withDefaultWeeklyConfig, getUnitMeta, getAvailableBase, safeObj, normalizeText, normalizeValue, normalizeIso, num, parseAiJsonFromText, makeTz, addDays, dayOfWeek };

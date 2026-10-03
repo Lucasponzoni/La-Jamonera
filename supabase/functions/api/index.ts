@@ -103,7 +103,7 @@ async function route(req: Request, path: string) {
     const cfg = await readAiConfig();
     if (!cfg.apiKey) throw new HttpError(400, 'ia_key_missing');
     const t0 = Date.now();
-    const out = await gemini.chat({ apiKey: cfg.apiKey, model: cfg.textModel, body: { messages: [{ role: 'user', content: 'Respondé sólo: OK' }], temperature: 0, max_tokens: 5 } });
+    const out = await gemini.chat({ apiKey: cfg.apiKey, model: cfg.textModel, body: { messages: [{ role: 'user', content: 'Respondé sólo: OK' }], temperature: 0, max_tokens: 20 } });
     return { ok: true, ms: Date.now() - t0, model: cfg.textModel, reply: out.choices[0].message.content };
   }
   if (path === '/config/ai/models' && method === 'GET') {

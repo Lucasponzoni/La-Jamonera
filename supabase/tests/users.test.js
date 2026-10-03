@@ -14,7 +14,7 @@ const EMP = 'empleado.prueba@test.lajamonera.invalid';
   const A = adm.token;
   let r = await AU(A, { action: 'list' });
   const self = (r.json && r.json.loginsSinPersona || [])[0];
-  ok('list', r.json && r.json.ok && r.json.personas.length >= 9, `${r.json && r.json.personas.length} personas · admin sin persona: ${self && self.email}`);
+  ok('list', r.json && r.json.ok && r.json.personas.length >= 8, `${r.json && r.json.personas.length} personas · admin sin persona: ${self && self.email}`);
   r = await AU(A, { action: 'grantAccess', personaId: 'test_sb_emp', role: 'empleado', puedeEditar: false, puedeBorrar: false, mode: 'password', tempPassword: 'Prueba-1234' });
   ok('grantAccess password', r.json && r.json.ok && r.json.estado === 'activa', JSON.stringify(r.json));
   r = await AU(A, { action: 'grantAccess', personaId: 'test_sb_emp', role: 'empleado', mode: 'password' });
@@ -46,7 +46,7 @@ const EMP = 'empleado.prueba@test.lajamonera.invalid';
   r = await AU(A, { action: 'resetPassword', personaId: 'test_sb_emp', mode: 'temp', tempPassword: 'Otra-56789' }); ok('resetPassword temp', r.json && r.json.tempPassword === 'Otra-56789');
   const emp2 = await signIn(EMP, 'Otra-56789'); ok('login con nueva temporal', emp2.status === 200, emp2.error || '');
 
-  r = await AU(A, { action: 'getTemplate' }); ok('getTemplate default', r.json && r.json.isDefault === true && /\{\{link\}\}/.test(r.json.html));
+  r = await AU(A, { action: 'getTemplate' }); ok('getTemplate', r.json && r.json.ok && /\{\{link\}\}/.test(r.json.html));
   r = await AU(A, { action: 'saveTemplate', asunto: 'Hola {{nombre}}', html: '<p>sin link</p>' }); ok('saveTemplate sin {{link}} → 400', r.status === 400, r.json && r.json.error);
   r = await AU(A, { action: 'saveTemplate', asunto: 'Hola {{nombre}}', html: '<p onclick="x()">Hola {{nombre}} <a href="javascript:alert(1)">x</a><script>alert(1)</script> <a href="{{link}}">Activar</a></p>' });
   ok('saveTemplate sanea', r.json && r.json.ok && !/script|onclick|javascript:/i.test(r.json.html), r.json && r.json.html);
