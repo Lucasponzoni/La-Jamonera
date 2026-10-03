@@ -70,5 +70,27 @@
     return compress(base64ToBlob(data.data, data.mimeType), options);
   }
 
-  window.LJAI = { ICON_SRC, chat, chatText, image, compress };
+  // Carátula (foto macro + cartel de madera con el nombre), con dos carátulas existentes como referencia de
+  // estilo. kind: 'producto' (recetas) o 'ingrediente'. El cartel lleva el nombre sin códigos ni presentación.
+  const COVER_REFERENCE_PATHS = ['recetas/uploads/1778420480856_ujnt0c.png', 'recetas/uploads/1784761419786_lvbsx3.png'];
+  async function cover(name, { kind = 'producto' } = {}) {
+    const clean = String(name || '').trim();
+    const sign = (clean.replace(/\([^)]*\)/g, ' ').replace(/\s+x\s*\d.*$/i, '').replace(/\s+/g, ' ').trim() || clean).toLocaleUpperCase('es-AR');
+    const subject = kind === 'ingrediente'
+      ? `de "${clean}" tal como se recibe o se usa en una fábrica de chacinados y fiambrería (a granel, crudo o en su envase, según corresponda)`
+      : `del producto "${clean}" (crudo / tal como se vende en carnicería-fiambrería)`;
+    const prompt = `Las imágenes adjuntas son carátulas de productos de nuestra fiambrería. Usalas SOLO como guía de estilo del cartel y de la fotografía; no copies su producto ni su texto.
+Generá una carátula nueva, cuadrada, para el ${kind === 'ingrediente' ? 'ingrediente' : 'producto'}: "${clean}".
+- Fondo: fotografía macro hiperrealista ${subject}, ocupando todo el cuadro, apetitosa, luz natural cálida, poca profundidad de campo.
+- En el centro, un único cartel horizontal con el MISMO estilo que las referencias: placa de madera oscura envejecida con borde de madera, ancho casi completo del cuadro.
+- Dentro del cartel, el texto "${sign}" en tipografía sans serif condensada, negrita, mayúsculas, color blanco hueso con textura gastada; centrado, en una o dos líneas, grande y COMPLETO dentro del cartel (ninguna letra cortada), con la ortografía exacta incluidos los acentos.
+- Sin ningún otro texto, logo, marca de agua ni borde blanco.`;
+    const base = window.LJ_SUPABASE ? `${window.LJ_SUPABASE.url}/storage/v1/object/public/archivos/` : '';
+    return image(prompt, { maxSize: 1024, quality: 0.86 }, {
+      referenceUrls: base ? COVER_REFERENCE_PATHS.map((p) => base + p) : [],
+      aspectRatio: '1:1'
+    });
+  }
+
+  window.LJAI = { ICON_SRC, chat, chatText, image, cover, compress };
 })();

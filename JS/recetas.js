@@ -537,23 +537,11 @@
   };
 
   // Imagen con Google Gemini (window.LJAI): webp comprimido, mismo estilo de ícono que antes.
-  // Carátula de producto: foto macro + cartel de madera con el nombre, con el mismo estilo que las carátulas
-  // existentes (se mandan dos como referencia de estilo). Si se borran del storage, sólo cuenta el prompt.
-  const COVER_REFERENCE_PATHS = ['recetas/uploads/1778420480856_ujnt0c.png', 'recetas/uploads/1784761419786_lvbsx3.png'];
-  const buildCoverPrompt = (name) => `Las imágenes adjuntas son carátulas de productos de nuestra fiambrería. Usalas SOLO como guía de estilo del cartel y de la fotografía; no copies su producto ni su texto.
-Generá una carátula nueva, cuadrada, para el producto: "${name}".
-- Fondo: fotografía macro hiperrealista del producto "${name}" (crudo / tal como se vende en carnicería-fiambrería) ocupando todo el cuadro, apetitosa, luz natural cálida, poca profundidad de campo.
-- En el centro, un único cartel horizontal con el MISMO estilo que las referencias: placa de madera oscura envejecida con borde de madera, ancho casi completo del cuadro.
-- Dentro del cartel, el texto "${name.toLocaleUpperCase('es-AR')}" en tipografía sans serif condensada, negrita, mayúsculas, color blanco hueso con textura gastada; centrado, en una o dos líneas, grande y COMPLETO dentro del cartel (ninguna letra cortada), con la ortografía exacta incluidos los acentos.
-- Sin ningún otro texto, logo, marca de agua ni borde blanco.`;
+  // Carátula de producto (foto + cartel de madera): el prompt y las referencias están en LJAI.cover.
   const generateCoverWithIA = async (name) => {
-    const base = `${window.LJ_SUPABASE?.url || ''}/storage/v1/object/public/archivos/`;
     let blob;
     try {
-      blob = await window.LJAI.image(buildCoverPrompt(name), { maxSize: 1024, quality: 0.86 }, {
-        referenceUrls: window.LJ_SUPABASE ? COVER_REFERENCE_PATHS.map((p) => base + p) : [],
-        aspectRatio: '1:1'
-      });
+      blob = await window.LJAI.cover(name, { kind: 'producto' });
     } catch (error) {
       throw new Error(`No se pudo generar la carátula con IA (${error?.message || error}).`);
     }

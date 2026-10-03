@@ -719,10 +719,17 @@
 
         <div id="${prefix}_aiWrap" class="d-none">
           <sl-input id="${prefix}_aiPrompt" label="Prompt corto para IA" placeholder="Ej: carne de cerdo"></sl-input>
-          <sl-button variant="default" id="${prefix}_aiGenerate" type="button" class="ai-generate-btn mt-2">
-            <img slot="prefix" src="${IA_ICON_SRC}" alt="" aria-hidden="true">
-            Generar imagen con IA
-          </sl-button>
+          <div class="ai-generate-actions mt-2">
+            <sl-button variant="default" id="${prefix}_aiGenerate" type="button" class="ai-generate-btn">
+              <img slot="prefix" src="${IA_ICON_SRC}" alt="" aria-hidden="true">
+              Generar imagen con IA
+            </sl-button>
+            ${prefix === 'ingredientImage' ? `<sl-button variant="default" id="${prefix}_aiCover" type="button" class="ai-generate-btn" title="Foto del ingrediente con el cartel de madera de La Jamonera">
+              <i slot="prefix" class="fa-solid fa-sign-hanging" aria-hidden="true"></i>
+              Carátula con IA
+            </sl-button>` : ''}
+          </div>
+          ${prefix === 'ingredientImage' ? '<small class="ai-generate-hint">Carátula: usa el prompt o, si está vacío, el nombre del ingrediente como texto del cartel.</small>' : ''}
           <div id="${prefix}_aiError" class="ai-alert-note d-none mt-2"></div>
         </div>
       </div>
@@ -834,6 +841,32 @@
     };
 
     aiGenerateBtn.addEventListener('click', generateWithIa);
+
+    const aiCoverBtn = document.getElementById(`${prefix}_aiCover`);
+    aiCoverBtn?.addEventListener('click', async () => {
+      const name = normalizeValue(aiPromptInput.value) || normalizeValue(document.getElementById('ingredientNameInput')?.value);
+      if (!name) {
+        aiError.textContent = 'Escribí el nombre del ingrediente o un prompt para el texto del cartel.';
+        aiError.classList.remove('d-none');
+        return;
+      }
+      aiCoverBtn.disabled = true;
+      aiGenerateBtn.disabled = true;
+      aiError.classList.add('d-none');
+      preview.innerHTML = '<span class="image-preview-overlay"><sl-spinner class="meta-spinner-login" aria-label="Generando"></sl-spinner></span>';
+      try {
+        const blob = await window.LJAI.cover(name, { kind: 'ingrediente' });
+        imageState.generatedBlob = blob;
+        setPreview(URL.createObjectURL(blob));
+      } catch (error) {
+        aiError.textContent = `No se pudo generar la carátula. ${String(error?.message || error)}`;
+        aiError.classList.remove('d-none');
+        setPreview('');
+      } finally {
+        aiCoverBtn.disabled = false;
+        aiGenerateBtn.disabled = false;
+      }
+    });
 
     return async () => {
       const method = methodInput.value;
