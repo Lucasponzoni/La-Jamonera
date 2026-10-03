@@ -467,9 +467,9 @@
   bottom: calc(100% + 10px);
   right: 0;
   background: var(--lj-surface);
-  border: 1px solid rgba(99,120,177,0.13);
+  border: 1px solid var(--lj-border);
   border-radius: var(--lj-radius-lg);
-  box-shadow: 0 4px 6px -2px rgba(0,0,0,0.06), 0 16px 48px -8px rgba(0,0,0,0.13), inset 0 0 0 1px rgba(255,255,255,0.7);
+  box-shadow: 0 12px 32px -12px rgba(0, 0, 0, .25);
   min-width: 246px;
   z-index: 300;
   overflow: hidden;
@@ -825,8 +825,7 @@ sl-button.inventario-page-btn,
 sl-button.inventario-icon-only-btn,
 sl-button.inventario-add-bulk-btn,
 sl-button.inventario-weekly-config-btn,
-#inventarioModal sl-button.recipe-table-action-btn,
-#inventarioModal sl-button.produccion-history-btn {
+#inventarioModal sl-button.recipe-table-action-btn {
   background: none;
   border: 0;
   padding: 0;
@@ -888,16 +887,9 @@ sl-button.inventario-status-btn[disabled]::part(base) { opacity: .55; }
 .inventario-actions-row.inventory-production-actions { gap: 8px; align-items: center; }
 
 /* Botones con identidad propia */
-sl-button.inventario-expand-btn::part(base) {
-  background: var(--lj-warning-soft);
-  color: var(--lj-warning);
-  border-color: color-mix(in srgb, var(--lj-warning) 35%, var(--lj-surface));
-}
-sl-button.inventario-expand-btn::part(base):hover { border-color: var(--lj-warning); }
+/* Secundarias de las barras de tablas: default neutro; eliminar sólo con ícono rojo. */
 sl-button.inventario-delete-btn[variant="default"]::part(base) {
-  background: var(--lj-danger-soft);
   color: var(--lj-danger);
-  border-color: color-mix(in srgb, var(--lj-danger) 35%, var(--lj-surface));
 }
 sl-button.inventario-delete-btn[variant="default"]::part(base):hover { border-color: var(--lj-danger); }
 #inventarioModal sl-button.recipe-table-action-btn { min-width: 0; }
@@ -1180,113 +1172,10 @@ sl-dialog.lj-alert-dialog:has(.inventario-provider-rne-alert) { --width: min(960
   background: var(--lj-surface);
 }
 
-/* Lista: tarjetas de ingrediente */
-#inventarioList { display: grid; gap: 8px; }
-#inventarioList .inventario-card.inventario-card-v2,
-#inventarioList .inventario-card.inventario-card-v2[class*="status-"] {
-  background: var(--lj-surface);
-  border: 1px solid var(--lj-border);
-  border-radius: var(--lj-radius-lg);
-  padding: 12px;
-  gap: 12px;
-  box-shadow: none;
-}
-#inventarioList .inventario-card.inventario-card-v2:hover { border-color: var(--lj-border-strong); }
-#inventarioList .inventario-card-v2 .ingrediente-avatar { width: 64px; height: 64px; border-radius: 50%; }
-#inventarioList .inventario-card-v2 .ingrediente-main { gap: 10px; flex: 1 1 auto; }
-#inventarioList .inventario-card-v2 .inventario-card-header { padding-bottom: 0; border-bottom: 0; gap: 8px; }
-#inventarioList .inventario-card-v2 .ingrediente-name { margin: 0; font-size: 15px; font-weight: 700; color: var(--lj-text); }
-#inventarioList .inventario-card-v2 .inventario-card-titles .ingrediente-meta { font-size: 13px; font-weight: 400; color: var(--lj-muted); }
-#inventarioList .inventario-card-v2 .inventario-card-titles .ingrediente-description { font-size: 12px; color: var(--lj-muted); }
-#inventarioList .inventario-card-v2 .inventario-status-badge {
-  border-radius: 4px;
-  font-size: 11.5px;
-  font-weight: 600;
-  padding: 2px 8px;
-  line-height: 18px;
-}
-#inventarioList .inventario-card-v2 .inventario-zone { padding: 0; }
-#inventarioList .inventario-card-v2 .inventario-hero-grid { gap: 8px; }
-#inventarioList .inventario-card-v2 .inventario-hero-main,
-#inventarioList .inventario-card-v2 .inventario-datum {
-  background: var(--lj-surface);
-  border: 1px solid var(--lj-border);
-  border-radius: var(--lj-radius);
-  padding: 8px 10px;
-  gap: 2px;
-}
-#inventarioList .inventario-card-v2 .inventario-hero-main > small,
-#inventarioList .inventario-card-v2 .inventario-datum small {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  color: var(--lj-muted);
-}
-#inventarioList .inventario-card-v2 .inventario-hero-value {
-  font-family: inherit;
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: 0;
-  color: var(--lj-text);
-}
-#inventarioList .inventario-card-v2.status-empty .inventario-hero-value,
-#inventarioList .inventario-card-v2.status-expired .inventario-hero-value { color: var(--lj-danger); }
-#inventarioList .inventario-card-v2.status-low .inventario-hero-value { color: var(--lj-warning); }
-#inventarioList .inventario-card-v2.status-good .inventario-hero-value { color: var(--lj-success); }
-#inventarioList .inventario-card-v2 .inventario-hero-value > span.inventario-hero-unit-suffix {
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--lj-muted);
-}
-#inventarioList .inventario-card-v2 .inventario-hero-value.inventario-infinity-symbol { font-size: 24px; }
-#inventarioList .inventario-card-v2 .inventario-hero-unit { font-size: 12px; }
-#inventarioList .inventario-card-v2 .inventario-datum strong {
-  font-family: inherit;
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--lj-text);
-}
-#inventarioList .inventario-card-v2 .inventario-zone-lotes {
-  background: var(--lj-warning-soft);
-  border: 1px solid color-mix(in srgb, var(--lj-warning) 35%, var(--lj-surface));
-  border-radius: var(--lj-radius);
-  padding: 4px 10px;
-}
-#inventarioList .inventario-card-v2 .inventario-zone-toggle { background: none; border: 0; padding: 4px 0; }
-#inventarioList .inventario-card-v2 .inventario-zone-toggle-label { font-size: 12px; font-weight: 600; letter-spacing: 0; text-transform: none; }
-#inventarioList .inventario-card-v2 .inventario-zone-body { border-top-color: color-mix(in srgb, var(--lj-warning) 30%, var(--lj-surface)); }
-#inventarioList .inventario-card-v2 .inventario-zone-acciones { border-top: 0; padding-top: 0; }
-#inventarioList .inventario-card-v2 .inventario-actions-row { gap: 6px; margin-top: 0; }
-#inventarioList .inventario-card-expired-banner { border-radius: var(--lj-radius); padding: 8px 10px; margin: 0; font-size: 13px; }
-#inventarioList .inventario-infinite-stock-note { border-radius: var(--lj-radius); font-size: 12.5px; }
-@media (max-width: 767.98px) {
-  #inventarioList .inventario-card-v2 .ingrediente-avatar { width: 48px; height: 48px; }
-}
-
 /* Vistas internas: editor de ingreso / historial */
 #inventarioEditorForm .lj-label { font-size: 12px; font-weight: 600; color: var(--lj-muted); }
 #inventarioEditorForm .recipe-step-card { border-radius: var(--lj-radius-lg); }
 #inventarioEditorForm .step-title { font-size: 15px; }
-#inventarioModal .inventario-table-compact { font-size: 13px; }
-#inventarioModal .inventario-table-compact thead th {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  color: var(--lj-muted);
-  background: var(--lj-surface-2);
-}
-#inventarioModal .inventario-table-compact tbody td {
-  font-size: 13px;
-  font-weight: 400;
-  padding: 8px;
-  vertical-align: middle;
-}
-#inventarioModal .inventario-table-compact tbody td:first-child { font-weight: 600; color: var(--lj-text); }
-#inventarioModal .inventario-table-compact tbody td strong { font-weight: 700; }
 #inventarioModal .inventario-period-board { background: var(--lj-surface); }
 #inventarioModal .inventario-period-head .step-title { font-size: 15px; color: var(--lj-brand); }
 
@@ -1317,3 +1206,18 @@ sl-dialog.lj-alert-dialog:has(.inventario-provider-rne-alert) { --width: min(960
 .lj-alert .inventario-weekly-product-head p { font-size: 12px; }
 .lj-alert .inventario-provider-manager-kicker { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--lj-muted); margin: 0; }
 .lj-alert .inventario-provider-manager-copy { font-size: 13px; color: var(--lj-muted); margin: 0; }
+
+
+/* Barra de Inventario en celular: acciones en una fila con scroll horizontal (no se aprietan). */
+@media (max-width: 767.98px) {
+  .inventario-toolbar.recetas-toolbar .inventario-toolbar-actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .inventario-toolbar.recetas-toolbar .inventario-toolbar-actions > sl-button { flex: 0 0 auto; }
+  .inventario-toolbar.recetas-toolbar .inventario-toolbar-actions > sl-button#inventarioToolbarCreateIngredientBtn { margin-left: auto; }
+  .inventario-status-filters.recetas-rnpa-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .inventario-status-filters.recetas-rnpa-filters > * { flex: 0 0 auto; }
+}

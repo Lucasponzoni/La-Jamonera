@@ -25,14 +25,17 @@
     activeFamilyId: 'all',
     search: '',
     familiesCollapsed: (() => { try { return localStorage.getItem('ingredientes_families_collapsed') === '1'; } catch (_) { return false; } })(),
-    ingredientes: { familias: {}, items: {}, config: { measures: [] } }
+    ingredientes: { familias: {}, items: {}, config: { measures: [] } },
+    selectedId: '',
+    detailOpen: false,
+    inventoryIndex: null,
+    inventoryIndexLoading: null
   };
 
   const ingredientesModal = document.getElementById('ingredientesModal');
   const ingredientesLoading = document.getElementById('ingredientesLoading');
   const ingredientesEmpty = document.getElementById('ingredientesEmpty');
   const ingredientesData = document.getElementById('ingredientesData');
-  const familiasCircles = document.getElementById('familiasCircles');
   const ingredientesList = document.getElementById('ingredientesList');
   const searchInput = document.getElementById('ingredientesSearchInput');
   const createIngredientBtn = document.getElementById('createIngredientBtn');
@@ -195,14 +198,14 @@
   const getFamiliasArray = () => Object.values(safeObject(state.ingredientes.familias));
   const getIngredientesArray = () => Object.values(safeObject(state.ingredientes.items));
 
-  const familyAvatar = (url, alt, itemCount = 0) => {
-    const countBadge = Number(itemCount) > 0 ? `<span class="family-circle-count">${Math.min(99, Number(itemCount))}</span>` : '';
-    return url
-      ? `<span class="family-circle-thumb"><span class="thumb-loading"><sl-spinner class="meta-spinner" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-family-thumb" src="${url}" alt="${alt}" loading="lazy">${countBadge}</span>`
-      : `<span class="family-circle-thumb family-circle-thumb-placeholder">${PLACEHOLDER_ICON}${countBadge}</span>`;
-  };
+  // ---------- Maestro-detalle (lista + ficha), mismo patrón que Recetas ----------
+  const familyFilterSelect = () => document.getElementById('ingredientesFamilyFilter');
+  const ingredientesDetail = () => document.getElementById('ingredientesDetail');
+  const ingredientesMasterDetail = () => document.getElementById('ingredientesMasterDetail');
+  const isIngMobileLayout = () => window.matchMedia('(max-width: 767.98px)').matches;
 
   const renderFamilies = () => {
+    const select = familyFilterSelect();
     const families = getFamiliasArray().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     const ingredientCounts = getIngredientesArray().reduce((acc, item) => {
       const familyId = normalizeValue(item?.familyId);
@@ -210,50 +213,17 @@
       acc[familyId] = Number(acc[familyId] || 0) + 1;
       return acc;
     }, {});
-
-    const allButton = `
-      <div class="family-circle-wrap">
-        <button type="button" class="lj-tile family-circle-item ${state.activeFamilyId === 'all' ? 'is-active' : ''}" data-family-filter="all">
-          <span class="family-circle-thumb family-circle-thumb-placeholder">${PLACEHOLDER_ICON}</span>
-          <span class="family-circle-name">Todas</span>
-        </button>
-      </div>
-    `;
-
-    const familyButtons = families.map((family) => `
-      <div class="family-circle-wrap">
-        <button type="button" class="lj-tile family-circle-item ${state.activeFamilyId === family.id ? 'is-active' : ''}" data-family-filter="${family.id}">
-          ${familyAvatar(family.imageUrl, capitalizeLabel(family.name), ingredientCounts[family.id] || 0)}
-          <span class="family-circle-name">${capitalizeLabel(family.name)}</span>
-        </button>
-        <div class="family-circle-actions">
-          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" data-family-edit="${family.id}" type="button" title="Editar familia" aria-label="Editar familia"><i class="fa-solid fa-pen"></i></sl-button>
-          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn is-danger" data-family-delete="${family.id}" type="button" title="Eliminar familia" aria-label="Eliminar familia"><i class="fa-solid fa-trash"></i></sl-button>
-        </div>
-      </div>
-    `).join('');
-
-    // Si hay búsqueda activa, forzamos collapse sin tocar la preferencia guardada.
-    const hasSearch = Boolean(normalizeValue(state.search));
-    const collapsed = Boolean(state.familiesCollapsed) || hasSearch;
-    const activeName = state.activeFamilyId !== 'all'
-      ? capitalizeLabel(safeObject(state.ingredientes.familias)[state.activeFamilyId]?.name || '')
-      : '';
-
-    familiasCircles.innerHTML = `
-      <div class="family-circle-section ${collapsed ? 'is-collapsed' : ''}">
-        <div class="family-circle-section-head">
-          <sl-button variant="text" size="small" type="button" class="family-circle-toggle" data-ing-families-toggle aria-expanded="${!collapsed}">
-            <i slot="prefix" class="fa-solid ${collapsed ? 'fa-chevron-right' : 'fa-chevron-down'}"></i>
-            Familias
-          </sl-button>
-          <small class="family-circle-summary">${families.length} ${families.length === 1 ? 'familia' : 'familias'}${activeName ? ` · filtrando: ${activeName}` : ''}${hasSearch ? ' · oculto por búsqueda' : ''}</small>
-        </div>
-        <div class="family-circle-section-body ${collapsed ? 'd-none' : ''}">
-          <div class="family-circles-row">${allButton}${familyButtons}</div>
-        </div>
-      </div>`;
-    prepareThumbLoaders('.js-family-thumb');
+    if (state.activeFamilyId !== 'all' && !safeObject(state.ingredientes.familias)[state.activeFamilyId]) state.activeFamilyId = 'all';
+    if (select) {
+      const total = getIngredientesArray().length;
+      select.innerHTML = `<i slot="prefix" class="fa-solid fa-carrot"></i><sl-option value="${ljOptionValue('all')}">Todas las familias<span slot="suffix" class="recetas-chip-count">${total}</span></sl-option>${families.map((family) => `<sl-option value="${ljOptionValue(family.id)}">${escapeHtml(capitalizeLabel(family.name))}<span slot="suffix" class="recetas-chip-count">${Number(ingredientCounts[family.id] || 0)}</span></sl-option>`).join('')}`;
+      if (window.ljSetSelectValue) window.ljSetSelectValue(select, state.activeFamilyId || 'all');
+      else select.value = state.activeFamilyId || 'all';
+    }
+    const hasFamily = state.activeFamilyId !== 'all';
+    ingredientesData?.querySelectorAll('[data-family-selected-action]').forEach((node) => {
+      node.disabled = !hasFamily;
+    });
   };
 
   const matchesSearch = (item) => {
@@ -284,7 +254,8 @@
       };
 
       const showFallback = () => {
-        wrapper.innerHTML = getPlaceholderCircle();
+        wrapper.classList.add('ingrediente-avatar-placeholder');
+        wrapper.innerHTML = PLACEHOLDER_ICON;
       };
 
       if (image.complete && image.naturalWidth > 0) {
@@ -313,6 +284,164 @@
     return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
   };
 
+  // Stock del ingrediente desde el índice liviano de inventario (una sola lectura por apertura).
+  const STOCK_UNIT_FACTORS = { kilos: 1000, kilo: 1000, kg: 1000, litros: 1000, litro: 1000, lts: 1000, l: 1000 };
+  const stockFromIndex = (item) => {
+    const row = safeObject(safeObject(state.inventoryIndex)[item.id]);
+    if (!Object.keys(row).length) return null;
+    const unit = normalizeLower(row.stockUnit || item.measure || 'kilos');
+    const factor = STOCK_UNIT_FACTORS[unit] || 1;
+    const stockQty = Number.isFinite(Number(row.stockBase)) ? Number(row.stockBase) / factor : Number(row.stockKg || 0);
+    const thresholdQty = Number.isFinite(Number(row.lowThresholdBase)) && row.lowThresholdBase !== null ? Number(row.lowThresholdBase) / factor : null;
+    const todayIso = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const lots = [...(Array.isArray(row.expiredEntries) ? row.expiredEntries : []), ...(Array.isArray(row.expiringEntries) ? row.expiringEntries : [])]
+      .filter((lot) => Number(lot?.qty || 0) > 0 && normalizeValue(lot?.expiryDate));
+    const expired = lots.filter((lot) => normalizeValue(lot.expiryDate) < todayIso);
+    const next = lots.map((lot) => normalizeValue(lot.expiryDate)).sort()[0] || '';
+    const infinite = Boolean(row.infiniteStock);
+    let tone = 'neu';
+    let label = 'Sin ingresos';
+    if (infinite) { tone = 'ok'; label = 'Infinito'; }
+    else if (row.hasEntries || Number(row.entriesCount || 0)) {
+      if (stockQty <= 0.0001) { tone = 'bad'; label = 'Sin stock'; }
+      else if (thresholdQty != null && stockQty <= thresholdQty) { tone = 'warn'; label = 'Stock bajo'; }
+      else { tone = 'ok'; label = 'En stock'; }
+    }
+    return { row, unit, stockQty, thresholdQty, entriesCount: Number(row.entriesCount || 0), expiredCount: expired.length, next, todayIso, infinite, frozen: Boolean(row.hasFrozenEntries), tone, label };
+  };
+
+  const loadInventoryIndex = async () => {
+    if (state.inventoryIndexLoading) return state.inventoryIndexLoading;
+    state.inventoryIndexLoading = window.dbLaJamoneraRest.read('/inventario_index/items')
+      .then((data) => { state.inventoryIndex = safeObject(data); })
+      .catch(() => { state.inventoryIndex = {}; });
+    return state.inventoryIndexLoading;
+  };
+
+  const formatIsoShort = (iso) => {
+    const value = normalizeValue(iso);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return '-';
+    const [y, m, d] = value.split('-');
+    return `${d}/${m}/${y}`;
+  };
+
+  const setIngDetailOpen = (open) => {
+    state.detailOpen = Boolean(open);
+    ingredientesMasterDetail()?.classList.toggle('is-detail-open', state.detailOpen);
+  };
+
+  const ingListRowHtml = (item, on) => {
+    const stock = stockFromIndex(item);
+    const measure = getMeasureLabel(item.measure);
+    const stockText = stock && !stock.infinite && stock.entriesCount ? `${stock.stockQty.toFixed(2)} ${measure}` : measure;
+    const sub = `${capitalizeLabel(item.familyName || 'Sin familia')} · ${stockText}`;
+    const name = capitalizeLabel(item.name);
+    return `<button type="button" class="lj-tile recetas-item ing-md-item ${on ? 'is-active' : ''}" role="option" aria-selected="${on}" tabindex="${on ? 0 : -1}" data-ing-select="${escapeHtml(item.id)}">
+        ${ingredientAvatar(item.imageUrl, escapeHtml(name))}
+        <span class="recetas-item-copy"><strong title="${escapeHtml(name)}">${escapeHtml(name)}</strong><small title="${escapeHtml(sub)}">${escapeHtml(sub)}</small></span>
+        <span class="md-item-tags">${stock ? `<span class="recetas-tag tone-${stock.tone}">${escapeHtml(stock.label)}</span>` : ''}${stock?.expiredCount ? '<span class="recetas-tag tone-bad" title="Tiene lotes vencidos con stock" aria-label="Tiene lotes vencidos con stock"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></span>' : ''}</span>
+      </button>`;
+  };
+
+  const renderIngredientDetail = (item) => {
+    const host = ingredientesDetail();
+    if (!host) return;
+    if (!item) {
+      host.innerHTML = '<div class="recetas-detail-empty"><i class="fa-solid fa-carrot" aria-hidden="true"></i><p>Elegí un ingrediente de la lista para ver su ficha.</p></div>';
+      return;
+    }
+    const name = capitalizeLabel(item.name);
+    const stock = stockFromIndex(item);
+    const measure = getMeasureLabel(item.measure);
+    const hasImage = Boolean(normalizeValue(item.imageUrl));
+    let stockKpis = '';
+    if (!stock) {
+      stockKpis = `<div class="recetas-kpi"><span>Stock actual</span><b class="tone-neu">${state.inventoryIndex ? 'Sin ingresos' : 'Cargando'}</b></div>
+        <div class="recetas-kpi"><span>Umbral</span><b class="tone-neu">-</b></div>
+        <div class="recetas-kpi"><span>Ingresos</span><b>0</b></div>
+        <div class="recetas-kpi"><span>Próximo vencimiento</span><b class="tone-neu">-</b></div>`;
+    } else {
+      const nextDiff = stock.next ? Math.round((new Date(`${stock.next}T00:00:00`) - new Date(`${stock.todayIso}T00:00:00`)) / 86400000) : null;
+      const nextTone = nextDiff == null ? 'neu' : (nextDiff < 0 ? 'bad' : 'warn');
+      stockKpis = `<div class="recetas-kpi"><span>Stock actual</span><b class="tone-${stock.tone}">${stock.infinite ? 'Infinito' : `${stock.stockQty.toFixed(2)} ${escapeHtml(measure)}`}</b><small>${escapeHtml(stock.label)}</small></div>
+        <div class="recetas-kpi"><span>Umbral</span><b>${stock.thresholdQty == null ? 'Global' : `${stock.thresholdQty.toFixed(2)} ${escapeHtml(measure)}`}</b><small>${stock.thresholdQty == null ? 'Configuración de inventario' : 'Personalizado'}</small></div>
+        <div class="recetas-kpi"><span>Ingresos</span><b>${stock.entriesCount}</b><small>${stock.expiredCount ? `${stock.expiredCount} lote(s) vencido(s) con stock` : 'lotes registrados'}</small></div>
+        <div class="recetas-kpi"><span>Próximo vencimiento</span><b class="tone-${nextTone}">${stock.next ? formatIsoShort(stock.next) : '-'}</b><small>${nextDiff == null ? 'Sin vencimientos cercanos' : (nextDiff < 0 ? `Venció hace ${Math.abs(nextDiff)} día(s)` : `En ${nextDiff} día(s)`)}</small></div>`;
+    }
+    host.innerHTML = `
+      <div class="recetas-detail-mobilebar">
+        <sl-button variant="default" size="small" type="button" data-ing-detail-back><i slot="prefix" class="fa-solid fa-arrow-left"></i>Volver</sl-button>
+      </div>
+      <header class="recetas-detail-head">
+        <span class="ing-md-avatar-lg">${ingredientAvatar(item.imageUrl, escapeHtml(name))}</span>
+        <div class="recetas-detail-titles">
+          <h6 class="recetas-detail-name">${escapeHtml(name)}</h6>
+          <p class="recetas-detail-group"><i class="fa-solid fa-carrot" aria-hidden="true"></i>${escapeHtml(capitalizeLabel(item.familyName || 'Sin familia'))} · ${escapeHtml(measure)}</p>
+          ${stock ? `<p class="ing-md-chips"><span class="recetas-tag tone-${stock.tone}">${escapeHtml(stock.label)}</span>${stock.frozen ? '<span class="recetas-tag tone-info"><sl-icon name="snow2"></sl-icon>Congelado</span>' : ''}</p>` : ''}
+        </div>
+        <div class="recetas-detail-tools">
+          <sl-button variant="default" size="small" type="button" data-ingrediente-edit="${item.id}"><i slot="prefix" class="fa-solid fa-pen"></i>Editar</sl-button>
+          <sl-button variant="success" size="small" type="button" data-ingrediente-stock="${item.id}" ${stock?.infinite ? 'disabled title="Stock infinito sin carga manual"' : ''}><i slot="prefix" class="fa-solid fa-plus"></i>Ingresar stock</sl-button>
+          <sl-dropdown hoist placement="bottom-end" class="recetas-detail-more">
+            <sl-button slot="trigger" variant="default" size="small" class="lj-icon-btn" title="Más acciones" aria-label="Más acciones"><i class="fa-solid fa-ellipsis-vertical"></i></sl-button>
+            <sl-menu>
+              <sl-menu-item data-ingrediente-image-view="${item.id}" ${hasImage ? '' : 'disabled'}><i slot="prefix" class="fa-regular fa-image"></i>Ver imagen</sl-menu-item>
+              <sl-menu-item data-ingrediente-ai-image="${item.id}"><img slot="prefix" src="${IA_ICON_SRC}" alt="" aria-hidden="true" class="ing-md-ai-icon">Generar imagen con IA</sl-menu-item>
+              <sl-menu-item data-ingrediente-inventory="${item.id}"><i slot="prefix" class="fa-solid fa-boxes-stacked"></i>Ver en inventario</sl-menu-item>
+              <sl-menu-item data-ingrediente-duplicate="${item.id}"><i slot="prefix" class="fa-regular fa-copy"></i>Duplicar</sl-menu-item>
+              <sl-divider></sl-divider>
+              <sl-menu-item data-ingrediente-delete="${item.id}" class="is-danger"><i slot="prefix" class="fa-solid fa-trash"></i>Eliminar</sl-menu-item>
+            </sl-menu>
+          </sl-dropdown>
+        </div>
+      </header>
+
+      <div class="recetas-kpis">${stockKpis}</div>
+
+      <section class="recetas-detail-section">
+        <h6 class="recetas-detail-title"><i class="fa-solid fa-circle-info" aria-hidden="true"></i>Datos</h6>
+        <div class="recetas-detail-table-wrap"><table class="recetas-detail-table">
+          <tbody>
+            <tr><td>Familia</td><td>${escapeHtml(capitalizeLabel(item.familyName || 'Sin familia'))}</td></tr>
+            <tr><td>Unidad de medida</td><td>${escapeHtml(measure)}</td></tr>
+            ${stock?.row?.suggestedExpiryDays ? `<tr><td>Vencimiento sugerido</td><td>${Number(stock.row.suggestedExpiryDays)} días desde el ingreso</td></tr>` : ''}
+            ${stock?.row?.weeklySheetConfig ? `<tr><td>Planilla semanal</td><td>${stock.row.weeklySheetConfig.perishable === false ? 'No perecedero' : 'Perecedero'}${stock.row.weeklySheetConfig.egresoEnabled ? ' · con egreso automático' : ''}</td></tr>` : ''}
+          </tbody>
+        </table></div>
+      </section>
+
+      ${normalizeValue(item.description) ? `<section class="recetas-detail-section">
+        <h6 class="recetas-detail-title"><i class="fa-solid fa-align-left" aria-hidden="true"></i>Descripción</h6>
+        <p class="recetas-detail-text">${escapeHtml(item.description)}</p>
+      </section>` : ''}
+
+      <footer class="recetas-detail-dates">
+        <span><i class="fa-regular fa-calendar-plus" aria-hidden="true"></i> Alta: ${formatDateLabel(item.createdAt)}</span>
+        <span><i class="fa-regular fa-calendar-check" aria-hidden="true"></i> Mod: ${formatDateLabel(item.updatedAt)}</span>
+      </footer>`;
+    prepareThumbLoaders('#ingredientesDetail .js-ingrediente-thumb');
+  };
+
+  const selectIngredient = (itemId, options = {}) => {
+    const id = normalizeValue(itemId);
+    const item = safeObject(state.ingredientes.items)[id];
+    if (!id || !item) return;
+    state.selectedId = id;
+    ingredientesList?.querySelectorAll('[data-ing-select]').forEach((node) => {
+      const on = node.dataset.ingSelect === id;
+      node.classList.toggle('is-active', on);
+      node.setAttribute('aria-selected', on ? 'true' : 'false');
+      node.tabIndex = on ? 0 : -1;
+    });
+    renderIngredientDetail(item);
+    ingredientesDetail()?.scrollTo?.({ top: 0 });
+    if (options.openDetail && isIngMobileLayout()) {
+      setIngDetailOpen(true);
+      LJModal.body(ingredientesModal)?.scrollTo({ top: 0 });
+    }
+    if (options.focus) ingredientesList?.querySelector(`[data-ing-select="${CSS.escape(id)}"]`)?.focus();
+  };
+
   const renderIngredientes = () => {
     const allItems = getIngredientesArray();
     const items = allItems.filter((item) => {
@@ -324,47 +453,34 @@
     let visibleItems = items;
     let helperHtml = '';
 
-    if (!items.length) {
-      const outsideMatches = state.search
-        ? allItems.filter((item) => {
-          const content = [item.name, item.familyName, item.measure, item.description].map(normalizeLower).join(' ');
-          return content.includes(state.search);
-        })
-        : [];
+    if (!items.length && state.search) {
+      const outsideMatches = allItems.filter((item) => {
+        const content = [item.name, item.familyName, item.measure, item.description].map(normalizeLower).join(' ');
+        return content.includes(state.search);
+      });
       if (outsideMatches.length) {
         visibleItems = outsideMatches;
-        const familyLabel = state.activeFamilyId === 'all'
-          ? 'Todas las familias'
-          : capitalizeLabel(state.ingredientes.familias?.[state.activeFamilyId]?.name || 'Sin familia');
-        helperHtml = `<div class="ingrediente-empty-list with-illustration"><p class="ingrediente-empty-title">No hay resultados con los filtros actuales.</p><div class="ingrediente-empty-image-wrap"><img src="${escapeHtml(NO_DATA_IMAGE_URL)}" alt="Sin resultados" class="ingrediente-empty-image"></div><p class="ingrediente-empty-filters">Usando filtro:</p><div class="ingrediente-empty-tags"><span class="ingrediente-empty-tag">${escapeHtml(familyLabel)}</span></div><sl-button variant="default" size="small" type="button" class="ingrediente-empty-btn" data-ingredient-search-all><sl-icon slot="prefix" name="lightning-charge"></sl-icon>Buscar en toda la base</sl-button></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del filtro</strong> seleccionado</p>`;
-      } else {
-        ingredientesList.innerHTML = '<div class="ingrediente-empty-list">No encontramos ingredientes con ese filtro.</div>';
-        updateListScrollHint();
-        return;
+        helperHtml = '<div class="recetas-list-helper"><p>No hay resultados en esta familia.</p><sl-button variant="default" size="small" type="button" data-ingredient-search-all><sl-icon slot="prefix" name="lightning-charge"></sl-icon>Buscar en toda la base</sl-button><small>Coincidencias <strong>fuera del filtro</strong> seleccionado</small></div>';
       }
     }
 
-    const sorted = visibleItems.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
-    ingredientesList.innerHTML = `${helperHtml}${sorted.map((item) => `
-      <article class="ingrediente-card">
-        ${ingredientAvatar(item.imageUrl, capitalizeLabel(item.name))}
-        <div class="ingrediente-main">
-          <h6 class="ingrediente-name">${capitalizeLabel(item.name)}</h6>
-          <p class="ingrediente-meta">${capitalizeLabel(item.familyName)} · ${getMeasureLabel(item.measure)}</p>
-          <p class="ingrediente-dates">
-            <span><i class="fa-regular fa-calendar-plus" aria-hidden="true"></i> Alta: ${formatDateLabel(item.createdAt)}</span>
-            <span><i class="fa-regular fa-calendar-check" aria-hidden="true"></i> Mod: ${formatDateLabel(item.updatedAt)}</span>
-          </p>
-          ${item.description ? `<p class="ingrediente-description">${item.description}</p>` : ''}
-        </div>
-        <div class="ingrediente-actions">
-          <sl-button variant="default" size="small" class="lj-icon-btn ingrediente-action" type="button" data-ingrediente-edit="${item.id}" title="Editar ingrediente" aria-label="Editar ingrediente"><i class="fa-solid fa-pen"></i></sl-button>
-          <sl-button variant="default" size="small" class="lj-icon-btn ingrediente-action is-danger" type="button" data-ingrediente-delete="${item.id}" title="Eliminar ingrediente" aria-label="Eliminar ingrediente"><i class="fa-solid fa-trash"></i></sl-button>
-        </div>
-      </article>
-    `).join('')}`;
+    if (!visibleItems.length) {
+      ingredientesList.innerHTML = '<div class="recetas-list-empty">No encontramos ingredientes con ese filtro.</div>';
+      state.selectedId = '';
+      setIngDetailOpen(false);
+      renderIngredientDetail(null);
+      return;
+    }
 
-    prepareThumbLoaders('.js-ingrediente-thumb');
+    const sorted = visibleItems.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    if (!sorted.some((item) => item.id === state.selectedId)) {
+      state.selectedId = sorted[0].id;
+      setIngDetailOpen(false);
+    }
+    ingredientesList.innerHTML = helperHtml + sorted.map((item) => ingListRowHtml(item, item.id === state.selectedId)).join('');
+    prepareThumbLoaders('#ingredientesList .js-ingrediente-thumb');
+    setIngDetailOpen(state.detailOpen);
+    renderIngredientDetail(safeObject(state.ingredientes.items)[state.selectedId]);
     updateListScrollHint();
   };
 
@@ -378,6 +494,7 @@
   };
 
   const ensurePrintButton = () => {
+    printIngredientsBtn = printIngredientsBtn || document.getElementById('printIngredientsBtn');
     if (!createIngredientBtn || printIngredientsBtn) return;
     const toolbar = createIngredientBtn.parentNode;
     if (!toolbar) return;
@@ -494,7 +611,12 @@
     try {
       await fetchIngredientes();
       try {
-        const inventoryConfig = await window.dbLaJamoneraRest.read('/inventario/items');
+        // El índice liviano trae weeklySheetConfig por ingrediente; /inventario/items completo (lotes,
+        // movimientos) tardaba ~20 s. Si el índice no está, se cae al nodo completo como antes.
+        const inventoryIndex = await window.dbLaJamoneraRest.read('/inventario_index/items').catch(() => null);
+        const inventoryConfig = inventoryIndex && Object.keys(safeObject(inventoryIndex)).length
+          ? inventoryIndex
+          : await window.dbLaJamoneraRest.read('/inventario/items');
         window.inventarioConfigSnapshot = Object.values(safeObject(inventoryConfig)).reduce((acc, record) => {
           const recordSafe = safeObject(record);
           const ingredientId = normalizeValue(recordSafe.ingredientId || recordSafe.id);
@@ -1015,7 +1137,93 @@
     return result.isConfirmed;
   };
 
+  const deleteFamilyById = async (familyId) => {
+    const family = state.ingredientes.familias[familyId];
+    if (!family) return;
+    const linkedItems = getIngredientesArray().filter((item) => item.familyId === familyId);
+    const ok = await confirmDelete('¿Eliminar familia?', `Se eliminará ${capitalizeLabel(family.name)} y ${linkedItems.length} ingrediente(s) asociados.`);
+    if (!ok) return;
+    delete state.ingredientes.familias[familyId];
+    linkedItems.forEach((item) => delete state.ingredientes.items[item.id]);
+    state.activeFamilyId = 'all';
+    await window.dbLaJamoneraRest.write(`/ingredientes/familias/${familyId}`, null);
+    await Promise.all(linkedItems.map((item) => window.dbLaJamoneraRest.write(`/ingredientes/items/${item.id}`, null)));
+    await persistIngredientes();
+    refreshView();
+  };
+
+  const openInventoryFor = async (itemId, editor) => {
+    const api = window.laJamoneraInventarioAPI;
+    if (!api?.openIngredient) return;
+    LJModal.close(ingredientesModal);
+    await LJModal.onceClosed(ingredientesModal);
+    api.openIngredient(itemId, { editor });
+  };
+
   const handleDataClicks = async (event) => {
+    const selectRow = event.target.closest('[data-ing-select]');
+    if (selectRow) {
+      selectIngredient(selectRow.dataset.ingSelect, { openDetail: true });
+      return;
+    }
+    if (event.target.closest('[data-ing-detail-back]')) {
+      setIngDetailOpen(false);
+      const id = state.selectedId;
+      requestAnimationFrame(() => ingredientesList?.querySelector(`[data-ing-select="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'nearest' }));
+      return;
+    }
+    if (event.target.closest('[data-family-create]')) {
+      await openFamilyForm();
+      return;
+    }
+    if (event.target.closest('[data-family-edit-selected]')) {
+      const family = state.ingredientes.familias[state.activeFamilyId];
+      if (family) await openFamilyForm(family);
+      return;
+    }
+    if (event.target.closest('[data-family-delete-selected]')) {
+      await deleteFamilyById(state.activeFamilyId);
+      return;
+    }
+    const stockButton = event.target.closest('[data-ingrediente-stock]');
+    if (stockButton) {
+      await openInventoryFor(stockButton.dataset.ingredienteStock, true);
+      return;
+    }
+    const inventoryButton = event.target.closest('[data-ingrediente-inventory]');
+    if (inventoryButton) {
+      await openInventoryFor(inventoryButton.dataset.ingredienteInventory, false);
+      return;
+    }
+    const imageViewButton = event.target.closest('[data-ingrediente-image-view]');
+    if (imageViewButton) {
+      const item = state.ingredientes.items[imageViewButton.dataset.ingredienteImageView];
+      if (item?.imageUrl) {
+        if (typeof Swal.viewDocument === 'function') Swal.viewDocument(item.imageUrl, capitalizeLabel(item.name));
+        else window.open(item.imageUrl, '_blank', 'noopener');
+      }
+      return;
+    }
+    const aiImageButton = event.target.closest('[data-ingrediente-ai-image]');
+    if (aiImageButton) {
+      const item = await ensureIngredientDetail(aiImageButton.dataset.ingredienteAiImage);
+      if (item?.id) await openIngredientForm(item);
+      return;
+    }
+    const duplicateButton = event.target.closest('[data-ingrediente-duplicate]');
+    if (duplicateButton) {
+      const item = await ensureIngredientDetail(duplicateButton.dataset.ingredienteDuplicate);
+      if (item?.id) {
+        await openIngredientForm(null, {
+          name: `${capitalizeLabel(item.name)} (copia)`,
+          familyId: item.familyId,
+          measure: item.measure,
+          description: item.description || ''
+        });
+      }
+      return;
+    }
+
     const searchAllButton = event.target.closest('[data-ingredient-search-all]');
     if (searchAllButton) {
       state.activeFamilyId = 'all';
@@ -1101,9 +1309,14 @@
 
   const loadIngredientes = async () => {
     showIngredientesState('loading');
+    state.inventoryIndexLoading = null;
     try {
       await fetchIngredientes();
       refreshView();
+      // Stock por ingrediente (índice liviano): se pinta cuando llega, sin bloquear la lista.
+      loadInventoryIndex().then(() => {
+        if (getIngredientesArray().length) renderIngredientes();
+      });
     } catch (error) {
       showIngredientesState('empty');
       await openIosSwal({ title: 'No se pudo cargar', html: '<p>Error leyendo ingredientes desde Firebase.</p>', icon: 'error', confirmButtonText: 'Entendido' });
@@ -1140,6 +1353,25 @@
   }
   if (ingredientesData) {
     ingredientesData.addEventListener('click', handleDataClicks);
+    ingredientesData.addEventListener('change', (event) => {
+      const select = event.target.closest?.('#ingredientesFamilyFilter');
+      if (!select) return;
+      const value = (window.ljSelectValue ? window.ljSelectValue(select) : select.value) || 'all';
+      if (value === state.activeFamilyId) return;
+      state.activeFamilyId = value;
+      renderFamilies();
+      renderIngredientes();
+    });
+    // Teclado en la lista: flechas cambian la selección (listbox con roving tabindex).
+    ingredientesData.addEventListener('keydown', (event) => {
+      const row = event.target.closest?.('[data-ing-select]');
+      if (!row || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+      const rows = [...ingredientesList.querySelectorAll('[data-ing-select]')];
+      const index = rows.indexOf(row);
+      const nextIndex = event.key === 'Home' ? 0 : event.key === 'End' ? rows.length - 1 : Math.max(0, Math.min(rows.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)));
+      event.preventDefault();
+      selectIngredient(rows[nextIndex].dataset.ingSelect, { focus: true });
+    });
   }
   if (ingredientesList) {
     ingredientesList.addEventListener('scroll', updateListScrollHint);

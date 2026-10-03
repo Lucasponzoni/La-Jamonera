@@ -346,9 +346,9 @@ sl-spinner.inventario-inline-delete-spinner {
 }
 
 
-.swal2-popup.inventario-provider-rne-alert :is(.swal2-input, .swal2-file, .swal2-textarea, .swal2-select),
-.swal2-popup.inventario-provider-form-alert :is(.swal2-input, .swal2-file, .swal2-textarea, .swal2-select),
-.swal2-popup.produccion-umbral-alert :is(.swal2-input, .swal2-file, .swal2-textarea, .swal2-select) {
+.swal2-popup.inventario-provider-rne-alert :is(.swal2-input, .swal2-textarea, .swal2-select),
+.swal2-popup.inventario-provider-form-alert :is(.swal2-input, .swal2-textarea, .swal2-select),
+.swal2-popup.produccion-umbral-alert :is(.swal2-input, .swal2-textarea, .swal2-select) {
   width: 100%;
   margin: 0;
   font-size: 0.98rem;

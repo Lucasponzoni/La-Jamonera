@@ -329,23 +329,11 @@
 
 .inventario-editor-photo {
   display: flex;
-  justify-content: center;
-  margin-bottom: 8px;
-  background-image: url("https://i.postimg.cc/SxTLsN2M/Ingredientes.png");
-  background-size: cover;
-  background-position: center;
-  padding: 6px 10px;
-  border-radius: var(--lj-radius-lg) var(--lj-radius-lg) 0 0;
-}
-
-.inventario-editor-photo .ingrediente-avatar {
-  width: 88px;
-  height: 88px;
+  align-items: flex-start;
 }
 
 .inventario-editor-name {
-  color: var(--lj-warning);
-  font-weight: 800;
+  font-weight: 700;
   margin: 0;
 }
 
@@ -521,10 +509,23 @@
 }
 
 .inventario-product-head-v2 {
-  border: 1px dashed var(--lj-border);
+  border: 1px solid var(--lj-border);
   border-radius: var(--lj-radius-lg);
   padding: 14px;
-  background: var(--lj-surface-2);
+  background: var(--lj-surface);
+}
+
+/* Encabezado del editor como la ficha: foto chica a la izquierda, sin banner decorativo. */
+.inventario-product-head-v2 .inventario-product-head-main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 14px;
+  align-items: start;
+  text-align: left;
+}
+
+.inventario-product-head-v2 .inventario-product-head-main > :not(.inventario-editor-photo):not(.inventario-product-copy) {
+  grid-column: 1 / -1;
 }
 
 .inventario-product-copy {
@@ -534,7 +535,6 @@
 
 .inventario-editor-kicker {
   margin: 0;
-  margin-top: 10px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-size: 0.75rem;
@@ -542,14 +542,22 @@
 }
 
 .inventario-editor-photo .ingrediente-avatar {
-  width: 96px;
-  height: 96px;
-  border: 3px solid var(--lj-success);
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--lj-border);
+}
+
+.inventario-editor-photo .ingrediente-avatar.ingrediente-avatar-placeholder {
+  width: 64px;
+  height: 64px;
+  background: var(--lj-surface-2);
+  color: var(--lj-muted);
 }
 
 .inventario-editor-name {
-  font-size: 1.45rem;
-  color: var(--lj-accent);
+  font-size: 17px;
+  line-height: 1.2;
+  color: var(--lj-brand);
 }
 
 .inventario-editor-meta {
@@ -678,8 +686,7 @@
 }
 
 .swal2-popup.inventario-edit-entry-alert .swal2-input,
-.swal2-popup.inventario-edit-entry-alert .swal2-select,
-.swal2-popup.inventario-edit-entry-alert .swal2-file {
+.swal2-popup.inventario-edit-entry-alert .swal2-select {
   margin: 0 !important;
 }
 
@@ -875,55 +882,33 @@
   min-width: 760px;
 }
 
-.inventario-table-compact th {
-  font-size: 0.72rem;
-  padding: 7px 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  text-align: center;
-  font-weight: 800;
-  color: var(--lj-accent);
-  white-space: nowrap;
-}
-
+/* Tablas de inventario: usan la base global de theme.css (cabecera gris en tipo oración,
+   celdas normales, números a la derecha, códigos en monoespaciada). Sólo ajustes locales. */
+.inventario-table-compact th,
 .inventario-table-compact td {
-  font-size: 0.9rem;
-  padding: 7px 8px;
-  text-align: start;
-  font-weight: 700;
-  color: var(--lj-muted);
   white-space: nowrap;
 }
 
-.inventario-provider-cell {
-  font-weight: 400 !important;
+.inventario-table-compact .inv-qty {
+  font-weight: 500;
+  color: var(--lj-text);
 }
 
-.inventario-table-compact tbody tr:nth-child(odd) {
-  background: var(--lj-surface-2);
+.inventario-table-compact .inventario-available-line {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--lj-muted);
 }
 
-.inventario-table-compact tbody tr:nth-child(even) {
-  background: var(--lj-surface-2);
+.inventario-table-compact .inventario-trace-kilos {
+  font-weight: 400;
+  color: var(--lj-text);
 }
 
-.inventario-table-compact tbody tr.is-even-row > td {
-  background: var(--lj-surface) !important;
-  border-bottom: 1px solid var(--lj-border) !important;
-}
-
-.inventario-table-compact tbody tr.is-odd-row > td {
-  background: var(--lj-surface-2) !important;
-  border-bottom: 1px solid var(--lj-border) !important;
-}
-
-.inventario-table-compact tbody td:nth-child(3) {
-  color: var(--lj-success);
-  text-transform: uppercase;
-}
-
-.inventario-table-compact tbody td:nth-child(4) {
-  color: var(--lj-accent);
+.inventario-table-compact .inventario-entry-actions {
+  justify-content: flex-end;
 }
 
 .inventario-field-feedback {
@@ -1142,7 +1127,7 @@
   color: var(--lj-danger);
 }
 
-.inventario-card-expired-banner .btn {
+.inventario-card-expired-banner sl-button {
   flex-shrink: 0;
 }
 
@@ -1273,12 +1258,7 @@
   margin-top: 10px;
 }
 
-.inventario-bulk-table thead th {
-  background: var(--lj-accent-soft);
-  color: var(--lj-accent);
-  font-weight: 700;
-  border-bottom: 1px solid var(--lj-border);
-}
+
 
 .inventario-bulk-main-row td {
   vertical-align: middle;
@@ -1493,13 +1473,6 @@
   font-size: 0.72rem;
 }
 
-.inventario-row-tone.is-even-row {
-  background: var(--lj-surface-2) !important;
-}
-
-.inventario-row-tone.is-odd-row {
-  background: var(--lj-accent-soft) !important;
-}
 
 
 .inventario-print-photo-wrap {

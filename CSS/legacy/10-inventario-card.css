@@ -1,296 +1,17 @@
 /* ===========================================================
    Inventario card v2 — zonas compactas con stat hero
    =========================================================== */
-.inventario-card-v2 {
-  align-items: flex-start;
-  padding: 10px 12px;
-  gap: 10px;
-}
-
-.inventario-card-v2 .ingrediente-avatar {
-  width: 64px;
-  height: 64px;
-  border-radius: 999px;
-  flex-shrink: 0;
-}
-
-.inventario-card-v2 .ingrediente-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: inherit;
-}
-
-.inventario-card-v2 .ingrediente-main {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-}
-
-.inventario-card-v2 .inventario-card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding-bottom: 6px;
-  border-bottom: 1px solid rgba(31, 63, 130, 0.08);
-}
-
-.inventario-card-v2 .inventario-card-titles {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.inventario-card-v2 .inventario-card-titles .ingrediente-meta {
-  margin: 0;
-  font-size: 0.78rem;
-  color: var(--lj-muted);
-  font-weight: 600;
-}
-
-.inventario-card-v2 .inventario-card-titles .ingrediente-description {
-  margin: 0;
-  font-size: 0.78rem;
-  color: var(--lj-muted);
-  line-height: 1.35;
-}
-
-.inventario-card-v2 .inventario-card-header-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
-
-.inventario-card-v2 .inventario-zone {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 0;
-  padding: 6px 0 0;
-}
-
-.inventario-card-v2 .inventario-zone:first-of-type {
-  padding-top: 0;
-}
 
 /* --- Stock hero --- */
-.inventario-card-v2 .inventario-hero-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 8px;
-}
-
-.inventario-card-v2 .inventario-hero-main {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px;
-  border-radius: var(--lj-radius-lg);
-  background: var(--lj-surface);
-  border: 1px solid rgba(31, 63, 130, 0.08);
-}
-
-.inventario-card-v2 .inventario-hero-main > small {
-  font-size: 0.66rem;
-  font-weight: 800;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  color: var(--lj-muted);
-}
-
-.inventario-card-v2 .inventario-hero-value-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.inventario-card-v2 .inventario-hero-value {
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
-  font-size: 1.7rem;
-  line-height: 1;
-  font-weight: 700;
-  color: var(--lj-accent);
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
 
 /* Sólo el sufijo de unidad (Kg., L, etc.) va achicado. El span del número
    conserva el tamaño grande del valor (1.7rem) heredado del strong. */
-.inventario-card-v2 .inventario-hero-value > span.inventario-hero-unit-suffix,
-.inventario-card-v2 .inventario-hero-value > span:not(.inventario-expired-strike):not(.inventario-hero-unit-suffix) {
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--lj-muted);
-  margin-left: 3px;
-}
 
 /* El span que contiene el número (con o sin strike) hereda el tamaño grande del strong. */
-.inventario-card-v2 .inventario-hero-value > span.inventario-expired-strike {
-  font-size: inherit;
-  font-weight: inherit;
-  font-family: inherit;
-  margin-left: 0;
-}
-
-.inventario-card-v2 .inventario-hero-value.inventario-infinity-symbol {
-  font-size: 2.2rem;
-}
-
-.inventario-card-v2 .inventario-hero-unit {
-  font-size: 0.74rem;
-  color: var(--lj-muted);
-}
-
-.inventario-card-v2 .inventario-hero-real {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 4px;
-  padding: 2px 8px;
-  width: fit-content;
-  font-size: 0.76rem;
-  font-weight: 700;
-  color: var(--lj-success);
-  background: var(--lj-success-soft);
-  border: 1px solid color-mix(in srgb, var(--lj-success) 35%, var(--lj-surface));
-  border-radius: 4px;
-  letter-spacing: 0.01em;
-}
-
-.inventario-card-v2 .inventario-hero-real::before {
-  content: "\f00c"; /* fa-check */
-  font-family: "Font Awesome 6 Free", "Font Awesome 5 Free";
-  font-weight: 900;
-  font-size: 0.7rem;
-  color: var(--lj-success);
-}
-
-.inventario-card-v2 .inventario-card.status-empty .inventario-hero-value,
-.inventario-card-v2.status-empty .inventario-hero-value {
-  color: var(--lj-danger);
-}
-
-.inventario-card-v2.status-low .inventario-hero-value {
-  color: var(--lj-warning);
-}
-
-.inventario-card-v2.status-good .inventario-hero-value {
-  color: var(--lj-success);
-}
-
-.inventario-card-v2 .inventario-hero-side {
-  display: grid;
-  align-content: stretch;
-}
-
-.inventario-card-v2 .inventario-datum {
-  display: grid;
-  gap: 2px;
-  padding: 6px 10px;
-  border-radius: var(--lj-radius-lg);
-  background: var(--lj-surface);
-  border: 1px solid rgba(31, 63, 130, 0.08);
-  height: 100%;
-}
-
-.inventario-card-v2 .inventario-datum small {
-  font-size: 0.64rem;
-  font-weight: 800;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  color: var(--lj-muted);
-}
-
-.inventario-card-v2 .inventario-datum strong {
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--lj-text);
-  font-variant-numeric: tabular-nums;
-}
 
 /* --- Lotes colapsable --- */
-.inventario-card-v2 .inventario-zone-lotes {
-  background: rgba(255, 244, 228, 0.55);
-  border-radius: var(--lj-radius-lg);
-  border: 1px solid rgba(176, 108, 8, 0.18);
-  padding: 4px 10px;
-}
-
-.inventario-card-v2 .inventario-zone-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  width: 100%;
-  border: none;
-  background: none;
-  padding: 2px 0;
-  color: var(--lj-warning);
-  cursor: pointer;
-  text-align: left;
-}
-
-.inventario-card-v2 .inventario-zone-toggle-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.inventario-card-v2 .inventario-zone-toggle-label {
-  font-size: 0.74rem;
-  font-weight: 800;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-}
-
-.inventario-card-v2 .inventario-zone-toggle-icon {
-  font-size: 0.8rem;
-  color: var(--lj-warning);
-  transition: transform .18s ease;
-}
-
-.inventario-card-v2 .inventario-zone-lotes[data-collapsed="false"] .inventario-zone-toggle-icon {
-  transform: rotate(180deg);
-}
-
-.inventario-card-v2 .inventario-zone-body {
-  margin-top: 4px;
-  padding-top: 4px;
-  border-top: 1px dashed rgba(176, 108, 8, 0.2);
-}
-
-.inventario-card-v2 .inventario-zone-lotes[data-collapsed="true"] .inventario-zone-body {
-  display: none;
-}
 
 /* --- Acciones --- */
-.inventario-card-v2 .inventario-zone-acciones {
-  border-top: 1px dashed rgba(31, 63, 130, 0.10);
-  padding-top: 6px;
-}
-
-.inventario-card-v2 .inventario-zone-acciones .inventario-actions-row {
-  margin-top: 0;
-}
-
-@media (max-width: 520px) {
-  .inventario-card-v2 .inventario-hero-grid {
-    grid-template-columns: 1fr;
-  }
-  .inventario-card-v2 .ingrediente-avatar {
-    width: 56px;
-    height: 56px;
-  }
-  .inventario-card-v2 .inventario-card-header-chips {
-    width: 100%;
-  }
-}
 
 .produccion-main-btn,
 .produccion-to-inventario-btn {
@@ -365,7 +86,6 @@
   max-width: 540px;
   border-radius: var(--lj-radius-lg);
 }
-
 
 .produccion-umbral-alert .swal2-html-container {
   margin-top: 0.4rem;
@@ -458,7 +178,7 @@
   border: 1.5px solid var(--lj-border);
   font-size: 1.15rem;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(31,122,232,0.12);
+  box-shadow: var(--lj-shadow);
 }
 
 .produccion-confirm-kicker {
@@ -895,7 +615,7 @@
 .produccion-trace-expiry { color: var(--lj-warning); font-weight: 700; }
 .produccion-trace-badge  { color: var(--lj-danger); font-weight: 700; }
 
-.swal2-popup.produccion-confirm-alert .swal2-icon.swal2-question {
+.swal2-popup.produccion-confirm-alert .swal2-icon.is-question {
   display: none !important;
 }
 

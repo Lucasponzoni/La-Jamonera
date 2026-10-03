@@ -45,7 +45,7 @@
   <meta name="apple-mobile-web-app-title" content="La Jamonera">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Viga&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202608282255">
@@ -161,11 +161,11 @@
 
           <section id="panelDashboard" class="panel-grid" aria-live="polite">
             <div id="panelResumen" class="panel-summary" aria-label="Indicadores">
-              <div class="panel-card-body"><div class="panel-sk-kpis" aria-label="Cargando métricas"><div class="panel-sk-card"><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton><sl-skeleton effect="sheen" class="sk-num"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w70"></sl-skeleton></div><div class="panel-sk-card"><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton><sl-skeleton effect="sheen" class="sk-num"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w70"></sl-skeleton></div><div class="panel-sk-card"><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton><sl-skeleton effect="sheen" class="sk-num"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w70"></sl-skeleton></div><div class="panel-sk-card"><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton><sl-skeleton effect="sheen" class="sk-num"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w70"></sl-skeleton></div></div></div>
+              <div class="panel-card-body"><div class="panel-kpi-row" aria-busy="true" aria-label="Cargando métricas"><article class="panel-metric is-skeleton"><div class="panel-metric-top"><sl-skeleton effect="sheen" class="sk-icon"></sl-skeleton><sl-skeleton effect="sheen" class="sk-text" style="width:62%"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-value"></sl-skeleton><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:78%"></sl-skeleton></article><article class="panel-metric is-skeleton"><div class="panel-metric-top"><sl-skeleton effect="sheen" class="sk-icon"></sl-skeleton><sl-skeleton effect="sheen" class="sk-text" style="width:55%"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-value"></sl-skeleton><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:52%"></sl-skeleton></article><article class="panel-metric is-skeleton"><div class="panel-metric-top"><sl-skeleton effect="sheen" class="sk-icon"></sl-skeleton><sl-skeleton effect="sheen" class="sk-text" style="width:40%"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-value"></sl-skeleton><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:64%"></sl-skeleton></article><article class="panel-metric is-skeleton"><div class="panel-metric-top"><sl-skeleton effect="sheen" class="sk-icon"></sl-skeleton><sl-skeleton effect="sheen" class="sk-text" style="width:48%"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-value"></sl-skeleton><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:82%"></sl-skeleton></article></div></div>
             </div>
 
             <article id="panelUltimoInforme" class="glass-card panel-informe" aria-label="Último informe">
-              <div class="panel-card-body"><div class="panel-sk-row" aria-label="Cargando informe"><sl-skeleton effect="sheen" class="sk-square"></sl-skeleton><div class="panel-sk-text"><sl-skeleton effect="sheen" class="sk-line sk-w50"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w30"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-btn"></sl-skeleton></div></div>
+              <div class="panel-card-body"><div class="panel-informe-row is-skeleton" aria-busy="true" aria-label="Cargando informe"><sl-skeleton effect="sheen" class="sk-icon-lg"></sl-skeleton><span class="panel-informe-text"><sl-skeleton effect="sheen" class="sk-text" style="width:46%"></sl-skeleton><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:32%"></sl-skeleton></span><span class="panel-sk-tags sk-tags-group"><sl-skeleton effect="sheen" class="sk-tag"></sl-skeleton><sl-skeleton effect="sheen" class="sk-tag" style="width:76px"></sl-skeleton></span><span class="panel-sk-tags sk-actions-group"><sl-skeleton effect="sheen" class="sk-btn"></sl-skeleton><sl-skeleton effect="sheen" class="sk-icon-btn"></sl-skeleton></span></div></div>
             </article>
 
             <article id="panelProduccion" class="glass-card panel-card panel-card-chart">
@@ -181,7 +181,7 @@
                   <input id="panelChartRange" class="lj-input panel-range-input" placeholder="Filtrar rango de fechas" aria-label="Rango de fechas">
                 </div>
               </header>
-              <div class="panel-card-body"><div class="panel-sk-bars" aria-label="Cargando producción"><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:92%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:48%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:38%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:26%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:22%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:16%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:13%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:9%"></sl-skeleton></div></div></div>
+              <div class="panel-card-body"><div class="panel-chart-canvas-wrap panel-sk-chart" aria-busy="true" aria-label="Cargando producción"><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:70%"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:92%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:84%"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:40%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:70%"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:31%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:90%"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:22%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:56%"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:18%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:96%"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:14%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:80%"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:12%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:84%"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:6%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:98%"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:4%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:76%"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:2%"></sl-skeleton></div><div class="panel-sk-axis"></div></div></div>
             </article>
 
             <article id="panelPendientes" class="glass-card panel-card panel-card-pend">
@@ -189,7 +189,7 @@
                 <h3><sl-icon name="list-check"></sl-icon>Pendientes</h3>
                 <span id="panelPendientesCount" class="panel-tag is-neutral" hidden></span>
               </header>
-              <div class="panel-card-body"><div class="panel-sk-list" aria-label="Cargando pendientes"><div class="panel-sk-row"><sl-skeleton effect="sheen" class="sk-circle"></sl-skeleton><div class="panel-sk-text"><sl-skeleton effect="sheen" class="sk-line sk-w60"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-tag"></sl-skeleton></div><div class="panel-sk-row"><sl-skeleton effect="sheen" class="sk-circle"></sl-skeleton><div class="panel-sk-text"><sl-skeleton effect="sheen" class="sk-line sk-w60"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-tag"></sl-skeleton></div><div class="panel-sk-row"><sl-skeleton effect="sheen" class="sk-circle"></sl-skeleton><div class="panel-sk-text"><sl-skeleton effect="sheen" class="sk-line sk-w60"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-tag"></sl-skeleton></div><div class="panel-sk-row"><sl-skeleton effect="sheen" class="sk-circle"></sl-skeleton><div class="panel-sk-text"><sl-skeleton effect="sheen" class="sk-line sk-w60"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-tag"></sl-skeleton></div><div class="panel-sk-row"><sl-skeleton effect="sheen" class="sk-circle"></sl-skeleton><div class="panel-sk-text"><sl-skeleton effect="sheen" class="sk-line sk-w60"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-tag"></sl-skeleton></div><div class="panel-sk-row"><sl-skeleton effect="sheen" class="sk-circle"></sl-skeleton><div class="panel-sk-text"><sl-skeleton effect="sheen" class="sk-line sk-w60"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-tag"></sl-skeleton></div></div></div>
+              <div class="panel-card-body"><div class="panel-pend-list" aria-busy="true" aria-label="Cargando pendientes"><div class="panel-pend-row is-skeleton"><sl-skeleton effect="sheen" class="sk-avatar-static"></sl-skeleton><span class="panel-pend-text"><sl-skeleton effect="sheen" class="sk-text" style="width:58%"></sl-skeleton><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:76%"></sl-skeleton></span><sl-skeleton effect="sheen" class="sk-tag" style="width:44px"></sl-skeleton></div><div class="panel-pend-row is-skeleton"><sl-skeleton effect="sheen" class="sk-avatar-static"></sl-skeleton><span class="panel-pend-text"><sl-skeleton effect="sheen" class="sk-text" style="width:48%"></sl-skeleton><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:70%"></sl-skeleton></span><sl-skeleton effect="sheen" class="sk-tag" style="width:44px"></sl-skeleton></div><div class="panel-pend-row is-skeleton"><sl-skeleton effect="sheen" class="sk-avatar-static"></sl-skeleton><span class="panel-pend-text"><sl-skeleton effect="sheen" class="sk-text" style="width:72%"></sl-skeleton><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:66%"></sl-skeleton></span><sl-skeleton effect="sheen" class="sk-tag" style="width:44px"></sl-skeleton></div><div class="panel-pend-row is-skeleton"><sl-skeleton effect="sheen" class="sk-avatar-static"></sl-skeleton><span class="panel-pend-text"><sl-skeleton effect="sheen" class="sk-text" style="width:60%"></sl-skeleton><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:72%"></sl-skeleton></span><sl-skeleton effect="sheen" class="sk-tag" style="width:44px"></sl-skeleton></div><div class="panel-pend-row is-skeleton"><sl-skeleton effect="sheen" class="sk-avatar-static"></sl-skeleton><span class="panel-pend-text"><sl-skeleton effect="sheen" class="sk-text" style="width:52%"></sl-skeleton><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:64%"></sl-skeleton></span><sl-skeleton effect="sheen" class="sk-tag" style="width:44px"></sl-skeleton></div><div class="panel-pend-row is-skeleton"><sl-skeleton effect="sheen" class="sk-avatar-static"></sl-skeleton><span class="panel-pend-text"><sl-skeleton effect="sheen" class="sk-text" style="width:78%"></sl-skeleton><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:80%"></sl-skeleton></span><sl-skeleton effect="sheen" class="sk-tag" style="width:44px"></sl-skeleton></div><div class="panel-pend-row is-skeleton"><sl-skeleton effect="sheen" class="sk-avatar-static"></sl-skeleton><span class="panel-pend-text"><sl-skeleton effect="sheen" class="sk-text" style="width:56%"></sl-skeleton><sl-skeleton effect="sheen" class="sk-text sk-small" style="width:74%"></sl-skeleton></span><sl-skeleton effect="sheen" class="sk-tag" style="width:44px"></sl-skeleton></div></div></div>
             </article>
 
           </section>
@@ -211,17 +211,41 @@
                 <sl-button variant="success" id="emptyCreateIngredientBtn" type="button">Cargar un ingrediente</sl-button>
               </div>
 
-              <div id="ingredientesData" class="ingredientes-data d-none" aria-live="polite">
-                <div class="ingredientes-toolbar">
-                  <sl-input id="ingredientesSearchInput" type="search" class="ingredientes-search-input ingredientes-search-group" placeholder="Buscar familia o ingrediente"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input>
-                  <sl-button variant="success" id="createIngredientBtn" type="button">
-                    <i slot="prefix" class="fa-solid fa-plus"></i>
-                    <span>Ingrediente</span>
-                  </sl-button>
+              <div id="ingredientesData" class="ingredientes-data recetas-data d-none" aria-live="polite">
+                <div class="recetas-toolbar ing-md-toolbar">
+                  <sl-input id="ingredientesSearchInput" type="search" class="recetas-search" placeholder="Buscar ingrediente o familia" clearable><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input>
+                  <div class="recetas-group-filter">
+                    <sl-select id="ingredientesFamilyFilter" class="recetas-group-select" hoist aria-label="Filtrar por familia">
+                      <i slot="prefix" class="fa-solid fa-carrot"></i>
+                      <sl-option value="all">Todas las familias</sl-option>
+                    </sl-select>
+                    <sl-dropdown id="ingredientesFamilyMenu" class="recetas-group-menu" hoist placement="bottom-end">
+                      <sl-button slot="trigger" variant="default" caret title="Gestionar familias"><i slot="prefix" class="fa-solid fa-layer-group"></i>Familias</sl-button>
+                      <sl-menu>
+                        <sl-menu-item data-family-create><i slot="prefix" class="fa-solid fa-plus"></i>Nueva familia</sl-menu-item>
+                        <sl-divider></sl-divider>
+                        <sl-menu-item data-family-edit-selected data-family-selected-action disabled><i slot="prefix" class="fa-solid fa-pen"></i>Editar familia seleccionada</sl-menu-item>
+                        <sl-menu-item data-family-delete-selected data-family-selected-action disabled class="is-danger"><i slot="prefix" class="fa-solid fa-trash"></i>Eliminar familia seleccionada</sl-menu-item>
+                      </sl-menu>
+                    </sl-dropdown>
+                  </div>
+                  <div class="recetas-toolbar-actions">
+                    <sl-button variant="default" id="printIngredientsBtn" type="button" title="Imprimir catálogo" aria-label="Imprimir catálogo">
+                      <i slot="prefix" class="fa-solid fa-print"></i>
+                      <span>Imprimir</span>
+                    </sl-button>
+                    <span class="recetas-toolbar-divider" aria-hidden="true"></span>
+                    <sl-button variant="success" id="createIngredientBtn" type="button">
+                      <i slot="prefix" class="fa-solid fa-plus"></i>
+                      <span>Ingrediente</span>
+                    </sl-button>
+                  </div>
                 </div>
 
-                <div id="familiasCircles" class="familias-circles"></div>
-                <div id="ingredientesList" class="ingredientes-list"></div>
+                <div id="ingredientesMasterDetail" class="recetas-md ingredientes-md">
+                  <div id="ingredientesList" class="recetas-list ing-md-list" role="listbox" aria-label="Ingredientes"></div>
+                  <section id="ingredientesDetail" class="recetas-detail ing-md-detail" aria-live="polite"></section>
+                </div>
               </div>
         </div>
       </sl-dialog>
@@ -324,37 +348,37 @@
               </div>
 
               <div id="inventarioData" class="recetas-data d-none" aria-live="polite">
-                <div class="inventario-toolbar">
-                  <sl-input id="inventarioSearchInput" type="search" class="ingredientes-search-input ingredientes-search-group" placeholder="Buscar ingrediente"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input>
-                  <div class="inventario-toolbar-actions toolbar-scroll-x">
-                    <sl-button variant="default" id="inventarioConfigBtn" type="button" title="Configurar stock bajo">
-                      <i class="fa-solid fa-gear"></i>
+                <div class="inventario-toolbar recetas-toolbar">
+                  <sl-input id="inventarioSearchInput" type="search" class="recetas-search" placeholder="Buscar ingrediente" clearable><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input>
+                  <div id="inventarioFamilies" class="recetas-group-filter inventario-families"></div>
+                  <div class="recetas-toolbar-actions inventario-toolbar-actions">
+                    <sl-button variant="default" id="inventarioOpenPeriodFilterBtn" type="button">
+                      <i slot="prefix" class="fa-solid fa-clock-rotate-left"></i>
+                      <span>Historial</span>
                     </sl-button>
                     <sl-button variant="default" id="inventarioWeeklyConfigBtn" type="button" class="inventario-weekly-config-btn">
-                      <i slot="prefix" class="fa-solid fa-sliders"></i>
+                      <i slot="prefix" class="fa-regular fa-file-lines"></i>
                       <span>Planilla semanal</span>
                     </sl-button>
                     <sl-button variant="default" id="inventarioProvidersRneBtn" type="button">
                       <i slot="prefix" class="fa-solid fa-file-shield"></i>
                       <span>RNE</span>
                     </sl-button>
+                    <sl-button variant="default" id="inventarioConfigBtn" type="button" class="lj-icon-btn" title="Configurar stock bajo y vencimientos" aria-label="Configurar stock bajo y vencimientos">
+                      <i class="fa-solid fa-gear"></i>
+                    </sl-button>
+                    <span class="recetas-toolbar-divider" aria-hidden="true"></span>
                     <sl-button variant="success" id="inventarioToolbarCreateIngredientBtn" type="button">
                       <i slot="prefix" class="fa-solid fa-plus"></i>
                       <span>Ingrediente</span>
                     </sl-button>
-                    <span class="barra-separadora"></span>
-                    <sl-button variant="default" id="inventarioOpenPeriodFilterBtn" type="button" class="produccion-history-btn">
-                      <i slot="prefix" class="fa-solid fa-clock-rotate-left"></i>
-                      <span>Historial</span>
-                    </sl-button>
                   </div>
                 </div>
 
+                <div id="inventarioStatusFilters" class="recetas-rnpa-filters inventario-status-filters" role="toolbar" aria-label="Filtrar por estado de stock"></div>
                 <div id="inventarioProvidersRneAlert" class="inventario-rne-alert d-none" aria-live="polite"></div>
                 <div id="inventarioExpiryAlert" class="inventario-expiry-alert-host d-none" aria-live="polite"></div>
-                <div id="inventarioFamilies" class="familias-circles inventario-families"></div>
-                <div id="inventarioStatusFilters" class="inventario-status-filters" aria-label="Filtrar por estado de stock"></div>
-                <div id="inventarioList" class="recetas-list inventario-list"></div>
+                <div id="inventarioList" class="recetas-md inventario-md"></div>
 
                 <section id="inventarioPeriodView" class="inventario-period-board d-none" aria-live="polite">
                   <div class="inventario-period-head">
@@ -367,7 +391,7 @@
                       <sl-button variant="default" id="inventarioGlobalClearBtn" type="button" class="inventario-delete-btn inventario-threshold-btn d-none"><i slot="prefix" class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></sl-button>
                       <sl-button variant="primary" id="inventarioGlobalApplyBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-filter"></i><span>Aplicar</span></sl-button>
                       <sl-button variant="default" id="inventarioGlobalExpandBtn" type="button" class="inventario-expand-btn inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></sl-button>
-                      <sl-button variant="success" id="inventarioGlobalExcelBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-file-excel"></i><span>Excel</span></sl-button>
+                      <sl-button variant="default" id="inventarioGlobalExcelBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-file-excel"></i><span>Excel</span></sl-button>
                       <span class="inventario-period-divider" aria-hidden="true"></span>
                       <sl-button variant="default" id="inventarioGlobalPrintBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-print"></i><span>Período <sl-icon name="plus-lg"></sl-icon> Adjuntos <i class="fa-solid fa-paperclip"></i></span></sl-button>
                       <sl-button variant="default" id="inventarioGlobalSheetBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planilla de ingresos</span></sl-button>
@@ -480,6 +504,7 @@
       <sl-dialog id="usersManagerModal" class="lj-modal informes-modal users-modal" label="Usuarios">
         <div slot="label" class="lj-dialog-title">
               <h5 class="lj-dialog-heading" id="usersManagerModalLabel">Usuarios</h5>
+              <span class="recetas-tag tone-neu users-count-tag" id="usersManagerCount" hidden></span>
         </div>
         <div class="lj-dialog-body">
               <div id="usersManagerLoading" class="informes-loading" aria-live="polite">
@@ -509,7 +534,6 @@
         <div class="lj-footer-inner">
           <section class="lj-footer-col lj-footer-brand" aria-label="La Jamonera">
             <div class="lj-footer-brand-row">
-              <span class="recetas-tag tone-neu users-count-tag" id="usersManagerCount" hidden></span>
               <img src="./IMG/La Jamonera Cerdito.webp" alt="Logo La Jamonera" class="lj-footer-logo">
               <div>
                 <p class="lj-footer-title"><span class="brand-light">La</span> <span class="brand-bold">Jamonera</span></p>
