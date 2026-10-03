@@ -132,22 +132,18 @@ a { color: var(--lj-accent); }
 
 .topbar-brand-text,
 .lj-footer-title {
-  font-family: 'Viga', 'Inter', sans-serif;
-  font-weight: 400;
-  font-synthesis: none;
-  letter-spacing: 0;
+  font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  letter-spacing: -0.01em;
   line-height: 1;
   color: var(--lj-brand);
   white-space: nowrap;
 }
 
-/* Viga tiene un solo peso: sin negrita sintética (se veía deformada). */
+/* Marca: "La" liviano y "Jamonera" en negrita, igual en encabezado, pie y login. */
 .topbar-brand-text .brand-light,
+.lj-footer-title .brand-light { font-weight: 400; }
 .topbar-brand-text .brand-bold,
-.lj-footer-title .brand-light,
-.lj-footer-title .brand-bold {
-  font-weight: 400;
-}
+.lj-footer-title .brand-bold { font-weight: 800; }
 
 .topbar-brand-text {
   font-size: 1.3rem;
@@ -357,34 +353,6 @@ a { color: var(--lj-accent); }
   color: var(--lj-muted);
 }
 
-.home-actions-scroll {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  overflow-x: auto;
-}
-
-.home-action-btn {
-  height: 40px;
-  padding: 0 14px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--lj-text);
-  white-space: nowrap;
-}
-
-.home-action-btn:hover {
-  background: var(--lj-accent-soft);
-}
-
-.icon-lila { color: #8b5cf6; }
-.icon-green { color: #10b981; }
-.icon-orange { color: #ff8a2a; }
-.icon-gray { color: #8e97ad; }
-.icon-blue { color: var(--lj-accent); }
 
 /* =========================================
    FOOTER
@@ -554,3 +522,33 @@ a { color: var(--lj-accent); }
 
   .lj-footer-actions sl-button { flex: 1 1 0; }
 }
+
+/* "Software de Ninja Soft" en el pie */
+.lj-footer-bottom .lj-footer-maker,
+.lj-footer-maker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 6px;
+  font-size: 12px;
+  color: var(--lj-muted);
+}
+.lj-footer-maker img { height: 18px; width: auto; }
+.lj-footer-maker .ns-dark { display: none; }
+.sl-theme-dark .lj-footer-maker .ns-light { display: none; }
+.sl-theme-dark .lj-footer-maker .ns-dark { display: inline; }
+
+/* Franja inferior del pie oscura (claro y oscuro), con texto claro. */
+.lj-footer-bottom {
+  --footer-ink: rgba(255, 255, 255, .72);
+  border-top: 0;
+  background: #1c2434;
+}
+.sl-theme-dark .lj-footer-bottom { background: #0b0a08; border-top: 1px solid var(--lj-border); }
+.lj-footer-bottom p,
+.lj-footer-bottom .lj-footer-maker { color: var(--footer-ink); }
+.lj-footer-bottom a { color: #fff; }
+.lj-footer-bottom .lj-footer-mail { color: #fff; }
+.lj-footer-bottom .lj-footer-maker .ns-light { display: none; }
+.lj-footer-bottom .lj-footer-maker .ns-dark { display: inline; }
+.lj-footer-bottom .lj-footer-legal { color: rgba(255, 255, 255, .55); }

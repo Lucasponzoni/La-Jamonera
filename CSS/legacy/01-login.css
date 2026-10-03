@@ -1,100 +1,167 @@
 /* =========================================
-   LOGIN
+   LOGIN · panel de marca + formulario
 ========================================= */
 .view-login {
+  --login-panel-bg: #173d73;
+  position: relative;
   min-height: 100dvh;
-  padding: 16px;
-  background: var(--lj-bg);
+  padding: 56px 16px 64px;
+  display: grid;
+  place-items: center;
+  background: transparent; /* se ve el fondo con puntos del body */
 }
 
-.login-card {
-  position: relative;
-  width: min(100%, 400px);
-  border-radius: var(--lj-radius-lg);
+.sl-theme-dark .view-login { --login-panel-bg: #13233f; }
+
+.login-theme { position: absolute; top: 14px; right: 16px; }
+
+.login-shell {
+  width: min(100%, 880px);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   background: var(--lj-surface);
   border: 1px solid var(--lj-border);
-  box-shadow: var(--lj-shadow);
-  padding: 28px 24px 20px;
+  border-radius: var(--lj-radius-lg);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(40, 30, 15, .05), 0 18px 40px -24px rgba(40, 30, 15, .3);
 }
 
-.login-brand {
-  margin-bottom: 22px;
-}
+.sl-theme-dark .login-shell { box-shadow: none; }
 
-.brand-image {
-  width: 64px;
-  max-width: 100%;
-  height: auto;
-}
-
-.sl-theme-dark .login-card .brand-image {
-  filter: invert(1) hue-rotate(180deg) brightness(1.15);
-}
-
-.brand-title {
-  margin-top: 8px;
-  margin-bottom: 0;
-  font-family: 'Viga', sans-serif;
-  font-size: clamp(1.7rem, 7vw, 2rem);
-  letter-spacing: 0.02em;
-  color: var(--lj-brand);
-}
-
-.brand-light {
-  font-weight: 400;
-}
-
-.brand-bold {
-  font-weight: 800;
-}
-
-.login-card-content {
-  transition: opacity 0.25s ease;
-}
-
-.login-form {
-  width: 100%;
-}
-
-.login-form sl-input,
-.login-form sl-button {
-  --sl-input-height-medium: 40px;
-}
-
-.login-form sl-button::part(base) {
-  min-height: 40px;
-}
-
-.login-support {
-  margin-top: 16px;
+/* Panel de marca */
+.login-panel {
   display: flex;
-  justify-content: center;
-  align-items: center;
+  flex-direction: column;
+  gap: 28px;
+  padding: 40px 36px 28px;
+  color: #fff;
+  background-color: var(--login-panel-bg);
+  background-image: radial-gradient(circle, rgba(255, 255, 255, .09) 1.1px, transparent 1.6px);
+  background-size: 16px 16px;
 }
 
-.support-link {
+.login-panel-brand { display: grid; gap: 6px; }
+.login-panel-logo { width: 64px; height: auto; filter: brightness(0) invert(1); margin-bottom: 6px; }
+.login-panel-title { margin: 0; font-size: 1.9rem; line-height: 1.1; letter-spacing: -0.01em; }
+.login-panel-sub { margin: 0; font-size: 14px; color: rgba(255, 255, 255, .72); }
+
+.login-panel-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.login-panel-list li { display: flex; align-items: center; gap: 12px; font-size: 14px; color: rgba(255, 255, 255, .9); }
+.login-panel-list sl-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 8px;
+  border-radius: var(--lj-radius);
+  background: rgba(255, 255, 255, .1);
+}
+
+.login-panel-maker {
+  margin-top: auto;
   display: flex;
   align-items: center;
   gap: 8px;
-  width: fit-content;
+  font-size: 12px;
+  color: rgba(255, 255, 255, .6);
+}
+.login-panel-maker img { height: 22px; width: auto; }
+
+/* Formulario */
+.login-card {
+  position: relative;
+  padding: 40px 40px 28px;
+}
+
+.login-brand { display: none; }
+
+.brand-image { width: 56px; height: auto; }
+.sl-theme-dark .login-card .brand-image { filter: invert(1) hue-rotate(180deg) brightness(1.15); }
+
+.brand-title {
+  margin: 6px 0 0;
+  font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  font-size: 1.6rem;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--lj-brand);
+}
+
+.brand-light { font-weight: 400; }
+.brand-bold { font-weight: 800; }
+
+.login-heading { margin-bottom: 22px; }
+.login-heading h2 { margin: 0; font-size: 20px; font-weight: 700; color: var(--lj-text); }
+.login-heading p { margin: 6px 0 0; font-size: 13px; color: var(--lj-muted); }
+
+.login-card-content { transition: opacity 0.25s ease; }
+
+.login-form { display: grid; gap: 16px; width: 100%; }
+.login-field { display: grid; gap: 6px; }
+.login-form sl-input { --sl-input-height-medium: 42px; }
+
+/* Botón: alto 44, texto centrado de verdad (el label de Shoelace no se estira por defecto). */
+.login-submit { width: 100%; margin-top: 8px; }
+.login-submit::part(base) {
+  height: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--lj-radius-lg);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: .01em;
+}
+.login-submit::part(label) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+
+.support-link {
+  margin-top: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   border-radius: var(--lj-radius);
-  padding: 6px 10px;
+  padding: 6px 8px;
+  margin-inline-start: -8px;
   text-decoration: none;
   color: var(--lj-muted);
+  font-size: 12.5px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.support-link:hover { background: var(--lj-surface-2); color: var(--lj-text); }
+.support-icon { width: 18px; height: 18px; }
+
+/* "Software de Ninja Soft" bajo la tarjeta (sólo celular; en escritorio va en el panel). */
+.login-maker {
+  position: absolute;
+  bottom: 18px;
+  left: 0;
+  right: 0;
+  margin: 0;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
   font-size: 12px;
-  border: 1px solid transparent;
-  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  color: var(--lj-muted);
 }
+.login-maker img { height: 20px; width: auto; }
+.login-maker .ns-dark { display: none; }
+.sl-theme-dark .login-maker .ns-light { display: none; }
+.sl-theme-dark .login-maker .ns-dark { display: inline; }
 
-.support-link:hover {
-  background: var(--lj-accent-soft);
-  color: var(--lj-accent);
-  border-color: var(--lj-border);
-}
-
-.support-icon {
-  width: 20px;
-  height: 20px;
+@media (max-width: 860px) {
+  .login-shell { grid-template-columns: 1fr; width: min(100%, 420px); }
+  .login-panel { display: none; }
+  .login-brand { display: grid; justify-items: center; text-align: center; margin-bottom: 22px; }
+  .login-heading { text-align: center; }
+  .login-card { padding: 30px 22px 22px; }
+  .support-link { display: flex; justify-content: center; margin-inline-start: 0; }
+  .login-maker { display: flex; }
 }
 
 .login-overlay {

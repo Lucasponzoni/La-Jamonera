@@ -86,38 +86,68 @@
 </head>
 <body>
   <main class="app-shell container-fluid px-0">
-    <section class="view view-login d-flex align-items-center justify-content-center">
-      <div id="loginCard" class="login-card mx-3">
-        <div class="login-card-content">
-          <div class="login-brand text-center">
-            <img src="./IMG/La Jamonera Cerdito.webp" alt="Logo La Jamonera" class="brand-image">
-            <h1 class="brand-title"><span class="brand-light">La</span> <span class="brand-bold">Jamonera</span></h1>
+    <section class="view view-login">
+      <div class="login-theme" data-lj-theme-slot></div>
+      <div class="login-shell">
+        <aside class="login-panel" aria-hidden="true">
+          <div class="login-panel-brand">
+            <img src="./IMG/La Jamonera Cerdito.webp" alt="" class="login-panel-logo" width="64" height="64">
+            <p class="login-panel-title"><span class="brand-light">La</span> <span class="brand-bold">Jamonera</span></p>
+            <p class="login-panel-sub">Gestión de fábrica para el frigorífico</p>
           </div>
-          <form id="loginForm" class="login-form" autocomplete="off">
-            <div class="mb-3">
-              <label class="visually-hidden" for="usernameInput">Usuario</label>
-              <sl-input id="usernameInput" type="text" placeholder="Usuario" autocomplete="username" required></sl-input>
-            </div>
-            <div class="mb-3">
-              <label class="visually-hidden" for="passwordInput">Contraseña</label>
-              <sl-input id="passwordInput" type="password" placeholder="Contraseña" autocomplete="current-password" password-toggle required></sl-input>
-            </div>
-            <sl-button variant="primary" id="loginButton" type="submit" class="w-100">
-              <span class="button-text">Ingresar</span>
-            </sl-button>
-          </form>
+          <ul class="login-panel-list">
+            <li><sl-icon name="journal-text"></sl-icon><span>Recetas y producción diaria</span></li>
+            <li><sl-icon name="box-seam"></sl-icon><span>Inventario, lotes y vencimientos</span></li>
+            <li><sl-icon name="diagram-3"></sl-icon><span>Trazabilidad e informes bromatológicos</span></li>
+          </ul>
+          <div class="login-panel-maker">
+            <span>Software de</span>
+            <img src="./IMG/ninja-soft-dark.webp" alt="Ninja Soft" width="104" height="29">
+          </div>
+        </aside>
 
-          <div class="login-support">
+        <div id="loginCard" class="login-card">
+          <div class="login-card-content">
+            <div class="login-brand">
+              <img src="./IMG/La Jamonera Cerdito.webp" alt="Logo La Jamonera" class="brand-image" width="56" height="56">
+              <h1 class="brand-title"><span class="brand-light">La</span> <span class="brand-bold">Jamonera</span></h1>
+            </div>
+            <div class="login-heading">
+              <h2>Ingresá a tu cuenta</h2>
+              <p>Usá el usuario que te asignó el administrador.</p>
+            </div>
+            <form id="loginForm" class="login-form" autocomplete="off">
+              <div class="login-field">
+                <label class="lj-label" for="usernameInput">Usuario</label>
+                <sl-input id="usernameInput" type="text" placeholder="usuario@empresa.com" autocomplete="username" required>
+                  <sl-icon name="person" slot="prefix"></sl-icon>
+                </sl-input>
+              </div>
+              <div class="login-field">
+                <label class="lj-label" for="passwordInput">Contraseña</label>
+                <sl-input id="passwordInput" type="password" placeholder="Tu contraseña" autocomplete="current-password" password-toggle required>
+                  <sl-icon name="lock" slot="prefix"></sl-icon>
+                </sl-input>
+              </div>
+              <sl-button variant="primary" id="loginButton" type="submit" class="login-submit">
+                <span class="button-text">Ingresar</span>
+              </sl-button>
+            </form>
             <a class="support-link" href="https://wa.me/543416292861?text=Nos%20contactamos%20de%20Frigorifico%20la%20Jamonera%20desde%20el%20back%20office." target="_blank" rel="noopener noreferrer">
-              <img src="./IMG/WhatsApp Logo.webp" alt="Soporte" class="support-icon">
-              <span>Ante cualquier problema contactar a soporte.</span>
+              <img src="./IMG/WhatsApp Logo.webp" alt="" class="support-icon">
+              <span>¿Problemas para ingresar? Escribile a soporte</span>
             </a>
           </div>
-        </div>
-        <div class="login-overlay" aria-hidden="true">
-          <sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner>
+          <div class="login-overlay" aria-hidden="true">
+            <sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner>
+          </div>
         </div>
       </div>
+      <p class="login-maker">
+        <span>Software de</span>
+        <img class="ns-light" src="./IMG/ninja-soft-light.webp" alt="Ninja Soft" width="90" height="25">
+        <img class="ns-dark" src="./IMG/ninja-soft-dark.webp" alt="Ninja Soft" width="90" height="25">
+      </p>
     </section>
   </main>
 
@@ -129,6 +159,7 @@
   <script src="./JS/ui/forms.js?v=202608282255"></script>
   <script src="./JS/ui/theme.js?v=202608282255"></script>
   <script src="./JS/ui/modal.js?v=202608282255"></script>
+  <script src="./JS/ui/header.js?v=202608282255"></script>
   <script src="./JS/ui/lj-alert.js?v=202608282255"></script>
   <script src="./JS/firebase-init.js?v=202608282255"></script>
   <script src="./JS/login.js?v=202608282255"></script>

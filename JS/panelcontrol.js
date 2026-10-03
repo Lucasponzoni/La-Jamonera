@@ -5,15 +5,13 @@
   const rangeInput = document.getElementById('panelChartRange');
   const nodes = {
     informe: document.querySelector('#panelUltimoInforme .panel-card-body'),
-    informeAgo: document.getElementById('panelInformeAgo'),
     resumen: document.querySelector('#panelResumen .panel-card-body'),
-    rne: document.querySelector('#panelRne .panel-card-body'),
-    rnpa: document.querySelector('#panelRnpa .panel-card-body'),
-    transporte: document.querySelector('#panelTransporte .panel-card-body'),
+    pendientes: document.querySelector('#panelPendientes .panel-card-body'),
+    pendientesCount: document.getElementById('panelPendientesCount'),
     produccion: document.querySelector('#panelProduccion .panel-card-body'),
-    wrapRne: document.getElementById('panelRne'),
-    wrapRnpa: document.getElementById('panelRnpa'),
-    wrapTransporte: document.getElementById('panelTransporte')
+    greetingTitle: document.getElementById('panelGreetingTitle'),
+    greetingSub: document.getElementById('panelGreetingSub'),
+    homeNav: document.getElementById('panelHomeNav')
   };
 
   const state = {
@@ -26,7 +24,8 @@
     providers: [],
     recipes: [],
     vehicles: [],
-    registros: []
+    registros: [],
+    userName: ''
   };
 
   const safeObject = (v) => (v && typeof v === 'object' ? v : {});
@@ -90,16 +89,14 @@
     return `HACE ${days} DÍAS`;
   };
 
-  const agoDaysLabel = (ts) => {
-    const days = Math.floor((Date.now() - Number(ts || Date.now())) / 86400000);
-    if (days === 0) return 'CREADO HOY';
-    if (days === 1) return 'Hace <strong>1 día</strong>';
-    if (days === -1) return 'Hace -<strong>1 día</strong>-';
-    if (days < 0) return `Hace -${Math.abs(days)} días-`;
-    return `Hace ${days} días`;
+  // Esqueletos de carga (en lugar de spinners) con la forma de cada bloque.
+  const SKELETONS = {
+    resumen: '<div class="panel-sk-kpis" aria-label="Cargando métricas"><div class="panel-sk-card"><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton><sl-skeleton effect="sheen" class="sk-num"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w70"></sl-skeleton></div><div class="panel-sk-card"><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton><sl-skeleton effect="sheen" class="sk-num"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w70"></sl-skeleton></div><div class="panel-sk-card"><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton><sl-skeleton effect="sheen" class="sk-num"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w70"></sl-skeleton></div><div class="panel-sk-card"><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton><sl-skeleton effect="sheen" class="sk-num"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w70"></sl-skeleton></div></div>',
+    informe: '<div class="panel-sk-row" aria-label="Cargando informe"><sl-skeleton effect="sheen" class="sk-square"></sl-skeleton><div class="panel-sk-text"><sl-skeleton effect="sheen" class="sk-line sk-w50"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w30"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-btn"></sl-skeleton></div>',
+    produccion: '<div class="panel-sk-bars" aria-label="Cargando producción"><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:92%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:48%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:38%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:26%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:22%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:16%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:13%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:9%"></sl-skeleton></div></div>',
+    pendientes: '<div class="panel-sk-list" aria-label="Cargando pendientes"><div class="panel-sk-row"><sl-skeleton effect="sheen" class="sk-circle"></sl-skeleton><div class="panel-sk-text"><sl-skeleton effect="sheen" class="sk-line sk-w60"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-tag"></sl-skeleton></div><div class="panel-sk-row"><sl-skeleton effect="sheen" class="sk-circle"></sl-skeleton><div class="panel-sk-text"><sl-skeleton effect="sheen" class="sk-line sk-w60"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-tag"></sl-skeleton></div><div class="panel-sk-row"><sl-skeleton effect="sheen" class="sk-circle"></sl-skeleton><div class="panel-sk-text"><sl-skeleton effect="sheen" class="sk-line sk-w60"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-tag"></sl-skeleton></div><div class="panel-sk-row"><sl-skeleton effect="sheen" class="sk-circle"></sl-skeleton><div class="panel-sk-text"><sl-skeleton effect="sheen" class="sk-line sk-w60"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-tag"></sl-skeleton></div><div class="panel-sk-row"><sl-skeleton effect="sheen" class="sk-circle"></sl-skeleton><div class="panel-sk-text"><sl-skeleton effect="sheen" class="sk-line sk-w60"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-tag"></sl-skeleton></div><div class="panel-sk-row"><sl-skeleton effect="sheen" class="sk-circle"></sl-skeleton><div class="panel-sk-text"><sl-skeleton effect="sheen" class="sk-line sk-w60"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-tag"></sl-skeleton></div></div>'
   };
-
-  const spinner = (alt) => `<div class="panel-spinner-wrap"><sl-spinner class="panel-spinner" aria-label="${escapeHtml(alt)}"></sl-spinner></div>`;
+  const AVATAR_SKELETON = '<sl-skeleton effect="sheen" class="sk-avatar"></sl-skeleton>';
 
   const flattenReports = (tree) => {
     const output = [];
@@ -118,13 +115,6 @@
 
   const findReportById = (id) => (state.reports || []).find((item) => item.id === id);
 
-  const makeMarquee = (rows, minToAnimate = 3, rowSeconds = 7) => {
-    const animate = rows.length >= minToAnimate;
-    const clone = animate ? rows.concat(rows) : rows;
-    const duration = Math.max(18, rows.length * rowSeconds);
-    return `<div class="panel-marquee ${animate ? 'is-animated-wrap' : ''}"><div class="panel-marquee-track ${animate ? 'is-animated' : ''}" style="--panel-marquee-duration:${duration}s;">${clone.join('')}</div></div>`;
-  };
-
   const reportPath = (report) => `/informes/${report.year}/${report.month}/${report.day}/${report.id}`;
 
   const getReportUser = (report) => {
@@ -138,7 +128,7 @@
 
   const renderUserAvatar = (user) => {
     if (user.photoUrl) {
-      return `<span class="user-avatar-thumb panel-user-avatar"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-panel-thumb" src="${escapeHtml(user.photoUrl)}" alt="${escapeHtml(user.name)}"></span>`;
+      return `<span class="user-avatar-thumb panel-user-avatar"><span class="thumb-loading">${AVATAR_SKELETON}</span><img class="thumb-image js-panel-thumb" src="${escapeHtml(user.photoUrl)}" alt="${escapeHtml(user.name)}"></span>`;
     }
     return `<span class="user-avatar-thumb">${escapeHtml(initials(user.name))}</span>`;
   };
@@ -404,101 +394,155 @@ const printReport = async (report) => {
     return true;
   };
 
+  // Visor del informe en un modal (sl-dialog), no en una alerta. Se crea una sola vez y se reutiliza.
+  const ensureReportModal = () => {
+    let dialog = document.getElementById('ultimoInformeModal');
+    if (dialog) return dialog;
+    dialog = document.createElement('sl-dialog');
+    dialog.id = 'ultimoInformeModal';
+    dialog.className = 'lj-modal panel-informe-modal';
+    dialog.setAttribute('label', 'Informe');
+    dialog.innerHTML = `
+      <div slot="label" class="lj-dialog-title">
+        <h5 class="lj-dialog-heading" data-ri="title">Informe</h5>
+        <span class="panel-tag is-info" data-ri="date"></span>
+        <span class="panel-tag" data-ri="age"></span>
+      </div>
+      <div class="lj-dialog-body" data-ri="body"></div>
+      <div slot="footer" class="panel-informe-modal-footer">
+        <sl-button variant="default" type="button" data-lj-close>Cerrar</sl-button>
+        <sl-button variant="default" type="button" data-ri="print"><i slot="prefix" class="fa-solid fa-print"></i>Imprimir</sl-button>
+        <sl-button variant="primary" href="./informes.html"><i slot="prefix" class="fa-solid fa-arrow-up-right-from-square"></i>Abrir en Informes</sl-button>
+      </div>`;
+    document.body.appendChild(dialog);
+    dialog.querySelector('[data-ri="print"]').addEventListener('click', async () => {
+      if (dialog.ljReport) await printReport(dialog.ljReport);
+    });
+    return dialog;
+  };
+
   const openViewer = async (report) => {
+    const dialog = ensureReportModal();
+    dialog.ljReport = report;
     const user = getReportUser(report);
-    const commentsCount = getCommentsCount(report);
     const attachments = Array.isArray(report.attachments) ? report.attachments : [];
-    const importance = toneImportance(report.importance);
+    const date = new Date(Number(report.createdAt || Date.now())).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    dialog.querySelector('[data-ri="title"]').textContent = reportTitle(report);
+    dialog.querySelector('[data-ri="date"]').textContent = date;
+    const ageTag = dialog.querySelector('[data-ri="age"]');
+    ageTag.className = `panel-tag is-${ageTone(report.createdAt)}`;
+    ageTag.textContent = `${ago(report.createdAt).charAt(0)}${ago(report.createdAt).slice(1).toLowerCase()}`;
+
     const attachmentHtml = attachments.length
-      ? attachments.map((item, index) => {
+      ? `<section class="panel-informe-modal-section"><h6 class="panel-informe-modal-subtitle">Adjuntos</h6><div class="attachments-grid">${attachments.map((item, index) => {
         if (item?.type === 'image') {
-          return `<button type="button" class="lj-tile attachment-card" data-open-report-image="${index}"><span class="attachment-loader"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img src="${escapeHtml(item.url || '')}" alt="${escapeHtml(item.name || 'Adjunto')}" class="attachment-image js-report-attachment-image"></button>`;
+          return `<button type="button" class="lj-tile attachment-card" data-open-report-image="${index}"><span class="attachment-loader"><sl-skeleton effect="sheen" class="sk-fill"></sl-skeleton></span><img src="${escapeHtml(item.url || '')}" alt="${escapeHtml(item.name || 'Adjunto')}" class="attachment-image js-report-attachment-image"></button>`;
         }
         return `<a href="${escapeHtml(item?.url || '#')}" target="_blank" rel="noopener noreferrer" class="attachment-card attachment-doc"><sl-icon name="file-earmark"></sl-icon><span>${escapeHtml(item?.name || 'Documento')}</span></a>`;
-      }).join('')
-      : '<div class="informes-empty">Sin adjuntos</div>';
+      }).join('')}</div></section>`
+      : '';
     const users = Object.values(state.usersMap || {}).sort((a, b) => String(a.fullName || '').localeCompare(String(b.fullName || '')));
-    const commentUserOptions = users.map((user) => `<sl-option value="${ljOptionValue(user.id || '')}">${escapeHtml(user.fullName || 'Usuario')}</sl-option>`).join('');
+    const commentUserOptions = users.map((item) => `<sl-option value="${ljOptionValue(item.id || '')}">${escapeHtml(item.fullName || 'Usuario')}</sl-option>`).join('');
     const comments = getCommentList(report);
     const commentsHtml = comments.length
       ? `<div class="report-comments-thread">${renderCommentTree(comments)}</div>`
       : '<div class="informes-empty report-comments-empty">Sin comentarios todavía.</div>';
 
-    await openIosSwal({
-      title: 'Informe completo',
-      width: 980,
-      html: `<div class="report-viewer"><div class="report-viewer-meta"><p><strong>Creador:</strong> ${escapeHtml(user.name || '-')}</p><p><strong>Puesto:</strong> ${escapeHtml(user.position || '-')}</p><p><strong>Fecha:</strong> ${escapeHtml(getDateLabel(report.createdAt))}</p><p><strong>Última actualización:</strong> ${escapeHtml(getDateLabel(report.updatedAt || report.createdAt))}</p><div class="report-viewer-meta-actions"><sl-button variant="warning" type="button" class="report-resend-btn" data-resend-report-email="1"><i slot="prefix" class="fa-regular fa-paper-plane"></i>Reenviar email</sl-button></div></div><div class="report-viewer-content-wrap"><div class="report-viewer-content">${report.html || ''}</div></div><div class="attachments-grid">${attachmentHtml}</div><section class="report-comments-wrap"><div class="report-comments-head"><h6><i class="fa-regular fa-comments"></i> <span class="report-comments-title-text">Comentarios</span></h6></div><div class="report-inline-comment-form"><div class="report-inline-comment-reply d-none" id="inlineReplyLabel"></div><sl-select id="inlineCommentUser" class="mb-2" placeholder="Seleccioná un usuario" hoist>${commentUserOptions}</sl-select><sl-textarea id="inlineCommentText" class="swal2-textarea mb-2" resize="auto" placeholder="Escribí un comentario"></sl-textarea><sl-input id="inlineCommentPin" class="swal2-input mb-2" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos"></sl-input><div class="d-flex justify-content-end gap-2"><sl-button variant="default" type="button" class="d-none" id="inlineCancelReplyBtn">Cancelar respuesta</sl-button><sl-button variant="primary" type="button" id="inlineSendCommentBtn"><i slot="prefix" class="fa-solid fa-paper-plane"></i>Enviar comentario</sl-button></div></div><div id="reportCommentsBody">${commentsHtml}</div></section></div>`,
-      customClass: { popup: 'panel-report-alert' },
-      confirmButtonText: 'Cerrar',
-      didOpen: (popup) => {
-        bindThumbs();
-        let replyToId = '';
-        const commentsBody = popup.querySelector('#reportCommentsBody');
-        const replyLabel = popup.querySelector('#inlineReplyLabel');
-        const cancelReplyBtn = popup.querySelector('#inlineCancelReplyBtn');
-        const sendBtn = popup.querySelector('#inlineSendCommentBtn');
+    const body = dialog.querySelector('[data-ri="body"]');
+    body.innerHTML = `
+      <div class="panel-informe-modal-inner">
+        <header class="panel-informe-modal-author">
+          ${renderUserAvatar(user)}
+          <div class="panel-informe-modal-author-text"><strong>${escapeHtml(user.name || '-')}</strong><small>${escapeHtml(user.position || '-')} · Actualizado ${escapeHtml(getDateLabel(report.updatedAt || report.createdAt))}</small></div>
+          <sl-button variant="default" size="small" type="button" data-resend-report-email="1"><i slot="prefix" class="fa-regular fa-paper-plane"></i>Reenviar email</sl-button>
+        </header>
+        <article class="report-viewer-content panel-informe-modal-content">${report.html || '<p>Sin contenido.</p>'}</article>
+        ${attachmentHtml}
+        <section class="report-comments-wrap panel-informe-modal-section">
+          <h6 class="panel-informe-modal-subtitle"><i class="fa-regular fa-comments" aria-hidden="true"></i><span>Comentarios</span></h6>
+          <div class="report-inline-comment-form">
+            <div class="report-inline-comment-reply d-none" id="inlineReplyLabel"></div>
+            <div class="panel-informe-comment-grid">
+              <sl-select id="inlineCommentUser" placeholder="Seleccioná un usuario" hoist>${commentUserOptions}</sl-select>
+              <sl-input id="inlineCommentPin" type="password" inputmode="numeric" maxlength="4" placeholder="Clave de 4 dígitos"></sl-input>
+            </div>
+            <sl-textarea id="inlineCommentText" resize="auto" rows="2" placeholder="Escribí un comentario"></sl-textarea>
+            <div class="panel-informe-comment-actions"><sl-button variant="default" type="button" class="d-none" id="inlineCancelReplyBtn">Cancelar respuesta</sl-button><sl-button variant="primary" type="button" id="inlineSendCommentBtn"><i slot="prefix" class="fa-solid fa-paper-plane"></i>Enviar comentario</sl-button></div>
+          </div>
+          <div id="reportCommentsBody">${commentsHtml}</div>
+        </section>
+      </div>`;
+    body.scrollTop = 0;
+    bindThumbs();
 
-        popup.querySelectorAll('.attachment-card[data-open-report-image]').forEach((node) => {
-          node.addEventListener('click', async (event) => {
-            event.preventDefault();
-            const index = Number(node.dataset.openReportImage || 0);
-            const imageAttachments = attachments.filter((item) => item?.type === 'image').map((item) => item?.url).filter(Boolean);
-            if (!imageAttachments.length) return;
-            if (typeof window.laJamoneraOpenImageViewer === 'function') {
-              await window.laJamoneraOpenImageViewer([{ invoiceImageUrls: imageAttachments }], Math.max(0, index), 'Adjuntos del informe');
-            }
-          });
-        });
+    let replyToId = '';
+    const commentsBody = body.querySelector('#reportCommentsBody');
+    const replyLabel = body.querySelector('#inlineReplyLabel');
+    const cancelReplyBtn = body.querySelector('#inlineCancelReplyBtn');
+    const sendBtn = body.querySelector('#inlineSendCommentBtn');
 
-        popup.querySelector('[data-resend-report-email]')?.addEventListener('click', async () => {
-          await openResendReportEmailPrompt(report);
-        });
-
-        commentsBody?.addEventListener('click', (event) => {
-          const btn = event.target.closest('[data-reply-comment]');
-          if (!btn) return;
-          replyToId = btn.dataset.replyComment || '';
-          const author = btn.closest('.report-comment-item')?.querySelector('.report-comment-head strong')?.textContent || 'usuario';
-          replyLabel.textContent = `Respondiendo a ${author}`;
-          replyLabel.classList.remove('d-none');
-          cancelReplyBtn.classList.remove('d-none');
-        });
-
-        cancelReplyBtn?.addEventListener('click', () => {
-          replyToId = '';
-          replyLabel.classList.add('d-none');
-          replyLabel.textContent = '';
-          cancelReplyBtn.classList.add('d-none');
-        });
-
-        sendBtn?.addEventListener('click', async () => {
-          const userId = normalize(ljSelectValue(popup.querySelector('#inlineCommentUser')));
-          const text = normalize(popup.querySelector('#inlineCommentText')?.value);
-          const pin = normalize(popup.querySelector('#inlineCommentPin')?.value);
-          if (!userId || !text) return;
-          const author = safeObject(state.usersMap[userId]);
-          const authorId = normalize(author.id || userId);
-          if (!authorId || String(author.pin || '') !== String(pin || '')) {
-            await openIosSwal({ title: 'Clave incorrecta', html: '<p>La clave no coincide con el usuario seleccionado.</p>', icon: 'error', confirmButtonText: 'Entendido' });
-            return;
-          }
-          const latest = safeObject(await window.dbLaJamoneraRest.read(reportPath(report)));
-          const list = getCommentList(latest);
-          const payload = { id: `comment_${Date.now()}`, createdAt: Date.now(), userId: authorId, userName: author.fullName || 'Usuario', text, replies: [] };
-          const nextComments = replyToId ? insertReplyInTree(list, replyToId, payload) : [...list, payload];
-          await window.dbLaJamoneraRest.update(reportPath(report), { comments: nextComments });
-          await window.dbLaJamoneraRest.update(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, { commentsCount: nextComments.length, updatedAt: Date.now() });
-          const refreshed = safeObject(await window.dbLaJamoneraRest.read(reportPath(report)));
-          commentsBody.innerHTML = `<div class="report-comments-thread">${renderCommentTree(getCommentList(refreshed))}</div>`;
-          popup.querySelector('#inlineCommentText').value = '';
-          popup.querySelector('#inlineCommentPin').value = '';
-          replyToId = '';
-          replyLabel.classList.add('d-none');
-          cancelReplyBtn.classList.add('d-none');
-          await loadOnce();
-        });
-      }
+    body.querySelectorAll('.attachment-card[data-open-report-image]').forEach((node) => {
+      node.addEventListener('click', async (event) => {
+        event.preventDefault();
+        const index = Number(node.dataset.openReportImage || 0);
+        const imageAttachments = attachments.filter((item) => item?.type === 'image').map((item) => item?.url).filter(Boolean);
+        if (!imageAttachments.length) return;
+        if (typeof window.laJamoneraOpenImageViewer === 'function') {
+          await window.laJamoneraOpenImageViewer([{ invoiceImageUrls: imageAttachments }], Math.max(0, index), 'Adjuntos del informe');
+        }
+      });
     });
+
+    body.querySelector('[data-resend-report-email]')?.addEventListener('click', async () => {
+      await openResendReportEmailPrompt(report);
+    });
+
+    commentsBody?.addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-reply-comment]');
+      if (!btn) return;
+      replyToId = btn.dataset.replyComment || '';
+      const author = btn.closest('.report-comment-item')?.querySelector('.report-comment-head strong')?.textContent || 'usuario';
+      replyLabel.textContent = `Respondiendo a ${author}`;
+      replyLabel.classList.remove('d-none');
+      cancelReplyBtn.classList.remove('d-none');
+    });
+
+    cancelReplyBtn?.addEventListener('click', () => {
+      replyToId = '';
+      replyLabel.classList.add('d-none');
+      replyLabel.textContent = '';
+      cancelReplyBtn.classList.add('d-none');
+    });
+
+    sendBtn?.addEventListener('click', async () => {
+      const userId = normalize(ljSelectValue(body.querySelector('#inlineCommentUser')));
+      const text = normalize(body.querySelector('#inlineCommentText')?.value);
+      const pin = normalize(body.querySelector('#inlineCommentPin')?.value);
+      if (!userId || !text) return;
+      const author = safeObject(state.usersMap[userId]);
+      const authorId = normalize(author.id || userId);
+      if (!authorId || String(author.pin || '') !== String(pin || '')) {
+        await openIosSwal({ title: 'Clave incorrecta', html: '<p>La clave no coincide con el usuario seleccionado.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+        return;
+      }
+      const latest = safeObject(await window.dbLaJamoneraRest.read(reportPath(report)));
+      const list = getCommentList(latest);
+      const payload = { id: `comment_${Date.now()}`, createdAt: Date.now(), userId: authorId, userName: author.fullName || 'Usuario', text, replies: [] };
+      const nextComments = replyToId ? insertReplyInTree(list, replyToId, payload) : [...list, payload];
+      await window.dbLaJamoneraRest.update(reportPath(report), { comments: nextComments });
+      await window.dbLaJamoneraRest.update(`/informes_index/${report.year}/${report.month}/${report.day}/${report.id}`, { commentsCount: nextComments.length, updatedAt: Date.now() });
+      const refreshed = safeObject(await window.dbLaJamoneraRest.read(reportPath(report)));
+      commentsBody.innerHTML = `<div class="report-comments-thread">${renderCommentTree(getCommentList(refreshed))}</div>`;
+      body.querySelector('#inlineCommentText').value = '';
+      body.querySelector('#inlineCommentPin').value = '';
+      replyToId = '';
+      replyLabel.classList.add('d-none');
+      cancelReplyBtn.classList.add('d-none');
+      await loadOnce();
+    });
+
+    await customElements.whenDefined('sl-dialog');
+    window.LJModal.open(dialog);
   };
 
   const promptComment = async (report) => {
@@ -582,114 +626,139 @@ const printReport = async (report) => {
     await loadOnce();
   };
 
+  // Título del informe: primer encabezado del HTML (en mayúsculas se pasa a tipo oración).
+  const reportTitle = (report) => {
+    let title = '';
+    try {
+      const doc = new DOMParser().parseFromString(String(report?.html || ''), 'text/html');
+      title = normalize(doc.querySelector('h1, h2, h3, h4, h5, h6, strong, p')?.textContent).replace(/\s+/g, ' ');
+    } catch (error) {}
+    if (!title) return 'Informe bromatológico';
+    if (title === title.toUpperCase()) title = title.toLowerCase().replace(/^./, (c) => c.toUpperCase());
+    return title.length > 90 ? `${title.slice(0, 88)}…` : title;
+  };
+
+  const ageTone = (ts) => {
+    const days = Math.floor((Date.now() - Number(ts || Date.now())) / 86400000);
+    if (days > 30) return 'danger';
+    return days > 7 ? 'warning' : 'info';
+  };
+
+  // Último informe en una fila compacta; "Ver informe" abre el visor completo de siempre.
   const renderLastReport = () => {
     const report = state.report;
     if (!report) {
-      nodes.informeAgo.classList.add('d-none');
-      nodes.informe.innerHTML = '<div class="panel-empty">Todavía no hay informes cargados.</div>';
+      nodes.informe.innerHTML = '<div class="panel-informe-row is-empty"><span class="panel-informe-icon" aria-hidden="true"><i class="fa-solid fa-file-medical"></i></span><span class="panel-informe-text"><strong>Último informe</strong><small>Todavía no hay informes cargados.</small></span></div>';
       return;
     }
 
     const user = getReportUser(report);
-    const commentsCount = commentsList(report).length;
     const attachments = Array.isArray(report.attachments) ? report.attachments : [];
+    const images = attachments.filter((x) => x?.type === 'image').length;
+    const docs = Math.max(0, attachments.length - images);
+    const comments = commentsList(report).length;
     const importance = toneImportance(report.importance);
-
-    nodes.informeAgo.classList.remove('d-none');
-    nodes.informeAgo.textContent = ago(report.createdAt);
+    const scoreLabel = importance.label.replace(/[^\p{L}\p{N}\s]/gu, '').trim();
+    const scoreTone = { ok: 'success', normal: 'info', warn: 'warning', high: 'warning', critical: 'danger' }[importance.tone] || 'info';
+    const date = new Date(Number(report.createdAt || Date.now())).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const avatar = user.photoUrl
+      ? `<span class="panel-informe-avatar"><img class="js-panel-thumb" src="${escapeHtml(user.photoUrl)}" alt=""></span>`
+      : `<span class="panel-informe-avatar">${escapeHtml(initials(user.name))}</span>`;
+    const countTag = (n, icon, label) => (n > 0 ? `<span class="panel-tag" title="${label}"><i class="fa-regular ${icon}" aria-hidden="true"></i>${n}</span>` : '');
 
     nodes.informe.innerHTML = `
-      <article class="informe-card" data-report-id="${escapeHtml(report.id)}">
-        <div class="informe-card-head">
-          <span class="informe-card-date"><i class="fa-regular fa-calendar"></i> ${escapeHtml(formatDateTime(report.createdAt))}</span>
-          <span class="informe-card-comments ${commentsCount ? 'has-comments' : 'no-comments'}"><i class="fa-solid ${commentsCount ? 'fa-comment-dots' : 'fa-comment-slash'}"></i> ${commentsCount ? `${commentsCount} comentario(s)` : 'Sin comentarios'}</span>
-        </div>
-        <div class="informe-card-preview">${report.html || '<p>Sin contenido.</p>'}</div>
-        <div class="informe-card-meta">
-          <span class="informe-attach-chip"><i class="fa-regular fa-image"></i> ${attachments.filter((x) => x?.type === 'image').length}</span>
-          <span class="informe-attach-chip"><i class="fa-regular fa-file-lines"></i> ${Math.max(0, attachments.length - attachments.filter((x) => x?.type === 'image').length)}</span>
-          <span class="importance-chip importance-${importance.tone}">${Math.max(0, Math.min(100, Number(report.importance || 0)))}% · ${importance.label}</span>
-          <span class="informe-attach-chip panel-report-age-chip"><i class="fa-regular fa-clock"></i> ${agoDaysLabel(report.createdAt)}</span>
-          <sl-button variant="default" size="small" class="lj-icon-btn informe-print-chip" type="button" data-print-report="${escapeHtml(report.id)}" title="Imprimir informe" aria-label="Imprimir informe"><i class="fa-solid fa-print"></i></sl-button>
-        </div>
-        <div class="informe-card-user">
-          ${renderUserAvatar(user)}
-          <div class="informe-card-user-text"><strong>${escapeHtml(user.name)}</strong><small>${escapeHtml(user.position)}</small></div>
-        </div>
-        <div class="informe-card-actions">
-          <sl-button variant="primary" type="button" data-view-report="${escapeHtml(report.id)}">Ver informe completo</sl-button>
-        </div>
-      </article>`;
-
+      <div class="panel-informe-row" data-report-id="${escapeHtml(report.id)}">
+        <span class="panel-informe-icon" aria-hidden="true"><i class="fa-solid fa-file-medical"></i></span>
+        <span class="panel-informe-text">
+          <strong title="${escapeHtml(reportTitle(report))}"><span class="panel-informe-kicker">Último informe</span>${escapeHtml(reportTitle(report))}</strong>
+          <small>${avatar}<span>${escapeHtml(date)} · ${escapeHtml(user.name)} · ${escapeHtml(user.position)}</span></small>
+        </span>
+        <span class="panel-informe-tags">
+          <span class="panel-tag is-${scoreTone}">${Math.max(0, Math.min(100, Number(report.importance || 0)))}% · ${escapeHtml(scoreLabel)}</span>
+          <span class="panel-tag is-${ageTone(report.createdAt)}">${escapeHtml(ago(report.createdAt).charAt(0))}${escapeHtml(ago(report.createdAt).slice(1).toLowerCase())}</span>
+          ${countTag(images, 'fa-image', 'Imágenes adjuntas')}${countTag(docs, 'fa-file-lines', 'Documentos adjuntos')}${countTag(comments, 'fa-comment', 'Comentarios')}
+        </span>
+        <span class="panel-informe-actions">
+          <sl-button variant="default" size="small" type="button" data-view-report="1"><i slot="prefix" class="fa-regular fa-eye"></i>Ver informe</sl-button>
+          <sl-button variant="default" size="small" type="button" class="lj-icon-btn" data-print-report="1" title="Imprimir informe" aria-label="Imprimir informe"><i class="fa-solid fa-print"></i></sl-button>
+        </span>
+      </div>`;
     bindThumbs();
-    const card = nodes.informe.querySelector('.informe-card');
-    card?.addEventListener('click', async (event) => {
-      if (event.target.closest('[data-print-report]')) {
-        await printReport(report);
-        return;
-      }
-      if (event.target.closest('[data-view-report]')) {
-        await openViewer(report);
-        return;
-      }
-      if (event.target.closest('[data-edit-report]')) {
-        await promptEdit(report);
-        return;
-      }
-      if (event.target.closest('[data-delete-report]')) {
-        await deleteReport(report);
-        return;
-      }
-      if (event.target.closest('[data-comment-report]')) {
-        await promptComment(report);
-      }
-    });
   };
+
+  nodes.informe?.addEventListener('click', async (event) => {
+    if (!state.report) return;
+    if (event.target.closest('[data-print-report]')) await printReport(state.report);
+    else if (event.target.closest('[data-view-report]')) await openViewer(state.report);
+  });
 
   const renderSummary = () => {
     const cards = [
-      { key: 'rne', icon: 'shield-exclamation', value: state.providers.length, title: 'RNE pendientes', note: 'proveedores sin completar', unit: 'proveedores' },
-      { key: 'rnpa', icon: 'clipboard2-check', value: state.recipes.length, title: 'RNPA críticos', note: 'recetas a revisar', unit: 'recetas' },
-      { key: 'transport', icon: 'truck-front', value: state.vehicles.length, title: 'UTA/URA', note: 'unidades por vencer', unit: 'unidades' },
-      { key: 'reports', icon: 'file-earmark-medical', value: state.reports.length, title: 'Informes', note: 'registros disponibles', unit: 'cargados' }
+      { key: 'rne', icon: 'shield-exclamation', value: state.providers.length, title: 'RNE pendientes', note: 'proveedores sin completar' },
+      { key: 'rnpa', icon: 'clipboard2-check', value: state.recipes.length, title: 'RNPA críticos', note: 'recetas a revisar' },
+      { key: 'transport', icon: 'truck-front', value: state.vehicles.length, title: 'UTA/URA', note: 'unidades por vencer' },
+      { key: 'reports', icon: 'file-earmark-medical', value: state.reports.length, title: 'Informes', note: state.report ? `cargados · último ${ago(state.report.createdAt).toLowerCase()}` : 'cargados' }
     ];
-    nodes.resumen.innerHTML = `<div class="panel-kpi-row">${cards.map((card) => `<article class="panel-metric panel-metric-${card.key}"><div class="panel-metric-top"><span class="panel-metric-icon"><sl-icon name="${card.icon}"></sl-icon></span><div class="panel-metric-copy"><strong>${escapeHtml(card.title)}</strong><small>${escapeHtml(card.note)}</small></div></div><div class="panel-metric-bottom"><span class="panel-metric-value">${card.value}</span><span class="panel-metric-unit">${escapeHtml(card.unit)}</span></div></article>`).join('')}</div>`;
+    nodes.resumen.innerHTML = `<div class="panel-kpi-row">${cards.map((card) => `<article class="panel-metric panel-metric-${card.key}"><div class="panel-metric-top"><span class="panel-metric-icon"><sl-icon name="${card.icon}"></sl-icon></span><strong class="panel-metric-title">${escapeHtml(card.title)}</strong></div><span class="panel-metric-value">${card.value}</span><small class="panel-metric-note">${escapeHtml(card.note)}</small></article>`).join('')}</div>`;
   };
 
-  const renderProviders = () => {
-    const rows = state.providers.map((provider) => {
-      const photo = normalize(provider.photoUrl);
-      const avatar = photo
-        ? `<div class="panel-avatar"><span class="thumb-loading"><sl-spinner class="panel-spinner" aria-label="cargando"></sl-spinner></span><img class="js-panel-thumb" src="${escapeHtml(photo)}" alt="${escapeHtml(provider.name)}"></div>`
-        : `<div class="panel-avatar">${escapeHtml(initials(provider.name))}</div>`;
-      return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(provider.name || 'Proveedor')}</strong><small><i class="fa-solid fa-triangle-exclamation"></i> RNE pendiente</small><p class="panel-status is-danger">Completar registro del proveedor</p></div></article>`;
-    });
-    if (!rows.length) { nodes.rne.innerHTML = '<div class="panel-empty">No hay alertas para mostrar.</div>'; return; }
-    nodes.rne.innerHTML = makeMarquee(rows, 3, 7);
+  // Saludo con la hora y la fecha de Argentina.
+  const TZ = 'America/Argentina/Buenos_Aires';
+  const pendingCount = () => state.providers.length + state.recipes.length + state.vehicles.length;
+  const renderGreeting = () => {
+    if (!nodes.greetingTitle) return;
+    const now = new Date();
+    const hour = Number(new Intl.DateTimeFormat('es-AR', { hour: 'numeric', hourCycle: 'h23', timeZone: TZ }).format(now));
+    const hello = hour >= 5 && hour < 13 ? 'Buen día' : (hour >= 13 && hour < 20 ? 'Buenas tardes' : 'Buenas noches');
+    const date = new Intl.DateTimeFormat('es-AR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ }).format(now).replace(',', '');
+    const n = pendingCount();
+    nodes.greetingTitle.textContent = `${hello}, ${state.userName || 'La Jamonera'}`;
+    const status = !state.initialized && !state.reports.length && !n ? '' : (n ? ` · ${n} ${n === 1 ? 'tema' : 'temas'} para revisar` : ' · Todo en orden');
+    nodes.greetingSub.textContent = `${date.charAt(0).toUpperCase()}${date.slice(1)}${status}`;
   };
 
-  const renderRnpa = () => {
-    const rows = state.recipes.map((recipe) => {
+  const daysText = (days, past, future) => {
+    if (days === 0) return `${future} hoy`;
+    const n = Math.abs(days);
+    return days < 0 ? `${past} hace ${n} ${n === 1 ? 'día' : 'días'}` : `${future} en ${n} ${n === 1 ? 'día' : 'días'}`;
+  };
+
+  // Lista única de pendientes por urgencia: vencidos, RNE sin completar, por vencer; el último informe al final.
+  const buildPendingItems = () => {
+    const items = [];
+    state.recipes.forEach((recipe) => {
       const days = dayDiff(recipe.rnpa?.expiryDate);
-      const expired = Number(days) < 0;
-      const photo = normalize(recipe.imageUrl);
-      const avatar = photo
-        ? `<div class="panel-avatar"><span class="thumb-loading"><sl-spinner class="panel-spinner" aria-label="cargando"></sl-spinner></span><img class="js-panel-thumb" src="${escapeHtml(photo)}" alt="${escapeHtml(recipe.title)}"></div>`
-        : `<div class="panel-avatar">${escapeHtml(initials(recipe.title))}</div>`;
-      return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(recipe.title || 'Receta')}</strong><small><i class="fa-regular fa-calendar"></i> Vence: ${escapeHtml(recipe.rnpa?.expiryDate || '-')}</small><p class="panel-status ${expired ? 'is-danger' : 'is-warning'}">${expired ? `Venció hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`}</p></div></article>`;
+      items.push({ rank: days < 0 ? 0 : 2, days, title: recipe.title || 'Receta', sub: `RNPA ${daysText(days, 'venció', 'vence')}`, tag: 'RNPA', tone: days < 0 ? 'danger' : 'warning', photo: recipe.imageUrl, icon: 'fa-clipboard-check', open: '#recetasModal' });
     });
-    if (!rows.length) { nodes.rnpa.innerHTML = '<div class="panel-empty">No hay alertas para mostrar.</div>'; return; }
-    nodes.rnpa.innerHTML = makeMarquee(rows, 3, 7);
+    state.vehicles.forEach((vehicle) => {
+      const days = dayDiff(vehicle.expiryDate);
+      items.push({ rank: days < 0 ? 0 : 2, days, title: `${vehicle.number || '-'} · ${vehicle.patent || '-'}`, sub: `${vehicle.brand || vehicle.type || 'Unidad'} · ${daysText(days, 'venció', 'vence')}`, tag: 'UTA/URA', tone: days < 0 ? 'danger' : 'warning', icon: 'fa-truck', open: '#produccionModal' });
+    });
+    state.providers.forEach((provider) => {
+      items.push({ rank: 1, days: 0, title: provider.name || 'Proveedor', sub: 'Completar el RNE del proveedor', tag: 'RNE', tone: 'danger', photo: provider.photoUrl, icon: 'fa-shield-halved', open: '#inventarioModal' });
+    });
+    return items.sort((a, b) => (a.rank - b.rank) || (a.days - b.days) || String(a.title).localeCompare(String(b.title)));
   };
 
-  const renderTransport = () => {
-    const rows = state.vehicles.map((vehicle) => {
-      const days = dayDiff(vehicle.expiryDate);
-      return `<article class="panel-list-card"><div class="panel-avatar"><i class="fa-solid fa-id-card-clip"></i></div><div class="panel-item-text"><strong>${escapeHtml(vehicle.number || '-')} · ${escapeHtml(vehicle.patent || '-')}</strong><small>${escapeHtml(vehicle.brand || vehicle.type || 'Unidad')} · ${escapeHtml(vehicle.expiryDate || '-')}</small><p class="panel-status ${days < 0 ? 'is-danger' : 'is-warning'}">${days < 0 ? `Vencido hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`}</p></div></article>`;
-    });
-    if (!rows.length) { nodes.transporte.innerHTML = '<div class="panel-empty">No hay alertas para mostrar.</div>'; return; }
-    nodes.transporte.innerHTML = makeMarquee(rows, 3, 7);
+  const pendingAvatar = (item) => {
+    const photo = normalize(item.photo);
+    if (photo) return `<span class="panel-avatar"><span class="thumb-loading">${AVATAR_SKELETON}</span><img class="js-panel-thumb" src="${escapeHtml(photo)}" alt=""></span>`;
+    return `<span class="panel-avatar is-icon is-${item.tone}"><i class="fa-solid ${item.icon}" aria-hidden="true"></i></span>`;
   };
+
+  const renderPendientes = () => {
+    const items = buildPendingItems();
+    const n = pendingCount();
+    nodes.pendientesCount.hidden = !n;
+    nodes.pendientesCount.textContent = String(n);
+    if (!items.length) {
+      nodes.pendientes.innerHTML = '<div class="panel-empty"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>No hay pendientes.</span></div>';
+      return;
+    }
+    nodes.pendientes.innerHTML = `<div class="panel-pend-list">${items.map((item) => `<button type="button" class="lj-tile panel-pend-row" data-lj-open="${item.open}" title="Abrir módulo">${pendingAvatar(item)}<span class="panel-pend-text"><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.sub)}</small></span><span class="panel-tag is-${item.tone}">${escapeHtml(item.tag)}</span></button>`).join('')}</div>`;
+  };
+
+  nodes.homeNav?.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
 
   // Gráfico de producción con Apache ECharts 5. Colores tomados de los tokens --lj-* (claro/oscuro).
   // Color por receta en todos los tipos (pedido del dueño): paleta categórica de 10 (cubre el top 10 sin repetir),
@@ -1033,9 +1102,8 @@ const printReport = async (report) => {
     renderChart();
     bindChartTypeToggle();
     renderLastReport();
-    renderProviders();
-    renderRnpa();
-    renderTransport();
+    renderPendientes();
+    renderGreeting();
     bindThumbs();
   };
 
@@ -1061,18 +1129,17 @@ const printReport = async (report) => {
   };
 
   const setLoading = () => {
-    nodes.informe.innerHTML = spinner('Cargando informe');
-    nodes.resumen.innerHTML = spinner('Cargando métricas');
-    nodes.rne.innerHTML = spinner('Cargando proveedores');
-    nodes.rnpa.innerHTML = spinner('Cargando RNPA');
-    nodes.transporte.innerHTML = spinner('Cargando transporte');
-    nodes.produccion.innerHTML = spinner('Cargando producción');
+    nodes.informe.innerHTML = SKELETONS.informe;
+    nodes.resumen.innerHTML = SKELETONS.resumen;
+    nodes.pendientes.innerHTML = SKELETONS.pendientes;
+    nodes.produccion.innerHTML = SKELETONS.produccion;
   };
 
   const loadOnce = async () => {
     if (!state.initialized) setLoading();
     try {
-      await window.laJamoneraReady;
+      const user = await window.laJamoneraReady;
+      if (!state.userName) state.userName = normalize(user?.displayName);
       const readPreferred = async (primaryPath, fallbackPath, fallback = {}) => {
         const primary = await window.dbLaJamoneraRest.read(primaryPath).catch(() => null);
         if (primary != null) return primary;
@@ -1101,7 +1168,7 @@ const printReport = async (report) => {
       }
     } catch {
       const fallback = '<div class="panel-empty">No se pudieron cargar los datos del panel.</div>';
-      [nodes.informe, nodes.resumen, nodes.rne, nodes.rnpa, nodes.transporte, nodes.produccion].forEach((n) => { if (n) n.innerHTML = fallback; });
+      [nodes.informe, nodes.resumen, nodes.pendientes, nodes.produccion].forEach((n) => { if (n) n.innerHTML = fallback; });
     }
   };
 
@@ -1147,5 +1214,6 @@ const printReport = async (report) => {
   };
 
   initRange();
+  renderGreeting();
   loadOnce().then(attachRealtimeListeners);
 })();

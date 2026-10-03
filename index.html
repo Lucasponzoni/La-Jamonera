@@ -84,6 +84,7 @@
   <link rel="stylesheet" href="./CSS/legacy/20-usuarios.css?v=202608282255">
   <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202608282255">
   <link rel="stylesheet" href="./CSS/legacy/22-planilla-protocolo.css?v=202608282255">
+  <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202608282255">
   <link rel="stylesheet" href="./CSS/panel.css?v=202608282255">
 </head>
 <body>
@@ -107,6 +108,7 @@
             </button>
             <div class="lj-user-menu-panel topbar-user-menu">
               <p class="topbar-user-name">Usuario: <strong>La Jamonera</strong></p>
+              <sl-button variant="default" class="w-100 js-open-config" hidden><i slot="prefix" class="fa-solid fa-gear"></i>Configuración</sl-button>
               <sl-button variant="default" class="w-100 js-logout"><sl-icon slot="prefix" name="box-arrow-right"></sl-icon>Cerrar sesión</sl-button>
             </div>
           </sl-dropdown>
@@ -121,45 +123,54 @@
         </nav>
       </sl-drawer>
 
-      <div class="contenido">
-        <div class="header-content">
-          <div class="home-actions-scroll" aria-label="Acciones disponibles">
-            <button class="lj-tile home-action-btn" id="openIngredientesModal" type="button" data-lj-open="#ingredientesModal">
-              <i class="fa-solid fa-carrot icon-lila" aria-hidden="true"></i>
-              <span>Ingredientes</span>
-            </button>
+      <div class="contenido lj-home">
+        <nav class="lj-home-side home-actions-scroll" aria-label="Módulos">
+          <p class="lj-home-side-title">Módulos</p>
+          <button class="lj-tile lj-home-nav is-active" id="panelHomeNav" type="button" aria-current="page">
+            <span class="lj-home-nav-icon" aria-hidden="true"><i class="fa-solid fa-house"></i></span>
+            <span class="lj-home-nav-label">Inicio</span>
+          </button>
+          <button class="lj-tile lj-home-nav home-action-btn" id="openIngredientesModal" type="button" data-lj-open="#ingredientesModal">
+            <span class="lj-home-nav-icon" aria-hidden="true"><i class="fa-solid fa-carrot"></i></span>
+            <span class="lj-home-nav-label">Ingredientes</span>
+          </button>
+          <button class="lj-tile lj-home-nav home-action-btn" id="openInventarioModal" type="button" data-lj-open="#inventarioModal">
+            <span class="lj-home-nav-icon" aria-hidden="true"><i class="fa-solid fa-boxes-stacked"></i></span>
+            <span class="lj-home-nav-label">Inventario</span>
+          </button>
+          <button class="lj-tile lj-home-nav home-action-btn" id="openRecetasModal" type="button" data-lj-open="#recetasModal">
+            <span class="lj-home-nav-icon" aria-hidden="true"><i class="fa-solid fa-utensils"></i></span>
+            <span class="lj-home-nav-label">Recetas</span>
+          </button>
+          <button class="lj-tile lj-home-nav home-action-btn" id="openProduccionModal" type="button" data-lj-open="#produccionModal">
+            <span class="lj-home-nav-icon" aria-hidden="true"><i class="fa-solid fa-industry"></i></span>
+            <span class="lj-home-nav-label">Producir</span>
+          </button>
+          <span class="lj-home-side-divider" aria-hidden="true"></span>
+          <button class="lj-tile lj-home-nav home-action-btn" id="openUsersManagerModal" type="button" data-lj-open="#usersManagerModal">
+            <span class="lj-home-nav-icon" aria-hidden="true"><i class="fa-solid fa-users"></i></span>
+            <span class="lj-home-nav-label">Usuarios</span>
+          </button>
+        </nav>
 
-            <button class="lj-tile home-action-btn" id="openInventarioModal" type="button" data-lj-open="#inventarioModal">
-              <i class="fa-solid fa-boxes-stacked icon-orange" aria-hidden="true"></i>
-              <span>Inventario</span>
-            </button>
+        <div class="lj-home-main">
+          <header class="lj-home-greeting">
+            <h1 id="panelGreetingTitle" class="lj-home-greeting-title">Hola</h1>
+            <p id="panelGreetingSub" class="lj-home-greeting-sub">&nbsp;</p>
+          </header>
 
-            <button class="lj-tile home-action-btn" id="openRecetasModal" type="button" data-lj-open="#recetasModal">
-              <i class="fa-solid fa-utensils icon-orangered" aria-hidden="true"></i>
-              <span>Recetas</span>
-            </button>
-
-            <button class="lj-tile home-action-btn home-action-btn-success" id="openProduccionModal" type="button" data-lj-open="#produccionModal">
-              <i class="fa-solid fa-industry icon-green" aria-hidden="true"></i>
-              <span>Producir</span>
-            </button>
-            <span class="barra-vertical home-actions-divider" aria-hidden="true"></span>
-            <button class="lj-tile home-action-btn" id="openUsersManagerModal" type="button" data-lj-open="#usersManagerModal">
-              <i class="fa-solid fa-users icon-blue" aria-hidden="true"></i>
-              <span>Usuarios</span>
-            </button>
-          </div>
-        </div>
-        <div class="home-content panel-home-content">
           <section id="panelDashboard" class="panel-grid" aria-live="polite">
-            <article id="panelResumen" class="glass-card panel-card panel-card-wide panel-summary-card">
-              <header class="panel-card-head"><h3><sl-icon name="speedometer2"></sl-icon> Recordatorios y estado general</h3></header>
-              <div class="panel-card-body"><div class="panel-spinner-wrap"><sl-spinner class="panel-spinner" aria-label="Cargando métricas"></sl-spinner></div></div>
+            <div id="panelResumen" class="panel-summary" aria-label="Indicadores">
+              <div class="panel-card-body"><div class="panel-sk-kpis" aria-label="Cargando métricas"><div class="panel-sk-card"><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton><sl-skeleton effect="sheen" class="sk-num"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w70"></sl-skeleton></div><div class="panel-sk-card"><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton><sl-skeleton effect="sheen" class="sk-num"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w70"></sl-skeleton></div><div class="panel-sk-card"><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton><sl-skeleton effect="sheen" class="sk-num"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w70"></sl-skeleton></div><div class="panel-sk-card"><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton><sl-skeleton effect="sheen" class="sk-num"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w70"></sl-skeleton></div></div></div>
+            </div>
+
+            <article id="panelUltimoInforme" class="glass-card panel-informe" aria-label="Último informe">
+              <div class="panel-card-body"><div class="panel-sk-row" aria-label="Cargando informe"><sl-skeleton effect="sheen" class="sk-square"></sl-skeleton><div class="panel-sk-text"><sl-skeleton effect="sheen" class="sk-line sk-w50"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w30"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-btn"></sl-skeleton></div></div>
             </article>
 
-            <article id="panelProduccion" class="glass-card panel-card panel-card-wide">
+            <article id="panelProduccion" class="glass-card panel-card panel-card-chart">
               <header class="panel-card-head panel-card-head-chart">
-                <h3><sl-icon name="bar-chart-line-fill"></sl-icon> Producción en kilos</h3>
+                <h3><sl-icon name="bar-chart-line-fill"></sl-icon>Producción en kilos</h3>
                 <div class="panel-chart-controls">
                   <div class="lj-btn-group panel-chart-type-group" role="group" aria-label="Tipo de gráfico">
                     <sl-button variant="text" type="button" class="lj-icon-btn panel-chart-type-btn is-active" data-chart-type="horizontalBar" title="Barras horizontales" aria-label="Barras horizontales"><sl-icon name="list-ol"></sl-icon></sl-button>
@@ -167,38 +178,20 @@
                     <sl-button variant="text" type="button" class="lj-icon-btn panel-chart-type-btn" data-chart-type="line" title="Línea" aria-label="Línea"><sl-icon name="graph-up"></sl-icon></sl-button>
                     <sl-button variant="text" type="button" class="lj-icon-btn panel-chart-type-btn" data-chart-type="doughnut" title="Dona" aria-label="Dona"><sl-icon name="pie-chart-fill"></sl-icon></sl-button>
                   </div>
-                  <input id="panelChartRange" class="lj-input panel-range-input" placeholder="Filtrar rango de fechas">
+                  <input id="panelChartRange" class="lj-input panel-range-input" placeholder="Filtrar rango de fechas" aria-label="Rango de fechas">
                 </div>
               </header>
-              <div class="panel-card-body"><div class="panel-spinner-wrap"><sl-spinner class="panel-spinner" aria-label="Cargando producción"></sl-spinner></div></div>
+              <div class="panel-card-body"><div class="panel-sk-bars" aria-label="Cargando producción"><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:92%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:48%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:38%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:26%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:22%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:16%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:13%"></sl-skeleton></div><div class="panel-sk-bar"><sl-skeleton effect="sheen" class="sk-line sk-label"></sl-skeleton><sl-skeleton effect="sheen" class="sk-bar" style="width:9%"></sl-skeleton></div></div></div>
             </article>
 
-            <article id="panelUltimoInforme" class="glass-card panel-card">
+            <article id="panelPendientes" class="glass-card panel-card panel-card-pend">
               <header class="panel-card-head">
-                <h3><sl-icon name="file-earmark-medical"></sl-icon> Último informe</h3>
-                <span id="panelInformeAgo" class="panel-pill d-none"></span>
+                <h3><sl-icon name="list-check"></sl-icon>Pendientes</h3>
+                <span id="panelPendientesCount" class="panel-tag is-neutral" hidden></span>
               </header>
-              <div class="panel-card-body">
-                <div class="panel-spinner-wrap"><sl-spinner class="panel-spinner" aria-label="Cargando informe"></sl-spinner></div>
-              </div>
+              <div class="panel-card-body"><div class="panel-sk-list" aria-label="Cargando pendientes"><div class="panel-sk-row"><sl-skeleton effect="sheen" class="sk-circle"></sl-skeleton><div class="panel-sk-text"><sl-skeleton effect="sheen" class="sk-line sk-w60"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-tag"></sl-skeleton></div><div class="panel-sk-row"><sl-skeleton effect="sheen" class="sk-circle"></sl-skeleton><div class="panel-sk-text"><sl-skeleton effect="sheen" class="sk-line sk-w60"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-tag"></sl-skeleton></div><div class="panel-sk-row"><sl-skeleton effect="sheen" class="sk-circle"></sl-skeleton><div class="panel-sk-text"><sl-skeleton effect="sheen" class="sk-line sk-w60"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-tag"></sl-skeleton></div><div class="panel-sk-row"><sl-skeleton effect="sheen" class="sk-circle"></sl-skeleton><div class="panel-sk-text"><sl-skeleton effect="sheen" class="sk-line sk-w60"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-tag"></sl-skeleton></div><div class="panel-sk-row"><sl-skeleton effect="sheen" class="sk-circle"></sl-skeleton><div class="panel-sk-text"><sl-skeleton effect="sheen" class="sk-line sk-w60"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-tag"></sl-skeleton></div><div class="panel-sk-row"><sl-skeleton effect="sheen" class="sk-circle"></sl-skeleton><div class="panel-sk-text"><sl-skeleton effect="sheen" class="sk-line sk-w60"></sl-skeleton><sl-skeleton effect="sheen" class="sk-line sk-w40"></sl-skeleton></div><sl-skeleton effect="sheen" class="sk-tag"></sl-skeleton></div></div></div>
             </article>
 
-            <article id="panelRne" class="glass-card panel-card">
-              <header class="panel-card-head"><h3><sl-icon name="shield-check"></sl-icon> Proveedores con RNE pendiente</h3></header>
-              <div class="panel-card-body"><div class="panel-spinner-wrap"><sl-spinner class="panel-spinner" aria-label="Cargando proveedores"></sl-spinner></div></div>
-            </article>
-
-            <article id="panelRnpa" class="glass-card panel-card">
-              <header class="panel-card-head"><h3><sl-icon name="clipboard2-check"></sl-icon> RNPA de recetas</h3></header>
-              <div class="panel-card-body"><div class="panel-spinner-wrap"><sl-spinner class="panel-spinner" aria-label="Cargando RNPA"></sl-spinner></div></div>
-            </article>
-
-            <article id="panelTransporte" class="glass-card panel-card">
-              <header class="panel-card-head"><h3><sl-icon name="truck-front"></sl-icon> Transporte habilitado (UTA/URA)</h3></header>
-              <div class="panel-card-body"><div class="panel-spinner-wrap"><sl-spinner class="panel-spinner" aria-label="Cargando transporte"></sl-spinner></div></div>
-            </article>
-
-            
           </section>
         </div>
       </div>
@@ -554,6 +547,11 @@
             · Ponzoni Lucas
             <a class="lj-footer-mail" href="mailto:pablomanuelscalise@gmail.com" target="_blank" rel="noopener noreferrer" aria-label="Enviar email"><sl-icon name="envelope"></sl-icon></a>
           </p>
+          <p class="lj-footer-maker">
+            <span>Software de</span>
+            <img class="ns-light" src="./IMG/ninja-soft-light.webp" alt="Ninja Soft" width="80" height="22">
+            <img class="ns-dark" src="./IMG/ninja-soft-dark.webp" alt="Ninja Soft" width="80" height="22">
+          </p>
           <p class="lj-footer-legal">
             El uso de este sitio implica la aceptación de los términos, condiciones y políticas de privacidad de
             <a href="https://asesoriabromatologicaros.com.ar/index.html" target="_blank" rel="noopener noreferrer">Asesoría Bromatológica Rosario</a>.
@@ -585,6 +583,8 @@
   <script defer src="./JS/ui/header.js?v=202608282255"></script>
   <script defer src="./JS/firebase-init.js?v=202608282255"></script>
   <script defer src="./JS/proxy-client.js?v=202608282255"></script>
+  <script defer src="./JS/ui/ai.js?v=202608282255"></script>
+  <script defer src="./JS/configuracion.js?v=202608282255"></script>
   <script defer src="./JS/firebase-indexes.js?v=202608282255"></script>
   <script defer src="./JS/email_sender.js?v=202608282255"></script>
   <script defer src="./JS/panelcontrol.js?v=202608282255"></script>

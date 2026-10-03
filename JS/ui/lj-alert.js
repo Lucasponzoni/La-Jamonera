@@ -221,12 +221,16 @@
         if (event.target !== dialog || state.done) return;
         try { opts.didRender?.(popup); opts.didOpen?.(popup); } catch (e) { console.error(e); }
         if (state.input) state.input.focus();
+        else popup.querySelectorAll('.swal2-html-container, .lj-dialog-body').forEach((el) => { el.scrollTop = 0; });
+        const body = dialog.shadowRoot?.querySelector('[part~="body"]');
+        if (body && !state.input) body.scrollTop = 0;
       });
       // Sin foco automático en el primer control: igual que SweetAlert, foco en confirmar.
       dialog.addEventListener('sl-initial-focus', (event) => {
         if (event.target !== dialog) return;
         event.preventDefault();
-        (state.input || state.confirm || state.cancel || popup).focus?.();
+        // preventScroll: enfocar el botón del pie no debe bajar el contenido largo (p.ej. informes).
+        (state.input || state.confirm || state.cancel || popup).focus?.({ preventScroll: !state.input });
       });
 
       current = state;

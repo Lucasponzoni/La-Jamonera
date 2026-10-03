@@ -1,18 +1,6 @@
 /* =========================================
    MODAL PRODUCCIÓN
 ========================================= */
-.home-action-btn-success {
-  border-color: color-mix(in srgb, var(--lj-success) 35%, var(--lj-border));
-  background: var(--lj-success-soft);
-  color: var(--lj-success);
-}
-
-.home-action-btn-success:hover {
-  border-color: color-mix(in srgb, var(--lj-success) 50%, var(--lj-border));
-  background: color-mix(in srgb, var(--lj-success) 18%, var(--lj-surface));
-  color: var(--lj-success);
-}
-
 .produccion-data {
   width: 100%;
 }
