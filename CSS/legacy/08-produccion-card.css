@@ -562,10 +562,12 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
-  margin: 2px 0 12px;
+  flex-wrap: nowrap;
+  margin: 0;
 }
-#produccionModal .produccion-group-filter .recetas-group-select { flex: 0 1 340px; width: auto; min-width: 0; }
+#produccionModal .produccion-group-filter .recetas-group-select { flex: 0 1 220px; width: 220px; min-width: 0; }
+/* En la barra: sin el margen que 21-misc da a .produccion-recipe-groups. */
+#produccionModal .prod-toolbar > .prod-toolbar-groups { margin-bottom: 0 !important; }
 #produccionModal .produccion-group-note { font-size: 12px; color: var(--lj-muted); }
 
 #produccionModal .produccion-compact-row {
@@ -626,4 +628,256 @@
   #produccionModal .produccion-compact-row > .produccion-more-wrap,
   #produccionModal .produccion-compact-row > :last-child { grid-area: more; }
   #produccionModal .produccion-group-filter .recetas-group-select { flex: 1 1 200px; }
+}
+
+/* ===========================================================
+   Producir — maestro-detalle (lista + ficha), mismo patrón que Recetas.
+   Reusa .recetas-md / .recetas-list / .recetas-item / .recetas-detail* de 09-recetas-card.css.
+   =========================================================== */
+#produccionModal .prod-toolbar {
+  display: flex;
+  flex-direction: row; /* 03-componentes la pone en columna en tablet/celular */
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+#produccionModal .prod-toolbar-search {
+  flex: 1 1 220px;
+  max-width: 420px;
+  min-width: 0;
+}
+
+#produccionModal .prod-toolbar-groups {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+#produccionModal .prod-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  margin-left: auto;
+  width: auto;
+}
+
+#produccionModal .prod-toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--lj-border);
+  flex: 0 0 auto;
+}
+
+#produccionModal .produccion-list {
+  max-height: none;
+  overflow: visible;
+}
+
+#produccionModal .produccion-list.has-scroll-hint::after {
+  content: none;
+  display: none;
+}
+
+.prod-md-item-tags {
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+
+.prod-md-item-max {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--lj-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.prod-md-detail .recetas-tag i,
+.prod-md-list .recetas-tag i {
+  font-size: 10px;
+}
+
+.prod-ficha-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  font-size: 12px;
+  color: var(--lj-muted);
+}
+
+.prod-ficha-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.prod-ficha-fact strong {
+  color: var(--lj-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.prod-ficha-fact-btn {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--lj-border);
+  border-radius: 4px;
+  background: var(--lj-surface);
+  font: inherit;
+  font-size: 12px;
+  color: var(--lj-muted);
+  cursor: pointer;
+}
+
+.prod-ficha-fact-btn:hover {
+  border-color: var(--lj-border-strong);
+  color: var(--lj-text);
+}
+
+.prod-ficha-fact-edit {
+  font-size: 10px;
+  opacity: .7;
+}
+
+.prod-ficha-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.prod-ficha-alert-line {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--lj-warning) 35%, transparent);
+  border-radius: var(--lj-radius);
+  background: var(--lj-warning-soft);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--lj-text);
+}
+
+.prod-ficha-alert-line > i {
+  margin-top: 3px;
+  color: var(--lj-warning);
+  flex: 0 0 auto;
+}
+
+.prod-ficha-table td {
+  vertical-align: middle;
+}
+
+.prod-ficha-hint {
+  display: block;
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--lj-muted);
+}
+
+.prod-ficha-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--lj-muted);
+  white-space: nowrap;
+}
+
+.prod-ficha-row-actions {
+  display: inline-flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.prod-ficha-link {
+  justify-self: start;
+}
+
+@media (max-width: 767.98px) {
+  #produccionModal .prod-toolbar-search,
+  #produccionModal .prod-toolbar-groups {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
+  #produccionModal .prod-toolbar-actions {
+    flex: 1 1 100%;
+    margin-left: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  #produccionModal .prod-toolbar-actions > sl-button:not(.lj-icon-btn) {
+    flex: 1 0 auto;
+  }
+
+  #produccionModal .prod-toolbar-divider {
+    display: none;
+  }
+
+  /* Ficha a pantalla completa: se ocultan barra, alertas y borradores. */
+  .produccion-data:has(.prod-md.is-detail-open) > :not(.produccion-list),
+  .produccion-list:has(.prod-md.is-detail-open) > :not(.prod-md) {
+    display: none !important;
+  }
+
+  .prod-ficha-table .prod-ficha-code {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 767.98px) {
+  #produccionModal .prod-toolbar-groups .recetas-group-select {
+    flex: 1 1 auto;
+    width: auto;
+  }
+}
+
+/* Código de producción: columna propia en escritorio, debajo de la fecha en celular. */
+.prod-code-inline { display: none; }
+@media (max-width: 600px) {
+  .prod-ficha-table .prod-col-code { display: none; }
+  .prod-code-inline { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+}
+
+/* Tablas de Producción (también dentro de los visores modales): neutras, como la de la ficha. */
+.prod-excel-icon { color: var(--lj-success); }
+:is(#produccionModal, .lj-viewer-dialog) .table :is(.produccion-trace-date, .produccion-trace-expiry) {
+  color: inherit;
+  font-weight: 400;
+}
+:is(#produccionModal, .lj-viewer-dialog) .table .produccion-trace-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--lj-surface-2);
+  color: var(--lj-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+:is(#produccionModal, .lj-viewer-dialog) .table .inventario-trace-kilos {
+  color: var(--lj-danger);
+  font-weight: 500;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+:is(#produccionModal, .lj-viewer-dialog) .table .is-code {
+  white-space: nowrap;
+}
+:is(#produccionModal, .lj-viewer-dialog) .table tr.inventario-row-tone > td {
+  background: transparent;
+}
+:is(#produccionModal, .lj-viewer-dialog) sl-button.lj-icon-btn.is-danger::part(base) { color: var(--lj-danger); }
+:is(#produccionModal, .lj-viewer-dialog) sl-button.lj-icon-btn.is-danger::part(base):hover {
+  background: var(--lj-danger-soft);
+  border-color: color-mix(in srgb, var(--lj-danger) 40%, var(--lj-border));
 }

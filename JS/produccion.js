@@ -65,6 +65,8 @@
     // La vista compacta es la inicial en cada apertura del modal;
     // el toggle sólo cambia la vista mientras el modal está abierto.
     compactList: true,
+    prodSelectedId: '',
+    prodDetailOpen: false,
     ingredientes: {},
     inventario: {},
     users: {},
@@ -672,9 +674,10 @@
     const meta = getProductExpiryStatusMeta(registro);
     const availableKg = Number(meta.availableKg ?? getDispatchAvailableByProductionId(registro?.id));
     const stockLabel = meta.expired && availableKg > 0.0001
-      ? `<small>${formatKgBadgeValue(availableKg)} kg disponibles vencidos</small>`
+      ? `<small class="prod-date-sub">${formatKgBadgeValue(availableKg)} kg disponibles vencidos</small>`
       : '';
-    return `<span class="produccion-history-date-stack produccion-vto-stack"><strong>${escapeHtml(formatProductExpiryLabel(registro))}</strong><small class="produccion-badge ${meta.tone}">${escapeHtml(meta.label)}</small>${stockLabel}</span>`;
+    const tagTone = { 'is-danger': 'bad', 'is-warning': 'warn', 'is-success': 'ok', 'is-ok': 'ok', 'is-info': 'info' }[meta.tone] || 'neu';
+    return `<span class="produccion-history-date-stack produccion-vto-stack"><span class="prod-date-main">${escapeHtml(formatProductExpiryLabel(registro))}</span><span class="recetas-tag tone-${tagTone}">${escapeHtml(meta.label)}</span>${stockLabel}</span>`;
   };
   const hasFrozenShelfLifeExtension = (registro = {}) => {
     if (Boolean(registro?.frozenShelfLifeExtensionAtProduction || registro?.traceability?.product?.frozenShelfLifeExtension)) return true;
@@ -4237,7 +4240,7 @@
   const renderProductionDateCell = (item) => {
     const productionDate = normalizeValue(item?.productionDate) || toIsoDate(item?.createdAt || nowTs());
     const loadDate = Number(item?.createdAt || 0) > 0 ? formatDateTime(item.createdAt) : '-';
-    return `<span class="produccion-history-date-stack" style="display:inline-block;line-height:1.12;white-space:nowrap;"><strong style="display:block;">${escapeHtml(formatIsoEs(productionDate) || productionDate || '-')}</strong><small style="display:block;margin-top:2px;color:#6b7ea8;font-size:0.68rem;font-weight:800;"><span>Carga</span> ${escapeHtml(loadDate)}</small></span>`;
+    return `<span class="produccion-history-date-stack"><span class="prod-date-main">${escapeHtml(formatIsoEs(productionDate) || productionDate || '-')}</span><small class="prod-date-sub">Carga ${escapeHtml(loadDate)}</small></span>`;
   };
   const renderHistoryTable = () => {
     if (!nodes.historyTableWrap) return;
@@ -4278,7 +4281,7 @@
         </tr>`).join('')
         : (!isCollapsed && hasTracePreview ? renderTraceLoadingRow(10) : '');
       return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
-        <td><div class="d-flex align-items-center gap-2">${hasTracePreview ? `<sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-prod-collapse="${escapeHtml(item.id)}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isRegistroDetailLoading(item) ? 'fa-circle-notch fa-spin' : (isCollapsed ? 'fa-expand' : 'fa-compress')}"></i></sl-button>` : ''}<span>${escapeHtml(item.id)}</span></div></td>
+        <td><div class="d-flex align-items-center gap-2">${hasTracePreview ? `<sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-prod-collapse="${escapeHtml(item.id)}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isRegistroDetailLoading(item) ? 'fa-circle-notch fa-spin' : (isCollapsed ? 'fa-expand' : 'fa-compress')}"></i></sl-button>` : ''}<span class="is-code">${escapeHtml(item.id)}</span></div></td>
         <td>${renderProductionDateCell(item)}</td>
         <td>${(() => {
           // Buscamos el nombre comercial desde la traceabilidad guardada, el
@@ -4289,15 +4292,15 @@
             state.recetas?.[item?.recipeId]?.nombreComercial
           );
           const loteAntiguoBadge = item.loteAntiguo ? '<small class="produccion-lote-antiguo-tag"><sl-icon name="calendar-minus"></sl-icon> Lote antiguo</small>' : '';
-          return `<span class="produccion-history-product-cell"><strong>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</strong>${comercial ? `<small class="produccion-history-product-comercial">${escapeHtml(capitalize(comercial))}</small>` : ''}${loteAntiguoBadge}</span>`;
+          return `<span class="produccion-history-product-cell"><strong>${escapeHtml(capitalize(item.recipeTitle || '-'))}</strong>${comercial ? `<small class="produccion-history-product-comercial">${escapeHtml(capitalize(comercial))}</small>` : ''}${loteAntiguoBadge}</span>`;
         })()}</td>
-        <td>${Number(item.quantityKg || 0).toFixed(2)} kg</td>
+        <td class="is-num">${Number(item.quantityKg || 0).toFixed(2)} kg</td>
         <td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td>
         <td class="produccion-vto-cell">${renderProductExpiryCell(item)}</td>
         <td><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-prod-trace="${item.id}"><img slot="prefix" src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></sl-button></td>
         <td><div class="produccion-planilla-actions"><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-prod-planilla="${escapeHtml(item.id)}" ${planillaDisabled}><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planilla</span></sl-button><sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-prod-qr-print="${escapeHtml(item.id)}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></sl-button></div></td>
         <td>${renderTraceAttachmentsBtnHtml(item, traceRows, 'data-prod-trace-images')}</td>
-        <td><sl-button variant="danger" type="button" class="inventario-threshold-btn" data-prod-cancel="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-trash"></i><span>Eliminar</span></sl-button></td>
+        <td><sl-button size="small" variant="default" type="button" class="lj-icon-btn is-danger inventario-threshold-btn" data-prod-cancel="${escapeHtml(item.id)}" title="Eliminar" aria-label="Eliminar"><i class="fa-solid fa-trash"></i></sl-button></td>
       </tr>${traceHtml}`;
     }).join('') : '<tr><td colspan="10" class="text-center">Sin producciones en ese rango.</td></tr>';
     nodes.historyTableWrap.innerHTML = `
@@ -4307,7 +4310,7 @@
       </div>
       <div class="table-responsive inventario-global-table inventario-table-compact-wrap">
         <table class="table recipe-table inventario-table-compact mb-0">
-          <thead><tr><th>ID producción</th><th>Fecha</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead>
+          <thead><tr><th>Código</th><th>Fecha</th><th>Producto</th><th class="is-num">Kilos</th><th>Responsable</th><th>Vencimiento</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead>
           <tbody>${htmlRows}</tbody>
         </table>
       </div>
@@ -4489,7 +4492,7 @@
       title: `Historial rápido · ${escapeHtml(capitalize(recipe.title || 'Producto'))}`,
       width: 'min(720px,96vw)',
       customClass: { popup: 'produccion-recipe-history-alert' },
-      html: `<div class="text-start produccion-recipe-history-modal"><sl-input type="search" class="mb-2" data-recipe-history-search placeholder="Buscar por código"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input><div class="produccion-inline-filter mb-2"><input type="text" class="lj-input" data-recipe-history-range placeholder="Filtrar rango (desde - hasta)" autocomplete="off"><sl-button variant="default" type="button" class="lj-icon-btn" data-recipe-history-range-clear aria-label="Limpiar rango"><i class="fa-solid fa-xmark"></i></sl-button></div><div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><sl-button variant="default" type="button" class="inventario-expand-btn inventario-threshold-btn" data-recipe-history-expand><i slot="prefix" class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></sl-button><sl-button variant="success" type="button" class="inventario-threshold-btn" data-recipe-history-excel><i slot="prefix" class="fa-solid fa-file-excel"></i><span>Excel</span></sl-button><span class="inventario-period-divider" aria-hidden="true"></span><sl-button variant="default" type="button" class="inventario-threshold-btn" data-recipe-history-print><i slot="prefix" class="fa-solid fa-print"></i><span>Período</span></sl-button></div><div data-recipe-history-body class="dispatch-clients-manager-list produccion-recipe-history-table-host"></div><div class="d-flex align-items-center justify-content-between mt-2"><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-recipe-history-prev><i class="fa-solid fa-chevron-left"></i></sl-button><span data-recipe-history-pager>Página 1 de 1</span><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-recipe-history-next><i class="fa-solid fa-chevron-right"></i></sl-button></div></div>`,
+      html: `<div class="text-start produccion-recipe-history-modal"><sl-input type="search" class="mb-2" data-recipe-history-search placeholder="Buscar por código"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input><div class="produccion-inline-filter mb-2"><input type="text" class="lj-input" data-recipe-history-range placeholder="Filtrar rango (desde - hasta)" autocomplete="off"><sl-button variant="default" type="button" class="lj-icon-btn" data-recipe-history-range-clear aria-label="Limpiar rango"><i class="fa-solid fa-xmark"></i></sl-button></div><div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><sl-button variant="default" type="button" class="inventario-threshold-btn" data-recipe-history-expand><i slot="prefix" class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></sl-button><sl-button variant="default" type="button" class="inventario-threshold-btn" data-recipe-history-excel><i slot="prefix" class="fa-solid fa-file-excel prod-excel-icon"></i><span>Excel</span></sl-button><span class="inventario-period-divider" aria-hidden="true"></span><sl-button variant="default" type="button" class="inventario-threshold-btn" data-recipe-history-print><i slot="prefix" class="fa-solid fa-print"></i><span>Período</span></sl-button></div><div data-recipe-history-body class="dispatch-clients-manager-list produccion-recipe-history-table-host"></div><div class="d-flex align-items-center justify-content-between mt-2"><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-recipe-history-prev><i class="fa-solid fa-chevron-left"></i></sl-button><span data-recipe-history-pager>Página 1 de 1</span><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-recipe-history-next><i class="fa-solid fa-chevron-right"></i></sl-button></div></div>`,
       confirmButtonText: 'Cerrar',
       didOpen: (popup) => {
         const rangeInput = popup.querySelector('[data-recipe-history-range]');
@@ -5395,7 +5398,7 @@
       const locationRow = !collapsed && locationLabel
         ? `<tr class="inventario-internal-use-row"><td colspan="8"><i class="fa-solid fa-house"></i> ${escapeHtml(locationLabel)}</td></tr>`
         : '';
-      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${products.length ? `<sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-dispatch-collapse="${escapeHtml(row.id)}" title="${collapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${collapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${collapsed ? 'fa-expand' : 'fa-compress'}"></i></sl-button>` : ''}<span>${escapeHtml(dispatchDateMeta.label)}</span></div></td><td>${productLabel}</td><td>${products.map((item) => escapeHtml(getDispatchProductSummaryLabel(item))).join('<br>')}</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || row.id || '-')}</td><td>${escapeHtml(client.name || '-')}</td><td><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-dispatch-planilla="${escapeHtml(row.id)}"><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planilla</span></sl-button></td><td><sl-button size="small" variant="danger" type="button" class="inventario-threshold-btn" data-dispatch-delete="${escapeHtml(row.id)}"><i slot="prefix" class="fa-solid fa-trash"></i><span>Eliminar</span></sl-button></td></tr>${detailRows}${locationRow}`;
+      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${products.length ? `<sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-dispatch-collapse="${escapeHtml(row.id)}" title="${collapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${collapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${collapsed ? 'fa-expand' : 'fa-compress'}"></i></sl-button>` : ''}<span>${escapeHtml(dispatchDateMeta.label)}</span></div></td><td>${productLabel}</td><td>${products.map((item) => escapeHtml(getDispatchProductSummaryLabel(item))).join('<br>')}</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || row.id || '-')}</td><td>${escapeHtml(client.name || '-')}</td><td><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-dispatch-planilla="${escapeHtml(row.id)}"><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planilla</span></sl-button></td><td><sl-button size="small" variant="default" type="button" class="lj-icon-btn is-danger inventario-threshold-btn" data-dispatch-delete="${escapeHtml(row.id)}" title="Eliminar" aria-label="Eliminar"><i class="fa-solid fa-trash"></i></sl-button></td></tr>${detailRows}${locationRow}`;
     }).join('') : '<tr><td colspan="8" class="text-center">Sin repartos para el filtro seleccionado.</td></tr>';
     const tableWrap = nodes.dispatchView.querySelector('#produccionDispatchTableWrap');
     if (!tableWrap) return;
@@ -5406,7 +5409,7 @@
     if (!nodes.dispatchView) return;
     state.dispatchCreateMode = false;
     state.dispatchXlsxMode = false;
-    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><sl-button variant="default" id="produccionDispatchBackBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-arrow-left"></i><span>Volver</span></sl-button><h6 class="step-title mb-0">Salida de Productos</h6><div class="produccion-dispatch-head-actions"><sl-button variant="success" id="produccionDispatchNewBtn" type="button" class="inventario-threshold-btn"><sl-icon slot="prefix" name="plus-lg"></sl-icon><span>Reparto</span></sl-button><sl-button variant="primary" id="produccionDispatchXlsxBtn" type="button" class="inventario-threshold-btn"><sl-icon slot="prefix" name="plus-lg"></sl-icon><span>Repartos por XLSX</span></sl-button></div></div><div class="inventario-period-filters"><sl-input id="produccionDispatchSearch" type="search" class="produccion-dispatch-filter" placeholder="Buscar reparto, cliente o producto" value="${escapeHtml(state.dispatchSearch)}"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input><input id="produccionDispatchRange" class="lj-input produccion-dispatch-filter" placeholder="Seleccionar rango de fechas" value="${escapeHtml(state.dispatchRange)}"><div class="toolbar-scroll-x inventario-period-actions-scroll"><sl-button variant="default" id="produccionDispatchClearBtn" type="button" class="inventario-delete-btn inventario-threshold-btn ${(state.dispatchRange || state.dispatchSearch) ? '' : 'd-none'}"><i slot="prefix" class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></sl-button><sl-button variant="primary" id="produccionDispatchApplyBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-filter"></i><span>Aplicar</span></sl-button><sl-button variant="default" id="produccionDispatchExpandBtn" type="button" class="inventario-expand-btn inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></sl-button><sl-button variant="success" id="produccionDispatchExcelBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-file-excel"></i><span>Excel</span></sl-button><sl-button variant="success" id="produccionDispatchAssalBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-shield-halved"></i><span>Excel Assal</span></sl-button><span class="inventario-period-divider" aria-hidden="true"></span><sl-button variant="default" id="produccionDispatchPrintBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-print"></i><span>Imprimir período</span></sl-button><sl-button variant="default" id="produccionDispatchMassBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planillas masivas</span></sl-button></div></div><div id="produccionDispatchTableWrap"></div>`;
+    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><sl-button variant="default" id="produccionDispatchBackBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-arrow-left"></i><span>Volver</span></sl-button><h6 class="step-title mb-0">Salida de Productos</h6><div class="produccion-dispatch-head-actions"><sl-button variant="default" id="produccionDispatchXlsxBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-file-excel prod-excel-icon"></i><span>Repartos por XLSX</span></sl-button><sl-button variant="success" id="produccionDispatchNewBtn" type="button" class="inventario-threshold-btn"><sl-icon slot="prefix" name="plus-lg"></sl-icon><span>Reparto</span></sl-button></div></div><div class="inventario-period-filters"><sl-input id="produccionDispatchSearch" type="search" class="produccion-dispatch-filter" placeholder="Buscar reparto, cliente o producto" value="${escapeHtml(state.dispatchSearch)}"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input><input id="produccionDispatchRange" class="lj-input produccion-dispatch-filter" placeholder="Seleccionar rango de fechas" value="${escapeHtml(state.dispatchRange)}"><div class="toolbar-scroll-x inventario-period-actions-scroll"><sl-button variant="default" id="produccionDispatchClearBtn" type="button" class="inventario-delete-btn inventario-threshold-btn ${(state.dispatchRange || state.dispatchSearch) ? '' : 'd-none'}"><i slot="prefix" class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></sl-button><sl-button variant="primary" id="produccionDispatchApplyBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-filter"></i><span>Aplicar</span></sl-button><sl-button variant="default" id="produccionDispatchExpandBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></sl-button><sl-button variant="default" id="produccionDispatchExcelBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-file-excel prod-excel-icon"></i><span>Excel</span></sl-button><sl-button variant="default" id="produccionDispatchAssalBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-shield-halved prod-excel-icon"></i><span>Excel Assal</span></sl-button><span class="inventario-period-divider" aria-hidden="true"></span><sl-button variant="default" id="produccionDispatchPrintBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-print"></i><span>Imprimir período</span></sl-button><sl-button variant="default" id="produccionDispatchMassBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planillas masivas</span></sl-button></div></div><div id="produccionDispatchTableWrap"></div>`;
     const rangeInput = nodes.dispatchView.querySelector('#produccionDispatchRange');
     if (window.flatpickr && rangeInput) {
       const locale = window.flatpickr.l10ns?.es || undefined;
@@ -7616,7 +7619,7 @@
     const html = rows.length
       ? `<sl-input id="dispatchVehiclesSearchInput" type="search" class="dispatch-vehicles-search-group" placeholder="Buscar por número, patente o marca" autocomplete="off"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input><div id="dispatchVehiclesManagerList" class="dispatch-vehicles-manager-list">${rows.map((item) => {
         const meta = getDispatchVehicleExpiryMeta(item);
-        return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}" data-vehicle-search="${escapeHtml(normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`))}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-edit="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-pen"></i><span>Editar</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i slot="prefix" class="fa-regular fa-eye"></i><span>Adjunto</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-upload"></i><span>Reemplazar</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-paperclip"></i><span>Quitar</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></sl-button><sl-button size="small" variant="danger" type="button" class="inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-trash"></i><span>Eliminar</span></sl-button></div></div>`;
+        return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}" data-vehicle-search="${escapeHtml(normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`))}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-edit="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-pen"></i><span>Editar</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i slot="prefix" class="fa-regular fa-eye"></i><span>Adjunto</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-upload"></i><span>Reemplazar</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-paperclip"></i><span>Quitar</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></sl-button><sl-button size="small" variant="default" type="button" class="lj-icon-btn is-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}" title="Eliminar" aria-label="Eliminar"><i class="fa-solid fa-trash"></i></sl-button></div></div>`;
       }).join('')}</div>`
       : '<p>No hay unidades cargadas.</p>';
     const result = await openIosSwal({
@@ -7633,7 +7636,7 @@
           const rowsLive = Object.values(safeObject(state.reparto.vehicles || {}));
           list.innerHTML = rowsLive.map((item) => {
             const meta = getDispatchVehicleExpiryMeta(item);
-            return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}" data-vehicle-search="${escapeHtml(normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`))}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-edit="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-pen"></i><span>Editar</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i slot="prefix" class="fa-regular fa-eye"></i><span>Adjunto</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-upload"></i><span>Reemplazar</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-paperclip"></i><span>Quitar</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></sl-button><sl-button size="small" variant="danger" type="button" class="inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-trash"></i><span>Eliminar</span></sl-button></div></div>`;
+            return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}" data-vehicle-search="${escapeHtml(normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`))}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-edit="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-pen"></i><span>Editar</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i slot="prefix" class="fa-regular fa-eye"></i><span>Adjunto</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-upload"></i><span>Reemplazar</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-paperclip"></i><span>Quitar</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></sl-button><sl-button size="small" variant="default" type="button" class="lj-icon-btn is-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}" title="Eliminar" aria-label="Eliminar"><i class="fa-solid fa-trash"></i></sl-button></div></div>`;
           }).join('') || '<p>No hay unidades cargadas.</p>';
         };
         const searchInput = box?.querySelector('#dispatchVehiclesSearchInput');
@@ -8231,7 +8234,6 @@
     renderRneExpiryAlert();
     renderModalRneBadge();
     renderRecipeGroups();
-    nodes.list.classList.toggle('is-compact', Boolean(state.compactList));
     const query = normalizeLower(state.search);
     const activeGroup = state.activeRecipeGroupId || 'all';
     const matchesQuery = (item) => !query
@@ -8244,7 +8246,7 @@
       .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
     // Vista compacta: recetas más producidas arriba para ubicarlas rápido.
     const usageByRecipe = {};
-    if (state.compactList) {
+    {
       getRegistrosList().forEach((reg) => {
         if (normalizeValue(reg.status) === 'anulada') return;
         const rid = normalizeValue(reg.recipeId);
@@ -8274,301 +8276,203 @@
       setStateView(getRecipes().length ? 'list' : 'empty');
       return;
     }
-    const buildCoverageChecksHtml = (analysis) => `
-        <div class="produccion-checks-list">${analysis.requirements.map((item) => `
-          <span class="produccion-check-item ${item.missingForMin <= 0.0001 ? 'is-ok' : (item.missingForMinIncludingExpired <= 0.0001 ? 'is-expired' : 'is-missing')}">
-            <i class="fa-solid ${item.missingForMin <= 0.0001 ? 'fa-circle-check' : (item.missingForMinIncludingExpired <= 0.0001 ? 'fa-triangle-exclamation' : 'fa-circle-xmark')}"></i>
-            <span>${item.name}${item.hasRelatedCoverage ? ` · sustituto ${item.substitutionCount}` : ''}</span>
-          </span>`).join('')}
-        </div>`;
-    const countAvailableIngredients = (analysis) => analysis.requirements.filter((item) => item.missingForMin <= 0.0001).length;
-    // Menú "Más opciones" compartido entre la tarjeta completa y la fila compacta.
-    const buildMoreMenuHtml = (recipe) => `
-              <div class="produccion-more-wrap">
-                <sl-button variant="text" type="button" class="lj-icon-btn produccion-more-btn" data-recipe-more="${recipe.id}" aria-label="Más opciones"><sl-icon name="three-dots-vertical"></sl-icon></sl-button>
-                <div class="produccion-more-menu d-none">
-                  <p class="produccion-more-menu-header">Más opciones</p>
-                  <div class="produccion-more-divider"></div>
-                  <button type="button" class="lj-tile produccion-more-item" data-produce-sin-trazabilidad="${recipe.id}">
-                    <span class="produccion-more-item-icon"><sl-icon name="exclamation-triangle-fill"></sl-icon></span>
-                    <span class="produccion-more-item-body">
-                      <span class="produccion-more-item-label">Producir sin trazabilidad</span>
-                      <span class="produccion-more-item-desc">Insumos sin stock no serán trazados</span>
-                    </span>
-                  </button>
-                  <button type="button" class="lj-tile produccion-more-item" data-produce-lote-antiguo="${recipe.id}">
-                    <span class="produccion-more-item-icon"><sl-icon name="calendar-minus"></sl-icon></span>
-                    <span class="produccion-more-item-body">
-                      <span class="produccion-more-item-label">Producir lote antiguo</span>
-                      <span class="produccion-more-item-desc">Producción retroactiva, sin tocar stock</span>
-                    </span>
-                  </button>
-                  <button type="button" class="lj-tile produccion-more-item" data-recipe-image-view="${recipe.id}" ${normalizeValue(recipe.imageUrl) ? '' : 'disabled'}>
-                    <span class="produccion-more-item-icon"><i class="fa-regular fa-image"></i></span>
-                    <span class="produccion-more-item-body">
-                      <span class="produccion-more-item-label">Ver imagen</span>
-                      <span class="produccion-more-item-desc">Imagen de la receta</span>
-                    </span>
-                  </button>
-                </div>
-              </div>`;
-    // Fila compacta: una línea por receta (semáforo + nombre + máximo + producir).
-    // Toda la fila abre el modo "Visualizar"; el botón "+" abre "Producir".
-    const buildCompactRowHtml = (recipe) => {
+    // ===== Vista maestro-detalle (mismo patrón que Recetas): lista a la izquierda, ficha a la derecha =====
+    const todayIso = toIsoDate();
+    const monthPrefix = todayIso.slice(0, 7);
+    const toneOf = (analysis) => {
+      const expiredOnly = Boolean(!analysis.canProduce && analysis.canProduceConsideringExpired);
+      if (expiredOnly) return { tone: 'info', label: 'Con expirados' };
+      if (analysis.status === 'success') return { tone: 'ok', label: 'Disponible' };
+      if (analysis.status === 'warning') return { tone: 'warn', label: analysis.statusText || 'Stock parcial' };
+      return { tone: 'bad', label: analysis.statusText || 'Sin insumos' };
+    };
+    const maxKgOf = (analysis) => (Boolean(!analysis.canProduce && analysis.canProduceConsideringExpired)
+      ? Number(analysis.maxKgIncludingExpired || 0)
+      : Number(analysis.maxKg || 0));
+    const isInfiniteMax = (analysis) => Boolean(Array.isArray(analysis.requirements) && analysis.requirements.length && analysis.requirements.every((item) => item.infiniteStock));
+    const thumbHtml = (recipe, size = '') => `<span class="recetas-thumb receta-thumb-wrap ${size}">${recipe.imageUrl
+      ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="receta-thumb js-produccion-thumb" src="${escapeHtml(recipe.imageUrl)}" alt="" loading="lazy">`
+      : getThumbPlaceholder()}</span>`;
+    const recipeRegistros = (recipeId) => getRegistrosList()
+      .filter((reg) => normalizeValue(reg.recipeId) === normalizeValue(recipeId) && normalizeValue(reg.status) !== 'anulada')
+      .sort((x, y) => getRegistroProductionIso(y).localeCompare(getRegistroProductionIso(x)) || Number(y.createdAt || 0) - Number(x.createdAt || 0));
+
+    if (!list.some((item) => item.id === state.prodSelectedId)) {
+      state.prodSelectedId = list[0].id;
+      state.prodDetailOpen = false;
+    }
+
+    const rowsHtml = list.map((recipe) => {
       const analysis = state.analysis[recipe.id] || analyzeRecipe(recipe);
+      const tone = toneOf(analysis);
+      const on = recipe.id === state.prodSelectedId;
+      const sub = [recipe.nombreComercial ? capitalize(recipe.nombreComercial) : '', capitalize(getRecipeGroupLabel(recipe) || '') || 'Sin grupo'].filter(Boolean).join(' · ');
+      const maxLabel = isInfiniteMax(analysis) ? 'Sin límite' : `${maxKgOf(analysis).toFixed(1)} kg`;
+      return `<button type="button" class="lj-tile recetas-item prod-md-item ${on ? 'is-active' : ''}" role="option" aria-selected="${on}" tabindex="${on ? 0 : -1}" data-prod-select="${escapeHtml(recipe.id)}">
+          ${thumbHtml(recipe)}
+          <span class="recetas-item-copy"><strong>${escapeHtml(capitalize(recipe.title || 'Sin título'))}</strong><small>${escapeHtml(sub)}</small></span>
+          <span class="prod-md-item-tags">
+            <span class="recetas-tag tone-${tone.tone}" title="Estado del stock">${escapeHtml(tone.label)}</span>
+            <span class="prod-md-item-max" title="Máximo producible hoy">${escapeHtml(maxLabel)}</span>
+          </span>
+        </button>`;
+    }).join('');
+
+    const buildFichaHtml = (recipe) => {
+      const analysis = state.analysis[recipe.id] || analyzeRecipe(recipe);
+      const tone = toneOf(analysis);
       const isExpiredOnlyAvailable = Boolean(!analysis.canProduce && analysis.canProduceConsideringExpired);
-      const showInfiniteMax = Array.isArray(analysis.requirements) && analysis.requirements.length && analysis.requirements.every((item) => item.infiniteStock);
-      const statusClass = isExpiredOnlyAvailable
-        ? 'tone-expired'
-        : (analysis.status === 'success' ? 'tone-success' : analysis.status === 'warning' ? 'tone-warning' : 'tone-danger');
-      // Entrar a producir nunca se bloquea por falta de stock: dentro del editor
-      // el usuario puede cambiar la fecha (lotes viejos/futuros) y recalcular.
-      // Sólo se bloquea si la receta no tiene ingredientes válidos.
       const canOpenProduction = Array.isArray(analysis.requirements) && analysis.requirements.length > 0;
       const hasStockToday = Boolean(analysis.canProduce || analysis.canProduceConsideringExpired);
-      const maxKg = isExpiredOnlyAvailable ? Number(analysis.maxKgIncludingExpired || 0) : Number(analysis.maxKg || 0);
-      const maxHtml = showInfiniteMax
-        ? '<strong class="produccion-compact-max">&infin;</strong>'
-        : `<strong class="produccion-compact-max ${maxKg <= 0.0001 ? 'is-zero' : ''}">${maxKg.toFixed(2)} <span>kg${isExpiredOnlyAvailable ? '*' : ''}</span></strong>`;
-      const usageCount = usageByRecipe[normalizeValue(recipe.id)] || 0;
-      const thumb = recipe.imageUrl
-        ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="receta-thumb js-produccion-thumb" src="${recipe.imageUrl}" alt="${capitalize(recipe.title || 'Receta')}" loading="lazy">`
-        : getThumbPlaceholder();
-      const statusLabel = isExpiredOnlyAvailable ? 'Disponible con expirados' : analysis.statusText;
-      return `
-        <article class="produccion-compact-row ${statusClass}" data-open-produccion="${recipe.id}" data-open-produccion-mode="view" title="${escapeHtml(capitalize(recipe.title || 'Receta'))} · ${escapeHtml(statusLabel)} · Tocá para visualizar">
-          <span class="produccion-compact-thumb receta-thumb-wrap">${thumb}</span>
-          <span class="produccion-semaforo" aria-hidden="true"></span>
-          <span class="produccion-compact-name">
-            <strong>${capitalize(recipe.title || 'Sin título')}</strong>
-            <small>${[recipe.nombreComercial ? escapeHtml(capitalize(recipe.nombreComercial)) : '', escapeHtml(capitalize(getRecipeGroupLabel(recipe) || ''))].filter(Boolean).join(' · ') || escapeHtml(statusLabel)}</small>
-          </span>
-          <span class="produccion-compact-uses" title="Producciones registradas" aria-label="${usageCount} producciones registradas"><i class="fa-solid fa-industry" aria-hidden="true"></i>${usageCount}</span>
-          <span class="produccion-compact-max-wrap" title="Máximo producible hoy"><small>Máx. hoy</small>${maxHtml}</span>
-          <sl-button variant="${analysis.canProduce ? 'success' : 'danger'}" size="small" type="button" class="${canOpenProduction ? '' : 'is-disabled'} produccion-compact-produce-btn" data-open-produccion="${recipe.id}" data-open-produccion-mode="produce" ${canOpenProduction ? '' : 'disabled'} title="${hasStockToday ? 'Producir' : 'Sin stock para hoy: entrá y probá otra fecha'}"><sl-icon slot="prefix" name="plus-lg"></sl-icon>Producir</sl-button>
-          ${buildMoreMenuHtml(recipe)}
-        </article>`;
-    };
-    const cardsHtml = state.compactList ? list.map(buildCompactRowHtml).join('') : list.map((recipe) => {
-      const analysis = state.analysis[recipe.id] || analyzeRecipe(recipe);
       const dispatchMeta = getProducedStockMeta(recipe.id);
       const draftLock = getRecipeDraftLockInfo(recipe.id);
-      const groupLabel = getRecipeGroupLabel(recipe);
-      const isExpiredOnlyAvailable = Boolean(!analysis.canProduce && analysis.canProduceConsideringExpired);
-      const showInfiniteMax = Array.isArray(analysis.requirements) && analysis.requirements.length && analysis.requirements.every((item) => item.infiniteStock);
-      const statusClass = isExpiredOnlyAvailable
-        ? 'tone-expired'
-        : (analysis.status === 'success' ? 'tone-success' : analysis.status === 'warning' ? 'tone-warning' : 'tone-danger');
-      // Entrar a producir nunca se bloquea por falta de stock (ver fila compacta).
-      const canOpenProduction = Array.isArray(analysis.requirements) && analysis.requirements.length > 0;
-      const hasStockToday = Boolean(analysis.canProduce || analysis.canProduceConsideringExpired);
-      const actionVariant = analysis.canProduce ? 'success' : 'danger';
-      const action = `<sl-button variant="${actionVariant}" type="button" class="produccion-main-btn ${canOpenProduction ? '' : 'is-disabled'}" data-open-produccion="${recipe.id}" data-open-produccion-mode="produce" ${canOpenProduction ? '' : 'disabled'} title="${hasStockToday ? 'Producir' : 'Sin stock para hoy: entrá y probá otra fecha'}"><sl-icon slot="prefix" name="plus-lg"></sl-icon><span>Producir</span></sl-button>`;
-      const inventoryAction = analysis.canProduce
-        ? ''
-        : `<sl-button variant="default" type="button" class="inventory-production-action-btn is-inventory" data-open-inventario="1"><i slot="prefix" class="fa-solid fa-boxes-stacked"></i><span>Inventario</span></sl-button>`;
-      const viewAction = `<sl-button variant="default" type="button" class="produccion-visualizar-btn" data-open-produccion="${recipe.id}" data-open-produccion-mode="view"><i slot="prefix" class="fa-regular fa-eye"></i><span>Visualizar</span></sl-button>`;
       const foreignDraft = getForeignDraftConflict(recipe.id);
+      const groupLabel = getRecipeGroupLabel(recipe);
+      const regs = recipeRegistros(recipe.id);
+      const lastReg = regs[0] || null;
+      const lastIso = lastReg ? getRegistroProductionIso(lastReg) : '';
+      const lastFallbackTs = state.config.lastProductionByRecipe?.[recipe.id] || recipe.lastProductionAt || recipe.production?.lastAt || 0;
+      const monthRegs = regs.filter((reg) => getRegistroProductionIso(reg).startsWith(monthPrefix));
+      const monthKg = monthRegs.reduce((acc, reg) => acc + Number(reg.quantityKg || 0), 0);
+      const total = analysis.requirements.length;
+      const missing = analysis.requirements.filter((item) => item.missingForMin > 0.0001).length;
+      const coverage = isExpiredOnlyAvailable ? Number(analysis.progressIncludingExpired || 0) : Number(analysis.progress || 0);
+      const maxKg = maxKgOf(analysis);
+      const maxValue = isInfiniteMax(analysis) ? 'Sin límite' : `${maxKg.toFixed(2)} kg${isExpiredOnlyAvailable ? '*' : ''}`;
+      const maxTone = isInfiniteMax(analysis) || maxKg > 0.0001 ? (analysis.canProduce ? 'ok' : 'warn') : 'bad';
+
+      const expiryHtml = (() => {
+        const expMeta = getRecipeNextExpiryMeta(recipe.id);
+        if (!expMeta.hasStock) return '';
+        if (expMeta.expired) return `<span class="recetas-tag tone-bad" title="Vto. ${escapeHtml(formatIsoEs(expMeta.expiryIso))}"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>Vencido</span>`;
+        if (!Number.isFinite(expMeta.days)) return '';
+        const label = expMeta.days === 0 ? 'Vence hoy' : `Vence en ${expMeta.days} día${expMeta.days === 1 ? '' : 's'}`;
+        return `<span class="recetas-tag ${expMeta.days <= 7 ? 'tone-warn' : 'tone-neu'}" title="Vto. ${escapeHtml(formatIsoEs(expMeta.expiryIso))}"><i class="fa-regular fa-clock" aria-hidden="true"></i>${escapeHtml(label)}</span>`;
+      })();
+
+      const substitutable = analysis.requirements.filter((item) => item.missingForMin > 0.0001 && item.hasRelatedCoverage);
       const badges = [
-        analysis.missingForMin.length
-          ? `<span class="produccion-badge">${isExpiredOnlyAvailable ? 'Faltan insumos frescos' : 'Faltan insumos'}</span>`
-          : '',
-        analysis.requirements.some((item) => item.missingForMin > 0.0001 && item.hasRelatedCoverage)
-          ? `<span class="produccion-badge is-warning">Sustituible por ${analysis.requirements.filter((item) => item.missingForMin > 0.0001 && item.hasRelatedCoverage).reduce((sum, item) => sum + item.substitutionCount, 0)} ingrediente(s)</span>`
-          : '',
-        (!isExpiredOnlyAvailable && analysis.status === 'warning') ? '<span class="produccion-badge is-warning">Stock parcial</span>' : '',
-        analysis.hasExpired ? '<span class="produccion-badge is-danger">Posee lotes expirados</span>' : '',
-        analysis.nextAvailableDate ? `<span class="produccion-badge is-warning">Stock desde ${formatIsoEs(analysis.nextAvailableDate)}</span>` : '',
-        foreignDraft ? '<span class="produccion-badge is-warning">Borrador en uso</span>' : ''
+        substitutable.length ? `<span class="recetas-tag tone-warn">Sustituible por ${substitutable.reduce((sum, item) => sum + item.substitutionCount, 0)} ingrediente(s)</span>` : '',
+        analysis.hasExpired ? '<span class="recetas-tag tone-bad">Posee lotes expirados</span>' : '',
+        analysis.nextAvailableDate ? `<span class="recetas-tag tone-warn">Stock desde ${escapeHtml(formatIsoEs(analysis.nextAvailableDate))}</span>` : '',
+        foreignDraft ? '<span class="recetas-tag tone-warn">Borrador en uso por otro usuario</span>' : ''
       ].filter(Boolean).join('');
-      const missingFresh = analysis.missingForMin.filter((item) => Number(item.missingForMinIncludingExpired || 0) > 0.0001);
-      const expiredOnlyIngredients = analysis.requirements.filter((item) => item.missingForMin > 0.0001 && item.missingForMinIncludingExpired <= 0.0001);
-      const missingHtml = analysis.missingForMin.length
-        ? `<div class="produccion-missing-list">${missingFresh.map((item) => {
-          const substituteHint = item.hasRelatedCoverage
-            ? ` · sustituye con ${item.substitutionCount} relacionado(s)`
-            : '';
-          const futureHint = item.nextEntryDate ? ` · ingresa ${formatIsoEs(item.nextEntryDate)}` : '';
-          return `<p><strong>${item.name}:</strong> disponible ${formatQty(item.available, item.unit)} / faltan ${formatQty(item.missingForMin, item.unit)}${substituteHint}${futureHint}</p>`;
-        }).join('')}${expiredOnlyIngredients.map((item) => `<p><strong>${item.name}:</strong> sin stock fresco · disponible en expirado ${formatQty(item.totalAvailable, item.unit)}</p>`).join('')}</div>`
-        : '<p class="produccion-ok-line">Cobertura suficiente para iniciar producción.</p>';
-      const lastProductionAt = state.config.lastProductionByRecipe?.[recipe.id] || recipe.lastProductionAt || recipe.production?.lastAt || 0;
-      const expiredKgLine = Number(analysis.expiredKg || 0) > 0.0001
-        ? `<p class="produccion-alert-line is-expired"><i class="fa-solid fa-triangle-exclamation"></i> <strong>Kilos expirados:</strong> <strong>${Number(analysis.expiredKg || 0).toFixed(2)} kg</strong></p>`
-        : '';
       const expiredWindowsHtml = (() => {
         if (!analysis.hasExpired) return '';
-        const windows = getRecipeExpiredDateWindows(recipe, analysis, toIsoDate());
+        const windows = getRecipeExpiredDateWindows(recipe, analysis, todayIso);
         if (!windows.length) return '';
-        const detail = windows.length
-          ? windows.map((item) => `<span><strong>${escapeHtml(item.ingredientName)}:</strong> ${escapeHtml(formatIsoEs(item.from || ''))} a ${escapeHtml(formatIsoEs(item.to || ''))}</span>`).join('<br>')
-          : `<span>${escapeHtml(formatIsoEs(normalizeValue(formatDateRangeForRecipe(recipe).split(' a ')[0] || '')))} a ${escapeHtml(formatIsoEs(normalizeValue(formatDateRangeForRecipe(recipe).split(' a ')[1] || '')))}</span>`;
-        const headline = (!analysis.canProduce && analysis.canProduceConsideringExpired)
-          ? `Podes producir con lote vencido ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg, pero en este rango por producto:`
-          : 'Lotes vencidos detectados en este rango por producto:';
-        return `<p class="produccion-alert-line is-expired"><i class="fa-solid fa-calendar-days"></i> ${headline}<br>${detail}</p>`;
+        const headline = isExpiredOnlyAvailable
+          ? `Podés producir con lote vencido hasta ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg. Rangos con lotes vencidos:`
+          : 'Rangos con lotes vencidos por ingrediente:';
+        return `<p class="prod-ficha-alert-line"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i><span>${headline}<br>${windows.map((item) => `<strong>${escapeHtml(item.ingredientName)}:</strong> ${escapeHtml(formatIsoEs(item.from || ''))} a ${escapeHtml(formatIsoEs(item.to || ''))}`).join('<br>')}</span></p>`;
       })();
+      const expiredKgLine = Number(analysis.expiredKg || 0) > 0.0001
+        ? `<p class="prod-ficha-alert-line"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>Kilos expirados: <strong>${Number(analysis.expiredKg || 0).toFixed(2)} kg</strong></span></p>` : '';
       const draftLockLine = draftLock?.blockedKg > 0
-        ? `<p class="produccion-alert-line" data-draft-lock-line="${recipe.id}"><i class="fa-solid fa-lock"></i> Bloqueado por borrador: <strong>${draftLock.blockedKg.toFixed(2)} kg</strong> · disponible en <strong data-draft-lock-time="${recipe.id}">${formatCountdown(draftLock.remainingMs)}</strong></p>`
-        : '';
-      const errorsOrMissing = analysis.errors.length
-        ? `<p class="produccion-error">${analysis.errors[0]}</p>`
-        : missingHtml;
-      const hasAlerts = Boolean(badges) || Boolean(expiredKgLine) || Boolean(expiredWindowsHtml) || Boolean(draftLockLine);
-      const ingredientsAvailable = countAvailableIngredients(analysis);
-      const ingredientsTotal = analysis.requirements.length;
-      const coveragePct = (isExpiredOnlyAvailable ? Number(analysis.progressIncludingExpired || 0) : analysis.progress).toFixed(0);
-      const coverageBarClass = isExpiredOnlyAvailable
-        ? 'is-expired'
-        : (analysis.status === 'danger' ? 'is-danger' : analysis.progress >= 100 ? 'is-success' : 'is-warning');
-      const maxProducibleForHero = isExpiredOnlyAvailable
-        ? Number(analysis.maxKgIncludingExpired || 0)
-        : Number(analysis.maxKg || 0);
-      const heroMaxZeroClass = (!showInfiniteMax && maxProducibleForHero <= 0.0001) ? 'is-zero' : '';
+        ? `<p class="prod-ficha-alert-line" data-draft-lock-line="${recipe.id}"><i class="fa-solid fa-lock" aria-hidden="true"></i><span>Bloqueado por borrador: <strong>${draftLock.blockedKg.toFixed(2)} kg</strong> · disponible en <strong data-draft-lock-time="${recipe.id}">${formatCountdown(draftLock.remainingMs)}</strong></span></p>` : '';
+      const alertsHtml = (badges || expiredWindowsHtml || expiredKgLine || draftLockLine)
+        ? `<section class="recetas-detail-section prod-ficha-alerts">
+            <h6 class="recetas-detail-title"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>Alertas</h6>
+            ${badges ? `<div class="prod-ficha-tags">${badges}</div>` : ''}${expiredKgLine}${expiredWindowsHtml}${draftLockLine}
+          </section>` : '';
+
+      const insumoStateHtml = (item) => {
+        if (item.infiniteStock) return '<span class="recetas-tag tone-neu">Stock infinito</span>';
+        if (item.missingForMin <= 0.0001) return '<span class="recetas-tag tone-ok"><i class="fa-solid fa-circle-check" aria-hidden="true"></i>Listo</span>';
+        if (item.missingForMinIncludingExpired <= 0.0001) return '<span class="recetas-tag tone-warn"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>Sólo vencido</span>';
+        return `<span class="recetas-tag tone-bad"><i class="fa-solid fa-circle-xmark" aria-hidden="true"></i>Faltan ${escapeHtml(formatQty(item.missingForMin, item.unit))}</span>`;
+      };
+      const insumosHtml = analysis.errors?.length
+        ? `<p class="recetas-detail-empty-text">${escapeHtml(analysis.errors[0])}</p>`
+        : (total ? `<div class="recetas-detail-table-wrap"><table class="recetas-detail-table prod-ficha-table">
+            <thead><tr><th>Ingrediente</th><th class="is-num">Por kg</th><th class="is-num">Disponible</th><th>Estado</th></tr></thead>
+            <tbody>${analysis.requirements.map((item) => {
+              const hints = [item.hasRelatedCoverage ? `sustituye con ${item.substitutionCount}` : '', item.nextEntryDate ? `ingresa ${formatIsoEs(item.nextEntryDate)}` : ''].filter(Boolean).join(' · ');
+              return `<tr><td>${escapeHtml(item.name)}${hints ? `<small class="prod-ficha-hint">${escapeHtml(hints)}</small>` : ''}</td><td class="is-num">${escapeHtml(formatQty(item.neededPerKg, item.unit, 3))}</td><td class="is-num">${item.infiniteStock ? 'Sin límite' : `${escapeHtml(formatQty(item.available, item.unit))}${item.available <= 0.0001 && item.hasRelatedCoverage ? '<small class="prod-ficha-hint">cubre con sustitutos</small>' : ''}`}</td><td>${insumoStateHtml(item)}</td></tr>`;
+            }).join('')}</tbody>
+          </table></div>` : '<p class="recetas-detail-empty-text">La receta no tiene ingredientes vinculados.</p>');
+
+      const recentHtml = regs.length
+        ? `<div class="recetas-detail-table-wrap"><table class="recetas-detail-table prod-ficha-table">
+            <thead><tr><th>Producción</th><th class="is-num">Kilos</th><th class="prod-col-code">Código</th><th class="is-num">Acciones</th></tr></thead>
+            <tbody>${regs.slice(0, 6).map((reg) => `<tr>
+              <td title="${escapeHtml(reg.id || '')}">${escapeHtml(formatIsoEs(getRegistroProductionIso(reg)) || '-')}<small class="prod-ficha-hint prod-code-inline">${escapeHtml(reg.id || '')}</small></td>
+              <td class="is-num">${Number(reg.quantityKg || 0).toFixed(2)}</td>
+              <td class="prod-col-code"><span class="prod-ficha-code">${escapeHtml(reg.id || '-')}</span></td>
+              <td class="is-num"><span class="prod-ficha-row-actions">
+                <sl-button size="small" variant="default" type="button" class="lj-icon-btn" data-fp-trace="${escapeHtml(reg.id)}" title="Trazabilidad" aria-label="Trazabilidad"><i class="fa-solid fa-diagram-project"></i></sl-button>
+                <sl-button size="small" variant="default" type="button" class="lj-icon-btn" data-fp-planilla="${escapeHtml(reg.id)}" title="Planilla" aria-label="Planilla"><i class="fa-regular fa-file-lines"></i></sl-button>
+                <sl-button size="small" variant="default" type="button" class="lj-icon-btn" data-fp-qr="${escapeHtml(reg.id)}" title="Imprimir QR" aria-label="Imprimir QR"><i class="fa-solid fa-qrcode"></i></sl-button>
+              </span></td>
+            </tr>`).join('')}</tbody>
+          </table></div>
+          <sl-button variant="text" size="small" type="button" class="prod-ficha-link" data-open-production-stock="${recipe.id}"><i slot="prefix" class="fa-solid fa-list-ul"></i>Ver todas las producciones</sl-button>`
+        : '<p class="recetas-detail-empty-text">Todavía no hay producciones registradas.</p>';
+
       return `
-        <article class="ingrediente-card receta-card produccion-card produccion-card-v2 ${statusClass}">
-          <div class="ingrediente-main receta-main">
-            <header class="produccion-card-header produccion-row-head">
-              <div class="produccion-card-titles">
-                <div class="produccion-card-avatar ingrediente-avatar receta-thumb-wrap">
-                  ${recipe.imageUrl
-                    ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="receta-thumb js-produccion-thumb" src="${recipe.imageUrl}" alt="${capitalize(recipe.title || 'Receta')}" loading="lazy">`
-                    : getThumbPlaceholder()}
-                </div>
-                <h6 class="ingrediente-name receta-name">${capitalize(recipe.title || 'Sin título')}</h6>
-                ${recipe.nombreComercial ? `<p class="produccion-nombre-comercial">${escapeHtml(capitalize(recipe.nombreComercial))}</p>` : ''}
-                <p class="produccion-recipe-folder"><i class="fa-regular fa-folder" aria-hidden="true"></i>${escapeHtml(groupLabel ? capitalize(groupLabel) : 'Sin carpeta')}</p>
-              </div>
-              <span class="produccion-chip ${statusClass}"><span class="produccion-semaforo"></span>${isExpiredOnlyAvailable ? 'Disponible con expirados' : analysis.statusText}</span>
-            </header>
-
-            <section class="produccion-zone produccion-zone-stock">
-              <div class="produccion-hero-max-v3 ${heroMaxZeroClass}">
-                <div class="produccion-hero-max-left">
-                  <span class="produccion-hero-max-icon"><i class="fa-solid fa-arrow-up-right-dots"></i></span>
-                  <div class="produccion-hero-max-text">
-                    <small>Máximo producible para hoy</small>
-                    ${isExpiredOnlyAvailable
-                      ? `<strong class="produccion-hero-max-value">${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} <span>kg*</span></strong>`
-                      : (showInfiniteMax ? '<strong class="produccion-hero-max-value">&infin;</strong>' : `<strong class="produccion-hero-max-value">${analysis.maxKg.toFixed(2)} <span>kg</span></strong>`)}
-                  </div>
-                </div>
-                <div class="produccion-hero-max-progress">
-                  <div class="produccion-progress-bar"><span class="${coverageBarClass}" style="width:${(isExpiredOnlyAvailable ? Number(analysis.progressIncludingExpired || 0) : analysis.progress).toFixed(1)}%"></span></div>
-                  <small>Cobertura del mínimo: ${coveragePct}%${isExpiredOnlyAvailable ? ' (con expirados)' : ''}</small>
-                </div>
-              </div>
-              <div class="produccion-stats-row-v2">
-                <div class="produccion-stat-mini-v2 is-min">
-                  <span class="produccion-stat-mini-icon"><i class="fa-solid fa-down-long"></i></span>
-                  <div class="produccion-stat-mini-text">
-                    <small>Mínimo</small>
-                    <strong>${analysis.minKg.toFixed(2)} <span>kg</span></strong>
-                  </div>
-                </div>
-                <div class="produccion-stat-mini-v2 is-stock-up">
-                  <span class="produccion-stat-mini-icon"><i class="fa-solid fa-warehouse"></i></span>
-                  <div class="produccion-stat-mini-text">
-                    <small>Disponible <i class="fa-solid fa-arrow-up"></i></small>
-                    <strong>${dispatchMeta.available.toFixed(2)} <span>kg</span></strong>
-                    ${(() => {
-                        const expMeta = getRecipeNextExpiryMeta(recipe.id);
-                        if (!expMeta.hasStock) return '';
-                        // Sumamos los kg de TODAS las producciones que vencen
-                        // en el mismo día que la más próxima (no sólo la primera),
-                        // así "Vence hoy 72 kg" muestra el total real.
-                        const sameDayKg = (() => {
-                          if (!expMeta.expiryIso) return Number(expMeta.availableKg || 0);
-                          const todayIso = toIsoDate();
-                          return getRegistrosList()
-                            .filter((reg) => normalizeValue(reg.recipeId) === normalizeValue(recipe.id) && normalizeValue(reg.status) !== 'anulada')
-                            .filter((reg) => {
-                              const iso = resolveProductExpiryIso(reg);
-                              return iso && iso === expMeta.expiryIso;
-                            })
-                            .reduce((acc, reg) => acc + getDispatchAvailableByProductionId(reg.id), 0);
-                        })();
-                        const kgLabel = sameDayKg > 0.0001 ? ` · ${sameDayKg.toFixed(2)} kg` : '';
-                        if (expMeta.expired) {
-                          return `<span class="produccion-expiry-badge is-danger" title="Vto. ${formatIsoEs(expMeta.expiryIso)}"><i class="fa-solid fa-circle-exclamation"></i> Vencido${kgLabel}</span>`;
-                        }
-                        if (!Number.isFinite(expMeta.days)) return '';
-                        const tone = expMeta.days <= 7 ? 'is-warning' : 'is-info';
-                        const label = expMeta.days === 0
-                          ? `Vence hoy${kgLabel}`
-                          : `Vence en ${expMeta.days} día${expMeta.days === 1 ? '' : 's'}${kgLabel}`;
-                        return `<span class="produccion-expiry-badge ${tone}" title="Vto. ${formatIsoEs(expMeta.expiryIso)} · ${expMeta.availableKg.toFixed(2)} kg"><i class="fa-solid fa-clock"></i> ${label}</span>`;
-                      })()}
-                  </div>
-                </div>
-                <div class="produccion-stat-mini-v2 is-stock-down">
-                  <span class="produccion-stat-mini-icon"><i class="fa-solid fa-truck-fast"></i></span>
-                  <div class="produccion-stat-mini-text">
-                    <small>Egresados <button type="button" class="lj-tile produccion-stat-mini-period-btn" data-egresados-period title="Cambiar período de egresados">(${dispatchMeta.periodDays || 7}d) <i class="fa-solid fa-pen"></i></button></small>
-                    <strong>${dispatchMeta.lastWeekOut.toFixed(2)} <span>kg</span></strong>
-                  </div>
-                </div>
-                <div class="produccion-stat-mini-v2 is-last">
-                  <span class="produccion-stat-mini-icon"><i class="fa-solid fa-calendar-day"></i></span>
-                  <div class="produccion-stat-mini-text">
-                    <small>Última producción</small>
-                    <strong class="is-date">${formatDate(lastProductionAt)}</strong>
-                  </div>
-                </div>
-              </div>
-              <div class="produccion-zone-footer produccion-zone-footer-v2">
-                <sl-button variant="text" type="button" class="p-0 produccion-zone-link" data-open-production-stock="${recipe.id}"><i slot="prefix" class="fa-solid fa-list-ul"></i> Ver producciones</sl-button>
-                <sl-button variant="text" type="button" class="p-0 produccion-zone-link produccion-product-history-btn" data-open-recipe-history="${recipe.id}"><i slot="prefix" class="fa-solid fa-clock-rotate-left"></i> Historial de movimientos</sl-button>
-              </div>
-            </section>
-
-            <section class="produccion-zone produccion-zone-ingredientes" data-collapsed="${query ? 'false' : 'true'}">
-              <button type="button" class="lj-tile produccion-zone-toggle" data-toggle-ingredientes="${recipe.id}">
-                <span class="produccion-zone-toggle-left">
-                  <i class="fa-solid fa-flask"></i>
-                  <span class="produccion-zone-toggle-label">Ingredientes</span>
-                  <span class="produccion-zone-count ${ingredientsAvailable === ingredientsTotal ? 'is-ok' : 'is-warn'}">${ingredientsAvailable}/${ingredientsTotal} listos</span>
-                </span>
-                <i class="fa-solid fa-chevron-down produccion-zone-toggle-icon"></i>
-              </button>
-              ${analysis.missingForMin.length ? `<p class="produccion-zone-summary">Faltan: ${analysis.missingForMin.slice(0, 3).map((item) => escapeHtml(item.name)).join(', ')}${analysis.missingForMin.length > 3 ? ` y ${analysis.missingForMin.length - 3} más` : ''}</p>` : ''}
-              <div class="produccion-zone-body">
-                ${buildCoverageChecksHtml(analysis)}
-                ${errorsOrMissing}
-              </div>
-            </section>
-
-            ${hasAlerts ? `
-            <section class="produccion-zone produccion-zone-alertas">
-              <h4 class="produccion-zone-title"><i class="fa-solid fa-triangle-exclamation"></i><span>Alertas</span></h4>
-              ${badges ? `<div class="produccion-badges">${badges}</div>` : ''}
-              ${expiredKgLine}
-              ${expiredWindowsHtml}
-              ${draftLockLine}
-            </section>` : ''}
-
-            <footer class="produccion-zone produccion-zone-acciones" data-collapsed="false">
-              <button type="button" class="lj-tile produccion-zone-toggle" data-toggle-acciones="${recipe.id}">
-                <span class="produccion-zone-toggle-left">
-                  <i class="fa-solid fa-bolt"></i>
-                  <span class="produccion-zone-toggle-label">Acciones</span>
-                </span>
-                <i class="fa-solid fa-chevron-up produccion-zone-toggle-icon"></i>
-              </button>
-              <div class="produccion-zone-body">
-              <div class="produccion-actions-row inventory-production-actions">
-                ${action.replace('produccion-main-btn', 'produccion-main-btn inventory-production-action-btn is-main')}
-                <span class="barra-vertical produccion-actions-divider" aria-hidden="true"></span>
-                ${inventoryAction}
-                ${viewAction.replace('produccion-visualizar-btn', 'produccion-visualizar-btn inventory-production-action-btn is-view')}
-                <sl-button variant="default" type="button" class="inventory-production-action-btn is-threshold" data-set-recipe-min="${recipe.id}"><i slot="prefix" class="fa-solid fa-sliders"></i><span>Umbral</span></sl-button>
-              ${buildMoreMenuHtml(recipe)}
-            </div>
-            </div>
-            </footer>
+        <div class="recetas-detail-mobilebar">
+          <sl-button variant="default" size="small" type="button" data-prod-detail-back><i slot="prefix" class="fa-solid fa-arrow-left"></i>Volver</sl-button>
+        </div>
+        <header class="recetas-detail-head">
+          ${thumbHtml(recipe, 'is-large')}
+          <div class="recetas-detail-titles">
+            <h6 class="recetas-detail-name">${escapeHtml(capitalize(recipe.title || 'Sin título'))}</h6>
+            ${recipe.nombreComercial ? `<p class="recetas-detail-commercial">${escapeHtml(capitalize(recipe.nombreComercial))}</p>` : ''}
+            <p class="recetas-detail-group"><i class="fa-regular fa-folder" aria-hidden="true"></i>${escapeHtml(groupLabel ? capitalize(groupLabel) : 'Sin grupo')}<span class="recetas-tag tone-${tone.tone}">${escapeHtml(tone.label)}</span></p>
           </div>
-        </article>`;
-    }).join('');
+          <div class="recetas-detail-tools">
+            <sl-button variant="primary" size="small" type="button" data-open-produccion="${recipe.id}" data-open-produccion-mode="produce" ${canOpenProduction ? '' : 'disabled'} title="${hasStockToday ? 'Producir' : 'Sin stock para hoy: entrá y probá otra fecha'}"><i slot="prefix" class="fa-solid fa-plus"></i>Producir</sl-button>
+            <sl-button variant="default" size="small" type="button" data-open-produccion="${recipe.id}" data-open-produccion-mode="view"><i slot="prefix" class="fa-regular fa-eye"></i>Ver receta</sl-button>
+            <sl-dropdown hoist placement="bottom-end" class="recetas-detail-more prod-ficha-more">
+              <sl-button slot="trigger" variant="default" size="small" class="lj-icon-btn" title="Más acciones" aria-label="Más acciones"><i class="fa-solid fa-ellipsis-vertical"></i></sl-button>
+              <sl-menu>
+                <sl-menu-item data-open-recipe-history="${recipe.id}"><i slot="prefix" class="fa-solid fa-clock-rotate-left"></i>Historial de movimientos</sl-menu-item>
+                <sl-menu-item data-open-production-stock="${recipe.id}"><i slot="prefix" class="fa-solid fa-list-ul"></i>Producciones y stock</sl-menu-item>
+                <sl-menu-item data-fp-planilla="${escapeHtml(lastReg?.id || '')}" ${lastReg ? '' : 'disabled'}><i slot="prefix" class="fa-regular fa-file-lines"></i>Planilla de la última producción</sl-menu-item>
+                <sl-menu-item data-fp-trace="${escapeHtml(lastReg?.id || '')}" ${lastReg ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-diagram-project"></i>Trazabilidad de la última producción</sl-menu-item>
+                <sl-menu-item data-fp-qr="${escapeHtml(lastReg?.id || '')}" ${lastReg ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-qrcode"></i>QR de la última producción</sl-menu-item>
+                <sl-divider></sl-divider>
+                <sl-menu-item data-set-recipe-min="${recipe.id}"><i slot="prefix" class="fa-solid fa-sliders"></i>Umbral mínimo</sl-menu-item>
+                <sl-menu-item data-recipe-image-view="${recipe.id}" ${normalizeValue(recipe.imageUrl) ? '' : 'disabled'}><i slot="prefix" class="fa-regular fa-image"></i>Ver imagen</sl-menu-item>
+                ${analysis.canProduce ? '' : '<sl-menu-item data-open-inventario="1"><i slot="prefix" class="fa-solid fa-boxes-stacked"></i>Ir a inventario</sl-menu-item>'}
+                <sl-divider></sl-divider>
+                <sl-menu-item data-produce-sin-trazabilidad="${recipe.id}"><i slot="prefix" class="fa-solid fa-triangle-exclamation"></i>Producir sin trazabilidad</sl-menu-item>
+                <sl-menu-item data-produce-lote-antiguo="${recipe.id}"><i slot="prefix" class="fa-solid fa-calendar-minus"></i>Producir lote antiguo</sl-menu-item>
+              </sl-menu>
+            </sl-dropdown>
+          </div>
+        </header>
+
+        <div class="recetas-kpis">
+          <div class="recetas-kpi"><span>Máx. producible hoy</span><b class="tone-${maxTone}">${escapeHtml(maxValue)}</b><small>Mínimo ${analysis.minKg.toFixed(2)} kg · cobertura ${coverage.toFixed(0)}%</small></div>
+          <div class="recetas-kpi"><span>Última producción</span><b>${escapeHtml(lastIso ? formatIsoEs(lastIso) : formatDate(lastFallbackTs))}</b><small>${lastReg ? `${Number(lastReg.quantityKg || 0).toFixed(2)} kg` : 'Por fecha de producción'}</small></div>
+          <div class="recetas-kpi"><span>Producido este mes</span><b>${monthKg.toFixed(2)} kg</b><small>${monthRegs.length} producción${monthRegs.length === 1 ? '' : 'es'}</small></div>
+          <div class="recetas-kpi"><span>Insumos faltantes</span><b class="tone-${missing ? (missing === total ? 'bad' : 'warn') : 'ok'}">${missing} de ${total}</b><small>${missing ? 'Para el mínimo de hoy' : 'Todo listo'}</small></div>
+        </div>
+
+        <div class="prod-ficha-facts">
+          <span class="prod-ficha-fact"><i class="fa-solid fa-warehouse" aria-hidden="true"></i>Stock elaborado <strong>${dispatchMeta.available.toFixed(2)} kg</strong></span>
+          ${expiryHtml}
+          <button type="button" class="lj-tile prod-ficha-fact prod-ficha-fact-btn" data-egresados-period title="Cambiar período de egresados"><i class="fa-solid fa-truck-fast" aria-hidden="true"></i>Egresados ${dispatchMeta.periodDays || 7} días <strong>${dispatchMeta.lastWeekOut.toFixed(2)} kg</strong><i class="fa-solid fa-pen prod-ficha-fact-edit" aria-hidden="true"></i></button>
+        </div>
+
+        ${alertsHtml}
+
+        <section class="recetas-detail-section">
+          <h6 class="recetas-detail-title"><i class="fa-solid fa-flask" aria-hidden="true"></i>Insumos para el mínimo de hoy</h6>
+          ${insumosHtml}
+        </section>
+
+        <section class="recetas-detail-section">
+          <h6 class="recetas-detail-title"><i class="fa-solid fa-industry" aria-hidden="true"></i>Últimas producciones</h6>
+          ${recentHtml}
+        </section>`;
+    };
+    const selectedRecipe = list.find((item) => item.id === state.prodSelectedId) || list[0];
+    const cardsHtml = `<div class="recetas-md prod-md ${state.prodDetailOpen ? 'is-detail-open' : ''}" data-prod-md>
+        <div class="recetas-list prod-md-list" role="listbox" aria-label="Recetas para producir">${rowsHtml}</div>
+        <section class="recetas-detail prod-md-detail" aria-live="polite">${buildFichaHtml(selectedRecipe)}</section>
+      </div>`;
     const drafts = getOwnDrafts();
     const draftsHtml = drafts.length
       ? `<section class="produccion-drafts-wrap">
@@ -9150,7 +9054,7 @@
         const manager = getManagerLabel(item);
         const productImage = normalizeValue(item?.traceability?.product?.imageUrl) || normalizeValue(state.recetas?.[item.recipeId]?.imageUrl);
         const productCell = `<span style="display:inline-flex;align-items:center;gap:8px;">${productImage ? `<img src="${escapeHtml(productImage)}" style="width:28px;height:28px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<strong>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</strong></span>`;
-        const main = `<tr><td>${escapeHtml(item.id || '-')}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${productCell}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)}<br><small>${escapeHtml(manager.role)}</small></td><td>${escapeHtml(formatProductExpiryLabel(item))} (VTO)</td></tr>`;
+        const main = `<tr><td>${escapeHtml(item.id || '-')}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${productCell}</td><td class="is-num">${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)}<br><small>${escapeHtml(manager.role)}</small></td><td>${escapeHtml(formatProductExpiryLabel(item))} (VTO)</td></tr>`;
         const resolutions = (Array.isArray(item?.lots) ? item.lots : [])
           .flatMap((plan) => (Array.isArray(plan?.lots) ? plan.lots : [])
             .flatMap((lot) => (Array.isArray(lot?.expiryResolutions) ? lot.expiryResolutions : [])
@@ -9164,7 +9068,7 @@
       const imagesHtml = ask.isConfirmed && tracesWithAttachments.length
         ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));">${tracesWithAttachments.map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><figcaption style="font-size:12px;color:#4b5f8e;font-weight:700;">${escapeHtml(getTraceIngredientLabelText(trace))}</figcaption></div>${(trace.invoiceImageUrls || []).map((url) => `<img src="${url}" style="width:100%;max-height:220px;object-fit:contain;border-radius:10px;margin-top:8px;">`).join('')}</figure>`).join('')}</div></section>`
         : '';
-      win.document.write(`<html><head><title>Historial producción ${escapeHtml(capitalize(recipe.title || ''))}</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.is-trace-row td{background:#ffecef}.is-resolution-row td{background:#fff6d9}.print-trace-date{color:#1f6fd6;font-weight:700}.print-trace-vto{color:#b04a09;font-weight:700}</style></head><body><h1>Historial producción ${escapeHtml(capitalize(recipe.title || ''))}</h1><table><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>VTO producto</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
+      win.document.write(`<html><head><title>Historial producción ${escapeHtml(capitalize(recipe.title || ''))}</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.is-trace-row td{background:#ffecef}.is-resolution-row td{background:#fff6d9}.print-trace-date{color:#1f6fd6;font-weight:700}.print-trace-vto{color:#b04a09;font-weight:700}</style></head><body><h1>Historial producción ${escapeHtml(capitalize(recipe.title || ''))}</h1><table><thead><tr><th>ID</th><th>Fecha y hora</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>Vencimiento</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
       win.document.close();
       win.focus();
       await waitPrintAssets(win);
@@ -9196,7 +9100,7 @@
         const traceHtml = (!isCollapsed && traceRows.length)
           ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${getTraceIngredientLabelHtml(trace)}</span></div></td><td></td><td><span class="produccion-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="produccion-trace-expiry">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td><td><span class="produccion-trace-badge">Trazabilidad</span></td><td>-</td><td>${trace.invoiceImageUrls.length ? `<sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-trace-images="${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}"><i slot="prefix" class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></sl-button>` : '<sl-button variant="danger" type="button" class="inventario-no-photo-btn" disabled>Sin adjuntos</sl-button>'}</td><td>-</td></tr>`).join('') : '';
         const resolvedTraceHtml = traceHtml || (!isCollapsed && hasTracePreview ? renderTraceLoadingRow(10) : '');
-        return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${hasTracePreview ? `<sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isRegistroDetailLoading(item) ? 'fa-circle-notch fa-spin' : (isCollapsed ? 'fa-expand' : 'fa-compress')}"></i></sl-button>` : ''}<span>${escapeHtml(item.id || '-')}</span></div></td><td>${renderProductionDateCell(item)}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${renderProductExpiryCell(item)}</td><td><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img slot="prefix" src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></sl-button></td><td><div class="produccion-planilla-actions"><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planilla</span></sl-button><sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></sl-button></div></td><td>${renderTraceAttachmentsBtnHtml(item, traceRows, 'data-recipe-prod-trace-images')}</td><td><sl-button size="small" variant="danger" type="button" class="inventario-threshold-btn" data-recipe-prod-delete="${escapeHtml(item.id || '')}"><i slot="prefix" class="fa-solid fa-trash"></i><span>Eliminar</span></sl-button></td></tr>${resolvedTraceHtml}`;
+        return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${hasTracePreview ? `<sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isRegistroDetailLoading(item) ? 'fa-circle-notch fa-spin' : (isCollapsed ? 'fa-expand' : 'fa-compress')}"></i></sl-button>` : ''}<span class="is-code">${escapeHtml(item.id || '-')}</span></div></td><td>${renderProductionDateCell(item)}</td><td>${escapeHtml(capitalize(item.recipeTitle || '-'))}</td><td class="is-num">${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${renderProductExpiryCell(item)}</td><td><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img slot="prefix" src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></sl-button></td><td><div class="produccion-planilla-actions"><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planilla</span></sl-button><sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></sl-button></div></td><td>${renderTraceAttachmentsBtnHtml(item, traceRows, 'data-recipe-prod-trace-images')}</td><td><sl-button size="small" variant="default" type="button" class="lj-icon-btn is-danger inventario-threshold-btn" data-recipe-prod-delete="${escapeHtml(item.id || '')}" title="Eliminar" aria-label="Eliminar"><i class="fa-solid fa-trash"></i></sl-button></td></tr>${resolvedTraceHtml}`;
       }).join('');
       node.innerHTML = `
         <div class="inventario-table-head enhanced">
@@ -9207,8 +9111,8 @@
             </div>
             <div class="inventario-print-row toolbar-scroll-x">
               <sl-button variant="default" type="button" class="inventario-delete-btn inventario-threshold-btn ${recipeHistoryState.range ? '' : 'd-none'}" id="produccionRecipeHistoryClearBtn"><i slot="prefix" class="fa-solid fa-xmark"></i><span>Limpiar rango</span></sl-button>
-              <sl-button variant="default" type="button" class="inventario-expand-btn inventario-threshold-btn" id="produccionRecipeHistoryExpandBtn"><i slot="prefix" class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar</span></sl-button>
-              <sl-button variant="success" type="button" class="inventario-threshold-btn" id="produccionRecipeHistoryExcelBtn"><i slot="prefix" class="fa-solid fa-file-excel"></i><span>Excel</span></sl-button>
+              <sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionRecipeHistoryExpandBtn"><i slot="prefix" class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar</span></sl-button>
+              <sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionRecipeHistoryExcelBtn"><i slot="prefix" class="fa-solid fa-file-excel prod-excel-icon"></i><span>Excel</span></sl-button>
               <span class="inventario-period-divider" aria-hidden="true"></span>
               <sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionRecipeHistoryPrintFilteredBtn"><i slot="prefix" class="fa-solid fa-print"></i><span>Imprimir filtro</span></sl-button>
               <sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionRecipeHistoryPrintAllBtn"><i slot="prefix" class="fa-solid fa-print"></i><span>Imprimir total</span></sl-button>
@@ -9221,7 +9125,7 @@
         </div>
         <div class="table-responsive inventario-table-compact-wrap">
           <table class="table recipe-table inventario-table-compact mb-0">
-            <thead><tr><th>ID producción</th><th>Fecha</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead>
+            <thead><tr><th>Código</th><th>Fecha</th><th>Producto</th><th class="is-num">Kilos</th><th>Responsable</th><th>Vencimiento</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead>
             <tbody>${htmlRows}</tbody>
           </table>
         </div>`;
@@ -9543,7 +9447,7 @@
               ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${getTraceIngredientLabelHtml(trace)}</span></div></td><td></td><td><span class="produccion-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="produccion-trace-expiry">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td><td><span class="produccion-trace-badge">Trazabilidad</span></td><td>-</td><td>${trace.invoiceImageUrls.length ? `<sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-trace-images="${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}"><i slot="prefix" class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></sl-button>` : '<sl-button variant="danger" type="button" class="inventario-no-photo-btn" disabled>Sin adjuntos</sl-button>'}</td></tr>`).join('')
               : '';
             const resolvedTraceHtml = traceHtml || (!isCollapsed && hasTracePreview ? renderTraceLoadingRow(10) : '');
-            return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${hasTracePreview ? `<sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isRegistroDetailLoading(item) ? 'fa-circle-notch fa-spin' : (isCollapsed ? 'fa-expand' : 'fa-compress')}"></i></sl-button>` : ''}<span>${escapeHtml(item.id || '-')}</span></div></td><td>${renderProductionDateCell(item)}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${renderProductExpiryCell(item)}</td><td><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img slot="prefix" src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></sl-button></td><td><div class="produccion-planilla-actions"><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planilla</span></sl-button><sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></sl-button></div></td><td>${renderTraceAttachmentsBtnHtml(item, traceRows, 'data-recipe-prod-trace-images')}</td><td><sl-button size="small" variant="danger" type="button" class="inventario-threshold-btn" data-recipe-prod-delete="${escapeHtml(item.id || '')}"><i slot="prefix" class="fa-solid fa-trash"></i><span>Eliminar</span></sl-button></td></tr>${resolvedTraceHtml}`;
+            return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${hasTracePreview ? `<sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isRegistroDetailLoading(item) ? 'fa-circle-notch fa-spin' : (isCollapsed ? 'fa-expand' : 'fa-compress')}"></i></sl-button>` : ''}<span class="is-code">${escapeHtml(item.id || '-')}</span></div></td><td>${renderProductionDateCell(item)}</td><td>${escapeHtml(capitalize(item.recipeTitle || '-'))}</td><td class="is-num">${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${renderProductExpiryCell(item)}</td><td><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img slot="prefix" src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></sl-button></td><td><div class="produccion-planilla-actions"><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planilla</span></sl-button><sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></sl-button></div></td><td>${renderTraceAttachmentsBtnHtml(item, traceRows, 'data-recipe-prod-trace-images')}</td><td><sl-button size="small" variant="default" type="button" class="lj-icon-btn is-danger inventario-threshold-btn" data-recipe-prod-delete="${escapeHtml(item.id || '')}" title="Eliminar" aria-label="Eliminar"><i class="fa-solid fa-trash"></i></sl-button></td></tr>${resolvedTraceHtml}`;
           }).join('')
           : '<tr><td colspan="10" class="text-center">Sin producciones.</td></tr>';
         const renderExpandedContent = (popup) => {
@@ -9555,7 +9459,7 @@
           const canCollapseRows = traceableRows.some((item) => collapseMap[item.id] !== true);
           const canExpandRows = traceableRows.some((item) => collapseMap[item.id] === true);
           const pages = totalPages();
-          host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionRecipeExpandedHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-compress"></i><span>Colapsar</span></sl-button><sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionRecipeExpandedHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-expand"></i><span>Descolapsar</span></sl-button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID producción</th><th>Fecha</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead><tbody>${renderRows()}</tbody></table></div><div class="inventario-pagination enhanced"><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-recipe-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></sl-button><span>Página ${expandedPage} de ${pages}</span><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-recipe-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></sl-button></div>`;
+          host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionRecipeExpandedHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-compress"></i><span>Colapsar</span></sl-button><sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionRecipeExpandedHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-expand"></i><span>Descolapsar</span></sl-button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>Código</th><th>Fecha</th><th>Producto</th><th class="is-num">Kilos</th><th>Responsable</th><th>Vencimiento</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead><tbody>${renderRows()}</tbody></table></div><div class="inventario-pagination enhanced"><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-recipe-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></sl-button><span>Página ${expandedPage} de ${pages}</span><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-recipe-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></sl-button></div>`;
           prepareThumbLoaders('.js-produccion-thumb');
         };
         await openIosSwal({
@@ -10338,7 +10242,8 @@
     await LJModal.onceClosed(produccionModal);
     LJModal.open(inventarioModal);
   };
-  nodes.search.addEventListener('input', (event) => {
+  // sl-input cubre tipeo y el botón de borrar (clearable).
+  nodes.search.addEventListener('sl-input', (event) => {
     state.search = event.target.value;
     renderList();
   });
@@ -10408,7 +10313,61 @@
   });
 
   nodes.list.addEventListener('scroll', updateProduccionListScrollHint);
+  // Maestro-detalle: elegir receta re-renderiza conservando el scroll de la lista y el foco.
+  const selectProdRecipe = (recipeId, { focus = false, openDetail = null } = {}) => {
+    if (!recipeId) return;
+    const listNode = nodes.list.querySelector('.prod-md-list');
+    const scrollTop = listNode ? listNode.scrollTop : 0;
+    state.prodSelectedId = recipeId;
+    if (openDetail !== null) state.prodDetailOpen = openDetail;
+    renderList();
+    const nextList = nodes.list.querySelector('.prod-md-list');
+    if (nextList) nextList.scrollTop = scrollTop;
+    const detail = nodes.list.querySelector('.prod-md-detail');
+    if (detail) detail.scrollTop = 0;
+    if (focus) {
+      const row = nodes.list.querySelector(`[data-prod-select="${CSS.escape(recipeId)}"]`);
+      row?.focus({ preventScroll: true });
+      row?.scrollIntoView({ block: 'nearest' });
+    }
+  };
+  nodes.list.addEventListener('keydown', (event) => {
+    if (!event.target.closest?.('[data-prod-select]')) return;
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    const items = [...nodes.list.querySelectorAll('[data-prod-select]')];
+    if (!items.length) return;
+    event.preventDefault();
+    const current = Math.max(0, items.findIndex((node) => node.dataset.prodSelect === state.prodSelectedId));
+    let next = current;
+    if (event.key === 'ArrowDown') next = Math.min(items.length - 1, current + 1);
+    if (event.key === 'ArrowUp') next = Math.max(0, current - 1);
+    if (event.key === 'Home') next = 0;
+    if (event.key === 'End') next = items.length - 1;
+    selectProdRecipe(items[next].dataset.prodSelect, { focus: true });
+  });
   nodes.list.addEventListener('click', async (event) => {
+    const selectRow = event.target.closest('[data-prod-select]');
+    if (selectRow) {
+      selectProdRecipe(selectRow.dataset.prodSelect, { openDetail: true });
+      return;
+    }
+    if (event.target.closest('[data-prod-detail-back]')) {
+      state.prodDetailOpen = false;
+      nodes.list.querySelector('[data-prod-md]')?.classList.remove('is-detail-open');
+      nodes.list.querySelector(`[data-prod-select="${CSS.escape(state.prodSelectedId || '')}"]`)?.focus({ preventScroll: true });
+      return;
+    }
+    const fpBtn = event.target.closest('[data-fp-trace], [data-fp-planilla], [data-fp-qr]');
+    if (fpBtn) {
+      const id = fpBtn.dataset.fpTrace || fpBtn.dataset.fpPlanilla || fpBtn.dataset.fpQr;
+      if (!id) return;
+      const reg = await ensureRegistroDetail(id);
+      if (!reg) return;
+      if (fpBtn.dataset.fpTrace) await openTraceability(reg);
+      else if (fpBtn.dataset.fpQr) await openProductionQrPrintConfigurator(reg);
+      else await window.laJamoneraPlanillaProduccion?.openByRegistro?.(reg, { companyLogoUrl: normalizeValue(state.config.companyLogoUrl), usersMap: safeObject(state.users), recetas: safeObject(state.recetas), allowInvoices: true });
+      return;
+    }
     // "Buscar en toda la base" cuando filtro de grupo activo y no hay matches.
     if (event.target.closest('[data-prod-search-all]')) {
       state.activeRecipeGroupId = 'all';
@@ -10790,7 +10749,7 @@
         <td>-</td>
       </tr>`).join('') : '';
       const resolvedTraceHtml = traceHtml || (!isCollapsed && hasTracePreview ? renderTraceLoadingRow(10) : '');
-      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${hasTracePreview ? `<sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-prod-expanded-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isRegistroDetailLoading(item) ? 'fa-circle-notch fa-spin' : (isCollapsed ? 'fa-expand' : 'fa-compress')}"></i></sl-button>` : ''}<span>${escapeHtml(item.id)}</span></div></td><td>${renderProductionDateCell(item)}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)} (${escapeHtml(manager.role)})</td><td class="produccion-vto-cell">${renderProductExpiryCell(item)}</td><td><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img slot="prefix" src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></sl-button></td><td><div class="produccion-planilla-actions"><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planilla</span></sl-button><sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></sl-button></div></td><td>${renderTraceAttachmentsBtnHtml(item, traceRows, 'data-recipe-prod-trace-images')}</td><td><sl-button variant="danger" type="button" class="inventario-threshold-btn" data-prod-cancel="${escapeHtml(item.id || '')}"><i slot="prefix" class="fa-solid fa-trash"></i><span>Eliminar</span></sl-button></td></tr>${resolvedTraceHtml}`;
+      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${hasTracePreview ? `<sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-prod-expanded-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isRegistroDetailLoading(item) ? 'fa-circle-notch fa-spin' : (isCollapsed ? 'fa-expand' : 'fa-compress')}"></i></sl-button>` : ''}<span class="is-code">${escapeHtml(item.id)}</span></div></td><td>${renderProductionDateCell(item)}</td><td>${escapeHtml(capitalize(item.recipeTitle || '-'))}</td><td class="is-num">${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)} (${escapeHtml(manager.role)})</td><td class="produccion-vto-cell">${renderProductExpiryCell(item)}</td><td><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img slot="prefix" src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></sl-button></td><td><div class="produccion-planilla-actions"><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planilla</span></sl-button><sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></sl-button></div></td><td>${renderTraceAttachmentsBtnHtml(item, traceRows, 'data-recipe-prod-trace-images')}</td><td><sl-button size="small" variant="default" type="button" class="lj-icon-btn is-danger inventario-threshold-btn" data-prod-cancel="${escapeHtml(item.id || '')}" title="Eliminar" aria-label="Eliminar"><i class="fa-solid fa-trash"></i></sl-button></td></tr>${resolvedTraceHtml}`;
     }).join('') : '<tr><td colspan="10" class="text-center">Sin producciones.</td></tr>';
     const renderExpandedContent = (popup) => {
       const host = popup.querySelector('#produccionExpandedHistoryHost');
@@ -10801,7 +10760,7 @@
       const canCollapseRows = traceableRows.some((item) => collapseMap[item.id] !== true);
       const canExpandRows = traceableRows.some((item) => collapseMap[item.id] === true);
       const pages = totalPages();
-      host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionExpandedHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-compress"></i><span>Colapsar</span></sl-button><sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionExpandedHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-expand"></i><span>Descolapsar</span></sl-button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID</th><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead><tbody>${renderRows()}</tbody></table></div><div class="inventario-pagination enhanced"><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-prod-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></sl-button><span>Página ${expandedPage} de ${pages}</span><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-prod-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></sl-button></div>`;
+      host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionExpandedHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-compress"></i><span>Colapsar</span></sl-button><sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionExpandedHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-expand"></i><span>Descolapsar</span></sl-button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID</th><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>Vencimiento</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead><tbody>${renderRows()}</tbody></table></div><div class="inventario-pagination enhanced"><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-prod-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></sl-button><span>Página ${expandedPage} de ${pages}</span><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-prod-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></sl-button></div>`;
       prepareThumbLoaders('.js-produccion-thumb');
     };
     nodes.recipeGroups?.classList.add('d-none');
@@ -11637,7 +11596,7 @@
       const manager = getManagerLabel(item);
       const productImage = normalizeValue(item?.traceability?.product?.imageUrl) || normalizeValue(state.recetas?.[item.recipeId]?.imageUrl);
         const productCell = `<span style="display:inline-flex;align-items:center;gap:8px;">${productImage ? `<img src="${escapeHtml(productImage)}" style="width:28px;height:28px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<strong>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</strong></span>`;
-      const main = `<tr><td>${escapeHtml(item.id)}</td><td>${escapeHtml(formatIsoEs(item.productionDate))}</td><td>${productCell}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)}<br><small>${escapeHtml(manager.role)}</small></td><td>${escapeHtml(formatProductExpiryLabel(item))} (VTO)</td></tr>`;
+      const main = `<tr><td>${escapeHtml(item.id)}</td><td>${escapeHtml(formatIsoEs(item.productionDate))}</td><td>${productCell}</td><td class="is-num">${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)}<br><small>${escapeHtml(manager.role)}</small></td><td>${escapeHtml(formatProductExpiryLabel(item))} (VTO)</td></tr>`;
       const resolutions = (Array.isArray(item?.lots) ? item.lots : [])
         .flatMap((plan) => (Array.isArray(plan?.lots) ? plan.lots : [])
           .flatMap((lot) => (Array.isArray(lot?.expiryResolutions) ? lot.expiryResolutions : [])
@@ -11651,7 +11610,7 @@
     const imagesHtml = includeImages && tracesWithAttachments.length
       ? `<section><h2 style="margin:16px 0 10px;font-size:18px;">Imágenes adjuntas del período</h2><div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">${tracesWithAttachments.map((trace) => `<figure style="margin:0;border:1px solid #d7def2;border-radius:12px;padding:10px;background:#fff;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><figcaption style="font-size:12px;color:#4b5f8e;font-weight:700;">${escapeHtml(getTraceIngredientLabelText(trace))}</figcaption></div>${(trace.invoiceImageUrls || []).map((url, idx) => `<img src="${url}" style="width:100%;max-height:240px;object-fit:contain;border-radius:10px;margin-top:${idx ? '8px' : '0'};">`).join('')}</figure>`).join('')}</div></section>`
       : '';
-    win.document.write(`<html><head><title>Producción por período</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.is-trace-row td{background:#ffecef}.is-resolution-row td{background:#fff6d9}.print-trace-date{color:#1f6fd6;font-weight:700}.print-trace-vto{color:#b04a09;font-weight:700}</style></head><body><h1>Producción por período • La Jamonera</h1><table><thead><tr><th>ID producción</th><th>Fecha</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
+    win.document.write(`<html><head><title>Producción por período</title><style>body{font-family:Inter,Arial;padding:20px;color:#1f2a44}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d7def2;padding:6px;font-size:11px;vertical-align:top}th{background:#eef3ff;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.is-trace-row td{background:#ffecef}.is-resolution-row td{background:#fff6d9}.print-trace-date{color:#1f6fd6;font-weight:700}.print-trace-vto{color:#b04a09;font-weight:700}</style></head><body><h1>Producción por período • La Jamonera</h1><table><thead><tr><th>Código</th><th>Fecha</th><th>Producto</th><th class="is-num">Kilos</th><th>Responsable</th><th>Vencimiento</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">Sin datos</td></tr>'}</tbody></table>${imagesHtml}</body></html>`);
     win.document.close();
     win.focus();
     await waitPrintAssets(win);
@@ -12458,7 +12417,7 @@
               const locationRow = !collapsed && locationLabel
                 ? `<tr class="inventario-internal-use-row"><td colspan="8"><i class="fa-solid fa-house"></i> ${escapeHtml(locationLabel)}</td></tr>`
                 : '';
-              return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${products.length ? `<sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-dispatch-expanded-collapse="${escapeHtml(row.id)}"><i class="fa-solid ${collapsed ? 'fa-expand' : 'fa-compress'}"></i></sl-button>` : ''}<span>${escapeHtml(formatDateTime(row.createdAt))}</span></div></td><td>${products.length === 1 ? '1 producto' : `${products.length} productos`}</td><td>${products.map((item) => escapeHtml(getDispatchProductSummaryLabel(item))).join('<br>')}</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || '-')}</td><td>${escapeHtml(client.name || '-')}</td><td><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-dispatch-planilla="${escapeHtml(row.id)}"><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planilla</span></sl-button></td><td><sl-button size="small" variant="danger" type="button" class="inventario-threshold-btn" data-dispatch-delete="${escapeHtml(row.id)}"><i slot="prefix" class="fa-solid fa-trash"></i><span>Eliminar</span></sl-button></td></tr>${detail}${locationRow}`;
+              return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${products.length ? `<sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-dispatch-expanded-collapse="${escapeHtml(row.id)}"><i class="fa-solid ${collapsed ? 'fa-expand' : 'fa-compress'}"></i></sl-button>` : ''}<span>${escapeHtml(formatDateTime(row.createdAt))}</span></div></td><td>${products.length === 1 ? '1 producto' : `${products.length} productos`}</td><td>${products.map((item) => escapeHtml(getDispatchProductSummaryLabel(item))).join('<br>')}</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || '-')}</td><td>${escapeHtml(client.name || '-')}</td><td><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-dispatch-planilla="${escapeHtml(row.id)}"><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planilla</span></sl-button></td><td><sl-button size="small" variant="default" type="button" class="lj-icon-btn is-danger inventario-threshold-btn" data-dispatch-delete="${escapeHtml(row.id)}" title="Eliminar" aria-label="Eliminar"><i class="fa-solid fa-trash"></i></sl-button></td></tr>${detail}${locationRow}`;
             }).join('') || '<tr><td colspan="8">Sin datos.</td></tr>';
             popup.querySelector('#dispatchExpandedWrap').innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><sl-button variant="default" type="button" class="inventario-threshold-btn" data-dispatch-expanded-collapse-all ${canCollapseRows ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-compress"></i><span>Colapsar</span></sl-button><sl-button variant="default" type="button" class="inventario-threshold-btn" data-dispatch-expanded-expand-all ${canExpandRows ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-expand"></i><span>Descolapsar</span></sl-button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0 produccion-dispatch-table-center"><thead><tr><th>Fecha de reparto</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th><th>Planilla</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div><div class="inventario-pagination enhanced"><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-dispatch-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></sl-button><span>Página ${expandedPage} de ${pages}</span><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-dispatch-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></sl-button></div>`;
             prepareThumbLoaders('.js-produccion-thumb');

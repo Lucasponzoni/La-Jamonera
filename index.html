@@ -433,24 +433,18 @@
               </div>
 
               <div id="produccionData" class="produccion-data d-none" aria-live="polite">
-                <div class="ingredientes-toolbar produccion-toolbar">
-                  <sl-input id="produccionSearchInput" type="search" class="ingredientes-search-input ingredientes-search-group" placeholder="Buscar receta para producir"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input>
-                  <div class="produccion-toolbar-actions toolbar-scroll-x">
-                    <sl-button variant="default" id="produccionViewToggleBtn" type="button" class="produccion-view-toggle-btn" title="Cambiar a vista compacta">
-                      <i slot="prefix" class="fa-solid fa-list"></i><span>Vista compacta</span>
-                    </sl-button>
-                    <span class="barra-separadora"></span>
-                    <sl-button variant="default" id="produccionGlobalMinBtn" type="button" class="produccion-toolbar-icon-btn" title="Configurar umbral">
-                     <i slot="prefix" class="fa-solid fa-file-shield"></i><span>RNE</span>  <span class="barra-vertical"></span> <i class="fa-solid fa-gear"></i>
-                    </sl-button>
-                    <sl-button variant="default" id="produccionDispatchBtn" type="button" class="produccion-dispatch-btn"><i slot="prefix" class="fa-solid fa-truck-fast"></i><span>Salida de Productos</span></sl-button>
-                    <span class="barra-separadora"></span>
-                    <sl-button variant="default" id="produccionHistoryBtn" type="button" class="produccion-history-btn"><i slot="prefix" class="fa-solid fa-clock-rotate-left"></i><span>Historial</span></sl-button>
+                <div class="ingredientes-toolbar produccion-toolbar prod-toolbar">
+                  <sl-input id="produccionSearchInput" type="search" clearable class="prod-toolbar-search" placeholder="Buscar receta para producir" aria-label="Buscar receta"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input>
+                  <div id="produccionRecipeGroups" class="produccion-recipe-groups prod-toolbar-groups" aria-live="polite"></div>
+                  <div class="produccion-toolbar-actions prod-toolbar-actions">
+                    <sl-button variant="default" id="produccionGlobalMinBtn" type="button" class="lj-icon-btn" title="RNE de la empresa y umbral mínimo" aria-label="RNE de la empresa y umbral mínimo"><i class="fa-solid fa-file-shield"></i></sl-button>
+                    <sl-button variant="default" id="produccionHistoryBtn" type="button"><i slot="prefix" class="fa-solid fa-clock-rotate-left"></i>Historial</sl-button>
+                    <span class="prod-toolbar-divider" aria-hidden="true"></span>
+                    <sl-button variant="primary" id="produccionDispatchBtn" type="button" class="produccion-dispatch-btn"><i slot="prefix" class="fa-solid fa-truck-fast"></i>Salida de productos</sl-button>
                   </div>
                 </div>
                 <div id="produccionRneAlert" class="produccion-rne-expiry-alert d-none" aria-live="polite"></div>
-                <div id="produccionRecipeGroups" class="produccion-recipe-groups" aria-live="polite"></div>
-                <div id="produccionList" class="recetas-list produccion-list"></div>
+                <div id="produccionList" class="produccion-list"></div>
 
                 <section id="produccionPeriodView" class="inventario-period-board produccion-period-board d-none" aria-live="polite">
                   <div class="inventario-period-head">
@@ -463,8 +457,8 @@
                     <div class="toolbar-scroll-x inventario-period-actions-scroll">
                       <sl-button variant="default" id="produccionGlobalClearBtn" type="button" class="inventario-delete-btn inventario-threshold-btn d-none"><i slot="prefix" class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></sl-button>
                       <sl-button variant="primary" id="produccionGlobalApplyBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-filter"></i><span>Aplicar</span></sl-button>
-                      <sl-button variant="default" id="produccionGlobalExpandBtn" type="button" class="inventario-expand-btn inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></sl-button>
-                      <sl-button variant="success" id="produccionGlobalExcelBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-file-excel"></i><span>Excel</span></sl-button>
+                      <sl-button variant="default" id="produccionGlobalExpandBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></sl-button>
+                      <sl-button variant="default" id="produccionGlobalExcelBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-file-excel prod-excel-icon"></i><span>Excel</span></sl-button>
                       <span class="inventario-period-divider" aria-hidden="true"></span>
                       <sl-button variant="default" id="produccionGlobalPrintBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-print"></i><span>Período <sl-icon name="plus-lg"></sl-icon> Adjuntos <i class="fa-solid fa-paperclip"></i></span></sl-button>
                       <sl-button variant="default" id="produccionGlobalMassPlanillasBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planillas masivas</span></sl-button>

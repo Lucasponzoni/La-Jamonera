@@ -144,47 +144,45 @@ sl-dialog.lj-alert-dialog:has(.produccion-recipe-history-alert.is-expanded) {
 
 .produccion-responsable-wrap {
   display: grid;
-  line-height: 1.2;
+  gap: 1px;
+  line-height: 1.25;
 }
 
 .produccion-responsable-wrap strong {
-  color: var(--lj-accent);
+  color: var(--lj-text);
+  font-weight: 500;
 }
 
 .produccion-responsable-wrap small {
-  color: var(--lj-accent);
-  font-size: 0.74rem;
+  color: var(--lj-muted);
+  font-size: 12px;
 }
 
+/* Fecha en tablas: principal normal, secundaria (carga / kg vencidos) chica y apagada. */
 .produccion-history-date-stack {
-  display: inline-block !important;
-  gap: 2px;
-  line-height: 1.12;
+  display: inline-grid;
+  justify-items: start;
+  gap: 3px;
+  line-height: 1.2;
   white-space: nowrap;
 }
 
+.produccion-history-date-stack .prod-date-main,
 .produccion-history-date-stack strong {
-  display: block !important;
-  color: var(--lj-brand);
-  font-weight: 800;
+  color: var(--lj-text);
+  font-weight: 400;
 }
 
+.produccion-history-date-stack .prod-date-sub,
 .produccion-history-date-stack small {
-  display: block !important;
-  color: var(--lj-accent);
-  font-size: 0.68rem;
-  font-weight: 800;
-  margin-top: 2px;
-}
-
-.produccion-history-date-stack small span {
-  text-transform: uppercase;
-  letter-spacing: 0;
+  color: var(--lj-muted);
+  font-size: 12px;
+  font-weight: 400;
 }
 
 .produccion-vto-cell {
-  color: var(--lj-warning) !important;
-  font-weight: 800 !important;
+  color: inherit;
+  font-weight: 400;
 }
 
 .produccion-vto-stack .produccion-badge {
@@ -311,9 +309,10 @@ sl-dialog.lj-alert-dialog:has(.produccion-recipe-history-alert.is-expanded) {
     flex-wrap: nowrap;
   }
 
-  /* En columna, el flex-basis 260px de .ingredientes-search-group se vuelve alto. */
+  /* Buscador a ancho completo en su propia fila. */
   .produccion-toolbar > #produccionSearchInput {
-    flex: 0 0 auto;
+    flex: 1 1 100%;
+    max-width: none;
   }
 }
 
@@ -1450,11 +1449,15 @@ sl-dialog.lj-alert-dialog:has(.produccion-recipe-history-alert.is-expanded) {
   line-height: 1.2;
 }
 
-.produccion-history-product-comercial {
-  font-size: 0.74rem;
-  color: var(--lj-muted);
+.produccion-history-product-cell strong {
   font-weight: 500;
-  font-style: italic;
+  color: var(--lj-text);
+}
+
+.produccion-history-product-comercial {
+  font-size: 12px;
+  color: var(--lj-muted);
+  font-weight: 400;
   text-transform: none;
 }
 
