@@ -9,7 +9,7 @@
 }
 
 .panel-pill {
-  border-radius: var(--lj-radius);
+  border-radius: 4px;
   border: 1px solid var(--lj-danger);
   background: var(--lj-danger-soft);
   padding: 3px 10px;
@@ -137,10 +137,22 @@
 }
 
 .panel-spinner {
-  width: 52px;
-  height: 52px;
-  animation: spin .9s linear infinite;
+  font-size: 40px;
+  --indicator-color: var(--lj-accent);
+  --track-color: var(--lj-border);
 }
+
+/* Spinners chicos dentro de avatares, adjuntos y alertas del panel */
+.panel-user-avatar sl-spinner.meta-spinner-login,
+.attachment-loader sl-spinner.meta-spinner-login,
+.informes-saving-spinner sl-spinner.meta-spinner-login {
+  width: auto;
+  height: auto;
+  font-size: 22px;
+  --indicator-color: var(--lj-accent);
+  --track-color: var(--lj-border);
+}
+.informes-saving-spinner sl-spinner.meta-spinner-login { font-size: 40px; }
 
 /* =========================================
    KPIS
@@ -304,10 +316,7 @@
   justify-content: center;
 }
 
-.panel-avatar .panel-spinner {
-  width: 22px;
-  height: 22px;
-}
+.panel-avatar .panel-spinner { font-size: 20px; }
 
 .panel-item-text { min-width: 0; }
 .panel-item-text strong { color: var(--lj-text); display: block; font-size: 14px; font-weight: 600; }
@@ -394,7 +403,7 @@
 #panelUltimoInforme .importance-chip {
   min-height: 30px;
   padding: 4px 10px;
-  border-radius: var(--lj-radius);
+  border-radius: 4px;
   border: 1px solid var(--lj-border);
   background: var(--lj-surface-2);
   color: var(--lj-muted);
@@ -409,7 +418,7 @@
 #panelUltimoInforme .importance-warn,
 #panelUltimoInforme .importance-high { background: var(--lj-warning-soft); color: var(--lj-warning); border-color: transparent; }
 #panelUltimoInforme .importance-critical { background: var(--lj-danger-soft); color: var(--lj-danger); border-color: transparent; }
-#panelUltimoInforme sl-button.informe-print-chip { width: auto; height: auto; border: 0; background: none; box-shadow: none; padding: 0; }
+#panelUltimoInforme sl-button.informe-print-chip { width: auto; height: auto; border: 0; background: none; box-shadow: none; padding: 0; border-radius: 4px; }
 #panelUltimoInforme sl-button.informe-print-chip::part(base) { height: 30px; }
 #panelUltimoInforme .informe-card-user-text strong { color: var(--lj-text); font-size: 14px; }
 #panelUltimoInforme .informe-card-user-text small { color: var(--lj-muted); font-size: 12px; }

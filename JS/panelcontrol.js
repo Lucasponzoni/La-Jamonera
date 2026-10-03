@@ -99,7 +99,7 @@
     return `Hace ${days} días`;
   };
 
-  const spinner = (alt) => `<div class="panel-spinner-wrap"><img src="./IMG/Meta-ai-logo.webp" alt="${escapeHtml(alt)}" class="panel-spinner"></div>`;
+  const spinner = (alt) => `<div class="panel-spinner-wrap"><sl-spinner class="panel-spinner" aria-label="${escapeHtml(alt)}"></sl-spinner></div>`;
 
   const flattenReports = (tree) => {
     const output = [];
@@ -138,7 +138,7 @@
 
   const renderUserAvatar = (user) => {
     if (user.photoUrl) {
-      return `<span class="user-avatar-thumb panel-user-avatar"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-panel-thumb" src="${escapeHtml(user.photoUrl)}" alt="${escapeHtml(user.name)}"></span>`;
+      return `<span class="user-avatar-thumb panel-user-avatar"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-panel-thumb" src="${escapeHtml(user.photoUrl)}" alt="${escapeHtml(user.name)}"></span>`;
     }
     return `<span class="user-avatar-thumb">${escapeHtml(initials(user.name))}</span>`;
   };
@@ -210,11 +210,7 @@
         gap:12px;
         text-align:center;
       ">
-        <img
-          src="./IMG/Meta-ai-logo.webp"
-          alt="Procesando"
-          class="meta-spinner-login"
-        >
+        <sl-spinner class="meta-spinner-login" aria-label="Procesando"></sl-spinner>
         <p style="margin:0;">
           ${escapeHtml(message || 'Estamos trabajando...')}
         </p>
@@ -416,7 +412,7 @@ const printReport = async (report) => {
     const attachmentHtml = attachments.length
       ? attachments.map((item, index) => {
         if (item?.type === 'image') {
-          return `<button type="button" class="lj-tile attachment-card" data-open-report-image="${index}"><span class="attachment-loader"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"></span><img src="${escapeHtml(item.url || '')}" alt="${escapeHtml(item.name || 'Adjunto')}" class="attachment-image js-report-attachment-image"></button>`;
+          return `<button type="button" class="lj-tile attachment-card" data-open-report-image="${index}"><span class="attachment-loader"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img src="${escapeHtml(item.url || '')}" alt="${escapeHtml(item.name || 'Adjunto')}" class="attachment-image js-report-attachment-image"></button>`;
         }
         return `<a href="${escapeHtml(item?.url || '#')}" target="_blank" rel="noopener noreferrer" class="attachment-card attachment-doc"><sl-icon name="file-earmark"></sl-icon><span>${escapeHtml(item?.name || 'Documento')}</span></a>`;
       }).join('')
@@ -664,7 +660,7 @@ const printReport = async (report) => {
     const rows = state.providers.map((provider) => {
       const photo = normalize(provider.photoUrl);
       const avatar = photo
-        ? `<div class="panel-avatar"><span class="thumb-loading"><img src="./IMG/Meta-ai-logo.webp" class="panel-spinner" alt="cargando"></span><img class="js-panel-thumb" src="${escapeHtml(photo)}" alt="${escapeHtml(provider.name)}"></div>`
+        ? `<div class="panel-avatar"><span class="thumb-loading"><sl-spinner class="panel-spinner" aria-label="cargando"></sl-spinner></span><img class="js-panel-thumb" src="${escapeHtml(photo)}" alt="${escapeHtml(provider.name)}"></div>`
         : `<div class="panel-avatar">${escapeHtml(initials(provider.name))}</div>`;
       return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(provider.name || 'Proveedor')}</strong><small><i class="fa-solid fa-triangle-exclamation"></i> RNE pendiente</small><p class="panel-status is-danger">Completar registro del proveedor</p></div></article>`;
     });
@@ -678,7 +674,7 @@ const printReport = async (report) => {
       const expired = Number(days) < 0;
       const photo = normalize(recipe.imageUrl);
       const avatar = photo
-        ? `<div class="panel-avatar"><span class="thumb-loading"><img src="./IMG/Meta-ai-logo.webp" class="panel-spinner" alt="cargando"></span><img class="js-panel-thumb" src="${escapeHtml(photo)}" alt="${escapeHtml(recipe.title)}"></div>`
+        ? `<div class="panel-avatar"><span class="thumb-loading"><sl-spinner class="panel-spinner" aria-label="cargando"></sl-spinner></span><img class="js-panel-thumb" src="${escapeHtml(photo)}" alt="${escapeHtml(recipe.title)}"></div>`
         : `<div class="panel-avatar">${escapeHtml(initials(recipe.title))}</div>`;
       return `<article class="panel-list-card">${avatar}<div class="panel-item-text"><strong>${escapeHtml(recipe.title || 'Receta')}</strong><small><i class="fa-regular fa-calendar"></i> Vence: ${escapeHtml(recipe.rnpa?.expiryDate || '-')}</small><p class="panel-status ${expired ? 'is-danger' : 'is-warning'}">${expired ? `Venció hace ${Math.abs(days)} día(s)` : `Vence en ${days} día(s)`}</p></div></article>`;
     });
@@ -696,11 +692,14 @@ const printReport = async (report) => {
   };
 
   // Gráfico de producción con Apache ECharts 5. Colores tomados de los tokens --lj-* (claro/oscuro).
-  // Barras y línea son una sola serie (kilos por receta) → un solo color (acento).
-  // La dona necesita identidad por categoría → paleta categórica validada (orden fijo, máx. 8; el resto va a "Otros").
+  // Color por receta en todos los tipos (pedido del dueño): paleta categórica de 10 (cubre el top 10 sin repetir),
+  // en orden fijo. Validada con el validador del skill dataviz (pares adyacentes):
+  //   claro vs #ffffff: banda/croma OK, CVD peor 16.3, visión normal peor 19.6 (3 tonos < 3:1 → hay etiquetas y tabla oculta).
+  //   oscuro vs #161e2e: banda/croma OK, CVD peor 13.2, visión normal peor 19.3, contraste ≥ 3:1.
+  // La posición 4 (azul) en claro es el valor de --lj-accent.
   const CATEGORICAL = {
-    light: ['', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'],
-    dark: ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767']
+    light: ['#eb6834', '#a43fbf', '#1baf7a', '#1f5fbf', '#e87ba4', '#eda100', '#0a8fb3', '#008300', '#4a3aa7', '#e34948'],
+    dark: ['#d95926', '#b866d6', '#199e70', '#3987e5', '#d55181', '#c98500', '#1aa3c9', '#2f9a2f', '#9085e9', '#e66767']
   };
   const DONUT_MAX_SLICES = CATEGORICAL.light.length;
 
@@ -712,7 +711,6 @@ const printReport = async (report) => {
     const dark = document.documentElement.classList.contains('sl-theme-dark');
     const accent = token('--lj-accent', dark ? '#6ea0ff' : '#1f5fbf');
     const categorical = (dark ? CATEGORICAL.dark : CATEGORICAL.light).slice();
-    if (!dark) categorical[0] = accent;
     return {
       dark,
       accent,
@@ -888,16 +886,16 @@ const printReport = async (report) => {
           axisPointer: { type: 'line', lineStyle: { color: theme.borderStrong, width: 1, type: 'solid' } },
           formatter: (params) => {
             const p = Array.isArray(params) ? params[0] : params;
-            return p ? tooltipHtml(theme, p.name, p.value, theme.accent) : '';
+            return p ? tooltipHtml(theme, p.name, p.value, theme.categorical[p.dataIndex % theme.categorical.length]) : '';
           }
         },
         series: [{
           type: 'line',
           name: 'Kilos',
-          data: values,
+          data: values.map((value, index) => ({ value, itemStyle: { color: theme.categorical[index % theme.categorical.length] } })),
           smooth: 0.35,
           symbol: 'circle',
-          symbolSize: 9,
+          symbolSize: 10,
           lineStyle: { width: 2, color: theme.accent, cap: 'round', join: 'round' },
           itemStyle: { color: theme.accent, borderColor: theme.surface, borderWidth: 2 },
           areaStyle: { color: theme.accent, opacity: 0.1 },
@@ -914,16 +912,16 @@ const printReport = async (report) => {
       tooltip: {
         ...base.tooltip,
         trigger: 'item',
-        formatter: (p) => tooltipHtml(theme, p.name, p.value, theme.accent)
+        formatter: (p) => tooltipHtml(theme, p.name, p.value, p.color)
       },
       series: [{
         type: 'bar',
         name: 'Kilos',
-        data: values,
+        data: values.map((value, index) => ({ value, itemStyle: { color: theme.categorical[index % theme.categorical.length] } })),
         barMaxWidth: 24,
         barCategoryGap: '30%',
-        itemStyle: { color: theme.accent, borderRadius: isHorizontal ? [0, 4, 4, 0] : [4, 4, 0, 0] },
-        emphasis: { itemStyle: { color: theme.accent, opacity: 0.85 } },
+        itemStyle: { borderRadius: isHorizontal ? [0, 4, 4, 0] : [4, 4, 0, 0] },
+        emphasis: { itemStyle: { opacity: 0.85 } },
         label: isHorizontal
           ? { show: true, position: 'right', distance: 6, color: theme.muted, fontSize: 11, formatter: (p) => formatAxis(p.value) }
           : { show: false }
