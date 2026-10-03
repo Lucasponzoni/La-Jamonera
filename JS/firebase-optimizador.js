@@ -32,8 +32,8 @@
     nodes.runBtn.disabled = running;
     nodes.runBtn.setAttribute('aria-disabled', running ? 'true' : 'false');
     nodes.runBtn.innerHTML = running
-      ? '<i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i><span>Optimizando...</span>'
-      : '<i class="fa-solid fa-bolt" aria-hidden="true"></i><span>Ejecutar optimizacion</span>';
+      ? '<i slot="prefix" class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i><span>Optimizando...</span>'
+      : '<i slot="prefix" class="fa-solid fa-bolt" aria-hidden="true"></i><span>Ejecutar optimizacion</span>';
   };
 
   const formatBytes = (bytes) => window.laJamoneraIndexService?.formatKb?.(bytes) || `${bytes} bytes`;

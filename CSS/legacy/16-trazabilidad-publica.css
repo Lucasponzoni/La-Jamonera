@@ -5,12 +5,14 @@
   position: relative;
 }
 
-.produccion-trace-mermaid-overlay {
+.produccion-trace-mermaid-overlay,
+.produccion-trace-mermaid-overlay.lj-tile {
   position: absolute;
   inset: 0;
   border: 0;
-  background: rgb(210 220 243 / 82%);
-  color: #2e4d8f;
+  border-radius: var(--lj-radius-lg, 6px);
+  background: color-mix(in srgb, var(--lj-accent-soft, #dbe6f7) 82%, transparent);
+  color: var(--lj-brand, #2e4d8f);
   display: grid;
   place-content: center;
   gap: 8px;
@@ -24,6 +26,35 @@
   font-size: 3rem;
 }
 
+/* Botones de adjuntos de la página pública (sl-button) */
+.produccion-trace-card-actions .public-trace-btn {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.public-trace-btn-missing::part(base) {
+  cursor: default;
+  opacity: 0.85;
+}
+
+/* Página pública: los h5/h6 ya no reciben tamaños de Bootstrap. */
+.public-trace-page .produccion-trace-summary h6,
+.public-trace-page .produccion-trace-ingredient-card h6 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--lj-brand);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.public-trace-page .produccion-trace-ingredient-card h6 {
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+}
+
 @media (max-width: 768px) {
   .public-trace-ingredients-scroll {
     grid-auto-columns: minmax(250px, 86vw);
@@ -32,5 +63,8 @@
   .public-trace-footer {
     width: calc(100% - 20px);
   }
-}
 
+  .produccion-trace-ingredient-card .public-trace-btn {
+    width: 100%;
+  }
+}

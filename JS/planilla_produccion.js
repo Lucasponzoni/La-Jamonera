@@ -446,33 +446,31 @@
       html: '<p>El navegador bloqueó la ventana de impresión. Habilitá las ventanas emergentes para este sitio y volvé a intentar.</p>',
       icon: 'warning',
       confirmButtonText: 'Entendido',
-      customClass: { popup: 'ios-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text', confirmButton: 'ios-btn ios-btn-primary' }
+      customClass: { popup: 'ios-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text', confirmButton: 'primary' }
     });
   };
 
-  const openPlanillaSwal = (options = {}) => {
-    // Mismo target que el resto de la app: si hay un modal Bootstrap abierto el
-    // dialogo se monta adentro para no quedar detras.
-    const activeBootstrapModal = document.querySelector('.modal.show .modal-content');
-    return Swal.fire({ target: activeBootstrapModal || document.body, returnFocus: false, buttonsStyling: false, ...options });
-  };
+  // LJAlert se monta como sl-dialog propio: queda por encima de cualquier modal abierto.
+  const openPlanillaSwal = (options = {}) => Swal.fire({ ...options });
 
   // Pregunta si se anexan las hojas de facturas y en cuantas partes se divide la
   // hoja. Devuelve null si el usuario cancela la impresion.
   const askInvoiceOptions = async (registros = []) => {
     const total = countRegistroInvoices(registros);
     if (!total || typeof Swal === 'undefined') return { include: false, perPage: 4 };
-    const optionHtml = (value, label) => `<label class="inventario-check-row"><input type="radio" name="planillaFacturasPerPage" value="${value}"${value === 4 ? ' checked' : ''}><span>${label}</span></label>`;
+    const optionHtml = (value, label) => `<sl-radio value="${value}">${label}</sl-radio>`;
     const perPageNote = 'Las facturas verticales se recortan a la franja superior (proveedor, N° de comprobante, fecha) para que se lean; las apaisadas y las que quedan solas en la hoja se imprimen enteras.';
     const result = await openPlanillaSwal({
       title: 'Facturas de ingredientes',
       html: `<p>Se detectaron <strong>${total}</strong> factura(s) adjunta(s). ¿Las imprimo después de la planilla?</p>
         <div class="swal-stack-fields text-start">
           <span class="selector-section-label">¿En cuántas partes divido la hoja?</span>
+          <sl-radio-group name="planillaFacturasPerPage" value="4" class="planilla-facturas-radios">
           ${optionHtml(1, '1 por hoja · factura completa, lo más grande posible')}
           ${optionHtml(2, '2 por hoja · franja superior bien grande')}
           ${optionHtml(3, '3 por hoja · franja superior')}
           ${optionHtml(4, '4 por hoja (2 × 2) · factura completa más chica')}
+          </sl-radio-group>
         </div>
         <p class="planilla-facturas-note">${perPageNote} Los adjuntos en PDF se convierten a imagen antes de imprimir.</p>`,
       showCancelButton: true,
@@ -484,12 +482,12 @@
         popup: 'ios-alert planilla-facturas-alert',
         title: 'ios-alert-title',
         htmlContainer: 'ios-alert-text',
-        confirmButton: 'ios-btn ios-btn-primary',
-        denyButton: 'ios-btn ios-btn-secondary',
-        cancelButton: 'ios-btn ios-btn-secondary'
+        confirmButton: 'primary',
+        denyButton: 'secondary',
+        cancelButton: 'secondary'
       },
       preConfirm: () => ({
-        perPage: Number(Swal.getHtmlContainer()?.querySelector('input[name="planillaFacturasPerPage"]:checked')?.value) || 4
+        perPage: Number(Swal.getHtmlContainer()?.querySelector('sl-radio-group[name="planillaFacturasPerPage"]')?.value) || 4
       })
     });
     if (result.isDismissed) return null;
@@ -1056,7 +1054,7 @@
         html: `<p>Se alcanzó el tope de <strong>${BATCH_IMAGE_LIMIT}</strong> imágenes para un mismo lote de impresión (evita que el navegador se quede sin memoria).</p><p><strong>${skippedImages}</strong> adjunto(s) quedaron afuera. Las planillas salen completas igual. Para incluirlos todos, imprimí el período en rangos más cortos.</p>`,
         icon: 'warning',
         confirmButtonText: 'Continuar',
-        customClass: { popup: 'ios-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text', confirmButton: 'ios-btn ios-btn-primary' }
+        customClass: { popup: 'ios-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text', confirmButton: 'primary' }
       });
     }
     const win = window.open('', '_blank', 'width=1240,height=900');
@@ -1095,10 +1093,10 @@
 
     await Swal.fire({
       title: `Planilla ${escapeHtml(registro.id || '')}`,
-      html: `<div class="planilla-toolbar"><button type="button" class="btn ios-btn ios-btn-secondary" id="planillaPrintBtn"><i class="fa-solid fa-print"></i><span>Imprimir</span></button></div>${printable.outerHTML}`,
+      html: `<div class="planilla-toolbar"><sl-button variant="default" type="button" id="planillaPrintBtn"><i slot="prefix" class="fa-solid fa-print"></i>Imprimir</sl-button></div>${printable.outerHTML}`,
       width: '98vw',
       confirmButtonText: 'Cerrar',
-      customClass: { popup: 'produccion-trace-alert planilla-modal', confirmButton: 'ios-btn ios-btn-secondary' },
+      customClass: { popup: 'produccion-trace-alert planilla-modal', confirmButton: 'secondary' },
       didOpen: async (popup) => {
         const node = popup.querySelector('#planillaProduccionPrintable');
         if (!node) return;

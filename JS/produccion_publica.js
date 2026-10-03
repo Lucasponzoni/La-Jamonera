@@ -369,10 +369,9 @@
       counter: document.getElementById('viewerCounter')
     };
 
-    if (!viewerNodes.modal || !window.bootstrap?.Modal) return null;
+    if (!viewerNodes.modal || !window.LJModal) return null;
 
     const state = { images: [], index: 0, scale: 1 };
-    const modalInstance = window.bootstrap.Modal.getOrCreateInstance(viewerNodes.modal);
 
     const setScale = (value) => {
       state.scale = Math.max(1, Math.min(4, value));
@@ -392,7 +391,7 @@
       node.style.gap = '12px';
       node.style.padding = '28px';
       node.style.textAlign = 'center';
-      node.style.color = '#2f4f8f';
+      node.style.color = 'var(--lj-brand)';
       viewerNodes.document?.insertAdjacentElement('afterend', node);
       return node;
     };
@@ -429,7 +428,7 @@
         }
         pdfPlaceholder?.classList.add('d-none');
         if (pdfPlaceholder) {
-          pdfPlaceholder.innerHTML = `<i class="fa-regular fa-file-pdf" style="font-size:44px;color:#d92d20;"></i><strong>Documento PDF adjunto</strong><p style="margin:0;color:#6073a1;">Si el visor interno no carga el PDF, abrilo en una pestaña.</p><a class="btn ios-btn ios-btn-primary" href="${escapeHtml(item.src)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-up-right-from-square"></i><span>Abrir PDF</span></a>`;
+          pdfPlaceholder.innerHTML = `<i class="fa-regular fa-file-pdf" style="font-size:44px;color:var(--lj-danger);"></i><strong>Documento PDF adjunto</strong><p style="margin:0;color:var(--lj-muted);">Si el visor interno no carga el PDF, abrilo en una pestaña.</p><sl-button variant="primary" href="${escapeHtml(item.src)}" target="_blank" rel="noopener noreferrer"><i slot="prefix" class="fa-solid fa-up-right-from-square"></i>Abrir PDF</sl-button>`;
         }
         viewerNodes.image.src = '';
       }
@@ -455,7 +454,7 @@
     });
     viewerNodes.zoomIn?.addEventListener('click', () => setScale(state.scale + 0.2));
     viewerNodes.zoomOut?.addEventListener('click', () => setScale(state.scale - 0.2));
-    viewerNodes.back?.addEventListener('click', () => modalInstance.hide());
+    viewerNodes.back?.addEventListener('click', () => LJModal.close(viewerNodes.modal));
 
     const openAttachmentViewer = async (entries, startIndex = 0, title = 'Adjuntos') => {
       const images = entries.flatMap((item) => (Array.isArray(item?.invoiceImageUrls) ? item.invoiceImageUrls : [])
@@ -463,13 +462,14 @@
         .filter(Boolean)
         .map((src) => ({ src })));
       if (!images.length) return;
-      const titleNode = viewerNodes.modal.querySelector('.ios-modal-title');
+      const titleNode = viewerNodes.modal.querySelector('.lj-dialog-heading');
       if (titleNode) titleNode.textContent = title;
+      viewerNodes.modal.setAttribute('label', title);
       state.images = images;
       state.index = Math.min(Math.max(0, startIndex), images.length - 1);
       setScale(1);
       render();
-      modalInstance.show();
+      LJModal.open(viewerNodes.modal);
     };
 
     window.laJamoneraOpenImageViewer = openAttachmentViewer;
@@ -647,7 +647,7 @@
         const providerRne = resolveProviderRneFromLot(lot);
         return `<article class="produccion-trace-lot-card">
           <div class="produccion-trace-lot-head">
-            <strong><i class="bi bi-upc-scan fa-solid fa-barcode"></i> Lote ${escapeHtml(lot?.lotNumber || lot?.entryId || '-')}</strong>
+            <strong><i class="fa-solid fa-barcode"></i> Lote ${escapeHtml(lot?.lotNumber || lot?.entryId || '-')}</strong>
             ${Boolean(lot?.isFrozen || lot?.frozen) ? '<span class="produccion-trace-used-badge">Congelado a -18 grados</span>' : ''}
             <span class="produccion-trace-used-badge">Vencimiento al elaborar: ${escapeHtml(formatIsoEs(lot?.expiryDate || ''))}</span>
           </div>
@@ -661,7 +661,7 @@
             <p><strong>Factura</strong><span>${escapeHtml(lot?.invoiceNumber || '-')}</span></p>
             <p><strong>Ingreso</strong><span>${escapeHtml(normalize(lot?.entryDate) ? formatIsoEs(lot.entryDate) : '-')}</span></p>
           </div>
-          <div class="produccion-trace-card-actions">${Array.isArray(lot?.invoiceImageUrls) && lot.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-public-images='${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}'><i class="bi bi-paperclip fa-solid fa-paperclip"></i><span>Ver adjunto (${lot.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}${providerRne.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-public-images='${encodeURIComponent(JSON.stringify([providerRne.attachmentUrl]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE sin adjunto</button>'}</div>
+          <div class="produccion-trace-card-actions">${Array.isArray(lot?.invoiceImageUrls) && lot.invoiceImageUrls.length ? `<sl-button variant="default" size="small" type="button" class="public-trace-btn" data-public-images='${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}'><i slot="prefix" class="fa-solid fa-paperclip"></i>Ver adjunto (${lot.invoiceImageUrls.length})</sl-button>` : '<sl-button variant="danger" outline size="small" type="button" class="public-trace-btn public-trace-btn-missing" disabled>Sin adjuntos</sl-button>'}${providerRne.attachmentUrl ? `<sl-button variant="default" size="small" type="button" class="public-trace-btn" data-public-images='${encodeURIComponent(JSON.stringify([providerRne.attachmentUrl]))}'><i slot="prefix" class="fa-regular fa-eye"></i>Ver adjunto RNE</sl-button>` : '<sl-button variant="danger" outline size="small" type="button" class="public-trace-btn public-trace-btn-missing" disabled>RNE sin adjunto</sl-button>'}</div>
         </article>`;
       }).join('');
 
@@ -669,9 +669,9 @@
         <header>
           <div class="produccion-trace-ingredient-head-main">
             <span class="produccion-trace-ingredient-index">${idx + 1}</span>
-            <span class="produccion-trace-ingredient-avatar">${ingredientImage ? `<img src="${escapeHtml(ingredientImage)}" alt="${escapeHtml(item?.ingredientName || 'Ingrediente')}">` : '<i class="bi bi-basket2-fill fa-solid fa-carrot"></i>'}</span>
+            <span class="produccion-trace-ingredient-avatar">${ingredientImage ? `<img src="${escapeHtml(ingredientImage)}" alt="${escapeHtml(item?.ingredientName || 'Ingrediente')}">` : '<i class="fa-solid fa-carrot"></i>'}</span>
             <div>
-              <h6><i class="bi bi-box-seam fa-solid fa-box-open"></i> ${escapeHtml(group.sourceIngredientName || item?.ingredientName || item?.ingredientId || 'Ingrediente')}</h6>
+              <h6><i class="fa-solid fa-box-open"></i> ${escapeHtml(group.sourceIngredientName || item?.ingredientName || item?.ingredientId || 'Ingrediente')}</h6>
               ${group.plans.some((plan) => plan.isSubstitute && getIngredientPlanUsedQty(plan) > 0.0001) ? `<small><i class="fa-solid fa-link"></i> Sustitutos usados: ${escapeHtml(group.plans.filter((plan) => plan.isSubstitute && getIngredientPlanUsedQty(plan) > 0.0001).map((plan) => plan.ingredientName).join(' + ') || '-')}</small>` : ''}
               ${hasInfiniteStock ? '<small><i class="fa-solid fa-infinity"></i> Stock infinito sin trazabilidad</small>' : ''}
               <small>Cantidad usada: ${formatCompactQty(totalUsedQty, item?.unit || item?.ingredientUnit || '')}</small>
@@ -679,7 +679,7 @@
               ${normalize(providerRneSummary.observations) ? `<small> - Obs. RNE: <strong>${escapeHtml(providerRneSummary.observations)}</strong></small>` : ''}
             </div>
           </div>
-          <div class="produccion-trace-card-actions">${aggregatedImages.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-public-images='${encodeURIComponent(JSON.stringify(aggregatedImages))}'><i class="bi bi-images fa-regular fa-images"></i><span>Ver adjunto (${aggregatedImages.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}${providerRneSummary.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-public-images='${encodeURIComponent(JSON.stringify([providerRneSummary.attachmentUrl]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE sin adjunto</button>'}</div>
+          <div class="produccion-trace-card-actions">${aggregatedImages.length ? `<sl-button variant="default" size="small" type="button" class="public-trace-btn" data-public-images='${encodeURIComponent(JSON.stringify(aggregatedImages))}'><i slot="prefix" class="fa-regular fa-images"></i>Ver adjunto (${aggregatedImages.length})</sl-button>` : '<sl-button variant="danger" outline size="small" type="button" class="public-trace-btn public-trace-btn-missing" disabled>Sin adjuntos</sl-button>'}${providerRneSummary.attachmentUrl ? `<sl-button variant="default" size="small" type="button" class="public-trace-btn" data-public-images='${encodeURIComponent(JSON.stringify([providerRneSummary.attachmentUrl]))}'><i slot="prefix" class="fa-regular fa-eye"></i>Ver adjunto RNE</sl-button>` : '<sl-button variant="danger" outline size="small" type="button" class="public-trace-btn public-trace-btn-missing" disabled>RNE sin adjunto</sl-button>'}</div>
         </header>
         <div class="produccion-trace-lots">${lotCards || (hasInfiniteStock ? `<div class="produccion-lote-infinite-note"><i class="fa-solid fa-infinity" aria-hidden="true"></i><span>${escapeHtml(INFINITE_STOCK_NOTICE)}</span></div>` : '<p class="m-0">Sin lotes asociados.</p>')}</div>
       </article>`;
@@ -687,14 +687,14 @@
 
     const managersHtml = (Array.isArray(registro?.managers) ? registro.managers : []).map((token) => {
       const manager = getManagerDisplay(token, usersMap);
-      return `<span class="produccion-trace-chip"><i class="bi bi-person-badge fa-solid fa-user-tie"></i><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span>`;
-    }).join('') || '<span class="produccion-trace-chip"><i class="bi bi-person-x fa-solid fa-user-xmark"></i><strong>Sin responsable</strong><small>Encargado</small></span>';
+      return `<span class="produccion-trace-chip"><i class="fa-solid fa-user-tie"></i><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span>`;
+    }).join('') || '<span class="produccion-trace-chip"><i class="fa-solid fa-user-xmark"></i><strong>Sin responsable</strong><small>Encargado</small></span>';
 
     dataNode.innerHTML = `<section class="produccion-trace-v2 produccion-trace-apple-viewer">
       <div class="produccion-trace-diagram-wrap">
         <div class="produccion-trace-diagram">
           <article class="produccion-trace-summary">
-            <h6><i class="bi bi-diagram-3 fa-solid fa-diagram-project"></i> Trazabilidad ${escapeHtml(registro.id)}</h6>
+            <h6><i class="fa-solid fa-diagram-project"></i> Trazabilidad ${escapeHtml(registro.id)}</h6>
             <div class="produccion-trace-grid">
               <p><strong>Empresa</strong><span>FRIGORIFICO LA JAMONERA SA</span></p>
               <p><strong>RNE empresa</strong><span>${escapeHtml(getTraceRneDisplay(companyRne))}</span></p>
@@ -709,13 +709,13 @@
               <p><strong>Estado</strong><span>${escapeHtml(registro.status || '-')}</span></p>
             </div>
             <div class="produccion-trace-card-actions">
-              ${companyRneAttachment ? '<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="publicCompanyRneAttachmentBtn"><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE empresa</span></button>' : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE empresa sin adjunto</button>'}
-              ${productRnpa.exempt ? '<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" disabled><i class="fa-solid fa-store"></i><span>RNPA no requerido</span></button>' : (rnpaAttachment ? '<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="publicRnpaAttachmentBtn"><i class="fa-regular fa-eye"></i><span>Ver adjunto RNPA</span></button>' : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNPA sin adjunto</button>')}
+              ${companyRneAttachment ? '<sl-button variant="default" size="small" type="button" class="public-trace-btn" id="publicCompanyRneAttachmentBtn"><i slot="prefix" class="fa-regular fa-eye"></i>Ver adjunto RNE empresa</sl-button>' : '<sl-button variant="danger" outline size="small" type="button" class="public-trace-btn public-trace-btn-missing" disabled>RNE empresa sin adjunto</sl-button>'}
+              ${productRnpa.exempt ? '<sl-button variant="default" size="small" type="button" class="public-trace-btn" disabled><i slot="prefix" class="fa-solid fa-store"></i>RNPA no requerido</sl-button>' : (rnpaAttachment ? '<sl-button variant="default" size="small" type="button" class="public-trace-btn" id="publicRnpaAttachmentBtn"><i slot="prefix" class="fa-regular fa-eye"></i>Ver adjunto RNPA</sl-button>' : '<sl-button variant="danger" outline size="small" type="button" class="public-trace-btn public-trace-btn-missing" disabled>RNPA sin adjunto</sl-button>')}
             </div>
             <div class="produccion-trace-managers">${managersHtml}</div>
-            <div class="public-trace-planilla-row"><button id="publicOpenPlanillaBtn" type="button" class="btn ios-btn ios-btn-primary public-open-planilla-btn"><i class="fa-regular fa-file-lines"></i><span>Ver planilla</span></button></div>
+            <div class="public-trace-planilla-row"><sl-button variant="primary" id="publicOpenPlanillaBtn" type="button" class="public-open-planilla-btn"><i slot="prefix" class="fa-regular fa-file-lines"></i>Ver planilla</sl-button></div>
           </article>
-          <div class="produccion-trace-mermaid-wrap"><div class="produccion-trace-mermaid" data-public-mermaid><div class="produccion-trace-mermaid-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"><p>Renderizando diagrama...</p></div><button type="button" class="produccion-trace-mermaid-overlay" data-public-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button></div></div>
+          <div class="produccion-trace-mermaid-wrap"><div class="produccion-trace-mermaid" data-public-mermaid><div class="produccion-trace-mermaid-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando" class="meta-spinner-login"><p>Renderizando diagrama...</p></div><button type="button" class="lj-tile produccion-trace-mermaid-overlay" data-public-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button></div></div>
           <div class="produccion-trace-ingredients">${ingredientsHtml}</div>
         </div>
       </div>
@@ -744,7 +744,7 @@
       if (hasMermaid) {
         try {
           const rendered = await window.mermaid.render(`public_trace_${Date.now()}`, buildDefinition(registro, config));
-          mermaidHost.innerHTML = `${rendered.svg}<button type="button" class="produccion-trace-mermaid-overlay is-ready" data-public-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button>`;
+          mermaidHost.innerHTML = `${rendered.svg}<button type="button" class="lj-tile produccion-trace-mermaid-overlay is-ready" data-public-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button>`;
           const overlay = mermaidHost.querySelector('[data-public-mermaid-overlay]');
           const activate = () => {
             overlay?.classList.add('d-none');

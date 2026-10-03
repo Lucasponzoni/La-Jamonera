@@ -209,7 +209,7 @@
 }
 
 @media (max-width: 768px) {
-  .planilla-toolbar .ios-btn {
+  .planilla-toolbar sl-button {
     width: 100%;
     max-width: none;
   }
@@ -223,17 +223,21 @@
   }
 }
 
-.planilla-modal {
-  width: min(98vw, 1280px) !important;
+/* Vista previa de la planilla dentro de LJAlert (sólo pantalla). */
+sl-dialog.lj-alert-dialog:has(.planilla-modal) {
+  --width: min(98vw, 1280px) !important;
+}
+
+.planilla-modal .lj-alert-html {
+  text-align: left;
 }
 
 .planilla-toolbar {
   justify-content: center;
 }
 
-.planilla-toolbar .ios-btn {
+.planilla-toolbar sl-button {
   min-width: 230px;
-  justify-content: center;
 }
 
 .planilla-product-hero-no-image {
@@ -252,7 +256,21 @@
 
 .public-open-planilla-btn {
   min-width: 240px;
-  justify-content: center;
+}
+
+/* Pregunta de facturas al imprimir (LJAlert + sl-radio-group). */
+.planilla-facturas-radios {
+  display: block;
+}
+
+.planilla-facturas-radios sl-radio {
+  display: flex;
+  padding: 4px 0;
+  font-size: 14px;
+}
+
+.lj-alert.planilla-facturas-alert .swal2-actions sl-button::part(base) {
+  align-items: center;
 }
 
 @media print {
@@ -876,8 +894,8 @@
 
 .planilla-progress-bar {
   height: 10px;
-  border-radius: 999px;
-  background: #e4e8f5;
+  border-radius: var(--lj-radius, 5px);
+  background: var(--lj-surface-2, #e4e8f5);
   overflow: hidden;
 }
 
@@ -886,14 +904,14 @@
   height: 100%;
   width: 0;
   border-radius: inherit;
-  background: linear-gradient(90deg, #2f6ecf 0%, #6c85dd 55%, #9a8cf0 100%);
+  background: var(--lj-accent, #2f6ecf);
   transition: width 0.2s ease;
 }
 
 .planilla-progress-text {
   margin: 0;
   font-size: 0.9rem;
-  color: #415780;
+  color: var(--lj-muted, #415780);
   text-align: center;
 }
 
@@ -904,9 +922,9 @@
 
 .public-viewer-stage {
   min-height: min(72vh, 640px);
-  border: 1px solid #d8def0;
-  border-radius: 14px;
-  background: #f8f9fd;
+  border: 1px solid var(--lj-border, #d8def0);
+  border-radius: var(--lj-radius-lg, 6px);
+  background: var(--lj-surface-2, #f8f9fd);
   overflow: hidden;
   display: grid;
   place-items: center;
@@ -918,7 +936,7 @@
   height: min(72vh, 640px);
   border: 0;
   object-fit: contain;
-  background: #ffffff;
+  background: var(--lj-surface, #ffffff);
 }
 
 .public-viewer-footer {

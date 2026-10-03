@@ -73,12 +73,12 @@
   <style>
     .optimizer-page {
       min-height: 100vh;
-      background: #f4f7fb;
-      color: #1f2937;
+      background: var(--lj-bg);
+      color: var(--lj-text);
     }
     .optimizer-header {
-      border-bottom: 1px solid rgba(31, 41, 55, 0.1);
-      background: #ffffff;
+      border-bottom: 1px solid var(--lj-border);
+      background: var(--lj-surface);
     }
     .optimizer-header-inner {
       max-width: 1180px;
@@ -93,7 +93,7 @@
       display: inline-flex;
       align-items: center;
       gap: 12px;
-      color: #1f2937;
+      color: var(--lj-text);
       text-decoration: none;
       min-width: 0;
     }
@@ -128,10 +128,9 @@
     }
     .optimizer-panel,
     .optimizer-console-panel {
-      background: #ffffff;
-      border: 1px solid rgba(31, 41, 55, 0.1);
-      border-radius: 8px;
-      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+      background: var(--lj-surface);
+      border: 1px solid var(--lj-border);
+      border-radius: var(--lj-radius-lg);
     }
     .optimizer-panel {
       padding: 22px;
@@ -141,7 +140,7 @@
     }
     .optimizer-kicker {
       margin: 0;
-      color: #64748b;
+      color: var(--lj-muted);
       font-size: 0.82rem;
       font-weight: 700;
       text-transform: uppercase;
@@ -152,11 +151,11 @@
       font-size: clamp(1.6rem, 4vw, 2.25rem);
       line-height: 1.05;
       letter-spacing: 0;
-      color: #111827;
+      color: var(--lj-text);
     }
     .optimizer-status {
       margin: 0;
-      color: #475569;
+      color: var(--lj-muted);
       line-height: 1.45;
     }
     .optimizer-meta {
@@ -165,14 +164,14 @@
       gap: 10px;
     }
     .optimizer-meta-item {
-      border: 1px solid rgba(31, 41, 55, 0.1);
-      border-radius: 8px;
+      border: 1px solid var(--lj-border);
+      border-radius: var(--lj-radius-lg);
       padding: 12px;
-      background: #f8fafc;
+      background: var(--lj-surface-2);
     }
     .optimizer-meta-item small {
       display: block;
-      color: #64748b;
+      color: var(--lj-muted);
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0;
@@ -182,37 +181,36 @@
       display: block;
       margin-top: 4px;
       font-size: 1rem;
-      color: #0f172a;
+      color: var(--lj-text);
     }
     .optimizer-run-btn {
-      min-height: 46px;
-      justify-content: center;
+      width: 100%;
     }
 
     /* Pulso del botón "Ejecutar" cuando hay índices desactualizados. */
     @keyframes optimizerPulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.45); }
-      50%      { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+      0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--lj-accent) 45%, transparent); }
+      50%      { box-shadow: 0 0 0 10px color-mix(in srgb, var(--lj-accent) 0%, transparent); }
     }
 
-    .btn-pulse-attention {
+    .btn-pulse-attention::part(base) {
       animation: optimizerPulse 1.8s ease-in-out infinite;
     }
 
     .optimizer-changelog {
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      border-radius: 8px;
+      background: var(--lj-accent-soft);
+      border: 1px solid var(--lj-border);
+      border-radius: var(--lj-radius-lg);
       padding: 12px 14px;
       font-size: 0.86rem;
-      color: #1e3a8a;
+      color: var(--lj-text);
       line-height: 1.5;
     }
 
     .optimizer-changelog strong {
       display: block;
       margin-bottom: 4px;
-      color: #0f172a;
+      color: var(--lj-brand);
       font-size: 0.78rem;
       text-transform: uppercase;
       letter-spacing: 0.02em;
@@ -234,15 +232,15 @@
     }
     .optimizer-console-head {
       padding: 14px 16px;
-      border-bottom: 1px solid rgba(31, 41, 55, 0.1);
+      border-bottom: 1px solid var(--lj-border);
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      background: #f8fafc;
+      background: var(--lj-surface-2);
     }
     .optimizer-console-head strong {
-      color: #0f172a;
+      color: var(--lj-text);
     }
     .optimizer-console {
       flex: 1 1 auto;

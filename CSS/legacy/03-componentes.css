@@ -63,6 +63,12 @@
   line-height: 1.15;
 }
 
+.swal2-popup.ios-alert.expiry-resolution-alert .swal2-actions sl-button::part(base),
+.swal2-popup.ios-alert.dispatch-xlsx-disable-alert .swal2-actions sl-button::part(base),
+.swal2-popup.ios-alert.planilla-facturas-alert .swal2-actions sl-button::part(base) {
+  align-items: center;
+}
+
 sl-dialog.lj-alert-dialog:has(.planilla-facturas-alert) {
   --width: 560px;
 }
