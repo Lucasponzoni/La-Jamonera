@@ -260,3 +260,35 @@ sl-dialog.lj-alert-form::part(footer) { border-top: 0; }
 :is(.table, .recipe-table) td :is(small, .text-muted) { color: var(--lj-muted); font-size: 12px; }
 :is(.table, .recipe-table) td:last-child:has(> sl-button, > .lj-icon-btn, > .table-actions) { text-align: right; white-space: nowrap; }
 :is(.table, .recipe-table) td > sl-button + sl-button { margin-inline-start: 6px; }
+
+/* ===== Formularios dentro de ventanas: más compactos en todo el sitio =====
+   Controles de 32 px y texto de 13 px, rótulos de 12 px, menos aire entre bloques, títulos de
+   sección como rótulo chico y vista previa de imagen más chica. En alertas-formulario, los campos
+   cortos van de a dos por fila cuando entra. */
+sl-dialog { --sl-input-height-medium: 32px; --sl-input-font-size-medium: 13px; --sl-input-spacing-medium: 10px; }
+sl-dialog :is(sl-input, sl-select, sl-textarea)::part(form-control-label) { font-size: 12px; font-weight: 600; color: var(--lj-muted); margin-bottom: 4px; }
+sl-dialog :is(sl-input, sl-select, sl-textarea)::part(form-control-help-text) { font-size: 11.5px; margin-top: 3px; }
+sl-dialog .lj-label { font-size: 12px; margin-bottom: 4px; }
+sl-dialog sl-textarea::part(textarea) { min-height: 56px; font-size: 13px; }
+sl-dialog .ingrediente-form-grid { gap: 10px; }
+sl-dialog .step-block + .step-block { margin-top: 0; padding-top: 10px; }
+sl-dialog .step-title { margin: 0 0 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--lj-muted); }
+sl-dialog .step-content { gap: 10px; }
+sl-dialog .image-preview-circle { width: 84px; height: 84px; }
+sl-dialog .image-method-buttons sl-button::part(base) { font-size: 12.5px; }
+sl-dialog.lj-alert-form::part(title) { padding-top: 16px; }
+sl-dialog.lj-alert-form::part(body) { padding-top: 2px; }
+sl-dialog.lj-alert-form::part(footer) { padding-top: 12px; padding-bottom: 16px; }
+.lj-alert-form .lj-alert-form-label .lj-alert-title { font-size: 16px; }
+@media (min-width: 640px) {
+  .lj-alert-form .step-content:not(:has(.image-method-buttons)) { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); align-items: end; }
+  .lj-alert-form .step-content > :is(sl-textarea, .custom-measure-wrap, .d-none, p, small, .full-row) { grid-column: 1 / -1; }
+}
+/* Rótulos alineados: el .lj-label propio y el rótulo interno de Shoelace con la misma altura. */
+sl-dialog .lj-label, sl-dialog :is(sl-input, sl-select, sl-textarea)::part(form-control-label) { line-height: 1.3; display: block; }
+sl-dialog .lj-label { margin-top: 0; }
+/* Editores con tarjetas de pasos (inventario, recetas, producción): menos relleno y títulos chicos. */
+sl-dialog .recipe-step-card { padding: 10px 12px; margin-bottom: 10px; }
+sl-dialog .recipe-step-card .inventario-collapse-head { min-height: 38px; padding: 6px 10px; font-size: 13px; }
+sl-dialog .recipe-step-card .recipe-step-number { width: 20px; height: 20px; font-size: 11px; }
+sl-dialog .recipe-step-card :is(h5, h6, .recipe-step-title) { font-size: 13px; letter-spacing: .02em; margin-bottom: 8px; }
