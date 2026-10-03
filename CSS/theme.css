@@ -223,3 +223,40 @@ sl-dialog.lj-alert-form.is-locked::part(close-button) { display: none; }
   .lj-alert-footer sl-button { flex: 1 1 0; }
 }
 sl-dialog.lj-alert-form::part(footer) { border-top: 0; }
+
+/* ===== Tablas: estilo único en todo el sitio =====
+   Contenedor con borde y radio 6, encabezado gris en minúscula, texto normal sin colores fuertes,
+   números a la derecha (tabulares), códigos en monoespaciada, acciones de ícono a la derecha.
+   (Las planillas impresas tienen su propio CSS y no usan estas clases.) */
+:is(.table-responsive, .inventario-table-compact-wrap, .recipe-table-wrap, .recipe-table-scroll):has(> table) {
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius-lg);
+  background: var(--lj-surface);
+  overflow: auto;
+}
+:is(.table, .recipe-table) { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13.5px; color: var(--lj-text); background: transparent; }
+:is(.table, .recipe-table) > thead > tr > th {
+  position: sticky; top: 0; z-index: 1;
+  padding: 10px 12px;
+  background: var(--lj-surface-2);
+  border-bottom: 1px solid var(--lj-border);
+  color: var(--lj-text);
+  font-size: 13px; font-weight: 600;
+  text-transform: none; letter-spacing: 0;
+  text-align: left; white-space: nowrap;
+}
+:is(.table, .recipe-table) > tbody > tr > td {
+  padding: 10px 12px;
+  border-top: 1px solid var(--lj-border);
+  border-bottom: 0;
+  background: transparent;
+  font-weight: 400;
+  vertical-align: middle;
+}
+:is(.table, .recipe-table) > tbody > tr:first-child > td { border-top: 0; }
+:is(.table, .recipe-table) > tbody > tr:hover > td { background: color-mix(in srgb, var(--lj-surface-2) 70%, transparent); }
+:is(.table, .recipe-table) :is(th, td):is(.is-num, .text-end, [data-num]) { text-align: right; font-variant-numeric: tabular-nums; }
+:is(.table, .recipe-table) :is(code, .is-code) { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12.5px; color: var(--lj-muted); background: none; padding: 0; }
+:is(.table, .recipe-table) td :is(small, .text-muted) { color: var(--lj-muted); font-size: 12px; }
+:is(.table, .recipe-table) td:last-child:has(> sl-button, > .lj-icon-btn, > .table-actions) { text-align: right; white-space: nowrap; }
+:is(.table, .recipe-table) td > sl-button + sl-button { margin-inline-start: 6px; }

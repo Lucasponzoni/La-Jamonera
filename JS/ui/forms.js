@@ -32,4 +32,38 @@
     return el.input || el.shadowRoot?.querySelector('input,textarea') || null;
   };
   window.ljFlatpickr = (el, opts) => window.flatpickr(window.ljNativeInput(el) || el, opts);
+
+  // Buscadores: el navegador los tomaba por el campo "usuario" del login y los autocompletaba con el
+  // email guardado (el filtro quedaba vacío). Les sacamos el autocompletado a todos, también a los
+  // que se crean después (listas que se re-renderizan).
+  const SEARCH_SEL = 'sl-input[type="search"], sl-input[placeholder^="Buscar" i], input[type="search"], input[placeholder^="Buscar" i]';
+  const noAutofill = (el) => {
+    if (el.dataset.ljNoAutofill) return;
+    el.dataset.ljNoAutofill = '1';
+    el.setAttribute('autocomplete', 'off');
+    el.setAttribute('autocorrect', 'off');
+    el.setAttribute('spellcheck', 'false');
+    if (!el.getAttribute('name')) el.setAttribute('name', `lj-search-${Math.random().toString(36).slice(2, 8)}`);
+    el.setAttribute('data-lpignore', 'true');
+    el.setAttribute('data-1p-ignore', '');
+    // Si el navegador ya lo rellenó al cargar (antes de este script), lo vaciamos.
+    if (el.value && /@/.test(String(el.value)) && !el.dataset.ljTyped) {
+      el.value = '';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  };
+  const scan = (root) => { if (root.querySelectorAll) root.querySelectorAll(SEARCH_SEL).forEach(noAutofill); };
+  document.addEventListener('keydown', (e) => { const t = e.target.closest?.(SEARCH_SEL); if (t) t.dataset.ljTyped = '1'; }, true);
+  const start = () => {
+    scan(document);
+    new MutationObserver((muts) => muts.forEach((m) => m.addedNodes.forEach((n) => {
+      if (n.nodeType !== 1) return;
+      if (n.matches?.(SEARCH_SEL)) noAutofill(n);
+      scan(n);
+    }))).observe(document.body, { childList: true, subtree: true });
+    // Autocompletado tardío del navegador (llega después de la carga).
+    setTimeout(() => document.querySelectorAll(SEARCH_SEL).forEach((el) => { delete el.dataset.ljNoAutofill; noAutofill(el); }), 1200);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
+  else start();
 })();
