@@ -62,3 +62,22 @@ sl-dialog.lj-modal { --width: min(1140px, 96vw); }
 .flatpickr-day.inRange { background: var(--lj-accent-soft); border-color: var(--lj-accent-soft); box-shadow: none; }
 .flatpickr-months .flatpickr-month, .flatpickr-weekdays, span.flatpickr-weekday, .flatpickr-current-month input.cur-year { color: var(--lj-text); fill: var(--lj-text); background: transparent; }
 .sl-theme-dark .flatpickr-day.flatpickr-disabled { color: #4a5671; }
+
+/* Alertas (LJAlert / Swal) */
+sl-dialog.lj-alert-dialog { --width: 32rem; }
+sl-dialog.lj-alert-dialog::part(body) { padding: 20px 20px 18px; }
+.lj-alert { display: grid; gap: 12px; text-align: center; color: var(--lj-text); }
+.lj-alert-icon { display: flex; justify-content: center; font-size: 44px; line-height: 1; color: var(--lj-accent); }
+.lj-alert-icon.is-success { color: var(--lj-success); }
+.lj-alert-icon.is-error { color: var(--lj-danger); }
+.lj-alert-icon.is-warning { color: var(--lj-warning); }
+.lj-alert-title { margin: 0; font-size: 18px; font-weight: 700; color: var(--lj-brand); }
+.lj-alert-html { text-align: left; font-size: 14px; line-height: 1.5; color: var(--lj-text); }
+.lj-alert-html:has(> p:only-child), .lj-alert-html:not(:has(*)) { text-align: center; }
+.lj-alert-validation { background: var(--lj-danger-soft); color: var(--lj-danger); padding: 8px 10px; border-radius: var(--lj-radius); text-align: left; font-size: 13px; }
+.lj-alert-validation[hidden] { display: none; }
+.lj-alert-actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.lj-alert-spinner { justify-self: center; font-size: 28px; }
+@media (max-width: 575.98px) {
+  .lj-alert-actions sl-button { flex: 1 1 100%; }
+}
