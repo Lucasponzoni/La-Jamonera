@@ -56,6 +56,10 @@
     import { setBasePath } from './vendor/shoelace/utilities/base-path.js?v=202608282255';
     setBasePath(new URL('./vendor/shoelace/', document.baseURI).href.slice(0, -1));
     import('./vendor/shoelace/shoelace-autoloader.js?v=202608282255');
+    // Puerta de carga: mostramos la página cuando los componentes principales ya están definidos
+    // (evita ver menús/drawers 'crudos' y saltos de layout). Tope de 2,5 s por si algo falla.
+    const ljCore = [...new Set([...document.querySelectorAll('sl-button, sl-input, sl-icon, sl-dialog, sl-dropdown, sl-drawer, sl-spinner, sl-icon-button')].map((n) => n.localName))].map((t) => customElements.whenDefined(t));
+    Promise.race([Promise.allSettled(ljCore), new Promise((r) => setTimeout(r, 2500))]).then(() => document.documentElement.classList.add('lj-ready'));
   </script>
   <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202608282255">
   <link rel="stylesheet" href="./CSS/legacy/01-login.css?v=202608282255">
@@ -245,42 +249,51 @@
                 <sl-button variant="success" id="emptyCreateRecipeBtn" type="button"><i slot="prefix" class="fa-solid fa-plus"></i><span>Crear receta</span></sl-button>
               </div>
 
-              <div id="recetasData" class="ingredientes-data d-none" aria-live="polite">
-                <div class="ingredientes-toolbar">
-                  <sl-input id="recetasSearchInput" type="search" class="ingredientes-search-input ingredientes-search-group" placeholder="Buscar receta"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input>
-                  <sl-button variant="success" id="createRecipeBtn" type="button">
-                    <i slot="prefix" class="fa-solid fa-plus"></i>
-                    <span>Crear receta</span>
-                  </sl-button>
+              <div id="recetasData" class="ingredientes-data recetas-data d-none" aria-live="polite">
+                <div class="recetas-toolbar">
+                  <sl-input id="recetasSearchInput" type="search" class="recetas-search" placeholder="Buscar receta" clearable><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input>
+                  <div class="recetas-group-filter">
+                    <sl-select id="recetasGroupFilter" class="recetas-group-select" value="all" hoist aria-label="Filtrar por grupo">
+                      <i slot="prefix" class="fa-regular fa-folder"></i>
+                      <sl-option value="all">Todos los grupos</sl-option>
+                    </sl-select>
+                    <sl-dropdown id="recetasGroupMenu" class="recetas-group-menu" hoist placement="bottom-end">
+                      <sl-button slot="trigger" variant="default" class="lj-icon-btn" title="Gestionar grupos" aria-label="Gestionar grupos"><i class="fa-solid fa-folder-tree"></i></sl-button>
+                      <sl-menu>
+                        <sl-menu-item data-recipe-group-create><i slot="prefix" class="fa-solid fa-plus"></i>Nuevo grupo</sl-menu-item>
+                        <sl-divider></sl-divider>
+                        <sl-menu-item data-recipe-group-edit="" data-group-action disabled><i slot="prefix" class="fa-solid fa-pen"></i>Editar grupo seleccionado</sl-menu-item>
+                        <sl-menu-item data-recipe-group-manage="" data-group-action disabled><i slot="prefix" class="fa-solid fa-list-check"></i>Asignar recetas al grupo</sl-menu-item>
+                        <sl-menu-item data-recipe-group-delete="" data-group-action disabled class="is-danger"><i slot="prefix" class="fa-solid fa-trash"></i>Eliminar grupo seleccionado</sl-menu-item>
+                      </sl-menu>
+                    </sl-dropdown>
+                  </div>
+                  <div class="recetas-toolbar-actions">
+                    <sl-button variant="default" id="printRecipesBtn" type="button" title="Imprimir recetas" aria-label="Imprimir recetas">
+                      <i slot="prefix" class="fa-solid fa-print"></i>
+                      <span>Imprimir</span>
+                    </sl-button>
+                    <sl-button variant="primary" id="createRecipeBtn" type="button">
+                      <i slot="prefix" class="fa-solid fa-plus"></i>
+                      <span>Crear receta</span>
+                    </sl-button>
+                  </div>
+                </div>
+
+                <div class="recetas-rnpa-filters" role="toolbar" aria-label="Filtros de RNPA">
+                  <button type="button" class="lj-tile recetas-chip" data-rnpa-filter="all"><span>Todas</span><b data-rnpa-filter-count="all">0</b></button>
+                  <button type="button" class="lj-tile recetas-chip" data-rnpa-filter="none"><span>Sin RNPA</span><b data-rnpa-filter-count="none">0</b></button>
+                  <button type="button" class="lj-tile recetas-chip is-warning" data-rnpa-filter="warning"><span>Vence &lt; 6 meses</span><b data-rnpa-filter-count="warning">0</b></button>
+                  <button type="button" class="lj-tile recetas-chip is-danger" data-rnpa-filter="danger"><span>Vence &lt; 60 días</span><b data-rnpa-filter-count="danger">0</b></button>
+                  <button type="button" class="lj-tile recetas-chip is-action" data-copy-rnpa-report><i class="fa-regular fa-copy" aria-hidden="true"></i><span>Copiar informe</span></button>
                 </div>
 
                 <div id="recetasRnpaAlert" class="inventario-rne-alert d-none" aria-live="polite"></div>
-                <div id="recetasGroups" class="produccion-recipe-groups" aria-live="polite"></div>
 
-                <div class="recetas-rnpa-filters" role="toolbar" aria-label="Filtros de RNPA">
-                  <sl-button variant="default" type="button" class="inventario-status-btn tone-neutral" data-rnpa-filter="all">
-                    <span>Todos</span>
-                    <strong data-rnpa-filter-count="all">0</strong>
-                  </sl-button>
-                  <sl-button variant="default" type="button" class="inventario-status-btn tone-info" data-rnpa-filter="none">
-                    <span>Sin RNPA</span>
-                    <strong data-rnpa-filter-count="none">0</strong>
-                  </sl-button>
-                  <sl-button variant="default" type="button" class="inventario-status-btn tone-warning" data-rnpa-filter="warning">
-                    <span>Vence en menos de 6 meses</span>
-                    <strong data-rnpa-filter-count="warning">0</strong>
-                  </sl-button>
-                  <sl-button variant="default" type="button" class="inventario-status-btn tone-danger" data-rnpa-filter="danger">
-                    <span>Vence en menos de 60 días</span>
-                    <strong data-rnpa-filter-count="danger">0</strong>
-                  </sl-button>
-                  <sl-button variant="default" type="button" class="inventario-status-btn tone-success" data-copy-rnpa-report>
-                    <span>Copiar informe</span>
-                    <strong><i class="fa-regular fa-copy"></i></strong>
-                  </sl-button>
+                <div id="recetasMasterDetail" class="recetas-md">
+                  <div id="recetasList" class="recetas-list" role="listbox" aria-label="Recetas"></div>
+                  <section id="recetasDetail" class="recetas-detail" aria-live="polite"></section>
                 </div>
-
-                <div id="recetasList" class="recetas-list"></div>
               </div>
 
               <div id="recetasEditor" class="recetas-editor d-none" aria-live="polite">

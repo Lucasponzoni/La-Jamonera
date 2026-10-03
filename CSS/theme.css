@@ -136,3 +136,9 @@ sl-input[size="small"] > [slot="suffix"], sl-select[size="small"] > [slot="suffi
 sl-badge::part(base), sl-tag::part(base) { border-radius: 4px; }
 sl-badge[pill]::part(base), sl-tag[pill]::part(base) { border-radius: 4px; }
 .badge, .rounded-pill { border-radius: 4px !important; }
+
+/* Puerta de carga: la página aparece cuando Shoelace definió sus componentes (ver módulo en <head>). */
+html:not(.lj-ready) body { opacity: 0; }
+html.lj-ready body { opacity: 1; transition: opacity .15s ease; }
+/* Además, nunca mostrar crudos los contenedores flotantes antes de definirse. */
+sl-drawer:not(:defined), sl-dropdown:not(:defined) > :not([slot="trigger"]), sl-dialog:not(:defined), sl-tooltip:not(:defined), sl-alert:not(:defined) { display: none; }

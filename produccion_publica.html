@@ -16,6 +16,10 @@
     import { setBasePath } from './vendor/shoelace/utilities/base-path.js?v=202608282255';
     setBasePath(new URL('./vendor/shoelace/', document.baseURI).href.slice(0, -1));
     import('./vendor/shoelace/shoelace-autoloader.js?v=202608282255');
+    // Puerta de carga: mostramos la página cuando los componentes principales ya están definidos
+    // (evita ver menús/drawers 'crudos' y saltos de layout). Tope de 2,5 s por si algo falla.
+    const ljCore = [...new Set([...document.querySelectorAll('sl-button, sl-input, sl-icon, sl-dialog, sl-dropdown, sl-drawer, sl-spinner, sl-icon-button')].map((n) => n.localName))].map((t) => customElements.whenDefined(t));
+    Promise.race([Promise.allSettled(ljCore), new Promise((r) => setTimeout(r, 2500))]).then(() => document.documentElement.classList.add('lj-ready'));
   </script>
   <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202608282255">
   <link rel="stylesheet" href="./CSS/legacy/01-login.css?v=202608282255">
