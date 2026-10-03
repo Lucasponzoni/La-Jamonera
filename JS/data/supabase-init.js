@@ -357,13 +357,36 @@
 
   // ---------- Storage (bucket "archivos", URLs públicas) ----------
   const storagePath = (p) => String(p || '').replace(/^\/+/, '');
+  // Toda foto se guarda en WebP reducida (una portada de 3 MB queda en ~100 KB). Portadas, avatares y
+  // fotos de proveedores a 1024 px; facturas y adjuntos a 2000 px para que se sigan leyendo.
+  // Se conserva el nombre del archivo (la URL ya la calculó quien sube). Si no achica, va el original.
+  const COMPRESSIBLE = /^image\/(jpeg|png|webp|bmp)$/i;
+  const toWebp = async (file, path) => {
+    if (!file || !COMPRESSIBLE.test(file.type || '') || file.size < 120 * 1024 || typeof createImageBitmap !== 'function') return file;
+    const small = /^(ingredientes|recetas|informes\/users|analisis_quimicos\/users|reparto\/vehiculos|inventario\/proveedores\/avatar|produccion\/logo)/.test(path);
+    const maxSize = small ? 1024 : 2000;
+    try {
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close?.();
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/webp', small ? 0.84 : 0.86));
+      return blob && blob.type === 'image/webp' && blob.size < file.size ? blob : file;
+    } catch (_) {
+      return file;
+    }
+  };
   const makeStorageRef = (path = '') => ({
     fullPath: storagePath(path),
     child: (sub) => makeStorageRef(`${storagePath(path)}${path ? '/' : ''}${storagePath(sub)}`),
     async put(file, metadata = {}) {
       await waitForAuth();
-      const { error } = await client.storage.from(CFG.bucket).upload(storagePath(path), file, {
-        upsert: true, contentType: metadata.contentType || file?.type || undefined, cacheControl: '3600'
+      const body = await toWebp(file, storagePath(path));
+      const { error } = await client.storage.from(CFG.bucket).upload(storagePath(path), body, {
+        upsert: true, contentType: body !== file ? 'image/webp' : (metadata.contentType || file?.type || undefined), cacheControl: '3600'
       });
       if (error) throw new Error(`No se pudo subir el archivo: ${error.message}`);
       return { ref: makeStorageRef(path), metadata: { fullPath: storagePath(path) } };
