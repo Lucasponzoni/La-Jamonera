@@ -326,7 +326,7 @@
           <sl-input name="asunto" label="Asunto" value="${escapeHtml(tpl.asunto || '')}"></sl-input>
           <div class="users-tpl-vars"><span class="users-muted">Variables</span>${vars.map((v) => `<sl-button size="small" variant="default" data-tpl-var="${escapeHtml(v)}">{{${escapeHtml(v)}}}</sl-button>`).join('')}</div>
           <label class="lj-label" for="usersTplHtml">HTML del correo</label>
-          <textarea id="usersTplHtml" class="users-tpl-code" spellcheck="false"></textarea>
+          <sl-textarea id="usersTplHtml" class="users-tpl-code" spellcheck="false" rows="16" resize="vertical"></sl-textarea>
           <p class="users-editor-error" role="alert" hidden></p>
         </div>
         <div class="users-tpl-preview">
@@ -342,6 +342,8 @@
       </footer>`;
     const code = nodes.editor.querySelector('#usersTplHtml');
     code.value = tpl.html || '';
+    await customElements.whenDefined('sl-textarea');
+    await code.updateComplete;
     const subject = nodes.editor.querySelector('[name="asunto"]');
     const frame = nodes.editor.querySelector('.users-tpl-frame');
     const subjectOut = nodes.editor.querySelector('[data-tpl-subject]');
@@ -353,20 +355,21 @@
       subjectOut.textContent = renderSample(subject.value).replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"');
     };
     const schedule = () => { clearTimeout(timer); timer = setTimeout(paint, 200); };
-    code.addEventListener('input', schedule);
+    code.addEventListener('sl-input', schedule);
     subject.addEventListener('sl-input', schedule);
     paint();
     let lastFocus = code;
-    code.addEventListener('focus', () => { lastFocus = code; });
+    code.addEventListener('sl-focus', () => { lastFocus = code; });
     subject.addEventListener('sl-focus', () => { lastFocus = subject; });
     nodes.editor.querySelectorAll('[data-tpl-var]').forEach((b) => b.addEventListener('click', () => {
       const token = `{{${b.dataset.tplVar}}}`;
       if (lastFocus === code) {
-        const { selectionStart: a, selectionEnd: z, value } = code;
-        code.value = value.slice(0, a) + token + value.slice(z);
-        code.selectionStart = a + token.length;
-        code.selectionEnd = a + token.length;
+        const native = window.ljNativeInput(code);
+        const a = native?.selectionStart ?? code.value.length;
+        const z = native?.selectionEnd ?? a;
+        code.value = code.value.slice(0, a) + token + code.value.slice(z);
         code.focus();
+        requestAnimationFrame(() => native?.setSelectionRange?.(a + token.length, a + token.length));
       } else {
         subject.value = `${subject.value}${token}`;
       }
