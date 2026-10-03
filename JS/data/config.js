@@ -2,7 +2,7 @@
 // CORTE: cambiar DEFAULT_BACKEND a 'supabase'. Para probar sin cambiar el default:
 // localStorage.setItem('lj-backend', 'supabase') y recargar (o 'firebase' para volver).
 (function ljBackendConfig() {
-  const DEFAULT_BACKEND = 'firebase';
+  const DEFAULT_BACKEND = 'supabase';
   let backend = DEFAULT_BACKEND;
   try {
     const override = localStorage.getItem('lj-backend');
