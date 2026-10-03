@@ -66,6 +66,7 @@
   <link rel="stylesheet" href="./CSS/legacy/20-usuarios.css?v=202608282255">
   <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202608282255">
   <link rel="stylesheet" href="./CSS/legacy/22-planilla-protocolo.css?v=202608282255">
+  <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202608282255">
 </head>
 <body>
   <main class="app-shell container-fluid px-0">
@@ -88,6 +89,7 @@
             </button>
             <div class="lj-user-menu-panel topbar-user-menu">
               <p class="topbar-user-name">Usuario: <strong>La Jamonera</strong></p>
+              <sl-button variant="default" class="w-100 js-open-config" hidden><i slot="prefix" class="fa-solid fa-gear"></i>Configuración</sl-button>
               <sl-button variant="default" class="w-100 js-logout"><sl-icon slot="prefix" name="box-arrow-right"></sl-icon>Cerrar sesión</sl-button>
             </div>
           </sl-dropdown>
@@ -240,10 +242,10 @@
                   <!-- Botón IA justo debajo del toolbar -->
                   <div class="ai-format-btn-wrap">
                     <sl-button variant="default" id="analisisFormatIABtn" class="ai-format-btn" type="button">
-                      <img slot="prefix" src="./IMG/ia-unscreen.gif" alt="IA" class="ia-icon-btn">
+                      <img slot="prefix" src="./IMG/gemini.webp" alt="IA" class="ia-icon-btn">
                       Arreglar con IA
                     </sl-button>
-                    <span class="ai-hint">DeepSeek estructura el texto con títulos, subtítulos y resalta hallazgos importantes</span>
+                    <span class="ai-hint">Gemini estructura el texto con títulos, subtítulos y resalta hallazgos importantes</span>
                   </div>
 
                   <div id="analisisEditor" class="informe-editor" contenteditable="true" aria-label="Editor de texto enriquecido" data-placeholder="Escribí los resultados del análisis acá..."></div>
@@ -389,6 +391,8 @@
   <script src="./JS/ui/header.js?v=202608282255"></script>
   <script src="./JS/firebase-init.js?v=202608282255"></script>
   <script src="./JS/proxy-client.js?v=202608282255"></script>
+  <script src="./JS/ui/ai.js?v=202608282255"></script>
+  <script src="./JS/configuracion.js?v=202608282255"></script>
   <script src="./JS/firebase-indexes.js?v=202608282255"></script>
   <script src="./JS/Notificaciones.js?v=202608282255"></script>
   <script src="./JS/email_sender.js?v=202608282255"></script>

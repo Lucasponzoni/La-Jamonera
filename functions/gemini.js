@@ -1,6 +1,6 @@
 // Cliente de Gemini (Google Generative Language API) para la Cloud Function.
 // Recibe/devuelve el formato "chat/completions" que ya usaban los módulos (messages → choices),
-// así el front no cambia de forma al pasar de DeepSeek a Gemini.
+// así el front no cambia de forma.
 const API = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 const DEFAULT_TEXT_MODEL = 'gemini-2.5-flash';

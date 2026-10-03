@@ -1625,25 +1625,8 @@
 
 
 
-  const callDeepseekIa = async (payload) => {
-    await window.laJamoneraReady;
-    const keyNode = await window.dbLaJamoneraRest.read('/deepseek/apiKey');
-    const apiKey  = typeof keyNode === 'string' ? normalizeValue(keyNode) : normalizeValue(keyNode?.apiKey);
-    if (!apiKey) throw new Error('Clave IA no configurada en Firebase.');
-    const ENDPOINT   = 'https://api.deepseek.com/chat/completions';
-    const doFetch    = (url, headers) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(payload) });
-    try {
-      const res = await doFetch(ENDPOINT, { Authorization: `Bearer ${apiKey}` });
-      if (res.ok) return res;
-      throw new Error(`IA ${res.status}`);
-    } catch (err) {
-      // Fallback via Cloud Function (reemplazo de cors.sh). La key vive en el server.
-      if (!window.laJamoneraProxy) throw err;
-      const proxyRes = await window.laJamoneraProxy.postJson('/ia', payload);
-      if (!proxyRes.ok) throw new Error(`IA proxy ${proxyRes.status}`);
-      return proxyRes;
-    }
-  };
+  // IA: Google Gemini vía Cloud Function (window.LJAI). Devuelve el JSON chat/completions.
+  const callIa = (payload) => window.LJAI.chat(payload);
 
   const formatInformeWithIA = async () => {
     const editorHtml = normalizeValue(informeEditor?.innerHTML);
@@ -1662,7 +1645,6 @@
       tempDiv.innerHTML = editorHtml;
       const plainText = (tempDiv.textContent || tempDiv.innerText || '').trim();
       const payload = {
-        model: 'deepseek-chat',
         temperature: 0.2,
         messages: [
           {
@@ -1682,8 +1664,7 @@ REGLAS:
           { role: 'user', content: `Formateá este informe bromatológico:\n\n${plainText}` }
         ]
       };
-      const response = await callDeepseekIa(payload);
-      const data = await response.json();
+      const data = await callIa(payload);
       let content = data?.choices?.[0]?.message?.content || '';
       content = content.replace(/^```html?\s*/i, '').replace(/\s*```$/i, '').trim();
       if (!content) throw new Error('La IA no devolvió contenido.');
@@ -2036,7 +2017,7 @@ REGLAS:
           </div>
           <div class="ai-format-btn-wrap">
             <sl-button variant="default" type="button" id="editFormatIABtn" class="ai-format-btn">
-              <img slot="prefix" src="./IMG/ia-unscreen.gif" alt="IA" class="ia-icon-btn">
+              <img slot="prefix" src="./IMG/gemini.webp" alt="IA" class="ia-icon-btn">
               Arreglar con IA
             </sl-button>
             <span class="ai-hint">Estructura el texto con títulos, subtítulos y resalta hallazgos importantes</span>
@@ -2106,7 +2087,7 @@ REGLAS:
             tempDiv.innerHTML = currentHtml;
             const plainText = (tempDiv.textContent || tempDiv.innerText || '').trim();
             const payload = {
-              model: 'deepseek-chat', temperature: 0.2,
+              temperature: 0.2,
               messages: [
                 {
                   role: 'system',
@@ -2125,8 +2106,7 @@ REGLAS:
                 { role: 'user', content: `Formateá este informe:\n\n${plainText}` }
               ]
             };
-            const response = await callDeepseekIa(payload);
-            const data = await response.json();
+            const data = await callIa(payload);
             let content = data?.choices?.[0]?.message?.content || '';
             content = content.replace(/^```html?\s*/i, '').replace(/\s*```$/i, '').trim();
             if (content && editEditor) editEditor.innerHTML = content;

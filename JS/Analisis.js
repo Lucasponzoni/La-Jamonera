@@ -517,25 +517,8 @@
   };
 
   // ── IA formatter ───────────────────────────────────────────────────────────
-  const callIaApi = async (payload) => {
-    await window.laJamoneraReady;
-    const keyNode = await window.dbLaJamoneraRest.read('/deepseek/apiKey');
-    const apiKey  = typeof keyNode === 'string' ? normalizeValue(keyNode) : normalizeValue(keyNode?.apiKey);
-    if (!apiKey) throw new Error('Clave IA no configurada en Firebase.');
-    const ENDPOINT  = 'https://api.deepseek.com/chat/completions';
-    const doFetch   = (url, headers) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(payload) });
-    try {
-      const res = await doFetch(ENDPOINT, { Authorization: `Bearer ${apiKey}` });
-      if (res.ok) return res;
-      throw new Error(`IA ${res.status}`);
-    } catch (err) {
-      // Fallback via Cloud Function (reemplazo de cors.sh). La key vive en el server.
-      if (!window.laJamoneraProxy) throw err;
-      const proxyRes = await window.laJamoneraProxy.postJson('/ia', payload);
-      if (!proxyRes.ok) throw new Error(`IA proxy ${proxyRes.status}`);
-      return proxyRes;
-    }
-  };
+  // Google Gemini vía Cloud Function (window.LJAI). Devuelve el JSON chat/completions.
+  const callIaApi = (payload) => window.LJAI.chat(payload);
 
   const formatWithIA = async () => {
     const editorHtml = normalizeValue(analisisEditor?.innerHTML);
@@ -557,7 +540,7 @@
       const obs       = normalizeValue(analisisObservations?.value);
 
       const payload = {
-        model: 'deepseek-chat', temperature: 0.2,
+        temperature: 0.2,
         messages: [
           {
             role: 'system',
@@ -577,8 +560,7 @@ REGLAS:
         ]
       };
 
-      const response = await callIaApi(payload);
-      const data     = await response.json();
+      const data     = await callIaApi(payload);
       let content    = data?.choices?.[0]?.message?.content || '';
       content = content.replace(/^```html?\s*/i, '').replace(/\s*```$/i, '').trim();
       if (!content) throw new Error('La IA no devolvió contenido.');

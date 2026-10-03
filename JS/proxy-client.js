@@ -27,6 +27,12 @@
     });
   };
 
+  // GET JSON autenticado. Devuelve el Response tal cual.
+  const getJson = async (path) => {
+    const token = await getToken();
+    return fetch(`${PROXY_BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+  };
+
   // GET de imagen de Storage a traves del proxy (cabeceras CORS para canvas/print).
   const imageResponse = async (url) => {
     const token = await getToken();
@@ -40,6 +46,7 @@
     base: PROXY_BASE,
     getToken,
     postJson,
+    getJson,
     imageResponse
   };
 })();

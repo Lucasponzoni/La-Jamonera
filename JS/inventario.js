@@ -1418,28 +1418,8 @@
     }
   };
 
-  const callDeepseekWithFallback = async (payload, apiKey, corsConfig) => {
-    const direct = async () => fetch('https://api.deepseek.com/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify(payload)
-    });
-    try {
-      const res = await direct();
-      if (res.ok) return res;
-      const txt = await res.text();
-      throw new Error(`DeepSeek ${res.status}: ${txt}`);
-    } catch (error) {
-      // Fallback via Cloud Function (reemplazo de cors.sh). La key vive en el server.
-      if (!window.laJamoneraProxy) throw error;
-      const proxyRes = await window.laJamoneraProxy.postJson('/ia', payload);
-      if (!proxyRes.ok) {
-        const txt = await proxyRes.text();
-        throw new Error(`CORS proxy ${proxyRes.status}: ${txt}`);
-      }
-      return proxyRes;
-    }
-  };
+  // IA: Google Gemini vía Cloud Function (window.LJAI). Devuelve el JSON chat/completions.
+  const callIa = (payload) => window.LJAI.chat(payload);
 
   const mondayStartIso = (isoDate) => {
     const normalized = normalizeIsoDate(isoDate);
@@ -1569,11 +1549,7 @@
       return acc;
     }, {});
     try {
-      await window.laJamoneraReady;
-      const keyNode = await window.dbLaJamoneraRest.read('/deepseek/apiKey');
-      const apiKey = typeof keyNode === 'string' ? normalizeValue(keyNode) : normalizeValue(keyNode?.apiKey);
-      if (!apiKey) return fallback;
-      const deepseekNode = safeObject(await window.dbLaJamoneraRest.read('/deepseek'));
+      if (!window.LJAI) return fallback;
       const compactRows = rows.map((row) => ({
         key: `${row.ingredientId}|${row.entryId}`,
         sharedKey: normalizeValue(row.lotNumber || row.invoiceNumber || row.entryId || ''),
@@ -1583,18 +1559,17 @@
         cantidad: Number(row.qty || 0)
       }));
       const payload = {
-        model: 'deepseek-chat',
+        response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: 'Sos un empleado de un frigorífico recepcionando productos. Respondé SOLO JSON válido.' },
           { role: 'user', content: `Completá temperaturas de ingreso (°C) para cada item. Para carnes, temperatura máxima 4°C. Para panes/panificados (ej: pan lactal en bolsa) NO usar grados bajos: devolver siempre 12°C o más. No fuerces todos los valores al mismo número; variá por producto/proveedor/lote. Devolvé SOLO JSON con esta estructura: {"temperaturas":{"KEY":"X.X"}}. Items: ${JSON.stringify(compactRows)}` }
         ],
         temperature: 0.1
       };
-      const res = await Promise.race([
-        callDeepseekWithFallback(payload, apiKey, { url_corsh: deepseekNode.url_corsh, cosh_api_key: deepseekNode.cosh_api_key }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout_deepseek')), 12000))
+      const data = await Promise.race([
+        callIa(payload),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout_ia')), 12000))
       ]);
-      const data = await res.json();
       const parsed = parseAiJsonFromText(data?.choices?.[0]?.message?.content || '');
       const map = safeObject(parsed?.temperaturas);
       const sharedTemperatures = {};
@@ -3907,7 +3882,7 @@
       didOpen: async () => {
         try {
           await new Promise((resolve) => setTimeout(resolve, 350));
-          Swal.update({ html: '<div class="informes-saving-spinner"><img src="./IMG/ia-unscreen.gif" alt="IA" class="recipe-ai-static-gif"></div><p>Obteniendo temperaturas...</p>' });
+          Swal.update({ html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="IA"></sl-spinner></div><p>Obteniendo temperaturas...</p>' });
           const tempMap = await estimateIngresoTemperatures(allRows);
           const weekSections = weeks.map((week, weekIndex) => {
             const managersPrintHtml = managers.selectedUsers.length

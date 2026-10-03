@@ -1,6 +1,7 @@
 (function ingredientesModule() {
-  const IA_WORKER_BASE = 'https://worker.lucasponzoninovogar.workers.dev';
-  const IA_ICON_SRC = './IMG/ia-unscreen.gif';
+  const IA_ICON_SRC = './IMG/gemini.webp';
+  // Gemini genera la imagen; este estilo mantiene el look de ícono que tenían los ingredientes.
+  const buildIngredientImagePrompt = (prompt) => `Ícono estilo emoji 3D, simple y nítido, de: ${prompt}. Un solo objeto centrado, sobre fondo blanco liso, sin texto, sin marcas, iluminación suave, formato cuadrado.`;
   const NO_DATA_IMAGE_URL = 'https://firebasestorage.googleapis.com/v0/b/fg-lj-d6325.firebasestorage.app/o/extras%2FNo%20data.png?alt=media&token=2d7086a4-6f7d-4fb8-aa8c-51c579f59828';
   const PLACEHOLDER_ICON = '<i class="fa-solid fa-carrot"></i>';
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -691,38 +692,18 @@
 
       aiGenerateBtn.disabled = true;
       aiError.classList.add('d-none');
-      preview.innerHTML = `<span class="image-preview-overlay"><img src="${IA_ICON_SRC}" alt="Generando"></span>`;
+      preview.innerHTML = '<span class="image-preview-overlay"><sl-spinner class="meta-spinner-login" aria-label="Generando"></sl-spinner></span>';
 
       try {
-        const res = await fetch(`${IA_WORKER_BASE}/emoji`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt, mode: 'fast' })
-        });
-
-        if (!res.ok) {
-          let msg = `${res.status} ${res.statusText}`;
-          try {
-            const j = await res.json();
-            msg = j?.details ? `${j.error}: ${j.details}` : (j?.error || msg);
-          } catch (error) {
-            msg = (await res.text()).slice(0, 220);
-          }
-
-          const policyError = /nft|nsfw|prohibid|unsafe|policy/i.test(msg);
-          aiError.innerHTML = policyError
-            ? 'La IA interpreta que querés generar una imagen de contenido prohibido. Reintentá y cambiá la descripción.'
-            : `No se pudo generar la imagen. ${msg}`;
-          aiError.classList.remove('d-none');
-          setPreview('');
-          return;
-        }
-
-        const blob = await res.blob();
+        const blob = await window.LJAI.image(buildIngredientImagePrompt(prompt));
         imageState.generatedBlob = blob;
         setPreview(URL.createObjectURL(blob));
       } catch (error) {
-        aiError.textContent = `No se pudo conectar: ${error?.message || error}`;
+        const msg = String(error?.message || error);
+        const policyError = /nft|nsfw|prohibid|unsafe|policy|safety|blocked/i.test(msg);
+        aiError.textContent = policyError
+          ? 'La IA interpreta que querés generar una imagen de contenido prohibido. Reintentá y cambiá la descripción.'
+          : `No se pudo generar la imagen. ${msg}`;
         aiError.classList.remove('d-none');
         setPreview('');
       } finally {
@@ -760,7 +741,8 @@
           if (optional) return '';
           throw new Error('Generá una imagen IA antes de guardar.');
         }
-        const aiFile = new File([imageState.generatedBlob], `ia_${Date.now()}.png`, { type: imageState.generatedBlob.type || 'image/png' });
+        const aiType = imageState.generatedBlob.type || 'image/webp';
+        const aiFile = new File([imageState.generatedBlob], `ia_${Date.now()}.${aiType === 'image/png' ? 'png' : 'webp'}`, { type: aiType });
         return uploadImageToStorage(aiFile, aiFolder);
       }
       return '';

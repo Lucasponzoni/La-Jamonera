@@ -1,0 +1,163 @@
+/* =========================================
+   CONFIGURACIÓN (claves de Gemini y Resend)
+   ========================================= */
+
+@media (min-width: 768px) { sl-dialog.config-modal { --width: min(920px, 96vw); } }
+
+.config-intro {
+  margin: 0 0 12px;
+  color: var(--lj-muted);
+  font-size: 13px;
+}
+
+.config-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.config-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: var(--lj-surface);
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius-lg);
+}
+
+.config-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.config-logo {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+.config-logo-resend {
+  display: inline-grid;
+  place-items: center;
+  background: var(--lj-surface-2);
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius);
+}
+
+/* El logo de Resend es negro: en oscuro se invierte para que se vea. */
+.sl-theme-dark .config-logo-resend img { filter: invert(1); }
+
+.config-card-titles { flex: 1; min-width: 0; }
+
+.config-card-titles h6 {
+  margin: 0;
+  color: var(--lj-text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.config-card-titles p {
+  margin: 2px 0 0;
+  color: var(--lj-muted);
+  font-size: 12px;
+}
+
+.config-status { flex-shrink: 0; }
+
+.config-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.config-facts > div {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius);
+}
+
+.config-facts dt {
+  color: var(--lj-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.config-facts dd {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--lj-text);
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config-facts [data-key-masked] { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+
+.config-fields {
+  display: grid;
+  gap: 10px;
+}
+
+.config-fields sl-input::part(form-control-label),
+.config-fields sl-select::part(form-control-label) {
+  margin-bottom: 4px;
+  color: var(--lj-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.config-fields sl-input::part(form-control-help-text) {
+  margin-top: 4px;
+  color: var(--lj-muted);
+  font-size: 12px;
+}
+
+.config-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 13px;
+  border: 1px solid;
+  border-radius: var(--lj-radius);
+}
+
+.config-result[hidden] { display: none; }
+.config-result i { margin-top: 2px; }
+
+.config-result.is-ok {
+  color: var(--lj-success);
+  background: var(--lj-success-soft);
+  border-color: color-mix(in srgb, var(--lj-success) 35%, transparent);
+}
+
+.config-result.is-error {
+  color: var(--lj-danger);
+  background: var(--lj-danger-soft);
+  border-color: color-mix(in srgb, var(--lj-danger) 35%, transparent);
+}
+
+.config-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Entrada "Configuración" del menú de usuario, encima de "Cerrar sesión". */
+.lj-user-menu-panel .js-open-config { margin-bottom: 8px; }
+.lj-user-menu-panel .js-open-config[hidden] { display: none; }
+
+@media (max-width: 767.98px) {
+  .config-grid { grid-template-columns: 1fr; }
+  .config-actions sl-button { flex: 1; }
+}

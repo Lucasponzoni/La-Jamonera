@@ -1,6 +1,5 @@
 (function recetasModule() {
-  const IA_WORKER_BASE = 'https://worker.lucasponzoninovogar.workers.dev';
-  const IA_ICON_SRC = './IMG/ia-unscreen.gif';
+  const IA_ICON_SRC = './IMG/gemini.webp';
   const RECIPE_PLACEHOLDER_ICON = '<i class="fa-solid fa-bowl-food"></i>';
   const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
@@ -15,7 +14,10 @@
   const recetasEditor = document.getElementById('recetasEditor');
   const recetasList = document.getElementById('recetasList');
   const recetasRnpaAlert = document.getElementById('recetasRnpaAlert');
-  const recetasGroups = document.getElementById('recetasGroups');
+  const recetasGroupFilter = document.getElementById('recetasGroupFilter');
+  const recetasGroupMenu = document.getElementById('recetasGroupMenu');
+  const recetasMasterDetail = document.getElementById('recetasMasterDetail');
+  const recetasDetail = document.getElementById('recetasDetail');
   const recetasSearchInput = document.getElementById('recetasSearchInput');
   const createRecipeBtn = document.getElementById('createRecipeBtn');
   let printRecipesBtn = document.getElementById('printRecipesBtn');
@@ -28,7 +30,8 @@
     recetas: {},
     recipeGroups: {},
     activeRecipeGroupId: 'all',
-    recipeGroupsCollapsed: (() => { try { return localStorage.getItem('recetas_groups_collapsed') === '1'; } catch (_) { return false; } })(),
+    selectedRecipeId: '',
+    detailOpen: false,
     ingredientes: {},
     familias: {},
     measures: [],
@@ -325,12 +328,6 @@
     state.editorDirty = true;
   };
 
-  const updateListScrollHint = () => {
-    if (!recetasList) return;
-    const hasOverflow = recetasList.scrollHeight > recetasList.clientHeight + 4;
-    const isAtEnd = recetasList.scrollTop + recetasList.clientHeight >= recetasList.scrollHeight - 4;
-    recetasList.classList.toggle('has-scroll-hint', hasOverflow && !isAtEnd);
-  };
 
   const setView = (view) => {
     state.view = view;
@@ -539,23 +536,17 @@
     return ref.getDownloadURL();
   };
 
+  // Imagen con Google Gemini (window.LJAI): webp comprimido, mismo estilo de ícono que antes.
   const generateImageWithIA = async (prompt) => {
-    const response = await fetch(`${IA_WORKER_BASE}/emoji`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, mode: 'fast' })
-    });
-    if (!response.ok) {
-      let details = `${response.status} ${response.statusText}`;
-      try {
-        const payload = await response.json();
-        if (payload?.error) details = payload.error;
-      } catch (_) {
-        // noop: fallback a status text
-      }
-      throw new Error(`No se pudo generar la imagen con IA (${details}).`);
+    let blob;
+    try {
+      blob = await window.LJAI.image(`Ícono estilo emoji 3D, simple y nítido, de: ${prompt}. Un solo objeto centrado, sobre fondo blanco liso, sin texto, sin marcas, iluminación suave, formato cuadrado.`);
+    } catch (error) {
+      throw new Error(`No se pudo generar la imagen con IA (${error?.message || error}).`);
     }
-    const blob = await response.blob();
     if (!blob?.size) throw new Error('La IA no devolvió una imagen válida.');
-    return new File([blob], `receta_${Date.now()}.png`, { type: blob.type || 'image/png' });
+    const type = blob.type || 'image/webp';
+    return new File([blob], `receta_${Date.now()}.${type === 'image/png' ? 'png' : 'webp'}`, { type });
   };
 
   const fetchIngredientesData = async () => {
@@ -979,70 +970,25 @@
       ? 'Días de congelado previo a envasado'
       : 'Días de estacionado';
 
+  // Los grupos se eligen desde el sl-select de la barra; su gestión vive en el menú contiguo.
   const renderRecipeGroups = () => {
-    if (!recetasGroups) return;
     const groups = getRecipeGroupsList();
     const counts = getRecipesByGroupCount();
     const active = state.activeRecipeGroupId || 'all';
-    // Si hay búsqueda activa, forzamos collapse sin tocar la preferencia guardada.
-    const hasSearch = Boolean(normalizeValue(state.search));
-    const collapsed = Boolean(state.recipeGroupsCollapsed) || hasSearch;
-
-    const renderThumb = (url, alt, count) => {
-      const countBadge = Number(count) > 0 ? `<span class="family-circle-count">${Math.min(99, Number(count))}</span>` : '';
-      if (url) {
-        // onload: marcamos como is-loaded (la clase .thumb-image arranca con opacity:0).
-        // onerror: si la URL falla, mutamos el span al placeholder con folder.
-        const onLoad = "this.classList.add('is-loaded');";
-        const onError = "this.parentNode.classList.add('family-circle-thumb-placeholder');this.outerHTML='&lt;i class=\\'fa-solid fa-folder\\'&gt;&lt;/i&gt;';";
-        return `<span class="family-circle-thumb"><img class="thumb-image" src="${escapeHtml(url)}" alt="${escapeHtml(alt)}" loading="lazy" onload="${onLoad}" onerror="${onError}">${countBadge}</span>`;
-      }
-      return `<span class="family-circle-thumb family-circle-thumb-placeholder"><i class="fa-solid fa-folder"></i>${countBadge}</span>`;
-    };
-
-    const totalRecipes = Object.keys(safeObject(state.recetas)).length;
-    const allButton = `
-      <div class="family-circle-wrap">
-        <button type="button" class="lj-tile family-circle-item ${active === 'all' ? 'is-active' : ''}" data-recipe-group-filter="all">
-          <span class="family-circle-thumb family-circle-thumb-placeholder"><i class="fa-solid fa-table-cells-large"></i>${totalRecipes > 0 ? `<span class="family-circle-count">${Math.min(99, totalRecipes)}</span>` : ''}</span>
-          <span class="family-circle-name">Todas</span>
-        </button>
-      </div>`;
-
-    const groupButtons = groups.map((g) => `
-      <div class="family-circle-wrap">
-        <button type="button" class="lj-tile family-circle-item ${active === g.id ? 'is-active' : ''}" data-recipe-group-filter="${escapeHtml(g.id)}">
-          ${renderThumb(g.imageUrl, g.name || 'Grupo', counts[g.id] || 0)}
-          <span class="family-circle-name">${escapeHtml(g.name || 'Grupo')}</span>
-        </button>
-        <div class="family-circle-actions">
-          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" data-recipe-group-manage="${escapeHtml(g.id)}" type="button" title="Administrar recetas del grupo" aria-label="Administrar recetas del grupo"><i class="fa-solid fa-list-check"></i></sl-button>
-          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" data-recipe-group-edit="${escapeHtml(g.id)}" type="button" title="Editar grupo" aria-label="Editar grupo"><i class="fa-solid fa-pen"></i></sl-button>
-          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn is-danger" data-recipe-group-delete="${escapeHtml(g.id)}" type="button" title="Eliminar grupo" aria-label="Eliminar grupo"><i class="fa-solid fa-trash"></i></sl-button>
-        </div>
-      </div>`).join('');
-
-    const createButton = `
-      <div class="family-circle-wrap">
-        <button type="button" class="lj-tile family-circle-item family-circle-create" data-recipe-group-create>
-          <span class="family-circle-thumb family-circle-thumb-placeholder family-circle-thumb-create"><i class="fa-solid fa-plus"></i></span>
-          <span class="family-circle-name">Nuevo grupo</span>
-        </button>
-      </div>`;
-
-    recetasGroups.innerHTML = `
-      <div class="family-circle-section ${collapsed ? 'is-collapsed' : ''}">
-        <div class="family-circle-section-head">
-          <button type="button" class="lj-tile family-circle-toggle" data-recipe-groups-toggle aria-expanded="${!collapsed}">
-            <i class="fa-solid ${collapsed ? 'fa-chevron-right' : 'fa-chevron-down'}"></i>
-            <span>Grupos de recetas</span>
-            <small>${groups.length} ${groups.length === 1 ? 'grupo' : 'grupos'}${active !== 'all' ? ` · filtrando: ${escapeHtml(safeObject(state.recipeGroups[active]).name || '')}` : ''}${hasSearch ? ' · oculto por búsqueda' : ''}</small>
-          </button>
-        </div>
-        <div class="family-circle-section-body ${collapsed ? 'd-none' : ''}">
-          <div class="family-circles-row">${allButton}${groupButtons}${createButton}</div>
-        </div>
-      </div>`;
+    if (active !== 'all' && !state.recipeGroups?.[active]) state.activeRecipeGroupId = 'all';
+    const current = state.activeRecipeGroupId || 'all';
+    if (recetasGroupFilter) {
+      const totalRecipes = Object.keys(safeObject(state.recetas)).length;
+      recetasGroupFilter.innerHTML = `<i slot="prefix" class="fa-regular fa-folder"></i><sl-option value="all">Todos los grupos (${totalRecipes})</sl-option>${groups.map((g) => `<sl-option value="${ljOptionValue(g.id)}">${escapeHtml(capitalize(g.name || 'Grupo'))} (${Number(counts[g.id] || 0)})</sl-option>`).join('')}`;
+      ljSetSelectValue(recetasGroupFilter, current);
+    }
+    recetasGroupMenu?.querySelectorAll('[data-group-action]').forEach((item) => {
+      const groupId = current === 'all' ? '' : current;
+      if (item.hasAttribute('data-recipe-group-edit')) item.setAttribute('data-recipe-group-edit', groupId);
+      if (item.hasAttribute('data-recipe-group-manage')) item.setAttribute('data-recipe-group-manage', groupId);
+      if (item.hasAttribute('data-recipe-group-delete')) item.setAttribute('data-recipe-group-delete', groupId);
+      item.disabled = !groupId;
+    });
   };
 
   const openRecipeGroupForm = async (existingId = '') => {
@@ -1181,32 +1127,173 @@
     renderRecetas();
   };
 
-  // Listener delegado del strip de grupos.
-  recetasGroups?.addEventListener('click', async (event) => {
-    if (event.target.closest('[data-recipe-groups-toggle]')) {
-      state.recipeGroupsCollapsed = !state.recipeGroupsCollapsed;
-      try { localStorage.setItem('recetas_groups_collapsed', state.recipeGroupsCollapsed ? '1' : '0'); } catch (_) {}
-      renderRecipeGroups();
-      return;
-    }
-    const filterBtn = event.target.closest('[data-recipe-group-filter]');
-    if (filterBtn) {
-      state.activeRecipeGroupId = normalizeValue(filterBtn.dataset.recipeGroupFilter) || 'all';
-      renderRecipeGroups();
-      renderRecetas();
-      return;
-    }
-    if (event.target.closest('[data-recipe-group-create]')) {
-      await openRecipeGroupForm('');
-      return;
-    }
-    const editBtn = event.target.closest('[data-recipe-group-edit]');
-    if (editBtn) { await openRecipeGroupForm(normalizeValue(editBtn.dataset.recipeGroupEdit)); return; }
-    const deleteBtn = event.target.closest('[data-recipe-group-delete]');
-    if (deleteBtn) { await deleteRecipeGroup(normalizeValue(deleteBtn.dataset.recipeGroupDelete)); return; }
-    const manageBtn = event.target.closest('[data-recipe-group-manage]');
-    if (manageBtn) { await openRecipeGroupAssign(normalizeValue(manageBtn.dataset.recipeGroupManage)); return; }
+  // Filtro de grupo (sl-select) y gestión de grupos (menú desplegable).
+  recetasGroupFilter?.addEventListener('change', () => {
+    state.activeRecipeGroupId = normalizeValue(ljSelectValue(recetasGroupFilter)) || 'all';
+    renderRecetas();
   });
+  recetasGroupMenu?.addEventListener('sl-select', async (event) => {
+    const item = event.detail?.item;
+    if (!item || item.disabled) return;
+    if (item.hasAttribute('data-recipe-group-create')) { await openRecipeGroupForm(''); return; }
+    const editId = normalizeValue(item.getAttribute('data-recipe-group-edit'));
+    if (editId) { await openRecipeGroupForm(editId); return; }
+    const manageId = normalizeValue(item.getAttribute('data-recipe-group-manage'));
+    if (manageId) { await openRecipeGroupAssign(manageId); return; }
+    const deleteId = normalizeValue(item.getAttribute('data-recipe-group-delete'));
+    if (deleteId) await deleteRecipeGroup(deleteId);
+  });
+
+  const isMobileLayout = () => window.matchMedia('(max-width: 767.98px)').matches;
+
+  const getRnpaListTag = (recipe) => {
+    const status = getRnpaStatus(recipe);
+    if (status.className === 'is-exempt') return { tone: 'neu', text: 'Mostrador', title: RNPA_EXEMPT_BADGE_LABEL };
+    if (status.className === 'is-pending') return { tone: 'bad', text: 'Sin RNPA', title: 'RNPA pendiente' };
+    if (status.days == null) return { tone: 'neu', text: 'RNPA', title: 'RNPA adjunto sin vencimiento' };
+    const tone = status.days < 60 ? 'bad' : status.days < 180 ? 'warn' : 'ok';
+    return { tone, text: `${status.days} d`, title: `RNPA · ${formatRnpaDaysText(status.days)}` };
+  };
+
+  const getRecipeThumbHtml = (item, extraClass = '') => `<span class="receta-thumb-wrap recetas-thumb ${extraClass}">${item.imageUrl
+    ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="receta-thumb js-receta-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(capitalize(item.title || 'Receta'))}" loading="lazy">`
+    : getPlaceholderCircle()}</span>`;
+
+  const prepareRecipeThumbs = (root) => {
+    root.querySelectorAll('.js-receta-thumb').forEach((image) => {
+      const wrapper = image.closest('.receta-thumb-wrap');
+      const loading = wrapper?.querySelector('.thumb-loading');
+      const showImage = () => {
+        image.classList.add('is-loaded');
+        loading?.classList.add('d-none');
+      };
+      const showFallback = () => {
+        if (wrapper) wrapper.innerHTML = getPlaceholderCircle();
+      };
+      if (image.complete && image.naturalWidth > 0) showImage();
+      else {
+        image.addEventListener('load', showImage, { once: true });
+        image.addEventListener('error', showFallback, { once: true });
+      }
+    });
+  };
+
+  const setDetailOpen = (open) => {
+    state.detailOpen = Boolean(open);
+    recetasMasterDetail?.classList.toggle('is-detail-open', state.detailOpen);
+  };
+
+  const renderRecipeDetail = (item) => {
+    if (!recetasDetail) return;
+    if (!item) {
+      recetasDetail.innerHTML = '<div class="recetas-detail-empty"><i class="fa-solid fa-bowl-food" aria-hidden="true"></i><p>Elegí una receta de la lista para ver su ficha.</p></div>';
+      return;
+    }
+    const measureLabel = getPrintMeasureLabel(item.yieldUnit);
+    const ingredientRows = (Array.isArray(item.rows) ? item.rows : []).filter((row) => row.type === 'ingredient' && normalizeValue(row.ingredientName));
+    const noteRows = (Array.isArray(item.rows) ? item.rows : []).filter((row) => row.type === 'comment' && normalizeValue(row.comment));
+    const frontLabels = Array.isArray(item.nutrition?.ai?.frontLabels) ? item.nutrition.ai.frontLabels : [];
+    const hasNutritionLabel = Boolean(normalizeValue(item.nutrition?.ai?.tableHtml));
+    const hasFrontLabels = frontLabels.length > 0;
+    const groupLabel = getRecipeGroupLabel(item);
+    const rnpaStatus = getRnpaStatus(item);
+    const rnpaTag = getRnpaListTag(item);
+    const hasImage = Boolean(normalizeValue(item.imageUrl));
+    const hasRnpaFile = Boolean(normalizeValue(item?.rnpa?.attachmentUrl));
+    const hasManual = Array.isArray(item?.rows) && item.rows.some((row) => row.type === MONOGRAPHY_ROW_TYPE && normalizeValue(row.manualUrl));
+    const shelfLife = normalizeValue(item.shelfLifeDays);
+    const delayLabel = getRecipePackagingDelayLabel(item);
+    const agingDays = normalizeValue(item.agingDays);
+    const rnpaNumber = normalizeValue(item?.rnpa?.number);
+    const rnpaKpi = rnpaStatus.className === 'is-exempt'
+      ? '<b class="tone-neu">Mostrador</b><small>No requiere RNPA</small>'
+      : rnpaStatus.className === 'is-pending'
+        ? '<b class="tone-bad">Pendiente</b><small>Sin adjunto</small>'
+        : `<b class="tone-${rnpaTag.tone}">${rnpaStatus.days == null ? 'Adjunto' : `${rnpaStatus.days} días`}</b><small>${escapeHtml(rnpaNumber ? `N° ${rnpaNumber}` : formatRnpaIsoDate(item?.rnpa?.expiryDate))}</small>`;
+
+    recetasDetail.innerHTML = `
+      <div class="recetas-detail-mobilebar">
+        <sl-button variant="default" size="small" type="button" data-receta-detail-back><i slot="prefix" class="fa-solid fa-arrow-left"></i>Volver</sl-button>
+      </div>
+      <header class="recetas-detail-head">
+        ${getRecipeThumbHtml(item, 'is-large')}
+        <div class="recetas-detail-titles">
+          <h6 class="recetas-detail-name">${escapeHtml(capitalize(item.title || 'Sin título'))}</h6>
+          ${item.nombreComercial ? `<p class="recetas-detail-commercial">${escapeHtml(capitalize(item.nombreComercial))}</p>` : ''}
+          <p class="recetas-detail-group"><i class="fa-regular fa-folder" aria-hidden="true"></i>${escapeHtml(groupLabel ? capitalize(groupLabel) : 'Sin grupo')}${item.frozenShelfLifeExtension ? '<span class="recetas-tag tone-info"><sl-icon name="snow2"></sl-icon>-18°C</span>' : ''}</p>
+        </div>
+        <div class="recetas-detail-tools">
+          <sl-button variant="default" size="small" type="button" data-receta-edit="${item.id}"><i slot="prefix" class="fa-solid fa-pen"></i>Editar</sl-button>
+          <sl-button variant="default" size="small" type="button" data-receta-full-print="${item.id}" title="Imprimir ficha"><i slot="prefix" class="fa-solid fa-print"></i>Ficha</sl-button>
+          <sl-dropdown hoist placement="bottom-end" class="recetas-detail-more">
+            <sl-button slot="trigger" variant="default" size="small" class="lj-icon-btn" title="Más acciones" aria-label="Más acciones"><i class="fa-solid fa-ellipsis-vertical"></i></sl-button>
+            <sl-menu>
+              <sl-menu-item data-receta-image-view="${item.id}" ${hasImage ? '' : 'disabled'}><i slot="prefix" class="fa-regular fa-image"></i>Ver imagen</sl-menu-item>
+              <sl-menu-item data-receta-rnpa-view="${item.id}" ${hasRnpaFile ? '' : 'disabled'}><i slot="prefix" class="fa-regular fa-eye"></i>Ver RNPA</sl-menu-item>
+              <sl-menu-item data-receta-manual-view="${item.id}" ${hasManual ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-book-open"></i>Ver manual (monografía)</sl-menu-item>
+              <sl-menu-item data-receta-duplicate="${item.id}"><i slot="prefix" class="fa-regular fa-copy"></i>Duplicar</sl-menu-item>
+              <sl-divider></sl-divider>
+              <sl-menu-item data-receta-delete="${item.id}" class="is-danger"><i slot="prefix" class="fa-solid fa-trash"></i>Eliminar</sl-menu-item>
+            </sl-menu>
+          </sl-dropdown>
+        </div>
+      </header>
+
+      <div class="recetas-kpis">
+        <div class="recetas-kpi"><span>Rinde</span><b>${escapeHtml(`${item.yieldQuantity || '0'} ${measureLabel || ''}`.trim())}</b></div>
+        <div class="recetas-kpi"><span>Vida útil</span><b>${shelfLife ? `${escapeHtml(shelfLife)} días` : '-'}</b><small>${escapeHtml(delayLabel)}: ${agingDays ? `${escapeHtml(agingDays)} días` : 'no posee'}</small></div>
+        <div class="recetas-kpi"><span>RNPA</span>${rnpaKpi}</div>
+        <div class="recetas-kpi"><span>Ingredientes</span><b>${ingredientRows.length}</b></div>
+      </div>
+
+      <section class="recetas-detail-section">
+        <h6 class="recetas-detail-title"><i class="fa-solid fa-flask" aria-hidden="true"></i>Ingredientes</h6>
+        ${ingredientRows.length ? `<div class="recetas-detail-table-wrap"><table class="recetas-detail-table">
+          <thead><tr><th>Ingrediente</th><th class="is-num">Cantidad</th></tr></thead>
+          <tbody>${ingredientRows.map((row) => `<tr><td>${escapeHtml(getIngredientDisplayWithRelations(row))}</td><td class="is-num">${escapeHtml(normalizeValue(row.quantity) || '-')} ${escapeHtml(getPrintMeasureLabel(row.unit) || '')}</td></tr>`).join('')}</tbody>
+        </table></div>` : '<p class="recetas-detail-empty-text">Sin ingredientes vinculados.</p>'}
+        ${noteRows.length ? `<ul class="recetas-detail-notes">${noteRows.map((row) => `<li>${escapeHtml(row.comment)}</li>`).join('')}</ul>` : ''}
+      </section>
+
+      ${normalizeValue(item.description) ? `
+      <section class="recetas-detail-section">
+        <h6 class="recetas-detail-title"><i class="fa-solid fa-align-left" aria-hidden="true"></i>Descripción</h6>
+        <p class="recetas-detail-text">${escapeHtml(capitalize(item.description))}</p>
+      </section>` : ''}
+
+      <section class="recetas-detail-section">
+        <h6 class="recetas-detail-title"><i class="fa-solid fa-tag" aria-hidden="true"></i>Etiquetado</h6>
+        <div class="receta-print-actions">
+          <sl-button variant="default" size="small" type="button" class="receta-print-btn" data-receta-print="nutrition" data-receta-id="${item.id}" ${hasNutritionLabel ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-print"></i><span>Tabla nutricional</span></sl-button>
+          <sl-button variant="default" size="small" type="button" class="receta-print-btn" data-receta-print="front" data-receta-id="${item.id}" ${hasFrontLabels ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-print"></i><span>Etiquetado frontal</span></sl-button>
+        </div>
+        ${hasFrontLabels ? `<div class="receta-front-inline">${buildFrontLabelsHtml(frontLabels, { compact: true })}</div>` : (hasNutritionLabel ? '' : '<p class="recetas-detail-empty-text">Sin tabla nutricional ni sellos generados.</p>')}
+      </section>
+
+      <footer class="recetas-detail-dates">
+        <span><i class="fa-regular fa-calendar-plus" aria-hidden="true"></i> Alta: ${formatDateLabel(item.createdAt)}</span>
+        <span><i class="fa-regular fa-calendar-check" aria-hidden="true"></i> Mod: ${formatDateLabel(item.updatedAt)}</span>
+      </footer>`;
+    prepareRecipeThumbs(recetasDetail);
+  };
+
+  const selectRecipe = (recipeId, options = {}) => {
+    const id = normalizeValue(recipeId);
+    if (!id || !state.recetas[id]) return;
+    state.selectedRecipeId = id;
+    recetasList?.querySelectorAll('[data-receta-select]').forEach((node) => {
+      const on = node.dataset.recetaSelect === id;
+      node.classList.toggle('is-active', on);
+      node.setAttribute('aria-selected', on ? 'true' : 'false');
+      node.tabIndex = on ? 0 : -1;
+    });
+    renderRecipeDetail(state.recetas[id]);
+    if (options.openDetail && isMobileLayout()) {
+      setDetailOpen(true);
+      LJModal.body(recetasModal)?.scrollTo({ top: 0 });
+    }
+    if (options.focus) recetasList?.querySelector(`[data-receta-select="${CSS.escape(id)}"]`)?.focus();
+  };
 
   const renderRecetas = () => {
     renderRecipeGroups();
@@ -1226,7 +1313,7 @@
     let baseSource = inGroup;
     if (!inGroup.length && outsideGroup.length && query) {
       const groupName = state.recipeGroups?.[activeGroup]?.name || '';
-      helperHtml = `<div class="ingrediente-empty-list with-illustration"><p class="ingrediente-empty-title">No hay recetas en "${escapeHtml(capitalize(groupName))}" con esa búsqueda.</p><sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-recipe-search-all><sl-icon slot="prefix" name="lightning-charge"></sl-icon><span>Buscar en toda la base</span></sl-button></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del grupo</strong> seleccionado</p>`;
+      helperHtml = `<div class="recetas-list-helper"><p>No hay recetas en "${escapeHtml(capitalize(groupName))}" con esa búsqueda.</p><sl-button variant="default" size="small" type="button" data-recipe-search-all><sl-icon slot="prefix" name="lightning-charge"></sl-icon><span>Buscar en toda la base</span></sl-button><small>Coincidencias <strong>fuera del grupo</strong> seleccionado</small></div>`;
       baseSource = outsideGroup;
     }
     updateRnpaFilterButtons(baseSource);
@@ -1240,139 +1327,50 @@
     });
 
     if (!source.length) {
-      recetasList.innerHTML = '<div class="ingrediente-empty-list">No encontramos recetas con ese filtro.</div>';
-      updateListScrollHint();
+      recetasList.innerHTML = `${helperHtml}<div class="recetas-list-empty">No encontramos recetas con ese filtro.</div>`;
+      state.selectedRecipeId = '';
+      setDetailOpen(false);
+      renderRecipeDetail(null);
       showState(getRecetasArray().length ? 'data' : 'empty');
       return;
     }
 
-    const measureMap = new Map(getMeasureOptions().map((item) => [item.value, item.label]));
+    if (!source.some((item) => item.id === state.selectedRecipeId)) {
+      state.selectedRecipeId = source[0].id;
+      setDetailOpen(false);
+    }
     recetasList.innerHTML = helperHtml + source.map((item) => {
-      const label = measureMap.get(normalizeLower(item.yieldUnit)) || capitalize(item.yieldUnit || '');
-      const recipeIngredients = (Array.isArray(item.rows) ? item.rows : [])
-        .filter((row) => row.type === 'ingredient' && normalizeValue(row.ingredientName))
-        .map((row) => getIngredientDisplayWithRelations(row));
-      const frontLabels = Array.isArray(item.nutrition?.ai?.frontLabels) ? item.nutrition.ai.frontLabels : [];
-      const hasNutritionLabel = Boolean(normalizeValue(item.nutrition?.ai?.tableHtml));
-      const hasFrontLabels = frontLabels.length > 0;
       const groupLabel = getRecipeGroupLabel(item);
-      const rnpaStatus = getRnpaStatus(item);
-      const daysHtml = rnpaStatus.days == null ? '' : `<span class="receta-rnpa-days ${rnpaStatus.daysTone || 'is-neutral'}"><sl-icon name="clock-history"></sl-icon>${rnpaStatus.days} días</span>`;
-      const ingredientsCount = recipeIngredients.length;
-      const hasDescription = Boolean(normalizeValue(item.description));
-      const hasEtiquetado = hasFrontLabels || hasNutritionLabel;
-      return `
-        <article class="ingrediente-card receta-card receta-card-v2" data-receta-id="${item.id}">
-          <div class="ingrediente-main receta-main">
-            <header class="receta-card-header">
-              <div class="receta-card-titles">
-                <div class="produccion-card-avatar receta-card-avatar ingrediente-avatar receta-thumb-wrap">
-                  ${item.imageUrl
-                    ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="receta-thumb js-receta-thumb" src="${item.imageUrl}" alt="${capitalize(item.title || 'Receta')}" loading="lazy">`
-                    : getPlaceholderCircle()}
-                </div>
-                <div class="receta-card-title-copy">
-                  <h6 class="ingrediente-name receta-name">${capitalize(item.title || 'Sin título')}</h6>
-                  <div class="receta-card-meta-row">
-                    ${item.nombreComercial ? `<p class="produccion-nombre-comercial receta-card-commercial">${escapeHtml(capitalize(item.nombreComercial))}</p>` : ''}
-                    <p class="produccion-recipe-folder receta-card-folder"><span aria-hidden="true">📁</span>${escapeHtml(groupLabel ? capitalize(groupLabel) : 'Sin carpeta')}</p>
-                  </div>
-                </div>
-              </div>
-              <div class="receta-card-header-side">
-                <div class="receta-card-header-chips">
-                  <span class="receta-rnpa-badge ${rnpaStatus.className}"><i class="fa-solid ${rnpaStatus.icon}"></i>${rnpaStatus.label}</span>
-                  ${daysHtml}
-                </div>
-                <div class="receta-card-quick-stats">
-                  <span class="receta-quick-stat"><small>Rinde</small><strong>${item.yieldQuantity || '0'} ${label || ''}</strong></span>
-                  ${item.frozenShelfLifeExtension ? `<span class="receta-quick-stat is-info"><small>Conservación</small><strong><sl-icon name="snow2"></sl-icon> -18°C</strong></span>` : ''}
-                </div>
-              </div>
-            </header>
-
-            <section class="receta-zone receta-zone-ingredientes" data-collapsed="true">
-              <button type="button" class="lj-tile receta-zone-toggle" data-toggle-receta-ingredientes="${item.id}">
-                <span class="receta-zone-toggle-left">
-                  <i class="fa-solid fa-flask"></i>
-                  <span class="receta-zone-toggle-label">Ingredientes</span>
-                  <span class="receta-zone-count">${ingredientsCount}</span>
-                </span>
-                <i class="fa-solid fa-chevron-down receta-zone-toggle-icon"></i>
-              </button>
-              <div class="receta-zone-body">
-                <p class="receta-card-ingredients">${recipeIngredients.length ? recipeIngredients.join(' · ') : 'Sin ingredientes vinculados.'}</p>
-              </div>
-            </section>
-
-            ${hasDescription ? `
-            <section class="receta-zone receta-zone-descripcion" data-collapsed="true">
-              <button type="button" class="lj-tile receta-zone-toggle" data-toggle-receta-descripcion="${item.id}">
-                <span class="receta-zone-toggle-left">
-                  <i class="fa-solid fa-align-left"></i>
-                  <span class="receta-zone-toggle-label">Descripción</span>
-                </span>
-                <i class="fa-solid fa-chevron-down receta-zone-toggle-icon"></i>
-              </button>
-              <div class="receta-zone-body">
-                <p class="receta-card-description">${capitalize(item.description)}</p>
-              </div>
-            </section>` : ''}
-
-            ${hasEtiquetado ? `
-            <section class="receta-zone receta-zone-etiquetado">
-              <h4 class="receta-zone-title"><i class="fa-solid fa-tag"></i><span>Etiquetado</span></h4>
-              <div class="receta-print-actions">
-                <sl-button variant="default" size="small" type="button" class="receta-print-btn" data-receta-print="nutrition" data-receta-id="${item.id}" ${hasNutritionLabel ? '' : 'disabled'}>
-                  <i slot="prefix" class="fa-solid fa-print"></i>
-                  <span>Tabla nutricional</span>
-                </sl-button>
-                <sl-button variant="default" size="small" type="button" class="receta-print-btn" data-receta-print="front" data-receta-id="${item.id}" ${hasFrontLabels ? '' : 'disabled'}>
-                  <i slot="prefix" class="fa-solid fa-print"></i>
-                  <span>Etiquetado frontal</span>
-                </sl-button>
-              </div>
-              ${frontLabels.length ? `<div class="receta-front-inline">${buildFrontLabelsHtml(frontLabels, { compact: true })}</div>` : ''}
-            </section>` : ''}
-
-            <footer class="receta-card-footer">
-              <p class="ingrediente-dates receta-card-dates">
-                <span><i class="fa-regular fa-calendar-plus" aria-hidden="true"></i> Alta: ${formatDateLabel(item.createdAt)}</span>
-                <span><i class="fa-regular fa-calendar-check" aria-hidden="true"></i> Mod: ${formatDateLabel(item.updatedAt)}</span>
-              </p>
-            </footer>
-          </div>
-          <div class="ingrediente-actions recipe-row-actions">
-            <sl-button variant="default" size="small" type="button" class="lj-icon-btn family-manage-btn" data-receta-image-view="${item.id}" title="Ver imagen" aria-label="Ver imagen" ${normalizeValue(item.imageUrl) ? '' : 'disabled'}><i class="fa-regular fa-image"></i></sl-button>
-            <sl-button variant="default" size="small" type="button" class="lj-icon-btn family-manage-btn" data-receta-rnpa-view="${item.id}" title="Ver RNPA" aria-label="Ver RNPA" ${normalizeValue(item?.rnpa?.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i></sl-button>
-            <sl-button variant="default" size="small" type="button" class="lj-icon-btn family-manage-btn receta-card-print-action" data-receta-full-print="${item.id}" title="Imprimir receta" aria-label="Imprimir receta"><i class="fa-solid fa-print"></i></sl-button>
-            <sl-button variant="default" size="small" type="button" class="lj-icon-btn family-manage-btn" data-receta-manual-view="${item.id}" title="Ver manual" aria-label="Ver manual" ${Array.isArray(item?.rows) && item.rows.some((row) => row.type === MONOGRAPHY_ROW_TYPE && normalizeValue(row.manualUrl)) ? '' : 'disabled'}><i class="fa-solid fa-book-open"></i></sl-button>
-            <sl-button variant="default" size="small" type="button" class="lj-icon-btn family-manage-btn" data-receta-duplicate="${item.id}" title="Duplicar" aria-label="Duplicar"><i class="fa-regular fa-copy"></i></sl-button>
-            <sl-button variant="default" size="small" type="button" class="lj-icon-btn family-manage-btn" data-receta-edit="${item.id}" title="Editar" aria-label="Editar"><i class="fa-solid fa-pen"></i></sl-button>
-            <sl-button variant="default" size="small" type="button" class="lj-icon-btn family-manage-btn is-danger" data-receta-delete="${item.id}" title="Eliminar" aria-label="Eliminar"><i class="fa-solid fa-trash"></i></sl-button>
-          </div>
-        </article>`;
+      const sub = [item.nombreComercial ? capitalize(item.nombreComercial) : '', groupLabel ? capitalize(groupLabel) : 'Sin grupo'].filter(Boolean).join(' · ');
+      const tag = getRnpaListTag(item);
+      const on = item.id === state.selectedRecipeId;
+      return `<button type="button" class="lj-tile recetas-item ${on ? 'is-active' : ''}" role="option" aria-selected="${on}" tabindex="${on ? 0 : -1}" data-receta-select="${escapeHtml(item.id)}">
+          ${getRecipeThumbHtml(item)}
+          <span class="recetas-item-copy"><strong>${escapeHtml(capitalize(item.title || 'Sin título'))}</strong><small>${escapeHtml(sub)}</small></span>
+          <span class="recetas-tag tone-${tag.tone}" title="${escapeHtml(tag.title)}">${escapeHtml(tag.text)}</span>
+        </button>`;
     }).join('');
-    document.querySelectorAll('.js-receta-thumb').forEach((image) => {
-      const wrapper = image.closest('.receta-thumb-wrap');
-      const loading = wrapper?.querySelector('.thumb-loading');
-      const showImage = () => {
-        image.classList.add('is-loaded');
-        loading?.classList.add('d-none');
-      };
-      const showFallback = () => {
-        if (wrapper) wrapper.innerHTML = getPlaceholderCircle();
-      };
-      if (image.complete && image.naturalWidth > 0) {
-        showImage();
-      } else {
-        image.addEventListener('load', showImage, { once: true });
-        image.addEventListener('error', showFallback, { once: true });
-      }
-    });
-    updateListScrollHint();
+    prepareRecipeThumbs(recetasList);
+    setDetailOpen(state.detailOpen);
+    renderRecipeDetail(state.recetas[state.selectedRecipeId]);
     showState('data');
   };
+
+  // Teclado en la lista: flechas cambian la selección (patrón listbox con roving tabindex).
+  recetasList?.addEventListener('keydown', (event) => {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    const items = [...recetasList.querySelectorAll('[data-receta-select]')];
+    if (!items.length) return;
+    event.preventDefault();
+    const current = items.findIndex((node) => node.dataset.recetaSelect === state.selectedRecipeId);
+    let next = current;
+    if (event.key === 'ArrowDown') next = Math.min(items.length - 1, current + 1);
+    if (event.key === 'ArrowUp') next = Math.max(0, current - 1);
+    if (event.key === 'Home') next = 0;
+    if (event.key === 'End') next = items.length - 1;
+    selectRecipe(items[next].dataset.recetaSelect, { focus: true });
+    items[next].scrollIntoView({ block: 'nearest' });
+  });
 
   const getPlaceholderCircle = () => `<span class="image-placeholder-circle-2">${RECIPE_PLACEHOLDER_ICON}</span>`;
 
@@ -2364,7 +2362,7 @@
       }
       aiGenerateBtn.disabled = true;
       aiError.classList.add('d-none');
-      preview.innerHTML = `<span class="image-preview-overlay"><img src="${IA_ICON_SRC}" alt="Generando"></span>`;
+      preview.innerHTML = '<span class="image-preview-overlay"><sl-spinner class="meta-spinner-login" aria-label="Generando"></sl-spinner></span>';
       try {
         const file = await generateImageWithIA(prompt);
         stateImage.generatedFile = file;
@@ -2811,29 +2809,8 @@
     if (html) state.editor.nutrition.ai.tableHtml = html;
   };
 
-  const callDeepseekWithFallback = async (payload, apiKey, corsConfig) => {
-    const direct = async () => fetch('https://api.deepseek.com/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify(payload)
-    });
-
-    try {
-      const res = await direct();
-      if (res.ok) return res;
-      const txt = await res.text();
-      throw new Error(`DeepSeek ${res.status}: ${txt}`);
-    } catch (error) {
-      // Fallback via Cloud Function (reemplazo de cors.sh). La key vive en el server.
-      if (!window.laJamoneraProxy) throw error;
-      const proxyRes = await window.laJamoneraProxy.postJson('/ia', payload);
-      if (!proxyRes.ok) {
-        const txt = await proxyRes.text();
-        throw new Error(`CORS proxy ${proxyRes.status}: ${txt}`);
-      }
-      return proxyRes;
-    }
-  };
+  // IA: Google Gemini vía Cloud Function (window.LJAI). Devuelve el JSON chat/completions.
+  const callIa = (payload) => window.LJAI.chat(payload);
 
   const generateNutritionTableWithIA = async () => {
     if (!hasNutritionFieldsForAI()) {
@@ -2843,7 +2820,7 @@
 
     Swal.fire({
       title: 'Generando tabla nutricional...',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/ia-unscreen.gif" alt="Generando" class="recipe-ai-static-gif"></div>',
+      html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Generando"></sl-spinner></div>',
       allowOutsideClick: false,
       allowEscapeKey: false,
       showConfirmButton: false,
@@ -2851,20 +2828,9 @@
     });
 
     try {
-      await window.laJamoneraReady;
-      const keyNode = await window.dbLaJamoneraRest.read('/deepseek/apiKey');
-      const apiKey = typeof keyNode === 'string' ? normalizeValue(keyNode) : normalizeValue(keyNode?.apiKey);
-      if (!apiKey) throw new Error('No se encontró /deepseek/apiKey en Firebase.');
-
-      const corsConfigNode = await window.dbLaJamoneraRest.read('/deepseek');
-      const corsConfig = {
-        cosh_api_key: normalizeValue(corsConfigNode?.cosh_api_key),
-        url_corsh: normalizeValue(corsConfigNode?.url_corsh)
-      };
-
       const snapshot = getNutritionGenerationSnapshot();
       const payload = {
-        model: 'deepseek-chat',
+        response_format: { type: 'json_object' },
         messages: [
           {
             role: 'system',
@@ -2878,8 +2844,7 @@
         temperature: 0.1
       };
 
-      const response = await callDeepseekWithFallback(payload, apiKey, corsConfig);
-      const data = await response.json();
+      const data = await callIa(payload);
       const content = data?.choices?.[0]?.message?.content || '';
       const parsed = parseAiJsonFromText(content);
       if (!parsed?.nutrients) {
@@ -2924,7 +2889,7 @@
 
     Swal.fire({
       title: 'Completando datos nutricionales...',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/ia-unscreen.gif" alt="Completando" class="recipe-ai-static-gif"></div>',
+      html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Completando"></sl-spinner></div>',
       allowOutsideClick: false,
       allowEscapeKey: false,
       showConfirmButton: false,
@@ -2932,15 +2897,9 @@
     });
 
     try {
-      await window.laJamoneraReady;
-      const keyNode = await window.dbLaJamoneraRest.read('/deepseek/apiKey');
-      const apiKey = typeof keyNode === 'string' ? normalizeValue(keyNode) : normalizeValue(keyNode?.apiKey);
-      if (!apiKey) throw new Error('No se encontró /deepseek/apiKey en Firebase.');
-
-      const deepseekNode = safeObject(await window.dbLaJamoneraRest.read('/deepseek'));
       const payload = {
-        model: 'deepseek-chat',
         temperature: 0.1,
+        response_format: { type: 'json_object' },
         messages: [
           {
             role: 'system',
@@ -2963,8 +2922,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
         ]
       };
 
-      const response = await callDeepseekWithFallback(payload, apiKey, { url_corsh: normalizeValue(deepseekNode.url_corsh), cosh_api_key: normalizeValue(deepseekNode.cosh_api_key) });
-      const data = await response.json();
+      const data = await callIa(payload);
       const content = data?.choices?.[0]?.message?.content || '';
       const parsed = safeObject(parseAiJsonFromText(content));
 
@@ -4493,6 +4451,7 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
       const recipeGroupId = normalizeValue(prev.recipeGroupId || activeGroupId);
       state.recetas[id] = { ...prev, id, ...payload, recipeGroupId, createdAt: prev.createdAt || Date.now(), updatedAt: Date.now() };
       await persistRecetas({ preferStateId: id });
+      state.selectedRecipeId = id;
       state.resumeEditor = null;
       state.editorDirty = false;
       renderRecetas();
@@ -4540,9 +4499,8 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
   ensurePrintRecipesButton();
   LJModal.on(recetasModal, 'show', loadRecetas);
 
-  recetasList?.addEventListener('scroll', updateListScrollHint);
 
-  recetasSearchInput?.addEventListener('input', (event) => {
+  recetasSearchInput?.addEventListener('sl-input', (event) => {
     state.search = normalizeLower(event.target.value);
     renderRecetas();
   });
@@ -4570,25 +4528,17 @@ Datos receta: ${JSON.stringify({ title, ingredients })}`
       renderRecetas();
       return;
     }
-    const recetaIngredientesToggle = event.target.closest('[data-toggle-receta-ingredientes]');
-    if (recetaIngredientesToggle) {
-      const section = recetaIngredientesToggle.closest('.receta-zone-ingredientes');
-      if (section) {
-        const collapsed = section.getAttribute('data-collapsed') === 'true';
-        section.setAttribute('data-collapsed', collapsed ? 'false' : 'true');
-      }
-      event.stopPropagation();
+    if (event.target.closest('sl-menu-item[disabled]')) return;
+
+    const selectBtn = event.target.closest('[data-receta-select]');
+    if (selectBtn) {
+      selectRecipe(selectBtn.dataset.recetaSelect, { openDetail: true });
       return;
     }
 
-    const recetaDescripcionToggle = event.target.closest('[data-toggle-receta-descripcion]');
-    if (recetaDescripcionToggle) {
-      const section = recetaDescripcionToggle.closest('.receta-zone-descripcion');
-      if (section) {
-        const collapsed = section.getAttribute('data-collapsed') === 'true';
-        section.setAttribute('data-collapsed', collapsed ? 'false' : 'true');
-      }
-      event.stopPropagation();
+    if (event.target.closest('[data-receta-detail-back]')) {
+      setDetailOpen(false);
+      recetasList?.querySelector('[data-receta-select].is-active')?.focus();
       return;
     }
 
