@@ -881,3 +881,13 @@
   background: var(--lj-danger-soft);
   border-color: color-mix(in srgb, var(--lj-danger) 40%, var(--lj-border));
 }
+
+/* Subfilas de sustitutos en "Insumos para el mínimo de hoy" */
+.prod-ficha-table tr.prod-ficha-subrow td { background: var(--lj-surface-2); padding-top: 6px; padding-bottom: 6px; font-size: 12.5px; border-top-style: dashed; }
+.prod-ficha-subname { display: inline-flex; align-items: center; gap: 8px; padding-left: 10px; color: var(--lj-text); }
+.prod-ficha-subname > i { font-size: 11px; color: var(--lj-muted); }
+.prod-ficha-table tr.prod-ficha-subrow .prod-ficha-hint { padding-left: 29px; }
+.prod-ficha-table tr.prod-ficha-subrow td.is-num .prod-ficha-hint { padding-left: 0; }
+.prod-ficha-muted { color: var(--lj-muted); }
+.recipe-history-pager { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 10px 0 4px; font-size: 13px; color: var(--lj-muted); }
+.recipe-history-count { padding: 8px 2px 0; font-size: 12px; color: var(--lj-muted); text-align: right; }

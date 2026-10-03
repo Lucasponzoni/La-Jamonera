@@ -8376,13 +8376,30 @@
         if (item.missingForMinIncludingExpired <= 0.0001) return '<span class="recetas-tag tone-warn"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>Sólo vencido</span>';
         return `<span class="recetas-tag tone-bad"><i class="fa-solid fa-circle-xmark" aria-hidden="true"></i>Faltan ${escapeHtml(formatQty(item.missingForMin, item.unit))}</span>`;
       };
+      // Subfilas con el stock de cada sustituto del insumo (ingredientes relacionados de la receta).
+      const substituteRowsHtml = (item) => (Array.isArray(item.relatedOptions) ? item.relatedOptions : []).map((opt) => {
+        const pct = Number(String(opt.maxPercent || '').replace(',', '.'));
+        const limit = Number.isFinite(pct) && pct > 0 && pct < 100 ? ` · hasta ${pct}%` : '';
+        const stock = opt.infiniteStock ? 'Sin límite' : formatQty(opt.available, opt.unit || item.unit);
+        const expiredOnly = !opt.infiniteStock && opt.available <= 0.0001 && opt.totalAvailable > 0.0001;
+        const tag = opt.infiniteStock
+          ? '<span class="recetas-tag tone-neu">Stock infinito</span>'
+          : opt.available > 0.0001
+            ? '<span class="recetas-tag tone-ok"><i class="fa-solid fa-circle-check" aria-hidden="true"></i>Con stock</span>'
+            : expiredOnly
+              ? '<span class="recetas-tag tone-warn"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>Sólo vencido</span>'
+              : '<span class="recetas-tag tone-bad"><i class="fa-solid fa-circle-xmark" aria-hidden="true"></i>Sin stock</span>';
+        const extra = expiredOnly ? `<small class="prod-ficha-hint">${escapeHtml(formatQty(opt.totalAvailable, opt.unit || item.unit))} vencido</small>`
+          : (opt.nextEntryDate && opt.available <= 0.0001 ? `<small class="prod-ficha-hint">ingresa ${escapeHtml(formatIsoEs(opt.nextEntryDate))}</small>` : '');
+        return `<tr class="prod-ficha-subrow"><td><span class="prod-ficha-subname"><i class="fa-solid fa-arrow-turn-up fa-rotate-90" aria-hidden="true"></i>${escapeHtml(opt.ingredientName)}</span><small class="prod-ficha-hint">sustituto${escapeHtml(limit)}</small></td><td class="is-num prod-ficha-muted">-</td><td class="is-num">${escapeHtml(stock)}${extra}</td><td>${tag}</td></tr>`;
+      }).join('');
       const insumosHtml = analysis.errors?.length
         ? `<p class="recetas-detail-empty-text">${escapeHtml(analysis.errors[0])}</p>`
         : (total ? `<div class="recetas-detail-table-wrap"><table class="recetas-detail-table prod-ficha-table">
             <thead><tr><th>Ingrediente</th><th class="is-num">Por kg</th><th class="is-num">Disponible</th><th>Estado</th></tr></thead>
             <tbody>${analysis.requirements.map((item) => {
               const hints = [item.hasRelatedCoverage ? `sustituye con ${item.substitutionCount}` : '', item.nextEntryDate ? `ingresa ${formatIsoEs(item.nextEntryDate)}` : ''].filter(Boolean).join(' · ');
-              return `<tr><td>${escapeHtml(item.name)}${hints ? `<small class="prod-ficha-hint">${escapeHtml(hints)}</small>` : ''}</td><td class="is-num">${escapeHtml(formatQty(item.neededPerKg, item.unit, 3))}</td><td class="is-num">${item.infiniteStock ? 'Sin límite' : `${escapeHtml(formatQty(item.available, item.unit))}${item.available <= 0.0001 && item.hasRelatedCoverage ? '<small class="prod-ficha-hint">cubre con sustitutos</small>' : ''}`}</td><td>${insumoStateHtml(item)}</td></tr>`;
+              return `<tr><td>${escapeHtml(item.name)}${hints ? `<small class="prod-ficha-hint">${escapeHtml(hints)}</small>` : ''}</td><td class="is-num">${escapeHtml(formatQty(item.neededPerKg, item.unit, 3))}</td><td class="is-num">${item.infiniteStock ? 'Sin límite' : `${escapeHtml(formatQty(item.available, item.unit))}${item.available <= 0.0001 && item.hasRelatedCoverage ? '<small class="prod-ficha-hint">cubre con sustitutos</small>' : ''}`}</td><td>${insumoStateHtml(item)}</td></tr>${substituteRowsHtml(item)}`;
             }).join('')}</tbody>
           </table></div>` : '<p class="recetas-detail-empty-text">La receta no tiene ingredientes vinculados.</p>');
 
@@ -8983,25 +9000,28 @@
     };
     const lotsWrap = nodes.editor.querySelector('#produccionLotsBreakdown');
     const confirmBtn = nodes.editor.querySelector('#produccionConfirmBtn');
-    const recipeHistoryState = { search: '', range: '' };
+    const recipeHistoryState = { search: '', range: '', page: 1 };
+    const RECIPE_HISTORY_PAGE = 10;
     const getRecipeHistoryRows = () => {
+      // Rango por fecha de PRODUCCIÓN; búsqueda por código, fechas (aaaa-mm-dd y dd-mm-aaaa), lote, responsable y kilos.
       const [from, to] = normalizeValue(recipeHistoryState.range).split(' a ').map((item) => normalizeValue(item));
-      const fromTs = from ? new Date(`${from}T00:00:00`).getTime() : 0;
-      const toTs = to ? new Date(`${to}T23:59:59`).getTime() : 0;
-      const query = normalizeLower(recipeHistoryState.search);
+      const toIso = to || from;
+      const terms = normalizeLower(recipeHistoryState.search).split(/\s+/).filter(Boolean);
       return getRegistrosList()
         .filter((item) => normalizeValue(item.recipeId) === normalizeValue(recipe.id))
         .filter((item) => {
-          const createdAt = Number(item?.createdAt || 0);
-          if (fromTs && createdAt < fromTs) return false;
-          if (toTs && createdAt > toTs) return false;
-          if (!query) return true;
-          const blob = [item.id, item.recipeTitle, item.status, formatDateTime(item.createdAt), item.productionDate]
+          const iso = getRegistroProductionIso(item);
+          if (from && (!iso || iso < from)) return false;
+          if (toIso && (!iso || iso > toIso)) return false;
+          if (!terms.length) return true;
+          const dmy = iso ? iso.split('-').reverse().join('-') : '';
+          const blob = [item.id, item.recipeTitle, item.status, formatDateTime(item.createdAt), item.productionDate, iso, dmy,
+            item.lotNumber, item.productLotNumber, getManagerLabel(item).name, Number(item.quantityKg || 0).toFixed(2)]
             .map(normalizeLower)
             .join(' ');
-          return blob.includes(query);
+          return terms.every((term) => blob.includes(term));
         })
-        .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+        .sort((a, b) => getRegistroProductionIso(b).localeCompare(getRegistroProductionIso(a)) || Number(b.createdAt || 0) - Number(a.createdAt || 0));
     };
     const getRecipeCalendarKgMap = () => getProductionKgDayMap(getRegistrosList().filter((item) => normalizeValue(item.recipeId) === normalizeValue(recipe.id)));
     const printRecipeHistoryRows = async (rows) => {
@@ -9069,9 +9089,15 @@
       win.print();
     };
     const renderRecipeHistory = () => {
-      const rows = getRecipeHistoryRows();
+      const filteredRows = getRecipeHistoryRows();
       const node = nodes.editor.querySelector('#produccionRecipeHistory');
       if (!node) return;
+      const pages = Math.max(1, Math.ceil(filteredRows.length / RECIPE_HISTORY_PAGE));
+      recipeHistoryState.page = Math.min(Math.max(1, recipeHistoryState.page), pages);
+      const rows = filteredRows.slice((recipeHistoryState.page - 1) * RECIPE_HISTORY_PAGE, recipeHistoryState.page * RECIPE_HISTORY_PAGE);
+      // Al redibujar se conserva el foco y el cursor del buscador (antes se perdían en cada letra).
+      const activeSearch = document.activeElement?.closest?.('#produccionRecipeHistorySearch') || null;
+      const caret = activeSearch ? (window.ljNativeInput?.(activeSearch)?.selectionStart ?? null) : null;
       hydrateRegistroDetailsForRows(rows.slice(0, 12), () => {
         if (state.activeRecipeId === recipe.id && state.editorRenderSeq === editorRenderSeq) renderRecipeHistory();
       }, 12);
@@ -9079,7 +9105,8 @@
         if (state.historyTraceCollapse[item.id] !== undefined) return;
         if (hasRegistroTracePreview(item)) state.historyTraceCollapse[item.id] = true;
       });
-      if (!rows.length) {
+      const hasAnyHistory = getRegistrosList().some((item) => normalizeValue(item.recipeId) === normalizeValue(recipe.id));
+      if (!hasAnyHistory) {
         return;
       }
       const traceableRows = rows.filter((item) => hasRegistroTracePreview(item));
@@ -9120,9 +9147,24 @@
         <div class="table-responsive inventario-table-compact-wrap">
           <table class="table recipe-table inventario-table-compact mb-0">
             <thead><tr><th>Código</th><th>Fecha</th><th>Producto</th><th class="is-num">Kilos</th><th>Responsable</th><th>Vencimiento</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead>
-            <tbody>${htmlRows}</tbody>
+            <tbody>${htmlRows || '<tr><td colspan="10" class="text-center text-muted">No hay producciones para ese filtro.</td></tr>'}</tbody>
           </table>
-        </div>`;
+        </div>
+        ${filteredRows.length > RECIPE_HISTORY_PAGE ? `<div class="inventario-pagination recipe-history-pager">
+          <sl-button variant="default" size="small" type="button" class="lj-icon-btn" data-recipe-history-page="prev" title="Página anterior" aria-label="Página anterior" ${recipeHistoryState.page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></sl-button>
+          <span>Página ${recipeHistoryState.page} de ${pages} · ${filteredRows.length} producciones</span>
+          <sl-button variant="default" size="small" type="button" class="lj-icon-btn" data-recipe-history-page="next" title="Página siguiente" aria-label="Página siguiente" ${recipeHistoryState.page >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></sl-button>
+        </div>` : `<div class="recipe-history-count">${filteredRows.length} producción(es)</div>`}`;
+      if (activeSearch) {
+        const search = node.querySelector('#produccionRecipeHistorySearch');
+        if (search) {
+          customElements.whenDefined('sl-input').then(() => search.updateComplete).then(() => {
+            search.focus({ preventScroll: true });
+            const input = window.ljNativeInput?.(search);
+            if (input && caret != null) input.setSelectionRange(caret, caret);
+          });
+        }
+      }
       prepareThumbLoaders('.js-produccion-thumb');
       const rangeNode = nodes.editor.querySelector('#produccionRecipeHistoryRange');
       if (window.flatpickr && rangeNode) {
@@ -9148,6 +9190,7 @@
             const from = instance.selectedDates[0] ? toIsoDate(instance.selectedDates[0].getTime()) : '';
             const to = instance.selectedDates[1] ? toIsoDate(instance.selectedDates[1].getTime()) : '';
             recipeHistoryState.range = from && to ? `${from} a ${to}` : from;
+            recipeHistoryState.page = 1;
             renderRecipeHistory();
           }
         });
@@ -9613,7 +9656,16 @@
       const searchNode = event.target.closest('#produccionRecipeHistorySearch');
       if (!searchNode) return;
       recipeHistoryState.search = normalizeValue(searchNode.value);
+      recipeHistoryState.page = 1;
+      clearTimeout(recipeHistoryState.timer);
+      recipeHistoryState.timer = setTimeout(renderRecipeHistory, 180);
+    });
+    nodes.editor.addEventListener('click', (event) => {
+      const pageBtn = event.target.closest('[data-recipe-history-page]');
+      if (!pageBtn || pageBtn.disabled) return;
+      recipeHistoryState.page += pageBtn.dataset.recipeHistoryPage === 'next' ? 1 : -1;
       renderRecipeHistory();
+      nodes.editor.querySelector('#produccionRecipeHistory')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
     });
     if (window.flatpickr) {
       const locale = window.flatpickr.l10ns?.es || undefined;
