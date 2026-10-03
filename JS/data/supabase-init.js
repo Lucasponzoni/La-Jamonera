@@ -146,15 +146,38 @@
   };
 
   // ---------- Lecturas (con lectura por partes para colecciones grandes) ----------
-  const CHUNKED_READS = { '/inventario/items': 15, '/produccion/registros': 60, '/produccion/auditoria': 80, '/produccion/reservas': 200, '/Reparto/registros': 200, '/public_traces': 40 };
+  // Colecciones pesadas: se leen por partes (claves + lotes de registros) con 3 pedidos en paralelo.
+  const CHUNKED_READS = { '/inventario/items': 20, '/produccion/registros': 50, '/produccion/auditoria': 60, '/produccion/reservas': 200, '/Reparto/registros': 200, '/public_traces': 30 };
   const readChunked = async (key, size) => {
     const keys = await rpc('lj_keys', { p_path: key }, `lectura de ${key}`);
     if (!keys || !keys.length) return null;
-    const out = {};
-    for (let i = 0; i < keys.length; i += size) {
-      const part = await rpc('lj_get_many', { p_path: key, p_keys: keys.slice(i, i + size) }, `lectura de ${key}`);
-      Object.assign(out, part || {});
+    const batches = [];
+    // Inventario: lotes armados por tamaño (los registros con mucho historial van solos).
+    const sizes = key === '/inventario/items' ? await rpc('lj_sizes', { p_path: key }, `lectura de ${key}`).catch(() => null) : null;
+    if (sizes) {
+      const MAX_BYTES = 250_000;
+      let current = []; let bytes = 0;
+      keys.forEach((k) => {
+        const b = Number(sizes[k] || 0);
+        if (current.length && (bytes + b > MAX_BYTES || current.length >= size)) { batches.push(current); current = []; bytes = 0; }
+        current.push(k); bytes += b;
+      });
+      if (current.length) batches.push(current);
+    } else {
+      for (let i = 0; i < keys.length; i += size) batches.push(keys.slice(i, i + size));
     }
+    const parts = new Array(batches.length);
+    let next = 0;
+    const worker = async () => {
+      while (next < batches.length) {
+        const idx = next++;
+        parts[idx] = await rpc('lj_get_many', { p_path: key, p_keys: batches[idx] }, `lectura de ${key}`);
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+    // Mismo orden de claves que Firebase (alfabético).
+    const out = {};
+    parts.forEach((part) => Object.assign(out, part || {}));
     return out;
   };
   const readRemote = async (key) => {
