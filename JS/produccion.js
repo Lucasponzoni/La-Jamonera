@@ -743,12 +743,12 @@
   const askSensitivePassword = async (title, html, withReason = false) => {
     const result = await openIosSwal({
       title,
-      html: `<div class="swal-stack-fields"><input id="produccionSecurePass" type="password" class="swal2-input ios-input" placeholder="Clave general" autocomplete="new-password" name="produccion-secure-pass" autocapitalize="off" autocorrect="off" spellcheck="false">${withReason ? '<textarea id="produccionSecureReason" class="swal2-textarea ios-input" placeholder="Motivo"></textarea><div class="d-flex flex-wrap gap-2 mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-quick-reason="error de produccion">Error de producción</button></div>' : ''}${html || ''}</div>`,
+      html: `<div class="swal-stack-fields"><sl-input id="produccionSecurePass" type="password" class="swal2-input" placeholder="Clave general" autocomplete="new-password" name="produccion-secure-pass" autocapitalize="off" autocorrect="off" spellcheck="false" password-toggle></sl-input>${withReason ? '<sl-textarea id="produccionSecureReason" class="swal2-textarea" placeholder="Motivo" resize="auto"></sl-textarea><div class="d-flex flex-wrap gap-2 mt-2"><sl-button variant="default" type="button" class="inventario-threshold-btn" data-quick-reason="error de produccion">Error de producción</sl-button></div>' : ''}${html || ''}</div>`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Validar',
       cancelButtonText: 'Cancelar',
-      customClass: { popup: 'produccion-secure-alert', confirmButton: 'ios-btn ios-btn-primary', cancelButton: 'ios-btn ios-btn-secondary' },
+      customClass: { popup: 'produccion-secure-alert', confirmButton: 'primary', cancelButton: 'secondary' },
       didOpen: () => {
         const passNode = document.getElementById('produccionSecurePass');
         if (passNode) {
@@ -1007,10 +1007,10 @@
   const renderUserAvatar = (user) => {
     const photoUrl = sanitizeImageUrl(user?.photoUrl);
     if (photoUrl) {
-      return `<span class="user-avatar-thumb"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-user-photo" src="${photoUrl}" alt="${normalizeValue(user.fullName || user.email || 'Usuario')}"></span>`;
+      return `<span class="user-avatar-thumb"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-produccion-user-photo" src="${photoUrl}" alt="${normalizeValue(user.fullName || user.email || 'Usuario')}"></span>`;
     }
     const initials = initialsFromName(user?.fullName || user?.email || '');
-    return `<span class="user-avatar-thumb user-avatar-initials">${initials || '<i class="bi bi-person-fill"></i>'}</span>`;
+    return `<span class="user-avatar-thumb user-avatar-initials">${initials || '<sl-icon name="person-fill"></sl-icon>'}</span>`;
   };
   const prepareThumbLoaders = (selector) => {
     const list = Array.from(document.querySelectorAll(selector));
@@ -1056,7 +1056,7 @@
     if (!unique.length) return;
     Swal.fire({
       title: 'Preparando impresión...',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Preparando impresión" class="meta-spinner-login"></div>',
+      html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Preparando impresión"></sl-spinner></div>',
       allowOutsideClick: false,
       showConfirmButton: false,
       customClass: {
@@ -1081,22 +1081,19 @@
     const joinClass = (base, extra) => [base, extra].filter(Boolean).join(' ').trim();
     const reserved = new Set(['popup', 'title', 'htmlContainer', 'confirmButton', 'cancelButton', 'denyButton']);
     const passthrough = Object.fromEntries(Object.entries(incoming).filter(([key]) => !reserved.has(key)));
-    const activeBootstrapModal = document.querySelector('.modal.show .modal-content');
-    const target = options?.target || activeBootstrapModal || document.body;
+    // LJAlert se apila solo sobre el sl-dialog abierto: no hace falta target ni returnFocus.
+    const { target, returnFocus, buttonsStyling, ...rest } = safeObject(options);
     return Swal.fire({
-      ...options,
-      target,
-      returnFocus: false,
+      ...rest,
       customClass: {
         ...passthrough,
         popup: joinClass('ios-alert', incoming.popup),
         title: joinClass('ios-alert-title', incoming.title),
         htmlContainer: joinClass('ios-alert-text', incoming.htmlContainer),
-        confirmButton: joinClass('ios-btn ios-btn-primary', incoming.confirmButton),
-        cancelButton: joinClass('ios-btn ios-btn-secondary', incoming.cancelButton),
-        denyButton: joinClass('ios-btn ios-btn-warning', incoming.denyButton)
-      },
-      buttonsStyling: false
+        confirmButton: incoming.confirmButton || 'primary',
+        cancelButton: incoming.cancelButton || 'secondary',
+        denyButton: incoming.denyButton || 'warning'
+      }
     });
   };
   const exportStyledExcel = async ({ fileName, sheetName, headers, rows, headerFill }) => {
@@ -1192,8 +1189,21 @@
     return ref.getDownloadURL();
   };
 
+  // Inputs de archivo: quedan nativos y ocultos; los dispara un sl-button (delegado en document).
+  const filePickerHtml = (inputId, accept, extraAttrs = '') => `<span class="image-file-picker"><input id="${inputId}" class="image-file-input" type="file" accept="${accept}" ${extraAttrs} hidden><sl-button variant="default" type="button" data-prod-file-pick="${inputId}"><i slot="prefix" class="fa-solid fa-upload"></i>Elegir archivo</sl-button><span class="image-file-name" data-prod-file-name="${inputId}">Ningún archivo seleccionado</span></span>`;
+  document.addEventListener('click', (event) => {
+    const trigger = event.target.closest?.('[data-prod-file-pick]');
+    if (trigger && !trigger.disabled) document.getElementById(trigger.dataset.prodFilePick)?.click();
+  });
+  document.addEventListener('change', (event) => {
+    const input = event.target;
+    if (input?.tagName !== 'INPUT' || input.type !== 'file' || !input.id) return;
+    document.querySelectorAll(`[data-prod-file-name="${input.id}"]`).forEach((node) => {
+      node.textContent = input.files?.[0]?.name || 'Ningún archivo seleccionado';
+    });
+  });
   const runWithBackSpinner = async (task) => {
-    const modalContent = produccionModal?.querySelector('.modal-content');
+    const modalContent = LJModal.body(produccionModal);
     if (!modalContent) {
       await task();
       return;
@@ -1204,7 +1214,11 @@
     document.querySelectorAll('.produccion-dispatch-floating-suggest').forEach((node) => node.remove());
     const overlay = document.createElement('div');
     overlay.className = 'modal-local-overlay';
-    overlay.innerHTML = '<div class="modal-local-overlay-card"><img src="./IMG/Meta-ai-logo.webp" alt="Actualizando" class="meta-spinner-login"></div>';
+    overlay.innerHTML = '<div class="modal-local-overlay-card"><sl-spinner class="meta-spinner-login" aria-label="Actualizando"></sl-spinner></div>';
+    // .lj-dialog-body scrollea: el overlay cubre sólo lo visible.
+    overlay.style.top = `${modalContent.scrollTop}px`;
+    overlay.style.bottom = 'auto';
+    overlay.style.height = `${modalContent.clientHeight}px`;
     modalContent.appendChild(overlay);
     try {
       await task();
@@ -2483,50 +2497,50 @@
   const openGlobalMinConfig = async () => {
     const currentRne = safeObject(state.config.rne);
     const rneHistoryHtml = (Array.isArray(currentRne.history) && currentRne.history.length)
-      ? `<div class="produccion-rne-history">${currentRne.history.map((item, index) => `<article class="produccion-rne-history-item" data-rne-history-item="${index}"><div><strong>Versión ${index + 1}</strong><p><strong>N° RNE:</strong> ${escapeHtml(item.number || '-')}</p><p><strong>Vigencia:</strong> ${escapeHtml(formatIsoEs(item.validFrom || ''))} → ${item.replacedAt || item.savedAt ? escapeHtml(formatDateTime(item.replacedAt || item.savedAt)) : '-'}</p><p><strong>Vencimiento declarado:</strong> ${escapeHtml(formatIsoEs(item.expiryDate || ''))}</p></div><div class="produccion-rne-history-actions">${item.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-open-rne-history="${index}"><i class="bi bi-eye"></i><span>Ver</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjunto</button>'}<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-delete-rne-history="${index}" aria-label="Eliminar versión de historial"><i class="fa-solid fa-trash"></i></button></div></article>`).join('')}</div>`
+      ? `<div class="produccion-rne-history">${currentRne.history.map((item, index) => `<article class="produccion-rne-history-item" data-rne-history-item="${index}"><div><strong>Versión ${index + 1}</strong><p><strong>N° RNE:</strong> ${escapeHtml(item.number || '-')}</p><p><strong>Vigencia:</strong> ${escapeHtml(formatIsoEs(item.validFrom || ''))} → ${item.replacedAt || item.savedAt ? escapeHtml(formatDateTime(item.replacedAt || item.savedAt)) : '-'}</p><p><strong>Vencimiento declarado:</strong> ${escapeHtml(formatIsoEs(item.expiryDate || ''))}</p></div><div class="produccion-rne-history-actions">${item.attachmentUrl ? `<sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-open-rne-history="${index}"><sl-icon slot="prefix" name="eye"></sl-icon><span>Ver</span></sl-button>` : '<sl-button variant="danger" type="button" class="inventario-no-photo-btn" disabled>Sin adjunto</sl-button>'}<sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-delete-rne-history="${index}" aria-label="Eliminar versión de historial"><i class="fa-solid fa-trash"></i></sl-button></div></article>`).join('')}</div>`
       : '<p class="produccion-rne-history-empty">Aún no hay historial de RNE.</p>';
     const result = await openIosSwal({
       title: 'Configuración de Producción',
       html: `<div class="text-center produccion-umbral-form produccion-config-form">
-          <label class="form-label" for="produccionGlobalMinInput"><strong>Umbral global de stock bajo (kg)</strong></label>
-          <input id="produccionGlobalMinInput" type="number" min="0" step="0.01" class="swal2-input ios-input" value="${Number(state.config.globalMinKg || 1).toFixed(2)}">
+          <label class="lj-label" for="produccionGlobalMinInput"><strong>Umbral global de stock bajo (kg)</strong></label>
+          <sl-input id="produccionGlobalMinInput" type="number" min="0" step="0.01" class="swal2-input" value="${Number(state.config.globalMinKg || 1).toFixed(2)}"></sl-input>
           <section class="recipe-step-card step-block inventario-lot-section mt-2 produccion-config-section">
-            <button type="button" class="inventario-collapse-head inventario-collapse-head-styled produccion-config-toggle" id="logoCompanyToggleBtn" aria-expanded="false">
-              <span><span class="recipe-step-number">2</span> <i class="bi bi-building"></i> <strong>Logo Empresa</strong></span>
-              <span class="inventario-collapse-summary"><strong><i class="bi bi-arrows-fullscreen"></i></strong></span>
+            <button type="button" class="lj-tile inventario-collapse-head inventario-collapse-head-styled produccion-config-toggle" id="logoCompanyToggleBtn" aria-expanded="false">
+              <span><span class="recipe-step-number">2</span> <sl-icon name="building"></sl-icon> <strong>Logo Empresa</strong></span>
+              <span class="inventario-collapse-summary"><strong><sl-icon name="arrows-fullscreen"></sl-icon></strong></span>
             </button>
             <div id="logoCompanyBody" class="step-content d-none">
               <div class="produccion-company-logo-preview-wrap">
                 <span class="produccion-company-logo-preview" id="produccionCompanyLogoPreview">${normalizeValue(state.config.companyLogoUrl) ? `<img src="${state.config.companyLogoUrl}" alt="Logo empresa">` : '<i class="fa-solid fa-image"></i>'}</span>
               </div>
               <div class="produccion-config-actions">
-                <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionOpenLogoViewerBtn" ${normalizeValue(state.config.companyLogoUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i><span>Visualizar logo</span></button>
+                <sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionOpenLogoViewerBtn" ${normalizeValue(state.config.companyLogoUrl) ? '' : 'disabled'}><i slot="prefix" class="fa-regular fa-eye"></i><span>Visualizar logo</span></sl-button>
               </div>
-              <input id="produccionCompanyLogoFile" class="form-control ios-input image-file-input" type="file" accept="image/*">
+              ${filePickerHtml('produccionCompanyLogoFile', 'image/*')}
               <small class="text-muted"><strong>Formatos:</strong> JPG, PNG, WEBP o GIF. <strong>Máx:</strong> 5MB.</small>
             </div>
           </section>
           <section class="recipe-step-card step-block inventario-lot-section mt-2 produccion-config-section">
-            <button type="button" class="inventario-collapse-head inventario-collapse-head-styled produccion-config-toggle" id="rneToggleBtn" aria-expanded="false">
-              <span><span class="recipe-step-number">3</span> <i class="bi bi-shield-check"></i> <strong>RNE</strong> • Empresa</span>
-              <span class="inventario-collapse-summary"><strong><i class="bi bi-arrows-fullscreen"></i></strong></span>
+            <button type="button" class="lj-tile inventario-collapse-head inventario-collapse-head-styled produccion-config-toggle" id="rneToggleBtn" aria-expanded="false">
+              <span><span class="recipe-step-number">3</span> <sl-icon name="shield-check"></sl-icon> <strong>RNE</strong> • Empresa</span>
+              <span class="inventario-collapse-summary"><strong><sl-icon name="arrows-fullscreen"></sl-icon></strong></span>
             </button>
             <div id="rneBody" class="step-content d-none">
-              <label class="form-label" for="produccionRneNumberInput"><strong>Número de RNE</strong></label>
-              <input id="produccionRneNumberInput" type="text" class="form-control ios-input" placeholder="Ej: 12-34567, RUCA 69354" value="${escapeHtml(currentRne.number || '')}">
+              <label class="lj-label" for="produccionRneNumberInput"><strong>Número de RNE</strong></label>
+              <sl-input id="produccionRneNumberInput" type="text" placeholder="Ej: 12-34567, RUCA 69354" value="${escapeHtml(currentRne.number || '')}"></sl-input>
               <small class="text-muted">Se permiten números y guion (<strong>-</strong>).</small>
-              <label class="form-label mt-2" for="produccionRneExpiryInput"><strong>Fecha de caducidad</strong></label>
-              <input id="produccionRneExpiryInput" type="text" class="form-control ios-input" placeholder="Seleccionar fecha" value="${escapeHtml(currentRne.expiryDate || '')}">
-              <label class="inventario-check-row inventario-check-row-compact mt-2"><input type="checkbox" id="produccionRneInfiniteInput" ${currentRne.infiniteExpiry ? 'checked' : ''}><span>Vencimiento infinito (∞)</span></label>
-              <label class="form-label mt-2" for="produccionRneFile"><strong>Archivo adjunto</strong> (PDF o imagen)</label>
+              <label class="lj-label mt-2" for="produccionRneExpiryInput"><strong>Fecha de caducidad</strong></label>
+              <input id="produccionRneExpiryInput" type="text" class="lj-input" placeholder="Seleccionar fecha" value="${escapeHtml(currentRne.expiryDate || '')}">
+              <div class="inventario-check-row inventario-check-row-compact mt-2"><sl-checkbox id="produccionRneInfiniteInput" ${currentRne.infiniteExpiry ? 'checked' : ''}>Vencimiento infinito (∞)</sl-checkbox></div>
+              <label class="lj-label mt-2" for="produccionRneFile"><strong>Archivo adjunto</strong> (PDF o imagen)</label>
               <div class="produccion-rne-file-row">
-                <input id="produccionRneFile" class="form-control ios-input image-file-input" type="file" accept="image/*,application/pdf">
-                <span id="produccionRneFileLoading" class="produccion-rne-upload-loading d-none"><img src="./IMG/Meta-ai-logo.webp" alt="Subiendo RNE" class="meta-spinner-login produccion-rne-spinner"></span>
+                ${filePickerHtml('produccionRneFile', 'image/*,application/pdf')}
+                <span id="produccionRneFileLoading" class="produccion-rne-upload-loading d-none"><sl-spinner class="meta-spinner-login produccion-rne-spinner" aria-label="Subiendo RNE"></sl-spinner></span>
               </div>
               <small class="text-muted">Se guarda la versión anterior en el historial.</small>
               <div class="produccion-config-actions">
-                <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionOpenRneViewerBtn" ${normalizeValue(currentRne.attachmentUrl) ? '' : 'disabled'}><i class="fa-regular fa-eye"></i><span>Visualizar adjunto actual</span></button>
-                <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionDeleteRneBtn" aria-label="Eliminar RNE actual" ${(normalizeValue(currentRne.number) || normalizeValue(currentRne.attachmentUrl) || (Array.isArray(currentRne.history) && currentRne.history.length)) ? '' : 'disabled'}><i class="fa-solid fa-trash"></i></button>
+                <sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionOpenRneViewerBtn" ${normalizeValue(currentRne.attachmentUrl) ? '' : 'disabled'}><i slot="prefix" class="fa-regular fa-eye"></i><span>Visualizar adjunto actual</span></sl-button>
+                <sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" id="produccionDeleteRneBtn" aria-label="Eliminar RNE actual" ${(normalizeValue(currentRne.number) || normalizeValue(currentRne.attachmentUrl) || (Array.isArray(currentRne.history) && currentRne.history.length)) ? '' : 'disabled'}><i class="fa-solid fa-trash"></i></sl-button>
               </div>
               <div class="produccion-rne-history-wrap">
                 <h6><strong>Historial de RNE</strong></h6>
@@ -2566,7 +2580,7 @@
 
         const setLoading = () => {
           if (!preview) return;
-          preview.innerHTML = '<span class="produccion-company-logo-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando logo" class="meta-spinner produccion-company-logo-spinner"></span>';
+          preview.innerHTML = '<span class="produccion-company-logo-loading"><sl-spinner class="meta-spinner produccion-company-logo-spinner" aria-label="Cargando logo"></sl-spinner></span>';
         };
         const setFallback = () => {
           if (!preview) return;
@@ -2698,7 +2712,7 @@
         if (file) {
           const preview = document.getElementById('produccionCompanyLogoPreview');
           if (preview) {
-            preview.innerHTML = '<span class="produccion-company-logo-loading"><img src="./IMG/Meta-ai-logo.webp" alt="Subiendo logo" class="meta-spinner produccion-company-logo-spinner"></span>';
+            preview.innerHTML = '<span class="produccion-company-logo-loading"><sl-spinner class="meta-spinner produccion-company-logo-spinner" aria-label="Subiendo logo"></sl-spinner></span>';
           }
           if (!ALLOWED_UPLOAD_TYPES.includes(file.type)) {
             Swal.showValidationMessage('Formato de logo no admitido.');
@@ -2786,8 +2800,8 @@
     const result = await openIosSwal({
       title: 'Umbral por producto',
       html: `<div class="text-center produccion-umbral-form">
-          <label class="form-label" for="produccionRecipeMinInput">Umbral de stock (kg)</label>
-          <input id="produccionRecipeMinInput" type="number" min="0" step="0.01" class="swal2-input ios-input" value="${normalizeValue(currentRaw)}" placeholder="Vacío = usar global">
+          <label class="lj-label" for="produccionRecipeMinInput">Umbral de stock (kg)</label>
+          <sl-input id="produccionRecipeMinInput" type="number" min="0" step="0.01" class="swal2-input" value="${normalizeValue(currentRaw)}" placeholder="Vacío = usar global"></sl-input>
         </div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
@@ -2888,9 +2902,9 @@
   // "Sin adjuntos").
   const renderTraceAttachmentsBtnHtml = (item, traceRows, attr) => {
     const urls = (Array.isArray(traceRows) ? traceRows : []).flatMap((trace) => trace.invoiceImageUrls);
-    if (urls.length) return `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" ${attr}='${encodeURIComponent(JSON.stringify(urls))}'><i class="fa-regular fa-image"></i><span>Ver adjuntos</span></button>`;
-    if (!isRegistroDetailHydrated(item)) return '<button type="button" class="btn ios-btn ios-btn-secondary inventario-no-photo-btn" disabled><i class="fa-solid fa-circle-notch fa-spin"></i><span>Cargando</span></button>';
-    return '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>';
+    if (urls.length) return `<sl-button variant="default" type="button" class="inventario-threshold-btn" ${attr}='${encodeURIComponent(JSON.stringify(urls))}'><i slot="prefix" class="fa-regular fa-image"></i><span>Ver adjuntos</span></sl-button>`;
+    if (!isRegistroDetailHydrated(item)) return '<sl-button variant="default" type="button" class="inventario-no-photo-btn" disabled><i slot="prefix" class="fa-solid fa-circle-notch fa-spin"></i><span>Cargando</span></sl-button>';
+    return '<sl-button variant="danger" type="button" class="inventario-no-photo-btn" disabled>Sin adjuntos</sl-button>';
   };
   const renderTraceLoadingRow = (colspan = 10) =>
     `<tr class="inventario-trace-row"><td colspan="${colspan}"><div class="d-flex align-items-center justify-content-center gap-2 py-2 text-muted" aria-live="polite"><i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i><span>Cargando movimientos...</span></div></td></tr>`;
@@ -2956,7 +2970,7 @@
             if (usedQty <= 0.0001 && !plan.sinTrazabilidad) return '';
             const isSinTraz = Boolean(plan.sinTrazabilidad);
             const badge = isSinTraz
-              ? `<span class="pc-notraz-badge"><i class="bi bi-exclamation-triangle-fill"></i> Sin trazabilidad</span>`
+              ? `<span class="pc-notraz-badge"><sl-icon name="exclamation-triangle-fill"></sl-icon> Sin trazabilidad</span>`
               : (plan.infiniteStock ? `<small class="pc-infinite-badge"><i class="fa-solid fa-infinity"></i> Stock infinito</small>` : '');
             return `<li class="produccion-confirm-ingredient${isSinTraz ? ' is-no-traceability' : ''}"><div class="produccion-confirm-ingredient-main"><strong>${escapeHtml(plan.ingredientName || group.sourceName)}</strong><span>${formatCompactQty(isSinTraz ? plan.neededQty : usedQty, plan.ingredientUnit || plan.unit || unit)}</span></div>${badge}</li>`;
           })
@@ -3033,7 +3047,7 @@
       confirmButtonText: 'Sí, incluir',
       denyButtonText: 'No incluir',
       cancelButtonText: 'Cancelar',
-      customClass: { denyButton: 'ios-btn ios-btn-danger' }
+      customClass: { denyButton: 'danger' }
     });
     if (!include.isConfirmed && !include.isDenied) return;
     const win = window.open('', '_blank', 'width=1200,height=900');
@@ -3264,24 +3278,24 @@
       width: 820,
       customClass: {
         popup: 'recipe-print-alert produccion-qr-print-alert',
-        denyButton: 'ios-btn ios-btn-success'
+        denyButton: 'success'
       },
       html: `
         <div class="recipe-print-panel">
           <div class="recipe-print-controls">
             <label class="recipe-print-field">
               <span>Tamaño de hoja</span>
-              <select id="printQrSheetType" class="form-select ios-input">
-                ${QR_PRINT_SIZES.map((item) => `<option value="${item.value}">${item.label}</option>`).join('')}
-              </select>
+              <sl-select id="printQrSheetType" value="${ljOptionValue(QR_PRINT_SIZES[0].value)}" hoist>
+                ${QR_PRINT_SIZES.map((item) => `<sl-option value="${ljOptionValue(item.value)}">${item.label}</sl-option>`).join('')}
+              </sl-select>
             </label>
             <label class="recipe-print-field">
               <span>Cantidad por hoja</span>
-              <input id="printQrPerSheet" type="number" min="1" step="1" value="1" class="form-control ios-input" disabled>
+              <sl-input id="printQrPerSheet" type="number" min="1" step="1" value="1" disabled></sl-input>
             </label>
             <label class="recipe-print-field">
               <span>Cantidad de hojas</span>
-              <input id="printQrSheetCount" type="number" min="1" step="1" value="1" class="form-control ios-input">
+              <sl-input id="printQrSheetCount" type="number" min="1" step="1" value="1"></sl-input>
             </label>
           </div>
           <div class="recipe-print-meta" id="printQrLayoutMeta"></div>
@@ -3304,7 +3318,7 @@
         const panelState = { sheet: QR_PRINT_SIZES[0].value, perSheet: 1, sheetCount: 1 };
 
         const normalizePanel = () => {
-          panelState.sheet = getQrPrintSizeConfig(sheetTypeNode.value).value;
+          panelState.sheet = getQrPrintSizeConfig(ljSelectValue(sheetTypeNode)).value;
           panelState.perSheet = 1;
           panelState.sheetCount = Math.max(1, Math.floor(Number(sheetCountNode.value) || 1));
           perSheetNode.value = '1';
@@ -3835,7 +3849,7 @@
         const providerRne = resolveProviderRneFromLot(lot);
         return `<article class="produccion-trace-lot-card">
           <div class="produccion-trace-lot-head">
-            <strong><i class="bi bi-upc-scan fa-solid fa-barcode"></i> Lote ${escapeHtml(lot.lotNumber || lot.entryId || '-')}</strong>
+            <strong><i class="fa-solid fa-barcode"></i> Lote ${escapeHtml(lot.lotNumber || lot.entryId || '-')}</strong>
             ${Boolean(lot?.isFrozen || lot?.frozen) ? '<span class="produccion-trace-used-badge">Congelado a -18 grados</span>' : ''}
             ${Number(lot?.mergedEntries || 1) > 1 ? `<span class="produccion-trace-used-badge">${Number(lot.mergedEntries)} ingresos del mismo lote</span>` : ''}
             <span class="produccion-trace-used-badge">Vencimiento al elaborar: ${escapeHtml(formatIsoEs(lot.expiryDate || ''))}</span>
@@ -3850,16 +3864,16 @@
             <p><strong>Factura</strong><span>${escapeHtml(lot.invoiceNumber || '-')}</span></p>
             <p><strong>Ingreso</strong><span>${escapeHtml(normalizeValue(lot.entryDate) ? formatIsoEs(lot.entryDate) : '-')}</span></p>
           </div>
-          <div class="produccion-trace-card-actions">${Array.isArray(lot.invoiceImageUrls) && lot.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}"><i class="bi bi-paperclip fa-solid fa-paperclip"></i><span>Ver adjunto (${lot.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}${providerRne.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify([providerRne.attachmentUrl]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE sin adjunto</button>'}</div>
+          <div class="produccion-trace-card-actions">${Array.isArray(lot.invoiceImageUrls) && lot.invoiceImageUrls.length ? `<sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}"><i slot="prefix" class="fa-solid fa-paperclip"></i><span>Ver adjunto (${lot.invoiceImageUrls.length})</span></sl-button>` : '<sl-button variant="danger" type="button" class="inventario-no-photo-btn" disabled>Sin adjuntos</sl-button>'}${providerRne.attachmentUrl ? `<sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify([providerRne.attachmentUrl]))}'><i slot="prefix" class="fa-regular fa-eye"></i><span>Ver adjunto RNE</span></sl-button>` : '<sl-button variant="danger" type="button" class="inventario-no-photo-btn" disabled>RNE sin adjunto</sl-button>'}</div>
         </article>`;
       }).join('');
       return `<article class="produccion-trace-ingredient-card">
         <header>
           <div class="produccion-trace-ingredient-head-main">
             <span class="produccion-trace-ingredient-index">${idx + 1}</span>
-            <span class="produccion-trace-ingredient-avatar">${ingredientImage ? `<img src="${ingredientImage}" alt="${escapeHtml(item.ingredientName || 'Ingrediente')}">` : '<i class="bi bi-basket2-fill fa-solid fa-carrot"></i>'}</span>
+            <span class="produccion-trace-ingredient-avatar">${ingredientImage ? `<img src="${ingredientImage}" alt="${escapeHtml(item.ingredientName || 'Ingrediente')}">` : '<i class="fa-solid fa-carrot"></i>'}</span>
             <div>
-              <h6><i class="bi bi-box-seam fa-solid fa-box-open"></i> ${escapeHtml(group.sourceIngredientName || item.ingredientName || item.ingredientId || 'Ingrediente')}</h6>
+              <h6><i class="fa-solid fa-box-open"></i> ${escapeHtml(group.sourceIngredientName || item.ingredientName || item.ingredientId || 'Ingrediente')}</h6>
               ${group.plans.some((plan) => plan.isSubstitute && getIngredientPlanUsedQty(plan) > 0.0001) ? `<small><i class="fa-solid fa-link"></i> Sustitutos usados: ${escapeHtml(group.plans.filter((plan) => plan.isSubstitute && getIngredientPlanUsedQty(plan) > 0.0001).map((plan) => plan.ingredientName).join(' + ') || '-')}</small>` : ''}
               ${hasInfiniteStock ? '<small><i class="fa-solid fa-infinity"></i> Stock infinito sin trazabilidad</small>' : ''}
               <small>Cantidad usada: ${formatCompactQty(group.plans.reduce((sum, plan) => sum + getIngredientPlanUsedQty(plan, { hasSiblingSubstitute: group.plans.some((candidate) => candidate?.isSubstitute) }), 0), item.unit || item.ingredientUnit || '')}</small>
@@ -3867,7 +3881,7 @@
               ${normalizeValue(providerRneSummary.observations) ? `<small> - Obs. RNE: <strong>${escapeHtml(providerRneSummary.observations)}</strong></small>` : ''}
             </div>
           </div>
-          <div class="produccion-trace-card-actions">${aggregatedImages.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(aggregatedImages))}"><i class="bi bi-images fa-regular fa-images"></i><span>Ver adjunto (${aggregatedImages.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}${providerRneSummary.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify([providerRneSummary.attachmentUrl]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE sin adjunto</button>'}</div>
+          <div class="produccion-trace-card-actions">${aggregatedImages.length ? `<sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(aggregatedImages))}"><i slot="prefix" class="fa-regular fa-images"></i><span>Ver adjunto (${aggregatedImages.length})</span></sl-button>` : '<sl-button variant="danger" type="button" class="inventario-no-photo-btn" disabled>Sin adjuntos</sl-button>'}${providerRneSummary.attachmentUrl ? `<sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify([providerRneSummary.attachmentUrl]))}'><i slot="prefix" class="fa-regular fa-eye"></i><span>Ver adjunto RNE</span></sl-button>` : '<sl-button variant="danger" type="button" class="inventario-no-photo-btn" disabled>RNE sin adjunto</sl-button>'}</div>
         </header>
         <div class="produccion-trace-lots">${lotCards || (hasInfiniteStock ? `<div class="produccion-lote-infinite-note"><i class="fa-solid fa-infinity" aria-hidden="true"></i><span>${escapeHtml(INFINITE_STOCK_NOTICE)}</span></div>` : '<p class="m-0">Sin lotes asociados.</p>')}</div>
       </article>`;
@@ -3876,13 +3890,13 @@
       <div class="produccion-trace-diagram-wrap">
         <div class="produccion-trace-diagram">
           <div class="produccion-trace-toolbar-zoom">
-            <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-trace-zoom-out aria-label="Alejar"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+            <sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-trace-zoom-out aria-label="Alejar"><i class="fa-solid fa-magnifying-glass-minus"></i></sl-button>
             <span class="produccion-trace-zoom-value" data-trace-zoom-value>100%</span>
-            <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-trace-zoom-in aria-label="Acercar"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
-            <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-trace-zoom-reset aria-label="Restablecer zoom"><i class="fa-solid fa-arrows-rotate"></i></button>
+            <sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-trace-zoom-in aria-label="Acercar"><i class="fa-solid fa-magnifying-glass-plus"></i></sl-button>
+            <sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-trace-zoom-reset aria-label="Restablecer zoom"><i class="fa-solid fa-arrows-rotate"></i></sl-button>
           </div>
           <article class="produccion-trace-summary">
-            <h6><i class="bi bi-diagram-3 fa-solid fa-diagram-project"></i> Trazabilidad ${escapeHtml(registro.id)}</h6>
+            <h6><i class="fa-solid fa-diagram-project"></i> Trazabilidad ${escapeHtml(registro.id)}</h6>
             <div class="produccion-trace-grid">
               <p><strong>Empresa</strong><span>${escapeHtml(COMPANY_LEGAL_NAME)}</span></p>
               <p><strong>RNE empresa</strong><span>${escapeHtml(getTraceRneDisplay(companyRne))}</span></p>
@@ -3896,11 +3910,11 @@
               <p><strong>Fecha</strong><span>${escapeHtml(formatDateTime(registro.createdAt))}</span></p>
               <p><strong>Estado</strong><span>${escapeHtml(registro.status || '-')}</span></p>
             </div>
-            <div class="produccion-trace-card-actions">${companyRne.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify([companyRne.attachmentUrl]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNE empresa</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNE empresa sin adjunto</button>'}${productRnpa.exempt ? '<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" disabled><i class="fa-solid fa-store"></i><span>RNPA no requerido</span></button>' : (productRnpa.attachmentUrl ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify([productRnpa.attachmentUrl]))}'><i class="fa-regular fa-eye"></i><span>Ver adjunto RNPA</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>RNPA sin adjunto</button>')}</div>
-            <div class="produccion-trace-managers">${(Array.isArray(registro.managers) ? registro.managers : []).map((token) => { const manager = getManagerDisplay(token); return `<span class="produccion-trace-chip"><i class="bi bi-person-badge fa-solid fa-user-tie"></i><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span>`; }).join('') || '<span class="produccion-trace-chip"><i class="bi bi-person-x fa-solid fa-user-xmark"></i><strong>Sin responsable</strong><small>Encargado</small></span>'}</div>
+            <div class="produccion-trace-card-actions">${companyRne.attachmentUrl ? `<sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify([companyRne.attachmentUrl]))}'><i slot="prefix" class="fa-regular fa-eye"></i><span>Ver adjunto RNE empresa</span></sl-button>` : '<sl-button variant="danger" type="button" class="inventario-no-photo-btn" disabled>RNE empresa sin adjunto</sl-button>'}${productRnpa.exempt ? '<sl-button variant="default" type="button" class="inventario-threshold-btn" disabled><i slot="prefix" class="fa-solid fa-store"></i><span>RNPA no requerido</span></sl-button>' : (productRnpa.attachmentUrl ? `<sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify([productRnpa.attachmentUrl]))}'><i slot="prefix" class="fa-regular fa-eye"></i><span>Ver adjunto RNPA</span></sl-button>` : '<sl-button variant="danger" type="button" class="inventario-no-photo-btn" disabled>RNPA sin adjunto</sl-button>')}</div>
+            <div class="produccion-trace-managers">${(Array.isArray(registro.managers) ? registro.managers : []).map((token) => { const manager = getManagerDisplay(token); return `<span class="produccion-trace-chip"><i class="fa-solid fa-user-tie"></i><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span>`; }).join('') || '<span class="produccion-trace-chip"><i class="fa-solid fa-user-xmark"></i><strong>Sin responsable</strong><small>Encargado</small></span>'}</div>
           </article>
           <div class="produccion-trace-mermaid-wrap">
-            <div class="produccion-trace-mermaid" data-trace-mermaid><button type="button" class="produccion-trace-mermaid-overlay" data-trace-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button></div>
+            <div class="produccion-trace-mermaid" data-trace-mermaid><button type="button" class="lj-tile produccion-trace-mermaid-overlay" data-trace-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button></div>
           </div>
           <div class="produccion-trace-ingredients">${ingredients || '<p class="m-0">Sin desglose de lotes para esta producción.</p>'}</div>
         </div>
@@ -3910,7 +3924,7 @@
   const initTraceMermaidDiagram = async (popup, registro) => {
     const host = popup.querySelector('[data-trace-mermaid]');
     if (!host) return;
-    host.innerHTML = '<div class="produccion-trace-mermaid-loading" aria-live="polite"><img src="./IMG/Meta-ai-logo.webp" alt="Renderizando diagrama" class="meta-spinner-login"><p>Generando diagrama...</p></div>';
+    host.innerHTML = '<div class="produccion-trace-mermaid-loading" aria-live="polite"><sl-spinner class="meta-spinner-login" aria-label="Renderizando diagrama"></sl-spinner><p>Generando diagrama...</p></div>';
     const hasLib = await ensureTraceDiagramLib();
     if (!hasLib) {
       host.innerHTML = '<p class="m-0">No se pudo cargar Mermaid.</p>';
@@ -3921,13 +3935,13 @@
       const renderId = `trace_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
       const rendered = await window.mermaid.render(renderId, source);
       if (!rendered || !rendered.svg) throw new Error('Mermaid render vacío');
-      host.innerHTML = `${rendered.svg}<button type="button" class="produccion-trace-mermaid-overlay is-ready" data-trace-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button>`;
+      host.innerHTML = `${rendered.svg}<button type="button" class="lj-tile produccion-trace-mermaid-overlay is-ready" data-trace-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button>`;
       host.dataset.traceScale = '1';
       host.style.transformOrigin = 'top left';
       host.style.transform = 'scale(1)';
       return;
     } catch (primaryError) {
-      host.innerHTML = `<pre class="mermaid">${source}</pre><button type="button" class="produccion-trace-mermaid-overlay is-ready" data-trace-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button>`;
+      host.innerHTML = `<pre class="mermaid">${source}</pre><button type="button" class="lj-tile produccion-trace-mermaid-overlay is-ready" data-trace-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button>`;
       try {
         const node = host.querySelector('.mermaid');
         if (!node) throw new Error('Nodo Mermaid ausente');
@@ -4150,7 +4164,7 @@
     }
     Swal.fire({
       title: 'Cargando trazabilidad...',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando trazabilidad" class="meta-spinner-login"></div>',
+      html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Cargando trazabilidad"></sl-spinner></div>',
       allowOutsideClick: false,
       showConfirmButton: false,
       customClass: {
@@ -4241,7 +4255,7 @@
       const planillaDisabled = hasPlanillaDisponible(item) ? '' : 'disabled';
       const traceHtml = (!isCollapsed && traceRows.length)
         ? traceRows.map((trace) => `<tr class="inventario-trace-row">
-          <td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${getTraceIngredientLabelHtml(trace)}</span></div></td>
+          <td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${getTraceIngredientLabelHtml(trace)}</span></div></td>
           <td></td>
           <td><span class="produccion-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td>
           <td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td>
@@ -4249,12 +4263,12 @@
           <td><span class="produccion-trace-expiry">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td>
           <td><span class="produccion-trace-badge">Trazabilidad</span></td>
           <td>-</td>
-          <td>${trace.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td>
+          <td>${trace.invoiceImageUrls.length ? `<sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-prod-trace-images="${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}"><i slot="prefix" class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></sl-button>` : '<sl-button variant="danger" type="button" class="inventario-no-photo-btn" disabled>Sin adjuntos</sl-button>'}</td>
           <td>-</td>
         </tr>`).join('')
         : (!isCollapsed && hasTracePreview ? renderTraceLoadingRow(10) : '');
       return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}">
-        <td><div class="d-flex align-items-center gap-2">${hasTracePreview ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-collapse="${escapeHtml(item.id)}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isRegistroDetailLoading(item) ? 'fa-circle-notch fa-spin' : (isCollapsed ? 'fa-expand' : 'fa-compress')}"></i></button>` : ''}<span>${escapeHtml(item.id)}</span></div></td>
+        <td><div class="d-flex align-items-center gap-2">${hasTracePreview ? `<sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-prod-collapse="${escapeHtml(item.id)}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isRegistroDetailLoading(item) ? 'fa-circle-notch fa-spin' : (isCollapsed ? 'fa-expand' : 'fa-compress')}"></i></sl-button>` : ''}<span>${escapeHtml(item.id)}</span></div></td>
         <td>${renderProductionDateCell(item)}</td>
         <td>${(() => {
           // Buscamos el nombre comercial desde la traceabilidad guardada, el
@@ -4264,22 +4278,22 @@
             item?.recipeNombreComercial ||
             state.recetas?.[item?.recipeId]?.nombreComercial
           );
-          const loteAntiguoBadge = item.loteAntiguo ? '<small class="produccion-lote-antiguo-tag"><i class="bi bi-calendar-minus"></i> Lote antiguo</small>' : '';
+          const loteAntiguoBadge = item.loteAntiguo ? '<small class="produccion-lote-antiguo-tag"><sl-icon name="calendar-minus"></sl-icon> Lote antiguo</small>' : '';
           return `<span class="produccion-history-product-cell"><strong>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</strong>${comercial ? `<small class="produccion-history-product-comercial">${escapeHtml(capitalize(comercial))}</small>` : ''}${loteAntiguoBadge}</span>`;
         })()}</td>
         <td>${Number(item.quantityKg || 0).toFixed(2)} kg</td>
         <td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td>
         <td class="produccion-vto-cell">${renderProductExpiryCell(item)}</td>
-        <td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${item.id}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td>
-        <td><div class="produccion-planilla-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-planilla="${escapeHtml(item.id)}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-qr-print="${escapeHtml(item.id)}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></button></div></td>
+        <td><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-prod-trace="${item.id}"><img slot="prefix" src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></sl-button></td>
+        <td><div class="produccion-planilla-actions"><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-prod-planilla="${escapeHtml(item.id)}" ${planillaDisabled}><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planilla</span></sl-button><sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-prod-qr-print="${escapeHtml(item.id)}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></sl-button></div></td>
         <td>${renderTraceAttachmentsBtnHtml(item, traceRows, 'data-prod-trace-images')}</td>
-        <td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-prod-cancel="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td>
+        <td><sl-button variant="danger" type="button" class="inventario-threshold-btn" data-prod-cancel="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-trash"></i><span>Eliminar</span></sl-button></td>
       </tr>${traceHtml}`;
     }).join('') : '<tr><td colspan="10" class="text-center">Sin producciones en ese rango.</td></tr>';
     nodes.historyTableWrap.innerHTML = `
       <div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x">
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button>
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button>
+        <sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-compress"></i><span>Colapsar</span></sl-button>
+        <sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-expand"></i><span>Descolapsar</span></sl-button>
       </div>
       <div class="table-responsive inventario-global-table inventario-table-compact-wrap">
         <table class="table recipe-table inventario-table-compact mb-0">
@@ -4288,9 +4302,9 @@
         </table>
       </div>
       <div class="inventario-pagination enhanced">
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-prod-page="prev" ${state.historyPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button>
+        <sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-prod-page="prev" ${state.historyPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></sl-button>
         <span>Página ${state.historyPage} de ${pages}</span>
-        <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-prod-page="next" ${state.historyPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button>
+        <sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-prod-page="next" ${state.historyPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></sl-button>
       </div>`;
     prepareThumbLoaders('.js-produccion-thumb');
   };
@@ -4351,7 +4365,7 @@
   const openRecipeQuickHistory = async (recipeId) => {
     Swal.fire({
       title: 'Cargando historial...',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando historial" class="meta-spinner-login"></div>',
+      html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Cargando historial"></sl-spinner></div>',
       allowOutsideClick: false,
       showConfirmButton: false,
       customClass: {
@@ -4391,7 +4405,7 @@
       const qtyLabel = `${isOut ? '-' : '+'}${Math.abs(qty).toFixed(2)} kg`;
       const codeHtml = isNonTraceable
         ? '<span class="inventario-internal-no-trace">SIN TRAZABILIDAD</span>'
-        : `<button type="button" class="btn btn-link p-0 ${codeClass}" data-history-shortcut-code="${escapeHtml(item.sourceCode || item.sourceId || '')}">${escapeHtml(item.sourceCode || item.sourceId || '-')}</button>`;
+        : `<sl-button variant="text" type="button" class="p-0 ${codeClass}" data-history-shortcut-code="${escapeHtml(item.sourceCode || item.sourceId || '')}">${escapeHtml(item.sourceCode || item.sourceId || '-')}</sl-button>`;
       return `<tr class="${isOut ? 'is-movement-out' : 'is-movement-in'}"><td><span class="${toneClass}"><i class="fa-solid ${isOut ? 'fa-arrow-down' : 'fa-arrow-up'}"></i> ${escapeHtml(movementTypeLabel)}</span></td><td>${escapeHtml(formatDateTime(item.at || 0))}</td><td>${codeHtml}</td><td><span class="${qtyClass}">${qtyLabel}</span></td></tr>`;
     }).join('');
     const exportRecipeHistoryExcel = async () => {
@@ -4423,8 +4437,8 @@
         confirmButtonText: 'Imprimir',
         cancelButtonText: 'Cancelar',
         customClass: {
-          confirmButton: 'ios-btn ios-btn-success',
-          cancelButton: 'ios-btn ios-btn-secondary'
+          confirmButton: 'success',
+          cancelButton: 'secondary'
         }
       });
       if (!ask.isConfirmed) return;
@@ -4464,7 +4478,7 @@
       title: `Historial rápido · ${escapeHtml(capitalize(recipe.title || 'Producto'))}`,
       width: 'min(720px,96vw)',
       customClass: { popup: 'produccion-recipe-history-alert' },
-      html: `<div class="text-start produccion-recipe-history-modal"><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input type="search" class="form-control ios-input" data-recipe-history-search placeholder="Buscar por código"></div><div class="input-group ios-input-group ingredientes-search-group mb-2"><span class="input-group-text ingredientes-search-icon"><i class="fa-regular fa-calendar"></i></span><input type="text" class="form-control ios-input" data-recipe-history-range placeholder="Filtrar rango (desde - hasta)" autocomplete="off"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-range-clear><i class="fa-solid fa-xmark"></i></button></div><div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn" data-recipe-history-expand><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button><button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" data-recipe-history-excel><i class="fa-solid fa-file-excel"></i><span>Excel</span></button><span class="inventario-period-divider" aria-hidden="true"></span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-print><i class="fa-solid fa-print"></i><span>Período</span></button></div><div data-recipe-history-body class="dispatch-clients-manager-list produccion-recipe-history-table-host"></div><div class="d-flex align-items-center justify-content-between mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-prev><i class="fa-solid fa-chevron-left"></i></button><span data-recipe-history-pager>Página 1 de 1</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-history-next><i class="fa-solid fa-chevron-right"></i></button></div></div>`,
+      html: `<div class="text-start produccion-recipe-history-modal"><sl-input type="search" class="mb-2" data-recipe-history-search placeholder="Buscar por código"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input><div class="produccion-inline-filter mb-2"><input type="text" class="lj-input" data-recipe-history-range placeholder="Filtrar rango (desde - hasta)" autocomplete="off"><sl-button variant="default" type="button" class="lj-icon-btn" data-recipe-history-range-clear aria-label="Limpiar rango"><i class="fa-solid fa-xmark"></i></sl-button></div><div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><sl-button variant="default" type="button" class="inventario-expand-btn inventario-threshold-btn" data-recipe-history-expand><i slot="prefix" class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></sl-button><sl-button variant="success" type="button" class="inventario-threshold-btn" data-recipe-history-excel><i slot="prefix" class="fa-solid fa-file-excel"></i><span>Excel</span></sl-button><span class="inventario-period-divider" aria-hidden="true"></span><sl-button variant="default" type="button" class="inventario-threshold-btn" data-recipe-history-print><i slot="prefix" class="fa-solid fa-print"></i><span>Período</span></sl-button></div><div data-recipe-history-body class="dispatch-clients-manager-list produccion-recipe-history-table-host"></div><div class="d-flex align-items-center justify-content-between mt-2"><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-recipe-history-prev><i class="fa-solid fa-chevron-left"></i></sl-button><span data-recipe-history-pager>Página 1 de 1</span><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-recipe-history-next><i class="fa-solid fa-chevron-right"></i></sl-button></div></div>`,
       confirmButtonText: 'Cerrar',
       didOpen: (popup) => {
         const rangeInput = popup.querySelector('[data-recipe-history-range]');
@@ -4791,7 +4805,7 @@
     const html = buildDispatchPlanillaHtml(dispatchRow).html.replace(/Fecha y hora de carga en BackOffice:[^<]*/gi, '');
     Swal.fire({
       title: 'Generando planilla...',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando planilla" class="meta-spinner-login"></div>',
+      html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Cargando planilla"></sl-spinner></div>',
       allowOutsideClick: false,
       showConfirmButton: false,
       customClass: { popup: 'ios-alert produccion-loading-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' }
@@ -4800,10 +4814,10 @@
     Swal.close();
     await openIosSwal({
       title: `Planilla ${escapeHtml(dispatchRow.code || dispatchRow.id)}`,
-      html: `<div class="planilla-toolbar"><button type="button" class="btn ios-btn ios-btn-secondary" id="dispatchPlanillaPrintBtn"><i class="fa-solid fa-print"></i><span>Imprimir</span></button></div><div class="planilla-card">${html}</div>`,
+      html: `<div class="planilla-toolbar"><sl-button variant="default" type="button" id="dispatchPlanillaPrintBtn"><i slot="prefix" class="fa-solid fa-print"></i><span>Imprimir</span></sl-button></div><div class="planilla-card">${html}</div>`,
       width: '98vw',
       confirmButtonText: 'Cerrar',
-      customClass: { popup: 'produccion-trace-alert planilla-modal', confirmButton: 'ios-btn ios-btn-secondary' },
+      customClass: { popup: 'produccion-trace-alert planilla-modal', confirmButton: 'secondary' },
       didOpen: async (popup) => {
         const printable = popup.querySelector('#dispatchPlanillaPrintable');
         if (!printable) return;
@@ -4906,7 +4920,7 @@
     const totalProducedKg = lots.reduce((sum, lot) => sum + Number(lot.producedKg || 0), 0);
     const rowsHtml = lots.length
       ? lots.map((lot) => `<tr>
-          <td><button type="button" class="produccion-stock-id-link" data-history-shortcut-code="${escapeHtml(lot.id || '')}" title="Buscar en historial de movimientos"><strong>${escapeHtml(lot.id || '-')}</strong><small>${escapeHtml(formatIsoEs(lot.productionDate || '') || '-')}</small></button></td>
+          <td><button type="button" class="lj-tile produccion-stock-id-link" data-history-shortcut-code="${escapeHtml(lot.id || '')}" title="Buscar en historial de movimientos"><strong>${escapeHtml(lot.id || '-')}</strong><small>${escapeHtml(formatIsoEs(lot.productionDate || '') || '-')}</small></button></td>
           <td class="produccion-stock-qty-cell"><strong>${escapeHtml(formatKgBadgeValue(lot.producedKg))} kg</strong></td>
           <td class="produccion-stock-qty-cell is-available"><strong>${escapeHtml(formatKgBadgeValue(lot.availableKg))} kg</strong></td>
           <td>${escapeHtml(formatIsoEs(lot.expiryIso || '') || 'Sin VTO')}</td>
@@ -4929,7 +4943,7 @@
       </div>`,
       width: 820,
       confirmButtonText: 'Cerrar',
-      customClass: { confirmButton: 'ios-btn ios-btn-secondary' },
+      customClass: { confirmButton: 'secondary' },
       didOpen: (popup) => {
         // Hace clickeable cada código de producción y lo abre en el buscador
         // del historial de movimientos (mismo flujo que usa el link de código
@@ -5104,9 +5118,9 @@
       cancelButtonText: 'Cancelar',
       customClass: {
         popup: 'expiry-resolution-alert',
-        confirmButton: 'ios-btn ios-btn-success',
-        denyButton: 'ios-btn ios-btn-danger',
-        cancelButton: 'ios-btn ios-btn-secondary'
+        confirmButton: 'success',
+        denyButton: 'danger',
+        cancelButton: 'secondary'
       }
     });
     if (result.isConfirmed) return 'sold_counter';
@@ -5118,7 +5132,7 @@
     if (!targets.length || !normalizeValue(resolutionType)) return 0;
     Swal.fire({
       title: 'Resolviendo vencidos...',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Resolviendo" class="meta-spinner-login"></div>',
+      html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Resolviendo"></sl-spinner></div>',
       allowOutsideClick: false,
       showConfirmButton: false,
       customClass: { popup: 'ios-alert produccion-loading-alert' }
@@ -5151,7 +5165,7 @@
   const openProductExpiryDaysConfig = async () => {
     const result = await openIosSwal({
       title: 'Alerta de vencimiento',
-      html: `<div class="text-start"><label class="form-label" for="productionExpiryAlertDaysInput">Dias antes de alertar</label><input id="productionExpiryAlertDaysInput" class="swal2-input ios-input" type="number" min="0" step="1" value="${getProductExpiryAlertDays()}"></div>`,
+      html: `<div class="text-start"><label class="lj-label" for="productionExpiryAlertDaysInput">Dias antes de alertar</label><sl-input id="productionExpiryAlertDaysInput" class="swal2-input" type="number" min="0" step="1" value="${getProductExpiryAlertDays()}"></sl-input></div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
@@ -5179,23 +5193,23 @@
       ? `${expiredRows.length} lote(s) de producto vencido(s) con stock`
       : `${soonRows.length} lote(s) de producto proximo(s) a vencer`;
     const rowHtml = rows.map((row) => `<div class="produccion-expiry-row ${row.expired ? 'is-expired' : 'is-soon'}">
-        <label class="produccion-expiry-select"><input type="checkbox" data-product-expiry-select="${escapeHtml(row.productionId)}" ${row.expired ? '' : 'disabled'}><span class="visually-hidden">Seleccionar lote</span></label>
+        <span class="produccion-expiry-select"><sl-checkbox data-product-expiry-select="${escapeHtml(row.productionId)}" ${row.expired ? '' : 'disabled'} aria-label="Seleccionar lote"></sl-checkbox></span>
         <span class="produccion-expiry-thumb">${row.imageUrl ? `<img src="${escapeHtml(row.imageUrl)}" alt="${escapeHtml(row.productName)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span>
         <span class="produccion-expiry-info"><strong>${escapeHtml(row.productName)}</strong><small>Lote ${escapeHtml(row.lotNumber)} · ${escapeHtml(productExpiryWhenLabel(row))} · ${escapeHtml(formatIsoEs(row.expiryDate))}</small></span>
         <span class="produccion-expiry-qty">${row.availableKg.toFixed(2)} kg</span>
-        ${row.expired ? `<button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-product-expiry-resolve-one="${escapeHtml(row.productionId)}"><i class="fa-solid fa-check"></i><span>Resolver</span></button>` : ''}
+        ${row.expired ? `<sl-button size="small" variant="danger" type="button" class="inventario-threshold-btn" data-product-expiry-resolve-one="${escapeHtml(row.productionId)}"><i slot="prefix" class="fa-solid fa-check"></i><span>Resolver</span></sl-button>` : ''}
       </div>`).join('');
     return `<section class="produccion-expiry-alert-card ${tone}" data-production-expiry-alert>
-      <button type="button" class="produccion-rne-expiry-alert ${tone} is-collapsible" data-product-expiry-toggle aria-expanded="false">
-        <span class="produccion-rne-expiry-text"><i class="bi ${expiredRows.length ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill'}"></i><span>${escapeHtml(title)}</span></span>
+      <button type="button" class="lj-tile produccion-rne-expiry-alert ${tone} is-collapsible" data-product-expiry-toggle aria-expanded="false">
+        <span class="produccion-rne-expiry-text"><sl-icon name="${expiredRows.length ? 'exclamation-octagon-fill' : 'exclamation-triangle-fill'}"></sl-icon><span>${escapeHtml(title)}</span></span>
         <span class="produccion-rne-expiry-collapse-meta"><strong>${rows.length}</strong><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
       </button>
       <div class="produccion-expiry-alert-details" data-product-expiry-details hidden>
         <div class="produccion-expiry-toolbar">
-          <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-product-expiry-config><i class="fa-solid fa-sliders"></i><span>${getProductExpiryAlertDays()} dias</span></button>
-          <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-product-expiry-select-all ${expiredRows.length ? '' : 'disabled'}><i class="fa-regular fa-square-check"></i><span>Seleccionar vencidos</span></button>
-          <button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-product-expiry-resolve-selected ${expiredRows.length ? '' : 'disabled'}><i class="fa-solid fa-list-check"></i><span>Resolver seleccionados</span></button>
-          <button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-product-expiry-resolve-all ${expiredRows.length ? '' : 'disabled'}><i class="fa-solid fa-check-double"></i><span>Resolver todos</span></button>
+          <sl-button variant="default" type="button" class="inventario-threshold-btn" data-product-expiry-config><i slot="prefix" class="fa-solid fa-sliders"></i><span>${getProductExpiryAlertDays()} dias</span></sl-button>
+          <sl-button variant="default" type="button" class="inventario-threshold-btn" data-product-expiry-select-all ${expiredRows.length ? '' : 'disabled'}><i slot="prefix" class="fa-regular fa-square-check"></i><span>Seleccionar vencidos</span></sl-button>
+          <sl-button variant="danger" type="button" class="inventario-threshold-btn" data-product-expiry-resolve-selected ${expiredRows.length ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-list-check"></i><span>Resolver seleccionados</span></sl-button>
+          <sl-button variant="danger" type="button" class="inventario-threshold-btn" data-product-expiry-resolve-all ${expiredRows.length ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-check-double"></i><span>Resolver todos</span></sl-button>
         </div>
         <div class="produccion-expiry-list">${rowHtml}</div>
       </div>
@@ -5342,10 +5356,10 @@
             return allocations.map((allocation) => {
               const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
               const traceBtn = normalizeValue(allocation.productionId)
-                ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button>`
+                ? `<sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img slot="prefix" src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></sl-button>`
                 : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
               const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
-              return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
+              return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
             });
           });
           return [parentRow, ...childRows];
@@ -5357,10 +5371,10 @@
           return allocations.map((allocation) => {
             const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
             const traceBtn = normalizeValue(allocation.productionId)
-              ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button>`
+              ? `<sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img slot="prefix" src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></sl-button>`
               : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
             const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
-            return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
+            return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
           });
         })
       ].join('') : '';
@@ -5368,18 +5382,18 @@
       const locationRow = !collapsed && locationLabel
         ? `<tr class="inventario-internal-use-row"><td colspan="8"><i class="fa-solid fa-house"></i> ${escapeHtml(locationLabel)}</td></tr>`
         : '';
-      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${products.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-collapse="${escapeHtml(row.id)}" title="${collapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${collapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${collapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(dispatchDateMeta.label)}</span></div></td><td>${productLabel}</td><td>${products.map((item) => escapeHtml(getDispatchProductSummaryLabel(item))).join('<br>')}</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || row.id || '-')}</td><td>${escapeHtml(client.name || '-')}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-planilla="${escapeHtml(row.id)}"><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button></td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-dispatch-delete="${escapeHtml(row.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${detailRows}${locationRow}`;
+      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${products.length ? `<sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-dispatch-collapse="${escapeHtml(row.id)}" title="${collapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${collapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${collapsed ? 'fa-expand' : 'fa-compress'}"></i></sl-button>` : ''}<span>${escapeHtml(dispatchDateMeta.label)}</span></div></td><td>${productLabel}</td><td>${products.map((item) => escapeHtml(getDispatchProductSummaryLabel(item))).join('<br>')}</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || row.id || '-')}</td><td>${escapeHtml(client.name || '-')}</td><td><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-dispatch-planilla="${escapeHtml(row.id)}"><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planilla</span></sl-button></td><td><sl-button size="small" variant="danger" type="button" class="inventario-threshold-btn" data-dispatch-delete="${escapeHtml(row.id)}"><i slot="prefix" class="fa-solid fa-trash"></i><span>Eliminar</span></sl-button></td></tr>${detailRows}${locationRow}`;
     }).join('') : '<tr><td colspan="8" class="text-center">Sin repartos para el filtro seleccionado.</td></tr>';
     const tableWrap = nodes.dispatchView.querySelector('#produccionDispatchTableWrap');
     if (!tableWrap) return;
-    tableWrap.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioGlobalCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar todo</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="inventarioGlobalExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar todo</span></button></div><div class="table-responsive inventario-global-table inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0 produccion-dispatch-table-center"><thead><tr><th>Fecha de reparto</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th><th>Planilla</th><th>Acciones</th></tr></thead><tbody>${htmlRows}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-page="prev" ${state.dispatchPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${state.dispatchPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-page="next" ${state.dispatchPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+    tableWrap.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><sl-button variant="default" type="button" class="inventario-threshold-btn" id="inventarioGlobalCollapseAllRowsBtn" ${canCollapse ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-compress"></i><span>Colapsar todo</span></sl-button><sl-button variant="default" type="button" class="inventario-threshold-btn" id="inventarioGlobalExpandAllRowsBtn" ${canExpand ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-expand"></i><span>Descolapsar todo</span></sl-button></div><div class="table-responsive inventario-global-table inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0 produccion-dispatch-table-center"><thead><tr><th>Fecha de reparto</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th><th>Planilla</th><th>Acciones</th></tr></thead><tbody>${htmlRows}</tbody></table></div><div class="inventario-pagination enhanced"><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-dispatch-page="prev" ${state.dispatchPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></sl-button><span>Página ${state.dispatchPage} de ${pages}</span><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-dispatch-page="next" ${state.dispatchPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></sl-button></div>`;
     prepareThumbLoaders('.js-produccion-thumb');
   };
   const renderDispatchMain = () => {
     if (!nodes.dispatchView) return;
     state.dispatchCreateMode = false;
     state.dispatchXlsxMode = false;
-    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Salida de Productos</h6><div class="produccion-dispatch-head-actions"><button id="produccionDispatchNewBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="bi bi-plus-lg"></i><span>Reparto</span></button><button id="produccionDispatchXlsxBtn" type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn"><i class="bi bi-plus-lg"></i><span>Repartos por XLSX</span></button></div></div><div class="inventario-period-filters"><input id="produccionDispatchSearch" type="search" class="form-control ios-input produccion-dispatch-filter" placeholder="Buscar reparto, cliente o producto" value="${escapeHtml(state.dispatchSearch)}"><input id="produccionDispatchRange" class="form-control ios-input produccion-dispatch-filter" placeholder="Seleccionar rango de fechas" value="${escapeHtml(state.dispatchRange)}"><div class="toolbar-scroll-x inventario-period-actions-scroll"><button id="produccionDispatchClearBtn" type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn ${(state.dispatchRange || state.dispatchSearch) ? '' : 'd-none'}"><i class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></button><button id="produccionDispatchApplyBtn" type="button" class="btn ios-btn ios-btn-primary inventario-threshold-btn"><i class="fa-solid fa-filter"></i><span>Aplicar</span></button><button id="produccionDispatchExpandBtn" type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></button><button id="produccionDispatchExcelBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="fa-solid fa-file-excel"></i><span>Excel</span></button><button id="produccionDispatchAssalBtn" type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn"><i class="fa-solid fa-shield-halved"></i><span>Excel Assal</span></button><span class="inventario-period-divider" aria-hidden="true"></span><button id="produccionDispatchPrintBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-print"></i><span>Imprimir período</span></button><button id="produccionDispatchMassBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-regular fa-file-lines"></i><span>Planillas masivas</span></button></div></div><div id="produccionDispatchTableWrap"></div>`;
+    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><sl-button variant="default" id="produccionDispatchBackBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-arrow-left"></i><span>Volver</span></sl-button><h6 class="step-title mb-0">Salida de Productos</h6><div class="produccion-dispatch-head-actions"><sl-button variant="success" id="produccionDispatchNewBtn" type="button" class="inventario-threshold-btn"><sl-icon slot="prefix" name="plus-lg"></sl-icon><span>Reparto</span></sl-button><sl-button variant="primary" id="produccionDispatchXlsxBtn" type="button" class="inventario-threshold-btn"><sl-icon slot="prefix" name="plus-lg"></sl-icon><span>Repartos por XLSX</span></sl-button></div></div><div class="inventario-period-filters"><sl-input id="produccionDispatchSearch" type="search" class="produccion-dispatch-filter" placeholder="Buscar reparto, cliente o producto" value="${escapeHtml(state.dispatchSearch)}"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input><input id="produccionDispatchRange" class="lj-input produccion-dispatch-filter" placeholder="Seleccionar rango de fechas" value="${escapeHtml(state.dispatchRange)}"><div class="toolbar-scroll-x inventario-period-actions-scroll"><sl-button variant="default" id="produccionDispatchClearBtn" type="button" class="inventario-delete-btn inventario-threshold-btn ${(state.dispatchRange || state.dispatchSearch) ? '' : 'd-none'}"><i slot="prefix" class="fa-solid fa-xmark"></i><span>Limpiar filtro</span></sl-button><sl-button variant="primary" id="produccionDispatchApplyBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-filter"></i><span>Aplicar</span></sl-button><sl-button variant="default" id="produccionDispatchExpandBtn" type="button" class="inventario-expand-btn inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar tabla</span></sl-button><sl-button variant="success" id="produccionDispatchExcelBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-file-excel"></i><span>Excel</span></sl-button><sl-button variant="success" id="produccionDispatchAssalBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-shield-halved"></i><span>Excel Assal</span></sl-button><span class="inventario-period-divider" aria-hidden="true"></span><sl-button variant="default" id="produccionDispatchPrintBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-print"></i><span>Imprimir período</span></sl-button><sl-button variant="default" id="produccionDispatchMassBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planillas masivas</span></sl-button></div></div><div id="produccionDispatchTableWrap"></div>`;
     const rangeInput = nodes.dispatchView.querySelector('#produccionDispatchRange');
     if (window.flatpickr && rangeInput) {
       const locale = window.flatpickr.l10ns?.es || undefined;
@@ -5487,7 +5501,7 @@
     state.dispatchPage = 1;
     setDispatchMode(true);
     if (nodes.dispatchView) {
-      nodes.dispatchView.innerHTML = '<div class="ingredientes-loading" aria-live="polite"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando repartos" class="meta-spinner-login"><p>Cargando salidas...</p></div>';
+      nodes.dispatchView.innerHTML = '<div class="ingredientes-loading" aria-live="polite"><sl-spinner class="meta-spinner-login" aria-label="Cargando repartos"></sl-spinner><p>Cargando salidas...</p></div>';
     }
     await ensureRepartoRecordsLoaded();
     renderDispatchMain();
@@ -5998,7 +6012,7 @@
     let selected = '';
     await openIosSwal({
       title: 'Relacionar producto',
-      html: '<p>Elegí el origen para vincular este producto.</p><div class="dispatch-xlsx-type-actions"><button type="button" class="btn ios-btn ios-btn-primary" data-dispatch-xlsx-type="ingredient">Ingredientes</button><button type="button" class="btn ios-btn ios-btn-primary" data-dispatch-xlsx-type="production">Productos</button><span class="dispatch-xlsx-type-divider"></span><button type="button" class="btn ios-btn ios-btn-secondary" data-dispatch-xlsx-type="cancel">Cancelar</button></div>',
+      html: '<p>Elegí el origen para vincular este producto.</p><div class="dispatch-xlsx-type-actions"><sl-button variant="primary" type="button" data-dispatch-xlsx-type="ingredient">Ingredientes</sl-button><sl-button variant="primary" type="button" data-dispatch-xlsx-type="production">Productos</sl-button><span class="dispatch-xlsx-type-divider"></span><sl-button variant="default" type="button" data-dispatch-xlsx-type="cancel">Cancelar</sl-button></div>',
       showConfirmButton: false,
       didOpen: (popup) => {
         popup.addEventListener('click', (event) => {
@@ -6024,7 +6038,7 @@
       if (!host || !isIngredientMode) return;
       const selected = getSelectedIngredientsList();
       host.innerHTML = selected.length
-        ? selected.map((item) => `<label class="dispatch-xlsx-ingredient-qty-row"><span class="dispatch-xlsx-ingredient-qty-label">Producto ${item.idx}: ${escapeHtml(capitalize(item.title || item.id))} (${escapeHtml(item.unit)})</span><input type="number" step="0.01" min="0" class="form-control ios-input dispatch-xlsx-ingredient-qty" data-dispatch-xlsx-ingredient-qty="${escapeHtml(item.id)}" placeholder="Si lo dejás vacío, usa la cantidad del XLSX" value="${escapeHtml(item.qty || '')}"></label>`).join('')
+        ? selected.map((item) => `<div class="dispatch-xlsx-ingredient-qty-row"><span class="dispatch-xlsx-ingredient-qty-label">Producto ${item.idx}: ${escapeHtml(capitalize(item.title || item.id))} (${escapeHtml(item.unit)})</span><sl-input type="number" step="0.01" min="0" class="dispatch-xlsx-ingredient-qty" data-dispatch-xlsx-ingredient-qty="${escapeHtml(item.id)}" placeholder="Si lo dejás vacío, usa la cantidad del XLSX" value="${escapeHtml(item.qty || '')}"></sl-input></div>`).join('')
         : '';
     };
     const renderList = (popup) => {
@@ -6032,7 +6046,7 @@
       if (!listHost) return;
       const rows = catalog.filter((item) => normalizeLower(item.title).includes(normalizeLower(query))).slice(0, 80);
       listHost.innerHTML = rows.length
-        ? rows.map((item) => {
+        ? `${isIngredientMode ? '' : `<sl-radio-group name="dispatchXlsxTargetPick" class="dispatch-xlsx-target-radios" value="${escapeHtml(picked)}">`}${rows.map((item) => {
           const checked = Boolean(selectedIngredients[item.id]);
           if (isIngredientMode) {
             const stockMeta = getDispatchXlsxIngredientStockMeta(item.id);
@@ -6040,10 +6054,10 @@
             const expiredInline = stockMeta.expired > 0
               ? ` <span class="dispatch-xlsx-stock-hint is-danger">→ ${stockMeta.expired.toFixed(2)} ${escapeHtml(stockMeta.unit)} vencidas</span>`
               : '';
-            return `<label class="inventario-check-row inventario-selector-row dispatch-xlsx-selector-row"><input type="checkbox" data-dispatch-xlsx-ingredient-pick="${escapeHtml(item.id)}" ${checked ? 'checked' : ''}><span class="inventario-print-photo-wrap">${item.imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-dispatch-xlsx-target-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><span><strong>${escapeHtml(capitalize(item.title))}</strong><small class="d-block dispatch-xlsx-stock-hint ${stockClass}">Stock: ${stockMeta.available.toFixed(2)} ${escapeHtml(stockMeta.unit)}${expiredInline}</small></span></label>`;
+            return `<div class="inventario-check-row inventario-selector-row dispatch-xlsx-selector-row"><sl-checkbox data-dispatch-xlsx-ingredient-pick="${escapeHtml(item.id)}" ${checked ? 'checked' : ''}><span class="dispatch-xlsx-selector-label"><span class="inventario-print-photo-wrap">${item.imageUrl ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-dispatch-xlsx-target-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><span><strong>${escapeHtml(capitalize(item.title))}</strong><small class="d-block dispatch-xlsx-stock-hint ${stockClass}">Stock: ${stockMeta.available.toFixed(2)} ${escapeHtml(stockMeta.unit)}${expiredInline}</small></span></span></sl-checkbox></div>`;
           }
-          return `<label class="inventario-check-row inventario-selector-row dispatch-xlsx-selector-row"><input type="radio" name="dispatchXlsxTargetPick" value="${escapeHtml(item.id)}" ${picked === item.id ? 'checked' : ''}><span class="inventario-print-photo-wrap">${item.imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-dispatch-xlsx-target-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><span>${escapeHtml(capitalize(item.title))}</span></label>`;
-        }).join('')
+          return `<div class="inventario-check-row inventario-selector-row dispatch-xlsx-selector-row"><sl-radio value="${escapeHtml(item.id)}"><span class="dispatch-xlsx-selector-label"><span class="inventario-print-photo-wrap">${item.imageUrl ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-dispatch-xlsx-target-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><span>${escapeHtml(capitalize(item.title))}</span></span></sl-radio></div>`;
+        }).join('')}${isIngredientMode ? '' : '</sl-radio-group>'}`
         : '<p class="text-muted mb-0">Sin resultados para la búsqueda.</p>';
       prepareThumbLoaders('.js-dispatch-xlsx-target-thumb');
       renderIngredientInputs(popup);
@@ -6051,7 +6065,7 @@
     const result = await openIosSwal({
       title: 'Seleccioná destino',
       width: 'min(760px,96vw)',
-      html: `<div class="dispatch-xlsx-selector-wrap"><div class="input-group ios-input-group ingredientes-search-group dispatch-managers-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchXlsxTargetSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar producto o ingrediente"></div><div id="dispatchXlsxTargetList" class="dispatch-xlsx-target-list"></div>${isIngredientMode ? '<div id="dispatchXlsxIngredientQtyList" class="dispatch-xlsx-ingredient-qty-list"></div>' : '<input id="dispatchXlsxMapQty" type="number" step="0.01" class="swal2-input ios-input" placeholder="Cantidad (multiplicador opcional)"><small class="dispatch-xlsx-multiplier-help">Si lo dejás vacío, se usará la cantidad original del XLSX.</small>'}</div>`,
+      html: `<div class="dispatch-xlsx-selector-wrap"><sl-input id="dispatchXlsxTargetSearch" class="dispatch-managers-search-group" placeholder="Buscar producto o ingrediente"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input><div id="dispatchXlsxTargetList" class="dispatch-xlsx-target-list"></div>${isIngredientMode ? '<div id="dispatchXlsxIngredientQtyList" class="dispatch-xlsx-ingredient-qty-list"></div>' : '<sl-input id="dispatchXlsxMapQty" type="number" step="0.01" class="swal2-input" placeholder="Cantidad (multiplicador opcional)"></sl-input><small class="dispatch-xlsx-multiplier-help">Si lo dejás vacío, se usará la cantidad original del XLSX.</small>'}</div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
@@ -6062,9 +6076,9 @@
           renderList(popup);
         });
         popup.addEventListener('change', (event) => {
-          const radio = event.target.closest('input[name="dispatchXlsxTargetPick"]');
-          if (radio) {
-            picked = normalizeValue(radio.value);
+          const radioGroup = event.target.closest('sl-radio-group[name="dispatchXlsxTargetPick"]');
+          if (radioGroup) {
+            picked = normalizeValue(radioGroup.value);
             return;
           }
           const checkbox = event.target.closest('[data-dispatch-xlsx-ingredient-pick]');
@@ -6155,13 +6169,13 @@
       const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
       page = Math.min(Math.max(1, page), pages);
       const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-      const body = pageRows.length ? pageRows.map((row) => `<tr><td>${escapeHtml(row.fileName || '-')}</td><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${escapeHtml((Number(row.sizeBytes || 0) / 1024).toFixed(1))} KB</td><td><div class="dispatch-xlsx-history-actions"><a class="btn ios-btn ios-btn-primary inventario-threshold-btn" href="${escapeHtml(row.fileUrl || '#')}" download="${escapeHtml(row.fileName || 'archivo.xlsx')}"><i class="fa-solid fa-download"></i><span>Descargar</span></a><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn dispatch-xlsx-history-delete" data-dispatch-xlsx-history-delete="${escapeHtml(row.id || '')}"><span>Eliminar</span></button></div></td></tr>`).join('') : '<tr><td colspan="4" class="text-center">Sin archivos en el período seleccionado.</td></tr>';
-      host.innerHTML = `<div class="table-responsive dispatch-xlsx-history-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Archivo</th><th>Fecha / hora</th><th>Tamaño</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-xlsx-history-page="prev" ${page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${page} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-xlsx-history-page="next" ${page >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+      const body = pageRows.length ? pageRows.map((row) => `<tr><td>${escapeHtml(row.fileName || '-')}</td><td>${escapeHtml(formatDateTime(row.createdAt))}</td><td>${escapeHtml((Number(row.sizeBytes || 0) / 1024).toFixed(1))} KB</td><td><div class="dispatch-xlsx-history-actions"><sl-button variant="primary" class="inventario-threshold-btn" href="${escapeHtml(row.fileUrl || '#')}" download="${escapeHtml(row.fileName || 'archivo.xlsx')}"><i slot="prefix" class="fa-solid fa-download"></i><span>Descargar</span></sl-button><sl-button size="small" variant="danger" type="button" class="inventario-threshold-btn dispatch-xlsx-history-delete" data-dispatch-xlsx-history-delete="${escapeHtml(row.id || '')}"><span>Eliminar</span></sl-button></div></td></tr>`).join('') : '<tr><td colspan="4" class="text-center">Sin archivos en el período seleccionado.</td></tr>';
+      host.innerHTML = `<div class="table-responsive dispatch-xlsx-history-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Archivo</th><th>Fecha / hora</th><th>Tamaño</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div><div class="inventario-pagination enhanced"><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-dispatch-xlsx-history-page="prev" ${page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></sl-button><span>Página ${page} de ${pages}</span><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-dispatch-xlsx-history-page="next" ${page >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></sl-button></div>`;
     };
     await openIosSwal({
       title: 'Historial de Archivos',
       width: 'min(980px,96vw)',
-      html: '<div class="dispatch-xlsx-history-filters"><input id="dispatchXlsxHistorySearch" class="form-control ios-input" placeholder="Buscar por nombre de archivo"><input id="dispatchXlsxHistoryRange" class="form-control ios-input" placeholder="Rango de fechas"></div><div id="dispatchXlsxHistoryHost"></div>',
+      html: '<div class="dispatch-xlsx-history-filters"><sl-input id="dispatchXlsxHistorySearch" placeholder="Buscar por nombre de archivo"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input><input id="dispatchXlsxHistoryRange" class="lj-input" placeholder="Rango de fechas"></div><div id="dispatchXlsxHistoryHost"></div>',
       confirmButtonText: 'Cerrar',
       didOpen: (popup) => {
         render(popup);
@@ -6579,7 +6593,8 @@
     recomputeDispatchXlsxDraftRows(draft);
     const resolutionPreview = buildDispatchXlsxResolutionPreview(draft);
     draft.vehicleId = normalizeValue(nodes.dispatchView?.querySelector('#dispatchXlsxVehicleSelect')?.value || draft.vehicleId);
-    draft.managers = [...(nodes.dispatchView?.querySelectorAll('[data-dispatch-xlsx-manager]:checked') || [])]
+    draft.managers = [...(nodes.dispatchView?.querySelectorAll('sl-checkbox[data-dispatch-xlsx-manager]') || [])]
+      .filter((n) => n.checked)
       .map((n) => normalizeValue(n.dataset.dispatchXlsxManager || n.value))
       .filter(Boolean);
     if (!draft.vehicleId) {
@@ -6606,7 +6621,7 @@
       await openIosSwal({ title: 'Sin filas activas', html: '<p>No hay filas listas para procesar.</p>', icon: 'warning' });
       return;
     }
-    Swal.fire({ title: 'Procesando ingresos...', html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Procesando" class="meta-spinner-login"></div>', allowOutsideClick: false, showConfirmButton: false, customClass: { popup: 'ios-alert produccion-loading-alert' } });
+    Swal.fire({ title: 'Procesando ingresos...', html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Procesando"></sl-spinner></div>', allowOutsideClick: false, showConfirmButton: false, customClass: { popup: 'ios-alert produccion-loading-alert' } });
     try {
       const touchedInventoryIds = new Set();
       const ingredientRowsToLoad = [...new Set(rows.flatMap((row) =>
@@ -6762,7 +6777,7 @@
     recomputeDispatchXlsxDraftRows(draft);
     Swal.fire({
       title: 'Resolviendo conflictos...',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Resolviendo" class="meta-spinner-login"></div>',
+      html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Resolviendo"></sl-spinner></div>',
       allowOutsideClick: false,
       showConfirmButton: false,
       customClass: { popup: 'ios-alert produccion-loading-alert' }
@@ -6961,7 +6976,7 @@
           const hasExpiredForConflict = (Number.isFinite(Number(itemPreview.expiredAvailable)) ? Number(itemPreview.expiredAvailable) : Number(item.expired || 0)) > 0.0001;
           const showResolveBtn = (hasConflict && hasExpiredForConflict) || Boolean(resolutionType);
           const resolveBtn = showResolveBtn
-            ? `<button type="button" class="btn ios-btn ${resolutionType ? 'ios-btn-secondary' : 'ios-btn-danger'} dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="ingredient" data-dispatch-xlsx-row="${escapeHtml(row.id)}" data-dispatch-xlsx-ingredient="${escapeHtml(item.id)}">${resolutionType ? 'Cambiar elección' : 'Resolver conflicto'}</button>`
+            ? `<sl-button variant="${resolutionType ? 'default' : 'danger'}" size="small" type="button" class="dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="ingredient" data-dispatch-xlsx-row="${escapeHtml(row.id)}" data-dispatch-xlsx-ingredient="${escapeHtml(item.id)}">${resolutionType ? 'Cambiar elección' : 'Resolver conflicto'}</sl-button>`
             : '';
           const toneClass = hasConflict
             ? ((Number(item.expired || 0) > 0.0001) ? 'is-danger' : (Number(item.available || 0) > 0.0001 ? 'is-warning' : 'is-danger'))
@@ -6999,7 +7014,7 @@
             ? `<span class="dispatch-xlsx-stock-create"> Se creará ${escapeHtml(formatDispatchXlsxQtyWithUnit(missingCreateQty, mappedIngredients.length ? (mappedIngredients[0]?.unit || 'u') : stockUnit))} sin trazabilidad.</span>`
             : '';
           const productResolveBtn = canResolveProductConflict && !dateFixMeta.hasFix
-            ? ` <button type="button" class="btn ios-btn ${productConflictResolutionType ? 'ios-btn-secondary' : 'ios-btn-danger'} dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="production" data-dispatch-xlsx-row="${escapeHtml(row.id)}">${productConflictResolutionType ? 'Cambiar elección' : 'Resolver conflicto'}</button>`
+            ? ` <sl-button variant="${productConflictResolutionType ? 'default' : 'danger'}" size="small" type="button" class="dispatch-xlsx-conflict-btn" data-dispatch-xlsx-resolve-conflict="production" data-dispatch-xlsx-row="${escapeHtml(row.id)}">${productConflictResolutionType ? 'Cambiar elección' : 'Resolver conflicto'}</sl-button>`
             : '';
           const dateHint = showFutureDateAlert
             ? `<br><span class="dispatch-xlsx-stock-future">Hay stock, pero se puede repartir desde ${escapeHtml(formatIsoEs(nextAvailableDate))}. Editá la fecha de reparto en esta fila.</span>`
@@ -7015,31 +7030,31 @@
       const rowStateClass = row.disabled
         ? 'dispatch-xlsx-row-disabled'
         : (row.mappedTargetTitle ? 'dispatch-xlsx-row-related' : 'dispatch-xlsx-row-pending');
-      return `<tr class="${rowStateClass}"><td><div class="dispatch-xlsx-client"><strong class="dispatch-xlsx-client-name" title="${escapeHtml(row.clientName || '-')}">${escapeHtml(row.clientName || '-')}</strong>${clientBadge}</div></td><td class="dispatch-xlsx-invoice-cell">${escapeHtml(row.invoiceNumber || '-')}</td><td class="dispatch-xlsx-date-cell"><input class="form-control ios-input dispatch-xlsx-date-input" data-dispatch-xlsx-date="${escapeHtml(row.id)}" value="${escapeHtml(row.invoiceDate || '')}" placeholder="Fecha reparto"><small>${escapeHtml(dateLabel)}</small></td><td><div class="dispatch-xlsx-mapping"><strong>${escapeHtml(row.sourceProduct || '-')}</strong>${relationMeta}${ingredientDetail}<span class="dispatch-xlsx-map-state ${row.mappedTargetTitle ? 'is-related' : 'is-pending'}">${row.mappedTargetTitle ? `<i class="fa-solid fa-circle-check"></i> Relacionado` : `<i class="bi bi-x-circle-fill"></i> Sin relacionado`}</span></div></td><td class="dispatch-xlsx-kilos-cell"><span class="${qtyClass}">${qtyMap}</span><small class="d-block ${qtyClass}">${stockLine}</small></td><td><label class="dispatch-xlsx-toggle"><input type="checkbox" data-dispatch-xlsx-row-enabled="${escapeHtml(row.id)}" ${row.disabled ? '' : 'checked'}><span>${row.disabled ? 'Deshabilitado' : (rowQtyValid ? 'Activo' : 'Revisar')}</span></label></td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-xlsx-map="${escapeHtml(row.id)}"><i class="fa-solid fa-link"></i><span>Relacionar</span></button></td></tr>`;
+      return `<tr class="${rowStateClass}"><td><div class="dispatch-xlsx-client"><strong class="dispatch-xlsx-client-name" title="${escapeHtml(row.clientName || '-')}">${escapeHtml(row.clientName || '-')}</strong>${clientBadge}</div></td><td class="dispatch-xlsx-invoice-cell">${escapeHtml(row.invoiceNumber || '-')}</td><td class="dispatch-xlsx-date-cell"><input class="lj-input dispatch-xlsx-date-input" data-dispatch-xlsx-date="${escapeHtml(row.id)}" value="${escapeHtml(row.invoiceDate || '')}" placeholder="Fecha reparto"><small>${escapeHtml(dateLabel)}</small></td><td><div class="dispatch-xlsx-mapping"><strong>${escapeHtml(row.sourceProduct || '-')}</strong>${relationMeta}${ingredientDetail}<span class="dispatch-xlsx-map-state ${row.mappedTargetTitle ? 'is-related' : 'is-pending'}">${row.mappedTargetTitle ? `<i class="fa-solid fa-circle-check"></i> Relacionado` : `<sl-icon name="x-circle-fill"></sl-icon> Sin relacionado`}</span></div></td><td class="dispatch-xlsx-kilos-cell"><span class="${qtyClass}">${qtyMap}</span><small class="d-block ${qtyClass}">${stockLine}</small></td><td><sl-switch size="small" class="dispatch-xlsx-toggle" data-dispatch-xlsx-row-enabled="${escapeHtml(row.id)}" ${row.disabled ? '' : 'checked'}>${row.disabled ? 'Deshabilitado' : (rowQtyValid ? 'Activo' : 'Revisar')}</sl-switch></td><td><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-dispatch-xlsx-map="${escapeHtml(row.id)}"><i slot="prefix" class="fa-solid fa-link"></i><span>Relacionar</span></sl-button></td></tr>`;
     }).join('') : (rows.length
       ? `<tr><td colspan="7" class="text-center">${isFilteringUnrelated ? 'No hay conflictos con el filtro activo.' : 'Sin filas en esta página.'}</td></tr>`
       : '<tr><td colspan="7" class="text-center">Adjuntá un XLS/XLSX para comenzar.</td></tr>');
     const uploadHint = state.dispatchXlsxUploadInProgress ? '<span class="dispatch-xlsx-uploading"><i class="fa-solid fa-spinner fa-spin"></i> Subiendo Excel...</span>' : '';
-    const usersRows = Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-check" data-user-search="${escapeHtml(normalizeLower(`${user.fullName || ''} ${user.email || ''} ${getDispatchUserRole(user) || ''}`))}"><input type="checkbox" data-dispatch-xlsx-manager="${escapeHtml(user.id)}" value="${escapeHtml(user.id)}" ${(Array.isArray(draft.managers) && draft.managers.includes(user.id)) ? 'checked' : ''}>${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(getDispatchUserRole(user))}</small></span></label>`).join('');
+    const usersRows = Object.values(safeObject(state.users)).map((user) => `<sl-checkbox class="produccion-user-check" data-user-search="${escapeHtml(normalizeLower(`${user.fullName || ''} ${user.email || ''} ${getDispatchUserRole(user) || ''}`))}" data-dispatch-xlsx-manager="${escapeHtml(user.id)}" value="${escapeHtml(user.id)}" ${(Array.isArray(draft.managers) && draft.managers.includes(user.id)) ? 'checked' : ''}><span class="produccion-user-check-body">${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(getDispatchUserRole(user))}</small></span></span></sl-checkbox>`).join('');
     const hasImportedFile = Boolean(normalizeValue(draft.uploadedFileName)) || rows.length > 0;
     const vehicleManagersSection = hasImportedFile
-      ? `<section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">2</span> Vehículo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Transporte habilitado (UTA/URA)</label><small class="d-block text-muted mb-1">Unidad de Transporte Alimentario / Unidad de Reparto Alimentario.</small><div class="inventario-provider-search-wrap"><input id="dispatchXlsxVehicleInput" class="form-control ios-input" placeholder="Seleccionar unidad habilitada" value="${escapeHtml(draft.vehicleSearch || (draft.vehicleId ? formatDispatchVehicleLabel(getDispatchVehicle(draft.vehicleId)) : ''))}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"><input type="hidden" id="dispatchXlsxVehicleSelect" value="${escapeHtml(draft.vehicleId || '')}"></div><div class="dispatch-vehicle-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchXlsxAddVehicleBtn"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchXlsxManageVehiclesBtn"><i class="fa-solid fa-pen-to-square"></i><span>Gestionar UTA/URA</span></button></div></div><div class="recipe-field recipe-field-half"><label class="form-label">Responsables</label><div class="input-group ios-input-group ingredientes-search-group dispatch-managers-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchXlsxManagersSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar responsable" value="${escapeHtml(draft.managerSearch || '')}"></div><div class="produccion-managers-grid">${usersRows}</div></div></div></section>`
+      ? `<section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">2</span> Vehículo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="lj-label">Transporte habilitado (UTA/URA)</label><small class="d-block text-muted mb-1">Unidad de Transporte Alimentario / Unidad de Reparto Alimentario.</small><div class="inventario-provider-search-wrap"><sl-input id="dispatchXlsxVehicleInput" placeholder="Seleccionar unidad habilitada" value="${escapeHtml(draft.vehicleSearch || (draft.vehicleId ? formatDispatchVehicleLabel(getDispatchVehicle(draft.vehicleId)) : ''))}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"></sl-input><input type="hidden" id="dispatchXlsxVehicleSelect" value="${escapeHtml(draft.vehicleId || '')}"></div><div class="dispatch-vehicle-actions"><sl-button variant="default" type="button" class="inventario-threshold-btn" id="dispatchXlsxAddVehicleBtn"><i slot="prefix" class="fa-solid fa-plus"></i><span>Nueva unidad</span></sl-button><sl-button variant="default" type="button" class="inventario-threshold-btn" id="dispatchXlsxManageVehiclesBtn"><i slot="prefix" class="fa-solid fa-pen-to-square"></i><span>Gestionar UTA/URA</span></sl-button></div></div><div class="recipe-field recipe-field-half"><label class="lj-label">Responsables</label><sl-input id="dispatchXlsxManagersSearch" class="dispatch-managers-search-group" placeholder="Buscar responsable" value="${escapeHtml(draft.managerSearch || '')}"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input><div class="produccion-managers-grid">${usersRows}</div></div></div></section>`
       : '';
     const fixAllDatesBtn = rowsNeedingDateFix.length
-      ? `<button type="button" id="dispatchXlsxFixAllDatesBtn" class="btn recipe-table-action-btn recipe-table-action-btn-neutral"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Corregir fechas (${rowsNeedingDateFix.length})</span></button>`
+      ? `<sl-button variant="default" type="button" id="dispatchXlsxFixAllDatesBtn" class="recipe-table-action-btn recipe-table-action-btn-neutral"><i slot="prefix" class="fa-solid fa-wand-magic-sparkles"></i><span>Corregir fechas (${rowsNeedingDateFix.length})</span></sl-button>`
       : "";
     const disableUnrelatedBtn = unrelatedRows.length
-      ? `<button type="button" class="btn ios-btn ios-btn-secondary" id="dispatchXlsxConflictsDisableAll"><i class="fa-solid fa-ban"></i><span>Deshabilitar filas sin relación</span></button>`
+      ? `<sl-button variant="default" type="button" id="dispatchXlsxConflictsDisableAll"><i slot="prefix" class="fa-solid fa-ban"></i><span>Deshabilitar filas sin relación</span></sl-button>`
       : '';
     const conflictsBtn = conflictRows.length
-      ? `<div class="dispatch-xlsx-conflicts-wrap"><button id="dispatchXlsxConflictsBtn" type="button" class="btn recipe-table-action-btn recipe-table-action-btn-danger" aria-expanded="false" aria-controls="dispatchXlsxConflictsPanel"><i class="fa-solid fa-triangle-exclamation"></i><span>Conflictos</span><span class="dispatch-xlsx-conflicts-badge">${conflictRows.length}</span></button><div id="dispatchXlsxConflictsPanel" class="dispatch-xlsx-conflicts-panel d-none"><p class="dispatch-xlsx-conflicts-title">${conflictRows.length} fila(s) con conflicto</p>${disableUnrelatedBtn}<button type="button" class="btn ios-btn ios-btn-secondary" id="dispatchXlsxConflictsFilterToggle"><i class="fa-solid fa-filter"></i><span>${isFilteringUnrelated ? 'Quitar filtro de conflictos' : 'Mostrar solo conflictos'}</span></button></div></div>`
+      ? `<div class="dispatch-xlsx-conflicts-wrap"><sl-button variant="default" id="dispatchXlsxConflictsBtn" type="button" class="recipe-table-action-btn recipe-table-action-btn-danger" aria-expanded="false" aria-controls="dispatchXlsxConflictsPanel"><i slot="prefix" class="fa-solid fa-triangle-exclamation"></i><span>Conflictos</span><span class="dispatch-xlsx-conflicts-badge">${conflictRows.length}</span></sl-button><div id="dispatchXlsxConflictsPanel" class="dispatch-xlsx-conflicts-panel d-none"><p class="dispatch-xlsx-conflicts-title">${conflictRows.length} fila(s) con conflicto</p>${disableUnrelatedBtn}<sl-button variant="default" type="button" id="dispatchXlsxConflictsFilterToggle"><i slot="prefix" class="fa-solid fa-filter"></i><span>${isFilteringUnrelated ? 'Quitar filtro de conflictos' : 'Mostrar solo conflictos'}</span></sl-button></div></div>`
       : (isFilteringUnrelated
-        ? `<button type="button" id="dispatchXlsxConflictsFilterToggle" class="btn recipe-table-action-btn recipe-table-action-btn-neutral"><i class="fa-solid fa-filter-circle-xmark"></i><span>Quitar filtro de conflictos</span></button>`
+        ? `<sl-button variant="default" type="button" id="dispatchXlsxConflictsFilterToggle" class="recipe-table-action-btn recipe-table-action-btn-neutral"><i slot="prefix" class="fa-solid fa-filter-circle-xmark"></i><span>Quitar filtro de conflictos</span></sl-button>`
         : '');
     const xlsxPaginationHtml = rows.length > xlsxPageSize
-      ? `<div class="inventario-pagination enhanced dispatch-xlsx-pagination"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-xlsx-page="prev" ${state.dispatchXlsxPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${state.dispatchXlsxPage} de ${xlsxTotalPages} · Mostrando ${xlsxPageRangeFrom}-${xlsxPageRangeTo} de ${visibleRows.length}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-xlsx-page="next" ${state.dispatchXlsxPage >= xlsxTotalPages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`
+      ? `<div class="inventario-pagination enhanced dispatch-xlsx-pagination"><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-dispatch-xlsx-page="prev" ${state.dispatchXlsxPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></sl-button><span>Página ${state.dispatchXlsxPage} de ${xlsxTotalPages} · Mostrando ${xlsxPageRangeFrom}-${xlsxPageRangeTo} de ${visibleRows.length}</span><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-dispatch-xlsx-page="next" ${state.dispatchXlsxPage >= xlsxTotalPages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></sl-button></div>`
       : '';
-    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Repartos por XLSX</h6><div class="dispatch-xlsx-head-actions">${uploadHint}${conflictsBtn}${fixAllDatesBtn}<button id="dispatchXlsxUploadBtn" type="button" class="btn recipe-table-action-btn recipe-table-action-btn-monography"><i class="fa-solid fa-file-arrow-up"></i><span>Adjuntar XLSX</span></button><button type="button" id="dispatchXlsxHistoryBtn" class="btn recipe-table-action-btn recipe-table-action-btn-neutral"><i class="fa-regular fa-message"></i><span>Historial de Archivos</span></button></div><input id="dispatchXlsxFileInput" class="d-none" type="file" accept=".xlsx,.xls"></div><section class="recipe-step-card step-block produccion-dispatch-create"><h6 class="step-title"><span class="recipe-step-number">1</span> Previsualización importada ${draft.uploadedFileName ? `<small>· ${escapeHtml(draft.uploadedFileName)}</small>` : ''}</h6><div class="table-responsive recipe-table-wrap dispatch-products-table dispatch-xlsx-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0 dispatch-xlsx-table"><thead><tr><th>Cliente</th><th>Factura</th><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div>${xlsxPaginationHtml}</section>${vehicleManagersSection}<div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchXlsxProcessBtn" ${readyToProcess ? '' : 'disabled'}><i class="fa-solid fa-gears"></i><span>Procesar ingresos</span></button></div>`;
+    nodes.dispatchView.innerHTML = `<div class="inventario-period-head produccion-dispatch-head"><sl-button variant="default" id="produccionDispatchBackToListBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-arrow-left"></i><span>Volver</span></sl-button><h6 class="step-title mb-0">Repartos por XLSX</h6><div class="dispatch-xlsx-head-actions">${uploadHint}${conflictsBtn}${fixAllDatesBtn}<sl-button variant="default" id="dispatchXlsxUploadBtn" type="button" class="recipe-table-action-btn recipe-table-action-btn-monography"><i slot="prefix" class="fa-solid fa-file-arrow-up"></i><span>Adjuntar XLSX</span></sl-button><sl-button variant="default" type="button" id="dispatchXlsxHistoryBtn" class="recipe-table-action-btn recipe-table-action-btn-neutral"><i slot="prefix" class="fa-regular fa-message"></i><span>Historial de Archivos</span></sl-button></div><input id="dispatchXlsxFileInput" class="d-none" type="file" accept=".xlsx,.xls" hidden></div><section class="recipe-step-card step-block produccion-dispatch-create"><h6 class="step-title"><span class="recipe-step-number">1</span> Previsualización importada ${draft.uploadedFileName ? `<small>· ${escapeHtml(draft.uploadedFileName)}</small>` : ''}</h6><div class="table-responsive recipe-table-wrap dispatch-products-table dispatch-xlsx-table-wrap"><table class="table recipe-table inventario-bulk-table mb-0 dispatch-xlsx-table"><thead><tr><th>Cliente</th><th>Factura</th><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div>${xlsxPaginationHtml}</section>${vehicleManagersSection}<div class="produccion-config-actions"><sl-button variant="primary" type="button" id="dispatchXlsxProcessBtn" ${readyToProcess ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-gears"></i><span>Procesar ingresos</span></sl-button></div>`;
     nodes.dispatchView.querySelectorAll('.dispatch-xlsx-date-cell small').forEach((node) => node.remove());
     nodes.dispatchView.querySelectorAll('.dispatch-xlsx-stock-future').forEach((hint) => {
       const stockCell = hint.closest('td');
@@ -7066,7 +7081,7 @@
       const windowText = normalizeValue(fixMeta.windowText) || `desde ${formatIsoEs(nextDate)}`;
       const alertRow = document.createElement('tr');
       alertRow.className = 'dispatch-xlsx-date-alert-row';
-      alertRow.innerHTML = `<td colspan="7"><div class="dispatch-xlsx-date-alert"><span class="dispatch-xlsx-date-alert-copy"><i class="fa-solid fa-calendar-days"></i><strong>${reason}</strong><span>Se puede repartir ${escapeHtml(windowText)}. Fecha sugerida: ${escapeHtml(formatIsoEs(nextDate))}.</span></span><button type="button" class="btn ios-btn ios-btn-secondary dispatch-xlsx-fix-date-btn" data-dispatch-xlsx-fix-date="${escapeHtml(rowId)}" data-dispatch-xlsx-next-date="${escapeHtml(nextDate)}"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Corregir fecha</span></button></div></td>`;
+      alertRow.innerHTML = `<td colspan="7"><div class="dispatch-xlsx-date-alert"><span class="dispatch-xlsx-date-alert-copy"><i class="fa-solid fa-calendar-days"></i><strong>${reason}</strong><span>Se puede repartir ${escapeHtml(windowText)}. Fecha sugerida: ${escapeHtml(formatIsoEs(nextDate))}.</span></span><sl-button variant="default" type="button" class="dispatch-xlsx-fix-date-btn" data-dispatch-xlsx-fix-date="${escapeHtml(rowId)}" data-dispatch-xlsx-next-date="${escapeHtml(nextDate)}"><i slot="prefix" class="fa-solid fa-wand-magic-sparkles"></i><span>Corregir fecha</span></sl-button></div></td>`;
       row.insertAdjacentElement('afterend', alertRow);
     });
     if (hasImportedFile) prepareThumbLoaders('.js-produccion-user-photo');
@@ -7156,16 +7171,19 @@
         : '';
       const expiredLot = alloc.hasStock ? null : expiredLots[0];
       const expiredHelpRow = expiredLot
-        ? `<tr class="dispatch-expired-row"><td colspan="6"><p class="dispatch-expired-copy">Podes sacar a reparto la unidad cambiando la fecha hasta el dia ${escapeHtml(formatIsoEs(expiredLot.expiryDate || ''))}. Tambien podes marcar los kilos disponibles del lote como vendidos en mostrador o decomisados.</p><div class="dispatch-expired-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expired-action="retail_sale" data-dispatch-row="${idx}"><i class="fa-solid fa-store"></i><span>Marcar venta en mostrador</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-dispatch-expired-action="decommissioned" data-dispatch-row="${idx}"><i class="fa-solid fa-trash"></i><span>Marcar decomisado</span></button></div></td></tr>`
+        ? `<tr class="dispatch-expired-row"><td colspan="6"><p class="dispatch-expired-copy">Podes sacar a reparto la unidad cambiando la fecha hasta el dia ${escapeHtml(formatIsoEs(expiredLot.expiryDate || ''))}. Tambien podes marcar los kilos disponibles del lote como vendidos en mostrador o decomisados.</p><div class="dispatch-expired-actions"><sl-button variant="default" type="button" class="inventario-threshold-btn" data-dispatch-expired-action="retail_sale" data-dispatch-row="${idx}"><i slot="prefix" class="fa-solid fa-store"></i><span>Marcar venta en mostrador</span></sl-button><sl-button variant="danger" type="button" class="inventario-threshold-btn" data-dispatch-expired-action="decommissioned" data-dispatch-row="${idx}"><i slot="prefix" class="fa-solid fa-trash"></i><span>Marcar decomisado</span></sl-button></div></td></tr>`
         : '';
-      return `<tr><td><div class="recipe-ing-autocomplete" data-dispatch-product-wrap="${idx}"><div class="recipe-ing-input-wrap dispatch-product-input-wrap"><span class="recipe-inline-avatar-wrap">${recipeImage ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-inline-avatar js-dispatch-inline-thumb" src="${escapeHtml(recipeImage)}" alt="${escapeHtml(recipeTitle || 'Producto')}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><input type="search" class="form-control ios-input dispatch-product-search-input" data-dispatch-product-search="${idx}" placeholder="Seleccionar producto" value="${escapeHtml(recipeTitle)}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"></div><input type="hidden" data-dispatch-product-id="${idx}" value="${escapeHtml(line.recipeId)}"></div></td><td><input class="form-control ios-input" type="number" step="0.01" min="0" data-dispatch-qty="${idx}" value="${escapeHtml(line.qtyKg || '')}"></td><td class="dispatch-stock-cell">${stockStatus}</td><td class="dispatch-lot-cell">${lotsText}</td><td class="dispatch-expiry-cell ${(expiredLots.length || futureLots.length) ? 'is-danger' : ''}">${expiryText}</td><td><button type="button" class="btn family-manage-btn" data-dispatch-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>${futureHelpRow}${expiredHelpRow}`;
+      return `<tr><td><div class="recipe-ing-autocomplete" data-dispatch-product-wrap="${idx}"><div class="recipe-ing-input-wrap dispatch-product-input-wrap"><span class="recipe-inline-avatar-wrap">${recipeImage ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="recipe-inline-avatar js-dispatch-inline-thumb" src="${escapeHtml(recipeImage)}" alt="${escapeHtml(recipeTitle || 'Producto')}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><sl-input type="search" class="dispatch-product-search-input" data-dispatch-product-search="${idx}" placeholder="Seleccionar producto" value="${escapeHtml(recipeTitle)}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"></sl-input></div><input type="hidden" data-dispatch-product-id="${idx}" value="${escapeHtml(line.recipeId)}"></div></td><td><sl-input type="number" step="0.01" min="0" data-dispatch-qty="${idx}" value="${escapeHtml(line.qtyKg || '')}"></sl-input></td><td class="dispatch-stock-cell">${stockStatus}</td><td class="dispatch-lot-cell">${lotsText}</td><td class="dispatch-expiry-cell ${(expiredLots.length || futureLots.length) ? 'is-danger' : ''}">${expiryText}</td><td><sl-button size="small" variant="default" type="button" class="lj-icon-btn family-manage-btn" data-dispatch-remove="${idx}"><i class="fa-solid fa-trash"></i></sl-button></td></tr>${futureHelpRow}${expiredHelpRow}`;
     }).join('');
-    const commentRows = draft.comments.map((comment, idx) => `<tr class="dispatch-comment-row"><td colspan="5"><textarea class="form-control ios-input dispatch-comment-textarea" data-dispatch-comment="${idx}" placeholder="Agregá comentarios y observaciones">${escapeHtml(comment)}</textarea></td><td><button type="button" class="btn family-manage-btn" data-dispatch-comment-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
-    const proofRows = (Array.isArray(draft.proofs) ? draft.proofs : []).map((proof, idx) => `<tr class="dispatch-proof-row"><td colspan="4"><label class="inventario-upload-dropzone dispatch-proof-drop" for="dispatchProofFile_${idx}"><i class="fa-solid fa-paperclip"></i><span>${escapeHtml(proof?.name || 'Adjuntar comprobante (imagen/PDF)')}</span></label><input id="dispatchProofFile_${idx}" class="inventario-hidden-file-input" type="file" accept="image/*,application/pdf" data-dispatch-proof-file="${idx}">${proof?.url ? `<p class="dispatch-proof-name">Cargado: ${escapeHtml(proof.name || 'comprobante')}</p>` : ''}</td><td class="dispatch-proof-expiry-cell">Comprobante</td><td><button type="button" class="btn family-manage-btn" data-dispatch-proof-remove="${idx}"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
-    nodes.dispatchView.innerHTML = `<div class="inventario-period-head"><button id="produccionDispatchBackToListBtn" type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn"><i class="fa-solid fa-arrow-left"></i><span>Volver</span></button><h6 class="step-title mb-0">Nuevo reparto</h6></div>
-    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">1</span> Datos generales</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Día de reparto</label><input id="dispatchDateInput" class="form-control ios-input" value="${escapeHtml(draft.dispatchDate)}"></div><div class="recipe-field recipe-field-half"><div class="dispatch-client-head"><label class="form-label mb-0">Cliente <small class="dispatch-client-helper">(si no existe, crealo)</small></label><div class="dispatch-client-head-actions"><button type="button" class="btn ios-btn ios-btn-secondary dispatch-quick-client-btn" id="dispatchQuickCreateClientBtn"><i class="fa-solid fa-plus"></i><span>Nuevo cliente</span></button><button type="button" class="btn ios-btn ios-btn-secondary dispatch-quick-client-btn" id="dispatchQuickEditClientBtn"><i class="fa-solid fa-pen"></i><span>Modificar cliente</span></button></div></div><div class="inventario-provider-search-wrap"><input id="dispatchClientInput" class="form-control ios-input" placeholder="Buscar por nombre, DNI o CUIL" value="${escapeHtml(draft.clientName)}"><input type="hidden" id="dispatchClientId" value="${escapeHtml(draft.clientId)}"></div></div><div class="recipe-field recipe-field-half"><label class="form-label">Dirección de reparto</label><input id="dispatchClientAddressInput" class="form-control ios-input" placeholder="Dirección" value="${escapeHtml(draft.clientAddress || '')}" ${draft.clientId ? '' : 'disabled'}></div><div class="recipe-field recipe-field-half"><label class="form-label">Localidad</label><input id="dispatchClientCityInput" class="form-control ios-input" list="dispatchLocalitiesList" placeholder="Localidad" value="${escapeHtml(draft.clientCity || '')}" ${draft.clientId ? '' : 'disabled'}><datalist id="dispatchLocalitiesList">${(Array.isArray(state.reparto.localities) ? state.reparto.localities : []).map((loc) => `<option value="${escapeHtml(loc)}"></option>`).join('')}</datalist></div><div class="recipe-field recipe-field-half"><label class="form-label">Provincia</label><select id="dispatchClientProvinceInput" class="form-select ios-input" ${draft.clientId ? '' : 'disabled'}>${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${normalizeValue(draft.clientProvince || 'Santa Fe') === item ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select></div><div class="recipe-field recipe-field-half"><label class="form-label">País</label><input id="dispatchClientCountryInput" class="form-control ios-input" value="${escapeHtml(draft.clientCountry || 'Argentina')}" ${draft.clientId ? '' : 'disabled'}></div></div></section>
-    <section class="recipe-step-card step-block produccion-dispatch-create"><div class="d-flex align-items-center justify-content-between mb-2"><h6 class="step-title mb-0"><span class="recipe-step-number">2</span> Productos a repartir</h6></div><div class="table-responsive recipe-table-wrap dispatch-products-table"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Producto</th><th>Kilos</th><th>Stock</th><th>Lote</th><th>Vencimiento</th><th></th></tr></thead><tbody>${lineRows}${commentRows}${proofRows}</tbody></table></div><div class="toolbar-scroll-x dispatch-actions-row mt-2"><button type="button" class="btn ios-btn ios-btn-success recipe-table-action-btn" id="dispatchAddProductBtn"><i class="fa-solid fa-plus"></i><span>Producto</span></button><button type="button" class="btn recipe-table-action-btn recipe-table-action-btn-neutral" id="dispatchAddCommentBtn"><i class="fa-regular fa-message"></i><span>Comentario</span></button><button type="button" class="btn recipe-table-action-btn recipe-table-action-btn-monography" id="dispatchAddProofBtn"><i class="fa-solid fa-paperclip"></i><span>Adjuntar comprobantes</span></button></div></section>
-    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">3</span> Vehículo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="form-label">Transporte habilitado (UTA/URA)</label><small class="d-block text-muted mb-1">Unidad de Transporte Alimentario / Unidad de Reparto Alimentario.</small><div class="inventario-provider-search-wrap"><input id="dispatchVehicleInput" class="form-control ios-input" placeholder="Seleccionar unidad habilitada" value="${escapeHtml(draft.vehicleSearch || (draft.vehicleId ? formatDispatchVehicleLabel(getDispatchVehicle(draft.vehicleId)) : ''))}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"><input type="hidden" id="dispatchVehicleSelect" value="${escapeHtml(draft.vehicleId)}"></div><div class="dispatch-vehicle-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchAddVehicleBtn"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="dispatchManageVehiclesBtn"><i class="fa-solid fa-pen-to-square"></i><span>Gestionar UTA/URA</span></button></div></div><div class="recipe-field recipe-field-half"><label class="form-label">Responsables</label><div class="input-group ios-input-group ingredientes-search-group dispatch-managers-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchManagersSearch" class="form-control ios-input ingredientes-search-input" placeholder="Buscar responsable" value="${escapeHtml(draft.managerSearch || '')}"></div><div class="produccion-managers-grid">${Object.values(safeObject(state.users)).map((user) => `<label class="produccion-user-check" data-user-search="${escapeHtml(normalizeLower(`${user.fullName || ''} ${user.email || ''} ${getDispatchUserRole(user) || ''}`))}"><input type="checkbox" data-dispatch-manager="${escapeHtml(user.id)}" value="${escapeHtml(user.id)}" ${draft.managers.includes(user.id) ? 'checked' : ''}>${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(getDispatchUserRole(user))}</small></span></label>`).join('')}</div></div></div></section><div class="produccion-config-actions"><button type="button" class="btn ios-btn ios-btn-primary" id="dispatchSaveBtn"><i class="fa-solid fa-floppy-disk"></i><span>Guardar reparto</span></button></div>`;
+    const commentRows = draft.comments.map((comment, idx) => `<tr class="dispatch-comment-row"><td colspan="5"><sl-textarea class="dispatch-comment-textarea" data-dispatch-comment="${idx}" placeholder="Agregá comentarios y observaciones" resize="auto" value="${escapeHtml(comment)}"></sl-textarea></td><td><sl-button size="small" variant="default" type="button" class="lj-icon-btn family-manage-btn" data-dispatch-comment-remove="${idx}"><i class="fa-solid fa-trash"></i></sl-button></td></tr>`).join('');
+    const proofRows = (Array.isArray(draft.proofs) ? draft.proofs : []).map((proof, idx) => `<tr class="dispatch-proof-row"><td colspan="4"><label class="inventario-upload-dropzone dispatch-proof-drop" for="dispatchProofFile_${idx}"><i class="fa-solid fa-paperclip"></i><span>${escapeHtml(proof?.name || 'Adjuntar comprobante (imagen/PDF)')}</span></label><input id="dispatchProofFile_${idx}" class="inventario-hidden-file-input" type="file" accept="image/*,application/pdf" data-dispatch-proof-file="${idx}" hidden>${proof?.url ? `<p class="dispatch-proof-name">Cargado: ${escapeHtml(proof.name || 'comprobante')}</p>` : ''}</td><td class="dispatch-proof-expiry-cell">Comprobante</td><td><sl-button size="small" variant="default" type="button" class="lj-icon-btn family-manage-btn" data-dispatch-proof-remove="${idx}"><i class="fa-solid fa-trash"></i></sl-button></td></tr>`).join('');
+    nodes.dispatchView.innerHTML = `<div class="inventario-period-head"><sl-button variant="default" id="produccionDispatchBackToListBtn" type="button" class="inventario-threshold-btn"><i slot="prefix" class="fa-solid fa-arrow-left"></i><span>Volver</span></sl-button><h6 class="step-title mb-0">Nuevo reparto</h6></div>
+    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">1</span> Datos generales</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="lj-label">Día de reparto</label><input id="dispatchDateInput" class="lj-input" value="${escapeHtml(draft.dispatchDate)}"></div><div class="recipe-field recipe-field-half"><div class="dispatch-client-head"><label class="lj-label mb-0">Cliente <small class="dispatch-client-helper">(si no existe, crealo)</small></label><div class="dispatch-client-head-actions"><sl-button variant="default" size="small" type="button" class="dispatch-quick-client-btn" id="dispatchQuickCreateClientBtn"><i slot="prefix" class="fa-solid fa-plus"></i><span>Nuevo cliente</span></sl-button><sl-button variant="default" size="small" type="button" class="dispatch-quick-client-btn" id="dispatchQuickEditClientBtn"><i slot="prefix" class="fa-solid fa-pen"></i><span>Modificar cliente</span></sl-button></div></div><div class="inventario-provider-search-wrap"><sl-input id="dispatchClientInput" placeholder="Buscar por nombre, DNI o CUIL" value="${escapeHtml(draft.clientName)}"></sl-input><input type="hidden" id="dispatchClientId" value="${escapeHtml(draft.clientId)}"></div></div><div class="recipe-field recipe-field-half"><label class="lj-label">Dirección de reparto</label><sl-input id="dispatchClientAddressInput" placeholder="Dirección" value="${escapeHtml(draft.clientAddress || '')}" ${draft.clientId ? '' : 'disabled'}></sl-input></div><div class="recipe-field recipe-field-half"><label class="lj-label">Localidad</label><input id="dispatchClientCityInput" class="lj-input" list="dispatchLocalitiesList" placeholder="Localidad" value="${escapeHtml(draft.clientCity || '')}" ${draft.clientId ? '' : 'disabled'}><datalist id="dispatchLocalitiesList"></datalist></div><div class="recipe-field recipe-field-half"><label class="lj-label">Provincia</label><sl-select id="dispatchClientProvinceInput" hoist value="${ljOptionValue(normalizeValue(draft.clientProvince || 'Santa Fe'))}" ${draft.clientId ? '' : 'disabled'}>${ARG_PROVINCIAS.map((item) => `<sl-option value="${ljOptionValue(item)}">${escapeHtml(item)}</sl-option>`).join('')}</sl-select></div><div class="recipe-field recipe-field-half"><label class="lj-label">País</label><sl-input id="dispatchClientCountryInput" value="${escapeHtml(draft.clientCountry || 'Argentina')}" ${draft.clientId ? '' : 'disabled'}></sl-input></div></div></section>
+    <section class="recipe-step-card step-block produccion-dispatch-create"><div class="d-flex align-items-center justify-content-between mb-2"><h6 class="step-title mb-0"><span class="recipe-step-number">2</span> Productos a repartir</h6></div><div class="table-responsive recipe-table-wrap dispatch-products-table"><table class="table recipe-table inventario-bulk-table mb-0"><thead><tr><th>Producto</th><th>Kilos</th><th>Stock</th><th>Lote</th><th>Vencimiento</th><th></th></tr></thead><tbody>${lineRows}${commentRows}${proofRows}</tbody></table></div><div class="toolbar-scroll-x dispatch-actions-row mt-2"><sl-button variant="success" type="button" class="recipe-table-action-btn" id="dispatchAddProductBtn"><i slot="prefix" class="fa-solid fa-plus"></i><span>Producto</span></sl-button><sl-button variant="default" type="button" class="recipe-table-action-btn recipe-table-action-btn-neutral" id="dispatchAddCommentBtn"><i slot="prefix" class="fa-regular fa-message"></i><span>Comentario</span></sl-button><sl-button variant="default" type="button" class="recipe-table-action-btn recipe-table-action-btn-monography" id="dispatchAddProofBtn"><i slot="prefix" class="fa-solid fa-paperclip"></i><span>Adjuntar comprobantes</span></sl-button></div></section>
+    <section class="recipe-step-card step-block"><h6 class="step-title"><span class="recipe-step-number">3</span> Vehículo y responsables</h6><div class="step-content recipe-fields-flex"><div class="recipe-field recipe-field-half"><label class="lj-label">Transporte habilitado (UTA/URA)</label><small class="d-block text-muted mb-1">Unidad de Transporte Alimentario / Unidad de Reparto Alimentario.</small><div class="inventario-provider-search-wrap"><sl-input id="dispatchVehicleInput" placeholder="Seleccionar unidad habilitada" value="${escapeHtml(draft.vehicleSearch || (draft.vehicleId ? formatDispatchVehicleLabel(getDispatchVehicle(draft.vehicleId)) : ''))}" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"></sl-input><input type="hidden" id="dispatchVehicleSelect" value="${escapeHtml(draft.vehicleId)}"></div><div class="dispatch-vehicle-actions"><sl-button variant="default" type="button" class="inventario-threshold-btn" id="dispatchAddVehicleBtn"><i slot="prefix" class="fa-solid fa-plus"></i><span>Nueva unidad</span></sl-button><sl-button variant="default" type="button" class="inventario-threshold-btn" id="dispatchManageVehiclesBtn"><i slot="prefix" class="fa-solid fa-pen-to-square"></i><span>Gestionar UTA/URA</span></sl-button></div></div><div class="recipe-field recipe-field-half"><label class="lj-label">Responsables</label><sl-input id="dispatchManagersSearch" class="dispatch-managers-search-group" placeholder="Buscar responsable" value="${escapeHtml(draft.managerSearch || '')}"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input><div class="produccion-managers-grid">${Object.values(safeObject(state.users)).map((user) => `<sl-checkbox class="produccion-user-check" data-user-search="${escapeHtml(normalizeLower(`${user.fullName || ''} ${user.email || ''} ${getDispatchUserRole(user) || ''}`))}" data-dispatch-manager="${escapeHtml(user.id)}" value="${escapeHtml(user.id)}" ${draft.managers.includes(user.id) ? 'checked' : ''}><span class="produccion-user-check-body">${renderUserAvatar(user)}<span class="produccion-user-text"><strong>${escapeHtml(user.fullName || user.email || user.id)}</strong><small>${escapeHtml(getDispatchUserRole(user))}</small></span></span></sl-checkbox>`).join('')}</div></div></div></section><div class="produccion-config-actions"><sl-button variant="primary" type="button" id="dispatchSaveBtn"><i slot="prefix" class="fa-solid fa-floppy-disk"></i><span>Guardar reparto</span></sl-button></div>`;
+    const localitiesList = nodes.dispatchView.querySelector('#dispatchLocalitiesList');
+    // datalist nativo (sl-input no soporta list): opciones creadas por DOM.
+    (Array.isArray(state.reparto.localities) ? state.reparto.localities : []).forEach((loc) => localitiesList?.append(new Option('', String(loc ?? ''))));
     const dateInput = nodes.dispatchView.querySelector('#dispatchDateInput');
     if (window.flatpickr && dateInput) {
       window.flatpickr(dateInput, {
@@ -7193,11 +7211,11 @@
   };
   const DISPATCH_NEW_LOCALITY_VALUE = '__new_locality__';
   const getDispatchLocalities = () => (Array.isArray(state.reparto.localities) ? state.reparto.localities : []).map((item) => normalizeValue(item)).filter(Boolean);
-  const renderDispatchLocalityOptions = (selected = '') => {
-    const normalized = normalizeValue(selected);
-    const options = getDispatchLocalities().map((loc) => `<option value="${escapeHtml(loc)}" ${normalizeValue(loc) === normalized ? 'selected' : ''}>${escapeHtml(loc)}</option>`).join('');
-    const newOption = `<option value="${DISPATCH_NEW_LOCALITY_VALUE}">+ Nueva localidad</option>`;
-    return `<option value="" ${!normalized ? 'selected' : ''}>Seleccionar localidad</option>${options}${newOption}`;
+  const renderDispatchLocalityOptions = () => {
+    // La opción vacía pasa a ser el placeholder del sl-select; el valor elegido va en el atributo value del sl-select.
+    const options = getDispatchLocalities().map((loc) => `<sl-option value="${ljOptionValue(loc)}">${escapeHtml(loc)}</sl-option>`).join('');
+    const newOption = `<sl-option value="${ljOptionValue(DISPATCH_NEW_LOCALITY_VALUE)}">+ Nueva localidad</sl-option>`;
+    return `${options}${newOption}`;
   };
   const askForNewDispatchLocality = async (seed = '') => {
     const result = await openIosSwal({
@@ -7226,7 +7244,7 @@
     const result = await openIosSwal({
       title: 'Nuevo cliente',
       customClass: { popup: 'dispatch-client-alert' },
-      html: `<div class="swal-stack-fields text-start"><div class="dispatch-client-preview"><span id="dispatchClientInitialsPreview" class="user-avatar-thumb dispatch-client-preview-avatar">${initialsFromPersonName(seedName) || '<i class=\"bi bi-person-fill\"></i>'}</span></div><input id="dispatchClientName" class="swal2-input ios-input" placeholder="Nombre y apellido / Razón social" value=""><input id="dispatchClientDoc" class="swal2-input ios-input" placeholder="DNI o CUIL"><input id="dispatchClientAddress" class="swal2-input ios-input" placeholder="Dirección"><select id="dispatchClientCity" class="swal2-select ios-input">${renderDispatchLocalityOptions('')}</select><select id="dispatchClientProvince" class="swal2-select ios-input">${ARG_PROVINCIAS.map((item) => `<option value="${escapeHtml(item)}" ${item === 'Santa Fe' ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select><input id="dispatchClientCountry" class="swal2-input ios-input" value="Argentina" placeholder="País"></div>`,
+      html: `<div class="swal-stack-fields text-start"><div class="dispatch-client-preview"><span id="dispatchClientInitialsPreview" class="user-avatar-thumb dispatch-client-preview-avatar">${initialsFromPersonName(seedName) || '<sl-icon name=\"person-fill\"></sl-icon>'}</span></div><sl-input id="dispatchClientName" class="swal2-input" placeholder="Nombre y apellido / Razón social" value=""></sl-input><sl-input id="dispatchClientDoc" class="swal2-input" placeholder="DNI o CUIL"></sl-input><sl-input id="dispatchClientAddress" class="swal2-input" placeholder="Dirección"></sl-input><sl-select id="dispatchClientCity" class="swal2-select" placeholder="Seleccionar localidad" hoist>${renderDispatchLocalityOptions('')}</sl-select><sl-select id="dispatchClientProvince" class="swal2-select" value="${ljOptionValue('Santa Fe')}" hoist>${ARG_PROVINCIAS.map((item) => `<sl-option value="${ljOptionValue(item)}">${escapeHtml(item)}</sl-option>`).join('')}</sl-select><sl-input id="dispatchClientCountry" class="swal2-input" value="Argentina" placeholder="País"></sl-input></div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
@@ -7238,14 +7256,14 @@
         const sync = () => {
           if (!preview) return;
           const initials = initialsFromPersonName(nameInput?.value || '');
-          preview.innerHTML = initials ? escapeHtml(initials) : '<i class="bi bi-person-fill"></i>';
+          preview.innerHTML = initials ? escapeHtml(initials) : '<sl-icon name="person-fill"></sl-icon>';
         };
         nameInput?.addEventListener('input', sync);
         citySelect?.addEventListener('change', async () => {
-          if (citySelect.value !== DISPATCH_NEW_LOCALITY_VALUE) return;
+          if (ljSelectValue(citySelect) !== DISPATCH_NEW_LOCALITY_VALUE) return;
           const created = await askForNewDispatchLocality('');
           citySelect.innerHTML = renderDispatchLocalityOptions(created);
-          citySelect.value = created || '';
+          ljSetSelectValue(citySelect, created || '');
         });
         sync();
       },
@@ -7253,8 +7271,8 @@
         const name = normalizeValue(document.getElementById('dispatchClientName')?.value);
         const doc = normalizeValue(document.getElementById('dispatchClientDoc')?.value);
         const address = normalizeValue(document.getElementById('dispatchClientAddress')?.value);
-        const city = normalizeValue(document.getElementById('dispatchClientCity')?.value);
-        const province = normalizeValue(document.getElementById('dispatchClientProvince')?.value) || 'Santa Fe';
+        const city = normalizeValue(ljSelectValue(document.getElementById('dispatchClientCity')));
+        const province = normalizeValue(ljSelectValue(document.getElementById('dispatchClientProvince'))) || 'Santa Fe';
         const country = normalizeValue(document.getElementById('dispatchClientCountry')?.value) || 'Argentina';
         if (!name) return Swal.showValidationMessage('Completá nombre o razón social.');
         if (!doc) return Swal.showValidationMessage('Completá DNI o CUIL.');
@@ -7324,19 +7342,22 @@
       const pages = Math.max(1, Math.ceil(rows.length / PAGE));
       page = Math.min(Math.max(1, page), pages);
       const slice = rows.slice((page - 1) * PAGE, page * PAGE);
-      host.innerHTML = `<div class="dispatch-clients-manager-toolbar mb-2"><div class="input-group ios-input-group ingredientes-search-group dispatch-clients-manager-search"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchClientsManagerSearch" type="search" class="form-control ios-input" placeholder="Buscar cliente" value="${escapeHtml(query)}"></div><button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" data-client-create-inline><i class="fa-solid fa-plus"></i><span>Crear cliente</span></button></div><div class="dispatch-clients-manager-list">${slice.map((item) => `<article class="dispatch-client-row"><div class="dispatch-client-row-main"><span class="user-avatar-thumb dispatch-client-suggest-avatar" style="${getDispatchClientAvatarStyle(item)}">${escapeHtml(item.initials || initialsFromPersonName(item.name) || 'U')}</span><div><strong>${escapeHtml(item.name || '-')}</strong><small>${escapeHtml(item.doc || '-')}</small></div></div><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-client-edit="${escapeHtml(item.id)}"><i class="fa-solid fa-pen"></i><span>Editar</span></button></article>`).join('') || '<p class="m-0">Sin clientes para ese filtro.</p>'}</div><div class="inventario-pagination enhanced mt-2"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-client-page="prev" ${page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${page} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-client-page="next" ${page >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+      host.innerHTML = `<div class="dispatch-clients-manager-toolbar mb-2"><sl-input id="dispatchClientsManagerSearch" type="search" class="dispatch-clients-manager-search" placeholder="Buscar cliente" value="${escapeHtml(query)}"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input><sl-button variant="success" type="button" class="inventario-threshold-btn" data-client-create-inline><i slot="prefix" class="fa-solid fa-plus"></i><span>Crear cliente</span></sl-button></div><div class="dispatch-clients-manager-list">${slice.map((item) => `<article class="dispatch-client-row"><div class="dispatch-client-row-main"><span class="user-avatar-thumb dispatch-client-suggest-avatar" style="${getDispatchClientAvatarStyle(item)}">${escapeHtml(item.initials || initialsFromPersonName(item.name) || 'U')}</span><div><strong>${escapeHtml(item.name || '-')}</strong><small>${escapeHtml(item.doc || '-')}</small></div></div><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-client-edit="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-pen"></i><span>Editar</span></sl-button></article>`).join('') || '<p class="m-0">Sin clientes para ese filtro.</p>'}</div><div class="inventario-pagination enhanced mt-2"><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-client-page="prev" ${page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></sl-button><span>Página ${page} de ${pages}</span><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-client-page="next" ${page >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></sl-button></div>`;
       const searchInput = host.querySelector('#dispatchClientsManagerSearch');
       if (searchInput) {
-        searchInput.focus();
-        const len = searchInput.value.length;
-        searchInput.setSelectionRange(len, len);
+        ljReady(host).then(() => {
+          if (!searchInput.isConnected) return;
+          searchInput.focus();
+          const len = String(searchInput.value || '').length;
+          searchInput.setSelectionRange(len, len);
+        });
       }
     };
     const renderEdit = (popup, clientId) => {
       const host = popup.querySelector('[data-dispatch-clients-host]');
       const client = safeObject(state.reparto.clients?.[clientId]);
       if (!host || !client.id) return;
-      host.innerHTML = `<div class=\"dispatch-clients-edit-head mb-2\"><div class=\"inventario-period-head mb-0\"><button type=\"button\" class=\"btn ios-btn ios-btn-secondary inventario-threshold-btn\" data-client-edit-back><i class=\"fa-solid fa-arrow-left\"></i><span>Volver</span></button><h6 class=\"step-title mb-0\">Editar cliente</h6></div><button type=\"button\" class=\"btn ios-btn ios-btn-success inventario-threshold-btn\" data-client-create-inline><i class=\"fa-solid fa-plus\"></i><span>Crear cliente</span></button></div><div class=\"swal-stack-fields text-start\"><div class=\"dispatch-client-preview\"><span id=\"dispatchClientEditInitialsPreview\" class=\"user-avatar-thumb dispatch-client-preview-avatar\" style=\"${getDispatchClientAvatarStyle(client)}\">${escapeHtml(client.initials || initialsFromPersonName(client.name) || 'U')}</span></div><input id=\"dispatchClientEditName\" class=\"swal2-input ios-input\" placeholder=\"Nombre\" value=\"${escapeHtml(client.name || '')}\"><input id=\"dispatchClientEditDoc\" class=\"swal2-input ios-input\" placeholder=\"DNI/CUIL\" value=\"${escapeHtml(client.doc || '')}\"><input id=\"dispatchClientEditAddress\" class=\"swal2-input ios-input\" placeholder=\"Dirección\" value=\"${escapeHtml(client.address || '')}\"><select id=\"dispatchClientEditCity\" class=\"swal2-select ios-input\">${renderDispatchLocalityOptions(client.city || '')}</select><select id=\"dispatchClientEditProvince\" class=\"swal2-select ios-input\">${ARG_PROVINCIAS.map((prov) => `<option value=\"${escapeHtml(prov)}\" ${normalizeValue(client.province || 'Santa Fe') === prov ? 'selected' : ''}>${escapeHtml(prov)}</option>`).join('')}</select><input id=\"dispatchClientEditCountry\" class=\"swal2-input ios-input\" placeholder=\"País\" value=\"${escapeHtml(client.country || 'Argentina')}\"></div><div class=\"produccion-config-actions\"><button type=\"button\" class=\"btn ios-btn ios-btn-success\" data-client-edit-save=\"${escapeHtml(client.id)}\"><i class=\"fa-solid fa-floppy-disk\"></i><span>Guardar</span></button></div>`;
+      host.innerHTML = `<div class=\"dispatch-clients-edit-head mb-2\"><div class=\"inventario-period-head mb-0\"><sl-button variant="default" type=\"button\" class=\"inventario-threshold-btn\" data-client-edit-back><i slot="prefix" class=\"fa-solid fa-arrow-left\"></i><span>Volver</span></sl-button><h6 class=\"step-title mb-0\">Editar cliente</h6></div><sl-button variant="success" type=\"button\" class=\"inventario-threshold-btn\" data-client-create-inline><i slot="prefix" class=\"fa-solid fa-plus\"></i><span>Crear cliente</span></sl-button></div><div class=\"swal-stack-fields text-start\"><div class=\"dispatch-client-preview\"><span id=\"dispatchClientEditInitialsPreview\" class=\"user-avatar-thumb dispatch-client-preview-avatar\" style=\"${getDispatchClientAvatarStyle(client)}\">${escapeHtml(client.initials || initialsFromPersonName(client.name) || 'U')}</span></div><sl-input id=\"dispatchClientEditName\" class=\"swal2-input\" placeholder=\"Nombre\" value=\"${escapeHtml(client.name || '')}\"></sl-input><sl-input id=\"dispatchClientEditDoc\" class=\"swal2-input\" placeholder=\"DNI/CUIL\" value=\"${escapeHtml(client.doc || '')}\"></sl-input><sl-input id=\"dispatchClientEditAddress\" class=\"swal2-input\" placeholder=\"Dirección\" value=\"${escapeHtml(client.address || '')}\"></sl-input><sl-select id=\"dispatchClientEditCity\" class=\"swal2-select\" placeholder=\"Seleccionar localidad\" hoist value=\"${getDispatchLocalities().includes(normalizeValue(client.city)) ? ljOptionValue(normalizeValue(client.city)) : ''}\">${renderDispatchLocalityOptions(client.city || '')}</sl-select><sl-select id=\"dispatchClientEditProvince\" class=\"swal2-select\" hoist value=\"${ljOptionValue(normalizeValue(client.province || 'Santa Fe'))}\">${ARG_PROVINCIAS.map((prov) => `<sl-option value=\"${ljOptionValue(prov)}\">${escapeHtml(prov)}</sl-option>`).join('')}</sl-select><sl-input id=\"dispatchClientEditCountry\" class=\"swal2-input\" placeholder=\"País\" value=\"${escapeHtml(client.country || 'Argentina')}\"></sl-input></div><div class=\"produccion-config-actions\"><sl-button variant="success" type=\"button\" data-client-edit-save=\"${escapeHtml(client.id)}\"><i slot="prefix" class=\"fa-solid fa-floppy-disk\"></i><span>Guardar</span></sl-button></div>`;
       const nameInput = host.querySelector('#dispatchClientEditName');
       const citySelect = host.querySelector('#dispatchClientEditCity');
       const preview = host.querySelector('#dispatchClientEditInitialsPreview');
@@ -7346,10 +7367,10 @@
         preview.textContent = initials || 'U';
       };
       citySelect?.addEventListener('change', async () => {
-        if (citySelect.value !== DISPATCH_NEW_LOCALITY_VALUE) return;
+        if (ljSelectValue(citySelect) !== DISPATCH_NEW_LOCALITY_VALUE) return;
         const created = await askForNewDispatchLocality('');
         citySelect.innerHTML = renderDispatchLocalityOptions(created || client.city || '');
-        citySelect.value = created || normalizeValue(client.city || '');
+        ljSetSelectValue(citySelect, created || normalizeValue(client.city || ''));
       });
       nameInput?.addEventListener('input', syncPreview);
       syncPreview();
@@ -7405,8 +7426,8 @@
             const name = normalizeValue(popup.querySelector('#dispatchClientEditName')?.value);
             const doc = normalizeValue(popup.querySelector('#dispatchClientEditDoc')?.value);
             const address = normalizeValue(popup.querySelector('#dispatchClientEditAddress')?.value);
-            const city = normalizeValue(popup.querySelector('#dispatchClientEditCity')?.value);
-            const province = normalizeValue(popup.querySelector('#dispatchClientEditProvince')?.value) || 'Santa Fe';
+            const city = normalizeValue(ljSelectValue(popup.querySelector('#dispatchClientEditCity')));
+            const province = normalizeValue(ljSelectValue(popup.querySelector('#dispatchClientEditProvince'))) || 'Santa Fe';
             const country = normalizeValue(popup.querySelector('#dispatchClientEditCountry')?.value) || 'Argentina';
             if (!name || !doc || !address || !city) {
               await openIosSwal({ title: 'Datos incompletos', html: '<p>Completá nombre, documento, dirección y localidad.</p>', icon: 'warning' });
@@ -7437,7 +7458,7 @@
     const result = await openIosSwal({
       title: 'Nueva UTA / URA',
       customClass: { popup: 'dispatch-vehicle-alert' },
-      html: '<div class="swal-stack-fields text-start"><input id="dispatchVehicleNumber" class="swal2-input ios-input" placeholder="Número de URA / UTA"><input id="dispatchVehiclePatent" class="swal2-input ios-input" placeholder="Patente"><input id="dispatchVehicleBrand" class="swal2-input ios-input" placeholder="Marca"><input id="dispatchVehicleType" class="swal2-input ios-input" value="Camión" placeholder="Tipo"><input id="dispatchVehicleExpiry" class="swal2-input ios-input" placeholder="Vencimiento"><label for="dispatchVehicleFile" class="inventario-upload-dropzone"><i class="fa-regular fa-file"></i><span id="dispatchVehicleFileLabel">Adjunto: click o arrastrá</span></label><input id="dispatchVehicleFile" class="form-control image-file-input inventario-hidden-file-input" type="file" accept="image/*,application/pdf"></div>',
+      html: '<div class="swal-stack-fields text-start"><sl-input id="dispatchVehicleNumber" class="swal2-input" placeholder="Número de URA / UTA"></sl-input><sl-input id="dispatchVehiclePatent" class="swal2-input" placeholder="Patente"></sl-input><sl-input id="dispatchVehicleBrand" class="swal2-input" placeholder="Marca"></sl-input><sl-input id="dispatchVehicleType" class="swal2-input" value="Camión" placeholder="Tipo"></sl-input><input id="dispatchVehicleExpiry" class="lj-input swal2-input" placeholder="Vencimiento"><label for="dispatchVehicleFile" class="inventario-upload-dropzone"><i class="fa-regular fa-file"></i><span id="dispatchVehicleFileLabel">Adjunto: click o arrastrá</span></label><input id="dispatchVehicleFile" class="image-file-input inventario-hidden-file-input" type="file" accept="image/*,application/pdf" hidden></div>',
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
@@ -7511,7 +7532,7 @@
     const result = await openIosSwal({
       title: 'Editar UTA / URA',
       customClass: { popup: 'dispatch-vehicle-alert' },
-      html: `<div class="swal-stack-fields text-start"><input id="dispatchVehicleEditNumber" class="swal2-input ios-input" placeholder="Número de URA / UTA" value="${escapeHtml(current.number || '')}"><input id="dispatchVehicleEditPatent" class="swal2-input ios-input" placeholder="Patente" value="${escapeHtml(current.patent || '')}"><input id="dispatchVehicleEditBrand" class="swal2-input ios-input" placeholder="Marca" value="${escapeHtml(current.brand || '')}"><input id="dispatchVehicleEditType" class="swal2-input ios-input" placeholder="Tipo" value="${escapeHtml(current.type || 'Camión')}"><input id="dispatchVehicleEditExpiry" class="swal2-input ios-input" placeholder="Vencimiento" value="${escapeHtml(current.expiryDate || '')}"><label for="dispatchVehicleEditFile" class="inventario-upload-dropzone"><i class="fa-regular fa-file"></i><span id="dispatchVehicleEditFileLabel">${normalizeValue(current.attachmentUrl) ? 'Adjunto actual cargado (opcional reemplazar)' : 'Adjunto: click o arrastrá'}</span></label><input id="dispatchVehicleEditFile" class="form-control image-file-input inventario-hidden-file-input" type="file" accept="image/*,application/pdf"></div>`,
+      html: `<div class="swal-stack-fields text-start"><sl-input id="dispatchVehicleEditNumber" class="swal2-input" placeholder="Número de URA / UTA" value="${escapeHtml(current.number || '')}"></sl-input><sl-input id="dispatchVehicleEditPatent" class="swal2-input" placeholder="Patente" value="${escapeHtml(current.patent || '')}"></sl-input><sl-input id="dispatchVehicleEditBrand" class="swal2-input" placeholder="Marca" value="${escapeHtml(current.brand || '')}"></sl-input><sl-input id="dispatchVehicleEditType" class="swal2-input" placeholder="Tipo" value="${escapeHtml(current.type || 'Camión')}"></sl-input><input id="dispatchVehicleEditExpiry" class="lj-input swal2-input" placeholder="Vencimiento" value="${escapeHtml(current.expiryDate || '')}"><label for="dispatchVehicleEditFile" class="inventario-upload-dropzone"><i class="fa-regular fa-file"></i><span id="dispatchVehicleEditFileLabel">${normalizeValue(current.attachmentUrl) ? 'Adjunto actual cargado (opcional reemplazar)' : 'Adjunto: click o arrastrá'}</span></label><input id="dispatchVehicleEditFile" class="image-file-input inventario-hidden-file-input" type="file" accept="image/*,application/pdf" hidden></div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar cambios',
       cancelButtonText: 'Cancelar',
@@ -7578,9 +7599,9 @@
   const openDispatchVehiclesManager = async () => {
     const rows = Object.values(safeObject(state.reparto.vehicles || {}));
     const html = rows.length
-      ? `<div class="input-group ios-input-group ingredientes-search-group dispatch-vehicles-search-group"><span class="input-group-text ingredientes-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span><input id="dispatchVehiclesSearchInput" type="search" class="form-control ios-input ingredientes-search-input" placeholder="Buscar por número, patente o marca" autocomplete="off"></div><div id="dispatchVehiclesManagerList" class="dispatch-vehicles-manager-list">${rows.map((item) => {
+      ? `<sl-input id="dispatchVehiclesSearchInput" type="search" class="dispatch-vehicles-search-group" placeholder="Buscar por número, patente o marca" autocomplete="off"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input><div id="dispatchVehiclesManagerList" class="dispatch-vehicles-manager-list">${rows.map((item) => {
         const meta = getDispatchVehicleExpiryMeta(item);
-        return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}" data-vehicle-search="${escapeHtml(normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`))}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-edit="${escapeHtml(item.id)}"><i class="fa-solid fa-pen"></i><span>Editar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i class="fa-regular fa-eye"></i><span>Adjunto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i class="fa-solid fa-upload"></i><span>Reemplazar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i class="fa-solid fa-paperclip"></i><span>Quitar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></div></div>`;
+        return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}" data-vehicle-search="${escapeHtml(normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`))}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-edit="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-pen"></i><span>Editar</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i slot="prefix" class="fa-regular fa-eye"></i><span>Adjunto</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-upload"></i><span>Reemplazar</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-paperclip"></i><span>Quitar</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></sl-button><sl-button size="small" variant="danger" type="button" class="inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-trash"></i><span>Eliminar</span></sl-button></div></div>`;
       }).join('')}</div>`
       : '<p>No hay unidades cargadas.</p>';
     const result = await openIosSwal({
@@ -7596,7 +7617,7 @@
           const rowsLive = Object.values(safeObject(state.reparto.vehicles || {}));
           list.innerHTML = rowsLive.map((item) => {
             const meta = getDispatchVehicleExpiryMeta(item);
-            return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}" data-vehicle-search="${escapeHtml(normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`))}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-edit="${escapeHtml(item.id)}"><i class="fa-solid fa-pen"></i><span>Editar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i class="fa-regular fa-eye"></i><span>Adjunto</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i class="fa-solid fa-upload"></i><span>Reemplazar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i class="fa-solid fa-paperclip"></i><span>Quitar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></button><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></div></div>`;
+            return `<div class="dispatch-vehicle-manager-card tone-${meta.tone}" data-vehicle-search="${escapeHtml(normalizeLower(`${item.number || ''} ${item.patent || ''} ${item.brand || ''} ${item.type || ''}`))}"><p><strong>${escapeHtml(formatDispatchVehicleLabel(item))}</strong></p><small>${escapeHtml(item.brand || '-')} · ${escapeHtml(item.patent || '-')}</small><div class="dispatch-vehicle-manager-actions"><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-edit="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-pen"></i><span>Editar</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-view="${escapeHtml(item.id)}"><i slot="prefix" class="fa-regular fa-eye"></i><span>Adjunto</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-upload="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-upload"></i><span>Reemplazar</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-clear="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-paperclip"></i><span>Quitar</span></sl-button><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-vehicle-toggle="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-toggle-${item.enabled === false ? 'off' : 'on'}"></i><span>${item.enabled === false ? 'Deshabilitado' : 'Habilitado'}</span></sl-button><sl-button size="small" variant="danger" type="button" class="inventario-threshold-btn" data-vehicle-delete="${escapeHtml(item.id)}"><i slot="prefix" class="fa-solid fa-trash"></i><span>Eliminar</span></sl-button></div></div>`;
           }).join('') || '<p>No hay unidades cargadas.</p>';
         };
         const searchInput = box?.querySelector('#dispatchVehiclesSearchInput');
@@ -7673,7 +7694,7 @@
   const showRestoringStockOverlay = (title = 'Restaurando stock...') => {
     Swal.fire({
       title,
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Restaurando stock" class="meta-spinner-login"></div>',
+      html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Restaurando stock"></sl-spinner></div>',
       allowOutsideClick: false,
       allowEscapeKey: false,
       showConfirmButton: false,
@@ -7681,9 +7702,7 @@
         popup: 'ios-alert ingredientes-alert ingredientes-saving-alert',
         title: 'ios-alert-title',
         htmlContainer: 'ios-alert-text ingredientes-saving-html'
-      },
-      buttonsStyling: false,
-      returnFocus: false
+      }
     });
   };
 
@@ -7827,7 +7846,7 @@
     if (!auth.isConfirmed) return;
     const form = await openIosSwal({
       title: `Editar ${registro.id}`,
-      html: `<div class="swal-stack-fields"><input id="editQty" type="number" min="0.1" step="0.01" class="swal2-input ios-input" value="${Number(registro.quantityKg || 0).toFixed(2)}"><input id="editDate" type="date" class="swal2-input ios-input" value="${registro.productionDate || toIsoDate()}"><textarea id="editObs" class="swal2-textarea ios-input">${escapeHtml(registro.observations || '')}</textarea></div>`,
+      html: `<div class="swal-stack-fields"><sl-input id="editQty" type="number" min="0.1" step="0.01" class="swal2-input" value="${Number(registro.quantityKg || 0).toFixed(2)}"></sl-input><sl-input id="editDate" type="date" class="swal2-input" value="${registro.productionDate || toIsoDate()}"></sl-input><sl-textarea id="editObs" class="swal2-textarea" resize="auto" value="${escapeHtml(registro.observations || '')}"></sl-textarea></div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar cambios',
       cancelButtonText: 'Cancelar',
@@ -7936,7 +7955,7 @@
       nodes.rneAlert.innerHTML = '';
       return;
     }
-    nodes.rneAlert.innerHTML = `<i class="bi ${meta.tone === 'danger' ? 'bi-exclamation-octagon-fill' : meta.tone === 'ok' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'}"></i><span>${escapeHtml(meta.text)}</span>`;
+    nodes.rneAlert.innerHTML = `<sl-icon name="${meta.tone === 'danger' ? 'exclamation-octagon-fill' : meta.tone === 'ok' ? 'check-circle-fill' : 'exclamation-triangle-fill'}"></sl-icon><span>${escapeHtml(meta.text)}</span>`;
   };
 
   const renderModalRneBadge = () => {
@@ -7945,12 +7964,12 @@
     const attachmentLabel = meta.hasAttachment ? 'RNE adjunto' : 'Sin adjunto';
     let expiryBadge = '';
     if (meta.infinite) {
-      expiryBadge = '<span class="produccion-modal-rne-badge is-ok"><i class="bi bi-infinity"></i>RNE</span>';
+      expiryBadge = '<span class="produccion-modal-rne-badge is-ok"><sl-icon name="infinity"></sl-icon>RNE</span>';
     } else if (meta.days != null) {
       const expiryLabel = meta.days < 0 ? `Vencido hace ${Math.abs(meta.days)} días` : `Vence en ${meta.days} días`;
-      expiryBadge = `<span class="produccion-modal-rne-badge ${meta.tone === 'danger' ? 'is-danger' : meta.tone === 'warning' ? 'is-warning' : 'is-ok'}"><i class="bi bi-clock-history"></i>${escapeHtml(expiryLabel)}</span>`;
+      expiryBadge = `<span class="produccion-modal-rne-badge ${meta.tone === 'danger' ? 'is-danger' : meta.tone === 'warning' ? 'is-warning' : 'is-ok'}"><sl-icon name="clock-history"></sl-icon>${escapeHtml(expiryLabel)}</span>`;
     }
-    const attachmentBadge = `<span class="produccion-modal-rne-badge ${meta.hasAttachment ? 'is-ok' : 'is-warning'}"><i class="bi bi-paperclip"></i>${attachmentLabel}</span>`;
+    const attachmentBadge = `<span class="produccion-modal-rne-badge ${meta.hasAttachment ? 'is-ok' : 'is-warning'}"><sl-icon name="paperclip"></sl-icon>${attachmentLabel}</span>`;
     if (!expiryBadge) {
       nodes.modalTitle.innerHTML = `Producción <span class="produccion-modal-rne-badges">${attachmentBadge}</span>`;
       return;
@@ -8036,7 +8055,7 @@
     const totalRecipes = Object.keys(safeObject(state.recetas)).length;
     const allButton = `
       <div class="family-circle-wrap">
-        <button type="button" class="family-circle-item ${active === 'all' ? 'is-active' : ''}" data-recipe-group-filter="all">
+        <button type="button" class="lj-tile family-circle-item ${active === 'all' ? 'is-active' : ''}" data-recipe-group-filter="all">
           <span class="family-circle-thumb family-circle-thumb-placeholder"><i class="fa-solid fa-table-cells-large"></i>${totalRecipes > 0 ? `<span class="family-circle-count">${Math.min(99, totalRecipes)}</span>` : ''}</span>
           <span class="family-circle-name">Todas</span>
         </button>
@@ -8044,20 +8063,20 @@
 
     const groupButtons = groups.map((g) => `
       <div class="family-circle-wrap">
-        <button type="button" class="family-circle-item ${active === g.id ? 'is-active' : ''}" data-recipe-group-filter="${escapeHtml(g.id)}">
+        <button type="button" class="lj-tile family-circle-item ${active === g.id ? 'is-active' : ''}" data-recipe-group-filter="${escapeHtml(g.id)}">
           ${renderThumb(g.imageUrl, g.name || 'Grupo', counts[g.id] || 0)}
           <span class="family-circle-name">${escapeHtml(g.name || 'Grupo')}</span>
         </button>
         <div class="family-circle-actions">
-          <button class="family-manage-btn" data-recipe-group-manage="${escapeHtml(g.id)}" type="button" title="Administrar recetas del grupo"><i class="fa-solid fa-list-check"></i></button>
-          <button class="family-manage-btn" data-recipe-group-edit="${escapeHtml(g.id)}" type="button" title="Editar grupo"><i class="fa-solid fa-pen"></i></button>
-          <button class="family-manage-btn" data-recipe-group-delete="${escapeHtml(g.id)}" type="button" title="Eliminar grupo"><i class="fa-solid fa-trash"></i></button>
+          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" data-recipe-group-manage="${escapeHtml(g.id)}" type="button" title="Administrar recetas del grupo" aria-label="Administrar recetas del grupo"><i class="fa-solid fa-list-check"></i></sl-button>
+          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" data-recipe-group-edit="${escapeHtml(g.id)}" type="button" title="Editar grupo" aria-label="Editar grupo"><i class="fa-solid fa-pen"></i></sl-button>
+          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn is-danger" data-recipe-group-delete="${escapeHtml(g.id)}" type="button" title="Eliminar grupo" aria-label="Eliminar grupo"><i class="fa-solid fa-trash"></i></sl-button>
         </div>
       </div>`).join('');
 
     const createButton = `
       <div class="family-circle-wrap">
-        <button type="button" class="family-circle-item family-circle-create" data-recipe-group-create>
+        <button type="button" class="lj-tile family-circle-item family-circle-create" data-recipe-group-create>
           <span class="family-circle-thumb family-circle-thumb-placeholder family-circle-thumb-create"><i class="fa-solid fa-plus"></i></span>
           <span class="family-circle-name">Nuevo grupo</span>
         </button>
@@ -8066,7 +8085,7 @@
     nodes.recipeGroups.innerHTML = `
       <div class="family-circle-section ${collapsed ? 'is-collapsed' : ''}">
         <div class="family-circle-section-head">
-          <button type="button" class="family-circle-toggle" data-recipe-groups-toggle aria-expanded="${!collapsed}" aria-controls="produccionRecipeGroupsBody">
+          <button type="button" class="lj-tile family-circle-toggle" data-recipe-groups-toggle aria-expanded="${!collapsed}" aria-controls="produccionRecipeGroupsBody">
             <i class="fa-solid ${collapsed ? 'fa-chevron-right' : 'fa-chevron-down'}"></i>
             <span>Grupos de recetas</span>
             <small>${groups.length} ${groups.length === 1 ? 'grupo' : 'grupos'}${active !== 'all' ? ` · filtrando: ${escapeHtml(safeObject(state.recipeGroups[active]).name || '')}` : ''}${hasSearch ? ' · oculto por búsqueda' : ''}</small>
@@ -8095,8 +8114,7 @@
           <section class="step-block">
             <h6 class="step-title">1) Datos del grupo</h6>
             <div class="step-content">
-              <label for="recipeGroupNameInput">Nombre del grupo *</label>
-              <input id="recipeGroupNameInput" class="swal2-input ios-input" placeholder="Ej: Embutidos" value="${escapeHtml(existing?.name || '')}">
+              <sl-input id="recipeGroupNameInput" label="Nombre del grupo *" placeholder="Ej: Embutidos" value="${escapeHtml(existing?.name || '')}"></sl-input>
             </div>
           </section>
           ${imageStep.buildHtml('recipeGroupImage', existing?.imageUrl || '')}
@@ -8104,8 +8122,7 @@
       showCancelButton: true,
       confirmButtonText: existing ? 'Guardar cambios' : 'Crear grupo',
       cancelButtonText: 'Cancelar',
-      buttonsStyling: false,
-      customClass: { popup: 'ios-alert', confirmButton: 'ios-btn ios-btn-primary', cancelButton: 'ios-btn ios-btn-secondary' },
+      customClass: { popup: 'ios-alert', confirmButton: 'primary', cancelButton: 'secondary' },
       didOpen: () => {
         // Carpetas de Storage propias para grupos de recetas.
         resolveImage = imageStep.attach('recipeGroupImage', {
@@ -8153,8 +8170,7 @@
       showCancelButton: true,
       confirmButtonText: 'Eliminar',
       cancelButtonText: 'Cancelar',
-      buttonsStyling: false,
-      customClass: { popup: 'ios-alert', confirmButton: 'ios-btn ios-btn-danger', cancelButton: 'ios-btn ios-btn-secondary' }
+      customClass: { popup: 'ios-alert', confirmButton: 'danger', cancelButton: 'secondary' }
     });
     if (!ok.isConfirmed) return;
     delete state.recipeGroups[groupId];
@@ -8180,7 +8196,7 @@
       .filter((r) => r && r.id)
       .sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'es'));
     if (!allRecipes.length) {
-      await Swal.fire({ title: 'Sin recetas', html: '<p>No hay recetas creadas todavía.</p>', icon: 'info', buttonsStyling: false, customClass: { popup: 'ios-alert', confirmButton: 'ios-btn ios-btn-primary' } });
+      await Swal.fire({ title: 'Sin recetas', html: '<p>No hay recetas creadas todavía.</p>', icon: 'info', customClass: { popup: 'ios-alert', confirmButton: 'primary' } });
       return;
     }
     const html = `
@@ -8189,11 +8205,10 @@
         ${allRecipes.map((r) => {
           const inThis = normalizeValue(r.recipeGroupId) === groupId;
           const otherGroup = !inThis && r.recipeGroupId ? safeObject(state.recipeGroups[r.recipeGroupId])?.name : '';
-          return `<label class="produccion-group-assign-row">
-            <input type="checkbox" data-assign-recipe="${escapeHtml(r.id)}" ${inThis ? 'checked' : ''}>
-            <span class="produccion-group-assign-thumb">${r.imageUrl ? `<img src="${escapeHtml(r.imageUrl)}" alt="">` : '<i class="bi bi-egg-fried"></i>'}</span>
+          return `<sl-checkbox class="produccion-group-assign-row" data-assign-recipe="${escapeHtml(r.id)}" ${inThis ? 'checked' : ''}>
+            <span class="produccion-group-assign-thumb">${r.imageUrl ? `<img src="${escapeHtml(r.imageUrl)}" alt="">` : '<sl-icon name="egg-fried"></sl-icon>'}</span>
             <span class="produccion-group-assign-name"><strong>${escapeHtml(capitalize(r.title || '-'))}</strong>${otherGroup ? `<small> · actualmente en <em>${escapeHtml(capitalize(otherGroup))}</em></small>` : ''}</span>
-          </label>`;
+          </sl-checkbox>`;
         }).join('')}
       </div>`;
     const result = await Swal.fire({
@@ -8203,10 +8218,9 @@
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
-      buttonsStyling: false,
-      customClass: { popup: 'ios-alert produccion-group-assign-alert', confirmButton: 'ios-btn ios-btn-primary', cancelButton: 'ios-btn ios-btn-secondary' },
+      customClass: { popup: 'ios-alert produccion-group-assign-alert', confirmButton: 'primary', cancelButton: 'secondary' },
       preConfirm: () => {
-        const checked = Array.from(document.querySelectorAll('[data-assign-recipe]'))
+        const checked = Array.from(document.querySelectorAll('sl-checkbox[data-assign-recipe]'))
           .filter((el) => el.checked)
           .map((el) => normalizeValue(el.dataset.assignRecipe));
         return checked;
@@ -8264,7 +8278,7 @@
     let list = inGroup;
     if (!inGroup.length && outsideGroup.length && query) {
       const groupName = activeGroup === 'all' ? '' : (state.recipeGroups?.[activeGroup]?.name || '');
-      helperHtml = `<div class="ingrediente-empty-list with-illustration"><p class="ingrediente-empty-title">No hay resultados en "${escapeHtml(capitalize(groupName))}".</p><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-search-all><i class="bi bi-lightning-charge"></i><span>Buscar en toda la base</span></button></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del grupo</strong> seleccionado</p>`;
+      helperHtml = `<div class="ingrediente-empty-list with-illustration"><p class="ingrediente-empty-title">No hay resultados en "${escapeHtml(capitalize(groupName))}".</p><sl-button variant="default" type="button" class="inventario-threshold-btn" data-prod-search-all><sl-icon slot="prefix" name="lightning-charge"></sl-icon><span>Buscar en toda la base</span></sl-button></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del grupo</strong> seleccionado</p>`;
       list = outsideGroup;
     }
     if (!list.length) {
@@ -8284,25 +8298,25 @@
     // Menú "Más opciones" compartido entre la tarjeta completa y la fila compacta.
     const buildMoreMenuHtml = (recipe) => `
               <div class="produccion-more-wrap">
-                <button type="button" class="btn ios-btn ios-btn-secondary produccion-more-btn" data-recipe-more="${recipe.id}" aria-label="Más opciones"><i class="bi bi-three-dots-vertical"></i></button>
+                <sl-button variant="text" type="button" class="lj-icon-btn produccion-more-btn" data-recipe-more="${recipe.id}" aria-label="Más opciones"><sl-icon name="three-dots-vertical"></sl-icon></sl-button>
                 <div class="produccion-more-menu d-none">
                   <p class="produccion-more-menu-header">Más opciones</p>
                   <div class="produccion-more-divider"></div>
-                  <button type="button" class="produccion-more-item" data-produce-sin-trazabilidad="${recipe.id}">
-                    <span class="produccion-more-item-icon"><i class="bi bi-exclamation-triangle-fill"></i></span>
+                  <button type="button" class="lj-tile produccion-more-item" data-produce-sin-trazabilidad="${recipe.id}">
+                    <span class="produccion-more-item-icon"><sl-icon name="exclamation-triangle-fill"></sl-icon></span>
                     <span class="produccion-more-item-body">
                       <span class="produccion-more-item-label">Producir sin trazabilidad</span>
                       <span class="produccion-more-item-desc">Insumos sin stock no serán trazados</span>
                     </span>
                   </button>
-                  <button type="button" class="produccion-more-item" data-produce-lote-antiguo="${recipe.id}">
-                    <span class="produccion-more-item-icon"><i class="bi bi-calendar-minus"></i></span>
+                  <button type="button" class="lj-tile produccion-more-item" data-produce-lote-antiguo="${recipe.id}">
+                    <span class="produccion-more-item-icon"><sl-icon name="calendar-minus"></sl-icon></span>
                     <span class="produccion-more-item-body">
                       <span class="produccion-more-item-label">Producir lote antiguo</span>
                       <span class="produccion-more-item-desc">Producción retroactiva, sin tocar stock</span>
                     </span>
                   </button>
-                  <button type="button" class="produccion-more-item" data-recipe-image-view="${recipe.id}" ${normalizeValue(recipe.imageUrl) ? '' : 'disabled'}>
+                  <button type="button" class="lj-tile produccion-more-item" data-recipe-image-view="${recipe.id}" ${normalizeValue(recipe.imageUrl) ? '' : 'disabled'}>
                     <span class="produccion-more-item-icon"><i class="fa-regular fa-image"></i></span>
                     <span class="produccion-more-item-body">
                       <span class="produccion-more-item-label">Ver imagen</span>
@@ -8331,7 +8345,7 @@
         : `<strong class="produccion-compact-max ${maxKg <= 0.0001 ? 'is-zero' : ''}">${maxKg.toFixed(2)} <span>kg${isExpiredOnlyAvailable ? '*' : ''}</span></strong>`;
       const usageCount = usageByRecipe[normalizeValue(recipe.id)] || 0;
       const thumb = recipe.imageUrl
-        ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="receta-thumb js-produccion-thumb" src="${recipe.imageUrl}" alt="${capitalize(recipe.title || 'Receta')}" loading="lazy">`
+        ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="receta-thumb js-produccion-thumb" src="${recipe.imageUrl}" alt="${capitalize(recipe.title || 'Receta')}" loading="lazy">`
         : getThumbPlaceholder();
       const statusLabel = isExpiredOnlyAvailable ? 'Disponible con expirados' : analysis.statusText;
       return `
@@ -8344,7 +8358,7 @@
           </span>
           <span class="produccion-compact-uses" title="Producciones registradas"><i class="fa-solid fa-industry"></i>${usageCount}</span>
           ${maxHtml}
-          <button type="button" class="btn ios-btn ${analysis.canProduce ? 'ios-btn-success' : 'ios-btn-danger'} ${canOpenProduction ? '' : 'is-disabled'} produccion-compact-produce-btn" data-open-produccion="${recipe.id}" data-open-produccion-mode="produce" ${canOpenProduction ? '' : 'disabled'} title="${hasStockToday ? 'Producir' : 'Sin stock para hoy: entrá y probá otra fecha'}"><i class="bi bi-plus-lg"></i></button>
+          <sl-button variant="${analysis.canProduce ? 'success' : 'danger'}" size="small" type="button" class="lj-icon-btn ${canOpenProduction ? '' : 'is-disabled'} produccion-compact-produce-btn" data-open-produccion="${recipe.id}" data-open-produccion-mode="produce" ${canOpenProduction ? '' : 'disabled'} title="${hasStockToday ? 'Producir' : 'Sin stock para hoy: entrá y probá otra fecha'}"><sl-icon name="plus-lg"></sl-icon></sl-button>
           ${buildMoreMenuHtml(recipe)}
         </article>`;
     };
@@ -8361,12 +8375,12 @@
       // Entrar a producir nunca se bloquea por falta de stock (ver fila compacta).
       const canOpenProduction = Array.isArray(analysis.requirements) && analysis.requirements.length > 0;
       const hasStockToday = Boolean(analysis.canProduce || analysis.canProduceConsideringExpired);
-      const actionToneClass = analysis.canProduce ? 'ios-btn-success' : 'ios-btn-danger';
-      const action = `<button type="button" class="btn ios-btn ${actionToneClass} produccion-main-btn ${canOpenProduction ? '' : 'is-disabled'}" data-open-produccion="${recipe.id}" data-open-produccion-mode="produce" ${canOpenProduction ? '' : 'disabled'} title="${hasStockToday ? 'Producir' : 'Sin stock para hoy: entrá y probá otra fecha'}"><i class="bi bi-plus-lg"></i><span>Producir</span></button>`;
+      const actionVariant = analysis.canProduce ? 'success' : 'danger';
+      const action = `<sl-button variant="${actionVariant}" type="button" class="produccion-main-btn ${canOpenProduction ? '' : 'is-disabled'}" data-open-produccion="${recipe.id}" data-open-produccion-mode="produce" ${canOpenProduction ? '' : 'disabled'} title="${hasStockToday ? 'Producir' : 'Sin stock para hoy: entrá y probá otra fecha'}"><sl-icon slot="prefix" name="plus-lg"></sl-icon><span>Producir</span></sl-button>`;
       const inventoryAction = analysis.canProduce
         ? ''
-        : `<button type="button" class="btn ios-btn inventory-production-action-btn is-inventory" data-open-inventario="1"><i class="fa-solid fa-boxes-stacked"></i><span>Inventario</span></button>`;
-      const viewAction = `<button type="button" class="btn ios-btn ios-btn-secondary produccion-visualizar-btn" data-open-produccion="${recipe.id}" data-open-produccion-mode="view"><i class="fa-regular fa-eye"></i><span>Visualizar</span></button>`;
+        : `<sl-button variant="default" type="button" class="inventory-production-action-btn is-inventory" data-open-inventario="1"><i slot="prefix" class="fa-solid fa-boxes-stacked"></i><span>Inventario</span></sl-button>`;
+      const viewAction = `<sl-button variant="default" type="button" class="produccion-visualizar-btn" data-open-produccion="${recipe.id}" data-open-produccion-mode="view"><i slot="prefix" class="fa-regular fa-eye"></i><span>Visualizar</span></sl-button>`;
       const foreignDraft = getForeignDraftConflict(recipe.id);
       const badges = [
         analysis.missingForMin.length
@@ -8431,7 +8445,7 @@
               <div class="produccion-card-titles">
                 <div class="produccion-card-avatar ingrediente-avatar receta-thumb-wrap">
                   ${recipe.imageUrl
-                    ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="receta-thumb js-produccion-thumb" src="${recipe.imageUrl}" alt="${capitalize(recipe.title || 'Receta')}" loading="lazy">`
+                    ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="receta-thumb js-produccion-thumb" src="${recipe.imageUrl}" alt="${capitalize(recipe.title || 'Receta')}" loading="lazy">`
                     : getThumbPlaceholder()}
                 </div>
                 <h6 class="ingrediente-name receta-name">${capitalize(recipe.title || 'Sin título')}</h6>
@@ -8503,7 +8517,7 @@
                 <div class="produccion-stat-mini-v2 is-stock-down">
                   <span class="produccion-stat-mini-icon"><i class="fa-solid fa-truck-fast"></i></span>
                   <div class="produccion-stat-mini-text">
-                    <small>Egresados <button type="button" class="produccion-stat-mini-period-btn" data-egresados-period title="Cambiar período de egresados">(${dispatchMeta.periodDays || 7}d) <i class="fa-solid fa-pen"></i></button></small>
+                    <small>Egresados <button type="button" class="lj-tile produccion-stat-mini-period-btn" data-egresados-period title="Cambiar período de egresados">(${dispatchMeta.periodDays || 7}d) <i class="fa-solid fa-pen"></i></button></small>
                     <strong>${dispatchMeta.lastWeekOut.toFixed(2)} <span>kg</span></strong>
                   </div>
                 </div>
@@ -8516,13 +8530,13 @@
                 </div>
               </div>
               <div class="produccion-zone-footer produccion-zone-footer-v2">
-                <button type="button" class="btn btn-link p-0 produccion-zone-link" data-open-production-stock="${recipe.id}"><i class="fa-solid fa-list-ul"></i> Ver producciones</button>
-                <button type="button" class="btn btn-link p-0 produccion-zone-link produccion-product-history-btn" data-open-recipe-history="${recipe.id}"><i class="fa-solid fa-clock-rotate-left"></i> Historial de movimientos</button>
+                <sl-button variant="text" type="button" class="p-0 produccion-zone-link" data-open-production-stock="${recipe.id}"><i slot="prefix" class="fa-solid fa-list-ul"></i> Ver producciones</sl-button>
+                <sl-button variant="text" type="button" class="p-0 produccion-zone-link produccion-product-history-btn" data-open-recipe-history="${recipe.id}"><i slot="prefix" class="fa-solid fa-clock-rotate-left"></i> Historial de movimientos</sl-button>
               </div>
             </section>
 
             <section class="produccion-zone produccion-zone-ingredientes" data-collapsed="${query ? 'false' : 'true'}">
-              <button type="button" class="produccion-zone-toggle" data-toggle-ingredientes="${recipe.id}">
+              <button type="button" class="lj-tile produccion-zone-toggle" data-toggle-ingredientes="${recipe.id}">
                 <span class="produccion-zone-toggle-left">
                   <i class="fa-solid fa-flask"></i>
                   <span class="produccion-zone-toggle-label">Ingredientes</span>
@@ -8547,7 +8561,7 @@
             </section>` : ''}
 
             <footer class="produccion-zone produccion-zone-acciones" data-collapsed="false">
-              <button type="button" class="produccion-zone-toggle" data-toggle-acciones="${recipe.id}">
+              <button type="button" class="lj-tile produccion-zone-toggle" data-toggle-acciones="${recipe.id}">
                 <span class="produccion-zone-toggle-left">
                   <i class="fa-solid fa-bolt"></i>
                   <span class="produccion-zone-toggle-label">Acciones</span>
@@ -8560,7 +8574,7 @@
                 <span class="barra-vertical produccion-actions-divider" aria-hidden="true"></span>
                 ${inventoryAction}
                 ${viewAction.replace('produccion-visualizar-btn', 'produccion-visualizar-btn inventory-production-action-btn is-view')}
-                <button type="button" class="btn ios-btn inventory-production-action-btn is-threshold" data-set-recipe-min="${recipe.id}"><i class="fa-solid fa-sliders"></i><span>Umbral</span></button>
+                <sl-button variant="default" type="button" class="inventory-production-action-btn is-threshold" data-set-recipe-min="${recipe.id}"><i slot="prefix" class="fa-solid fa-sliders"></i><span>Umbral</span></sl-button>
               ${buildMoreMenuHtml(recipe)}
             </div>
             </div>
@@ -8582,8 +8596,8 @@
                 ${getDraftExpirationCountdown(draft) ? `<small class="produccion-reserva-timer" data-draft-expiry-timer="${draft.id}">Borrador vence en: ${getDraftExpirationCountdown(draft)}</small>` : '<small data-draft-expiry-timer="">Borrador vencido.</small>'}
               </div>
               <div class="produccion-draft-actions">
-                <button type="button" class="btn ios-btn ios-btn-secondary" data-open-draft="${draft.id}"><i class="fa-solid fa-pen"></i><span>Continuar</span></button>
-                <button type="button" class="btn ios-btn ios-btn-danger" data-delete-draft="${draft.id}"><i class="fa-solid fa-trash"></i><span>Descartar</span></button>
+                <sl-button variant="default" type="button" data-open-draft="${draft.id}"><i slot="prefix" class="fa-solid fa-pen"></i><span>Continuar</span></sl-button>
+                <sl-button variant="danger" type="button" data-delete-draft="${draft.id}"><i slot="prefix" class="fa-solid fa-trash"></i><span>Descartar</span></sl-button>
               </div>
             </article>`;
           }).join('')}</div>
@@ -8651,8 +8665,8 @@
       return `<span class="produccion-expiry-badge is-ok">${days}d</span>`;
     };
     return `<div class="produccion-lote-global-actions">
-        <button type="button" class="btn ios-btn ios-btn-secondary" id="produccionCollapseAllBtn" ${allCollapsed ? 'disabled' : ''}>Colapsar todo</button>
-        <button type="button" class="btn ios-btn ios-btn-secondary" id="produccionExpandAllBtn" ${allExpanded ? 'disabled' : ''}>Descolapsar todo</button>
+        <sl-button variant="default" type="button" id="produccionCollapseAllBtn" ${allCollapsed ? 'disabled' : ''}>Colapsar todo</sl-button>
+        <sl-button variant="default" type="button" id="produccionExpandAllBtn" ${allExpanded ? 'disabled' : ''}>Descolapsar todo</sl-button>
       </div>` + plan.ingredientPlans.map((row, index) => {
       // Ocultar sustitutos que no aportan a la fecha (todo vencido/futuro → neededQty 0).
       // Mantiene index alineado con groupKeys devolviendo ''.
@@ -8674,7 +8688,7 @@
       // Chip de estado: texto + color para entender la fila de un vistazo.
       const statusChips = [];
       if (isSkippedIngredient) {
-        statusChips.push('<span class="produccion-lote-status-chip is-sin-traz"><i class="bi bi-exclamation-triangle-fill"></i> Sin trazabilidad</span>');
+        statusChips.push('<span class="produccion-lote-status-chip is-sin-traz"><sl-icon name="exclamation-triangle-fill"></sl-icon> Sin trazabilidad</span>');
       } else if (row.isSubstitute) {
         statusChips.push(`<span class="produccion-lote-status-chip is-substitute"><i class="fa-solid fa-link"></i> Aporta ${fmt(row.neededQty)}</span>`);
       } else if (rowInfiniteStock) {
@@ -8684,7 +8698,7 @@
           statusChips.push('<span class="produccion-lote-status-chip is-substitutable"><i class="fa-solid fa-link"></i> Cubierto con sustitutos</span>');
         }
         if (hasMeaningfulMissing) {
-          statusChips.push(`<span class="produccion-lote-status-chip is-missing"><i class="bi bi-exclamation-triangle-fill"></i> Faltan ${fmt(netMissingQty)}</span>`);
+          statusChips.push(`<span class="produccion-lote-status-chip is-missing"><sl-icon name="exclamation-triangle-fill"></sl-icon> Faltan ${fmt(netMissingQty)}</span>`);
         } else if (!hasSubstituteCoverage) {
           statusChips.push('<span class="produccion-lote-status-chip is-ok"><i class="fa-solid fa-check"></i> Completo</span>');
         }
@@ -8726,15 +8740,15 @@
               <h6>${row.ingredientName}</h6>
               ${statusChipsHtml ? `<div class="produccion-lote-status-chips">${statusChipsHtml}</div>` : ''}
               ${row.isSubstitute ? `<p class="produccion-lote-substitute-line"><i class="fa-solid fa-link"></i> Reemplaza a <strong>${escapeHtml(row.sourceIngredientName || row.sourceIngredientId || '')}</strong></p>` : ''}
-              ${isSkippedIngredient ? `<p class="produccion-lote-sin-traz-note"><i class="bi bi-exclamation-triangle-fill"></i> Este ingrediente se producirá <strong>sin trazabilidad</strong> — los faltantes no se descontarán de stock. <button type="button" class="produccion-lote-undo-skip" data-skip-trace-ingredient="${escapeHtml(row.sourceIngredientId || row.ingredientId)}" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-rotate-left"></i> Quitar</button></p>` : ''}
+              ${isSkippedIngredient ? `<p class="produccion-lote-sin-traz-note"><sl-icon name="exclamation-triangle-fill"></sl-icon> Este ingrediente se producirá <strong>sin trazabilidad</strong> — los faltantes no se descontarán de stock. <button type="button" class="lj-tile produccion-lote-undo-skip" data-skip-trace-ingredient="${escapeHtml(row.sourceIngredientId || row.ingredientId)}" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-rotate-left"></i> Quitar</button></p>` : ''}
               ${qtyDetailHtml}
             </div>
           </div>
           <div class="produccion-lote-head-actions">
-            <button type="button" class="btn ios-btn ios-btn-secondary produccion-lote-toggle-btn" data-lot-toggle="${row.ingredientId}_${index}">
-              <i class="fa-solid ${state.lotCollapseState[`${row.ingredientId}_${index}`] ? 'fa-chevron-down' : 'fa-chevron-up'}"></i>
+            <sl-button size="small" variant="default" type="button" class="produccion-lote-toggle-btn" data-lot-toggle="${row.ingredientId}_${index}">
+              <i slot="prefix" class="fa-solid ${state.lotCollapseState[`${row.ingredientId}_${index}`] ? 'fa-chevron-down' : 'fa-chevron-up'}"></i>
               <span>${state.lotCollapseState[`${row.ingredientId}_${index}`] ? 'Desplegar' : 'Colapsar'}</span>
-            </button>
+            </sl-button>
             <img src="${gitIcon}" alt="Desglose" class="produccion-merge-icon" width="20" height="20" style="width:20px;height:20px;">
           </div>
         </header>
@@ -8746,25 +8760,25 @@
             <div><strong>Vence:</strong> ${formatExpiryHuman(lot.expiryDate)} ${normalizeLower(lot.expiryDate) === 'no perecedero' ? '' : getExpiryBadge(lot.expiryDate)}</div>
             <div><strong>Usar:</strong> ${formatCompactQty(lot.takeQty, lot.unit)}</div>
             ${lot.status === 'expired' ? (state.loteAntiguo
-              ? `<div class="produccion-lote-neutral-help"><i class="bi bi-info-circle"></i> Lote ya vencido al ${formatIsoEs(plan.productionDate)} ${formatValidProductionRange(lot.entryDate, lot.expiryDate)}: no se usa para la trazabilidad de esta fecha.</div>`
+              ? `<div class="produccion-lote-neutral-help"><sl-icon name="info-circle"></sl-icon> Lote ya vencido al ${formatIsoEs(plan.productionDate)} ${formatValidProductionRange(lot.entryDate, lot.expiryDate)}: no se usa para la trazabilidad de esta fecha.</div>`
               : `<div class="produccion-lote-expired-help"><strong>Lote expirado:</strong> no se usará con fecha ${formatIsoEs(plan.productionDate)}. Cambiá la fecha o resolvelo manualmente ${formatValidProductionRange(lot.entryDate, lot.expiryDate)}.</div>
               <div class="produccion-lote-blocked-actions">
-                <button type="button" class="btn ios-btn ios-btn-secondary" data-set-production-date="${escapeHtml(lot.entryDate || '')}" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-calendar-day"></i><span>Cambiar fecha</span></button>
-                <button type="button" class="btn ios-btn ios-btn-warning" data-skip-trace-ingredient="${escapeHtml(lot.ingredientId)}" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-arrow-right"></i><span>Producir sin trazabilidad este ingrediente</span></button>
+                <sl-button size="small" variant="default" type="button" data-set-production-date="${escapeHtml(lot.entryDate || '')}" ${state.editorMode === 'view' ? 'disabled' : ''}><i slot="prefix" class="fa-solid fa-calendar-day"></i><span>Cambiar fecha</span></sl-button>
+                <sl-button size="small" variant="warning" type="button" data-skip-trace-ingredient="${escapeHtml(lot.ingredientId)}" ${state.editorMode === 'view' ? 'disabled' : ''}><i slot="prefix" class="fa-solid fa-arrow-right"></i><span>Producir sin trazabilidad este ingrediente</span></sl-button>
               </div>`) : ''}
             ${lot.status === 'future' && !fullyCoveredBySubstitute ? (state.loteAntiguo
-              ? `<div class="produccion-lote-neutral-help"><i class="bi bi-info-circle"></i> Lote ingresado el ${formatIsoEs(lot.entryDate || '')}, posterior al ${formatIsoEs(plan.productionDate)}: no existía a esa fecha, no se usa.</div>`
+              ? `<div class="produccion-lote-neutral-help"><sl-icon name="info-circle"></sl-icon> Lote ingresado el ${formatIsoEs(lot.entryDate || '')}, posterior al ${formatIsoEs(plan.productionDate)}: no existía a esa fecha, no se usa.</div>`
               : `<div class="produccion-lote-expired-help"><strong>Lote posterior a la fecha:</strong> ingresó el ${formatIsoEs(lot.entryDate || '')}. No se usará con fecha ${formatIsoEs(plan.productionDate)}; cambiá la producción a ${formatIsoEs(lot.entryDate || '')} o producí sin trazabilidad para el faltante.</div>
               <div class="produccion-lote-blocked-actions">
-                <button type="button" class="btn ios-btn ios-btn-secondary" data-set-production-date="${escapeHtml(lot.entryDate || '')}" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-calendar-day"></i><span>Usar fecha ${formatIsoEs(lot.entryDate || '')}</span></button>
-                <button type="button" class="btn ios-btn ios-btn-warning" data-skip-trace-ingredient="${escapeHtml(lot.ingredientId)}" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-arrow-right"></i><span>Producir sin trazabilidad este ingrediente</span></button>
+                <sl-button size="small" variant="default" type="button" data-set-production-date="${escapeHtml(lot.entryDate || '')}" ${state.editorMode === 'view' ? 'disabled' : ''}><i slot="prefix" class="fa-solid fa-calendar-day"></i><span>Usar fecha ${formatIsoEs(lot.entryDate || '')}</span></sl-button>
+                <sl-button size="small" variant="warning" type="button" data-skip-trace-ingredient="${escapeHtml(lot.ingredientId)}" ${state.editorMode === 'view' ? 'disabled' : ''}><i slot="prefix" class="fa-solid fa-arrow-right"></i><span>Producir sin trazabilidad este ingrediente</span></sl-button>
               </div>`) : ''}
             <div><strong class="produccion-provider-key">Proveedor:</strong> ${lot.provider || '-'}</div>
             <div><strong>Factura:</strong> ${lot.invoiceNumber || '-'}</div>
             <div class="produccion-lote-adjuntos-row"><strong>Adjuntos:</strong> ${lot.invoiceImageUrls.length
-              ? `<button type="button" class="btn ios-btn ios-btn-secondary produccion-lote-adjuntos-btn" data-lot-images="${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Ver (${lot.invoiceImageUrls.length})</span></button>`
+              ? `<sl-button variant="default" size="small" type="button" class="produccion-lote-adjuntos-btn" data-lot-images="${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}"><i slot="prefix" class="fa-regular fa-image"></i><span>Ver (${lot.invoiceImageUrls.length})</span></sl-button>`
               : '<span>Sin adjuntos</span>'}</div>
-            ${lot.status === 'expired' && !state.loteAntiguo ? `<div class="produccion-lote-expired-actions"><button type="button" class="btn ios-btn ios-btn-secondary" data-resolve-expired-lot="${escapeHtml(lot.ingredientId)}" data-resolve-expired-entry="${escapeHtml(lot.entryId)}" data-resolve-expired-qtykg="${Number(lot.availableKg || 0).toFixed(4)}" data-resolve-expired-mode="sold_counter" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-shop"></i><span>Vendido en mostrador</span></button><button type="button" class="btn ios-btn ios-btn-danger" data-resolve-expired-lot="${escapeHtml(lot.ingredientId)}" data-resolve-expired-entry="${escapeHtml(lot.entryId)}" data-resolve-expired-qtykg="${Number(lot.availableKg || 0).toFixed(4)}" data-resolve-expired-mode="decommissioned" ${state.editorMode === 'view' ? 'disabled' : ''}><i class="fa-solid fa-trash"></i><span>Decomisado</span></button></div>` : ''}
+            ${lot.status === 'expired' && !state.loteAntiguo ? `<div class="produccion-lote-expired-actions"><sl-button size="small" variant="default" type="button" data-resolve-expired-lot="${escapeHtml(lot.ingredientId)}" data-resolve-expired-entry="${escapeHtml(lot.entryId)}" data-resolve-expired-qtykg="${Number(lot.availableKg || 0).toFixed(4)}" data-resolve-expired-mode="sold_counter" ${state.editorMode === 'view' ? 'disabled' : ''}><i slot="prefix" class="fa-solid fa-shop"></i><span>Vendido en mostrador</span></sl-button><sl-button size="small" variant="danger" type="button" data-resolve-expired-lot="${escapeHtml(lot.ingredientId)}" data-resolve-expired-entry="${escapeHtml(lot.entryId)}" data-resolve-expired-qtykg="${Number(lot.availableKg || 0).toFixed(4)}" data-resolve-expired-mode="decommissioned" ${state.editorMode === 'view' ? 'disabled' : ''}><i slot="prefix" class="fa-solid fa-trash"></i><span>Decomisado</span></sl-button></div>` : ''}
           </div>`).join('<hr class="produccion-lote-separator">') : (rowInfiniteStock ? `<div class="produccion-lote-infinite-note"><i class="fa-solid fa-infinity" aria-hidden="true"></i><span>${escapeHtml(INFINITE_STOCK_NOTICE)}</span></div>` : '<p class="produccion-lote-empty">Sin lotes aptos para la fecha elegida.</p>')}
         </div>
       </article>
@@ -8777,7 +8791,7 @@
     const qty = parsePositive(nodes.editor.querySelector('#produccionQtyInput')?.value, state.editorPlan.qtyKg || 1);
     const productionDate = normalizeValue(nodes.editor.querySelector('#produccionDateInput')?.value) || toIsoDate();
     const observations = normalizeValue(nodes.editor.querySelector('#produccionObsInput')?.value);
-    const managers = [...nodes.editor.querySelectorAll('[data-manager-check]:checked')].map((node) => node.value).filter(Boolean);
+    const managers = [...nodes.editor.querySelectorAll('sl-checkbox[data-manager-check]')].filter((node) => node.checked).map((node) => node.value).filter(Boolean);
     const skipTraceList = state.skipTraceIngredients instanceof Set
       ? [...state.skipTraceIngredients]
       : [];
@@ -8804,11 +8818,10 @@
       const fullName = normalizeValue(user.fullName || user.name || user.email || 'Usuario');
       const userId = normalizeValue(user.id) || normalizeValue(user.email) || `user_${normalizeLower(fullName).replace(/[^a-z0-9]+/g, '_')}`;
       const position = normalizeValue(user.position || user.role || 'Sin puesto');
-      return `<label class="produccion-user-check">
-        <input type="checkbox" data-manager-check value="${userId}" ${selected.includes(userId) ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+      return `<sl-checkbox class="produccion-user-check" data-manager-check value="${userId}" ${selected.includes(userId) ? 'checked' : ''} ${disabled ? 'disabled' : ''}><span class="produccion-user-check-body">
         ${renderUserAvatar(user)}
         <span class="produccion-user-text"><strong>${fullName}</strong><small>${position}</small></span>
-      </label>`;
+      </span></sl-checkbox>`;
     }).join('');
   };
   const renderEditor = async (recipeId, options = {}) => {
@@ -8889,7 +8902,7 @@
     state.activeDraftId = isViewOnly ? '' : (ownDraft?.id || state.activeDraftId);
     nodes.editor.innerHTML = `
       <div class="recetas-editor-header produccion-editor-header">
-        <button id="produccionBackBtn" type="button" class="btn ios-btn ios-btn-secondary recetas-back-btn"><i class="fa-solid fa-arrow-left"></i><span>Atrás</span></button>
+        <sl-button variant="default" id="produccionBackBtn" type="button" class="recetas-back-btn"><i slot="prefix" class="fa-solid fa-arrow-left"></i><span>Atrás</span></sl-button>
         <div>
           <p class="recetas-editor-kicker">${isViewOnly ? 'Visualización' : (state.loteAntiguo ? 'Lote antiguo' : 'Producción')}</p>
           <h6 class="recetas-editor-title mb-0">${isViewOnly ? 'Detalle de producción (solo lectura)' : (state.loteAntiguo ? 'Producción retroactiva (lote antiguo)' : 'Detalle de producción')}</h6>
@@ -8899,7 +8912,7 @@
         <div class="produccion-hero-wrap">
           <img src="${FIAMBRES_IMAGE}" class="produccion-hero-bg" alt="Producción">
           <div class="produccion-hero-avatar">
-            <span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img id="produccionHeadImage" class="produccion-head-image js-produccion-head-photo" src="${normalizeValue(recipe.imageUrl) || FIAMBRES_IMAGE}" alt="${capitalize(recipe.title || 'Producto')}" loading="lazy">
+            <span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img id="produccionHeadImage" class="produccion-head-image js-produccion-head-photo" src="${normalizeValue(recipe.imageUrl) || FIAMBRES_IMAGE}" alt="${capitalize(recipe.title || 'Producto')}" loading="lazy">
           </div>
         </div>
         <div class="inventario-product-copy">
@@ -8912,31 +8925,31 @@
           <p id="produccionReservaTimer" class="produccion-reserva-timer"></p>
         </div>
       </section>
-      ${state.sinTrazabilidad ? `<div class="produccion-sin-traz-banner"><i class="bi bi-exclamation-triangle-fill"></i><div><strong>Modo sin trazabilidad activo</strong>Los insumos sin stock suficiente se registrarán como "sin trazabilidad" en esta producción. El resto se traza normalmente.</div></div>` : ''}
-      ${state.loteAntiguo ? `<div class="produccion-sin-traz-banner produccion-lote-antiguo-banner"><i class="bi bi-calendar-minus"></i><div><strong>Modo lote antiguo (producción retroactiva)</strong>Elegí una fecha pasada. Buscamos los lotes que existían y no estaban vencidos a esa fecha. <b>No</b> se descuenta stock ni se registra movimiento en producto/ingredientes: sólo se genera la planilla y la trazabilidad.</div></div>` : ''}
+      ${state.sinTrazabilidad ? `<div class="produccion-sin-traz-banner"><sl-icon name="exclamation-triangle-fill"></sl-icon><div><strong>Modo sin trazabilidad activo</strong>Los insumos sin stock suficiente se registrarán como "sin trazabilidad" en esta producción. El resto se traza normalmente.</div></div>` : ''}
+      ${state.loteAntiguo ? `<div class="produccion-sin-traz-banner produccion-lote-antiguo-banner"><sl-icon name="calendar-minus"></sl-icon><div><strong>Modo lote antiguo (producción retroactiva)</strong>Elegí una fecha pasada. Buscamos los lotes que existían y no estaban vencidos a esa fecha. <b>No</b> se descuenta stock ni se registra movimiento en producto/ingredientes: sólo se genera la planilla y la trazabilidad.</div></div>` : ''}
       <section class="recipe-step-card step-block">
         <h6 class="step-title"><span class="recipe-step-number">1</span> ¿Qué cantidad deseás producir?</h6>
         <div class="produccion-qty-grid">
-          <input id="produccionQtyInput" type="number" min="0.1" step="0.01" max="${editorMaxKg.toFixed(2)}" value="${initialQty.toFixed(2)}" class="form-control ios-input" ${isViewOnly ? 'disabled' : ''}>
-          <button id="produccionQtyMaxBtn" type="button" class="btn ios-btn ios-btn-secondary" ${(isViewOnly || hasOnlyInfiniteStock || state.sinTrazabilidad || state.loteAntiguo) ? 'disabled' : ''}>Usar máximo</button>
+          <sl-input id="produccionQtyInput" type="number" min="0.1" step="0.01" max="${editorMaxKg.toFixed(2)}" value="${initialQty.toFixed(2)}" ${isViewOnly ? 'disabled' : ''}></sl-input>
+          <sl-button variant="default" id="produccionQtyMaxBtn" type="button" ${(isViewOnly || hasOnlyInfiniteStock || state.sinTrazabilidad || state.loteAntiguo) ? 'disabled' : ''}>Usar máximo</sl-button>
         </div>
         <p id="produccionQtyHelp" class="produccion-qty-help"></p>
       </section>
       <section class="recipe-step-card step-block">
         <h6 class="step-title"><span class="recipe-step-number">2</span> Fecha de producción</h6>
-        <input id="produccionDateInput" type="text" class="form-control ios-input" value="${initialDate}" ${isViewOnly ? 'disabled' : ''}>
+        <input id="produccionDateInput" type="text" class="lj-input" value="${initialDate}" ${isViewOnly ? 'disabled' : ''}>
         <p class="produccion-qty-help">Si cambiás la fecha, recalculamos vencimientos y lotes (FEFO).</p>
       </section>
       <section class="recipe-step-card step-block">
         <h6 class="step-title"><span class="recipe-step-number">3</span> Encargados</h6>
         <div class="produccion-managers-actions">
-          <button id="produccionSaveManagersPrefBtn" type="button" class="btn ios-btn ios-btn-secondary" ${isViewOnly ? 'disabled' : ''}><i class="fa-regular fa-bookmark"></i><span>Guardar preferencia</span></button>
+          <sl-button variant="default" id="produccionSaveManagersPrefBtn" type="button" ${isViewOnly ? 'disabled' : ''}><i slot="prefix" class="fa-regular fa-bookmark"></i><span>Guardar preferencia</span></sl-button>
         </div>
         <div class="produccion-managers-grid">${buildManagersHtml(initialManagers, isViewOnly)}</div>
       </section>
       <section class="recipe-step-card step-block">
         <h6 class="step-title"><span class="recipe-step-number">4</span> Observaciones</h6>
-        <textarea id="produccionObsInput" class="form-control ios-input" rows="3" placeholder="Notas de producción, incidentes, reemplazos..." ${isViewOnly ? 'disabled' : ''}>${initialObs}</textarea>
+        <sl-textarea id="produccionObsInput" rows="3" resize="auto" placeholder="Notas de producción, incidentes, reemplazos..." value="${escapeHtml(initialObs)}" ${isViewOnly ? 'disabled' : ''}></sl-textarea>
       </section>
       <section class="recipe-step-card step-block">
         <h6 class="step-title"><span class="recipe-step-number">5</span> Desglose por lotes (FEFO)</h6>
@@ -8944,7 +8957,7 @@
         <div id="produccionLotsBreakdown" class="produccion-lotes-wrap"></div>
       </section>
       <section class="recipe-step-card step-block produccion-history-section" data-collapsed="true">
-        <button type="button" class="produccion-history-toggle" data-toggle-history aria-expanded="false">
+        <button type="button" class="lj-tile produccion-history-toggle" data-toggle-history aria-expanded="false">
           <span class="produccion-history-toggle-left">
             <span class="recipe-step-number">6</span>
             <span class="step-title-text">Historial de producción</span>
@@ -8958,14 +8971,16 @@
           ${isViewOnly
             ? '<span class="produccion-view-only-note"><i class="fa-regular fa-eye"></i><span>Entraste desde Visualizar: no se guardan borradores ni se puede confirmar.</span></span>'
             : (state.loteAntiguo
-              ? '<button id="produccionConfirmBtn" type="button" class="btn ios-btn ios-btn-success"><i class="fa-solid fa-check"></i><span>Confirmar producción retroactiva</span></button>'
-              : '<button id="produccionSaveDraftBtn" type="button" class="btn ios-btn ios-btn-secondary"><i class="fa-solid fa-floppy-disk"></i><span>Guardar borrador</span></button><button id="produccionConfirmBtn" type="button" class="btn ios-btn ios-btn-success"><i class="fa-solid fa-check"></i><span>Confirmar producción</span></button>')}
+              ? '<sl-button variant="success" id="produccionConfirmBtn" type="button"><i slot="prefix" class="fa-solid fa-check"></i><span>Confirmar producción retroactiva</span></sl-button>'
+              : '<sl-button variant="default" id="produccionSaveDraftBtn" type="button"><i slot="prefix" class="fa-solid fa-floppy-disk"></i><span>Guardar borrador</span></sl-button><sl-button variant="success" id="produccionConfirmBtn" type="button"><i slot="prefix" class="fa-solid fa-check"></i><span>Confirmar producción</span></sl-button>')}
         </div>
       </section>`;
     const qtyInput = nodes.editor.querySelector('#produccionQtyInput');
     const dateInput = nodes.editor.querySelector('#produccionDateInput');
     const qtyHelp = nodes.editor.querySelector('#produccionQtyHelp');
     const missingPanel = nodes.editor.querySelector('#produccionMissingPanel');
+    // Los sl-* recién insertados tienen que estar definidos antes de leer .value (cantidad, observaciones).
+    await ljReady(nodes.editor);
 
     // Construye un panel que lista cada ingrediente con su estado para la fecha
     // seleccionada: OK (verde) / sólo cubierto con vencidos (amarillo) / faltante
@@ -9026,7 +9041,7 @@
 
       missingPanel.classList.remove('d-none');
       missingPanel.innerHTML = `
-        <button type="button" class="produccion-missing-toggle-v2" data-toggle-missing aria-expanded="${!collapsed}">
+        <button type="button" class="lj-tile produccion-missing-toggle-v2" data-toggle-missing aria-expanded="${!collapsed}">
           <span><i class="fa-solid fa-lightbulb"></i> ¿Cómo producir más?</span>
           <span class="produccion-missing-toggle-v2-meta">${tipCount} sugerencia${tipCount === 1 ? '' : 's'} <i class="fa-solid fa-chevron-${collapsed ? 'down' : 'up'}"></i></span>
         </button>
@@ -9034,9 +9049,9 @@
           <div class="produccion-missing-extra-row">
             <label for="produccionMissingExtraKg">Extra a producir</label>
             <div class="produccion-missing-extra-control">
-              <input id="produccionMissingExtraKg" type="number" min="0.01" step="0.01" value="${targetExtraKg.toFixed(2)}" class="form-control ios-input" data-missing-extra-kg>
+              <sl-input id="produccionMissingExtraKg" type="number" size="small" min="0.01" step="0.01" value="${targetExtraKg.toFixed(2)}" data-missing-extra-kg></sl-input>
               <span>kg</span>
-              <button type="button" class="btn ios-btn ios-btn-secondary produccion-missing-extra-apply" data-missing-extra-apply title="Calcular extra"><i class="fa-solid fa-calculator"></i></button>
+              <sl-button variant="default" size="small" type="button" class="lj-icon-btn produccion-missing-extra-apply" data-missing-extra-apply title="Calcular extra"><i class="fa-solid fa-calculator"></i></sl-button>
             </div>
           </div>
           <p class="produccion-missing-summary-v2">Para pasar de <strong>${currentMaxKg.toFixed(2)} kg</strong> a <strong>${targetMaxKg.toFixed(2)} kg</strong> en ${escapeHtml(formatIsoEs(productionDate))}, ingresá estos insumos.</p>
@@ -9114,9 +9129,9 @@
         denyButtonText: 'No incluir',
         cancelButtonText: 'Cancelar',
         customClass: {
-          confirmButton: 'ios-btn ios-btn-success',
-          denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical',
-          cancelButton: 'ios-btn ios-btn-secondary'
+          confirmButton: 'success',
+          denyButton: 'danger',
+          cancelButton: 'secondary'
         }
       });
       if (!ask.isConfirmed && !ask.isDenied) return;
@@ -9129,9 +9144,9 @@
         denyButtonText: 'No incluir',
         cancelButtonText: 'Cancelar',
         customClass: {
-          confirmButton: 'ios-btn ios-btn-success',
-          denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical',
-          cancelButton: 'ios-btn ios-btn-secondary'
+          confirmButton: 'success',
+          denyButton: 'danger',
+          cancelButton: 'secondary'
         }
       });
       if (!askTrace.isConfirmed && !askTrace.isDenied) return;
@@ -9192,28 +9207,28 @@
         const isCollapsed = state.historyTraceCollapse[item.id] === true;
         const planillaDisabled = hasPlanillaDisponible(item) ? '' : 'disabled';
         const traceHtml = (!isCollapsed && traceRows.length)
-          ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${getTraceIngredientLabelHtml(trace)}</span></div></td><td></td><td><span class="produccion-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="produccion-trace-expiry">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td><td><span class="produccion-trace-badge">Trazabilidad</span></td><td>-</td><td>${trace.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images="${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td><td>-</td></tr>`).join('') : '';
+          ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${getTraceIngredientLabelHtml(trace)}</span></div></td><td></td><td><span class="produccion-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="produccion-trace-expiry">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td><td><span class="produccion-trace-badge">Trazabilidad</span></td><td>-</td><td>${trace.invoiceImageUrls.length ? `<sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-trace-images="${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}"><i slot="prefix" class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></sl-button>` : '<sl-button variant="danger" type="button" class="inventario-no-photo-btn" disabled>Sin adjuntos</sl-button>'}</td><td>-</td></tr>`).join('') : '';
         const resolvedTraceHtml = traceHtml || (!isCollapsed && hasTracePreview ? renderTraceLoadingRow(10) : '');
-        return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${hasTracePreview ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isRegistroDetailLoading(item) ? 'fa-circle-notch fa-spin' : (isCollapsed ? 'fa-expand' : 'fa-compress')}"></i></button>` : ''}<span>${escapeHtml(item.id || '-')}</span></div></td><td>${renderProductionDateCell(item)}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${renderProductExpiryCell(item)}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td><div class="produccion-planilla-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></button></div></td><td>${renderTraceAttachmentsBtnHtml(item, traceRows, 'data-recipe-prod-trace-images')}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-recipe-prod-delete="${escapeHtml(item.id || '')}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${resolvedTraceHtml}`;
+        return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${hasTracePreview ? `<sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isRegistroDetailLoading(item) ? 'fa-circle-notch fa-spin' : (isCollapsed ? 'fa-expand' : 'fa-compress')}"></i></sl-button>` : ''}<span>${escapeHtml(item.id || '-')}</span></div></td><td>${renderProductionDateCell(item)}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${renderProductExpiryCell(item)}</td><td><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img slot="prefix" src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></sl-button></td><td><div class="produccion-planilla-actions"><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planilla</span></sl-button><sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></sl-button></div></td><td>${renderTraceAttachmentsBtnHtml(item, traceRows, 'data-recipe-prod-trace-images')}</td><td><sl-button size="small" variant="danger" type="button" class="inventario-threshold-btn" data-recipe-prod-delete="${escapeHtml(item.id || '')}"><i slot="prefix" class="fa-solid fa-trash"></i><span>Eliminar</span></sl-button></td></tr>${resolvedTraceHtml}`;
       }).join('');
       node.innerHTML = `
         <div class="inventario-table-head enhanced">
-          <input id="produccionRecipeHistorySearch" type="search" class="form-control ios-input" autocomplete="off" placeholder="Buscar por producción" value="${escapeHtml(recipeHistoryState.search)}">
+          <sl-input id="produccionRecipeHistorySearch" type="search" autocomplete="off" placeholder="Buscar por producción" value="${escapeHtml(recipeHistoryState.search)}"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input>
           <div class="inventario-history-toolbar">
             <div class="inventario-table-range">
-              <input id="produccionRecipeHistoryRange" class="form-control ios-input" autocomplete="off" placeholder="Rango de fechas" value="${escapeHtml(recipeHistoryState.range)}">
+              <input id="produccionRecipeHistoryRange" class="lj-input" autocomplete="off" placeholder="Rango de fechas" value="${escapeHtml(recipeHistoryState.range)}">
             </div>
             <div class="inventario-print-row toolbar-scroll-x">
-              <button type="button" class="btn ios-btn inventario-delete-btn inventario-threshold-btn ${recipeHistoryState.range ? '' : 'd-none'}" id="produccionRecipeHistoryClearBtn"><i class="fa-solid fa-xmark"></i><span>Limpiar rango</span></button>
-              <button type="button" class="btn ios-btn inventario-expand-btn inventario-threshold-btn" id="produccionRecipeHistoryExpandBtn"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar</span></button>
-              <button type="button" class="btn ios-btn ios-btn-success inventario-threshold-btn" id="produccionRecipeHistoryExcelBtn"><i class="fa-solid fa-file-excel"></i><span>Excel</span></button>
+              <sl-button variant="default" type="button" class="inventario-delete-btn inventario-threshold-btn ${recipeHistoryState.range ? '' : 'd-none'}" id="produccionRecipeHistoryClearBtn"><i slot="prefix" class="fa-solid fa-xmark"></i><span>Limpiar rango</span></sl-button>
+              <sl-button variant="default" type="button" class="inventario-expand-btn inventario-threshold-btn" id="produccionRecipeHistoryExpandBtn"><i slot="prefix" class="fa-solid fa-up-right-and-down-left-from-center"></i><span>Ampliar</span></sl-button>
+              <sl-button variant="success" type="button" class="inventario-threshold-btn" id="produccionRecipeHistoryExcelBtn"><i slot="prefix" class="fa-solid fa-file-excel"></i><span>Excel</span></sl-button>
               <span class="inventario-period-divider" aria-hidden="true"></span>
-              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeHistoryPrintFilteredBtn"><i class="fa-solid fa-print"></i><span>Imprimir filtro</span></button>
-              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeHistoryPrintAllBtn"><i class="fa-solid fa-print"></i><span>Imprimir total</span></button>
+              <sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionRecipeHistoryPrintFilteredBtn"><i slot="prefix" class="fa-solid fa-print"></i><span>Imprimir filtro</span></sl-button>
+              <sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionRecipeHistoryPrintAllBtn"><i slot="prefix" class="fa-solid fa-print"></i><span>Imprimir total</span></sl-button>
             </div>
             <div class="inventario-print-row toolbar-scroll-x">
-              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button>
-              <button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button>
+              <sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionRecipeHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-compress"></i><span>Colapsar</span></sl-button>
+              <sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionRecipeHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-expand"></i><span>Descolapsar</span></sl-button>
             </div>
           </div>
         </div>
@@ -9538,10 +9553,10 @@
             const isCollapsed = collapseMap[item.id] === true;
             const planillaDisabled = hasPlanillaDisponible(item) ? '' : 'disabled';
             const traceHtml = (!isCollapsed && traceRows.length)
-              ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${getTraceIngredientLabelHtml(trace)}</span></div></td><td></td><td><span class="produccion-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="produccion-trace-expiry">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td><td><span class="produccion-trace-badge">Trazabilidad</span></td><td>-</td><td>${trace.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images="${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}"><i class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td></tr>`).join('')
+              ? traceRows.map((trace) => `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${getTraceIngredientLabelHtml(trace)}</span></div></td><td></td><td><span class="produccion-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td><td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td><td>${escapeHtml(trace.lotNumber)}</td><td><span class="produccion-trace-expiry">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td><td><span class="produccion-trace-badge">Trazabilidad</span></td><td>-</td><td>${trace.invoiceImageUrls.length ? `<sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-trace-images="${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}"><i slot="prefix" class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></sl-button>` : '<sl-button variant="danger" type="button" class="inventario-no-photo-btn" disabled>Sin adjuntos</sl-button>'}</td></tr>`).join('')
               : '';
             const resolvedTraceHtml = traceHtml || (!isCollapsed && hasTracePreview ? renderTraceLoadingRow(10) : '');
-            return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${hasTracePreview ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isRegistroDetailLoading(item) ? 'fa-circle-notch fa-spin' : (isCollapsed ? 'fa-expand' : 'fa-compress')}"></i></button>` : ''}<span>${escapeHtml(item.id || '-')}</span></div></td><td>${renderProductionDateCell(item)}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${renderProductExpiryCell(item)}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td><div class="produccion-planilla-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></button></div></td><td>${renderTraceAttachmentsBtnHtml(item, traceRows, 'data-recipe-prod-trace-images')}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-recipe-prod-delete="${escapeHtml(item.id || '')}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${resolvedTraceHtml}`;
+            return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${hasTracePreview ? `<sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-recipe-prod-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isRegistroDetailLoading(item) ? 'fa-circle-notch fa-spin' : (isCollapsed ? 'fa-expand' : 'fa-compress')}"></i></sl-button>` : ''}<span>${escapeHtml(item.id || '-')}</span></div></td><td>${renderProductionDateCell(item)}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td><span class="produccion-responsable-wrap"><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span></td><td class="produccion-vto-cell">${renderProductExpiryCell(item)}</td><td><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img slot="prefix" src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></sl-button></td><td><div class="produccion-planilla-actions"><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planilla</span></sl-button><sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></sl-button></div></td><td>${renderTraceAttachmentsBtnHtml(item, traceRows, 'data-recipe-prod-trace-images')}</td><td><sl-button size="small" variant="danger" type="button" class="inventario-threshold-btn" data-recipe-prod-delete="${escapeHtml(item.id || '')}"><i slot="prefix" class="fa-solid fa-trash"></i><span>Eliminar</span></sl-button></td></tr>${resolvedTraceHtml}`;
           }).join('')
           : '<tr><td colspan="10" class="text-center">Sin producciones.</td></tr>';
         const renderExpandedContent = (popup) => {
@@ -9553,7 +9568,7 @@
           const canCollapseRows = traceableRows.some((item) => collapseMap[item.id] !== true);
           const canExpandRows = traceableRows.some((item) => collapseMap[item.id] === true);
           const pages = totalPages();
-          host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeExpandedHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionRecipeExpandedHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID producción</th><th>Fecha</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead><tbody>${renderRows()}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-recipe-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-recipe-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+          host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionRecipeExpandedHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-compress"></i><span>Colapsar</span></sl-button><sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionRecipeExpandedHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-expand"></i><span>Descolapsar</span></sl-button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID producción</th><th>Fecha</th><th>Producto</th><th>Fabricado (KG.)</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead><tbody>${renderRows()}</tbody></table></div><div class="inventario-pagination enhanced"><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-recipe-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></sl-button><span>Página ${expandedPage} de ${pages}</span><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-recipe-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></sl-button></div>`;
           prepareThumbLoaders('.js-produccion-thumb');
         };
         await openIosSwal({
@@ -9561,7 +9576,7 @@
           html: '<div id="produccionRecipeExpandedHistoryHost" class="inventario-expand-wrap"></div>',
           width: '92vw',
           confirmButtonText: 'Cerrar',
-          customClass: { confirmButton: 'ios-btn ios-btn-secondary' },
+          customClass: { confirmButton: 'secondary' },
           didOpen: (popup) => {
             renderExpandedContent(popup);
             popup.addEventListener('click', async (clickEvent) => {
@@ -9746,7 +9761,7 @@
       await updateEditorPlan();
     });
     nodes.editor.querySelector('#produccionSaveManagersPrefBtn')?.addEventListener('click', async () => {
-      const selected = [...nodes.editor.querySelectorAll('[data-manager-check]:checked')].map((node) => node.value).filter(Boolean);
+      const selected = [...nodes.editor.querySelectorAll('sl-checkbox[data-manager-check]')].filter((node) => node.checked).map((node) => node.value).filter(Boolean);
       state.config.preferredManagers = selected;
       state.config.preferredManagersByRecipe = {
         ...safeObject(state.config.preferredManagersByRecipe),
@@ -9812,9 +9827,9 @@
             width: 600,
             customClass: {
               popup: 'produccion-blocked-alert',
-              confirmButton: 'ios-btn ios-btn-warning',
-              denyButton: 'ios-btn ios-btn-secondary',
-              cancelButton: 'ios-btn ios-btn-secondary'
+              confirmButton: 'warning',
+              denyButton: 'secondary',
+              cancelButton: 'secondary'
             }
           });
           if (action.isDismissed) return; // Cancelar — no produce.
@@ -9864,7 +9879,7 @@
         renderRecipeHistory();
         return;
       }
-      const managers = [...nodes.editor.querySelectorAll('[data-manager-check]:checked')].map((node) => node.value).filter(Boolean);
+      const managers = [...nodes.editor.querySelectorAll('sl-checkbox[data-manager-check]')].filter((node) => node.checked).map((node) => node.value).filter(Boolean);
       if (!managers.length) {
         await openIosSwal({
           title: 'Encargado requerido',
@@ -9892,7 +9907,7 @@
       const managersHtml = managers.map((mid) => {
         const u = Object.values(usersMap).find((x) => normalizeValue(x.id) === mid || normalizeValue(x.email) === mid) || {};
         const fullName = normalizeValue(u.fullName || u.name || u.email || mid);
-        return `<span class="pc-confirm-manager-chip"><i class="bi bi-person"></i> ${escapeHtml(fullName)}</span>`;
+        return `<span class="pc-confirm-manager-chip"><sl-icon name="person"></sl-icon> ${escapeHtml(fullName)}</span>`;
       }).join('');
       // Confiamos en el flag del plan (`noTraceability`/`sinTrazabilidad`)
       // que setea buildPlanForRecipe — refleja correctamente per-ingrediente.
@@ -9902,7 +9917,7 @@
         const isInfinite = Boolean(row.infiniteStock);
         const sinTraz = !isInfinite && Boolean(row.noTraceability || row.sinTrazabilidad);
         const lotsCount = (row.lots || []).filter((lot) => Number(lot.takeQty || 0) > 0.0001).length;
-        if (isInfinite) return '<span class="pc-confirm-infinite-badge"><i class="bi bi-infinity"></i> Stock infinito</span>';
+        if (isInfinite) return '<span class="pc-confirm-infinite-badge"><sl-icon name="infinity"></sl-icon> Stock infinito</span>';
         if (sinTraz) return '<span class="pc-confirm-sin-traz-badge">Sin trazabilidad</span>';
         if (lotsCount) return `<small class="pc-confirm-lots-count">${lotsCount} lote${lotsCount === 1 ? '' : 's'}</small>`;
         return '';
@@ -9957,15 +9972,15 @@
       }).join('');
       const skipCount = (revalidated.ingredientPlans || []).filter((row) => !row.infiniteStock && Boolean(row.noTraceability || row.sinTrazabilidad)).length;
       const sinTrazBanner = state.loteAntiguo
-        ? `<div class="pc-confirm-warning"><i class="bi bi-calendar-minus"></i><span>Producción <strong>retroactiva (lote antiguo)</strong> para ${escapeHtml(formatIsoEs(date))}. <strong>No</strong> se descuenta stock ni se registra en producto/ingredientes. Sólo planilla + trazabilidad.</span></div>`
+        ? `<div class="pc-confirm-warning"><sl-icon name="calendar-minus"></sl-icon><span>Producción <strong>retroactiva (lote antiguo)</strong> para ${escapeHtml(formatIsoEs(date))}. <strong>No</strong> se descuenta stock ni se registra en producto/ingredientes. Sólo planilla + trazabilidad.</span></div>`
         : (skipCount > 0
-          ? `<div class="pc-confirm-warning"><i class="bi bi-exclamation-triangle-fill"></i><span>Se guardará <strong>sin trazabilidad</strong> ${skipCount} ingrediente${skipCount === 1 ? '' : 's'}. Revisá el listado antes de confirmar.</span></div>`
+          ? `<div class="pc-confirm-warning"><sl-icon name="exclamation-triangle-fill"></sl-icon><span>Se guardará <strong>sin trazabilidad</strong> ${skipCount} ingrediente${skipCount === 1 ? '' : 's'}. Revisá el listado antes de confirmar.</span></div>`
           : '');
       const confirm = await openIosSwal({
         title: 'Confirmar producción final',
         html: `<div class="text-start produccion-confirm-summary produccion-confirm-card">
           <div class="produccion-confirm-head">
-            <span class="produccion-confirm-icon"><i class="bi bi-check2-circle"></i></span>
+            <span class="produccion-confirm-icon"><sl-icon name="check2-circle"></sl-icon></span>
             <div>
               <p class="produccion-confirm-kicker">Validación final</p>
               <p class="produccion-confirm-note">Revisá los datos antes de confirmar la producción.</p>
@@ -9974,40 +9989,40 @@
           ${sinTrazBanner}
           <div class="pc-confirm-product">
             <p class="pc-confirm-product-name">${escapeHtml(capitalize(recipe.title || '-'))}</p>
-            ${recipe.nombreComercial ? `<p class="pc-confirm-product-comercial"><i class="bi bi-tag" style="margin-right:4px"></i>${escapeHtml(capitalize(recipe.nombreComercial))}</p>` : ''}
+            ${recipe.nombreComercial ? `<p class="pc-confirm-product-comercial"><sl-icon name="tag" style="margin-right:4px"></sl-icon>${escapeHtml(capitalize(recipe.nombreComercial))}</p>` : ''}
           </div>
           <div class="pc-confirm-meta-grid">
             <div class="pc-confirm-meta-item">
-              <i class="bi bi-calendar-event pc-confirm-meta-icon"></i>
+              <sl-icon name="calendar-event" class="pc-confirm-meta-icon"></sl-icon>
               <div><small>Producción</small><strong>${escapeHtml(formatIsoEs(date))}</strong></div>
             </div>
             <div class="pc-confirm-meta-item is-vto">
-              <i class="bi bi-hourglass-split pc-confirm-meta-icon"></i>
+              <sl-icon name="hourglass-split" class="pc-confirm-meta-icon"></sl-icon>
               <div><small>Vencimiento</small><strong>${escapeHtml(formatIsoEs(productExpiry || ''))}</strong></div>
             </div>
             <div class="pc-confirm-meta-item is-qty">
-              <i class="bi bi-speedometer2 pc-confirm-meta-icon"></i>
+              <sl-icon name="speedometer2" class="pc-confirm-meta-icon"></sl-icon>
               <div><small>Total</small><strong>${qty.toFixed(3)} kg</strong><span>${qtyGrams.toFixed(0)} g</span></div>
             </div>
           </div>
           <div class="pc-confirm-section">
-            <p class="pc-confirm-section-label"><i class="bi bi-people"></i> Encargado/s</p>
+            <p class="pc-confirm-section-label"><sl-icon name="people"></sl-icon> Encargado/s</p>
             <div class="pc-confirm-managers">${managersHtml}</div>
           </div>
           <div class="pc-confirm-section">
-            <p class="pc-confirm-section-label"><i class="bi bi-list-check"></i> Insumos</p>
+            <p class="pc-confirm-section-label"><sl-icon name="list-check"></sl-icon> Insumos</p>
             <ul class="produccion-confirm-ingredients">${summaryRows}</ul>
           </div>
         </div>`,
         showCancelButton: true,
         confirmButtonText: 'Confirmar',
         cancelButtonText: 'Cancelar',
-        customClass: { popup: 'produccion-confirm-alert', confirmButton: 'ios-btn ios-btn-success', cancelButton: 'ios-btn ios-btn-secondary' }
+        customClass: { popup: 'produccion-confirm-alert', confirmButton: 'success', cancelButton: 'secondary' }
       });
       if (!confirm.isConfirmed) return;
       Swal.fire({
         title: 'Cargando producción...',
-        html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando producción" class="meta-spinner-login"></div>',
+        html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Cargando producción"></sl-spinner></div>',
         allowOutsideClick: false,
         showConfirmButton: false,
         customClass: {
@@ -10327,17 +10342,13 @@
     recomputeAnalysis();
     state.lastRefreshAt = nowTs();
   };
-  const openInventarioFromProduccion = () => {
-    const productionInstance = window.bootstrap?.Modal?.getOrCreateInstance(produccionModal);
+  const openInventarioFromProduccion = async () => {
     const inventarioModal = document.getElementById('inventarioModal');
-    const inventarioInstance = inventarioModal ? window.bootstrap?.Modal?.getOrCreateInstance(inventarioModal) : null;
-    if (!productionInstance || !inventarioInstance) return;
-    const openOnHidden = () => {
-      produccionModal.removeEventListener('hidden.bs.modal', openOnHidden);
-      inventarioInstance.show();
-    };
-    produccionModal.addEventListener('hidden.bs.modal', openOnHidden, { once: true });
-    productionInstance.hide();
+    if (!inventarioModal) return;
+    // Cerrar producción, esperar el fin de la animación y recién ahí abrir inventario.
+    LJModal.close(produccionModal);
+    await LJModal.onceClosed(produccionModal);
+    LJModal.open(inventarioModal);
   };
   nodes.search.addEventListener('input', (event) => {
     state.search = event.target.value;
@@ -10351,8 +10362,8 @@
     const compact = Boolean(state.compactList);
     nodes.viewToggleBtn.classList.toggle('is-active', compact);
     nodes.viewToggleBtn.innerHTML = compact
-      ? '<i class="fa-solid fa-table-cells-large"></i><span>Vista desglosada</span>'
-      : '<i class="fa-solid fa-list"></i><span>Vista compacta</span>';
+      ? '<i slot="prefix" class="fa-solid fa-table-cells-large"></i><span>Vista desglosada</span>'
+      : '<i slot="prefix" class="fa-solid fa-list"></i><span>Vista compacta</span>';
     nodes.viewToggleBtn.title = compact ? 'Cambiar a vista desglosada' : 'Cambiar a vista compacta';
   };
   nodes.viewToggleBtn?.addEventListener('click', () => {
@@ -10429,8 +10440,8 @@
     }
     if (event.target.closest('[data-product-expiry-select-all]')) {
       const card = event.target.closest('[data-production-expiry-alert]') || nodes.list;
-      card.querySelectorAll('[data-product-expiry-select]:not(:disabled)').forEach((checkbox) => {
-        checkbox.checked = true;
+      card.querySelectorAll('sl-checkbox[data-product-expiry-select]').forEach((checkbox) => {
+        if (!checkbox.disabled) checkbox.checked = true;
       });
       return;
     }
@@ -10449,7 +10460,7 @@
     if (resolveSelectedProductExpiry || resolveAllProductExpiry) {
       const allRows = getProductExpiryAlertRows().filter((row) => row.expired);
       const scope = event.target.closest('[data-production-expiry-alert]') || nodes.list;
-      const selectedIds = new Set([...scope.querySelectorAll('[data-product-expiry-select]:checked')].map((node) => normalizeValue(node.dataset.productExpirySelect)));
+      const selectedIds = new Set([...scope.querySelectorAll('sl-checkbox[data-product-expiry-select]')].filter((node) => node.checked).map((node) => normalizeValue(node.dataset.productExpirySelect)));
       const rows = resolveAllProductExpiry ? allRows : allRows.filter((row) => selectedIds.has(row.productionId));
       if (!rows.length) {
         await openIosSwal({ title: 'Sin seleccion', html: '<p>Selecciona al menos un lote vencido para resolver.</p>', icon: 'info' });
@@ -10499,10 +10510,7 @@
     const usersBtn = event.target.closest('[data-open-users-manager]');
     if (usersBtn) {
       const modal = document.getElementById('usersManagerModal');
-      if (window.bootstrap && modal) {
-        const instance = bootstrap.Modal.getOrCreateInstance(modal);
-        instance.show();
-      }
+      if (modal) LJModal.open(modal);
       return;
     }
 
@@ -10544,10 +10552,10 @@
         html: `
           <div class="produccion-period-form text-center">
             <p class="produccion-period-help"><small>Define cuántos días hacia atrás se cuentan los egresados que se muestran en la card.</small></p>
-            <label class="form-label produccion-period-label" for="egresadosPeriodInput">Días</label>
-            <input id="egresadosPeriodInput" type="number" min="1" max="365" step="1" class="swal2-input ios-input produccion-period-input" value="${current}">
+            <label class="lj-label produccion-period-label" for="egresadosPeriodInput">Días</label>
+            <sl-input id="egresadosPeriodInput" type="number" min="1" max="365" step="1" class="swal2-input produccion-period-input" value="${current}"></sl-input>
             <div class="produccion-period-presets">
-              ${[7, 15, 30, 60, 90].map((d) => `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-period-preset="${d}">${d} días</button>`).join('')}
+              ${[7, 15, 30, 60, 90].map((d) => `<sl-button variant="default" type="button" class="inventario-threshold-btn" data-period-preset="${d}">${d} días</sl-button>`).join('')}
             </div>
           </div>`,
         showCancelButton: true,
@@ -10606,7 +10614,7 @@
       state.editorMode = 'produce';
       Swal.fire({
         title: 'Cargando producción...',
-        html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando producción" class="meta-spinner-login"></div>',
+        html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Cargando producción"></sl-spinner></div>',
         allowOutsideClick: false,
         showConfirmButton: false,
         customClass: { popup: 'ios-alert produccion-loading-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' }
@@ -10632,7 +10640,7 @@
       state.editorMode = 'produce';
       Swal.fire({
         title: 'Cargando producción...',
-        html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando producción" class="meta-spinner-login"></div>',
+        html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Cargando producción"></sl-spinner></div>',
         allowOutsideClick: false,
         showConfirmButton: false,
         customClass: { popup: 'ios-alert produccion-loading-alert', title: 'ios-alert-title', htmlContainer: 'ios-alert-text' }
@@ -10660,7 +10668,7 @@
       state.editorMode = normalizeValue(produceBtn.dataset.openProduccionMode) === 'view' ? 'view' : 'produce';
       Swal.fire({
         title: 'Cargando producción...',
-        html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando producción" class="meta-spinner-login"></div>',
+        html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Cargando producción"></sl-spinner></div>',
         allowOutsideClick: false,
         showConfirmButton: false,
         customClass: {
@@ -10774,7 +10782,7 @@
       const isCollapsed = collapseMap[item.id] === true;
       const planillaDisabled = hasPlanillaDisponible(item) ? '' : 'disabled';
       const traceHtml = (!isCollapsed && traceRows.length) ? traceRows.map((trace) => `<tr class="inventario-trace-row">
-        <td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${getTraceIngredientLabelHtml(trace)}</span></div></td>
+        <td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${trace.ingredientImageUrl ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(trace.ingredientImageUrl)}" alt="${escapeHtml(trace.ingredientName)}">` : '<i class="fa-solid fa-carrot"></i>'}</span><span class="inventario-trace-label">${getTraceIngredientLabelHtml(trace)}</span></div></td>
         <td></td>
         <td><span class="produccion-trace-date">${escapeHtml(formatDateTime(trace.createdAt))}</span></td>
         <td class="inventario-trace-kilos">-${escapeHtml(trace.amount)}</td>
@@ -10782,11 +10790,11 @@
         <td><span class="produccion-trace-expiry">${escapeHtml(formatExpiryHuman(trace.expiryDate))}${normalizeLower(trace.expiryDate)==='no perecedero' ? '' : ' (VTO)'}</span></td>
         <td><span class="produccion-trace-badge">Trazabilidad</span></td>
         <td>-</td>
-        <td>${trace.invoiceImageUrls.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}'><i class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></button>` : '<button type="button" class="btn ios-btn ios-btn-danger inventario-no-photo-btn" disabled>Sin adjuntos</button>'}</td>
+        <td>${trace.invoiceImageUrls.length ? `<sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-trace-images='${encodeURIComponent(JSON.stringify(trace.invoiceImageUrls))}'><i slot="prefix" class="fa-regular fa-image"></i><span>Adjunto (${trace.invoiceImageUrls.length})</span></sl-button>` : '<sl-button variant="danger" type="button" class="inventario-no-photo-btn" disabled>Sin adjuntos</sl-button>'}</td>
         <td>-</td>
       </tr>`).join('') : '';
       const resolvedTraceHtml = traceHtml || (!isCollapsed && hasTracePreview ? renderTraceLoadingRow(10) : '');
-      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${hasTracePreview ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-expanded-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isRegistroDetailLoading(item) ? 'fa-circle-notch fa-spin' : (isCollapsed ? 'fa-expand' : 'fa-compress')}"></i></button>` : ''}<span>${escapeHtml(item.id)}</span></div></td><td>${renderProductionDateCell(item)}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)} (${escapeHtml(manager.role)})</td><td class="produccion-vto-cell">${renderProductExpiryCell(item)}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button></td><td><div class="produccion-planilla-actions"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></button></div></td><td>${renderTraceAttachmentsBtnHtml(item, traceRows, 'data-recipe-prod-trace-images')}</td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-prod-cancel="${escapeHtml(item.id || '')}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${resolvedTraceHtml}`;
+      return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${hasTracePreview ? `<sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-prod-expanded-collapse="${escapeHtml(item.id || '')}" title="${isCollapsed ? 'Descolapsar' : 'Colapsar'}" aria-label="${isCollapsed ? 'Descolapsar' : 'Colapsar'}"><i class="fa-solid ${isRegistroDetailLoading(item) ? 'fa-circle-notch fa-spin' : (isCollapsed ? 'fa-expand' : 'fa-compress')}"></i></sl-button>` : ''}<span>${escapeHtml(item.id)}</span></div></td><td>${renderProductionDateCell(item)}</td><td>${escapeHtml(normalizeUpper(item.recipeTitle || '-'))}</td><td>${Number(item.quantityKg || 0).toFixed(2)} kg</td><td>${escapeHtml(manager.name)} (${escapeHtml(manager.role)})</td><td class="produccion-vto-cell">${renderProductExpiryCell(item)}</td><td><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-trace="${escapeHtml(item.id || '')}"><img slot="prefix" src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></sl-button></td><td><div class="produccion-planilla-actions"><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-recipe-prod-planilla="${escapeHtml(item.id || '')}" ${planillaDisabled}><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planilla</span></sl-button><sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-recipe-prod-qr-print="${escapeHtml(item.id || '')}" title="Imprimir QR"><i class="fa-solid fa-qrcode"></i></sl-button></div></td><td>${renderTraceAttachmentsBtnHtml(item, traceRows, 'data-recipe-prod-trace-images')}</td><td><sl-button variant="danger" type="button" class="inventario-threshold-btn" data-prod-cancel="${escapeHtml(item.id || '')}"><i slot="prefix" class="fa-solid fa-trash"></i><span>Eliminar</span></sl-button></td></tr>${resolvedTraceHtml}`;
     }).join('') : '<tr><td colspan="10" class="text-center">Sin producciones.</td></tr>';
     const renderExpandedContent = (popup) => {
       const host = popup.querySelector('#produccionExpandedHistoryHost');
@@ -10797,7 +10805,7 @@
       const canCollapseRows = traceableRows.some((item) => collapseMap[item.id] !== true);
       const canExpandRows = traceableRows.some((item) => collapseMap[item.id] === true);
       const pages = totalPages();
-      host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionExpandedHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" id="produccionExpandedHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID</th><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead><tbody>${renderRows()}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-prod-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-prod-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+      host.innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionExpandedHistoryCollapseAllRowsBtn" ${canCollapseRows ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-compress"></i><span>Colapsar</span></sl-button><sl-button variant="default" type="button" class="inventario-threshold-btn" id="produccionExpandedHistoryExpandAllRowsBtn" ${canExpandRows ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-expand"></i><span>Descolapsar</span></sl-button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0"><thead><tr><th>ID</th><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>VTO producto</th><th>Trazabilidad</th><th>Planilla</th><th>Adjuntos</th><th>Acciones</th></tr></thead><tbody>${renderRows()}</tbody></table></div><div class="inventario-pagination enhanced"><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-prod-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></sl-button><span>Página ${expandedPage} de ${pages}</span><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-prod-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></sl-button></div>`;
       prepareThumbLoaders('.js-produccion-thumb');
     };
     nodes.recipeGroups?.classList.add('d-none');
@@ -10872,7 +10880,7 @@
           }
         });
       },
-      customClass: { confirmButton: 'ios-btn ios-btn-secondary' }
+      customClass: { confirmButton: 'secondary' }
     });
   });
   nodes.historyExcelBtn?.addEventListener('click', async () => {
@@ -10927,7 +10935,7 @@
     if (!normalizeValue(state.historyRange)) {
       const rangeResult = await openIosSwal({
         title: 'Rango obligatorio para planilla',
-        html: '<p>Seleccioná un rango de fechas antes de generar planillas masivas.</p><input id="massPlanillaRangeInput" class="form-control ios-input mt-2" placeholder="Seleccionar rango de fechas" autocomplete="off">',
+        html: '<p>Seleccioná un rango de fechas antes de generar planillas masivas.</p><input id="massPlanillaRangeInput" class="lj-input mt-2" placeholder="Seleccionar rango de fechas" autocomplete="off">',
         showCancelButton: true,
         confirmButtonText: 'Continuar',
         cancelButtonText: 'Cancelar',
@@ -10989,25 +10997,22 @@
       confirmButtonText: 'Continuar',
       cancelButtonText: 'Cancelar',
       didOpen: () => {
-        const all = document.querySelector('input[name="dispatchMassPlanillaScope"][value="all"]');
-        const exclude = document.querySelector('input[name="dispatchMassPlanillaScope"][value="exclude"]');
-        const withQr = document.querySelector('input[name="dispatchMassPlanillaScope"][value="with_qr"]');
+        const scopeGroup = document.querySelector('sl-radio-group[name="dispatchMassPlanillaScope"]');
         const list = document.getElementById('dispatchMassPlanillasScope');
         const qrScope = document.getElementById('dispatchMassQrScope');
         const toggle = () => {
-          list?.classList.toggle('d-none', !exclude?.checked);
-          qrScope?.classList.toggle('d-none', !withQr?.checked);
+          const scope = scopeGroup?.value || 'all';
+          list?.classList.toggle('d-none', scope !== 'exclude');
+          qrScope?.classList.toggle('d-none', scope !== 'with_qr');
         };
-        all?.addEventListener('change', toggle);
-        exclude?.addEventListener('change', toggle);
-        withQr?.addEventListener('change', toggle);
+        scopeGroup?.addEventListener('change', toggle);
         toggle();
         prepareThumbLoaders('.js-dispatch-mass-thumb');
       },
       preConfirm: () => {
-        const mode = document.querySelector('input[name="dispatchMassPlanillaScope"]:checked')?.value || 'all';
-        const selected = [...document.querySelectorAll('[data-dispatch-mass-planilla-recipe]:checked')].map((node) => node.value);
-        const qrKind = document.querySelector('input[name="dispatchMassQrKind"]:checked')?.value || 'all';
+        const mode = document.querySelector('sl-radio-group[name="dispatchMassPlanillaScope"]')?.value || 'all';
+        const selected = [...document.querySelectorAll('sl-checkbox[data-dispatch-mass-planilla-recipe]')].filter((node) => node.checked).map((node) => node.value);
+        const qrKind = document.querySelector('sl-radio-group[name="dispatchMassQrKind"]')?.value || 'all';
         if (mode === 'exclude' && !selected.length) {
           Swal.showValidationMessage('Seleccioná al menos un producto o ingrediente para excluir.');
           return false;
@@ -11028,7 +11033,7 @@
     // tienen facturas adjuntas para ofrecer las hojas extra.
     await openIosSwal({
       title: 'Planillas masivas',
-      html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Cargando datos" class="meta-spinner-login"></div><p>Cargando datos de las producciones...</p>',
+      html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Cargando datos"></sl-spinner></div><p>Cargando datos de las producciones...</p>',
       allowOutsideClick: false,
       showConfirmButton: false,
       customClass: { popup: 'produccion-loading-alert' },
@@ -11106,20 +11111,24 @@
 
   const buildDispatchMassSelectorHtml = (catalog) => {
     const renderItems = (items, key) => items.length
-      ? items.map((item) => `<label class="inventario-check-row inventario-selector-row dispatch-mass-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap dispatch-mass-photo-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-dispatch-mass-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}"></span>` : '<span class="inventario-print-photo-wrap dispatch-mass-photo-wrap"><span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span></span>'}<input type="checkbox" data-dispatch-mass-planilla-recipe="${key}" value="${escapeHtml(item.id)}"><span>${escapeHtml(normalizeUpper(item.title))}</span></label>`).join('')
+      ? items.map((item) => `<sl-checkbox class="inventario-check-row inventario-selector-row dispatch-mass-selector-row" data-dispatch-mass-planilla-recipe="${key}" value="${escapeHtml(item.id)}"><span class="dispatch-xlsx-selector-label">${item.imageUrl ? `<span class="inventario-print-photo-wrap dispatch-mass-photo-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-dispatch-mass-thumb" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}"></span>` : '<span class="inventario-print-photo-wrap dispatch-mass-photo-wrap"><span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span></span>'}<span>${escapeHtml(normalizeUpper(item.title))}</span></span></sl-checkbox>`).join('')
       : '';
     return `<div class="swal-stack-fields text-start">
-      <label class="inventario-check-row"><input type="radio" name="dispatchMassPlanillaScope" value="all" checked><span>Incluir todos los productos</span></label>
-      <label class="inventario-check-row"><input type="radio" name="dispatchMassPlanillaScope" value="exclude"><span>Excluir algunos productos</span></label>
-      <label class="inventario-check-row"><input type="radio" name="dispatchMassPlanillaScope" value="with_qr"><span>Incluir solo con QR de trazabilidad</span></label>
+      <sl-radio-group name="dispatchMassPlanillaScope" value="all" class="produccion-radio-list">
+        <sl-radio value="all">Incluir todos los productos</sl-radio>
+        <sl-radio value="exclude">Excluir algunos productos</sl-radio>
+        <sl-radio value="with_qr">Incluir solo con QR de trazabilidad</sl-radio>
+      </sl-radio-group>
       <div id="dispatchMassPlanillasScope" class="notify-specific-users-list d-none">
         <div class="step-block"><span class="selector-section-label">Productos</span>${renderItems(catalog.production, 'production')}</div>
         ${catalog.ingredient.length ? `<div class="step-block"><span class="selector-section-label">Ingredientes</span>${renderItems(catalog.ingredient, 'ingredient')}</div>` : ''}
       </div>
       <div id="dispatchMassQrScope" class="notify-specific-users-list d-none">
-        <label class="inventario-check-row"><input type="radio" name="dispatchMassQrKind" value="all" checked><span>Imprimir todo</span></label>
-        <label class="inventario-check-row"><input type="radio" name="dispatchMassQrKind" value="production"><span>Imprimir solo producciones</span></label>
-        <label class="inventario-check-row"><input type="radio" name="dispatchMassQrKind" value="ingredient"><span>Imprimir solo ingredientes</span></label>
+        <sl-radio-group name="dispatchMassQrKind" value="all" class="produccion-radio-list">
+          <sl-radio value="all">Imprimir todo</sl-radio>
+          <sl-radio value="production">Imprimir solo producciones</sl-radio>
+          <sl-radio value="ingredient">Imprimir solo ingredientes</sl-radio>
+        </sl-radio-group>
       </div>
     </div>`;
   };
@@ -11130,7 +11139,7 @@
     if (!normalizeValue(state.dispatchRange)) {
       const rangeResult = await openIosSwal({
         title: 'Rango obligatorio para planilla',
-        html: '<p>Seleccioná un rango de fechas antes de generar planillas masivas.</p><input id="massDispatchPlanillaRangeInput" class="form-control ios-input mt-2" placeholder="Seleccionar rango de fechas" autocomplete="off">',
+        html: '<p>Seleccioná un rango de fechas antes de generar planillas masivas.</p><input id="massDispatchPlanillaRangeInput" class="lj-input mt-2" placeholder="Seleccionar rango de fechas" autocomplete="off">',
         showCancelButton: true,
         confirmButtonText: 'Continuar',
         cancelButtonText: 'Cancelar',
@@ -11184,25 +11193,22 @@
       confirmButtonText: 'Continuar',
       cancelButtonText: 'Cancelar',
       didOpen: () => {
-        const all = document.querySelector('input[name="dispatchMassPlanillaScope"][value="all"]');
-        const exclude = document.querySelector('input[name="dispatchMassPlanillaScope"][value="exclude"]');
-        const withQr = document.querySelector('input[name="dispatchMassPlanillaScope"][value="with_qr"]');
+        const scopeGroup = document.querySelector('sl-radio-group[name="dispatchMassPlanillaScope"]');
         const list = document.getElementById('dispatchMassPlanillasScope');
         const qrScope = document.getElementById('dispatchMassQrScope');
         const toggle = () => {
-          list?.classList.toggle('d-none', !exclude?.checked);
-          qrScope?.classList.toggle('d-none', !withQr?.checked);
+          const scope = scopeGroup?.value || 'all';
+          list?.classList.toggle('d-none', scope !== 'exclude');
+          qrScope?.classList.toggle('d-none', scope !== 'with_qr');
         };
-        all?.addEventListener('change', toggle);
-        exclude?.addEventListener('change', toggle);
-        withQr?.addEventListener('change', toggle);
+        scopeGroup?.addEventListener('change', toggle);
         toggle();
         prepareThumbLoaders('.js-dispatch-mass-thumb');
       },
       preConfirm: () => {
-        const mode = document.querySelector('input[name="dispatchMassPlanillaScope"]:checked')?.value || 'all';
-        const selected = [...document.querySelectorAll('[data-dispatch-mass-planilla-recipe]:checked')].map((node) => node.value);
-        const qrKind = document.querySelector('input[name="dispatchMassQrKind"]:checked')?.value || 'all';
+        const mode = document.querySelector('sl-radio-group[name="dispatchMassPlanillaScope"]')?.value || 'all';
+        const selected = [...document.querySelectorAll('sl-checkbox[data-dispatch-mass-planilla-recipe]')].filter((node) => node.checked).map((node) => node.value);
+        const qrKind = document.querySelector('sl-radio-group[name="dispatchMassQrKind"]')?.value || 'all';
         if (mode === 'exclude' && !selected.length) {
           Swal.showValidationMessage('Seleccioná al menos un producto o ingrediente para excluir.');
           return false;
@@ -11272,25 +11278,22 @@
       confirmButtonText: 'Continuar',
       cancelButtonText: 'Cancelar',
       didOpen: () => {
-        const all = document.querySelector('input[name="dispatchMassPlanillaScope"][value="all"]');
-        const exclude = document.querySelector('input[name="dispatchMassPlanillaScope"][value="exclude"]');
-        const withQr = document.querySelector('input[name="dispatchMassPlanillaScope"][value="with_qr"]');
+        const scopeGroup = document.querySelector('sl-radio-group[name="dispatchMassPlanillaScope"]');
         const list = document.getElementById('dispatchMassPlanillasScope');
         const qrScope = document.getElementById('dispatchMassQrScope');
         const toggle = () => {
-          list?.classList.toggle('d-none', !exclude?.checked);
-          qrScope?.classList.toggle('d-none', !withQr?.checked);
+          const scope = scopeGroup?.value || 'all';
+          list?.classList.toggle('d-none', scope !== 'exclude');
+          qrScope?.classList.toggle('d-none', scope !== 'with_qr');
         };
-        all?.addEventListener('change', toggle);
-        exclude?.addEventListener('change', toggle);
-        withQr?.addEventListener('change', toggle);
+        scopeGroup?.addEventListener('change', toggle);
         toggle();
         prepareThumbLoaders('.js-dispatch-mass-thumb');
       },
       preConfirm: () => {
-        const mode = document.querySelector('input[name="dispatchMassPlanillaScope"]:checked')?.value || 'all';
-        const selected = [...document.querySelectorAll('[data-dispatch-mass-planilla-recipe]:checked')].map((node) => node.value);
-        const qrKind = document.querySelector('input[name="dispatchMassQrKind"]:checked')?.value || 'all';
+        const mode = document.querySelector('sl-radio-group[name="dispatchMassPlanillaScope"]')?.value || 'all';
+        const selected = [...document.querySelectorAll('sl-checkbox[data-dispatch-mass-planilla-recipe]')].filter((node) => node.checked).map((node) => node.value);
+        const qrKind = document.querySelector('sl-radio-group[name="dispatchMassQrKind"]')?.value || 'all';
         if (mode === 'exclude' && !selected.length) {
           Swal.showValidationMessage('Seleccioná al menos un producto o ingrediente para excluir.');
           return false;
@@ -11409,7 +11412,7 @@
     const picker = await openIosSwal({
       title: 'Rango obligatorio para planilla',
       customClass: { popup: 'weekly-range-alert' },
-      html: '<p>Para evitar procesar datos infinitos, seleccioná un rango de fechas antes de continuar.</p><input id="sheetRangeInput" class="swal2-input ios-input w-100" placeholder="Seleccionar rango">',
+      html: '<p>Para evitar procesar datos infinitos, seleccioná un rango de fechas antes de continuar.</p><input id="sheetRangeInput" class="lj-input swal2-input w-100" placeholder="Seleccionar rango">',
       showCancelButton: true,
       confirmButtonText: 'Continuar',
       cancelButtonText: 'Cancelar',
@@ -11485,22 +11488,20 @@
     }, {}));
     const selector = await openIosSwal({
       title: 'Selector de productos',
-      html: `<div class="swal-stack-fields text-start"><label class="inventario-check-row"><input type="radio" name="weeklyPlanillaScope" value="all" checked><span>Incluir todos los productos</span></label><label class="inventario-check-row"><input type="radio" name="weeklyPlanillaScope" value="exclude"><span>Excluir algunos productos</span></label><div id="weeklyPlanillasScope" class="notify-specific-users-list d-none"><div class="step-block"><span class="selector-section-label">Productos</span>${uniqueRecipes.map((item) => `<label class="inventario-check-row inventario-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap dispatch-mass-photo-wrap"><span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-weekly-production-thumb" style="width:42px;height:42px;border-radius:999px;object-fit:cover;" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}"></span>` : '<span class="inventario-print-photo-wrap dispatch-mass-photo-wrap"><span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span></span>'}<input type="checkbox" data-weekly-planilla-recipe value="${escapeHtml(item.id)}"><span>${escapeHtml(normalizeUpper(item.title))}</span></label>`).join('')}</div></div></div>`,
+      html: `<div class="swal-stack-fields text-start"><sl-radio-group name="weeklyPlanillaScope" value="all" class="produccion-radio-list"><sl-radio value="all">Incluir todos los productos</sl-radio><sl-radio value="exclude">Excluir algunos productos</sl-radio></sl-radio-group><div id="weeklyPlanillasScope" class="notify-specific-users-list d-none"><div class="step-block"><span class="selector-section-label">Productos</span>${uniqueRecipes.map((item) => `<sl-checkbox class="inventario-check-row inventario-selector-row" data-weekly-planilla-recipe value="${escapeHtml(item.id)}"><span class="dispatch-xlsx-selector-label">${item.imageUrl ? `<span class="inventario-print-photo-wrap dispatch-mass-photo-wrap"><span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-weekly-production-thumb" style="width:42px;height:42px;border-radius:999px;object-fit:cover;" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}"></span>` : '<span class="inventario-print-photo-wrap dispatch-mass-photo-wrap"><span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span></span>'}<span>${escapeHtml(normalizeUpper(item.title))}</span></span></sl-checkbox>`).join('')}</div></div></div>`,
       showCancelButton: true,
       confirmButtonText: 'Continuar',
       cancelButtonText: 'Cancelar',
       didOpen: () => {
-        const all = document.querySelector('input[name="weeklyPlanillaScope"][value="all"]');
-        const exclude = document.querySelector('input[name="weeklyPlanillaScope"][value="exclude"]');
+        const scopeGroup = document.querySelector('sl-radio-group[name="weeklyPlanillaScope"]');
         const list = document.getElementById('weeklyPlanillasScope');
-        const toggle = () => list?.classList.toggle('d-none', !exclude?.checked);
-        all?.addEventListener('change', toggle);
-        exclude?.addEventListener('change', toggle);
+        const toggle = () => list?.classList.toggle('d-none', (scopeGroup?.value || 'all') !== 'exclude');
+        scopeGroup?.addEventListener('change', toggle);
         prepareThumbLoaders('.js-weekly-production-thumb');
       },
       preConfirm: () => {
-        const mode = document.querySelector('input[name="weeklyPlanillaScope"]:checked')?.value || 'all';
-        const selected = [...document.querySelectorAll('[data-weekly-planilla-recipe]:checked')].map((node) => node.value);
+        const mode = document.querySelector('sl-radio-group[name="weeklyPlanillaScope"]')?.value || 'all';
+        const selected = [...document.querySelectorAll('sl-checkbox[data-weekly-planilla-recipe]')].filter((node) => node.checked).map((node) => node.value);
         if (mode === 'exclude' && !selected.length) {
           Swal.showValidationMessage('Seleccioná al menos un producto para excluir.');
           return false;
@@ -11581,9 +11582,9 @@
     await openIosSwal({
       title: 'Planilla de Producción Semanal',
       width: 'min(1400px,98vw)',
-      html: `<div class="planilla-toolbar"><button type="button" class="btn ios-btn ios-btn-secondary" id="weeklyProductionPrintBtn"><i class="fa-solid fa-print"></i><span>Imprimir</span></button></div><div class="planilla-card">${html}</div>`,
+      html: `<div class="planilla-toolbar"><sl-button variant="default" type="button" id="weeklyProductionPrintBtn"><i slot="prefix" class="fa-solid fa-print"></i><span>Imprimir</span></sl-button></div><div class="planilla-card">${html}</div>`,
       confirmButtonText: 'Cerrar',
-      customClass: { popup: 'produccion-trace-alert planilla-modal', confirmButton: 'ios-btn ios-btn-secondary' },
+      customClass: { popup: 'produccion-trace-alert planilla-modal', confirmButton: 'secondary' },
       didOpen: (popup) => {
         popup.querySelector('#weeklyProductionPrintBtn')?.addEventListener('click', async () => {
           printWeeklyProductionPlanilla(html);
@@ -11602,9 +11603,9 @@
       denyButtonText: 'No incluir',
       cancelButtonText: 'Cancelar',
       customClass: {
-        confirmButton: 'ios-btn ios-btn-success',
-        denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical',
-        cancelButton: 'ios-btn ios-btn-secondary'
+        confirmButton: 'success',
+        denyButton: 'danger',
+        cancelButton: 'secondary'
       }
     });
     if (!ask.isConfirmed && !ask.isDenied) return;
@@ -11618,9 +11619,9 @@
       denyButtonText: 'No incluir',
       cancelButtonText: 'Cancelar',
       customClass: {
-        confirmButton: 'ios-btn ios-btn-success',
-        denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical',
-        cancelButton: 'ios-btn ios-btn-secondary'
+        confirmButton: 'success',
+        denyButton: 'danger',
+        cancelButton: 'secondary'
       }
     });
     if (!askTrace.isConfirmed && !askTrace.isDenied) return;
@@ -12031,9 +12032,9 @@
       draft.vehicleId = normalizeValue(nodes.dispatchView.querySelector('#dispatchVehicleSelect')?.value);
       draft.clientAddress = normalizeValue(nodes.dispatchView.querySelector('#dispatchClientAddressInput')?.value);
       draft.clientCity = normalizeValue(nodes.dispatchView.querySelector('#dispatchClientCityInput')?.value);
-      draft.clientProvince = normalizeValue(nodes.dispatchView.querySelector('#dispatchClientProvinceInput')?.value) || 'Santa Fe';
+      draft.clientProvince = normalizeValue(ljSelectValue(nodes.dispatchView.querySelector('#dispatchClientProvinceInput'))) || 'Santa Fe';
       draft.clientCountry = normalizeValue(nodes.dispatchView.querySelector('#dispatchClientCountryInput')?.value) || 'Argentina';
-      draft.managers = [...nodes.dispatchView.querySelectorAll('[data-dispatch-manager]:checked')].map((n) => normalizeValue(n.dataset.dispatchManager || n.value)).filter(Boolean);
+      draft.managers = [...nodes.dispatchView.querySelectorAll('sl-checkbox[data-dispatch-manager]')].filter((n) => n.checked).map((n) => normalizeValue(n.dataset.dispatchManager || n.value)).filter(Boolean);
       draft.comments = [...nodes.dispatchView.querySelectorAll('[data-dispatch-comment]')].map((n) => normalizeValue(n.value)).filter(Boolean);
       draft.proofs = Array.isArray(draft.proofs) ? draft.proofs.filter((item) => normalizeValue(item?.url)) : [];
       if (!draft.clientId) {
@@ -12106,16 +12107,16 @@
       const productsSummaryRows = normalizedProducts.map((item) => `<li><strong>${escapeHtml(item.recipeTitle || 'Producto')}</strong>: ${escapeHtml(getDispatchProductSummaryLabel(item))}</li>`).join('');
       const confirmSaveDispatch = await openIosSwal({
         title: 'Confirmar reparto final',
-        html: `<div class="text-start produccion-confirm-summary produccion-confirm-card"><div class="produccion-confirm-head"><span class="produccion-confirm-icon"><i class="bi bi-truck"></i></span><div><p class="produccion-confirm-kicker">Validación final</p><p class="produccion-confirm-note">Se descontará stock de productos al guardar el reparto.</p></div></div><p><strong><i class="bi bi-calendar-event"></i> Fecha:</strong> <span>${escapeHtml(formatIsoEs(draft.dispatchDate || ''))}</span></p><p><strong><i class="fa-solid fa-user"></i> Cliente:</strong> <span>${escapeHtml(draft.clientName || selectedClient.name || '-')}</span></p><p><strong><i class="fa-solid fa-truck"></i> UTA/URA:</strong> <span>${escapeHtml(formatDispatchVehicleLabel(selectedVehicle))}</span></p><p><strong><i class="bi bi-people"></i> Responsables:</strong><br>${managerSummary || '-'}</p><p><strong><i class="bi bi-box-seam"></i> Productos:</strong></p><ul>${productsSummaryRows}</ul></div>`,
+        html: `<div class="text-start produccion-confirm-summary produccion-confirm-card"><div class="produccion-confirm-head"><span class="produccion-confirm-icon"><sl-icon name="truck"></sl-icon></span><div><p class="produccion-confirm-kicker">Validación final</p><p class="produccion-confirm-note">Se descontará stock de productos al guardar el reparto.</p></div></div><p><strong><sl-icon name="calendar-event"></sl-icon> Fecha:</strong> <span>${escapeHtml(formatIsoEs(draft.dispatchDate || ''))}</span></p><p><strong><i class="fa-solid fa-user"></i> Cliente:</strong> <span>${escapeHtml(draft.clientName || selectedClient.name || '-')}</span></p><p><strong><i class="fa-solid fa-truck"></i> UTA/URA:</strong> <span>${escapeHtml(formatDispatchVehicleLabel(selectedVehicle))}</span></p><p><strong><sl-icon name="people"></sl-icon> Responsables:</strong><br>${managerSummary || '-'}</p><p><strong><sl-icon name="box-seam"></sl-icon> Productos:</strong></p><ul>${productsSummaryRows}</ul></div>`,
         showCancelButton: true,
         confirmButtonText: 'Guardar reparto',
         cancelButtonText: 'Cancelar',
-        customClass: { popup: 'produccion-confirm-alert', confirmButton: 'ios-btn ios-btn-success', cancelButton: 'ios-btn ios-btn-secondary' }
+        customClass: { popup: 'produccion-confirm-alert', confirmButton: 'success', cancelButton: 'secondary' }
       });
       if (!confirmSaveDispatch.isConfirmed) return;
       Swal.fire({
         title: 'Guardando reparto...',
-        html: '<div class="informes-saving-spinner"><img src="./IMG/Meta-ai-logo.webp" alt="Guardando reparto" class="meta-spinner-login"></div>',
+        html: '<div class="informes-saving-spinner"><sl-spinner class="meta-spinner-login" aria-label="Guardando reparto"></sl-spinner></div>',
         allowOutsideClick: false,
         showConfirmButton: false,
         customClass: {
@@ -12219,9 +12220,9 @@
         denyButtonText: 'No incluir',
         cancelButtonText: 'Cancelar',
         customClass: {
-          confirmButton: 'ios-btn ios-btn-success',
-          denyButton: 'ios-btn ios-btn-danger ios-btn-deny-critical',
-          cancelButton: 'ios-btn ios-btn-secondary'
+          confirmButton: 'success',
+          denyButton: 'danger',
+          cancelButton: 'secondary'
         }
       });
       if (!askDetail.isConfirmed && !askDetail.isDenied) return;
@@ -12433,11 +12434,11 @@
                     const allocations = Array.isArray(item.allocations) && item.allocations.length ? item.allocations : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
                     return allocations.map((allocation) => {
                       const traceBtn = normalizeValue(allocation.productionId)
-                        ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button>`
+                        ? `<sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img slot="prefix" src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></sl-button>`
                         : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
                       const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
                       const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
-                      return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
+                      return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
                     });
                   });
                   return [parentRow, ...childRows];
@@ -12446,11 +12447,11 @@
                   const allocations = Array.isArray(item.allocations) && item.allocations.length ? item.allocations : [{ lotNumber: '-', qtyKg: item.qtyKg, expiryDate: '', productionId: '' }];
                   return allocations.map((allocation) => {
                     const traceBtn = normalizeValue(allocation.productionId)
-                      ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></button>`
+                      ? `<sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-prod-trace="${escapeHtml(allocation.productionId)}"><img slot="prefix" src="./IMG/family-tree-icon-no-bg.svg" alt="" style="width:14px;height:14px"><span>Trazabilidad</span></sl-button>`
                       : '<span class="inventario-internal-no-trace">Sin trazabilidad</span>';
                     const imageUrl = sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl);
                     const allocationDisplay = getDispatchAllocationDisplay(item, allocation);
-                    return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
+                    return `<tr class="inventario-trace-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon"><span class="inventario-trace-avatar">${imageUrl ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-produccion-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.recipeTitle)}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span><span class="inventario-trace-label">${escapeHtml(item.recipeTitle || '-')} ${escapeHtml(allocationDisplay.label)}</span></div></td><td>${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(allocationDisplay.label)}</td><td>${escapeHtml(formatIsoEs(allocation.expiryDate || '')) || '-'}</td><td>${traceBtn}</td><td>${escapeHtml(client.name || '-')}</td><td>-</td><td>-</td></tr>`;
                   });
                 })
               ].join('') : '';
@@ -12458,9 +12459,9 @@
               const locationRow = !collapsed && locationLabel
                 ? `<tr class="inventario-internal-use-row"><td colspan="8"><i class="fa-solid fa-house"></i> ${escapeHtml(locationLabel)}</td></tr>`
                 : '';
-              return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${products.length ? `<button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-collapse="${escapeHtml(row.id)}"><i class="fa-solid ${collapsed ? 'fa-expand' : 'fa-compress'}"></i></button>` : ''}<span>${escapeHtml(formatDateTime(row.createdAt))}</span></div></td><td>${products.length === 1 ? '1 producto' : `${products.length} productos`}</td><td>${products.map((item) => escapeHtml(getDispatchProductSummaryLabel(item))).join('<br>')}</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || '-')}</td><td>${escapeHtml(client.name || '-')}</td><td><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-planilla="${escapeHtml(row.id)}"><i class="fa-regular fa-file-lines"></i><span>Planilla</span></button></td><td><button type="button" class="btn ios-btn ios-btn-danger inventario-threshold-btn" data-dispatch-delete="${escapeHtml(row.id)}"><i class="fa-solid fa-trash"></i><span>Eliminar</span></button></td></tr>${detail}${locationRow}`;
+              return `<tr class="inventario-row-tone ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td><div class="d-flex align-items-center gap-2">${products.length ? `<sl-button size="small" variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-dispatch-expanded-collapse="${escapeHtml(row.id)}"><i class="fa-solid ${collapsed ? 'fa-expand' : 'fa-compress'}"></i></sl-button>` : ''}<span>${escapeHtml(formatDateTime(row.createdAt))}</span></div></td><td>${products.length === 1 ? '1 producto' : `${products.length} productos`}</td><td>${products.map((item) => escapeHtml(getDispatchProductSummaryLabel(item))).join('<br>')}</td><td>${escapeHtml(expiryLabel)}</td><td>${escapeHtml(row.code || '-')}</td><td>${escapeHtml(client.name || '-')}</td><td><sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-dispatch-planilla="${escapeHtml(row.id)}"><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planilla</span></sl-button></td><td><sl-button size="small" variant="danger" type="button" class="inventario-threshold-btn" data-dispatch-delete="${escapeHtml(row.id)}"><i slot="prefix" class="fa-solid fa-trash"></i><span>Eliminar</span></sl-button></td></tr>${detail}${locationRow}`;
             }).join('') || '<tr><td colspan="8">Sin datos.</td></tr>';
-            popup.querySelector('#dispatchExpandedWrap').innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-collapse-all ${canCollapseRows ? '' : 'disabled'}><i class="fa-solid fa-compress"></i><span>Colapsar</span></button><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn" data-dispatch-expanded-expand-all ${canExpandRows ? '' : 'disabled'}><i class="fa-solid fa-expand"></i><span>Descolapsar</span></button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0 produccion-dispatch-table-center"><thead><tr><th>Fecha de reparto</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th><th>Planilla</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div><div class="inventario-pagination enhanced"><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button><span>Página ${expandedPage} de ${pages}</span><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn inventario-page-btn" data-dispatch-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button></div>`;
+            popup.querySelector('#dispatchExpandedWrap').innerHTML = `<div class="inventario-print-row mb-2 inventario-trace-toolbar toolbar-scroll-x"><sl-button variant="default" type="button" class="inventario-threshold-btn" data-dispatch-expanded-collapse-all ${canCollapseRows ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-compress"></i><span>Colapsar</span></sl-button><sl-button variant="default" type="button" class="inventario-threshold-btn" data-dispatch-expanded-expand-all ${canExpandRows ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-expand"></i><span>Descolapsar</span></sl-button></div><div class="table-responsive inventario-table-compact-wrap"><table class="table recipe-table inventario-table-compact mb-0 produccion-dispatch-table-center"><thead><tr><th>Fecha de reparto</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de reparto</th><th>Cliente</th><th>Planilla</th><th>Acciones</th></tr></thead><tbody>${body}</tbody></table></div><div class="inventario-pagination enhanced"><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-dispatch-expanded-page="prev" ${expandedPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></sl-button><span>Página ${expandedPage} de ${pages}</span><sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn inventario-page-btn" data-dispatch-expanded-page="next" ${expandedPage >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></sl-button></div>`;
             prepareThumbLoaders('.js-produccion-thumb');
           };
           renderExpanded();
@@ -12645,7 +12646,7 @@
     }
     const xlsxManagerCheck = event.target.closest('[data-dispatch-xlsx-manager]');
     if (xlsxManagerCheck && state.dispatchXlsxDraft) {
-      state.dispatchXlsxDraft.managers = [...nodes.dispatchView.querySelectorAll('[data-dispatch-xlsx-manager]:checked')]
+      state.dispatchXlsxDraft.managers = [...nodes.dispatchView.querySelectorAll('sl-checkbox[data-dispatch-xlsx-manager]')].filter((n) => n.checked)
         .map((n) => normalizeValue(n.dataset.dispatchXlsxManager || n.value))
         .filter(Boolean);
       return;
@@ -12694,7 +12695,7 @@
       return;
     }
     if (event.target.matches('#dispatchClientProvinceInput')) {
-      state.dispatchDraft.clientProvince = normalizeValue(event.target.value) || 'Santa Fe';
+      state.dispatchDraft.clientProvince = normalizeValue(ljSelectValue(event.target)) || 'Santa Fe';
       return;
     }
   });
@@ -12753,8 +12754,8 @@
     positionFloatingSuggest(suggest, vehicleInput);
     suggest.innerHTML = `${list.map((item) => {
       const meta = getDispatchVehicleExpiryMeta(item);
-      return `<button type="button" class="recipe-suggest-item" data-dispatch-vehicle-pick="${escapeHtml(item.id)}"><span class="dispatch-vehicle-tone tone-${meta.tone}"></span><span><strong>${escapeHtml(item.number || item.id)}</strong><br><small>${escapeHtml(formatDispatchVehicleLabel(item))}</small></span></button>`;
-    }).join('')}${query ? `<button type="button" class="recipe-suggest-item recipe-suggest-create" data-dispatch-vehicle-create="1"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button>` : ''}`;
+      return `<button type="button" class="lj-tile recipe-suggest-item" data-dispatch-vehicle-pick="${escapeHtml(item.id)}"><span class="dispatch-vehicle-tone tone-${meta.tone}"></span><span><strong>${escapeHtml(item.number || item.id)}</strong><br><small>${escapeHtml(formatDispatchVehicleLabel(item))}</small></span></button>`;
+    }).join('')}${query ? `<button type="button" class="lj-tile recipe-suggest-item recipe-suggest-create" data-dispatch-vehicle-create="1"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button>` : ''}`;
     suggest.onclick = async (ev) => {
       const pick = ev.target.closest('[data-dispatch-vehicle-pick]');
       if (pick) {
@@ -12797,8 +12798,8 @@
     positionFloatingSuggest(suggest, vehicleInput);
     suggest.innerHTML = `${list.map((item) => {
       const meta = getDispatchVehicleExpiryMeta(item);
-      return `<button type="button" class="recipe-suggest-item" data-dispatch-xlsx-vehicle-pick="${escapeHtml(item.id)}"><span class="dispatch-vehicle-tone tone-${meta.tone}"></span><span><strong>${escapeHtml(item.number || item.id)}</strong><br><small>${escapeHtml(formatDispatchVehicleLabel(item))}</small></span></button>`;
-    }).join('')}${query ? `<button type="button" class="recipe-suggest-item recipe-suggest-create" data-dispatch-xlsx-vehicle-create="1"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button>` : ''}`;
+      return `<button type="button" class="lj-tile recipe-suggest-item" data-dispatch-xlsx-vehicle-pick="${escapeHtml(item.id)}"><span class="dispatch-vehicle-tone tone-${meta.tone}"></span><span><strong>${escapeHtml(item.number || item.id)}</strong><br><small>${escapeHtml(formatDispatchVehicleLabel(item))}</small></span></button>`;
+    }).join('')}${query ? `<button type="button" class="lj-tile recipe-suggest-item recipe-suggest-create" data-dispatch-xlsx-vehicle-create="1"><i class="fa-solid fa-plus"></i><span>Nueva unidad</span></button>` : ''}`;
     suggest.onclick = async (ev) => {
       const pick = ev.target.closest('[data-dispatch-xlsx-vehicle-pick]');
       if (pick) {
@@ -12836,7 +12837,7 @@
       .filter((item) => !query || normalizeLower(item.title).includes(query))
       .slice(0, 8)
       .map((item) => ({ ...item, meta: getProducedStockMeta(item.id) }));
-    suggest.innerHTML = `${recipes.map((item) => `<button type="button" class="recipe-suggest-item" data-dispatch-product-pick="${escapeHtml(item.id)}" data-dispatch-row="${idx}"><span class="recipe-suggest-avatar-wrap">${sanitizeImageUrl(item.imageUrl) ? `<span class="thumb-loading"><img class="meta-spinner-login" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="recipe-suggest-avatar js-dispatch-suggest-thumb" src="${escapeHtml(sanitizeImageUrl(item.imageUrl))}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><span><strong>${escapeHtml(capitalize(item.title || 'Receta'))}</strong><br><small class="${item.meta.available > 0.0001 ? 'produccion-dispatch-ok' : 'text-danger'}">${item.meta.available > 0.0001 ? `Disponible: ${item.meta.available.toFixed(2)} kg` : 'Sin stock disponible'}</small></span></button>`).join('')}`;
+    suggest.innerHTML = `${recipes.map((item) => `<button type="button" class="lj-tile recipe-suggest-item" data-dispatch-product-pick="${escapeHtml(item.id)}" data-dispatch-row="${idx}"><span class="recipe-suggest-avatar-wrap">${sanitizeImageUrl(item.imageUrl) ? `<span class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span><img class="recipe-suggest-avatar js-dispatch-suggest-thumb" src="${escapeHtml(sanitizeImageUrl(item.imageUrl))}" alt="${escapeHtml(item.title)}">` : '<span class="image-placeholder-circle-2 dispatch-product-placeholder"><i class="fa-solid fa-drumstick-bite dispatch-product-table-icon dispatch-product-row-icon"></i></span>'}</span><span><strong>${escapeHtml(capitalize(item.title || 'Receta'))}</strong><br><small class="${item.meta.available > 0.0001 ? 'produccion-dispatch-ok' : 'text-danger'}">${item.meta.available > 0.0001 ? `Disponible: ${item.meta.available.toFixed(2)} kg` : 'Sin stock disponible'}</small></span></button>`).join('')}`;
     prepareThumbLoaders('.js-dispatch-suggest-thumb');
     suggest.onclick = (ev) => {
       const pick = ev.target.closest('[data-dispatch-product-pick]');
@@ -12870,7 +12871,7 @@
         .slice(0, 8);
       const suggest = ensureFloatingSuggest('client');
       positionFloatingSuggest(suggest, clientInput);
-      suggest.innerHTML = `${list.map((item) => `<button type="button" class="recipe-suggest-item" data-dispatch-client-pick="${escapeHtml(item.id)}"><span class="user-avatar-thumb dispatch-client-suggest-avatar">${escapeHtml(item.initials || 'U')}</span><span>${escapeHtml(item.name)}<br><small>${escapeHtml(item.doc || '-')}</small></span></button>`).join('')}${query ? `<button type="button" class="recipe-suggest-item recipe-suggest-create" data-dispatch-client-create="1"><i class="fa-solid fa-plus"></i><span>Nuevo Cliente</span></button>` : ''}`;
+      suggest.innerHTML = `${list.map((item) => `<button type="button" class="lj-tile recipe-suggest-item" data-dispatch-client-pick="${escapeHtml(item.id)}"><span class="user-avatar-thumb dispatch-client-suggest-avatar">${escapeHtml(item.initials || 'U')}</span><span>${escapeHtml(item.name)}<br><small>${escapeHtml(item.doc || '-')}</small></span></button>`).join('')}${query ? `<button type="button" class="lj-tile recipe-suggest-item recipe-suggest-create" data-dispatch-client-create="1"><i class="fa-solid fa-plus"></i><span>Nuevo Cliente</span></button>` : ''}`;
       suggest.onclick = async (ev) => {
         const pick = ev.target.closest('[data-dispatch-client-pick]');
         if (pick) {
@@ -13070,7 +13071,7 @@
       await openTraceability(reg);
     }
   };
-  produccionModal.addEventListener('shown.bs.modal', async () => {
+  LJModal.on(produccionModal, 'shown', async () => {
     if (state.modalBootstrapping) return;
     state.modalBootstrapping = true;
     try {
@@ -13129,7 +13130,7 @@
       state.modalBootstrapping = false;
     }
   });
-  produccionModal.addEventListener('hidden.bs.modal', async () => {
+  LJModal.on(produccionModal, 'hidden', async () => {
     state.modalBootstrapping = false;
     if (state.activeRecipeId && state.editorMode !== 'view') {
       await saveEditorDraft();

@@ -2,17 +2,17 @@
    INVENTARIO / PRODUCCIÓN TRACE UI
 ========================================= */
 .inventario-available-line {
-  color: #6c7a98;
+  color: var(--lj-muted);
   font-size: 0.78rem;
   font-weight: 600;
 }
 
 .inventario-expired-strike {
   text-decoration: line-through;
-  text-decoration-color: #c2434f;
+  text-decoration-color: var(--lj-danger);
   text-decoration-thickness: 2px;
   text-decoration-skip-ink: none;
-  color: #94a3b8 !important;
+  color: var(--lj-accent) !important;
   opacity: 0.85;
   display: inline-block;
 }
@@ -20,32 +20,32 @@
 /* La unidad (Kg.) va en su propio span sin strike: queda visible y "normal".
    Le bajamos el color para que igual se vea "secundaria" cuando hay vencimiento. */
 .inventario-hero-value:has(.inventario-expired-strike) .inventario-hero-unit-suffix {
-  color: #94a3b8;
+  color: var(--lj-accent);
   margin-left: 4px;
 }
 
 .inventario-trace-row td {
-  background: #f8ecee !important;
-  border-top: 1px dashed #b82646 !important;
-  color: #810c0c;
+  background: var(--lj-surface-2) !important;
+  border-top: 1px dashed var(--lj-danger) !important;
+  color: var(--lj-danger);
   font-size: 0.82rem;
 }
 
 .inventario-resolution-row td {
-  background: #eaf1ff !important;
-  border-top: 1px dashed #0c40a8 !important;
-  color: #002a73;
+  background: var(--lj-accent-soft) !important;
+  border-top: 1px dashed var(--lj-accent) !important;
+  color: var(--lj-brand);
   font-size: 0.82rem;
 }
 
 .inventario-internal-use-row td {
-  background: #fff2e3 !important;
-  border-top: 1px dashed #ef8f27 !important;
+  background: var(--lj-warning-soft) !important;
+  border-top: 1px dashed var(--lj-warning) !important;
   font-size: 0.82rem;
 }
 
 #copyIngredientIdBtn {
-  border-radius: 0 14px 14px 0 !important;
+  border-radius: 0 var(--lj-radius-lg) var(--lj-radius-lg) 0 !important;
 }
 
 .produccion-dispatch-table-center th,
@@ -60,13 +60,13 @@
 
 .produccion-dispatch-table-center .inventario-trace-row td,
 .produccion-dispatch-table-center .inventario-internal-use-row td {
-  color: #1f2a44;
+  color: var(--lj-brand);
 }
 
 .produccion-dispatch-table-center .inventario-dispatch-group-row td {
-  background: #f0f2f5 !important;
-  border-top: 1px dashed #c3cad6 !important;
-  color: #425066;
+  background: var(--lj-surface-2) !important;
+  border-top: 1px dashed var(--lj-border-strong) !important;
+  color: var(--lj-accent);
   font-size: 0.82rem;
   font-weight: 800;
   text-align: left;
@@ -84,18 +84,18 @@
 }
 
 .inventario-internal-meta small {
-  color: #9a4f0a;
+  color: var(--lj-warning);
   font-weight: 600;
 }
 
 .inventario-internal-no-trace {
-  color: #9a4f0a;
+  color: var(--lj-warning);
   font-size: 0.74rem;
   font-weight: 600;
 }
 
 tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
-  background: #fff4d1 !important;
+  background: var(--lj-warning-soft) !important;
 }
 
 .inventario-expired-badge {
@@ -103,13 +103,13 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   align-items: center;
   margin-left: 6px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 4px;
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.03em;
-  color: #a3162f;
-  background: #ffd5df;
-  border: 1px solid #f3a5b6;
+  color: var(--lj-danger);
+  background: var(--lj-danger-soft);
+  border: 1px solid color-mix(in srgb, var(--lj-danger) 35%, var(--lj-surface));
 }
 
 .inventario-expiry-days-badge {
@@ -117,26 +117,26 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   align-items: center;
   padding: 2px 8px;
   margin-top: 2px;
-  border-radius: 999px;
+  border-radius: 4px;
   font-size: 0.66rem;
   font-weight: 700;
   color: #fff;
 }
 
 .inventario-expiry-days-badge.is-success {
-  background: linear-gradient(90deg, #30d158 0%, #34c759 100%);
+  background: var(--lj-success);
 }
 
 .inventario-expiry-days-badge.is-warning {
-  background: linear-gradient(90deg, #ffb340 0%, #ff8a00 100%);
+  background: var(--lj-warning);
 }
 
 .inventario-expiry-days-badge.is-danger {
-  background: linear-gradient(90deg, #ff5e57 0%, #ff3b30 100%);
+  background: var(--lj-danger);
 }
 
 .inventario-expiry-days-badge.is-neutral {
-  background: #8e97ad;
+  background: var(--lj-muted);
 }
 
 .inventario-resolution-badge {
@@ -144,17 +144,17 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   align-items: center;
   margin-left: 6px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 4px;
   font-size: 0.68rem;
   font-weight: 700;
-  color: #2156b8;
-  background: #e7efff;
-  border: 1px solid #bdd0ff;
+  color: var(--lj-accent);
+  background: var(--lj-accent-soft);
+  border: 1px solid var(--lj-border);
 }
 
 .produccion-lote-expired-help {
   grid-column: 1 / -1;
-  color: #b42338;
+  color: var(--lj-danger);
   font-size: 0.82rem;
 }
 
@@ -164,12 +164,12 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  color: #6b7280;
+  color: var(--lj-muted);
   font-size: 0.8rem;
 }
 
 .produccion-lote-neutral-help i {
-  color: #9aa3af;
+  color: var(--lj-muted);
   flex-shrink: 0;
   margin-top: 1px;
 }
@@ -191,21 +191,21 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   margin-top: 6px;
 }
 
-.produccion-lote-blocked-actions .ios-btn-warning {
-  background: #fff4e4;
-  color: #b26b08;
-  border-color: #f0c87a;
+.produccion-lote-blocked-actions sl-button[variant="warning"]::part(base) {
+  background: var(--lj-warning-soft);
+  color: var(--lj-warning);
+  border-color: color-mix(in srgb, var(--lj-warning) 45%, var(--lj-surface));
   font-weight: 700;
 }
 
-.produccion-lote-blocked-actions .ios-btn-warning:hover {
-  background: #ffe9c6;
+.produccion-lote-blocked-actions sl-button[variant="warning"]::part(base):hover {
+  background: color-mix(in srgb, var(--lj-warning) 18%, var(--lj-surface));
 }
 
 /* Card de ingrediente marcada como "sin trazabilidad". */
 .produccion-lote-group.is-sin-traz {
-  background: #fff8e6;
-  border-color: #f0d692;
+  background: var(--lj-warning-soft);
+  border-color: color-mix(in srgb, var(--lj-warning) 35%, var(--lj-surface));
 }
 
 .produccion-lote-sin-traz-badge {
@@ -214,10 +214,10 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   gap: 4px;
   padding: 2px 8px;
   margin-left: 6px;
-  border-radius: 999px;
-  background: #fff3d4;
-  color: #8a5d00;
-  border: 1px solid #f0c87a;
+  border-radius: 4px;
+  background: var(--lj-warning-soft);
+  color: var(--lj-warning);
+  border: 1px solid var(--lj-warning);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.01em;
@@ -225,7 +225,7 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 
 .produccion-lote-sin-traz-badge i {
   font-size: 0.7rem;
-  color: #d39c2b;
+  color: var(--lj-warning);
 }
 
 .produccion-lote-sin-traz-note {
@@ -234,30 +234,30 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   gap: 6px;
   padding: 6px 10px;
   margin: 4px 0;
-  background: #fff8e6;
-  border: 1px solid #f0d692;
-  border-radius: 8px;
+  background: var(--lj-warning-soft);
+  border: 1px solid color-mix(in srgb, var(--lj-warning) 35%, var(--lj-surface));
+  border-radius: var(--lj-radius-lg);
   font-size: 0.78rem;
-  color: #6b4f16;
+  color: var(--lj-warning);
   flex-wrap: wrap;
 }
 
 .produccion-lote-sin-traz-note i {
-  color: #d39c2b;
+  color: var(--lj-warning);
 }
 
 .produccion-lote-sin-traz-note strong {
-  color: #8a5d00;
+  color: var(--lj-warning);
   font-weight: 700;
 }
 
 .produccion-lote-undo-skip {
   margin-left: 6px;
   padding: 2px 8px;
-  background: #ffffff;
-  border: 1px solid #d39c2b;
-  border-radius: 999px;
-  color: #8a5d00;
+  background: var(--lj-surface);
+  border: 1px solid var(--lj-warning);
+  border-radius: 4px;
+  color: var(--lj-warning);
   font-size: 0.7rem;
   font-weight: 700;
   cursor: pointer;
@@ -268,7 +268,7 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 }
 
 .produccion-lote-undo-skip:hover:not(:disabled) {
-  background: #fff3d4;
+  background: var(--lj-warning-soft);
 }
 
 .produccion-lote-undo-skip:disabled {
@@ -283,11 +283,10 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   justify-content: center;
 }
 
-.produccion-blocked-alert .swal2-actions .ios-btn {
+.produccion-blocked-alert .swal2-actions sl-button {
   flex: 0 1 auto;
   min-width: 140px;
   white-space: nowrap;
-  padding: 10px 16px;
 }
 
 .produccion-resolve-qty-wrap {
@@ -308,10 +307,10 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 .inventario-trace-avatar {
   width: 24px;
   height: 24px;
-  border-radius: 999px;
+  border-radius: 50%;
   overflow: hidden;
-  border: 1px solid #d6deef;
-  background: #eef2fd;
+  border: 1px solid var(--lj-border);
+  background: var(--lj-surface-2);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -325,13 +324,12 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 }
 
 .inventario-trace-avatar .thumb-loading .meta-spinner-login {
-  width: 16px;
-  height: 16px;
+  font-size: 16px;
 }
 
 .inventario-trace-label {
   font-weight: 700;
-  color: #465a88;
+  color: var(--lj-accent);
 }
 
 .inventario-trace-relation {
@@ -341,38 +339,38 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   margin-left: 6px;
   font-size: 0.72rem;
   font-weight: 700;
-  color: #7c57cc;
+  color: var(--lj-accent);
   vertical-align: middle;
 }
 
 .inventario-trace-icon {
   width: 18px;
   height: 18px;
-  color: #5b7ec8;
+  color: var(--lj-accent);
   flex-shrink: 0;
 }
 
 .inventario-trace-kilos {
-  color: #d31233 !important;
+  color: var(--lj-danger) !important;
   font-weight: 800;
 }
 
 .inventario-available-line.is-zero {
-  color: #cc3f52;
+  color: var(--lj-danger);
   text-decoration: line-through;
 }
 
 .produccion-visualizar-btn {
-  background: #edf3ff;
-  color: #2a4ea3;
+  background: var(--lj-accent-soft);
+  color: var(--lj-accent);
   width: fit-content;
 }
 
 .produccion-recipe-history {
-  border: 1px solid #d8e2f7;
-  border-radius: 14px;
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius-lg);
   padding: 10px;
-  background: #fbfdff;
+  background: var(--lj-surface);
 }
 
 /* =========================================
@@ -390,53 +388,32 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 .produccion-visualizar-btn {
   width: fit-content;
   max-width: none;
-  min-height: 40px;
 }
 
 .produccion-umbral-btn {
   width: fit-content;
   max-width: none;
   min-height: 40px;
-  border-radius: 16px;
-  border: 1px solid #dcdcdc;
-  background: #ececef;
-  color: #4d4f57;
+  border-radius: var(--lj-radius-lg);
+  border: 1px solid var(--lj-border);
+  background: var(--lj-surface-2);
+  color: var(--lj-text);
   font-size: 16px;
   font-weight: 700;
   padding: 8px 14px;
 }
 
 .produccion-umbral-btn i {
-  color: #666a73;
+  color: var(--lj-muted);
 }
 
 .produccion-umbral-btn:hover {
-  background: #e2e3e8;
-  color: #3f424a;
+  background: var(--lj-surface-2);
+  color: var(--lj-text);
 }
 
 .produccion-actions-row .inventory-production-action-btn.is-threshold {
-  min-height: 38px;
-  border-radius: 14px;
-  font-size: 0.88rem;
-  font-weight: 700;
-  padding: 8px 14px;
-  background: #eceef3;
-  color: #555c68;
-  border: 1px solid #d6d8de;
-}
-
-.produccion-actions-row .inventory-production-action-btn.is-threshold i {
-  color: inherit;
-}
-
-.produccion-actions-row .inventory-production-action-btn.is-threshold:hover {
-  background: #dee4f0;
-  color: #434f6a;
-}
-
-.swal2-popup.ios-alert.produccion-umbral-alert {
-  max-width: 520px;
+  width: fit-content;
 }
 
 .produccion-umbral-alert .swal2-html-container {
@@ -447,8 +424,11 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   justify-content: center;
 }
 
-.produccion-umbral-alert .swal2-input.ios-input {
+.produccion-umbral-alert sl-input.swal2-input {
   margin-inline: auto;
+}
+
+.produccion-umbral-alert sl-input.swal2-input::part(input) {
   text-align: center;
 }
 
@@ -460,14 +440,14 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 .produccion-company-logo-preview {
   width: 120px;
   height: 120px;
-  border-radius: 999px;
-  border: 1px solid #d6def3;
-  background: #eef3ff;
+  border-radius: 50%;
+  border: 1px solid var(--lj-border);
+  background: var(--lj-accent-soft);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  color: #6280bf;
+  color: var(--lj-accent);
   font-size: 1.8rem;
 }
 
@@ -486,16 +466,15 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 }
 
 .produccion-company-logo-spinner {
-  width: 42px;
-  height: 42px;
+  font-size: 42px;
 }
 
 .viewer-document {
   width: 100%;
   min-height: 72vh;
   border: 0;
-  border-radius: 12px;
-  background: #fff;
+  border-radius: var(--lj-radius-lg);
+  background: var(--lj-surface);
 }
 
 .produccion-config-form {
@@ -503,11 +482,21 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 }
 
 .produccion-config-section {
-  background: linear-gradient(180deg, #f9fbff 0%, #f3f7ff 100%);
+  background: var(--lj-surface);
+  padding: 0;
+  overflow: hidden;
 }
 
-.produccion-config-toggle {
-  border: 1px solid #ced8f1;
+.produccion-config-section > .produccion-config-toggle {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.produccion-config-section > .step-content {
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--lj-border);
 }
 
 .swal2-popup.produccion-umbral-alert .inventario-collapse-head-styled {
@@ -546,9 +535,9 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 .produccion-rne-upload-loading {
   width: 48px;
   height: 48px;
-  border-radius: 12px;
-  border: 1px solid #d7e2fb;
-  background: #f5f8ff;
+  border-radius: var(--lj-radius-lg);
+  border: 1px solid var(--lj-border);
+  background: var(--lj-surface);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -556,7 +545,7 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 
 .produccion-rne-history-wrap {
   margin-top: 12px;
-  border-top: 1px dashed #c9d7f5;
+  border-top: 1px dashed var(--lj-border);
   padding-top: 10px;
 }
 
@@ -572,10 +561,10 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   justify-content: space-between;
   gap: 10px;
   align-items: flex-start;
-  border: 1px solid #dbe4fa;
-  border-radius: 12px;
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius-lg);
   padding: 10px;
-  background: #fff;
+  background: var(--lj-surface);
   margin-bottom: 8px;
 }
 
@@ -587,32 +576,32 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 .produccion-rne-history-item p {
   margin: 0;
   font-size: 0.84rem;
-  color: #455a8a;
+  color: var(--lj-accent);
 }
 
 .produccion-rne-history-empty {
-  color: #6f7f9f;
+  color: var(--lj-accent);
   margin: 0;
 }
 
 .produccion-trace-alert {
-  background: #f9fbff;
+  background: var(--lj-surface);
 }
 
 .swal2-popup.produccion-trace-alert .swal2-html-container {
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: visible !important;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
   text-align: left;
 }
 
 .produccion-trace-apple-viewer {
-  border: 1px solid #dfe6f8;
-  border-radius: 16px;
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius-lg);
   padding: 12px;
-  background-image: radial-gradient(circle at 1px 1px, rgba(117, 136, 180, 0.16) 1px, transparent 0);
+  background-image: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--lj-muted) 22%, transparent) 1px, transparent 0);
   background-size: 18px 18px;
-  background-color: #f5f8ff;
+  background-color: var(--lj-surface);
 }
 
 .produccion-trace-ingredient-avatar {
@@ -621,14 +610,14 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
   min-width: 42px;
   min-height: 42px;
   flex: 0 0 42px;
-  border-radius: 999px;
+  border-radius: 50%;
   overflow: hidden;
-  border: 1px solid #d2dcf2;
-  background: #eef3ff;
+  border: 1px solid var(--lj-border);
+  background: var(--lj-accent-soft);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #4c69a5;
+  color: var(--lj-accent);
 }
 
 .produccion-trace-ingredient-avatar img {

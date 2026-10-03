@@ -10,7 +10,7 @@
 .produccion-card-v2 .ingrediente-avatar {
   width: 64px;
   height: 64px;
-  border-radius: 999px;
+  border-radius: 50%;
 }
 
 .produccion-card-v2 .ingrediente-avatar img,
@@ -33,7 +33,7 @@
   align-items: start;
   gap: 8px 12px;
   padding-bottom: 6px;
-  border-bottom: 1px solid rgba(31, 63, 130, 0.08);
+  border-bottom: 1px solid var(--lj-border);
 }
 
 .produccion-card-v2 .produccion-card-titles {
@@ -81,7 +81,7 @@
   gap: 4px;
   margin: 0;
   padding: 6px 0 0;
-  border-top: 1px dashed rgba(31, 63, 130, 0.10);
+  border-top: 1px dashed var(--lj-border);
 }
 
 .produccion-card-v2 .produccion-zone:first-of-type {
@@ -98,26 +98,26 @@
   font-weight: 800;
   letter-spacing: .06em;
   text-transform: uppercase;
-  color: #4f6aa3;
+  color: var(--lj-accent);
 }
 
 .produccion-card-v2 .produccion-zone-title > i {
   font-size: 0.85rem;
-  color: #6c84b6;
+  color: var(--lj-accent);
 }
 
 .produccion-card-v2 .produccion-zone-link {
   font-size: 0.78rem;
   font-weight: 700;
   text-decoration: none;
-  color: #4f6aa3;
+  color: var(--lj-accent);
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
 .produccion-card-v2 .produccion-zone-link:hover {
-  color: #2a3556;
+  color: var(--lj-brand);
   text-decoration: underline;
 }
 
@@ -140,9 +140,9 @@
   flex-direction: column;
   gap: 4px;
   padding: 8px 10px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(232, 240, 255, 0.6) 100%);
-  border: 1px solid rgba(31, 63, 130, 0.10);
+  border-radius: var(--lj-radius-lg);
+  background: var(--lj-surface-2);
+  border: 1px solid var(--lj-border);
 }
 
 .produccion-card-v2 .produccion-hero-main > small {
@@ -150,7 +150,7 @@
   font-weight: 800;
   letter-spacing: .06em;
   text-transform: uppercase;
-  color: #5b6d95;
+  color: var(--lj-accent);
 }
 
 .produccion-card-v2 .produccion-hero-value {
@@ -158,7 +158,7 @@
   font-size: 1.85rem;
   line-height: 1;
   font-weight: 700;
-  color: #1f3f82;
+  color: var(--lj-brand);
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   margin: 2px 0;
@@ -177,7 +177,7 @@
 .produccion-card-v2 .produccion-hero-value span {
   font-size: 0.95rem;
   font-weight: 600;
-  color: #4f6aa3;
+  color: var(--lj-accent);
   margin-left: 3px;
 }
 
@@ -186,7 +186,7 @@
 }
 
 .produccion-card-v2 .produccion-hero-value.produccion-max-expired-only {
-  color: #b06c08;
+  color: var(--lj-warning);
 }
 
 .produccion-card-v2 .produccion-hero-main .produccion-max-values {
@@ -218,9 +218,9 @@
 
 .produccion-card-v2 .produccion-stat-mini {
   padding: 6px 8px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(31, 63, 130, 0.08);
+  border-radius: var(--lj-radius-lg);
+  background: var(--lj-surface);
+  border: 1px solid var(--lj-border);
   gap: 1px;
 }
 
@@ -237,15 +237,15 @@
 .produccion-card-v2 .produccion-stat-mini-last strong {
   font-size: 0.8rem;
   font-weight: 700;
-  color: #2a3556;
+  color: var(--lj-brand);
 }
 
 .produccion-stock-lot-status {
-  border: 1px solid #cbd7ef;
+  border: 1px solid var(--lj-border);
   border-radius: 4px;
   padding: 1px 5px;
-  background: #eef3ff;
-  color: #38558f;
+  background: var(--lj-accent-soft);
+  color: var(--lj-accent);
   font-weight: 800;
   white-space: nowrap;
 }
@@ -255,7 +255,7 @@
   align-self: flex-start;
   border: 0;
   background: transparent;
-  color: #2d5aa0;
+  color: var(--lj-accent);
   font-size: 0.68rem;
   font-weight: 800;
   padding: 0;
@@ -269,7 +269,7 @@
 
 .produccion-stock-alert-total {
   margin: 0 0 10px;
-  color: #516897;
+  color: var(--lj-accent);
   font-weight: 800;
 }
 
@@ -279,33 +279,33 @@
 }
 
 .produccion-stock-alert td small {
-  color: #6b7ea8;
+  color: var(--lj-accent);
   font-size: 0.72rem;
 }
 
 .produccion-stock-lot-status.is-success {
-  border-color: #a7e2bd;
-  background: #eafaf0;
-  color: #168044;
+  border-color: color-mix(in srgb, var(--lj-success) 35%, var(--lj-surface));
+  background: var(--lj-success-soft);
+  color: var(--lj-success);
 }
 
 .produccion-stock-lot-status.is-warning {
-  border-color: #ffd7a4;
-  background: #fff4e4;
-  color: #b26b08;
+  border-color: color-mix(in srgb, var(--lj-warning) 35%, var(--lj-surface));
+  background: var(--lj-warning-soft);
+  color: var(--lj-warning);
 }
 
 .produccion-stock-lot-status.is-danger {
-  border-color: #f2b7c4;
-  background: #ffecef;
-  color: #be2f48;
+  border-color: color-mix(in srgb, var(--lj-danger) 35%, var(--lj-surface));
+  background: var(--lj-danger-soft);
+  color: var(--lj-danger);
 }
 
 /* Tone informativo azul: "Vence en N días" para lotes con > 7 días restantes. */
 .produccion-stock-lot-status.is-info {
-  border-color: #b6d8ff;
-  background: #e7f1ff;
-  color: #2c6fb0;
+  border-color: var(--lj-border-strong);
+  background: var(--lj-accent-soft);
+  color: var(--lj-accent);
 }
 
 /* Resumen del modal "Stock de ...": 2 pills lado a lado con Total producido /
@@ -322,15 +322,15 @@
   flex-direction: column;
   gap: 1px;
   padding: 8px 14px;
-  border-radius: 12px;
-  border: 1px solid #d6e1ef;
-  background: #f3f6fb;
+  border-radius: var(--lj-radius-lg);
+  border: 1px solid var(--lj-border);
+  background: var(--lj-surface-2);
   min-width: 140px;
 }
 
 .produccion-stock-alert-pill small {
   font-size: 0.7rem;
-  color: #6b7689;
+  color: var(--lj-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-weight: 600;
@@ -339,35 +339,35 @@
 .produccion-stock-alert-pill strong {
   font-size: 1.1rem;
   font-weight: 800;
-  color: #173d73;
+  color: var(--lj-brand);
   letter-spacing: -0.01em;
 }
 
 .produccion-stock-alert-pill.is-produced {
-  background: #f3ecff;
-  border-color: #ddd5ee;
+  background: var(--lj-accent-soft);
+  border-color: var(--lj-border);
 }
 
 .produccion-stock-alert-pill.is-produced strong {
-  color: #5e3fa4;
+  color: var(--lj-accent);
 }
 
 .produccion-stock-alert-pill.is-available {
-  background: #e9f7ef;
-  border-color: #c4e7d2;
+  background: var(--lj-surface-2);
+  border-color: color-mix(in srgb, var(--lj-success) 35%, var(--lj-surface));
 }
 
 .produccion-stock-alert-pill.is-available strong {
-  color: #1f6b4f;
+  color: var(--lj-success);
 }
 
 .produccion-stock-qty-cell strong {
   font-weight: 800;
-  color: #173d73;
+  color: var(--lj-brand);
 }
 
 .produccion-stock-qty-cell.is-available strong {
-  color: #1f6b4f;
+  color: var(--lj-success);
 }
 
 /* Botón-link para el código de producción en el modal "Stock de [producto]".
@@ -382,12 +382,12 @@
   display: inline-flex;
   flex-direction: column;
   gap: 1px;
-  color: #2c6fb0;
+  color: var(--lj-accent);
   transition: color 0.15s ease;
 }
 
 .produccion-stock-id-link:hover {
-  color: #173d73;
+  color: var(--lj-brand);
   text-decoration: underline;
 }
 
@@ -399,17 +399,17 @@
 
 .produccion-stock-id-link small {
   font-size: 0.72rem;
-  color: #6b7689;
+  color: var(--lj-muted);
   font-weight: 500;
 }
 
 /* --- Ingredientes colapsable --- */
 .produccion-card-v2 .produccion-zone-ingredientes {
-  background: rgba(255, 255, 255, 0.5);
-  border-radius: 10px;
-  border: 1px solid rgba(31, 63, 130, 0.08);
+  background: var(--lj-surface-2);
+  border-radius: var(--lj-radius-lg);
+  border: 1px solid var(--lj-border);
   padding: 4px 10px;
-  border-top: 1px solid rgba(31, 63, 130, 0.08);
+  border-top: 1px solid var(--lj-border);
 }
 
 .produccion-card-v2 .produccion-zone-toggle {
@@ -421,7 +421,7 @@
   border: none;
   background: none;
   padding: 2px 0;
-  color: #4f6aa3;
+  color: var(--lj-accent);
   cursor: pointer;
   text-align: left;
 }
@@ -447,24 +447,24 @@
   letter-spacing: 0;
   text-transform: none;
   padding: 2px 9px;
-  border-radius: 999px;
-  background: rgba(56, 85, 143, 0.10);
-  color: #38558f;
+  border-radius: 4px;
+  background: var(--lj-surface-2);
+  color: var(--lj-accent);
 }
 
 .produccion-card-v2 .produccion-zone-count.is-ok {
-  background: rgba(20, 141, 68, 0.12);
-  color: #148d44;
+  background: var(--lj-success-soft);
+  color: var(--lj-success);
 }
 
 .produccion-card-v2 .produccion-zone-count.is-warn {
-  background: rgba(176, 108, 8, 0.14);
-  color: #b06c08;
+  background: var(--lj-warning-soft);
+  color: var(--lj-warning);
 }
 
 .produccion-card-v2 .produccion-zone-toggle-icon {
   font-size: 0.82rem;
-  color: #6c84b6;
+  color: var(--lj-accent);
   transition: transform .18s ease;
 }
 
@@ -475,7 +475,7 @@
 .produccion-card-v2 .produccion-zone-summary {
   margin: 0;
   font-size: 0.8rem;
-  color: #b06c08;
+  color: var(--lj-warning);
   font-weight: 600;
 }
 
@@ -501,11 +501,11 @@
 
 /* --- Alertas --- */
 .produccion-card-v2 .produccion-zone-alertas {
-  background: rgba(255, 244, 228, 0.55);
-  border-radius: 10px;
-  border: 1px solid rgba(176, 108, 8, 0.18);
+  background: var(--lj-warning-soft);
+  border-radius: var(--lj-radius-lg);
+  border: 1px solid color-mix(in srgb, var(--lj-warning) 30%, var(--lj-surface));
   padding: 4px 10px;
-  border-top: 1px solid rgba(176, 108, 8, 0.18);
+  border-top: 1px solid color-mix(in srgb, var(--lj-warning) 30%, var(--lj-surface));
 }
 
 .produccion-card-v2 .produccion-zone-alertas .produccion-badges {
@@ -515,17 +515,17 @@
 .produccion-card-v2 .produccion-alert-line {
   margin: 0;
   font-size: 0.8rem;
-  color: #60739f;
+  color: var(--lj-accent);
 }
 
 .produccion-card-v2 .produccion-alert-line.is-expired {
-  color: #b42338;
+  color: var(--lj-danger);
   font-weight: 700;
 }
 
 .produccion-card-v2 .produccion-alert-line.is-expired i,
 .produccion-card-v2 .produccion-alert-line.is-expired strong {
-  color: #b42338;
+  color: var(--lj-danger);
 }
 
 /* --- Acciones --- */
@@ -549,7 +549,7 @@
   .produccion-card-v2 .ingrediente-avatar {
     width: 68px;
     height: 68px;
-    border-radius: 999px;
+    border-radius: 50%;
   }
 }
 

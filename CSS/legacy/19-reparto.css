@@ -14,21 +14,21 @@
 .dispatch-xlsx-multiplier-help {
   display: block;
   margin-top: 6px;
-  color: #5e6f97;
+  color: var(--lj-accent);
   font-size: 0.78rem;
 }
 
 .dispatch-xlsx-row-disabled td {
   opacity: 0.55;
-  background: #f4f6fb !important;
+  background: var(--lj-surface) !important;
 }
 
 .dispatch-xlsx-row-related td {
-  background: #eefaf2 !important;
+  background: var(--lj-surface-2) !important;
 }
 
 .dispatch-xlsx-row-pending td {
-  background: #fff1f3 !important;
+  background: var(--lj-surface) !important;
 }
 
 .dispatch-xlsx-toggle {
@@ -37,11 +37,13 @@
   gap: 6px;
   font-size: 0.82rem;
   font-weight: 700;
-  color: #3a4f79;
+  color: var(--lj-accent);
 }
 
-.dispatch-xlsx-toggle input {
-  accent-color: #2f7ef1;
+sl-switch.dispatch-xlsx-toggle::part(label) {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--lj-accent);
 }
 
 
@@ -65,7 +67,7 @@
 .dispatch-xlsx-type-divider {
   width: 1px;
   height: 30px;
-  background: #d2dbef;
+  background: var(--lj-accent-soft);
   margin: 0 4px;
 }
 
@@ -86,12 +88,12 @@
 }
 
 .dispatch-xlsx-stock-hint.is-ok {
-  color: #1a7f4d !important;
+  color: var(--lj-success) !important;
   font-weight: 700;
 }
 
 .dispatch-xlsx-stock-hint.is-danger {
-  color: #b23d4d !important;
+  color: var(--lj-danger) !important;
   font-weight: 700;
 }
 
@@ -108,7 +110,7 @@
 }
 
 .dispatch-xlsx-ingredient-qty-label {
-  color: #3f517d;
+  color: var(--lj-accent);
   font-size: 0.88rem;
   font-weight: 700;
 }
@@ -127,7 +129,7 @@
   align-items: center;
   gap: 6px;
   font-weight: 700;
-  color: #2e5aac;
+  color: var(--lj-accent);
 }
 
 .dispatch-xlsx-client-badge {
@@ -147,27 +149,27 @@
   width: fit-content;
   white-space: nowrap;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 4px;
   font-size: 0.72rem;
   font-weight: 700;
 }
 
 .dispatch-xlsx-map-state.is-related {
-  background: #ebf9f1;
-  color: #1a7f4d;
-  border: 1px solid #bfe7cf;
+  background: var(--lj-surface-2);
+  color: var(--lj-success);
+  border: 1px solid color-mix(in srgb, var(--lj-success) 35%, var(--lj-surface));
 }
 
 .dispatch-xlsx-map-state.is-pending {
-  background: #fff1f3;
-  color: #b23d4d;
-  border: 1px solid #f0c3c9;
+  background: var(--lj-surface);
+  color: var(--lj-danger);
+  border: 1px solid color-mix(in srgb, var(--lj-danger) 35%, var(--lj-surface));
 }
 
 #dispatchXlsxProcessBtn:disabled {
-  background-color: #e5e5e5 !important;
-  border-color: #d7d7d7 !important;
-  color: #6f6f6f !important;
+  background-color: var(--lj-surface-2) !important;
+  border-color: var(--lj-border-strong) !important;
+  color: var(--lj-muted) !important;
 }
 
 .dispatch-xlsx-history-filters {
@@ -184,16 +186,16 @@
 }
 
 #dispatchXlsxMapQty.swal2-input {
-  margin: 8px 0 0 !important;
-  width: 100% !important;
+  margin: 8px 0 0;
+  width: 100%;
 }
 
 .dispatch-xlsx-selector-row .inventario-print-photo-wrap {
   width: 42px;
   height: 42px;
-  border-radius: 999px;
+  border-radius: 50%;
   overflow: hidden;
-  border: 1px solid #d7def2;
+  border: 1px solid var(--lj-border);
   flex: 0 0 42px;
 }
 
@@ -215,7 +217,7 @@
   }
 }
 
-.dispatch-xlsx-type-actions .ios-btn {
+.dispatch-xlsx-type-actions sl-button {
   width: auto;
   max-width: none;
   white-space: nowrap;
@@ -234,11 +236,11 @@
   width: fit-content;
   white-space: normal;
   max-width: 100%;
-  color: #3b4f79;
+  color: var(--lj-accent);
 }
 
 .dispatch-xlsx-map-link.is-unmapped {
-  color: #b23d4d;
+  color: var(--lj-danger);
 }
 
 
@@ -247,26 +249,26 @@
 }
 
 .dispatch-xlsx-mapped-kg.is-ok {
-  color: #1a7f4d;
+  color: var(--lj-success);
 }
 
 .dispatch-xlsx-mapped-kg.is-danger {
-  color: #b23d4d;
+  color: var(--lj-danger);
 }
 
 .dispatch-xlsx-mapped-kg.is-warning {
-  color: #b26a1f;
+  color: var(--lj-warning);
 }
 
 .dispatch-xlsx-kilos-cell small.is-ok,
 .dispatch-xlsx-kilos-cell small.is-ok strong {
-  color: #1a7f4d !important;
+  color: var(--lj-success) !important;
   font-weight: 700;
 }
 
 .dispatch-xlsx-kilos-cell small.is-danger,
 .dispatch-xlsx-kilos-cell small.is-danger strong {
-  color: #b23d4d !important;
+  color: var(--lj-danger) !important;
   font-weight: 700;
 }
 
@@ -281,10 +283,6 @@
 
 .dispatch-xlsx-history-delete {
   display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  line-height: 1.05;
 }
 
 
@@ -294,9 +292,9 @@
   display: grid;
   gap: 3px;
   padding: 8px 10px;
-  border: 1px solid #dbe3f7;
-  border-radius: 12px;
-  background: #f7f9ff;
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius-lg);
+  background: var(--lj-surface);
 }
 
 .dispatch-xlsx-ingredient-line {
@@ -306,17 +304,17 @@
 
 .dispatch-xlsx-ingredient-line.is-ok,
 .dispatch-xlsx-ingredient-line.is-ok strong {
-  color: #1a7f4d;
+  color: var(--lj-success);
 }
 
 .dispatch-xlsx-ingredient-line.is-danger,
 .dispatch-xlsx-ingredient-line.is-danger strong {
-  color: #b23d4d;
+  color: var(--lj-danger);
 }
 
 .dispatch-xlsx-ingredient-line.is-warning,
 .dispatch-xlsx-ingredient-line.is-warning strong {
-  color: #b26a1f;
+  color: var(--lj-warning);
 }
 
 .dispatch-xlsx-ingredient-item {
@@ -338,18 +336,18 @@
 }
 
 .dispatch-xlsx-stock-ok {
-  color: #1a7f4d;
+  color: var(--lj-success);
 }
 
 .dispatch-xlsx-stock-expired,
 .dispatch-xlsx-expired-part {
-  color: #b23d4d;
+  color: var(--lj-danger);
   font-weight: 700;
 }
 
 .dispatch-xlsx-stock-future,
 .dispatch-date-hint {
-  color: #9a5f1b;
+  color: var(--lj-warning);
   font-weight: 700;
 }
 
@@ -360,26 +358,26 @@
 }
 
 .dispatch-date-hint.is-expired {
-  color: #b23d4d;
+  color: var(--lj-danger);
 }
 
 .dispatch-stock-muted {
   display: block;
-  color: #6f7b98;
+  color: var(--lj-muted);
   font-size: 0.78rem;
   font-weight: 700;
   margin-top: 3px;
 }
 
 .dispatch-date-block-row td {
-  background: #fff8ed !important;
-  color: #7c4a12;
+  background: var(--lj-warning-soft) !important;
+  color: var(--lj-warning);
 }
 
 .dispatch-xlsx-date-alert-row td {
   padding: 0 !important;
   border-top: 0 !important;
-  background: #fff8e8 !important;
+  background: var(--lj-warning-soft) !important;
 }
 
 .dispatch-xlsx-date-alert {
@@ -388,7 +386,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 10px 14px;
-  color: #8a5416;
+  color: var(--lj-warning);
 }
 
 .dispatch-xlsx-date-alert-copy {
@@ -401,7 +399,7 @@
 
 .dispatch-xlsx-date-alert-copy i {
   margin-top: 2px;
-  color: #b8741b;
+  color: var(--lj-warning);
 }
 
 .dispatch-xlsx-date-alert-copy strong,
@@ -416,8 +414,6 @@
 
 .dispatch-xlsx-date-input {
   min-width: 132px;
-  height: 34px;
-  padding: 6px 8px;
 }
 
 .dispatch-xlsx-date-cell small {
@@ -429,27 +425,20 @@
 }
 
 .dispatch-xlsx-stock-missing {
-  color: #6f7b98;
+  color: var(--lj-muted);
   font-weight: 600;
 }
 
 
 .dispatch-xlsx-stock-create {
-  color: #6f7b98;
+  color: var(--lj-muted);
   font-weight: 600;
 }
 
 .dispatch-xlsx-conflict-btn {
   margin-left: 8px;
-  padding: 2px 8px;
-  min-height: 28px;
   width: 170px;
   min-width: 170px;
-  border-radius: 10px;
-  font-size: 0.72rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   white-space: nowrap;
 }
 
@@ -457,21 +446,21 @@
   display: inline-flex;
   align-items: center;
   padding: 1px 7px;
-  border-radius: 999px;
+  border-radius: 4px;
   font-size: 0.68rem;
   font-weight: 700;
   margin-left: 6px;
 }
 
 .dispatch-xlsx-conflict-badge.is-sold {
-  color: #1a7f4d;
-  background: #e9f8f0;
-  border: 1px solid #bfe7cf;
+  color: var(--lj-success);
+  background: var(--lj-surface-2);
+  border: 1px solid color-mix(in srgb, var(--lj-success) 35%, var(--lj-surface));
 }
 
 .dispatch-xlsx-conflict-badge.is-decommissioned {
-  color: #b23d4d;
-  background: #fff1f3;
-  border: 1px solid #f0c3c9;
+  color: var(--lj-danger);
+  background: var(--lj-surface);
+  border: 1px solid color-mix(in srgb, var(--lj-danger) 35%, var(--lj-surface));
 }
 

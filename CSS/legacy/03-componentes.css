@@ -329,3 +329,8 @@ sl-dialog.lj-alert-dialog:has(.planilla-facturas-alert) {
     width: 78px;
   }
 }
+
+/* En toolbars en columna el flex-basis de 260px se volvía alto: el buscador ocupa el ancho, no el alto. */
+@media (max-width: 991px) {
+  .ingredientes-toolbar .ingredientes-search-group { flex: 0 0 auto; width: 100%; }
+}

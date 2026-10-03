@@ -157,3 +157,6 @@ sl-menu-item > i, sl-menu-item > sl-icon, sl-menu-item > img { width: 16px; marg
 sl-menu-item::part(label) { display: inline-flex; align-items: center; font-size: 13px; }
 sl-menu-item[variant="danger"]::part(base), sl-menu-item.is-danger::part(base), sl-menu-item.is-danger > i { color: var(--lj-danger); }
 sl-menu-item::part(checked-icon) { width: 8px; }
+
+/* Inputs nativos deshabilitados (flatpickr, datalist) con el mismo aspecto que sl-input disabled. */
+.lj-input:disabled { opacity: .6; cursor: not-allowed; background: var(--lj-surface-2); }
