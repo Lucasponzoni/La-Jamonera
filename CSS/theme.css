@@ -4,14 +4,14 @@
   --lj-success: #1f7a4c; --lj-success-soft: #e3f5ec; --lj-warning: #9a6200; --lj-warning-soft: #fff3dd;
   --lj-danger: #b42338; --lj-danger-soft: #ffecef; --lj-overlay: rgba(23, 34, 58, .35); --lj-shadow: 0 1px 2px rgba(23, 34, 58, .06);
   --lj-radius: 5px; --lj-radius-lg: 6px;
-  --lj-bg-tint: #e9effb; --lj-bg-dot: rgba(23, 61, 115, .07);
+  --lj-bg-tint: #e9effb; --lj-bg-dot: rgba(23, 61, 115, .18);
 }
 .sl-theme-dark {
   --lj-bg: #0f1522; --lj-surface: #161e2e; --lj-surface-2: #1c2638; --lj-border: #26324a; --lj-border-strong: #334262;
   --lj-text: #e3e9f5; --lj-muted: #93a0bb; --lj-brand: #cddcff; --lj-accent: #6ea0ff; --lj-accent-soft: #16233d;
   --lj-success: #5fd39a; --lj-success-soft: #12301f; --lj-warning: #f2b75a; --lj-warning-soft: #33260f;
   --lj-danger: #ff8a9a; --lj-danger-soft: #3a1820; --lj-overlay: rgba(0, 0, 0, .55); --lj-shadow: none;
-  --lj-bg-tint: #131c2d; --lj-bg-dot: rgba(205, 220, 255, .05);
+  --lj-bg-tint: #131c2d; --lj-bg-dot: rgba(205, 220, 255, .11);
 }
 :root {
   --sl-font-sans: Inter, "Segoe UI", Arial, sans-serif;

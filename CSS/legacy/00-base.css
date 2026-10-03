@@ -24,11 +24,12 @@ body {
   color: var(--lj-text);
   /* Fondo: tinte suave arriba + grilla de puntos muy sutil (plano, sin manchas de color). */
   background-color: var(--lj-bg);
+  /* Los puntos van primero (capa superior): el degradado es opaco y los tapaba. */
   background-image:
-    linear-gradient(180deg, var(--lj-bg-tint) 0, var(--lj-bg) 420px),
-    radial-gradient(var(--lj-bg-dot) 1px, transparent 1.2px);
-  background-size: 100% 100%, 18px 18px;
-  background-repeat: no-repeat, repeat;
+    radial-gradient(circle, var(--lj-bg-dot) 1.1px, transparent 1.6px),
+    linear-gradient(180deg, var(--lj-bg-tint) 0, var(--lj-bg) 420px);
+  background-size: 16px 16px, 100% 100%;
+  background-repeat: repeat, no-repeat;
   background-attachment: fixed, fixed;
 }
 
@@ -125,15 +126,31 @@ a { color: var(--lj-accent); }
 
 .topbar-brand-logo {
   width: 40px;
-  height: 40px;
-  object-fit: contain;
+  height: auto;
+  object-fit: cover;
+}
+
+.topbar-brand-text,
+.lj-footer-title {
+  font-family: 'Viga', 'Inter', sans-serif;
+  font-weight: 400;
+  font-synthesis: none;
+  letter-spacing: 0;
+  line-height: 1;
+  color: var(--lj-brand);
+  white-space: nowrap;
+}
+
+/* Viga tiene un solo peso: sin negrita sintética (se veía deformada). */
+.topbar-brand-text .brand-light,
+.topbar-brand-text .brand-bold,
+.lj-footer-title .brand-light,
+.lj-footer-title .brand-bold {
+  font-weight: 400;
 }
 
 .topbar-brand-text {
-  font-family: 'Viga', sans-serif;
   font-size: 1.3rem;
-  line-height: 1;
-  color: var(--lj-brand);
 }
 
 .lj-header-nav {
@@ -402,16 +419,13 @@ a { color: var(--lj-accent); }
 
 .lj-footer-logo {
   width: 44px;
-  height: 44px;
+  height: auto;
   object-fit: contain;
 }
 
 .lj-footer-title {
   margin: 0;
-  font-family: 'Viga', sans-serif;
   font-size: 1.2rem;
-  line-height: 1.1;
-  color: var(--lj-brand);
 }
 
 .lj-footer-subtitle {

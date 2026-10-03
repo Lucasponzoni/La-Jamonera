@@ -69,6 +69,7 @@
     reportsLoaded: false,
     reopenViewerReportId: '',
     notifySpecificUserIds: [],
+    search: '',
     emailPrefs: {}
   };
 
@@ -705,6 +706,8 @@
 
   const renderUsers = () => {
     const users = Object.values(state.users).sort((a, b) => String(a.fullName).localeCompare(String(b.fullName)));
+    const usersSummary = document.getElementById('informesUsersSummary');
+    if (usersSummary) usersSummary.textContent = `${users.length} ${users.length === 1 ? 'usuario' : 'usuarios'}`;
 
     if (!users.length) {
       informesUsersList.innerHTML = '<div class="informes-empty">No hay usuarios cargados.</div>';
@@ -723,8 +726,8 @@
           </div>
         </article>
         <div class="informe-user-actions">
-          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" type="button" data-user-edit="${user.id}" title="Editar usuario"><i class="fa-solid fa-pen"></i></sl-button>
-          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" type="button" data-user-delete="${user.id}" title="Eliminar usuario"><i class="fa-solid fa-trash"></i></sl-button>
+          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" type="button" data-user-edit="${user.id}" title="Editar usuario" aria-label="Editar usuario"><i class="fa-solid fa-pen"></i></sl-button>
+          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" type="button" data-user-delete="${user.id}" title="Eliminar usuario" aria-label="Eliminar usuario"><i class="fa-solid fa-trash"></i></sl-button>
         </div>
       </div>
     `).join('');
@@ -1118,9 +1121,9 @@
       .map((p) => `<sl-button size="small" variant="${p === cur ? 'primary' : 'default'}" class="informes-page-btn" data-page="${p}">${p}</sl-button>`)
       .join('');
     informesPagination.innerHTML = `<nav class="informes-page-nav" aria-label="Paginación de informes">
-      <sl-button size="small" variant="default" class="informes-page-btn" data-page="${Math.max(1, cur - 1)}"${cur === 1 ? ' disabled' : ''}>‹</sl-button>
+      <sl-button size="small" variant="default" class="informes-page-btn" data-page="${Math.max(1, cur - 1)}"${cur === 1 ? ' disabled' : ''} aria-label="Página anterior" title="Página anterior"><i class="fa-solid fa-chevron-left"></i></sl-button>
       ${pages}
-      <sl-button size="small" variant="default" class="informes-page-btn" data-page="${Math.min(totalPages, cur + 1)}"${cur === totalPages ? ' disabled' : ''}>›</sl-button>
+      <sl-button size="small" variant="default" class="informes-page-btn" data-page="${Math.min(totalPages, cur + 1)}"${cur === totalPages ? ' disabled' : ''} aria-label="Página siguiente" title="Página siguiente"><i class="fa-solid fa-chevron-right"></i></sl-button>
     </nav>`;
   };
 
@@ -1141,9 +1144,33 @@
     return hydratedCount || Number(report.commentsCount || 0) || 0;
   };
 
+  // Título y extracto en texto plano para la fila (el HTML completo se ve en "Ver informe completo").
+  const getReportTextSummary = (html) => {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = String(html || '');
+    const root = tpl.content;
+    const heading = root.querySelector('h1, h2, h3, h4');
+    const clean = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+    const title = clean(heading?.textContent) || 'Informe bromatológico';
+    heading?.remove();
+    root.querySelectorAll('*').forEach((el) => el.append(' '));
+    const text = clean(root.textContent).replace(/\s+([.,;:])/g, '$1');
+    return { title, excerpt: text.length > 180 ? `${text.slice(0, 180)}…` : text };
+  };
+
+  const matchesReportSearch = (report) => {
+    const user = state.users[report.userId] || {};
+    const haystack = [
+      user.fullName, report.userName, user.position, report.userPosition,
+      getReportCardDateLabel(report), report.html ? getReportTextSummary(report.html).title : ''
+    ].join(' ').toLowerCase();
+    return haystack.includes(state.search);
+  };
+
   const renderReportsBoard = async () => {
     const renderSeq = ++boardRenderSeq;
-    const source = state.filteredReports.length || state.activeRange ? state.filteredReports : state.reports;
+    const baseSource = state.filteredReports.length || state.activeRange ? state.filteredReports : state.reports;
+    const source = state.search ? baseSource.filter(matchesReportSearch) : baseSource;
     if (!source.length) {
       setBoardState('empty');
       informesCardsGrid.innerHTML = '';
@@ -1166,36 +1193,33 @@
       const importance = getImportanceMeta(report.importance);
       const displayName = user.fullName || report.userName || 'Usuario';
       const displayUser = user.fullName ? user : { fullName: displayName, photoUrl: '' };
+      const { title, excerpt } = getReportTextSummary(report.html);
 
       return `
-        <article class="informe-card" data-report-id="${report.id}" data-year="${report.year}" data-month="${report.month}" data-day="${report.day}">
-          <div class="informe-card-head">
-            <span class="informe-card-date"><i class="fa-regular fa-calendar"></i> ${getReportCardDateLabel(report)}</span>
-            <span class="informe-card-comments ${commentsCount ? 'has-comments' : 'no-comments'}"><i class="fa-solid ${commentsCount ? 'fa-comment-dots' : 'fa-comment-slash'}"></i> ${commentsCount ? `${commentsCount} comentario(s)` : 'Sin comentarios'}</span>
-          </div>
-
-          <div class="informe-card-preview">${report.html || '<p>Sin contenido</p>'}</div>
-
-          <div class="informe-card-meta">
-            <span class="informe-attach-chip"><i class="fa-regular fa-image"></i> ${imageCount}</span>
-            <span class="informe-attach-chip"><i class="fa-regular fa-file-lines"></i> ${docCount}</span>
-            <span class="importance-chip importance-${importance.tone}">${normalizeImportance(report.importance, 50)}% · ${importance.label}</span>
-            <sl-button variant="default" size="small" class="lj-icon-btn informe-print-chip" type="button" data-print-report="${report.id}" title="Imprimir informe"><i class="fa-solid fa-print"></i></sl-button>
-          </div>
-
-          <div class="informe-card-user">
-            ${renderUserAvatar(displayUser)}
-            <div class="informe-card-user-text">
-              <strong>${escapeHtml(displayName)}</strong>
-              <small>${escapeHtml(user.position || report.userPosition || 'Sin puesto')}</small>
+        <article class="informe-card informe-row" data-report-id="${report.id}" data-year="${report.year}" data-month="${report.month}" data-day="${report.day}">
+          <div class="informe-row-avatar">${renderUserAvatar(displayUser)}</div>
+          <div class="informe-row-main">
+            <div class="informe-row-head">
+              <h3 class="informe-row-title">${escapeHtml(title)}</h3>
+              <span class="importance-chip importance-${importance.tone}">${normalizeImportance(report.importance, 50)}% · ${importance.label}</span>
+            </div>
+            <p class="informe-row-sub">${escapeHtml(displayName)} · ${escapeHtml(user.position || report.userPosition || 'Sin puesto')}</p>
+            ${excerpt ? `<p class="informe-row-excerpt">${escapeHtml(excerpt)}</p>` : ''}
+            <div class="informe-row-meta">
+              <span><i class="fa-regular fa-calendar"></i> ${getReportCardDateLabel(report)}</span>
+              <span class="informe-card-comments ${commentsCount ? 'has-comments' : 'no-comments'}"><i class="fa-solid ${commentsCount ? 'fa-comment-dots' : 'fa-comment-slash'}"></i> ${commentsCount ? `${commentsCount} comentario(s)` : 'Sin comentarios'}</span>
+              <span title="Imágenes adjuntas"><i class="fa-regular fa-image"></i> ${imageCount}</span>
+              <span title="Documentos adjuntos"><i class="fa-regular fa-file-lines"></i> ${docCount}</span>
             </div>
           </div>
-
-          <div class="informe-card-actions">
-            <sl-button variant="primary" class="informe-view-btn" type="button" data-view-report="${report.id}">Ver informe completo</sl-button>
-            <sl-button variant="default" class="lj-icon-btn informe-icon-btn" type="button" data-comment-report="${report.id}" title="Comentar"><i class="fa-regular fa-message"></i></sl-button>
-            <sl-button variant="default" class="lj-icon-btn informe-icon-btn" type="button" data-edit-report="${report.id}" title="Editar"><i class="fa-solid fa-pen"></i></sl-button>
-            <sl-button variant="default" class="lj-icon-btn informe-icon-btn danger" type="button" data-delete-report="${report.id}" title="Borrar"><i class="fa-solid fa-trash"></i></sl-button>
+          <div class="informe-row-actions">
+            <div class="informe-row-icons">
+              <sl-button variant="default" size="small" class="lj-icon-btn informe-icon-btn" type="button" data-comment-report="${report.id}" title="Comentar" aria-label="Comentar"><i class="fa-regular fa-message"></i></sl-button>
+              <sl-button variant="default" size="small" class="lj-icon-btn informe-icon-btn" type="button" data-print-report="${report.id}" title="Imprimir informe" aria-label="Imprimir informe"><i class="fa-solid fa-print"></i></sl-button>
+              <sl-button variant="default" size="small" class="lj-icon-btn informe-icon-btn is-edit" type="button" data-edit-report="${report.id}" title="Editar" aria-label="Editar"><i class="fa-solid fa-pen"></i></sl-button>
+              <sl-button variant="default" size="small" class="lj-icon-btn informe-icon-btn danger" type="button" data-delete-report="${report.id}" title="Borrar" aria-label="Borrar"><i class="fa-solid fa-trash"></i></sl-button>
+            </div>
+            <sl-button variant="primary" size="small" class="informe-view-btn" type="button" data-view-report="${report.id}">Ver informe completo</sl-button>
           </div>
         </article>
       `;
@@ -1792,11 +1816,11 @@ REGLAS:
       html: `
         <div class="report-viewer">
           <div class="report-viewer-meta">
-            <p><strong>Creador:</strong> ${escapeHtml(report.userName || '')}</p>
-            <p><strong>Puesto:</strong> ${escapeHtml(report.userPosition || '-')}</p>
-            <p><strong>Email:</strong> ${escapeHtml(report.userEmail || '-')}</p>
-            <p><strong>Fecha:</strong> ${getDateLabel(report.createdAt)}</p>
-            <p><strong>Última actualización:</strong> ${lastUpdatedAt ? getDateLabel(lastUpdatedAt) : 'Sin actualizaciones'}</p>
+            <div class="informe-data-block"><span>Creador</span><strong>${escapeHtml(report.userName || '')}</strong></div>
+            <div class="informe-data-block"><span>Puesto</span><strong>${escapeHtml(report.userPosition || '-')}</strong></div>
+            <div class="informe-data-block"><span>Email</span><strong>${escapeHtml(report.userEmail || '-')}</strong></div>
+            <div class="informe-data-block"><span>Fecha</span><strong>${getDateLabel(report.createdAt)}</strong></div>
+            <div class="informe-data-block"><span>Última actualización</span><strong>${lastUpdatedAt ? getDateLabel(lastUpdatedAt) : 'Sin actualizaciones'}</strong></div>
             <div class="report-viewer-meta-actions">
               <sl-button variant="warning" size="small" type="button" class="report-resend-btn" data-resend-report-email="1"><i slot="prefix" class="fa-regular fa-paper-plane"></i>Reenviar email</sl-button>
             </div>
@@ -2003,12 +2027,12 @@ REGLAS:
         <div class="text-start report-edit-wrap">
           <label class="lj-label mb-2">Contenido del informe</label>
           <div class="editor-toolbar report-edit-toolbar" role="toolbar" aria-label="Herramientas de edición">
-            <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-edit-cmd="bold" title="Negrita"><i class="fa-solid fa-bold"></i></sl-button>
-            <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-edit-cmd="italic" title="Cursiva"><i class="fa-solid fa-italic"></i></sl-button>
-            <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-edit-cmd="underline" title="Subrayado"><i class="fa-solid fa-underline"></i></sl-button>
-            <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-edit-cmd="insertUnorderedList" title="Lista con viñetas"><i class="fa-solid fa-list-ul"></i></sl-button>
-            <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-edit-cmd="justifyLeft" title="Alinear a izquierda"><i class="fa-solid fa-align-left"></i></sl-button>
-            <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-edit-cmd="justifyCenter" title="Alinear al centro"><i class="fa-solid fa-align-center"></i></sl-button>
+            <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-edit-cmd="bold" title="Negrita" aria-label="Negrita"><i class="fa-solid fa-bold"></i></sl-button>
+            <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-edit-cmd="italic" title="Cursiva" aria-label="Cursiva"><i class="fa-solid fa-italic"></i></sl-button>
+            <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-edit-cmd="underline" title="Subrayado" aria-label="Subrayado"><i class="fa-solid fa-underline"></i></sl-button>
+            <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-edit-cmd="insertUnorderedList" title="Lista con viñetas" aria-label="Lista con viñetas"><i class="fa-solid fa-list-ul"></i></sl-button>
+            <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-edit-cmd="justifyLeft" title="Alinear a izquierda" aria-label="Alinear a izquierda"><i class="fa-solid fa-align-left"></i></sl-button>
+            <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-edit-cmd="justifyCenter" title="Alinear al centro" aria-label="Alinear al centro"><i class="fa-solid fa-align-center"></i></sl-button>
           </div>
           <div class="ai-format-btn-wrap">
             <sl-button variant="default" type="button" id="editFormatIABtn" class="ai-format-btn">
@@ -2030,7 +2054,7 @@ REGLAS:
                 ${item.type === 'image'
                   ? `<img src="${item.url}" alt="${escapeHtml(item.name)}" class="attachment-image is-loaded">`
                   : `<sl-icon name="file-earmark"></sl-icon><span>${escapeHtml(item.name)}</span>`}
-                <sl-button variant="text" size="small" type="button" class="lj-icon-btn remove-attachment-btn is-danger" data-remove-edit-attachment="${idx}" title="Quitar adjunto"><i class="fa-solid fa-circle-xmark"></i></sl-button>
+                <sl-button variant="text" size="small" type="button" class="lj-icon-btn remove-attachment-btn is-danger" data-remove-edit-attachment="${idx}" title="Quitar adjunto" aria-label="Quitar adjunto"><i class="fa-solid fa-circle-xmark"></i></sl-button>
               </article>
             `).join('') : '<div class="informes-empty">Sin adjuntos</div>'}
           </div>
@@ -2125,7 +2149,7 @@ REGLAS:
                 ${item.type === 'image'
                   ? `<img src="${item.url}" alt="${escapeHtml(item.name)}" class="attachment-image is-loaded">`
                   : `<sl-icon name="file-earmark"></sl-icon><span>${escapeHtml(item.name)}</span>`}
-                <sl-button variant="text" size="small" type="button" class="lj-icon-btn remove-attachment-btn is-danger" data-remove-edit-attachment="${idx}" title="Quitar adjunto"><i class="fa-solid fa-circle-xmark"></i></sl-button>
+                <sl-button variant="text" size="small" type="button" class="lj-icon-btn remove-attachment-btn is-danger" data-remove-edit-attachment="${idx}" title="Quitar adjunto" aria-label="Quitar adjunto"><i class="fa-solid fa-circle-xmark"></i></sl-button>
               </article>
             `).join('')
             : '<div class="informes-empty">Sin adjuntos</div>';
@@ -3226,6 +3250,28 @@ REGLAS:
   }
 
   document.getElementById('informeFormatIABtn')?.addEventListener('click', formatInformeWithIA);
+
+  // Buscador de la lista (filtra lo ya cargado: usuario, puesto, fecha, título).
+  const informesSearchInput = document.getElementById('informesSearchInput');
+  let informesSearchTimer = null;
+  informesSearchInput?.addEventListener('sl-input', () => {
+    clearTimeout(informesSearchTimer);
+    informesSearchTimer = setTimeout(() => {
+      state.search = normalizeLower(informesSearchInput.value);
+      state.currentPage = 1;
+      void renderReportsBoard();
+    }, 200);
+  });
+
+  // Sección plegable de usuarios en el modal (como "Familias" en ingredientes).
+  const informesUsersToggle = document.getElementById('informesUsersToggle');
+  informesUsersToggle?.addEventListener('click', () => {
+    const collapse = !informesUsersList.classList.contains('d-none');
+    informesUsersList.classList.toggle('d-none', collapse);
+    informesUsersToggle.setAttribute('aria-expanded', String(!collapse));
+    const icon = informesUsersToggle.querySelector('i');
+    if (icon) icon.className = `fa-solid ${collapse ? 'fa-chevron-right' : 'fa-chevron-down'}`;
+  });
 
   LJModal.on(informesModal, 'show', async () => {
     if (!datePicker && window.flatpickr) {

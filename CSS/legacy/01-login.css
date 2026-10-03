@@ -22,9 +22,13 @@
 }
 
 .brand-image {
-  width: 112px;
+  width: 64px;
   max-width: 100%;
   height: auto;
+}
+
+.sl-theme-dark .login-card .brand-image {
+  filter: invert(1) hue-rotate(180deg) brightness(1.15);
 }
 
 .brand-title {

@@ -1007,11 +1007,6 @@ sl-button.informe-icon-btn.danger::part(base):hover {
   color: var(--lj-muted);
 }
 
-#clearFilterInformesBtn {
-  position: relative;
-  z-index: 120;
-  order: -1;
-}
 
 /* ---------- Visor de informe completo (alerta) ---------- */
 .report-viewer {
@@ -1567,17 +1562,6 @@ sl-button.analisis-type-chip.active::part(base) {
 }
 
 /* ---------- Responsive ---------- */
-@media (min-width: 768px) {
-  .informes-cards-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 1100px) {
-  .informes-cards-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
 
 @media (max-width: 768px) {
   .informe-meta-grid {
@@ -1665,4 +1649,357 @@ sl-button.analisis-type-chip.active::part(base) {
 .report-viewer-content {
   max-width: 100%;
   overflow-x: auto;
+}
+
+/* =========================================
+   DISEÑO DE LISTA Y MODALES (guía: modal Ingredientes)
+========================================= */
+
+/* Barra de la página: buscador a la izquierda, acciones a la derecha */
+.informes-page-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.informes-search {
+  flex: 1 1 260px;
+  max-width: 420px;
+}
+
+.informes-search i[slot="prefix"] {
+  color: var(--lj-muted);
+  font-size: 13px;
+}
+
+.informes-page-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.informes-toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--lj-border);
+}
+
+#openFilterInformesBtn i,
+#openFilterAnalisisBtn i {
+  color: var(--lj-warning);
+}
+
+/* Chips de tipo (análisis) */
+.analisis-type-chips {
+  margin-top: 10px;
+}
+
+sl-button.analisis-type-chip::part(base) {
+  border-radius: 4px;
+}
+
+sl-button.analisis-type-chip.active::part(base) {
+  background: var(--lj-accent-soft);
+  border-color: var(--lj-accent);
+  color: var(--lj-accent);
+}
+
+/* Lista: una fila por informe / análisis */
+.informes-cards-grid {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.informe-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  flex-direction: initial;
+}
+
+.informe-row-avatar .user-avatar-thumb,
+.analisis-row-icon {
+  width: 64px;
+  height: 64px;
+  font-size: 18px;
+}
+
+.analisis-row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--lj-border);
+  background: var(--lj-accent-soft);
+  color: var(--lj-accent);
+  font-size: 24px;
+}
+
+.informe-row-main {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.informe-row-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.informe-row-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--lj-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analisis-row-sample {
+  font-weight: 600;
+  color: var(--lj-accent);
+}
+
+.informe-row-sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--lj-muted);
+}
+
+.informe-row-excerpt {
+  margin: 0;
+  font-size: 13px;
+  color: var(--lj-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.informe-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12px;
+  color: var(--lj-muted);
+}
+
+.informe-row-meta i {
+  margin-right: 2px;
+}
+
+.informe-row-meta .informe-card-comments {
+  font-size: 12px;
+}
+
+.informe-row-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.informe-row-icons {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+sl-button.informe-icon-btn.is-edit::part(base) {
+  color: var(--lj-accent);
+}
+
+/* Bloques de datos (visor de informe, detalle de análisis) */
+.informe-data-block {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--lj-border);
+  border-radius: 5px;
+  background: var(--lj-surface);
+}
+
+.informe-data-block > span {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--lj-muted);
+}
+
+.informe-data-block > strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--lj-text);
+  overflow-wrap: anywhere;
+}
+
+.report-viewer-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.report-viewer-meta-actions {
+  grid-column: 1 / -1;
+}
+
+.aq-detail-chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+/* Modal: cabecera de usuarios plegable + acción principal */
+.informes-data > .informes-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.informes-users-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+/* Usuarios como círculos (igual que las familias de ingredientes) */
+.informe-user-circle-wrap {
+  width: 116px;
+  min-width: 116px;
+  flex: 0 0 116px;
+  align-items: center;
+  gap: 6px;
+}
+
+.informe-user-circle {
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: center;
+  width: 100%;
+}
+
+.informe-user-circle .user-avatar-thumb {
+  width: 84px;
+  height: 84px;
+  font-size: 22px;
+}
+
+.informe-user-main {
+  width: 100%;
+  justify-items: center;
+}
+
+.informe-user-main h6 {
+  max-width: 100%;
+  font-size: 13px;
+}
+
+.informe-user-main p,
+.informe-user-main .email-user {
+  max-width: 100%;
+  font-size: 11px;
+}
+
+/* Visor de imágenes: "Volver" a la izquierda, controles a la derecha */
+#informesModal ~ #imageViewerModal .image-viewer-controls,
+#analisisImageViewerModal .image-viewer-controls {
+  justify-content: flex-end;
+}
+
+#informesModal ~ #imageViewerModal #viewerBackBtn,
+#analisisImageViewerModal #analisisViewerBackBtn {
+  margin-right: auto;
+}
+
+@media (max-width: 768px) {
+  .informes-search {
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  .informes-page-actions {
+    margin-left: 0;
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .informes-page-actions sl-button {
+    flex: 0 0 auto;
+  }
+
+  .informe-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .informe-row-avatar .user-avatar-thumb,
+  .analisis-row-icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .informe-row-head {
+    flex-wrap: wrap;
+  }
+
+  .informe-row-title {
+    white-space: normal;
+  }
+
+  .informe-row-actions {
+    grid-column: 1 / -1;
+    flex-direction: row-reverse;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+/* Chips de filtro por tipo: contador como tag a la derecha (reglas del dueño) */
+.analisis-chip-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--lj-surface-2);
+  color: var(--lj-text);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+sl-button.analisis-type-chip.active .analisis-chip-count {
+  background: var(--lj-accent);
+  color: #fff;
+}
+
+sl-button.analisis-type-chip[disabled] {
+  opacity: .55;
+}
+
+sl-button.analisis-type-chip::part(prefix) {
+  margin-right: 2px;
 }

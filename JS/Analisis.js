@@ -84,6 +84,7 @@
     filteredRecords: [],
     activeRange: null,
     activeTypeFilter: '',
+    search: '',
     currentPage: 1,
     viewerImages: [],
     imageViewerIndex: 0,
@@ -232,6 +233,8 @@
   // ── users ──────────────────────────────────────────────────────────────────
   const renderUsers = () => {
     const users = Object.values(state.users).sort((a, b) => String(a.fullName).localeCompare(String(b.fullName)));
+    const usersSummary = document.getElementById('analisisUsersSummary');
+    if (usersSummary) usersSummary.textContent = `${users.length} ${users.length === 1 ? 'usuario' : 'usuarios'}`;
     if (!users.length) {
       analisisUsersList.innerHTML = '<div class="informes-empty">No hay usuarios cargados.</div>';
       renderUserSelect(); return;
@@ -247,8 +250,8 @@
           </div>
         </article>
         <div class="informe-user-actions">
-          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" type="button" data-user-edit="${u.id}" title="Editar"><i class="fa-solid fa-pen"></i></sl-button>
-          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" type="button" data-user-delete="${u.id}" title="Eliminar"><i class="fa-solid fa-trash"></i></sl-button>
+          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" type="button" data-user-edit="${u.id}" title="Editar" aria-label="Editar"><i class="fa-solid fa-pen"></i></sl-button>
+          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" type="button" data-user-delete="${u.id}" title="Eliminar" aria-label="Eliminar"><i class="fa-solid fa-trash"></i></sl-button>
         </div>
       </div>`).join('');
     renderUserSelect();
@@ -369,7 +372,7 @@
       return `<div class="attachment-card attachment-doc${isPdf ? ' attachment-pdf' : ''}">
         <sl-icon name="${fileIcon(item.file || { name: itemName })}"></sl-icon>
         <span>${escapeHtml(itemName)}</span>
-        <sl-button variant="text" size="small" class="lj-icon-btn remove-attachment-btn is-danger" type="button" data-remove-attachment="${idx}" title="Quitar"><i class="fa-solid fa-xmark"></i></sl-button>
+        <sl-button variant="text" size="small" class="lj-icon-btn remove-attachment-btn is-danger" type="button" data-remove-attachment="${idx}" title="Quitar" aria-label="Quitar"><i class="fa-solid fa-xmark"></i></sl-button>
       </div>`;
     }).join('');
     analisisAttachmentsGrid.querySelectorAll('.js-attachment-preview').forEach((img) => {
@@ -767,8 +770,23 @@ REGLAS:
       const e = new Date(state.activeRange[1]); e.setHours(23, 59, 59, 999);
       src = src.filter((r) => { const ts = Number(r.createdAt || 0); return ts >= s.getTime() && ts <= e.getTime(); });
     }
+    updateTypeCounts(src);
     if (state.activeTypeFilter) src = src.filter((r) => r.analysisType === state.activeTypeFilter);
     state.filteredRecords = src;
+  };
+
+  // Contadores de los chips por tipo (sobre el rango de fechas activo). Sin resultados → chip deshabilitado.
+  const updateTypeCounts = (records) => {
+    if (!analisisTypeFilterPanel) return;
+    const counts = {};
+    records.forEach((r) => { counts[r.analysisType] = (counts[r.analysisType] || 0) + 1; });
+    analisisTypeFilterPanel.querySelectorAll('[data-type-count]').forEach((badge) => {
+      const type = badge.dataset.typeCount;
+      const n = type ? (counts[type] || 0) : records.length;
+      badge.textContent = String(n);
+      const chip = badge.closest('.analisis-type-chip');
+      if (chip && type) chip.disabled = !n && !chip.classList.contains('active');
+    });
   };
 
   // ── board ──────────────────────────────────────────────────────────────────
@@ -780,16 +798,27 @@ REGLAS:
       .map((p) => `<sl-button size="small" variant="${p === cur ? 'primary' : 'default'}" class="informes-page-btn" data-page="${p}">${p}</sl-button>`)
       .join('');
     analisisPagination.innerHTML = `<nav class="informes-page-nav" aria-label="Paginación de análisis">
-      <sl-button size="small" variant="default" class="informes-page-btn" data-page="${Math.max(1, cur - 1)}"${cur === 1 ? ' disabled' : ''}>‹</sl-button>
+      <sl-button size="small" variant="default" class="informes-page-btn" data-page="${Math.max(1, cur - 1)}"${cur === 1 ? ' disabled' : ''} aria-label="Página anterior" title="Página anterior"><i class="fa-solid fa-chevron-left"></i></sl-button>
       ${pages}
-      <sl-button size="small" variant="default" class="informes-page-btn" data-page="${Math.min(total, cur + 1)}"${cur === total ? ' disabled' : ''}>›</sl-button>
+      <sl-button size="small" variant="default" class="informes-page-btn" data-page="${Math.min(total, cur + 1)}"${cur === total ? ' disabled' : ''} aria-label="Página siguiente" title="Página siguiente"><i class="fa-solid fa-chevron-right"></i></sl-button>
     </nav>`;
+  };
+
+  const matchesRecordSearch = (record) => {
+    const user = state.users[record.userId] || {};
+    const haystack = [
+      getAnalysisTypeMeta(record.analysisType).label, record.sampleId, record.laboratory,
+      user.fullName, record.userName, user.position, record.userPosition,
+      record.createdAt ? getDateLabel(record.createdAt) : ''
+    ].join(' ').toLowerCase();
+    return haystack.includes(state.search);
   };
 
   const renderRecordsBoard = async () => {
     const seq    = ++boardRenderSeq;
     const isFiltered = state.activeRange || state.activeTypeFilter;
-    const source = isFiltered ? state.filteredRecords : state.records;
+    const baseSource = isFiltered ? state.filteredRecords : state.records;
+    const source = state.search ? baseSource.filter(matchesRecordSearch) : baseSource;
     if (!source.length) { setBoardState('empty'); return; }
 
     if (analisisCardsGrid) analisisCardsGrid.innerHTML = '';
@@ -800,7 +829,7 @@ REGLAS:
     const items  = await Promise.all(source.slice(start, start + RECORDS_PER_PAGE).map(ensureRecordDetail));
     if (seq !== boardRenderSeq) return;
 
-    const tableRows = items.map((record) => {
+    analisisCardsGrid.innerHTML = items.map((record) => {
       const user        = state.users[record.userId] || {};
       const typeMeta    = getAnalysisTypeMeta(record.analysisType);
       const importance  = getImportanceMeta(record.importance);
@@ -811,42 +840,30 @@ REGLAS:
       const dateStr     = d ? `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` : '-';
       const timeStr     = d ? d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '';
 
-      return `<tr>
-        <td class="analisis-td-date"><span>${dateStr}</span><small>${timeStr}</small></td>
-        <td><span class="analisis-type-badge">${typeIcon(typeMeta)} ${escapeHtml(typeMeta.label)}</span></td>
-        <td>${record.sampleId ? `<span class="sample-chip"><i class="fa-solid fa-vial"></i> ${escapeHtml(record.sampleId)}</span>` : '<span class="analisis-td-empty">—</span>'}</td>
-        <td>${record.laboratory ? `<span class="analisis-lab-chip"><i class="fa-solid fa-flask"></i> ${escapeHtml(record.laboratory)}</span>` : '<span class="analisis-td-empty">—</span>'}</td>
-        <td class="analisis-td-user"><strong>${escapeHtml(displayName)}</strong><small>${escapeHtml(user.position || record.userPosition || '')}</small></td>
-        <td style="white-space:nowrap;"><span class="importance-chip importance-${importance.tone}">${importance.label}</span></td>
-        <td style="text-align:center;white-space:nowrap;">${attachments.length ? `<span class="informe-attach-chip"><i class="fa-solid fa-paperclip"></i> ${attachments.length}</span>` : '<span class="analisis-td-empty">—</span>'}</td>
-        <td>
-          <div class="analisis-table-actions">
-            <sl-button variant="default" size="small" class="lj-icon-btn informe-icon-btn" type="button" data-view-record="${record.id}" title="Ver análisis"><i class="fa-solid fa-eye"></i></sl-button>
-            <sl-button variant="default" size="small" class="lj-icon-btn informe-icon-btn" type="button" data-edit-record="${record.id}" title="Editar"><i class="fa-solid fa-pen"></i></sl-button>
-            <sl-button variant="default" size="small" class="lj-icon-btn informe-icon-btn danger" type="button" data-delete-record="${record.id}" title="Eliminar"><i class="fa-solid fa-trash"></i></sl-button>
-            <sl-button variant="default" size="small" class="lj-icon-btn informe-icon-btn" type="button" data-print-record="${record.id}" title="Imprimir"><i class="fa-solid fa-print"></i></sl-button>
+      return `<article class="informe-card informe-row analisis-row" data-record-id="${record.id}">
+        <div class="informe-row-avatar"><span class="analisis-row-icon" aria-hidden="true">${typeIcon(typeMeta)}</span></div>
+        <div class="informe-row-main">
+          <div class="informe-row-head">
+            <h3 class="informe-row-title">${escapeHtml(typeMeta.label)}${record.sampleId ? ` · <span class="analisis-row-sample">${escapeHtml(record.sampleId)}</span>` : ''}</h3>
+            <span class="importance-chip importance-${importance.tone}">${importance.label}</span>
           </div>
-        </td>
-      </tr>`;
+          <p class="informe-row-sub">${escapeHtml(displayName)} · ${escapeHtml(user.position || record.userPosition || 'Sin puesto')}</p>
+          <div class="informe-row-meta">
+            <span><i class="fa-regular fa-calendar"></i> ${dateStr}${timeStr ? `, ${timeStr}` : ''}</span>
+            <span><i class="fa-solid fa-flask"></i> ${record.laboratory ? escapeHtml(record.laboratory) : 'Sin laboratorio'}</span>
+            <span title="Adjuntos"><i class="fa-solid fa-paperclip"></i> ${attachments.length}</span>
+          </div>
+        </div>
+        <div class="informe-row-actions">
+          <div class="informe-row-icons">
+            <sl-button variant="default" size="small" class="lj-icon-btn informe-icon-btn" type="button" data-print-record="${record.id}" title="Imprimir" aria-label="Imprimir"><i class="fa-solid fa-print"></i></sl-button>
+            <sl-button variant="default" size="small" class="lj-icon-btn informe-icon-btn is-edit" type="button" data-edit-record="${record.id}" title="Editar" aria-label="Editar"><i class="fa-solid fa-pen"></i></sl-button>
+            <sl-button variant="default" size="small" class="lj-icon-btn informe-icon-btn danger" type="button" data-delete-record="${record.id}" title="Eliminar" aria-label="Eliminar"><i class="fa-solid fa-trash"></i></sl-button>
+          </div>
+          <sl-button variant="primary" size="small" class="informe-view-btn" type="button" data-view-record="${record.id}" title="Ver análisis">Ver análisis</sl-button>
+        </div>
+      </article>`;
     }).join('');
-
-    analisisCardsGrid.innerHTML = `<div class="analisis-table-wrap">
-      <table class="analisis-table">
-        <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>Tipo</th>
-            <th>Muestra</th>
-            <th>Laboratorio</th>
-            <th>Usuario</th>
-            <th>Alerta</th>
-            <th>Adj.</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>${tableRows}</tbody>
-      </table>
-    </div>`;
     renderBoardPagination(total);
     setBoardState('data');
   };
@@ -895,9 +912,9 @@ REGLAS:
           <span class="importance-chip importance-${imp.tone}">${imp.label}</span>
         </div>
         <div class="aq-detail-chips">
-          ${full.sampleId  ? `<span class="sample-chip">Muestra: ${escapeHtml(full.sampleId)}</span>` : ''}
-          ${full.laboratory ? `<span class="sample-chip">Lab: ${escapeHtml(full.laboratory)}</span>` : ''}
-          <span class="sample-chip">Por: ${escapeHtml(displayName)}</span>
+          ${full.sampleId  ? `<div class="informe-data-block"><span>Muestra</span><strong>${escapeHtml(full.sampleId)}</strong></div>` : ''}
+          ${full.laboratory ? `<div class="informe-data-block"><span>Laboratorio</span><strong>${escapeHtml(full.laboratory)}</strong></div>` : ''}
+          <div class="informe-data-block"><span>Por</span><strong>${escapeHtml(displayName)}</strong></div>
         </div>
         <div class="aq-detail-content">${full.html || '<p>Sin contenido</p>'}</div>
         ${full.observations ? `<div class="aq-detail-obs"><strong>Observaciones</strong><p>${escapeHtml(full.observations)}</p></div>` : ''}
@@ -1213,6 +1230,28 @@ REGLAS:
   });
 
   analisisFormatIABtn?.addEventListener('click', formatWithIA);
+
+  // Buscador de la lista (filtra lo ya cargado: tipo, muestra, laboratorio, usuario, fecha).
+  const analisisSearchInput = document.getElementById('analisisSearchInput');
+  let analisisSearchTimer = null;
+  analisisSearchInput?.addEventListener('sl-input', () => {
+    clearTimeout(analisisSearchTimer);
+    analisisSearchTimer = setTimeout(() => {
+      state.search = normalizeLower(analisisSearchInput.value);
+      state.currentPage = 1;
+      void renderRecordsBoard();
+    }, 200);
+  });
+
+  // Sección plegable de usuarios en el modal (como "Familias" en ingredientes).
+  const analisisUsersToggle = document.getElementById('analisisUsersToggle');
+  analisisUsersToggle?.addEventListener('click', () => {
+    const collapse = !analisisUsersList.classList.contains('d-none');
+    analisisUsersList.classList.toggle('d-none', collapse);
+    analisisUsersToggle.setAttribute('aria-expanded', String(!collapse));
+    const icon = analisisUsersToggle.querySelector('i');
+    if (icon) icon.className = `fa-solid ${collapse ? 'fa-chevron-right' : 'fa-chevron-down'}`;
+  });
 
   // ── init ───────────────────────────────────────────────────────────────────
   const loadData = async () => {

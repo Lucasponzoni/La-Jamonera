@@ -91,7 +91,7 @@
     <section id="appView" class="view view-app">
       <header class="lj-header topbar">
         <a class="lj-header-brand topbar-brand" href="./index.html" aria-label="Ir a inicio">
-          <img src="./IMG/La Jamonera Logo 128.webp" alt="Logo Frigorífico La Jamonera" class="topbar-brand-logo" width="40" height="40">
+          <img src="./IMG/La Jamonera Cerdito.webp" alt="Logo La Jamonera" class="topbar-brand-logo">
           <span class="topbar-brand-text"><span class="brand-light">La</span> <span class="brand-bold">Jamonera</span></span>
         </a>
         <nav class="lj-header-nav" aria-label="Secciones">
@@ -258,7 +258,7 @@
                       <sl-option value="all">Todos los grupos</sl-option>
                     </sl-select>
                     <sl-dropdown id="recetasGroupMenu" class="recetas-group-menu" hoist placement="bottom-end">
-                      <sl-button slot="trigger" variant="default" class="lj-icon-btn" title="Gestionar grupos" aria-label="Gestionar grupos"><i class="fa-solid fa-folder-tree"></i></sl-button>
+                      <sl-button slot="trigger" variant="default" caret title="Gestionar grupos de recetas"><i slot="prefix" class="fa-solid fa-layer-group"></i>Grupos</sl-button>
                       <sl-menu>
                         <sl-menu-item data-recipe-group-create><i slot="prefix" class="fa-solid fa-plus"></i>Nuevo grupo</sl-menu-item>
                         <sl-divider></sl-divider>
@@ -282,11 +282,11 @@
                 </div>
 
                 <div class="recetas-rnpa-filters" role="toolbar" aria-label="Filtros de RNPA">
-                  <button type="button" class="lj-tile recetas-chip" data-rnpa-filter="all"><span>Todas</span><b data-rnpa-filter-count="all">0</b></button>
-                  <button type="button" class="lj-tile recetas-chip" data-rnpa-filter="none"><span>Sin RNPA</span><b data-rnpa-filter-count="none">0</b></button>
-                  <button type="button" class="lj-tile recetas-chip is-warning" data-rnpa-filter="warning"><span>Vence &lt; 6 meses</span><b data-rnpa-filter-count="warning">0</b></button>
-                  <button type="button" class="lj-tile recetas-chip is-danger" data-rnpa-filter="danger"><span>Vence &lt; 60 días</span><b data-rnpa-filter-count="danger">0</b></button>
-                  <button type="button" class="lj-tile recetas-chip is-action" data-copy-rnpa-report><i class="fa-regular fa-copy" aria-hidden="true"></i><span>Copiar informe</span></button>
+                  <sl-button size="small" variant="default" type="button" class="recetas-chip" data-rnpa-filter="all"><i slot="prefix" class="fa-solid fa-list"></i>Todas<span slot="suffix" class="recetas-chip-count" data-rnpa-filter-count="all">0</span></sl-button>
+                  <sl-button size="small" variant="default" type="button" class="recetas-chip" data-rnpa-filter="none"><i slot="prefix" class="fa-solid fa-file-circle-xmark"></i>Sin RNPA<span slot="suffix" class="recetas-chip-count" data-rnpa-filter-count="none">0</span></sl-button>
+                  <sl-button size="small" variant="default" type="button" class="recetas-chip is-warning" data-rnpa-filter="warning"><i slot="prefix" class="fa-solid fa-hourglass-half"></i>Por vencer · 6 meses<span slot="suffix" class="recetas-chip-count" data-rnpa-filter-count="warning">0</span></sl-button>
+                  <sl-button size="small" variant="default" type="button" class="recetas-chip is-danger" data-rnpa-filter="danger"><i slot="prefix" class="fa-solid fa-triangle-exclamation"></i>Vence pronto · 60 días<span slot="suffix" class="recetas-chip-count" data-rnpa-filter-count="danger">0</span></sl-button>
+                  <sl-button size="small" variant="default" type="button" class="recetas-chip is-action" data-copy-rnpa-report><i slot="prefix" class="fa-regular fa-copy"></i>Copiar informe</sl-button>
                 </div>
 
                 <div id="recetasRnpaAlert" class="inventario-rne-alert d-none" aria-live="polite"></div>
@@ -511,9 +511,9 @@
         <div class="lj-footer-inner">
           <section class="lj-footer-col lj-footer-brand" aria-label="La Jamonera">
             <div class="lj-footer-brand-row">
-              <img src="./IMG/La Jamonera Logo 128.webp" alt="Logo Frigorífico La Jamonera" class="lj-footer-logo" width="48" height="48">
+              <img src="./IMG/La Jamonera Cerdito.webp" alt="Logo La Jamonera" class="lj-footer-logo">
               <div>
-                <p class="lj-footer-title">La Jamonera</p>
+                <p class="lj-footer-title"><span class="brand-light">La</span> <span class="brand-bold">Jamonera</span></p>
                 <p class="lj-footer-subtitle">Back Office · Panel de gestión</p>
               </div>
             </div>

@@ -113,20 +113,17 @@
 
       <div class="contenido">
         <div class="header-content">
-          <div class="home-actions-scroll" aria-label="Acciones disponibles">
-            <button class="lj-tile home-action-btn" id="openInformesModal" type="button" data-lj-open="#informesModal">
-              <i class="fa-solid fa-file-lines icon-green" aria-hidden="true"></i>
-              <span>Nuevo informe</span>
-            </button>
-            <button id="openFilterInformesBtn" type="button" class="lj-tile home-action-btn">
-              <i class="fa-solid fa-filter icon-orange" aria-hidden="true"></i>
-              <span>Filtrar informes</span>
-            </button>
-            <button id="clearFilterInformesBtn" type="button" class="lj-tile home-action-btn d-none">
-              <i class="fa-solid fa-rotate-left icon-gray" aria-hidden="true"></i>
-              <span>Volver atrás</span>
-            </button>
-            <input id="informesFilterInput" type="text" class="lj-input d-none" aria-label="Filtro por fecha">
+          <div class="informes-page-toolbar" aria-label="Acciones disponibles">
+            <sl-input id="informesSearchInput" class="informes-search" placeholder="Buscar por usuario, puesto, fecha o título" clearable autocomplete="off">
+              <i slot="prefix" class="fa-solid fa-magnifying-glass"></i>
+            </sl-input>
+            <div class="informes-page-actions">
+              <sl-button variant="default" id="clearFilterInformesBtn" type="button" class="d-none"><i slot="prefix" class="fa-solid fa-rotate-left"></i>Volver atrás</sl-button>
+              <sl-button variant="default" id="openFilterInformesBtn" type="button"><i slot="prefix" class="fa-regular fa-calendar"></i>Filtrar informes</sl-button>
+              <span class="informes-toolbar-divider" aria-hidden="true"></span>
+              <sl-button variant="success" id="openInformesModal" type="button" data-lj-open="#informesModal"><i slot="prefix" class="fa-solid fa-plus"></i>Nuevo informe</sl-button>
+              <input id="informesFilterInput" type="text" class="lj-input d-none" aria-label="Filtro por fecha">
+            </div>
           </div>
         </div>
         <div class="home-content informes-home-content">
@@ -150,9 +147,13 @@
 
               <div id="informesData" class="informes-data d-none" aria-live="polite">
                 <div class="informes-toolbar">
+                  <div class="family-circle-section-head informes-users-head">
+                    <sl-button variant="text" size="small" type="button" class="family-circle-toggle" id="informesUsersToggle" aria-expanded="true"><i slot="prefix" class="fa-solid fa-chevron-down"></i>Usuarios</sl-button>
+                    <small class="family-circle-summary" id="informesUsersSummary"></small>
+                  </div>
                   <sl-button variant="success" id="openUserFormBtn" type="button">
-                    <i slot="prefix" class="fa-solid fa-user-plus"></i>
-                    <span>Crear usuario</span>
+                    <i slot="prefix" class="fa-solid fa-plus"></i>
+                    Crear usuario
                   </sl-button>
                 </div>
 
@@ -190,10 +191,10 @@
                 <div class="editor-wrap">
                   <div class="editor-toolbar-scroll">
                     <div class="editor-toolbar" role="toolbar" aria-label="Herramientas de edición">
-                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="bold" title="Negrita"><i class="fa-solid fa-bold"></i></sl-button>
-                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="italic" title="Cursiva"><i class="fa-solid fa-italic"></i></sl-button>
-                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="underline" title="Subrayado"><i class="fa-solid fa-underline"></i></sl-button>
-                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="strikeThrough" title="Tachado"><i class="fa-solid fa-strikethrough"></i></sl-button>
+                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="bold" title="Negrita" aria-label="Negrita"><i class="fa-solid fa-bold"></i></sl-button>
+                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="italic" title="Cursiva" aria-label="Cursiva"><i class="fa-solid fa-italic"></i></sl-button>
+                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="underline" title="Subrayado" aria-label="Subrayado"><i class="fa-solid fa-underline"></i></sl-button>
+                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="strikeThrough" title="Tachado" aria-label="Tachado"><i class="fa-solid fa-strikethrough"></i></sl-button>
 
                     <sl-select id="formatBlockSelect" class="editor-select" value="P" hoist aria-label="Tipo de texto"><sl-option value="P">Normal</sl-option><sl-option value="H3">Título</sl-option><sl-option value="H4">Subtítulo</sl-option><sl-option value="BLOCKQUOTE">Cita</sl-option></sl-select>
 
@@ -207,17 +208,17 @@
                       <i class="fa-solid fa-highlighter"></i>
                       <input id="highlightColorInput" type="color" class="editor-color-input" value="#ffffff" aria-label="Color de resaltado">
                     </label>
-                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" id="applyHighlightBtn" title="Aplicar resaltado"><i class="fa-solid fa-highlighter"></i></sl-button>
-                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="removeFormat" title="Quitar formato"><i class="fa-solid fa-eraser"></i></sl-button>
-                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="insertUnorderedList" title="Lista con viñetas"><i class="fa-solid fa-list-ul"></i></sl-button>
-                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="insertOrderedList" title="Lista numerada"><i class="fa-solid fa-list-ol"></i></sl-button>
-                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="justifyLeft" title="Alinear a izquierda"><i class="fa-solid fa-align-left"></i></sl-button>
-                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="justifyCenter" title="Alinear al centro"><i class="fa-solid fa-align-center"></i></sl-button>
-                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="justifyRight" title="Alinear a derecha"><i class="fa-solid fa-align-right"></i></sl-button>
-                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="justifyFull" title="Justificar"><i class="fa-solid fa-align-justify"></i></sl-button>
+                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" id="applyHighlightBtn" title="Aplicar resaltado" aria-label="Aplicar resaltado"><i class="fa-solid fa-highlighter"></i></sl-button>
+                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="removeFormat" title="Quitar formato" aria-label="Quitar formato"><i class="fa-solid fa-eraser"></i></sl-button>
+                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="insertUnorderedList" title="Lista con viñetas" aria-label="Lista con viñetas"><i class="fa-solid fa-list-ul"></i></sl-button>
+                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="insertOrderedList" title="Lista numerada" aria-label="Lista numerada"><i class="fa-solid fa-list-ol"></i></sl-button>
+                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="justifyLeft" title="Alinear a izquierda" aria-label="Alinear a izquierda"><i class="fa-solid fa-align-left"></i></sl-button>
+                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="justifyCenter" title="Alinear al centro" aria-label="Alinear al centro"><i class="fa-solid fa-align-center"></i></sl-button>
+                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="justifyRight" title="Alinear a derecha" aria-label="Alinear a derecha"><i class="fa-solid fa-align-right"></i></sl-button>
+                    <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" data-cmd="justifyFull" title="Justificar" aria-label="Justificar"><i class="fa-solid fa-align-justify"></i></sl-button>
 
                     <div class="emoji-picker-wrap">
-                      <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" id="toggleEmojiPanel" title="Insertar emoji"><i class="fa-regular fa-face-smile"></i></sl-button>
+                      <sl-button variant="text" type="button" class="lj-icon-btn editor-btn" id="toggleEmojiPanel" title="Insertar emoji" aria-label="Insertar emoji"><i class="fa-regular fa-face-smile"></i></sl-button>
                       <div id="emojiPanel" class="emoji-panel" aria-label="Selector de emojis"></div>
                     </div>
                     </div>
@@ -277,11 +278,11 @@
         <div class="lj-dialog-body">
               <div class="image-viewer-controls image-viewer-controls-inventario">
                 <sl-button variant="default" id="viewerBackBtn" type="button"><i slot="prefix" class="fa-solid fa-arrow-left"></i><span>Volver</span></sl-button>
-                <sl-button variant="default" id="viewerPrevBtn" type="button"><i class="fa-solid fa-chevron-left"></i></sl-button>
+                <sl-button variant="default" id="viewerPrevBtn" type="button" class="lj-icon-btn" title="Imagen anterior" aria-label="Imagen anterior"><i class="fa-solid fa-chevron-left"></i></sl-button>
                 <span id="viewerCounter" class="viewer-counter" aria-live="polite">1/1</span>
-                <sl-button variant="default" id="viewerZoomOutBtn" type="button"><i class="fa-solid fa-magnifying-glass-minus"></i></sl-button>
-                <sl-button variant="default" id="viewerZoomInBtn" type="button"><i class="fa-solid fa-magnifying-glass-plus"></i></sl-button>
-                <sl-button variant="default" id="viewerNextBtn" type="button"><i class="fa-solid fa-chevron-right"></i></sl-button>
+                <sl-button variant="default" id="viewerZoomOutBtn" type="button" class="lj-icon-btn" title="Alejar" aria-label="Alejar"><i class="fa-solid fa-magnifying-glass-minus"></i></sl-button>
+                <sl-button variant="default" id="viewerZoomInBtn" type="button" class="lj-icon-btn" title="Acercar" aria-label="Acercar"><i class="fa-solid fa-magnifying-glass-plus"></i></sl-button>
+                <sl-button variant="default" id="viewerNextBtn" type="button" class="lj-icon-btn" title="Imagen siguiente" aria-label="Imagen siguiente"><i class="fa-solid fa-chevron-right"></i></sl-button>
               </div>
               <div id="viewerStage" class="viewer-stage">
                 <span id="viewerStageSpinner" class="thumb-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner></span>
@@ -296,7 +297,7 @@
             <div class="lj-footer-brand-row">
               <img src="./IMG/La Jamonera Cerdito.webp" alt="Logo La Jamonera" class="lj-footer-logo">
               <div>
-                <p class="lj-footer-title">La Jamonera</p>
+                <p class="lj-footer-title"><span class="brand-light">La</span> <span class="brand-bold">Jamonera</span></p>
                 <p class="lj-footer-subtitle">Back Office · Panel de gestión</p>
               </div>
             </div>
