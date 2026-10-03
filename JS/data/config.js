@@ -3,8 +3,9 @@
 // localStorage.setItem('lj-backend', 'supabase') y recargar (o 'firebase' para volver).
 (function ljBackendConfig() {
   const DEFAULT_BACKEND = 'supabase';
-  let backend = DEFAULT_BACKEND;
-  try {
+  // JS/data/backend.js (cargado antes, sin defer) ya decidió el backend y bajó el SDK si hacía falta.
+  let backend = window.LJ_BACKEND === 'firebase' || window.LJ_BACKEND === 'supabase' ? window.LJ_BACKEND : DEFAULT_BACKEND;
+  if (!window.LJ_BACKEND) try {
     const override = localStorage.getItem('lj-backend');
     if (override === 'firebase' || override === 'supabase') backend = override;
   } catch (_) { /* almacenamiento bloqueado: default */ }
