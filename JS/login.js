@@ -48,12 +48,11 @@
       html: `<p>${text}</p>`,
       icon: 'error',
       customClass: {
-        popup: 'ios-alert',
+        popup: 'ios-alert lj-login-alert',
         title: 'ios-alert-title',
         htmlContainer: 'ios-alert-text',
-        confirmButton: 'ios-btn ios-btn-primary'
+        confirmButton: 'primary'
       },
-      buttonsStyling: false,
       confirmButtonText: 'Entendido'
     });
   };

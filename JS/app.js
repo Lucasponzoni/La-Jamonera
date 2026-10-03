@@ -80,14 +80,12 @@
       cancelButtonText: 'Cancelar',
       reverseButtons: true,
       customClass: {
-        popup: 'ios-alert',
+        popup: 'ios-alert lj-session-alert',
         title: 'ios-alert-title',
         htmlContainer: 'ios-alert-text',
-        confirmButton: 'ios-btn ios-btn-primary',
-        cancelButton: 'ios-btn ios-btn-secondary'
-      },
-      buttonsStyling: false,
-      returnFocus: false
+        confirmButton: 'primary',
+        cancelButton: 'secondary'
+      }
     });
 
     if (result.isConfirmed) {

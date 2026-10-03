@@ -23,17 +23,15 @@
   };
 
   const openIosSwal = (options) => Swal.fire({
-    target: modalEl,
     ...options,
     customClass: {
-      popup: `ios-alert informes-alert ${options?.customClass?.popup || ''}`.trim(),
+      popup: `ios-alert informes-alert users-manager-alert ${options?.customClass?.popup || ''}`.trim(),
       title: 'ios-alert-title',
       htmlContainer: 'ios-alert-text',
-      confirmButton: 'ios-btn ios-btn-primary',
-      cancelButton: 'ios-btn ios-btn-secondary',
+      confirmButton: 'primary',
+      cancelButton: 'secondary',
       ...options.customClass
-    },
-    buttonsStyling: false
+    }
   });
 
   const uploadToStorage = async (file, folder) => {
@@ -82,8 +80,8 @@
           </div>
         </div>
         <div class="users-manager-card-actions">
-          <button class="users-manager-card-btn" type="button" data-user-edit="${escapeHtml(user.id)}" title="Editar usuario" aria-label="Editar usuario"><i class="bi bi-pencil"></i></button>
-          <button class="users-manager-card-btn is-danger" type="button" data-user-delete="${escapeHtml(user.id)}" title="Eliminar usuario" aria-label="Eliminar usuario"><i class="bi bi-trash"></i></button>
+          <sl-button variant="default" size="small" class="lj-icon-btn users-manager-card-btn" type="button" data-user-edit="${escapeHtml(user.id)}" title="Editar usuario" aria-label="Editar usuario"><sl-icon name="pencil"></sl-icon></sl-button>
+          <sl-button variant="default" size="small" class="lj-icon-btn users-manager-card-btn is-danger" type="button" data-user-delete="${escapeHtml(user.id)}" title="Eliminar usuario" aria-label="Eliminar usuario"><sl-icon name="trash"></sl-icon></sl-button>
         </div>
       </article>
     `).join('');
@@ -105,29 +103,23 @@
     let pendingFile = null;
     const result = await openIosSwal({
       title: initial ? 'Editar usuario' : 'Cargar usuario',
-      customClass: { popup: 'informes-user-form-alert ingredientes-alert' },
+      customClass: { popup: 'users-manager-alert informes-user-form-alert ingredientes-alert' },
       html: `<div class="ingrediente-form-grid">
         <section class="step-block">
           <h6 class="step-title">1) Datos personales</h6>
           <div class="step-content">
-            <label for="userFullName">Nombre y apellido *</label>
-            <input id="userFullName" class="swal2-input ios-input" autocomplete="off" placeholder="Ej: Juan Pérez" value="${escapeHtml(initial?.fullName || '')}">
-            <label for="userPosition">Puesto en la empresa *</label>
-            <input id="userPosition" class="swal2-input ios-input" autocomplete="off" placeholder="Ej: Bromatólogo" value="${escapeHtml(initial?.position || '')}">
-            <label for="userEmail">Email *</label>
-            <input id="userEmail" class="swal2-input ios-input" autocomplete="off" type="email" placeholder="Ej: usuario@empresa.com" value="${escapeHtml(initial?.email || '')}">
-            <label for="userPin">Clave de 4 dígitos *</label>
-            <div class="ios-input-group d-flex align-items-center px-2">
-              <input id="userPin" class="swal2-input ios-input border-0 bg-transparent flex-grow-1" type="password" maxlength="4" inputmode="numeric" autocomplete="new-password" placeholder="4 dígitos" value="${escapeHtml(initial?.pin || '')}">
-              <button id="toggleUserPin" type="button" class="btn ios-toggle-pass" aria-label="Ver u ocultar clave"><i class="fa-solid fa-eye"></i></button>
-            </div>
+            <sl-input id="userFullName" label="Nombre y apellido *" autocomplete="off" placeholder="Ej: Juan Pérez" value="${escapeHtml(initial?.fullName || '')}"></sl-input>
+            <sl-input id="userPosition" label="Puesto en la empresa *" autocomplete="off" placeholder="Ej: Bromatólogo" value="${escapeHtml(initial?.position || '')}"></sl-input>
+            <sl-input id="userEmail" label="Email *" autocomplete="off" type="email" placeholder="Ej: usuario@empresa.com" value="${escapeHtml(initial?.email || '')}"></sl-input>
+            <sl-input id="userPin" label="Clave de 4 dígitos *" type="password" password-toggle maxlength="4" inputmode="numeric" autocomplete="new-password" placeholder="4 dígitos" value="${escapeHtml(initial?.pin || '')}"></sl-input>
           </div>
         </section>
         <section class="step-block">
           <h6 class="step-title">2) Fotografía (opcional)</h6>
           <div class="step-content">
-            <div id="userPhotoPreview" class="image-preview-circle">${initial?.photoUrl ? `<img src="${escapeHtml(initial.photoUrl)}" alt="Foto">` : '<span class="image-placeholder-circle-2 user-initials-preview"><i class="bi bi-person-fill"></i></span>'}</div>
-            <input id="userPhotoInput" type="file" class="form-control image-file-input" accept="image/*">
+            <div id="userPhotoPreview" class="image-preview-circle">${initial?.photoUrl ? `<img src="${escapeHtml(initial.photoUrl)}" alt="Foto">` : '<span class="image-placeholder-circle-2 user-initials-preview"><sl-icon name="person-fill"></sl-icon></span>'}</div>
+            <input id="userPhotoInput" type="file" class="image-file-input" accept="image/*" hidden>
+            <sl-button id="userPhotoPickBtn" type="button" variant="default" class="users-photo-pick"><i slot="prefix" class="fa-solid fa-camera"></i>Elegir foto</sl-button>
           </div>
         </section>
       </div>`,
@@ -138,20 +130,15 @@
         const fullNameInput = document.getElementById('userFullName');
         const photoInput = document.getElementById('userPhotoInput');
         const preview = document.getElementById('userPhotoPreview');
-        const pinInput = document.getElementById('userPin');
-        const togglePin = document.getElementById('toggleUserPin');
+        const photoPickBtn = document.getElementById('userPhotoPickBtn');
         const updateInitials = () => {
           if (pendingFile || normalizeValue(initial?.photoUrl)) return;
           const initials = initialsFromName(fullNameInput?.value);
           preview.innerHTML = initials
             ? `<span class="image-placeholder-circle-2 user-initials-preview">${escapeHtml(initials)}</span>`
-            : '<span class="image-placeholder-circle-2 user-initials-preview"><i class="bi bi-person-fill"></i></span>';
+            : '<span class="image-placeholder-circle-2 user-initials-preview"><sl-icon name="person-fill"></sl-icon></span>';
         };
-        togglePin?.addEventListener('click', () => {
-          const hidden = pinInput.type === 'password';
-          pinInput.type = hidden ? 'text' : 'password';
-          togglePin.innerHTML = hidden ? '<i class="fa-solid fa-eye-slash"></i>' : '<i class="fa-solid fa-eye"></i>';
-        });
+        photoPickBtn?.addEventListener('click', () => photoInput?.click());
         fullNameInput?.addEventListener('input', updateInitials);
         photoInput?.addEventListener('change', () => {
           const file = photoInput.files?.[0] || null;
@@ -204,7 +191,7 @@
     if (editBtn) {
       const user = state.users[editBtn.dataset.userEdit];
       if (!user) return;
-      const auth = await openIosSwal({ title: 'Clave de usuario', html: '<input id="editUserPin" type="password" class="swal2-input ios-input" placeholder="Clave actual">', showCancelButton: true, confirmButtonText: 'Continuar', preConfirm: () => {
+      const auth = await openIosSwal({ title: 'Clave de usuario', html: '<sl-input id="editUserPin" type="password" password-toggle autocomplete="off" placeholder="Clave actual"></sl-input>', showCancelButton: true, confirmButtonText: 'Continuar', preConfirm: () => {
         const pin = normalizeValue(document.getElementById('editUserPin')?.value);
         if (pin !== String(user.pin || '')) return Swal.showValidationMessage('Clave incorrecta.');
         return true;
@@ -219,7 +206,7 @@
     if (delBtn) {
       const user = state.users[delBtn.dataset.userDelete];
       if (!user) return;
-      const auth = await openIosSwal({ title: 'Clave de usuario', html: '<input id="deleteUserPin" type="password" class="swal2-input ios-input" placeholder="Clave">', showCancelButton: true, confirmButtonText: 'Continuar', preConfirm: () => {
+      const auth = await openIosSwal({ title: 'Clave de usuario', html: '<sl-input id="deleteUserPin" type="password" password-toggle autocomplete="off" placeholder="Clave"></sl-input>', showCancelButton: true, confirmButtonText: 'Continuar', preConfirm: () => {
         const pin = normalizeValue(document.getElementById('deleteUserPin')?.value);
         if (pin !== String(user.pin || '')) return Swal.showValidationMessage('Clave incorrecta.');
         return true;
@@ -233,7 +220,7 @@
     }
   });
 
-  modalEl.addEventListener('shown.bs.modal', () => {
+  LJModal.on(modalEl, 'shown', () => {
     loadUsers().catch(() => {
       nodes.loading.classList.add('d-none');
       nodes.data.classList.remove('d-none');

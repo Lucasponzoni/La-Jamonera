@@ -1,50 +1,34 @@
 (function notificationsModule() {
-  const CONTAINER_ID = 'iosNotifyStack';
+  // Notificaciones flotantes sobre <sl-alert>.toast() (pila de toasts de Shoelace).
+  const VARIANT_BY_TYPE = {
+    success: 'success',
+    error: 'danger',
+    warning: 'warning',
+    info: 'primary'
+  };
 
-  const ensureContainer = () => {
-    let stack = document.getElementById(CONTAINER_ID);
-    if (stack) return stack;
-    stack = document.createElement('div');
-    stack.id = CONTAINER_ID;
-    stack.className = 'ios-notify-stack';
-    document.body.appendChild(stack);
-    return stack;
+  const ICON_BY_TYPE = {
+    success: 'fa-circle-check',
+    error: 'fa-circle-xmark',
+    warning: 'fa-triangle-exclamation',
+    info: 'fa-circle-info'
   };
 
   const show = ({ title = 'Notificación', message = '', type = 'info', duration = 4200 } = {}) => {
-    const stack = ensureContainer();
-    const toast = document.createElement('article');
-    toast.className = `ios-notify-card type-${type}`;
-
-    const iconByType = {
-      success: 'fa-circle-check',
-      error: 'fa-circle-xmark',
-      warning: 'fa-triangle-exclamation',
-      info: 'fa-circle-info'
-    };
-
-    toast.innerHTML = `
-      <div class="ios-notify-icon-wrap"><i class="fa-solid ${iconByType[type] || iconByType.info}"></i></div>
-      <div class="ios-notify-content">
-        <strong>${String(title || '')}</strong>
-        <p>${String(message || '')}</p>
-      </div>
-      <button type="button" class="btn ios-notify-close" aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button>
+    const alert = document.createElement('sl-alert');
+    alert.className = `lj-notify type-${type}`;
+    alert.variant = VARIANT_BY_TYPE[type] || VARIANT_BY_TYPE.info;
+    alert.closable = true;
+    alert.duration = Math.max(1800, Number(duration) || 4200);
+    alert.innerHTML = `
+      <i slot="icon" class="fa-solid ${ICON_BY_TYPE[type] || ICON_BY_TYPE.info}"></i>
+      <strong class="lj-notify-title">${String(title || '')}</strong>
+      ${message ? `<span class="lj-notify-text">${String(message)}</span>` : ''}
     `;
-
-    const remove = () => {
-      toast.classList.add('is-leaving');
-      setTimeout(() => toast.remove(), 220);
-    };
-
-    toast.querySelector('.ios-notify-close')?.addEventListener('click', remove);
-    stack.appendChild(toast);
-
-    requestAnimationFrame(() => {
-      toast.classList.add('is-visible');
-    });
-
-    setTimeout(remove, Math.max(1800, Number(duration) || 4200));
+    document.body.appendChild(alert);
+    customElements.whenDefined('sl-alert')
+      .then(() => alert.toast())
+      .catch(() => alert.remove());
   };
 
   window.laJamoneraNotify = { show };
