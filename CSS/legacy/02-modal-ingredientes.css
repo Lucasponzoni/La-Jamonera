@@ -1,36 +1,6 @@
 /* =========================================
-   MODAL
+   MODAL (genérico: estados de carga/vacío)
 ========================================= */
-.ios-modal {
-  border-radius: 22px;
-  border: 1px solid #dbe0ef;
-  background: #f8f9fd;
-}
-
-.ios-modal-header {
-  border-bottom: 1px solid #e4e8f4;
-  padding: 16px 18px;
-}
-
-.ios-modal-title {
-  color: #2a3556;
-  font-size: 1.2rem;
-  font-weight: 700;
-}
-
-.ios-modal-close {
-  border-radius: 10px;
-}
-
-.ios-modal-close:focus {
-  box-shadow: none;
-}
-
-.ios-modal-body {
-  min-height: 300px;
-  padding: 18px;
-}
-
 .ingredientes-loading,
 .ingredientes-empty,
 .ingredientes-data {
@@ -42,14 +12,13 @@
   text-align: center;
 }
 
-.ingredientes-empty-text {
-  margin: 0;
-  color: #5a6482;
+.ingredientes-empty {
+  gap: 12px;
 }
 
-.ingredientes-modal .ios-modal-body {
-  min-height: 65vh;
-  overflow: auto;
+.ingredientes-empty-text {
+  margin: 0;
+  color: var(--lj-muted);
 }
 
 .ingredientes-data {
@@ -60,12 +29,15 @@
   text-align: left;
 }
 
+/* =========================================
+   MODAL INGREDIENTES · TOOLBAR
+========================================= */
 .ingredientes-toolbar {
   width: 100%;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   align-items: center;
   justify-content: space-between;
 }
@@ -80,34 +52,78 @@
   width: fit-content;
 }
 
-.ingredientes-toolbar-actions .ios-btn,
+.ingredientes-toolbar-actions sl-button,
 .ingredientes-toolbar-actions .barra-separadora {
   flex: 0 0 auto;
 }
 
+.ingredientes-toolbar .barra-separadora {
+  height: 24px;
+  margin: 0 2px;
+}
+
 .ingredientes-search-group {
+  flex: 1 1 260px;
   max-width: 420px;
   width: 100%;
 }
 
-.ingredientes-search-icon {
-  border: 0;
-  border-right: 1px solid #d2d8e8;
-  background: transparent;
-  color: #7d87a4;
+.ingredientes-search-input i[slot="prefix"] {
+  color: var(--lj-muted);
+  font-size: 13px;
 }
 
-.ingredientes-search-input {
-  border: 0;
-}
-
+/* =========================================
+   FAMILIAS (círculos)
+========================================= */
 .familias-circles {
   width: 100%;
+  margin-bottom: 14px;
+}
+
+.family-circle-section-head {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+/* 21-misc-2026 estiliza .family-circle-toggle como botón nativo (padding, hover claro): lo anulamos para el sl-button */
+#ingredientesModal sl-button.family-circle-toggle,
+#ingredientesModal sl-button.family-circle-toggle:hover {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+}
+
+.family-circle-toggle::part(base) {
+  padding: 0 6px 0 0;
+  color: var(--lj-brand);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.family-circle-toggle::part(prefix) {
+  width: 18px;
+  justify-content: center;
+  font-size: 11px;
+}
+
+.family-circle-toggle::part(label) {
+  padding: 0 0 0 4px;
+}
+
+.family-circle-summary {
+  color: var(--lj-muted);
+  font-size: 12px;
+}
+
+.family-circles-row {
+  display: flex;
+  gap: 10px;
   overflow-x: auto;
-  padding-bottom: 6px;
-  margin-bottom: 18px;
+  padding: 4px 2px 8px;
 }
 
 .family-circle-wrap {
@@ -115,6 +131,7 @@
   flex-direction: column;
   align-items: center;
   gap: 6px;
+  flex: 0 0 auto;
 }
 
 .family-circle-actions {
@@ -122,24 +139,38 @@
   gap: 4px;
 }
 
-.family-circle-item {
+.family-circle-item.lj-tile {
   border: 0;
   background: transparent;
+  padding: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  min-width: 86px;
-  color: #55607f;
+  width: 92px;
+  color: var(--lj-muted);
+}
+
+.family-circle-item.lj-tile:hover .family-circle-thumb {
+  border-color: var(--lj-accent);
+}
+
+.family-circle-item.lj-tile:focus-visible {
+  outline: none;
+}
+
+.family-circle-item.lj-tile:focus-visible .family-circle-thumb {
+  outline: 2px solid var(--lj-accent);
+  outline-offset: 2px;
 }
 
 .family-circle-thumb {
-  width: 90px;
-  height: 90px;
-  border-radius: 999px;
-  border: 1px solid #d6deef;
-  overflow: hidden;
-  background: #eef2fd;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  border: 1px solid var(--lj-border);
+  overflow: visible;
+  background: var(--lj-surface-2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -148,33 +179,53 @@
 
 .family-circle-count {
   position: absolute;
-  /* bottom: 6px; */
-  left: -5px;
-  min-width: 24px;
-  height: 24px;
-  text-align: end;
-  border-radius: 0 5px 5px 0;
-  /* border: 1px solid #8a939d; */
-  background: linear-gradient(135deg, #ff4747, #dc0b49);
-  color: #ffffff;
-  font-size: 0.8rem;
-  font-weight: 800;
+  top: -2px;
+  right: -4px;
+  min-width: 22px;
+  height: 20px;
+  border-radius: 4px;
+  border: 2px solid var(--lj-surface);
+  box-sizing: content-box;
+  background: var(--lj-danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
-  padding: 0 4px;
+  padding: 0 5px;
   z-index: 3;
-  padding-left: 10px;
-  box-shadow: 0 4px 10px rgba(23, 37, 84, 0.25);
+}
+
+.sl-theme-dark .family-circle-count {
+  color: #2a0d13;
 }
 
 .family-circle-thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: 50%;
 }
 
+.family-circle-name {
+  font-size: 12px;
+  line-height: 1.3;
+  text-transform: capitalize;
+  text-align: center;
+}
+
+.family-circle-item.is-active .family-circle-thumb {
+  border: 2px solid var(--lj-accent);
+}
+
+.family-circle-item.is-active .family-circle-name {
+  color: var(--lj-accent);
+  font-weight: 600;
+}
+
+/* Miniaturas con carga diferida (compartido con recetas/inventario/producción) */
 .thumb-loading {
   position: absolute;
   inset: 0;
@@ -227,25 +278,7 @@ img.is-broken-image {
   height: 100%;
   object-fit: cover;
   border-radius: inherit;
-  background-color: #eef0f4;
-  background-image: linear-gradient(135deg, #eef0f4 0%, #e2e6ee 100%);
-}
-
-.family-circle-name {
-  font-size: 0.78rem;
-  text-transform: capitalize;
-  text-align: center;
-}
-
-.family-circle-item.is-active .family-circle-thumb {
-  border-color: #dc0b49 !important;
-  border: 2px solid;
-}
-
-.family-circle-item:focus,
-.family-circle-item:focus-visible {
-  outline: none;
-  box-shadow: none;
+  background-color: var(--lj-surface-2);
 }
 
 /* =========================================
@@ -254,47 +287,51 @@ img.is-broken-image {
 .ingredientes-list {
   width: 100%;
   display: grid;
-  gap: 10px;
+  gap: 8px;
   max-height: 46vh;
   overflow-y: auto;
-  padding-right: 6px;
+  padding-right: 4px;
   padding-bottom: 8px;
 }
 
 .ingredientes-list.has-scroll-hint::after {
   content: '↓ Deslizá para ver más ingredientes';
   position: sticky;
-  bottom: -10px;
+  bottom: -8px;
   left: 0;
   right: 0;
   display: block;
   text-align: center;
-  font-size: 0.78rem;
+  font-size: 12px;
   font-weight: 600;
-  color: #7048e9;
-  background: linear-gradient(to bottom, rgba(242, 245, 252, 0), rgb(236 231 255));
-  padding: 10px 0 4px;
-  margin-top: -28px;
+  color: var(--lj-accent);
+  background: var(--lj-surface);
+  border-top: 1px solid var(--lj-border);
+  padding: 6px 0 4px;
   pointer-events: none;
 }
 
 .ingrediente-card {
-  border: 1px solid #dbe0ef;
-  background: #fdfdff;
-  border-radius: 16px;
-  padding: 12px;
+  border: 1px solid var(--lj-border);
+  background: var(--lj-surface);
+  border-radius: var(--lj-radius-lg);
+  padding: 10px 12px;
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
 }
 
+.ingrediente-card:hover {
+  border-color: var(--lj-border-strong);
+}
+
 .ingrediente-avatar {
-  width: 75px;
-  height: 75px;
-  border-radius: 999px;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
   overflow: hidden;
-  border: 1px solid #d6deef;
-  background: #eff2fb;
+  border: 1px solid var(--lj-border);
+  background: var(--lj-surface-2);
   flex-shrink: 0;
   position: relative;
 }
@@ -312,16 +349,17 @@ img.is-broken-image {
 
 .ingrediente-name {
   margin: 0;
+  font-size: 15px;
   font-weight: 700;
-  color: #2a3556;
+  color: var(--lj-text);
   text-transform: capitalize;
 }
 
 .ingrediente-meta,
 .ingrediente-description {
   margin: 2px 0 0;
-  color: #5f6a89;
-  font-size: 0.85rem;
+  color: var(--lj-muted);
+  font-size: 13px;
 }
 
 .ingrediente-meta {
@@ -333,8 +371,8 @@ img.is-broken-image {
   flex-wrap: wrap;
   gap: 10px;
   margin: 3px 0 0;
-  color: #7b86a4;
-  font-size: 0.72rem;
+  color: var(--lj-muted);
+  font-size: 12px;
 }
 
 .ingrediente-dates i {
@@ -356,44 +394,48 @@ img.is-broken-image {
   gap: 6px;
 }
 
-.ingrediente-action,
-.family-manage-btn {
-  border: 1px solid #d3dbf0;
-  background: #eef3ff;
-  color: #2a4ea3;
-  border-radius: 10px;
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+/* Botones de acción (editar/eliminar) de tarjetas y familias */
+sl-button.ingrediente-action::part(base),
+sl-button.family-manage-btn::part(base) {
+  color: var(--lj-accent);
+}
+
+sl-button.ingrediente-action.is-danger::part(base),
+sl-button.family-manage-btn.is-danger::part(base) {
+  color: var(--lj-danger);
+}
+
+sl-button.ingrediente-action.is-danger::part(base):hover,
+sl-button.family-manage-btn.is-danger::part(base):hover {
+  background: var(--lj-danger-soft);
+  border-color: var(--lj-danger);
+  color: var(--lj-danger);
 }
 
 .ingrediente-empty-list {
-  border: 1px dashed #d2d9ed;
-  border-radius: 16px;
+  border: 1px dashed var(--lj-border-strong);
+  border-radius: var(--lj-radius-lg);
   padding: 18px;
   text-align: center;
-  color: #60708f;
+  color: var(--lj-muted);
 }
 
 .ingrediente-empty-list.with-illustration {
-  background: linear-gradient(180deg, #f7f9ff 0%, #f1f4fb 100%);
-  border: 1px dashed #c7d4ef;
+  background: var(--lj-surface-2);
   padding: 12px 10px;
 }
 
 .ingrediente-empty-title {
   margin: 0;
-  color: #56668d;
+  color: var(--lj-text);
   font-weight: 600;
-  font-size: 0.96rem;
+  font-size: 14px;
 }
 
 .ingrediente-empty-filters {
-  margin: 6px 0 6px;
-  font-size: 0.8rem;
-  color: #61719a;
+  margin: 6px 0;
+  font-size: 12px;
+  color: var(--lj-muted);
 }
 
 .ingrediente-empty-tags {
@@ -405,17 +447,13 @@ img.is-broken-image {
 }
 
 .ingrediente-empty-tag {
-  border: 1px solid #c8d5f0;
-  border-radius: 999px;
-  background: #eef3ff;
-  color: #355a9d;
-  font-size: 0.78rem;
+  border: 1px solid var(--lj-border-strong);
+  border-radius: var(--lj-radius);
+  background: var(--lj-accent-soft);
+  color: var(--lj-accent);
+  font-size: 12px;
   font-weight: 600;
   padding: 3px 9px;
-}
-
-.ingrediente-empty-btn {
-  min-height: 34px !important;
 }
 
 .ingrediente-empty-image-wrap {
@@ -430,8 +468,30 @@ img.is-broken-image {
   object-fit: contain;
 }
 
-.swal2-popup.ios-alert.ingredientes-alert {
-  max-width: 720px;
+/* =========================================
+   ALERTAS DE INGREDIENTES (formularios LJAlert)
+========================================= */
+sl-dialog.lj-alert-dialog:has(.ingredientes-alert) {
+  --width: min(720px, 96vw);
+}
+
+sl-dialog.lj-alert-dialog:has(.ingredientes-saving-alert) {
+  --width: 22rem;
+}
+
+.ingredientes-saving-html {
+  overflow: hidden;
+  text-align: center;
+}
+
+.ingredientes-saving-html .meta-spinner-login {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+
+.lj-alert.ingredientes-alert .lj-alert-html {
+  width: 100%;
 }
 
 .ingrediente-form-grid {
@@ -440,22 +500,98 @@ img.is-broken-image {
   text-align: left;
 }
 
-.ingrediente-form-grid label {
+.step-block:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.step-block + .step-block {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--lj-border);
+}
+
+.step-title {
+  margin: 0 0 8px;
+  color: var(--lj-brand);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.step-content {
+  display: grid;
+  gap: 12px;
+}
+
+.family-inline-create {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.custom-measure-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px;
+  gap: 8px;
+}
+
+.ingredientes-alert sl-option::part(base) {
+  font-size: 13px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+/* Selector de impresión (radios + checkboxes con foto) */
+.ingredientes-print-scope::part(form-control-input) {
+  display: grid;
+  gap: 8px;
+}
+
+sl-checkbox.ingredientes-print-check {
   display: block;
-  margin-bottom: 6px;
-  font-size: 0.86rem;
-  color: #566180;
+}
+
+#ingredientPrintProductsScope {
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius-lg);
+  padding: 8px 10px;
+  max-height: 260px;
+}
+
+#ingredientPrintProductsScope .step-block {
+  display: grid;
+  gap: 6px;
+}
+
+#ingredientPrintProductsScope .step-block strong {
+  color: var(--lj-brand);
+  font-size: 13px;
+}
+
+sl-checkbox.ingredientes-print-check::part(base) {
+  align-items: center;
+}
+
+.ingredientes-print-check-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--lj-text);
   font-weight: 600;
 }
 
+/* =========================================
+   SELECTOR / PREVIEW DE IMAGEN (compartido)
+========================================= */
 .image-preview-circle {
-  width: 130px;
-  height: 130px;
-  border-radius: 999px;
-  border: 1px solid #d4ddf1;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 1px solid var(--lj-border);
   margin: 0 auto;
   overflow: hidden;
-  background: #edf2fd;
+  background: var(--lj-surface-2);
   position: relative;
   display: flex;
   align-items: center;
@@ -468,13 +604,10 @@ img.is-broken-image {
   object-fit: cover;
 }
 
-/* =========================================
-   SELECTOR / PREVIEW DE IMAGEN
-========================================= */
 .image-preview-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(248, 250, 255, 0.72);
+  background: var(--lj-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -486,103 +619,34 @@ img.is-broken-image {
   object-fit: contain;
 }
 
-.ai-generate-btn {
-  width: 100%;
-  border-radius: 12px;
-  border: 1px solid #d2daf1;
-  background: #eef3ff;
-  color: #2a4ea3;
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.ai-generate-btn img {
-  width: 30px;
-  height: 30px;
-  object-fit: contain;
-}
-
-.ai-alert-note {
-  border: 1px solid #f0cfcf;
-  background: #fff2f2;
-  color: #945454;
-  border-radius: 12px;
-  padding: 10px;
-  font-size: 0.83rem;
-}
-
-/* SweetAlert layout fix */
-
-.ingredientes-saving-alert .swal2-html-container,
-.swal2-html-container.ingredientes-saving-html {
-  overflow: hidden !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  max-height: none !important;
-}
-
-.swal2-popup.ingredientes-alert .swal2-html-container {
-  width: 100%;
-}
-
-.swal2-popup.ingredientes-alert :is(.swal2-input, .swal2-file, .swal2-textarea, .swal2-select) {
-  margin: 0;
-  width: 100%;
-}
-
-.step-block:first-child {
-  border-top: 0;
-  padding-top: 0;
-}
-
-.step-block + .step-block {
-  margin-top: 12px;
-}
-
-.step-title {
-  margin: 0 0 8px;
-  color: #3f4f78;
-  font-size: 0.98rem;
-  font-weight: 700;
-}
-
-.step-content {
-  display: grid;
-  gap: 10px;
-}
-
-.family-inline-create {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-}
-
-.family-inline-create .ios-btn-secondary {
-  max-width: 180px;
-}
-
-.custom-measure-wrap {
-  display: grid;
-  grid-template-columns: 1fr 140px;
-  gap: 8px;
-}
-
 .image-method-buttons {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.image-method-btn {
-  border: 1px solid #d4ddf1;
-  border-radius: 12px;
-  background: #f3f6ff;
-  color: #425381;
-  min-height: 42px;
-  padding: 8px 12px;
+.image-method-buttons.lj-btn-group {
+  display: inline-flex;
+  gap: 0;
+  flex-wrap: nowrap;
+  justify-self: start;
+}
+
+sl-button.image-method-btn img[slot="prefix"],
+sl-button.ai-generate-btn img[slot="prefix"] {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+/* Botones nativos que todavía usan otros módulos con el mismo selector */
+button.image-method-btn {
+  border: 1px solid var(--lj-border-strong);
+  border-radius: var(--lj-radius);
+  background: var(--lj-surface);
+  color: var(--lj-text);
+  min-height: var(--sl-input-height-medium);
+  padding: 0 12px;
   font-weight: 600;
   display: inline-flex;
   align-items: center;
@@ -590,91 +654,178 @@ img.is-broken-image {
   gap: 6px;
 }
 
-.image-method-btn.is-active {
-  background: #e1eaff;
-  border-color: #99b2ef;
-  color: #2a4ea3;
+button.image-method-btn.is-active {
+  background: var(--lj-accent-soft);
+  border-color: var(--lj-accent);
+  color: var(--lj-accent);
 }
 
-.image-method-btn img {
-  width: 24px;
-  height: 24px;
+button.image-method-btn img {
+  width: 20px;
+  height: 20px;
   object-fit: contain;
 }
 
-.image-method-btn i,
-.ai-generate-btn i {
-  font-size: 1rem;
+sl-button.ai-generate-btn {
+  width: 100%;
 }
 
-.image-file-input {
+button.ai-generate-btn {
+  width: 100%;
+  border-radius: var(--lj-radius);
+  border: 1px solid var(--lj-border-strong);
+  background: var(--lj-surface);
+  color: var(--lj-accent);
+  min-height: var(--sl-input-height-medium);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+button.ai-generate-btn img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.ai-alert-note {
+  border: 1px solid var(--lj-danger);
+  background: var(--lj-danger-soft);
+  color: var(--lj-danger);
+  border-radius: var(--lj-radius);
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.image-file-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.image-file-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--lj-muted);
+  font-size: 13px;
+}
+
+/* input[type=file] visible que todavía usan otros módulos */
+.image-file-input:not([hidden]) {
   min-height: 0;
   height: auto;
-  padding: 6px 10px;
-  border-radius: 12px;
-  border: 1px solid #d2d8e8;
-  background: #f2f4fa;
+  width: 100%;
+  padding: 4px 8px;
+  border-radius: var(--lj-radius);
+  border: 1px solid var(--lj-border-strong);
+  background: var(--lj-surface);
+  color: var(--lj-text);
+  font-size: 13px;
 }
 
 .image-file-input::file-selector-button {
-  border: 0;
-  border-radius: 10px;
-  padding: 8px 12px;
-  background: #e3eafc;
-  color: #2a4ea3;
+  border: 1px solid var(--lj-border-strong);
+  border-radius: var(--lj-radius);
+  padding: 5px 10px;
+  background: var(--lj-surface-2);
+  color: var(--lj-accent);
   margin-right: 10px;
+  font-weight: 600;
 }
 
-.image-placeholder-circle {
+/* Marcadores de imagen (ícono zanahoria) */
+.image-placeholder-circle,
+.family-circle-thumb-placeholder,
+.ingrediente-avatar-placeholder,
+.image-placeholder-circle-2 {
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--lj-accent-soft);
+  color: var(--lj-accent);
+}
+
+.image-placeholder-circle,
+.ingrediente-avatar-placeholder,
+.image-placeholder-circle-2 {
   width: 100%;
   height: 100%;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #ece6ff;
-  color: #7048e8;
 }
 
-.family-circle-thumb-placeholder {
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #ece6ff;
-  color: #7048e8;
-}
-
-.ingrediente-avatar-placeholder {
-  width: 100%;
-  height: 100%;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #ece6ff;
-  color: #7048e8;
+.image-placeholder-circle-2 {
+  border: 1px solid var(--lj-border);
 }
 
 .image-placeholder-circle i,
 .family-circle-thumb-placeholder i,
 .ingrediente-avatar-placeholder i {
-  font-size: 2.2rem;
+  font-size: 28px;
 }
 
 .image-placeholder-circle-2 i {
-  font-size: 2.5rem;
+  font-size: 30px;
 }
 
-.image-placeholder-circle-2 {
-  width: 100%;
-  height: 100%;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #ece6ff;
-  color: #6f46eb;
-  border: 1px solid #d8ccff;
+.inventario-print-photo-wrap .image-placeholder-circle-2 i {
+  font-size: 14px;
 }
 
+/* =========================================
+   MÓVIL
+========================================= */
+@media (max-width: 767.98px) {
+  .ingredientes-data .ingredientes-toolbar {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+  }
+
+  .ingredientes-data .ingredientes-search-group {
+    flex: 0 0 auto;
+    max-width: none;
+  }
+
+  .ingredientes-data .ingredientes-toolbar-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .ingredientes-toolbar-actions sl-button {
+    flex: 1 1 0;
+  }
+
+  .ingredientes-toolbar-actions sl-button.boton-fc {
+    width: auto !important;
+  }
+
+  .ingredientes-list {
+    max-height: none;
+  }
+
+  .ingrediente-card {
+    align-items: flex-start;
+  }
+
+  .ingrediente-avatar {
+    width: 52px;
+    height: 52px;
+  }
+
+  .family-circle-item.lj-tile {
+    width: 76px;
+  }
+
+  .family-circle-thumb {
+    width: 68px;
+    height: 68px;
+  }
+
+  .custom-measure-wrap {
+    grid-template-columns: minmax(0, 1fr) 110px;
+  }
+}

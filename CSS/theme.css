@@ -109,3 +109,6 @@ sl-button::part(base) { font-weight: 600; }
 sl-button[variant="default"]::part(base) { background: var(--lj-surface); border-color: var(--lj-border-strong); color: var(--lj-text); }
 sl-button[variant="default"]::part(base):hover { background: var(--lj-accent-soft); border-color: var(--lj-border-strong); color: var(--lj-accent); }
 sl-button[variant="text"]::part(base) { color: var(--lj-accent); }
+
+/* Opciones de selects: mismo tamaño que los controles */
+sl-option::part(base) { font-size: 13px; padding-top: 6px; padding-bottom: 6px; }

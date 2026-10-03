@@ -61,65 +61,17 @@
     }
   };
 
-  const parkFocusOutsideHiddenContainers = () => {
-    let node = document.getElementById('focusParkingNode');
-    if (!node) {
-      node = document.createElement('button');
-      node.id = 'focusParkingNode';
-      node.type = 'button';
-      node.setAttribute('aria-hidden', 'true');
-      node.tabIndex = -1;
-      node.style.position = 'fixed';
-      node.style.opacity = '0';
-      node.style.pointerEvents = 'none';
-      node.style.width = '1px';
-      node.style.height = '1px';
-      node.style.left = '-9999px';
-      node.style.top = '-9999px';
-      document.body.appendChild(node);
+  const openIosSwal = (options) => Swal.fire({
+    ...options,
+    customClass: {
+      popup: `ios-alert ingredientes-alert ${options?.customClass?.popup || ''}`.trim(),
+      title: 'ios-alert-title',
+      htmlContainer: 'ios-alert-text',
+      confirmButton: 'primary',
+      cancelButton: 'secondary',
+      ...options.customClass
     }
-    node.focus({ preventScroll: true });
-  };
-
-  const releaseAriaHiddenFocus = () => {
-    const active = document.activeElement;
-    if (!active || active === document.body) return;
-    let node = active;
-    while (node && node !== document.body) {
-      if (node.getAttribute && node.getAttribute('aria-hidden') === 'true') {
-        blurActiveElement();
-        document.body.focus?.();
-        break;
-      }
-      node = node.parentElement;
-    }
-  };
-
-  const openIosSwal = (options) => {
-    blurActiveElement();
-    releaseAriaHiddenFocus();
-    parkFocusOutsideHiddenContainers();
-    ingredientesModal.setAttribute('inert', '');
-    return Swal.fire({
-      ...options,
-      returnFocus: false,
-      willClose: () => {
-        ingredientesModal.removeAttribute('inert');
-        if (typeof options.willClose === 'function') {
-          options.willClose();
-        }
-      },
-      customClass: {
-        popup: `ios-alert ingredientes-alert ${options?.customClass?.popup || ''}`.trim(),
-        title: 'ios-alert-title',
-        htmlContainer: 'ios-alert-text',
-        confirmButton: 'ios-btn ios-btn-primary',
-        cancelButton: 'ios-btn ios-btn-secondary',
-        ...options.customClass
-      },
-      buttonsStyling: false
-    });
-  };
+  });
 
   const measureKey = (name) => normalizeLower(name);
 
@@ -260,7 +212,7 @@
 
     const allButton = `
       <div class="family-circle-wrap">
-        <button type="button" class="family-circle-item ${state.activeFamilyId === 'all' ? 'is-active' : ''}" data-family-filter="all">
+        <button type="button" class="lj-tile family-circle-item ${state.activeFamilyId === 'all' ? 'is-active' : ''}" data-family-filter="all">
           <span class="family-circle-thumb family-circle-thumb-placeholder">${PLACEHOLDER_ICON}</span>
           <span class="family-circle-name">Todas</span>
         </button>
@@ -269,13 +221,13 @@
 
     const familyButtons = families.map((family) => `
       <div class="family-circle-wrap">
-        <button type="button" class="family-circle-item ${state.activeFamilyId === family.id ? 'is-active' : ''}" data-family-filter="${family.id}">
+        <button type="button" class="lj-tile family-circle-item ${state.activeFamilyId === family.id ? 'is-active' : ''}" data-family-filter="${family.id}">
           ${familyAvatar(family.imageUrl, capitalizeLabel(family.name), ingredientCounts[family.id] || 0)}
           <span class="family-circle-name">${capitalizeLabel(family.name)}</span>
         </button>
         <div class="family-circle-actions">
-          <button class="family-manage-btn" data-family-edit="${family.id}" type="button" title="Editar familia"><i class="fa-solid fa-pen"></i></button>
-          <button class="family-manage-btn" data-family-delete="${family.id}" type="button" title="Eliminar familia"><i class="fa-solid fa-trash"></i></button>
+          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn" data-family-edit="${family.id}" type="button" title="Editar familia" aria-label="Editar familia"><i class="fa-solid fa-pen"></i></sl-button>
+          <sl-button variant="default" size="small" class="lj-icon-btn family-manage-btn is-danger" data-family-delete="${family.id}" type="button" title="Eliminar familia" aria-label="Eliminar familia"><i class="fa-solid fa-trash"></i></sl-button>
         </div>
       </div>
     `).join('');
@@ -290,11 +242,11 @@
     familiasCircles.innerHTML = `
       <div class="family-circle-section ${collapsed ? 'is-collapsed' : ''}">
         <div class="family-circle-section-head">
-          <button type="button" class="family-circle-toggle" data-ing-families-toggle aria-expanded="${!collapsed}">
-            <i class="fa-solid ${collapsed ? 'fa-chevron-right' : 'fa-chevron-down'}"></i>
-            <span>Familias</span>
-            <small>${families.length} ${families.length === 1 ? 'familia' : 'familias'}${activeName ? ` · filtrando: ${activeName}` : ''}${hasSearch ? ' · oculto por búsqueda' : ''}</small>
-          </button>
+          <sl-button variant="text" size="small" type="button" class="family-circle-toggle" data-ing-families-toggle aria-expanded="${!collapsed}">
+            <i slot="prefix" class="fa-solid ${collapsed ? 'fa-chevron-right' : 'fa-chevron-down'}"></i>
+            Familias
+          </sl-button>
+          <small class="family-circle-summary">${families.length} ${families.length === 1 ? 'familia' : 'familias'}${activeName ? ` · filtrando: ${activeName}` : ''}${hasSearch ? ' · oculto por búsqueda' : ''}</small>
         </div>
         <div class="family-circle-section-body ${collapsed ? 'd-none' : ''}">
           <div class="family-circles-row">${allButton}${familyButtons}</div>
@@ -383,7 +335,7 @@
         const familyLabel = state.activeFamilyId === 'all'
           ? 'Todas las familias'
           : capitalizeLabel(state.ingredientes.familias?.[state.activeFamilyId]?.name || 'Sin familia');
-        helperHtml = `<div class="ingrediente-empty-list with-illustration"><p class="ingrediente-empty-title">No hay resultados con los filtros actuales.</p><div class="ingrediente-empty-image-wrap"><img src="${escapeHtml(NO_DATA_IMAGE_URL)}" alt="Sin resultados" class="ingrediente-empty-image"></div><p class="ingrediente-empty-filters">Usando filtro:</p><div class="ingrediente-empty-tags"><span class="ingrediente-empty-tag">${escapeHtml(familyLabel)}</span></div><button type="button" class="btn ios-btn ios-btn-secondary inventario-threshold-btn ingrediente-empty-btn" data-ingredient-search-all><i class="bi bi-lightning-charge"></i><span>Buscar en toda la base</span></button></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del filtro</strong> seleccionado</p>`;
+        helperHtml = `<div class="ingrediente-empty-list with-illustration"><p class="ingrediente-empty-title">No hay resultados con los filtros actuales.</p><div class="ingrediente-empty-image-wrap"><img src="${escapeHtml(NO_DATA_IMAGE_URL)}" alt="Sin resultados" class="ingrediente-empty-image"></div><p class="ingrediente-empty-filters">Usando filtro:</p><div class="ingrediente-empty-tags"><span class="ingrediente-empty-tag">${escapeHtml(familyLabel)}</span></div><sl-button variant="default" size="small" type="button" class="ingrediente-empty-btn" data-ingredient-search-all><sl-icon slot="prefix" name="lightning-charge"></sl-icon>Buscar en toda la base</sl-button></div><hr class="inventario-filter-separator"><p class="inventario-filter-helper">Coincidencias <strong>fuera del filtro</strong> seleccionado</p>`;
       } else {
         ingredientesList.innerHTML = '<div class="ingrediente-empty-list">No encontramos ingredientes con ese filtro.</div>';
         updateListScrollHint();
@@ -405,8 +357,8 @@
           ${item.description ? `<p class="ingrediente-description">${item.description}</p>` : ''}
         </div>
         <div class="ingrediente-actions">
-          <button class="ingrediente-action" type="button" data-ingrediente-edit="${item.id}" title="Editar ingrediente"><i class="fa-solid fa-pen"></i></button>
-          <button class="ingrediente-action" type="button" data-ingrediente-delete="${item.id}" title="Eliminar ingrediente"><i class="fa-solid fa-trash"></i></button>
+          <sl-button variant="default" size="small" class="lj-icon-btn ingrediente-action" type="button" data-ingrediente-edit="${item.id}" title="Editar ingrediente" aria-label="Editar ingrediente"><i class="fa-solid fa-pen"></i></sl-button>
+          <sl-button variant="default" size="small" class="lj-icon-btn ingrediente-action is-danger" type="button" data-ingrediente-delete="${item.id}" title="Eliminar ingrediente" aria-label="Eliminar ingrediente"><i class="fa-solid fa-trash"></i></sl-button>
         </div>
       </article>
     `).join('')}`;
@@ -441,13 +393,14 @@
     separator.className = 'barra-separadora ingredientes-toolbar-separator';
     separator.setAttribute('aria-hidden', 'true');
 
-    printIngredientsBtn = document.createElement('button');
-    printIngredientsBtn.type = 'button';
+    printIngredientsBtn = document.createElement('sl-button');
+    printIngredientsBtn.setAttribute('variant', 'default');
+    printIngredientsBtn.setAttribute('type', 'button');
     printIngredientsBtn.id = 'printIngredientsBtn';
-    printIngredientsBtn.className = 'btn ios-btn ios-btn-secondary produccion-toolbar-icon-btn boton-fc';
+    printIngredientsBtn.className = 'produccion-toolbar-icon-btn boton-fc';
     printIngredientsBtn.title = 'Imprimir';
     printIngredientsBtn.setAttribute('aria-label', 'Imprimir');
-    printIngredientsBtn.innerHTML = '<i class="fa-solid fa-print"></i><span>Imprimir</span>';
+    printIngredientsBtn.innerHTML = '<i slot="prefix" class="fa-solid fa-print"></i><span>Imprimir</span>';
 
     actionsWrap.insertBefore(separator, createIngredientBtn);
     actionsWrap.insertBefore(printIngredientsBtn, separator);
@@ -456,34 +409,35 @@
   const openIngredientsScopeSelector = async () => openIosSwal({
     title: 'Selector de productos',
     html: `<div class="swal-stack-fields text-start">
-      <label class="inventario-check-row"><input type="radio" name="ingredientPrintScope" value="all" checked><span>Todos los productos</span></label>
-      <label class="inventario-check-row"><input type="radio" name="ingredientPrintScope" value="exclude"><span>Algunos productos</span></label>
-      <label class="inventario-check-row"><input type="radio" name="ingredientPrintScope" value="perishable"><span>Perecederos o no perecederos</span></label>
+      <sl-radio-group name="ingredientPrintScope" value="all" class="ingredientes-print-scope">
+        <sl-radio value="all">Todos los productos</sl-radio>
+        <sl-radio value="exclude">Algunos productos</sl-radio>
+        <sl-radio value="perishable">Perecederos o no perecederos</sl-radio>
+      </sl-radio-group>
       <div id="ingredientPrintTypeScope" class="notify-specific-users-list d-none">
-        <label class="inventario-check-row"><input type="radio" name="ingredientPerishableType" value="perishable" checked><span>Solo perecederos</span></label>
-        <label class="inventario-check-row"><input type="radio" name="ingredientPerishableType" value="non_perishable"><span>Solo no perecederos</span></label>
+        <sl-radio-group name="ingredientPerishableType" value="perishable" class="ingredientes-print-scope">
+          <sl-radio value="perishable">Solo perecederos</sl-radio>
+          <sl-radio value="non_perishable">Solo no perecederos</sl-radio>
+        </sl-radio-group>
       </div>
       <div id="ingredientPrintProductsScope" class="notify-specific-users-list d-none">
-        <div class="step-block"><strong>Familias</strong>${getFamiliasArray().map((family) => `<label class="inventario-check-row inventario-selector-row">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${escapeHtml(family.imageUrl)}" alt="${escapeHtml(capitalizeLabel(family.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<input type="checkbox" data-ingredient-print-family value="${family.id}"><span>${escapeHtml(capitalizeLabel(family.name))}</span></label>`).join('')}</div>
-        <div class="step-block"><strong>Productos</strong>${getIngredientesArray().map((item) => `<label class="inventario-check-row inventario-selector-row">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(capitalizeLabel(item.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<input type="checkbox" data-ingredient-print-product data-family-id="${item.familyId || ''}" value="${item.id}"><span>${escapeHtml(capitalizeLabel(item.name))}</span></label>`).join('')}</div>
+        <div class="step-block"><strong>Familias</strong>${getFamiliasArray().map((family) => `<sl-checkbox class="ingredientes-print-check" data-ingredient-print-family value="${family.id}"><span class="ingredientes-print-check-label">${family.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${escapeHtml(family.imageUrl)}" alt="${escapeHtml(capitalizeLabel(family.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<span>${escapeHtml(capitalizeLabel(family.name))}</span></span></sl-checkbox>`).join('')}</div>
+        <div class="step-block"><strong>Productos</strong>${getIngredientesArray().map((item) => `<sl-checkbox class="ingredientes-print-check" data-ingredient-print-product data-family-id="${item.familyId || ''}" value="${item.id}"><span class="ingredientes-print-check-label">${item.imageUrl ? `<span class="inventario-print-photo-wrap"><span class="thumb-loading"><img class="meta-spinner" src="./IMG/Meta-ai-logo.webp" alt="Cargando"></span><img class="thumb-image js-ingredientes-print-thumb ingredientes-print-thumb-fit" src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(capitalizeLabel(item.name))}"></span>` : '<span class="inventario-print-photo-wrap"><span class="image-placeholder-circle-2"><i class="fa-solid fa-carrot"></i></span></span>'}<span>${escapeHtml(capitalizeLabel(item.name))}</span></span></sl-checkbox>`).join('')}</div>
       </div>
     </div>`,
     showCancelButton: true,
     confirmButtonText: 'Continuar',
     cancelButtonText: 'Cancelar',
     didOpen: () => {
-      const all = document.querySelector('input[name="ingredientPrintScope"][value="all"]');
-      const exclude = document.querySelector('input[name="ingredientPrintScope"][value="exclude"]');
-      const perishable = document.querySelector('input[name="ingredientPrintScope"][value="perishable"]');
+      const scopeGroup = document.querySelector('sl-radio-group[name="ingredientPrintScope"]');
       const productsScope = document.getElementById('ingredientPrintProductsScope');
       const typeScope = document.getElementById('ingredientPrintTypeScope');
       const toggle = () => {
-        productsScope?.classList.toggle('d-none', !exclude?.checked);
-        typeScope?.classList.toggle('d-none', !perishable?.checked);
+        const mode = scopeGroup?.value || 'all';
+        productsScope?.classList.toggle('d-none', mode !== 'exclude');
+        typeScope?.classList.toggle('d-none', mode !== 'perishable');
       };
-      all?.addEventListener('change', toggle);
-      exclude?.addEventListener('change', toggle);
-      perishable?.addEventListener('change', toggle);
+      scopeGroup?.addEventListener('change', toggle);
       document.querySelectorAll('[data-ingredient-print-family]').forEach((familyCheckbox) => {
         familyCheckbox.addEventListener('change', () => {
           const familyId = familyCheckbox.value;
@@ -496,9 +450,9 @@
       prepareThumbLoaders('.js-ingredientes-print-thumb');
     },
     preConfirm: () => {
-      const mode = document.querySelector('input[name="ingredientPrintScope"]:checked')?.value || 'all';
-      const selected = [...document.querySelectorAll('[data-ingredient-print-product]:checked')].map((node) => node.value);
-      const targetPerishable = document.querySelector('input[name="ingredientPerishableType"]:checked')?.value || 'perishable';
+      const mode = document.querySelector('sl-radio-group[name="ingredientPrintScope"]')?.value || 'all';
+      const selected = [...document.querySelectorAll('sl-checkbox[data-ingredient-print-product]')].filter((node) => node.checked).map((node) => node.value);
+      const targetPerishable = document.querySelector('sl-radio-group[name="ingredientPerishableType"]')?.value || 'perishable';
       if (mode === 'exclude' && !selected.length) {
         Swal.showValidationMessage('Seleccioná al menos un producto para imprimir.');
         return false;
@@ -552,7 +506,6 @@
       }
     } finally {
       Swal.close();
-      ingredientesModal.removeAttribute('inert');
     }
     const selector = await openIngredientsScopeSelector();
     if (!selector.isConfirmed) return;
@@ -617,10 +570,10 @@
     <section class="step-block">
       <h6 class="step-title">3) Imagen</h6>
       <div class="step-content">
-        <div class="image-method-buttons" id="${prefix}_methodButtons">
-          <button type="button" class="btn image-method-btn" data-image-method="url"><i class="fa-solid fa-link"></i>Link</button>
-          <button type="button" class="btn image-method-btn" data-image-method="upload"><i class="fa-solid fa-upload"></i>Subir</button>
-          <button type="button" class="btn image-method-btn is-active" data-image-method="ai"><img src="${IA_ICON_SRC}" alt="" aria-hidden="true"> IA</button>
+        <div class="image-method-buttons lj-btn-group" id="${prefix}_methodButtons" role="group" aria-label="Origen de la imagen">
+          <sl-button variant="default" type="button" class="image-method-btn" data-image-method="url"><i slot="prefix" class="fa-solid fa-link"></i>Link</sl-button>
+          <sl-button variant="default" type="button" class="image-method-btn" data-image-method="upload"><i slot="prefix" class="fa-solid fa-upload"></i>Subir</sl-button>
+          <sl-button variant="default" type="button" class="image-method-btn is-active" data-image-method="ai"><img slot="prefix" src="${IA_ICON_SRC}" alt="" aria-hidden="true">IA</sl-button>
         </div>
         <input type="hidden" id="${prefix}_method" value="ai">
 
@@ -629,22 +582,24 @@
         </div>
 
         <div id="${prefix}_urlWrap">
-          <label for="${prefix}_imageUrl">Link de imagen</label>
-          <input id="${prefix}_imageUrl" class="swal2-input ios-input" placeholder="https://..." value="${initialImage || ''}">
+          <sl-input id="${prefix}_imageUrl" label="Link de imagen" placeholder="https://..." value="${escapeHtml(initialImage || '')}"></sl-input>
         </div>
 
         <div id="${prefix}_uploadWrap" class="d-none">
-          <label for="${prefix}_imageFile">Subir imagen</label>
-          <input id="${prefix}_imageFile" type="file" class="form-control image-file-input" accept="image/*">
+          <label class="lj-label" for="${prefix}_imageFile">Subir imagen</label>
+          <div class="image-file-picker">
+            <input id="${prefix}_imageFile" type="file" class="image-file-input" accept="image/*" hidden>
+            <sl-button variant="default" type="button" id="${prefix}_imageFilePick"><i slot="prefix" class="fa-solid fa-upload"></i>Elegir archivo</sl-button>
+            <span id="${prefix}_imageFileName" class="image-file-name">Ningún archivo seleccionado</span>
+          </div>
         </div>
 
         <div id="${prefix}_aiWrap" class="d-none">
-          <label for="${prefix}_aiPrompt">Prompt corto para IA</label>
-          <input id="${prefix}_aiPrompt" class="swal2-input ios-input" placeholder="Ej: carne de cerdo">
-          <button id="${prefix}_aiGenerate" type="button" class="ai-generate-btn mt-2">
-            <img src="${IA_ICON_SRC}" alt="" aria-hidden="true">
-            <span>Generar imagen con IA</span>
-          </button>
+          <sl-input id="${prefix}_aiPrompt" label="Prompt corto para IA" placeholder="Ej: carne de cerdo"></sl-input>
+          <sl-button variant="default" id="${prefix}_aiGenerate" type="button" class="ai-generate-btn mt-2">
+            <img slot="prefix" src="${IA_ICON_SRC}" alt="" aria-hidden="true">
+            Generar imagen con IA
+          </sl-button>
           <div id="${prefix}_aiError" class="ai-alert-note d-none mt-2"></div>
         </div>
       </div>
@@ -667,6 +622,8 @@
     const preview = document.getElementById(`${prefix}_preview`);
     const imageUrlInput = document.getElementById(`${prefix}_imageUrl`);
     const imageFileInput = document.getElementById(`${prefix}_imageFile`);
+    const imageFilePick = document.getElementById(`${prefix}_imageFilePick`);
+    const imageFileName = document.getElementById(`${prefix}_imageFileName`);
     const aiPromptInput = document.getElementById(`${prefix}_aiPrompt`);
     const aiGenerateBtn = document.getElementById(`${prefix}_aiGenerate`);
     const aiError = document.getElementById(`${prefix}_aiError`);
@@ -701,13 +658,22 @@
       }
     });
 
+    const showFileName = () => {
+      if (!imageFileName) return;
+      const file = imageFileInput.files && imageFileInput.files[0];
+      imageFileName.textContent = file ? file.name : 'Ningún archivo seleccionado';
+    };
+    imageFilePick?.addEventListener('click', () => imageFileInput.click());
+
     imageFileInput.addEventListener('change', () => {
       const file = imageFileInput.files && imageFileInput.files[0];
       const message = validateImageFile(file);
+      showFileName();
       if (message) {
         aiError.textContent = `Archivo no admitido: ${message}`;
         aiError.classList.remove('d-none');
         imageFileInput.value = '';
+        showFileName();
         setPreview('');
         return;
       }
@@ -802,7 +768,6 @@
   };
 
   const showSavingOverlay = () => {
-    ingredientesModal.setAttribute('inert', '');
     Swal.fire({
       title: 'Guardando...',
       html: '<img src="./IMG/Meta-ai-logo.webp" alt="Guardando" class="meta-spinner-login">',
@@ -813,16 +778,12 @@
         popup: 'ios-alert ingredientes-alert ingredientes-saving-alert',
         title: 'ios-alert-title',
         htmlContainer: 'ios-alert-text ingredientes-saving-html'
-      },
-      willClose: () => {
-        ingredientesModal.removeAttribute('inert');
       }
     });
   };
 
   const hideSavingOverlay = () => {
     Swal.close();
-    ingredientesModal.removeAttribute('inert');
   };
 
   const openFamilyForm = async (initial = null) => {
@@ -839,8 +800,7 @@
           <section class="step-block">
             <h6 class="step-title">1) Datos de familia</h6>
             <div class="step-content">
-              <label for="familyNameInput">Nombre de familia *</label>
-              <input id="familyNameInput" class="swal2-input ios-input" placeholder="Ej: Carnes" value="${initial ? capitalizeLabel(initial.name) : ''}">
+              <sl-input id="familyNameInput" label="Nombre de familia *" placeholder="Ej: Carnes" value="${initial ? escapeHtml(capitalizeLabel(initial.name)) : ''}"></sl-input>
             </div>
           </section>
           ${buildImageStepHtml('familyImage', initial?.imageUrl || '')}
@@ -900,6 +860,9 @@
     const isEdit = Boolean(initial);
     const families = getFamiliasArray().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     const measures = getMeasures();
+    const selectedFamilyId = normalizeValue(draft?.familyId || initial?.familyId);
+    const selectedFamily = families.find((family) => family.id === selectedFamilyId);
+    const selectedMeasure = measures.find((item) => measureKey(item.name) === measureKey(draft?.measure || initial?.measure));
 
     const result = await openIosSwal({
       title: isEdit ? 'Editar ingrediente' : 'Crear ingrediente',
@@ -907,43 +870,40 @@
       confirmButtonText: isEdit ? 'Guardar' : 'Crear ingrediente',
       cancelButtonText: 'Cancelar',
       customClass: {
-        confirmButton: `ios-btn ${isEdit ? 'ios-btn-primary' : 'ios-btn-success'}`,
-        cancelButton: 'ios-btn ios-btn-secondary'
+        confirmButton: isEdit ? 'primary' : 'success',
+        cancelButton: 'secondary'
       },
       html: `
         <div class="ingrediente-form-grid">
           <section class="step-block">
             <h6 class="step-title">1) Datos básicos</h6>
             <div class="step-content">
-              <label for="ingredientNameInput">Nombre de ingrediente *</label>
-              <input id="ingredientNameInput" class="swal2-input ios-input" placeholder="Ej: Jamón cocido" value="${draft?.name ?? (initial ? capitalizeLabel(initial.name) : '')}">
+              <sl-input id="ingredientNameInput" label="Nombre de ingrediente *" placeholder="Ej: Jamón cocido" value="${escapeHtml(draft?.name ?? (initial ? capitalizeLabel(initial.name) : ''))}"></sl-input>
 
-              <label for="ingredientFamilySelect">Familia *</label>
-              <div class="family-inline-create">
-                <select id="ingredientFamilySelect" class="form-select ios-input">
-                  <option value="">Seleccioná una familia</option>
-                  ${families.map((family) => `<option value="${family.id}" ${(draft?.familyId || initial?.familyId) === family.id ? 'selected' : ''}>${capitalizeLabel(family.name)}</option>`).join('')}
-                </select>
-                <button type="button" id="createFamilyInline" class="btn ios-btn ios-btn-secondary">Crear familia</button>
+              <div>
+                <label class="lj-label" for="ingredientFamilySelect">Familia *</label>
+                <div class="family-inline-create">
+                  <sl-select id="ingredientFamilySelect" placeholder="Seleccioná una familia" hoist value="${selectedFamily ? ljOptionValue(selectedFamily.id) : ''}">
+                    ${families.map((family) => `<sl-option value="${ljOptionValue(family.id)}">${capitalizeLabel(family.name)}</sl-option>`).join('')}
+                  </sl-select>
+                  <sl-button variant="default" type="button" id="createFamilyInline">Crear familia</sl-button>
+                </div>
               </div>
 
-              <label for="ingredientDescriptionInput">Descripción (opcional)</label>
-              <textarea id="ingredientDescriptionInput" class="swal2-textarea ios-input" placeholder="Descripción del ingrediente">${draft?.description ?? (initial?.description || '')}</textarea>
+              <sl-textarea id="ingredientDescriptionInput" label="Descripción (opcional)" resize="auto" rows="3" placeholder="Descripción del ingrediente" value="${escapeHtml(draft?.description ?? (initial?.description || ''))}"></sl-textarea>
             </div>
           </section>
 
           <section class="step-block">
             <h6 class="step-title">2) Medida</h6>
             <div class="step-content">
-              <label for="ingredientMeasureSelect">Medida *</label>
-              <select id="ingredientMeasureSelect" class="form-select ios-input">
-                <option value="">Seleccioná una medida</option>
-                ${measures.map((item) => `<option value="${item.name}" ${measureKey((draft?.measure || initial?.measure)) === measureKey(item.name) ? 'selected' : ''}>${capitalizeLabel(item.name)} (${item.abbr})</option>`).join('')}
-                <option value="custom">Otra medida</option>
-              </select>
+              <sl-select id="ingredientMeasureSelect" label="Medida *" placeholder="Seleccioná una medida" hoist value="${selectedMeasure ? ljOptionValue(selectedMeasure.name) : ''}">
+                ${measures.map((item) => `<sl-option value="${ljOptionValue(item.name)}">${capitalizeLabel(item.name)} (${item.abbr})</sl-option>`).join('')}
+                <sl-option value="custom">Otra medida</sl-option>
+              </sl-select>
               <div id="customMeasureWrap" class="d-none custom-measure-wrap">
-                <input id="ingredientMeasureCustomName" class="swal2-input ios-input" placeholder="Nombre de medida">
-                <input id="ingredientMeasureCustomAbbr" class="swal2-input ios-input" placeholder="Abreviatura">
+                <sl-input id="ingredientMeasureCustomName" placeholder="Nombre de medida"></sl-input>
+                <sl-input id="ingredientMeasureCustomAbbr" placeholder="Abreviatura"></sl-input>
               </div>
             </div>
           </section>
@@ -959,28 +919,21 @@
         const familySelect = document.getElementById('ingredientFamilySelect');
 
         measureSelect.addEventListener('change', () => {
-          customWrap.classList.toggle('d-none', measureSelect.value !== 'custom');
+          customWrap.classList.toggle('d-none', ljSelectValue(measureSelect) !== 'custom');
         });
 
         createFamilyInline.addEventListener('click', async () => {
           const draftState = {
             name: document.getElementById('ingredientNameInput').value,
-            familyId: familySelect.value,
+            familyId: ljSelectValue(familySelect),
             description: document.getElementById('ingredientDescriptionInput').value,
-            measure: document.getElementById('ingredientMeasureSelect').value,
+            measure: ljSelectValue(document.getElementById('ingredientMeasureSelect')),
             customName: document.getElementById('ingredientMeasureCustomName').value,
             customAbbr: document.getElementById('ingredientMeasureCustomAbbr').value
           };
 
-          blurActiveElement();
-          releaseAriaHiddenFocus();
           Swal.close();
-          ingredientesModal.removeAttribute('inert');
-          parkFocusOutsideHiddenContainers();
           await new Promise((resolve) => setTimeout(resolve, 30));
-          blurActiveElement();
-          releaseAriaHiddenFocus();
-          parkFocusOutsideHiddenContainers();
           const familyId = await openFamilyForm();
           if (!familyId) {
             await openIngredientForm(initial, draftState);
@@ -993,9 +946,9 @@
       },
       preConfirm: async () => {
         const name = normalizeLower(document.getElementById('ingredientNameInput').value);
-        const familyId = normalizeValue(document.getElementById('ingredientFamilySelect').value);
+        const familyId = normalizeValue(ljSelectValue(document.getElementById('ingredientFamilySelect')));
         const description = normalizeValue(document.getElementById('ingredientDescriptionInput').value);
-        const measureSelect = normalizeLower(document.getElementById('ingredientMeasureSelect').value);
+        const measureSelect = normalizeLower(ljSelectValue(document.getElementById('ingredientMeasureSelect')));
         const customName = normalizeLower(document.getElementById('ingredientMeasureCustomName').value);
         const customAbbr = normalizeValue(document.getElementById('ingredientMeasureCustomAbbr').value);
 
@@ -1176,16 +1129,15 @@
   };
 
 
-  ingredientesModal.addEventListener('hide.bs.modal', () => {
+  LJModal.on(ingredientesModal, 'hide', () => {
     blurActiveElement();
   });
 
-  ingredientesModal.addEventListener('hidden.bs.modal', () => {
+  LJModal.on(ingredientesModal, 'hidden', () => {
     blurActiveElement();
-    ingredientesModal.removeAttribute('inert');
   });
 
-  ingredientesModal.addEventListener('show.bs.modal', loadIngredientes);
+  LJModal.on(ingredientesModal, 'show', loadIngredientes);
   let searchRenderTimer = null;
   const scheduleIngredientesSearchRender = () => {
     if (searchRenderTimer) {
