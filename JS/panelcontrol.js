@@ -942,7 +942,7 @@ const printReport = async (report) => {
       splitLine: { lineStyle: { color: theme.border, width: 1, type: 'dotted' } },
       axisLabel: { color: theme.muted, fontSize: 11, formatter: formatAxis }
     };
-    const grid = { left: isHorizontal ? 8 : (narrow ? 28 : 16), right: isHorizontal ? 48 : 16, top: 16, bottom: 8, containLabel: true };
+    const grid = { left: isHorizontal ? 8 : (narrow ? 36 : 44), right: isHorizontal ? 48 : 16, top: 16, bottom: 8, containLabel: true };
 
     if (type === 'line') {
       return {

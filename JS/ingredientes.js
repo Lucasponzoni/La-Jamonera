@@ -1343,7 +1343,7 @@
       // Re-render de familias para que se colapse / expanda según haya búsqueda.
       renderFamilies();
       renderIngredientes();
-    }, 0);
+    }, 120); // espera breve: no redibujar ~250 filas en cada tecla
   };
   if (searchInput) {
     searchInput.addEventListener('input', (event) => {

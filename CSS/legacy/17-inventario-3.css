@@ -1145,7 +1145,7 @@ sl-dialog.lj-alert-dialog:has(.inventario-provider-rne-alert) { --width: min(960
 }
 @media (max-width: 767.98px) {
   #inventarioModal .inventario-toolbar > sl-input { flex-basis: 100%; max-width: none; }
-  #inventarioModal .inventario-toolbar-actions { margin-left: 0; width: 100%; overflow-x: auto; }
+  #inventarioModal .inventario-toolbar-actions { margin-left: 0; width: 100%; }
 }
 
 /* Avisos (vencidos / RNE) */
@@ -1208,16 +1208,18 @@ sl-dialog.lj-alert-dialog:has(.inventario-provider-rne-alert) { --width: min(960
 .lj-alert .inventario-provider-manager-copy { font-size: 13px; color: var(--lj-muted); margin: 0; }
 
 
-/* Barra de Inventario en celular: acciones en una fila con scroll horizontal (no se aprietan). */
+/* Barra de Inventario en celular: las acciones se acomodan en filas (todas visibles, sin scroll
+   oculto) y la acción principal ocupa el ancho al final. */
 @media (max-width: 767.98px) {
-  .inventario-toolbar.recetas-toolbar .inventario-toolbar-actions {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-    padding-bottom: 2px;
+  #inventarioModal .inventario-toolbar.recetas-toolbar .inventario-toolbar-actions {
+    flex-wrap: wrap;
+    overflow: visible;
+    padding-bottom: 0;
   }
-  .inventario-toolbar.recetas-toolbar .inventario-toolbar-actions > sl-button { flex: 0 0 auto; }
-  .inventario-toolbar.recetas-toolbar .inventario-toolbar-actions > sl-button#inventarioToolbarCreateIngredientBtn { margin-left: auto; }
+  #inventarioModal .inventario-toolbar.recetas-toolbar .inventario-toolbar-actions > sl-button { flex: 1 1 auto; }
+  #inventarioModal .inventario-toolbar.recetas-toolbar .inventario-toolbar-actions > sl-button.lj-icon-btn { flex: 0 0 auto; }
+  #inventarioModal .inventario-toolbar.recetas-toolbar .inventario-toolbar-actions > .recetas-toolbar-divider { display: none; }
+  #inventarioModal .inventario-toolbar.recetas-toolbar .inventario-toolbar-actions > sl-button#inventarioToolbarCreateIngredientBtn { flex: 1 1 100%; margin-left: 0; }
   .inventario-status-filters.recetas-rnpa-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
   .inventario-status-filters.recetas-rnpa-filters > * { flex: 0 0 auto; }
 }

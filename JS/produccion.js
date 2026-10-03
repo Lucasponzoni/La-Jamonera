@@ -793,10 +793,10 @@
     });
     return result;
   };
+  // Agrega una entrada escribiendo sólo su propio nodo (antes leía y reescribía toda la auditoría, ~7 MB).
   const appendAudit = async ({ action, productionId = '', before = null, after = null, reason = '' }) => {
-    const existing = safeObject(await window.dbLaJamoneraRest.read(AUDIT_PATH));
     const id = makeId('audit');
-    existing[id] = stripUndefinedDeep({
+    const entry = stripUndefinedDeep({
       id,
       action,
       productionId,
@@ -806,7 +806,7 @@
       before,
       after
     });
-    await window.dbLaJamoneraRest.write(AUDIT_PATH, stripUndefinedDeep(existing));
+    await window.dbLaJamoneraRest.write(`${AUDIT_PATH}/${id}`, entry);
   };
   const updateEntryMovement = (entry, movement) => {
     const next = { ...entry };

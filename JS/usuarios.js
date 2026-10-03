@@ -157,6 +157,8 @@
       nodes.list.innerHTML = total
         ? '<div class="users-empty"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><p>No hay usuarios que coincidan.</p></div>'
         : '<div class="users-empty"><i class="fa-solid fa-users" aria-hidden="true"></i><p>Todavía no hay usuarios cargados.</p><sl-button size="small" variant="success" data-user-create><i slot="prefix" class="fa-solid fa-user-plus"></i>Crear el primero</sl-button></div>';
+      // Sin resultados: la ficha no debe seguir mostrando a la persona elegida antes.
+      state.selectedId = '';
       return;
     }
     if (!users.some((u) => u.id === state.selectedId)) state.selectedId = isMobile() ? '' : users[0].id;

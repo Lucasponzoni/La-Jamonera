@@ -1865,16 +1865,25 @@ sl-button.informe-icon-btn.is-edit::part(base) {
     max-width: none;
   }
 
+  /* Acciones en filas (todas visibles); la principal ("Nuevo …", success) a lo ancho al final. */
   .informes-page-actions {
     margin-left: 0;
     width: 100%;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
+    flex-wrap: wrap;
+    overflow: visible;
   }
 
   .informes-page-actions sl-button {
-    flex: 0 0 auto;
+    flex: 1 1 auto;
+  }
+
+  .informes-page-actions sl-button[variant="success"] {
+    flex: 1 1 100%;
+  }
+
+  .informes-page-actions .recetas-toolbar-divider,
+  .informes-page-actions [class*="divider"] {
+    display: none;
   }
 
   .informe-row {

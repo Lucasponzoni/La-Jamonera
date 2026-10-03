@@ -4899,6 +4899,7 @@
           <div class="recipe-field recipe-field-half">
             <label class="lj-label" for="inventoryInvoiceNumber"><i class="fa-solid fa-file-invoice inventario-step-icon"></i> Número de factura</label>
             <sl-textarea id="inventoryInvoiceNumber" name="inventory_code_free" class="inventario-invoice-textarea" rows="1" resize="none" placeholder="Ej: A-000123" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" value="${escapeHtml(state.editorDraft.invoiceNumber)}" ${stockDisabledAttr}></sl-textarea>
+            <small id="inventoryInvoiceFeedback" class="inventario-field-feedback" role="status"></small>
           </div>
           <div class="recipe-field recipe-field-half">
             <label class="lj-label" for="inventoryRemitoNumber"><i class="fa-regular fa-file-lines inventario-step-icon"></i> Número de remito (opcional)</label>
@@ -6002,6 +6003,8 @@
       updateInvoiceUploadFeedback();
       state.editorDirty = true;
     });
+    // Aviso en vivo de factura repetida (estaba definido pero sin conectar).
+    nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.addEventListener('input', renderInvoiceFeedback);
     nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.addEventListener('change', async () => {
       const invoice = normalizeLower(nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value);
       if (!invoice) return;
@@ -6391,6 +6394,7 @@
 
     wireTokenDrag();
     renderPattern();
+    renderInvoiceFeedback();
     initThumbLoading(nodes.editorForm);
 
     const focusBulkIdx = Number(state.editorDraft.focusBulkSearchIndex);
@@ -8011,7 +8015,9 @@
       }
       setStateView('list');
       setPeriodMode(false);
-      if (state.resumeEditor?.ingredientId && state.ingredientes[state.resumeEditor.ingredientId]) {
+      // Un pedido explícito (Ingredientes → Ingresar stock) gana sobre el borrador que quedó abierto.
+      const explicitOpen = state.pendingOpen?.ingredientId && state.ingredientes[state.pendingOpen.ingredientId];
+      if (!explicitOpen && state.resumeEditor?.ingredientId && state.ingredientes[state.resumeEditor.ingredientId]) {
         await ensureInventoryRecordDetail(state.resumeEditor.ingredientId);
         renderEditor(state.resumeEditor.ingredientId, state.resumeEditor.draft || null);
       } else {
@@ -8030,7 +8036,8 @@
           invListNode()?.querySelector(`[data-inv-select="${CSS.escape(pending.ingredientId)}"]`)?.scrollIntoView({ block: 'center' });
           if (pending.editor) {
             await ensureInventoryRecordDetail(pending.ingredientId);
-            renderEditor(pending.ingredientId);
+            const sameDraft = state.resumeEditor?.ingredientId === pending.ingredientId ? state.resumeEditor.draft : null;
+            renderEditor(pending.ingredientId, sameDraft || null);
           }
         }
         alignScrollActionsToRight(document);
@@ -8087,7 +8094,7 @@
       // Re-render de familias para que se colapse / expanda según haya búsqueda.
       renderFamilies();
       renderList();
-    }, 0);
+    }, 120); // espera breve: no redibujar ~250 filas con imágenes en cada tecla
   });
   nodes.list?.addEventListener('click', onListClick);
   nodes.families?.addEventListener('click', onListClick);

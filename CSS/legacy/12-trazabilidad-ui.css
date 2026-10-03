@@ -111,29 +111,20 @@ tr.inventario-row-tone:has(.inventario-expiry-days-badge.is-danger) > td {
 .inventario-expiry-days-badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  padding: 1px 7px;
   margin-top: 2px;
   border-radius: 4px;
-  font-size: 0.66rem;
-  font-weight: 700;
-  color: #fff;
+  border: 1px solid transparent;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
 }
 
-.inventario-expiry-days-badge.is-success {
-  background: var(--lj-success);
-}
-
-.inventario-expiry-days-badge.is-warning {
-  background: var(--lj-warning);
-}
-
-.inventario-expiry-days-badge.is-danger {
-  background: var(--lj-danger);
-}
-
-.inventario-expiry-days-badge.is-neutral {
-  background: var(--lj-muted);
-}
+/* Etiquetas suaves (fondo claro + texto del estado), como el resto de los tags. */
+.inventario-expiry-days-badge.is-success { color: var(--lj-success); background: var(--lj-success-soft); border-color: color-mix(in srgb, var(--lj-success) 30%, transparent); }
+.inventario-expiry-days-badge.is-warning { color: var(--lj-warning); background: var(--lj-warning-soft); border-color: color-mix(in srgb, var(--lj-warning) 30%, transparent); }
+.inventario-expiry-days-badge.is-danger { color: var(--lj-danger); background: var(--lj-danger-soft); border-color: color-mix(in srgb, var(--lj-danger) 30%, transparent); }
+.inventario-expiry-days-badge.is-neutral { color: var(--lj-muted); background: var(--lj-surface-2); border-color: var(--lj-border); }
 
 .inventario-resolution-badge {
   display: inline-flex;

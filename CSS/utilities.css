@@ -16,3 +16,4 @@
 
 /* Antes lo daba Bootstrap: el atributo hidden siempre oculta, aunque una regla ponga display. */
 [hidden] { display: none !important; }
+.pt-2 { padding-top: .5rem !important; }

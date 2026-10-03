@@ -8,10 +8,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
-  <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202608282255">
-  <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/theme.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/utilities.css?v=202608282255">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202610030446">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/theme.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/utilities.css?v=202610030446">
   <script type="module">
     import { setBasePath } from './vendor/shoelace/utilities/base-path.js?v=202608282255';
     setBasePath(new URL('./vendor/shoelace/', document.baseURI).href.slice(0, -1));
@@ -21,29 +21,29 @@
     const ljCore = [...new Set([...document.querySelectorAll('sl-button, sl-input, sl-icon, sl-dialog, sl-dropdown, sl-drawer, sl-spinner, sl-icon-button')].map((n) => n.localName))].map((t) => customElements.whenDefined(t));
     Promise.race([Promise.allSettled(ljCore), new Promise((r) => setTimeout(r, 2500))]).then(() => document.documentElement.classList.add('lj-ready'));
   </script>
-  <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/01-login.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/02-modal-ingredientes.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/03-componentes.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/04-informes.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/05-recetas.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/06-inventario.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/07-produccion.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/08-produccion-card.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/09-recetas-card.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/10-inventario-card.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/11-produccion-2.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/12-trazabilidad-ui.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/13-trazabilidad-diagrama.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/14-inventario-rne.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/15-planilla.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/16-trazabilidad-publica.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/17-inventario-3.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/18-produccion-qr.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/19-reparto.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/20-usuarios.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202608282255">
-  <link rel="stylesheet" href="./CSS/legacy/22-planilla-protocolo.css?v=202608282255">
+  <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/01-login.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/02-modal-ingredientes.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/03-componentes.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/04-informes.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/05-recetas.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/06-inventario.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/07-produccion.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/08-produccion-card.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/09-recetas-card.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/10-inventario-card.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/11-produccion-2.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/12-trazabilidad-ui.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/13-trazabilidad-diagrama.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/14-inventario-rne.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/15-planilla.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/16-trazabilidad-publica.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/17-inventario-3.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/18-produccion-qr.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/19-reparto.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/20-usuarios.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202610030446">
+  <link rel="stylesheet" href="./CSS/legacy/22-planilla-protocolo.css?v=202610030446">
   <link rel="icon" type="image/webp" href="./IMG/La Jamonera Cerdito.webp">
 </head>
 <body class="public-trace-page">
@@ -110,12 +110,12 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script src="./JS/ui/forms.js?v=202608282255"></script>
-  <script src="./JS/ui/theme.js?v=202608282255"></script>
-  <script src="./JS/ui/modal.js?v=202608282255"></script>
-  <script src="./JS/ui/lj-alert.js?v=202608282255"></script>
-  <script src="./JS/firebase-init.js?v=202608282255"></script>
-  <script src="./JS/planilla_produccion.js?v=202608282255"></script>
-  <script src="./JS/produccion_publica.js?v=202608282255"></script>
+  <script src="./JS/ui/forms.js?v=202610030446"></script>
+  <script src="./JS/ui/theme.js?v=202610030446"></script>
+  <script src="./JS/ui/modal.js?v=202610030446"></script>
+  <script src="./JS/ui/lj-alert.js?v=202610030446"></script>
+  <script src="./JS/firebase-init.js?v=202610030446"></script>
+  <script src="./JS/planilla_produccion.js?v=202610030446"></script>
+  <script src="./JS/produccion_publica.js?v=202610030446"></script>
 </body>
 </html>
