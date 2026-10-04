@@ -160,27 +160,28 @@
     ensureMeasures();
   };
 
-  const persistIngredientes = async () => {
+  // Guarda sólo lo que cambió (antes reescribía los ~250 ingredientes y todas las familias en cada guardado:
+  // lento y, con la ventana abierta en otra PC, pisaba cambios ajenos). La config va siempre (medidas).
+  const persistIngredientes = async ({ items = [], families = [] } = {}) => {
     ensureMeasures();
     await window.laJamoneraReady;
-    const hasLiteItems = Object.values(safeObject(state.ingredientes.items)).some((item) => item?.__indexLite);
-    let payload = state.ingredientes;
-    if (hasLiteItems) {
-      const full = safeObject(await window.dbLaJamoneraRest.read('/ingredientes'));
-      const mergedItems = {};
-      Object.entries(safeObject(state.ingredientes.items)).forEach(([id, item]) => {
-        const base = item?.__indexLite && full.items?.[id] ? safeObject(full.items[id]) : {};
-        const { __indexLite, ...cleanItem } = safeObject(item);
-        mergedItems[id] = { ...base, ...cleanItem };
-      });
-      payload = {
-        familias: safeObject(state.ingredientes.familias),
-        items: mergedItems,
-        config: safeObject(state.ingredientes.config)
-      };
-      state.ingredientes = payload;
+    await window.dbLaJamoneraRest.write('/ingredientes/config', safeObject(state.ingredientes.config));
+    for (const id of [...new Set(families)].filter(Boolean)) {
+      const family = state.ingredientes.familias?.[id];
+      await window.dbLaJamoneraRest.write(`/ingredientes/familias/${id}`, family ? safeObject(family) : null);
     }
-    await window.dbLaJamoneraRest.write('/ingredientes', payload);
+    const ids = [...new Set(items)].filter(Boolean);
+    for (let i = 0; i < ids.length; i += 8) {
+      await Promise.all(ids.slice(i, i + 8).map(async (id) => {
+        const item = state.ingredientes.items?.[id];
+        if (!item) return window.dbLaJamoneraRest.write(`/ingredientes/items/${id}`, null);
+        const { __indexLite, ...cleanItem } = safeObject(item);
+        const base = __indexLite ? safeObject(await window.dbLaJamoneraRest.read(`/ingredientes/items/${id}`)) : {};
+        const next = { ...base, ...cleanItem };
+        state.ingredientes.items[id] = next;
+        return window.dbLaJamoneraRest.write(`/ingredientes/items/${id}`, next);
+      }));
+    }
   };
 
   const ensureIngredientDetail = async (itemId) => {
@@ -975,15 +976,17 @@
       createdAt: initial?.createdAt || Date.now()
     };
 
+    const renamedItemIds = [];
     Object.values(state.ingredientes.items).forEach((item) => {
       if (item.familyId === familyId) {
+        if (item.familyName !== result.value.name) renamedItemIds.push(item.id);
         item.familyName = result.value.name;
       }
     });
 
     showSavingOverlay();
     try {
-      await persistIngredientes();
+      await persistIngredientes({ families: [familyId], items: renamedItemIds });
       state.activeFamilyId = familyId;
       refreshView();
       return familyId;
@@ -1148,7 +1151,7 @@
 
     showSavingOverlay();
     try {
-      await persistIngredientes();
+      await persistIngredientes({ items: [itemId] });
       state.activeFamilyId = result.value.familyId;
       refreshView();
       return itemId;

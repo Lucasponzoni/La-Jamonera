@@ -214,6 +214,28 @@
     return Object.keys(out).length ? out : null;
   };
 
+  // "Foto" de cada registro de las colecciones que la app guarda enteras (Reparto, ingredientes, inventario,
+  // recetas): al escribir la colección completa sólo se mandan los registros que cambiaron desde que se leyeron
+  // (antes, cada salida de productos reescribía uno por uno los ~2.200 repartos). Tampoco pisa cambios ajenos
+  // en registros que este usuario no tocó.
+  const MAP_PARENTS = new Set(['/Reparto/registros', '/Reparto/clients', '/Reparto/vehicles', '/Reparto/productIndex', '/ingredientes/items', '/ingredientes/familias', '/inventario/items', '/recetas']);
+  const childSnap = new Map();
+  const snapJson = (v) => { try { return JSON.stringify(v === undefined ? null : v); } catch (_) { return null; } };
+  const snapChildren = (base, obj) => {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
+    Object.entries(obj).forEach(([k, v]) => childSnap.set(`${base}/${k}`, snapJson(v)));
+  };
+  const snapFromRead = (key, value) => {
+    if (!value || typeof value !== 'object') return;
+    if (MAP_PARENTS.has(key)) snapChildren(key, value);
+    else if (key === '/Reparto') ['clients', 'vehicles', 'productIndex', 'registros'].forEach((p) => snapChildren(`/Reparto/${p}`, value[p]));
+    else if (key === '/ingredientes') { snapChildren('/ingredientes/items', value.items); snapChildren('/ingredientes/familias', value.familias); }
+    else if (key === '/inventario') snapChildren('/inventario/items', value.items);
+    else {
+      const parent = key.slice(0, key.lastIndexOf('/'));
+      if (MAP_PARENTS.has(parent)) childSnap.set(key, snapJson(value));
+    }
+  };
   const read = async (path) => {
     await waitForAuth();
     const key = normalizePath(path);
@@ -221,7 +243,7 @@
     if (cached.hit) return cached.value;
     if (pendingReads.has(key)) return clone(await pendingReads.get(key));
     const promise = readRemote(key)
-      .then((value) => { setCache(key, value); return value; })
+      .then((value) => { setCache(key, value); snapFromRead(key, value); return value; })
       .finally(() => pendingReads.delete(key));
     pendingReads.set(key, promise);
     return clone(await promise);
@@ -241,9 +263,14 @@
   const setRemote = (key, value) => rpc('lj_set', { p_path: key, p_value: value === undefined ? null : value }, `escritura de ${key}`);
   // Igual que firebase-init: las raíces grandes se escriben hijo por hijo (sin borrar los que no vienen).
   const writeMapChildren = async (base, value) => {
-    const entries = Object.entries(value && typeof value === 'object' && !Array.isArray(value) ? value : {});
+    const entries = Object.entries(value && typeof value === 'object' && !Array.isArray(value) ? value : {})
+      .map(([k, v]) => [k, v, snapJson(v)])
+      .filter(([k, , json]) => json === null || childSnap.get(`${base}/${k}`) !== json);
     for (let i = 0; i < entries.length; i += 8) {
-      await Promise.all(entries.slice(i, i + 8).map(([k, v]) => setRemote(`${base}/${k}`, v === undefined ? null : v)));
+      await Promise.all(entries.slice(i, i + 8).map(async ([k, v, json]) => {
+        await setRemote(`${base}/${k}`, v === undefined ? null : v);
+        if (json !== null) childSnap.set(`${base}/${k}`, json);
+      }));
     }
   };
   const writeChunkedRoot = async (key, value) => {
@@ -271,6 +298,7 @@
     const key = normalizePath(path);
     const cleanValue = value === undefined ? null : value;
     await writeChunkedRoot(key, clone(cleanValue));
+    { const parent = key.slice(0, key.lastIndexOf('/')); if (MAP_PARENTS.has(parent)) childSnap.set(key, snapJson(cleanValue)); }
     invalidateCache(key);
     setCache(key, cleanValue);
     await syncIndexAfterWrite(key, cleanValue, 'write');
@@ -282,7 +310,11 @@
     const cleanValue = value === undefined ? null : value;
     await rpc('lj_update', { p_path: key, p_patch: clone(cleanValue) }, `actualización de ${key}`);
     invalidateCache(key);
-    Object.keys(cleanValue || {}).forEach((k) => invalidateCache(`${key === '/' ? '' : key}/${k}`));
+    Object.keys(cleanValue || {}).forEach((k) => {
+      invalidateCache(`${key === '/' ? '' : key}/${k}`);
+      childSnap.delete(`${key === '/' ? '' : key}/${k}`);
+    });
+    childSnap.delete(key);
     await syncIndexAfterWrite(key, cleanValue, 'update');
     return { ok: true };
   };

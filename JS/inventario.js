@@ -1118,11 +1118,23 @@
   const persistInventario = async (options = {}) => {
     normalizeProvidersConfig();
     await window.laJamoneraReady;
+    // Sólo config (umbrales globales, proveedores): no se tocan los registros.
+    if (options.configOnly) {
+      await window.dbLaJamoneraRest.write('/inventario/config', state.inventario.config || {});
+      return;
+    }
     const itemIds = [...new Set((Array.isArray(options.itemIds) ? options.itemIds : []).map(normalizeValue).filter(Boolean))];
     if (itemIds.length) {
       await window.dbLaJamoneraRest.write('/inventario/config', state.inventario.config || {});
       for (const itemId of itemIds) {
-        const record = { ...safeObject(state.inventario.items?.[itemId]) };
+        let record = { ...safeObject(state.inventario.items?.[itemId]) };
+        // Registro "liviano" del índice (sin lotes): se combina con el detalle completo para no borrar lotes.
+        if (record.__indexLite) {
+          const base = safeObject(await window.dbLaJamoneraRest.read(`/inventario/items/${itemId}`));
+          ['__indexLite', 'entries', 'entriesCount', 'expiredEntries', 'expiringEntries', 'hasFrozenEntries'].forEach((k) => delete record[k]);
+          record = { ...base, ...record };
+          state.inventario.items[itemId] = record;
+        }
         delete record.__indexLite;
         await window.dbLaJamoneraRest.write(`/inventario/items/${itemId}`, record);
       }
@@ -2699,7 +2711,7 @@
     state.inventario.config.globalLowThresholdKg = result.value.low;
     state.inventario.config.globalLowThresholdUnits = result.value.lowUnits;
     state.inventario.config.expiringSoonDays = result.value.days;
-    await persistInventario();
+    await persistInventario({ configOnly: true });
     renderList();
   };
 
@@ -2772,7 +2784,7 @@
     next.lowThresholdMode = result.value.low == null ? 'global' : 'custom';
     next.expiringSoonDays = result.value.days;
     state.inventario.items[ingredientId] = next;
-    await persistInventario();
+    await persistInventario({ itemIds: [ingredientId] });
     renderList();
 
     if (state.selectedIngredientId === ingredientId && state.view === 'editor') {
@@ -2886,7 +2898,7 @@
       updatedAt: Date.now()
     };
     state.inventario.items[ingredientId] = record;
-    await persistInventario();
+    await persistInventario({ itemIds: [ingredientId] });
     return true;
   };
 
@@ -3121,7 +3133,7 @@
       };
       state.inventario.items[ingredientId] = record;
     });
-    await persistInventario();
+    await persistInventario({ itemIds: Object.keys(result.value || {}) });
     await openIosSwal({
       title: 'Configuración guardada',
       html: '<p>La planilla semanal quedó actualizada para todos los productos editados.</p>',
@@ -4153,7 +4165,7 @@
 
     state.inventario.items[ingredientId] = record;
     rebuildInventarioIndexes();
-    await persistInventario();
+    await persistInventario({ itemIds: [ingredientId] });
     return true;
   };
 
@@ -4294,7 +4306,7 @@
     recomputeRecordStock(record, record.stockUnit || entry.unit || 'kilos');
     state.inventario.items[ingredientId] = record;
     rebuildInventarioIndexes();
-    await persistInventario();
+    await persistInventario({ itemIds: [ingredientId] });
     return true;
   };
 
@@ -4419,7 +4431,7 @@
       recomputeRecordStock(record, record.stockUnit || entryUnit);
       state.inventario.items[ingredientId] = record;
       rebuildInventarioIndexes();
-      await persistInventario();
+      await persistInventario({ itemIds: [ingredientId] });
       return true;
     } catch (error) {
       await openIosSwal({ title: 'No se pudo eliminar', html: '<p>Ocurrió un error eliminando los movimientos.</p>', icon: 'error', confirmButtonText: 'Entendido' });
@@ -5248,7 +5260,7 @@
         const currentRecord = getRecord(ingredientId);
         currentRecord.suggestedExpiryDays = val || null;
         state.inventario.items[ingredientId] = currentRecord;
-        await persistInventario();
+        await persistInventario({ itemIds: [ingredientId] });
         // Update UI immediately without alert
         renderEditor(ingredientId, state.editorDraft);
       } catch (error) {
@@ -5316,7 +5328,7 @@
         }
         state.inventario.items[ingredientId] = currentRecord;
         rebuildInventarioIndexes();
-        await persistInventario();
+        await persistInventario({ itemIds: [ingredientId] });
         state.editorDirty = false;
         renderEditor(ingredientId, state.editorDraft);
       } catch (error) {
@@ -5672,7 +5684,7 @@
           : { ...createProviderWithName(result.value.name), email: normalizeValue(result.value.email), phone: normalizeValue(result.value.phone), photoUrl: normalizeValue(result.value.photoUrl), nonFoodCategory: Boolean(result.value.nonFoodCategory), rne: safeObject(result.value.rne) };
         saveProviderInConfig(provider);
         state.editorDraft.provider = provider.id;
-        await persistInventario();
+        await persistInventario({ configOnly: true });
       }
 
       renderEditor(ingredientId, state.editorDraft);
@@ -6558,7 +6570,7 @@
       };
       state.inventario.items[ingredientId] = record;
       rebuildInventarioIndexes();
-      await persistInventario();
+      await persistInventario({ itemIds: [ingredientId] });
       state.editorDirty = false;
       // Re-render para reflejar el estado guardado, sin alert de éxito.
       renderEditor(ingredientId, state.editorDraft);
@@ -7155,7 +7167,7 @@
 
     if (!result.isConfirmed) return false;
     saveProviderInConfig(result.value);
-    await persistInventario();
+    await persistInventario({ configOnly: true });
     renderProviderRneAlert();
     return true;
   };
@@ -7593,7 +7605,7 @@
               const providers = Array.isArray(state.inventario.config.providers) ? state.inventario.config.providers : [];
               state.inventario.config.providers = providers.filter((item) => normalizeValue(item?.id) !== providerId);
               state.pendingProviderDeleteId = '';
-              await persistInventario();
+              await persistInventario({ configOnly: true });
               rerenderPreservingScroll();
             } catch (error) {
               acceptProviderDeleteBtn.disabled = false;
@@ -7700,7 +7712,7 @@
                 }
               };
               saveProviderInConfig(nextProvider);
-              await persistInventario();
+              await persistInventario({ configOnly: true });
               ui.setMode('list');
             } catch (error) {
               saveBtn.disabled = false;
@@ -7757,7 +7769,7 @@
             nextHistory.splice(index, 1);
             selected.rne = { ...getDefaultProviderRne(), ...safeObject(selected.rne), history: nextHistory };
             saveProviderInConfig(selected);
-            await persistInventario();
+            await persistInventario({ configOnly: true });
             rerenderPreservingScroll();
             return;
           }
@@ -7784,7 +7796,7 @@
               updatedAt: Date.now()
             };
             saveProviderInConfig(provider);
-            await persistInventario();
+            await persistInventario({ configOnly: true });
             rerender();
           }
         });
@@ -7874,7 +7886,7 @@
                 updated += 1;
               }
               if (updated > 0) {
-                await persistInventario();
+                await persistInventario({ configOnly: true });
                 rerenderPreservingScroll();
                 renderProviderRneAlert();
               }
