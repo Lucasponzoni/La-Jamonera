@@ -422,7 +422,11 @@
 .recetas-detail-table-wrap {
   border: 1px solid var(--lj-border);
   border-radius: var(--lj-radius-lg);
-  overflow: hidden;
+  /* Scroll lateral en celular (antes overflow:hidden cortaba las columnas de la derecha). */
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 
 .recetas-detail-table {
