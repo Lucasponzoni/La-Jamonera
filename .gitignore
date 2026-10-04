@@ -5,3 +5,7 @@ docs/carga-facturas-proveedores.md
 tools/facturas/
 docs/migracion-supabase/
 .mcp.json
+
+# Contexto y herramientas locales (no se publican)
+docs/contexto-proyecto.md
+docs/herramientas/
