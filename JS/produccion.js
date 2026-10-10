@@ -3961,13 +3961,19 @@
           return fallback;
         }
       };
-      const [recetas, inventario, config] = await Promise.all([
+      // El RNE de los proveedores está en /inventario/config (catálogo de proveedores): no hace falta bajar el
+      // inventario completo (~50 MB), que demoraba la apertura casi un minuto. Se lee una vez por sesión.
+      const readProviders = needsInventoryLookup && !state.traceProvidersLoaded;
+      const [recetas, inventarioConfig, config] = await Promise.all([
         needsRecipeLookup ? safeRead('/recetas', state.recetas) : state.recetas,
-        needsInventoryLookup ? safeRead('/inventario', state.inventario) : state.inventario,
+        readProviders ? safeRead('/inventario/config', null) : null,
         needsCompanyLookup ? safeRead(CONFIG_PATH, state.config) : state.config
       ]);
       if (needsRecipeLookup) state.recetas = safeObject(recetas);
-      if (needsInventoryLookup) state.inventario = safeObject(inventario);
+      if (readProviders && inventarioConfig) {
+        state.inventario = { ...safeObject(state.inventario), config: { ...safeObject(state.inventario?.config), ...safeObject(inventarioConfig) } };
+        state.traceProvidersLoaded = true;
+      }
       if (needsCompanyLookup) applyTraceConfigSnapshot(config);
     } catch (error) {
       console.warn('[Produccion] No se pudo completar la busqueda lazy de trazabilidad.', error);
@@ -4013,13 +4019,9 @@
         htmlContainer: 'ios-alert-text'
       }
     });
-    await new Promise((resolve) => setTimeout(resolve, 220));
     const traceRegistro = await ensureTraceabilityDerivedData(registro);
-    try {
-      await publishPublicTrace(traceRegistro);
-    } catch (error) {
-      console.warn('[Produccion] No se pudo publicar la trazabilidad publica.', error);
-    }
+    // La copia pública (QR) se actualiza en segundo plano: no hace falta esperarla para mostrar la trazabilidad.
+    publishPublicTrace(traceRegistro).catch((error) => console.warn('[Produccion] No se pudo publicar la trazabilidad publica.', error));
     Swal.close();
     await openIosSwal({
       ljModal: true,

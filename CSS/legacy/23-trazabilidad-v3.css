@@ -1,0 +1,281 @@
+/* =========================================
+   TRAZABILIDAD v3 · resumen en fichas, ingredientes y lotes compactos
+   Aplica a la ventana de Producción y a la vista pública del QR (mismo HTML: .produccion-trace-v2).
+   Se carga al final para ganarle a 07 / 12 / 13 / 16.
+========================================= */
+.produccion-trace-v2 {
+  --tr-label: var(--lj-muted);
+  --tr-value: var(--lj-text);
+  --tr-tile: var(--lj-surface-2);
+  gap: 14px;
+}
+
+/* ---------- Resumen ---------- */
+.produccion-trace-v2 .produccion-trace-summary {
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius-lg);
+  background: var(--lj-surface);
+  box-shadow: var(--lj-shadow-sm, 0 1px 2px rgba(15, 23, 42, .06));
+  display: grid;
+  gap: 12px;
+}
+.produccion-trace-v2 .produccion-trace-summary > h6 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--lj-text);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.produccion-trace-v2 .produccion-trace-summary > h6 i {
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--lj-radius);
+  background: var(--lj-accent-soft);
+  color: var(--lj-accent);
+  font-size: 14px;
+  flex: 0 0 auto;
+}
+.produccion-trace-v2 .produccion-trace-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+.produccion-trace-v2 .produccion-trace-grid p {
+  margin: 0;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius);
+  background: var(--tr-tile);
+}
+.produccion-trace-v2 .produccion-trace-grid strong {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--tr-label);
+  line-height: 1.3;
+}
+.produccion-trace-v2 .produccion-trace-grid span {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tr-value);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.produccion-trace-v2 .produccion-trace-card-actions,
+.produccion-trace-v2 .produccion-trace-managers,
+.produccion-trace-v2 .public-trace-planilla-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+}
+.produccion-trace-v2 .produccion-trace-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--lj-border);
+  background: var(--lj-accent-soft);
+  color: var(--lj-accent);
+  font-size: 13px;
+}
+.produccion-trace-v2 .produccion-trace-chip strong { font-weight: 700; color: var(--lj-text); }
+.produccion-trace-v2 .produccion-trace-chip small { color: var(--lj-muted); font-size: 12px; }
+
+/* Botones "sin adjunto": aviso discreto, no un botón rojo lleno. */
+.produccion-trace-v2 .inventario-no-photo-btn,
+.produccion-trace-v2 .public-trace-btn-missing {
+  --sl-color-danger-600: transparent;
+  pointer-events: none;
+}
+.produccion-trace-v2 .inventario-no-photo-btn::part(base),
+.produccion-trace-v2 .public-trace-btn-missing::part(base) {
+  background: var(--lj-surface-2);
+  border: 1px dashed var(--lj-border-strong);
+  color: var(--lj-muted);
+  font-weight: 600;
+  font-size: 12.5px;
+  opacity: 1;
+  min-height: 32px;
+  height: 32px;
+}
+.produccion-trace-v2 .inventario-no-photo-btn::part(label),
+.produccion-trace-v2 .public-trace-btn-missing::part(label) { line-height: 30px; }
+
+/* ---------- Ingredientes ---------- */
+.produccion-trace-v2 .produccion-trace-ingredients { display: grid; gap: 12px; margin: 0; }
+.produccion-trace-v2 .produccion-trace-ingredient-card {
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius-lg);
+  background: var(--lj-surface);
+  overflow: hidden;
+}
+.produccion-trace-v2 .produccion-trace-ingredient-card > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--lj-border);
+  background: var(--lj-surface-2);
+}
+.produccion-trace-v2 .produccion-trace-ingredient-head-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1 1 320px;
+}
+.produccion-trace-v2 .produccion-trace-ingredient-head-main > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.produccion-trace-v2 .produccion-trace-ingredient-index {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  background: var(--lj-accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.produccion-trace-v2 .produccion-trace-ingredient-avatar { width: 44px; height: 44px; min-width: 44px; flex-basis: 44px; }
+.produccion-trace-v2 .produccion-trace-ingredient-head-main h6 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--lj-text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.produccion-trace-v2 .produccion-trace-ingredient-head-main h6 i { color: var(--lj-accent); font-size: 13px; }
+.produccion-trace-v2 .produccion-trace-ingredient-head-main small {
+  display: block;
+  font-size: 12.5px;
+  color: var(--lj-muted);
+  line-height: 1.4;
+}
+.produccion-trace-v2 .produccion-trace-ingredient-head-main small strong { color: var(--lj-text); font-weight: 600; }
+.produccion-trace-v2 .produccion-trace-ingredient-card > header .produccion-trace-card-actions { flex: 0 0 auto; }
+
+/* ---------- Lotes ---------- */
+.produccion-trace-v2 .produccion-trace-lots {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px 14px;
+}
+.produccion-trace-v2 .produccion-trace-lot-card {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius);
+  background: var(--lj-surface);
+  display: grid;
+  gap: 10px;
+}
+.produccion-trace-v2 .produccion-trace-lot-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin: 0;
+}
+.produccion-trace-v2 .produccion-trace-lot-head > strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--lj-text);
+  margin-right: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.produccion-trace-v2 .produccion-trace-lot-head > strong i { color: var(--lj-muted); }
+.produccion-trace-v2 .produccion-trace-used-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--lj-border);
+  background: var(--lj-accent-soft);
+  color: var(--lj-accent);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.produccion-trace-v2 .produccion-trace-lot-card .produccion-trace-grid {
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px 14px;
+}
+.produccion-trace-v2 .produccion-trace-lot-card .produccion-trace-grid p {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.produccion-trace-v2 .produccion-trace-lot-card .produccion-trace-grid strong { font-size: 10px; }
+.produccion-trace-v2 .produccion-trace-lot-card .produccion-trace-grid span { font-size: 13.5px; }
+.produccion-trace-v2 .produccion-trace-lot-card .produccion-trace-card-actions sl-button::part(base) { min-height: 32px; }
+
+/* ---------- Celular ---------- */
+@media (max-width: 768px) {
+  .produccion-trace-v2 { gap: 12px; }
+  .produccion-trace-v2 .produccion-trace-summary { padding: 12px; gap: 10px; }
+  .produccion-trace-v2 .produccion-trace-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .produccion-trace-v2 .produccion-trace-grid p { padding: 7px 9px; }
+  .produccion-trace-v2 .produccion-trace-grid span { font-size: 13px; }
+  .produccion-trace-v2 .produccion-trace-ingredient-card > header { padding: 10px 12px; }
+  .produccion-trace-v2 .produccion-trace-card-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .produccion-trace-v2 .produccion-trace-card-actions sl-button { width: 100%; }
+  .produccion-trace-v2 .produccion-trace-card-actions sl-button::part(base) { width: 100%; }
+  .produccion-trace-v2 .produccion-trace-lots { padding: 10px; }
+  .produccion-trace-v2 .produccion-trace-lot-card { padding: 10px; }
+  .produccion-trace-v2 .produccion-trace-lot-card .produccion-trace-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 10px; }
+  .produccion-trace-v2 .produccion-trace-lot-head > strong { width: 100%; }
+  .produccion-trace-v2 .produccion-trace-chip { font-size: 12.5px; }
+  /* La hoja pública vieja centraba encabezados y etiquetas en celular. */
+  .produccion-trace-v2 .produccion-trace-ingredient-card > header { flex-direction: column; align-items: stretch; text-align: left; }
+  .produccion-trace-v2 .produccion-trace-ingredient-head-main { flex: 0 0 auto; justify-content: flex-start; align-items: center; text-align: left; }
+  .produccion-trace-v2 .produccion-trace-lot-head { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; text-align: left; }
+  .produccion-trace-v2 .produccion-trace-ingredient-head-main > div { align-items: flex-start; }
+  .produccion-trace-v2 .produccion-trace-ingredient-head-main h6 { justify-content: flex-start; }
+  .produccion-trace-v2 .public-trace-planilla-row sl-button,
+  .produccion-trace-v2 .public-trace-planilla-row sl-button::part(base) { width: 100%; }
+}
+
+/* ---------- Cajas del diagrama ---------- */
+svg[id^="lj_trace_"] .node rect,
+svg[id^="lj_trace_"] .node polygon {
+  rx: 8px;
+  ry: 8px;
+  stroke-width: 1.2px;
+  filter: drop-shadow(0 1px 1.5px rgba(15, 23, 42, .10));
+}
+svg[id^="lj_trace_"] .flowchart-link { stroke-width: 1.4px; }
+svg[id^="lj_trace_"] .edgeLabel,
+svg[id^="lj_trace_"] .edgeLabel rect { background-color: #f8fafc; fill: #f8fafc; }
+svg[id^="lj_trace_"] .edgeLabel span { color: #64748b; font-weight: 600; }

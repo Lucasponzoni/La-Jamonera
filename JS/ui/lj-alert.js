@@ -217,6 +217,8 @@
       const hasButtons = opts.showConfirmButton !== false || Boolean(opts.showDenyButton) || Boolean(opts.showCancelButton);
       const form = !modal && hasButtons;
       dialog.className = modal ? 'lj-alert-dialog lj-modal lj-viewer-dialog' : (form ? 'lj-alert-dialog lj-alert-form' : 'lj-alert-dialog');
+      // Visor sin botones (p.ej. "Cargando…"): sin pie, si no queda una línea vacía abajo.
+      if (modal && !hasButtons) dialog.classList.add('lj-no-footer');
       if (!modal && !form) {
         dialog.noHeader = true;
         dialog.setAttribute('no-header', '');
