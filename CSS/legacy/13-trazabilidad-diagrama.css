@@ -587,3 +587,172 @@
 .produccion-modal-rne-badge.is-danger{background: var(--lj-danger-soft);border-color: color-mix(in srgb, var(--lj-danger) 35%, var(--lj-surface));color: var(--lj-danger);}
 .produccion-modal-rne-badge.is-ok{background: var(--lj-surface-2);border-color: color-mix(in srgb, var(--lj-success) 35%, var(--lj-surface));color: var(--lj-success);}
 
+
+/* =========================================
+   TRAZABILIDAD · LAYOUT LIMPIO + VISOR DEL DIAGRAMA (JS/ui/trace-diagram.js)
+   Sin recuadros anidados ni scroll interno: la ventana / página scrollea una sola vez.
+========================================= */
+.produccion-trace-apple-viewer {
+  border: 0;
+  padding: 0;
+  background: none;
+}
+.produccion-trace-diagram-wrap {
+  max-height: none;
+  overflow: visible;
+  border: 0;
+  background: none;
+  touch-action: auto;
+}
+.produccion-trace-diagram {
+  padding: 0;
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.produccion-trace-mermaid-wrap {
+  border: 0;
+  background: none;
+  margin: 0;
+  overflow: visible;
+  min-width: 0;
+}
+.produccion-trace-mermaid-wrap > .produccion-trace-mermaid-loading {
+  min-height: 220px;
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius-lg);
+  background: var(--lj-surface);
+}
+.produccion-trace-mermaid-wrap > .produccion-trace-mermaid-loading .meta-spinner-login { font-size: 34px; }
+
+.lj-trace-dia {
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius-lg);
+  background: var(--lj-surface);
+  box-shadow: var(--lj-shadow-sm, 0 1px 2px rgba(15, 23, 42, .06));
+  overflow: hidden;
+  min-width: 0;
+}
+.lj-trace-dia-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px 8px 14px;
+  border-bottom: 1px solid var(--lj-border);
+  background: var(--lj-surface-2);
+}
+.lj-trace-dia-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--lj-muted);
+  min-width: 0;
+}
+.lj-trace-dia-title i { color: var(--lj-accent); }
+.lj-trace-dia-title-short { display: none; }
+.lj-trace-dia-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.lj-trace-dia-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--lj-border);
+  border-radius: var(--lj-radius);
+  background: var(--lj-surface);
+  color: var(--lj-text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+}
+.lj-trace-dia-btn:hover { background: var(--lj-accent-soft); border-color: var(--lj-border-strong); color: var(--lj-accent); }
+.lj-trace-dia-btn:focus-visible { outline: 2px solid var(--lj-accent); outline-offset: 1px; }
+.lj-trace-dia-zoom {
+  min-width: 48px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--lj-muted);
+}
+.lj-trace-dia-viewport {
+  position: relative;
+  height: 420px;
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  /* Un dedo en vertical sigue scrolleando la página; horizontal y pellizco mueven el diagrama. */
+  touch-action: pan-y;
+  /* El diagrama siempre sobre "papel" claro (sus colores están pensados para fondo claro). */
+  background-color: #f8fafc;
+  background-image: radial-gradient(circle at 1px 1px, rgba(100, 116, 139, .18) 1px, transparent 0);
+  background-size: 20px 20px;
+}
+.lj-trace-dia-viewport.is-dragging { cursor: grabbing; }
+.lj-trace-dia-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.lj-trace-dia-canvas svg { display: block; max-width: none; }
+/* Las etiquetas se miden al generar el diagrama: no cambiar su interlineado acá. Si una fuente tarda en cargar,
+   que el texto no quede recortado por su caja. */
+.lj-trace-dia-canvas svg foreignObject { overflow: visible; }
+.lj-trace-dia-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, .72);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: opacity .25s ease;
+}
+.lj-trace-dia-hint.is-hidden { opacity: 0; }
+
+/* Pantalla completa: API del navegador o, si no hay (iPhone), fijo sobre todo. */
+.lj-trace-dia.is-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  border-radius: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+}
+.lj-trace-dia.is-fullscreen .lj-trace-dia-viewport { flex: 1 1 auto; height: auto !important; touch-action: none; }
+.lj-trace-dia:fullscreen { background: var(--lj-surface); }
+html.lj-trace-dia-open, html.lj-trace-dia-open body { overflow: hidden; }
+
+@media (max-width: 768px) {
+  .lj-trace-dia-head { padding: 6px 6px 6px 10px; }
+  .lj-trace-dia-title { font-size: 11px; }
+  .lj-trace-dia-title-long { display: none; }
+  .lj-trace-dia-title-short { display: inline; }
+  .lj-trace-dia-btn { width: 34px; height: 34px; }
+  .lj-trace-dia-zoom { min-width: 40px; }
+}
+@media (max-width: 380px) {
+  .lj-trace-dia-zoom { display: none; }
+}
+/* Las etiquetas del diagrama se miden en <body> y se muestran dentro de ventanas con otro interlineado: se fija
+   el mismo en ambos lugares (el id del SVG empieza con lj_trace_ al medir y al mostrar). */
+svg[id^="lj_trace_"] foreignObject div,
+svg[id^="lj_trace_"] foreignObject span,
+svg[id^="lj_trace_"] foreignObject p { line-height: 1.5; font-size: 15px; letter-spacing: normal; }

@@ -3521,19 +3521,7 @@
         'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js'
       ], 'la-jamonera-mermaid');
       if (!loaded || !window.mermaid) return false;
-      window.mermaid.initialize({
-        startOnLoad: false,
-        theme: 'base',
-        securityLevel: 'loose',
-        themeVariables: {
-          primaryColor: '#eef4ff',
-          primaryTextColor: '#223f78',
-          primaryBorderColor: '#c4d5f5',
-          lineColor: '#6e88bc',
-          tertiaryColor: '#ffffff',
-          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
-        }
-      });
+      window.mermaid.initialize(window.LJTraceDiagram?.mermaidConfig?.() || { startOnLoad: false, theme: 'base', securityLevel: 'loose' });
       return true;
     })();
     return window.__laJamoneraLoadingMermaid;
@@ -3892,12 +3880,6 @@
     return `<section class="produccion-trace-v2 produccion-trace-apple-viewer">
       <div class="produccion-trace-diagram-wrap">
         <div class="produccion-trace-diagram">
-          <div class="produccion-trace-toolbar-zoom">
-            <sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-trace-zoom-out aria-label="Alejar"><i class="fa-solid fa-magnifying-glass-minus"></i></sl-button>
-            <span class="produccion-trace-zoom-value" data-trace-zoom-value>100%</span>
-            <sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-trace-zoom-in aria-label="Acercar"><i class="fa-solid fa-magnifying-glass-plus"></i></sl-button>
-            <sl-button variant="default" type="button" class="lj-icon-btn inventario-threshold-btn" data-trace-zoom-reset aria-label="Restablecer zoom"><i class="fa-solid fa-arrows-rotate"></i></sl-button>
-          </div>
           <article class="produccion-trace-summary">
             <h6><i class="fa-solid fa-diagram-project"></i> Trazabilidad ${escapeHtml(registro.id)}</h6>
             <div class="produccion-trace-grid">
@@ -3916,9 +3898,7 @@
             <div class="produccion-trace-card-actions">${companyRne.attachmentUrl ? `<sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify([companyRne.attachmentUrl]))}'><i slot="prefix" class="fa-regular fa-eye"></i><span>Ver adjunto RNE empresa</span></sl-button>` : '<sl-button variant="danger" type="button" class="inventario-no-photo-btn" disabled>RNE empresa sin adjunto</sl-button>'}${productRnpa.exempt ? '<sl-button variant="default" type="button" class="inventario-threshold-btn" disabled><i slot="prefix" class="fa-solid fa-store"></i><span>RNPA no requerido</span></sl-button>' : (productRnpa.attachmentUrl ? `<sl-button size="small" variant="default" type="button" class="inventario-threshold-btn" data-prod-trace-images='${encodeURIComponent(JSON.stringify([productRnpa.attachmentUrl]))}'><i slot="prefix" class="fa-regular fa-eye"></i><span>Ver adjunto RNPA</span></sl-button>` : '<sl-button variant="danger" type="button" class="inventario-no-photo-btn" disabled>RNPA sin adjunto</sl-button>')}</div>
             <div class="produccion-trace-managers">${(Array.isArray(registro.managers) ? registro.managers : []).map((token) => { const manager = getManagerDisplay(token); return `<span class="produccion-trace-chip"><i class="fa-solid fa-user-tie"></i><strong>${escapeHtml(manager.name)}</strong><small>${escapeHtml(manager.role)}</small></span>`; }).join('') || '<span class="produccion-trace-chip"><i class="fa-solid fa-user-xmark"></i><strong>Sin responsable</strong><small>Encargado</small></span>'}</div>
           </article>
-          <div class="produccion-trace-mermaid-wrap">
-            <div class="produccion-trace-mermaid" data-trace-mermaid><button type="button" class="lj-tile produccion-trace-mermaid-overlay" data-trace-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button></div>
-          </div>
+          <div class="produccion-trace-mermaid-wrap" data-trace-mermaid></div>
           <div class="produccion-trace-ingredients">${ingredients || '<p class="m-0">Sin desglose de lotes para esta producción.</p>'}</div>
         </div>
       </div>
@@ -3935,156 +3915,12 @@
     }
     const source = buildTraceMermaidDefinition(registro);
     try {
-      const renderId = `trace_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-      const rendered = await window.mermaid.render(renderId, source);
-      if (!rendered || !rendered.svg) throw new Error('Mermaid render vacío');
-      host.innerHTML = `${rendered.svg}<button type="button" class="lj-tile produccion-trace-mermaid-overlay is-ready" data-trace-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button>`;
-      host.dataset.traceScale = '1';
-      host.style.transformOrigin = 'top left';
-      host.style.transform = 'scale(1)';
-      return;
-    } catch (primaryError) {
-      host.innerHTML = `<pre class="mermaid">${source}</pre><button type="button" class="lj-tile produccion-trace-mermaid-overlay is-ready" data-trace-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button>`;
-      try {
-        const node = host.querySelector('.mermaid');
-        if (!node) throw new Error('Nodo Mermaid ausente');
-        await window.mermaid.run({ nodes: [node] });
-        host.dataset.traceScale = '1';
-        host.style.transformOrigin = 'top left';
-        host.style.transform = 'scale(1)';
-      } catch (fallbackError) {
-        host.innerHTML = renderTraceabilityFallbackDiagram(registro);
-      }
+      // Visor compartido con la vista pública (JS/ui/trace-diagram.js): controles, arrastre, zoom y pantalla completa.
+      await window.LJTraceDiagram.render(host, source);
+    } catch (error) {
+      console.warn('[Produccion] Diagrama de trazabilidad:', error);
+      host.innerHTML = renderTraceabilityFallbackDiagram(registro);
     }
-  };
-  const initTraceMermaidZoomControls = (popup) => {
-    const host = popup.querySelector('[data-trace-mermaid]');
-    const viewport = popup.querySelector('.produccion-trace-mermaid');
-    const label = popup.querySelector('[data-trace-zoom-value]');
-    if (!host || !viewport || !label) return;
-    let zoom = Number(host.dataset.traceScale || 1);
-    let panX = Number(host.dataset.tracePanX || 0);
-    let panY = Number(host.dataset.tracePanY || 0);
-    const minZoom = 0.65;
-    const maxZoom = 2.5;
-    const pointers = new Map();
-    let pointerDrag = null;
-    let pinchStart = null;
-
-    const applyTransform = () => {
-      host.dataset.traceScale = String(zoom);
-      host.dataset.tracePanX = String(panX);
-      host.dataset.tracePanY = String(panY);
-      host.style.transformOrigin = '0 0';
-      host.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
-      label.textContent = `${Math.round(zoom * 100)}%`;
-    };
-
-    const setZoom = (next, originX = viewport.clientWidth / 2, originY = viewport.clientHeight / 2) => {
-      const clamped = Math.min(maxZoom, Math.max(minZoom, next));
-      if (Math.abs(clamped - zoom) < 0.0001) return;
-      const worldX = (originX - panX) / zoom;
-      const worldY = (originY - panY) / zoom;
-      zoom = clamped;
-      panX = originX - worldX * zoom;
-      panY = originY - worldY * zoom;
-      applyTransform();
-    };
-
-    const setPan = (nextX, nextY) => {
-      panX = nextX;
-      panY = nextY;
-      applyTransform();
-    };
-
-    viewport.addEventListener('wheel', (event) => {
-      event.preventDefault();
-      const rect = viewport.getBoundingClientRect();
-      const originX = event.clientX - rect.left;
-      const originY = event.clientY - rect.top;
-      const factor = event.deltaY < 0 ? 1.1 : 0.9;
-      setZoom(zoom * factor, originX, originY);
-    }, { passive: false });
-
-    viewport.addEventListener('pointerdown', (event) => {
-      viewport.setPointerCapture(event.pointerId);
-      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-      if (pointers.size === 1) {
-        pointerDrag = { startX: event.clientX, startY: event.clientY, originX: panX, originY: panY };
-        viewport.classList.add('is-dragging');
-      } else if (pointers.size === 2) {
-        const [a, b] = Array.from(pointers.values());
-        pinchStart = {
-          distance: Math.hypot(a.x - b.x, a.y - b.y),
-          zoom,
-          panX,
-          panY,
-          centerX: (a.x + b.x) / 2,
-          centerY: (a.y + b.y) / 2
-        };
-      }
-    });
-
-    viewport.addEventListener('pointermove', (event) => {
-      if (!pointers.has(event.pointerId)) return;
-      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-      if (pointers.size >= 2) {
-        const [a, b] = Array.from(pointers.values());
-        const distance = Math.hypot(a.x - b.x, a.y - b.y);
-        if (!pinchStart || pinchStart.distance <= 0) return;
-        const rect = viewport.getBoundingClientRect();
-        const centerX = ((a.x + b.x) / 2) - rect.left;
-        const centerY = ((a.y + b.y) / 2) - rect.top;
-        const ratio = distance / pinchStart.distance;
-        const nextZoom = Math.min(maxZoom, Math.max(minZoom, pinchStart.zoom * ratio));
-        const worldX = (centerX - pinchStart.panX) / pinchStart.zoom;
-        const worldY = (centerY - pinchStart.panY) / pinchStart.zoom;
-        zoom = nextZoom;
-        panX = centerX - worldX * zoom;
-        panY = centerY - worldY * zoom;
-        applyTransform();
-        return;
-      }
-      if (!pointerDrag) return;
-      const dx = event.clientX - pointerDrag.startX;
-      const dy = event.clientY - pointerDrag.startY;
-      setPan(pointerDrag.originX + dx, pointerDrag.originY + dy);
-    });
-
-    const endPointer = (event) => {
-      pointers.delete(event.pointerId);
-      if (pointers.size < 2) pinchStart = null;
-      if (pointers.size === 0) {
-        pointerDrag = null;
-        viewport.classList.remove('is-dragging');
-      } else if (pointers.size === 1) {
-        const [single] = Array.from(pointers.values());
-        pointerDrag = { startX: single.x, startY: single.y, originX: panX, originY: panY };
-      }
-    };
-
-    viewport.addEventListener('pointerup', endPointer);
-    viewport.addEventListener('pointercancel', endPointer);
-    viewport.addEventListener('pointerleave', (event) => {
-      if (!event.buttons) endPointer(event);
-    });
-
-    const setZoomCentered = (next) => {
-      const rect = viewport.getBoundingClientRect();
-      setZoom(next, rect.width / 2, rect.height / 2);
-    };
-    popup.querySelector('[data-trace-zoom-in]')?.addEventListener('click', () => setZoomCentered(zoom + 0.12));
-    popup.querySelector('[data-trace-zoom-out]')?.addEventListener('click', () => setZoomCentered(zoom - 0.12));
-    popup.querySelector('[data-trace-zoom-reset]')?.addEventListener('click', () => {
-      zoom = 1;
-      panX = 0;
-      panY = 0;
-      applyTransform();
-    });
-    zoom = 1;
-    panX = 0;
-    panY = 0;
-    applyTransform();
   };
   const traceNeedsProviderRneLookup = (registro = {}) => (Array.isArray(registro?.lots) ? registro.lots : []).some((plan) => {
     if (plan?.infiniteStock || plan?.noTraceability) return false;
@@ -4196,19 +4032,6 @@
       },
       didOpen: async (popup) => {
         await initTraceMermaidDiagram(popup, traceRegistro);
-        const overlay = popup.querySelector('[data-trace-mermaid-overlay]');
-        const activateTraceDiagram = () => {
-          overlay?.classList.add('d-none');
-          if (!popup.__traceZoomInitialized) {
-            initTraceMermaidZoomControls(popup);
-            popup.__traceZoomInitialized = true;
-          }
-        };
-        if (overlay) {
-          overlay.addEventListener('click', activateTraceDiagram, { once: true });
-        } else {
-          activateTraceDiagram();
-        }
         popup.querySelectorAll('[data-prod-trace-images]').forEach((btn) => {
           btn.addEventListener('click', async () => {
             const urls = JSON.parse(decodeURIComponent(btn.dataset.prodTraceImages || '[]'));

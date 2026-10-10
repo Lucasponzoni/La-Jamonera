@@ -293,17 +293,7 @@
     });
     const ok = await load('https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js', 'la-jamonera-mermaid-public');
     if (!ok || !window.mermaid) return false;
-    window.mermaid.initialize({
-      startOnLoad: false,
-      securityLevel: 'loose',
-      theme: 'base',
-      themeVariables: {
-        primaryColor: '#eef4ff',
-        primaryTextColor: '#223f78',
-        primaryBorderColor: '#c4d5f5',
-        lineColor: '#6e88bc'
-      }
-    });
+    window.mermaid.initialize(window.LJTraceDiagram?.mermaidConfig?.() || { startOnLoad: false, securityLevel: 'loose', theme: 'base' });
     return true;
   };
   const hasFrozenShelfLifeExtension = (registro = {}) =>
@@ -325,7 +315,7 @@
     const frozenShelfLifeExtension = hasFrozenShelfLifeExtension(registro);
     const frozenShelfLifeExtensionNodeLabel = frozenShelfLifeExtension ? `<br/><b>${escapeHtml(getFrozenShelfLifeExtensionLabel())}</b>` : '';
     const lines = [
-      'flowchart LR',
+      `flowchart ${window.LJTraceDiagram?.isMobile?.() ? 'TB' : 'LR'}`,
       `C["<b>FRIGORIFICO LA JAMONERA SA</b>"]:::toneCompany`,
       `CR["<b>RNE EMPRESA</b><br/>${escapeHtml(companyRne)}"]:::toneRegistry`,
       `P["<b>${escapeHtml((registro?.recipeTitle || 'Producto').toUpperCase())}</b>"]:::toneProduct`,
@@ -527,82 +517,6 @@
     await viewer([{ invoiceImageUrls: cleanUrls }], 0, title);
   };
 
-  const initMermaidZoom = (container) => {
-    const svg = container.querySelector('svg');
-    if (!svg) return;
-    let scale = 1;
-    let tx = 0;
-    let ty = 0;
-    container.style.touchAction = 'none';
-
-    const apply = () => {
-      svg.style.transformOrigin = '0 0';
-      svg.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
-    };
-
-    container.addEventListener('wheel', (event) => {
-      event.preventDefault();
-      const delta = event.deltaY < 0 ? 0.12 : -0.12;
-      scale = Math.max(0.65, Math.min(2.5, scale + delta));
-      apply();
-    }, { passive: false });
-
-    let dragging = false;
-    let sx = 0;
-    let sy = 0;
-    container.addEventListener('pointerdown', (event) => {
-      dragging = true;
-      sx = event.clientX - tx;
-      sy = event.clientY - ty;
-      container.setPointerCapture(event.pointerId);
-    });
-    container.addEventListener('pointermove', (event) => {
-      if (!dragging) return;
-      tx = event.clientX - sx;
-      ty = event.clientY - sy;
-      apply();
-    });
-    container.addEventListener('pointerup', () => { dragging = false; });
-    container.addEventListener('pointercancel', () => { dragging = false; });
-
-    const distance = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-    let pinchStartDistance = 0;
-    let pinchStartScale = 1;
-    let pinchStartTx = 0;
-    let pinchStartTy = 0;
-    let pinchMidStart = { x: 0, y: 0 };
-
-    container.addEventListener('touchstart', (event) => {
-      if (event.touches.length === 2) {
-        const [t1, t2] = event.touches;
-        pinchStartDistance = distance(t1, t2);
-        pinchStartScale = scale;
-        pinchStartTx = tx;
-        pinchStartTy = ty;
-        pinchMidStart = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
-      }
-    }, { passive: false });
-
-    container.addEventListener('touchmove', (event) => {
-      if (event.touches.length !== 2) return;
-      event.preventDefault();
-      const [t1, t2] = event.touches;
-      const mid = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
-      const nextDistance = distance(t1, t2);
-      if (!pinchStartDistance) return;
-      scale = Math.max(0.65, Math.min(2.5, pinchStartScale * (nextDistance / pinchStartDistance)));
-      tx = pinchStartTx + (mid.x - pinchMidStart.x);
-      ty = pinchStartTy + (mid.y - pinchMidStart.y);
-      apply();
-    }, { passive: false });
-
-    container.addEventListener('touchend', () => {
-      pinchStartDistance = 0;
-    });
-
-    apply();
-  };
-
   const TRACE_PENDING_RNE = 'Pendiente';
   const TRACE_PENDING_RNPA = 'Pendiente';
   const INFINITE_STOCK_NOTICE = 'Stock infinito, producto comprado en el dia por caja chica, sin trazabilidad.';
@@ -756,7 +670,7 @@
             <div class="produccion-trace-managers">${managersHtml}</div>
             <div class="public-trace-planilla-row"><sl-button variant="primary" id="publicOpenPlanillaBtn" type="button" class="public-open-planilla-btn"><i slot="prefix" class="fa-regular fa-file-lines"></i>Ver planilla</sl-button></div>
           </article>
-          <div class="produccion-trace-mermaid-wrap"><div class="produccion-trace-mermaid" data-public-mermaid><div class="produccion-trace-mermaid-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner><p>Renderizando diagrama...</p></div><button type="button" class="lj-tile produccion-trace-mermaid-overlay" data-public-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button></div></div>
+          <div class="produccion-trace-mermaid-wrap" data-public-mermaid><div class="produccion-trace-mermaid-loading"><sl-spinner class="meta-spinner-login" aria-label="Cargando"></sl-spinner><p>Generando diagrama...</p></div></div>
           <div class="produccion-trace-ingredients">${ingredientsHtml}</div>
         </div>
       </div>
@@ -784,14 +698,8 @@
       const hasMermaid = await ensureMermaid();
       if (hasMermaid) {
         try {
-          const rendered = await window.mermaid.render(`public_trace_${Date.now()}`, buildDefinition(registro, config));
-          mermaidHost.innerHTML = `${rendered.svg}<button type="button" class="lj-tile produccion-trace-mermaid-overlay is-ready" data-public-mermaid-overlay><i class="fa-solid fa-hand-pointer"></i><span>Click para visualizar diagrama</span></button>`;
-          const overlay = mermaidHost.querySelector('[data-public-mermaid-overlay]');
-          const activate = () => {
-            overlay?.classList.add('d-none');
-            initMermaidZoom(mermaidHost);
-          };
-          overlay?.addEventListener('click', activate, { once: true });
+          // Visor compartido con Producción (JS/ui/trace-diagram.js).
+          await window.LJTraceDiagram.render(mermaidHost, buildDefinition(registro, config));
         } catch (error) {
           mermaidHost.innerHTML = '<p class="m-0">No se pudo renderizar el diagrama.</p>';
         }
