@@ -30,10 +30,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202610162012">
-  <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202610162012">
-  <link rel="stylesheet" href="./CSS/theme.css?v=202610162012">
-  <link rel="stylesheet" href="./CSS/utilities.css?v=202610162012">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202610162017">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202610162017">
+  <link rel="stylesheet" href="./CSS/theme.css?v=202610162017">
+  <link rel="stylesheet" href="./CSS/utilities.css?v=202610162017">
   <script type="module">
     import { setBasePath } from './vendor/shoelace/utilities/base-path.js?v=202608282255';
     setBasePath(new URL('./vendor/shoelace/', document.baseURI).href.slice(0, -1));
@@ -41,12 +41,12 @@
     const ljCore = [...new Set([...document.querySelectorAll('sl-button, sl-input, sl-icon, sl-dialog, sl-dropdown, sl-drawer, sl-spinner, sl-icon-button')].map((n) => n.localName))].map((t) => customElements.whenDefined(t));
     Promise.race([Promise.allSettled(ljCore), new Promise((r) => setTimeout(r, 2500))]).then(() => document.documentElement.classList.add('lj-ready'));
   </script>
-  <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202610162012">
-  <link rel="stylesheet" href="./CSS/legacy/03-componentes.css?v=202610162012">
-  <link rel="stylesheet" href="./CSS/legacy/04-informes.css?v=202610162012">
-  <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202610162012">
-  <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202610162012">
-  <link rel="stylesheet" href="./CSS/ventaslocal.css?v=202610162012">
+  <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202610162017">
+  <link rel="stylesheet" href="./CSS/legacy/03-componentes.css?v=202610162017">
+  <link rel="stylesheet" href="./CSS/legacy/04-informes.css?v=202610162017">
+  <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202610162017">
+  <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202610162017">
+  <link rel="stylesheet" href="./CSS/ventaslocal.css?v=202610162017">
 </head>
 <body>
   <main class="app-shell container-fluid px-0">
@@ -305,6 +305,7 @@
             <sl-tab slot="nav" panel="sync" active><i class="fa-solid fa-rotate" aria-hidden="true"></i>Sincronización</sl-tab>
             <sl-tab slot="nav" panel="kpis"><i class="fa-solid fa-gauge-high" aria-hidden="true"></i>Indicadores</sl-tab>
             <sl-tab slot="nav" panel="cred" data-solo-admin><i class="fa-solid fa-plug" aria-hidden="true"></i>Conexión IM5</sl-tab>
+            <sl-tab slot="nav" panel="mp" data-solo-admin><img src="./IMG/pagos/mercadopago.svg" alt="" width="16" height="16" class="vl-tab-logo">Mercado Pago</sl-tab>
 
             <sl-tab-panel name="sync" active>
               <div class="vl-form">
@@ -374,6 +375,15 @@
                 <div><sl-button id="cfgCredGuardar" variant="primary"><i slot="prefix" class="fa-solid fa-plug-circle-check"></i>Probar y guardar</sl-button></div>
               </div>
             </sl-tab-panel>
+            <sl-tab-panel name="mp">
+              <div class="vl-form">
+                <p class="vl-ayuda">Se usa para ver, en cada cobro con Mercado Pago (Point / QR), la tarjeta real, el estado, la comisión y el neto que se acredita. <b>Solo lectura</b>: no cobra, no devuelve y no renueva el token.</p>
+                <p class="vl-cred-estado" id="cfgMpEstado"></p>
+                <div class="vl-mp-aviso"><i class="fa-solid fa-circle-info"></i><span>Son las mismas credenciales del otro sistema de La Jamonera. Ese sistema es el que renueva el token: cuando lo haga, pegá acá el <b>access token</b> nuevo. Desde acá nunca se renueva, para no romper el otro.</span></div>
+                <sl-input id="cfgMpToken" label="Access token nuevo" type="password" password-toggle autocomplete="off" placeholder="APP_USR-…" help-text="Se prueba contra Mercado Pago antes de guardar y queda cifrado: no se vuelve a mostrar."></sl-input>
+                <div><sl-button id="cfgMpGuardar" variant="primary"><i slot="prefix" class="fa-solid fa-plug-circle-check"></i>Probar y guardar</sl-button></div>
+              </div>
+            </sl-tab-panel>
           </sl-tab-group>
           <div class="vl-dialog-pie">
             <sl-button variant="default" id="cfgCancelar">Cancelar</sl-button>
@@ -435,25 +445,25 @@
     </section>
   </main>
 
-  <script src="./JS/data/backend.js?v=202610162012"></script>
+  <script src="./JS/data/backend.js?v=202610162017"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-  <script src="./vendor/echarts/echarts.min.js?v=202610162012"></script>
-  <script src="./JS/ui/forms.js?v=202610162012"></script>
-  <script src="./JS/ui/theme.js?v=202610162012"></script>
-  <script src="./JS/ui/modal.js?v=202610162012"></script>
-  <script src="./JS/ui/lj-alert.js?v=202610162012"></script>
-  <script src="./JS/ui/header.js?v=202610162012"></script>
-  <script src="./JS/data/config.js?v=202610162012"></script>
-  <script src="./JS/data/supabase-init.js?v=202610162012"></script>
-  <script src="./JS/firebase-init.js?v=202610162012"></script>
-  <script src="./JS/data/security.js?v=202610162012"></script>
-  <script src="./JS/proxy-client.js?v=202610162012"></script>
-  <script src="./JS/data/authz.js?v=202610162012"></script>
-  <script src="./JS/configuracion.js?v=202610162012"></script>
-  <script src="./JS/Notificaciones.js?v=202610162012"></script>
-  <script src="./JS/app.js?v=202610162012"></script>
-  <script src="./JS/ventaslocal.js?v=202610162012"></script>
+  <script src="./vendor/echarts/echarts.min.js?v=202610162017"></script>
+  <script src="./JS/ui/forms.js?v=202610162017"></script>
+  <script src="./JS/ui/theme.js?v=202610162017"></script>
+  <script src="./JS/ui/modal.js?v=202610162017"></script>
+  <script src="./JS/ui/lj-alert.js?v=202610162017"></script>
+  <script src="./JS/ui/header.js?v=202610162017"></script>
+  <script src="./JS/data/config.js?v=202610162017"></script>
+  <script src="./JS/data/supabase-init.js?v=202610162017"></script>
+  <script src="./JS/firebase-init.js?v=202610162017"></script>
+  <script src="./JS/data/security.js?v=202610162017"></script>
+  <script src="./JS/proxy-client.js?v=202610162017"></script>
+  <script src="./JS/data/authz.js?v=202610162017"></script>
+  <script src="./JS/configuracion.js?v=202610162017"></script>
+  <script src="./JS/Notificaciones.js?v=202610162017"></script>
+  <script src="./JS/app.js?v=202610162017"></script>
+  <script src="./JS/ventaslocal.js?v=202610162017"></script>
 </body>
 </html>

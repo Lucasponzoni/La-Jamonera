@@ -33,7 +33,11 @@
     empresas_invalidas: 'Elegí al menos una empresa.',
     tipos_invalidos: 'Los tipos de comprobante no son válidos.',
     mail_invalido: 'Algún mail no es válido.',
-    sin_mail_avisos: 'No hay mails guardados para los avisos.'
+    sin_mail_avisos: 'No hay mails guardados para los avisos.',
+    mp_token_invalido: 'El token no tiene el formato de Mercado Pago (APP_USR-…).',
+    mp_token_rechazado: 'Mercado Pago rechazó ese token.',
+    mp_otra_cuenta: 'Ese token es de otra cuenta de Mercado Pago.',
+    mp_token_vencido: 'El token de Mercado Pago venció: cargá el nuevo en Configuración → Mercado Pago.'
   };
   const textoError = (e) => {
     const m = String(e?.message || e?.error || e || '');
@@ -578,7 +582,34 @@
     const ico = m.logo ? `<img src="${LOGO(m.logo)}" alt="" width="26" height="26">` : `<i class="fa-solid ${m.icono}"></i>`;
     return `<span class="vl-marca" style="--c:${m.color}"><span class="vl-marca-ico ${m.logo ? 'con-logo' : ''}">${ico}</span><span class="vl-marca-txt"><b>${esc(m.nombre)}</b>${m.det ? `<small>${esc(m.det)}</small>` : ''}</span></span>`;
   }
-  function htmlCobros(c, r) {
+  // Mercado Pago: tarjeta real (payment_method_id), estado y lo que se acredita, consultado por la API.
+  const MP_METODO = {
+    debvisa: ['Visa débito', 'visa'], visa: ['Visa crédito', 'visa'], master: ['Mastercard crédito', 'mastercard'], debmaster: ['Mastercard débito', 'mastercard'],
+    amex: ['American Express', 'amex'], maestro: ['Maestro', 'mastercard'], naranja: ['Naranja', ''], cabal: ['Cabal crédito', ''], debcabal: ['Cabal débito', ''],
+    account_money: ['Dinero en cuenta de Mercado Pago', 'mercadopago'], consumer_credits: ['Mercado Crédito', 'mercadopago']
+  };
+  const MP_ESTADO = { approved: ['Aprobado', 'ok'], refunded: ['Devuelto', 'mal'], charged_back: ['Contracargo', 'mal'], cancelled: ['Cancelado', 'mal'], rejected: ['Rechazado', 'mal'], pending: ['Pendiente', 'esp'], in_process: ['En proceso', 'esp'], no_encontrado: ['No encontrado en MP', 'esp'] };
+  const fmtFechaHoraLarga = new Intl.DateTimeFormat('es-AR', { timeZone: TZ, day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  function htmlMP(m) {
+    const [estTxt, estCls] = MP_ESTADO[m.estado] || [m.estado || '—', 'esp'];
+    if (m.estado === 'no_encontrado') return `<div class="vl-mp"><div class="vl-mp-head"><img src="${LOGO('mercadopago')}" alt="" width="18" height="18">Mercado Pago<span class="vl-mp-estado is-${estCls}">${estTxt}</span></div></div>`;
+    const [metTxt, metLogo] = MP_METODO[m.metodo] || [m.metodo || '—', ''];
+    const tarjeta = `${metLogo ? `<img class="vl-mp-tar" src="${LOGO(metLogo)}" alt="">` : ''}${esc(metTxt)}${m.ultimos4 ? ` •••• ${esc(m.ultimos4)}` : ''}`;
+    const dato = (t, v) => (v ? `<div><dt>${t}</dt><dd>${v}</dd></div>` : '');
+    return `<div class="vl-mp">
+      <div class="vl-mp-head"><img src="${LOGO('mercadopago')}" alt="" width="18" height="18">Verificado en Mercado Pago<span class="vl-mp-estado is-${estCls}">${estTxt}</span></div>
+      <dl class="vl-pago-datos vl-mp-datos">
+        ${dato('Medio', tarjeta)}${Number(m.cuotas) > 1 ? dato('Cuotas', String(m.cuotas)) : ''}
+        ${dato('Aprobado', m.aprobado_at ? esc(fmtFechaHoraLarga.format(new Date(m.aprobado_at))) : '')}
+        ${dato('Se acredita', m.acreditacion_at ? esc(fmtFechaHoraLarga.format(new Date(m.acreditacion_at))) : '')}
+      </dl>
+      ${m.neto != null ? `<div class="vl-pago-neto">
+        <span><small>Cobrado</small><b class="is-neutro">${pesos2(m.monto)}</b></span>
+        ${Number(m.comision) ? `<span><small>Comisión MP</small><b>− ${pesos2(m.comision)}</b></span>` : ''}
+        <span class="is-neto"><small>Neto acreditado</small><b>${pesos2(m.neto)}</b></span></div>` : ''}
+    </div>`;
+  }
+  function htmlCobros(c, r, mp = {}) {
     if (c.error) return `<p class="vl-ayuda">${esc(textoError(c.error))}</p>`;
     if (!c.pagos.length) {
       return `<div class="vl-pago-card"><div class="vl-pago-card-top">${marcaPago(r.condicion_venta)}<b class="vl-pago-imp">${pesos2(r.total)}</b></div>
@@ -589,10 +620,12 @@
       const datos = [dato('ID de pago', p.id_pago_externo), dato('Cupón', p.cupon), dato('Tarjeta', p.tarjeta_numero ? `•••• ${String(p.tarjeta_numero).slice(-4)}` : ''), dato('Autorización', p.autorizacion), dato('Lote', p.lote)].join('');
       const arancel = Number(p.arancel) || 0; const costo = Number(p.costo_financiero) || 0;
       const neto = Number(p.importe) - arancel - costo;
+      const m = p.id_pago_externo ? mp[String(p.id_pago_externo)] : null;
       return `<div class="vl-pago-card">
         <div class="vl-pago-card-top">${marcaPago(p.medio, p.cond_pago)}<b class="vl-pago-imp">${pesos2(p.importe)}</b></div>
         ${datos ? `<dl class="vl-pago-datos">${datos}</dl>` : ''}
-        ${arancel || costo ? `<div class="vl-pago-neto">
+        ${m ? htmlMP(m) : ''}
+        ${!m && (arancel || costo) ? `<div class="vl-pago-neto">
           ${arancel ? `<span><small>Arancel</small><b>− ${pesos2(arancel)}</b></span>` : ''}
           ${costo ? `<span><small>Costo financiero</small><b>− ${pesos2(costo)}</b></span>` : ''}
           <span class="is-neto"><small>Neto recibido</small><b>${pesos2(neto)}</b></span></div>` : ''}
@@ -629,7 +662,7 @@
         </section>
         <section>
           <p class="vl-detalle-tit"><i class="fa-solid fa-credit-card"></i> Cobro</p>
-          <div class="vl-pagos">${htmlCobros(cobros, r)}</div>
+          <div class="vl-pagos">${htmlCobros(cobros, r, det._datos.mp || {})}</div>
           <p class="vl-detalle-tit vl-detalle-tit-2"><i class="fa-solid fa-file-invoice"></i> Comprobante</p>
           <dl class="vl-det-meta">
             <div><dt>Número</dt><dd>${esc(nombreComp(r))}</dd></div>
@@ -657,8 +690,20 @@
       leerCobros(emp, id)
     ]);
     const items = error ? Object.assign([], { error }) : (data || []);
-    det._datos = { r, items, cobros };
+    det._datos = { r, items, cobros, mp: {} };
     await pintarDetalle(det);
+    // Después, el detalle de Mercado Pago de los cobros que traen id de pago (no frena la apertura).
+    const ids = (cobros.pagos || []).map((p) => p.id_pago_externo).filter(Boolean);
+    if (ids.length) {
+      try {
+        const res = await window.laJamoneraProxy.postJson('/ventas/mp/pagos', { ids });
+        const out = await res.json().catch(() => ({}));
+        if (res.ok && out.ok !== false && Array.isArray(out.pagos) && out.pagos.length && det.isConnected) {
+          det._datos.mp = Object.fromEntries(out.pagos.map((m) => [String(m.id_pago), m]));
+          pintarDetalle(det);
+        }
+      } catch { /* sin Mercado Pago: queda lo de IM5 */ }
+    }
   }
   const repintarDetalles = () => document.querySelectorAll('tr.vl-detalle').forEach((det) => { if (det._datos) pintarDetalle(det); });
 
@@ -913,8 +958,8 @@
       actualizarResumenCfg();
     });
     const esAdmin = Boolean(st.me?.admin);
-    document.querySelector('[data-solo-admin]').hidden = !esAdmin;
-    if (esAdmin) cargarEstadoCred();
+    document.querySelectorAll('[data-solo-admin]').forEach((t) => { t.hidden = !esAdmin; });
+    if (esAdmin) { cargarEstadoCred(); cargarEstadoMP(); }
     $('vlConfigDialog').show();
   }
   function leerCfgForm() {
@@ -976,6 +1021,31 @@
         el.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Todavía no hay credenciales cargadas.';
       }
     } catch (e) { el.textContent = textoError(e); }
+  }
+  async function cargarEstadoMP() {
+    const el = $('cfgMpEstado');
+    el.className = 'vl-cred-estado'; el.textContent = 'Revisando…';
+    try {
+      const res = await window.laJamoneraProxy.getJson('/ventas/mp/credenciales');
+      const out = await res.json();
+      if (!res.ok || out.ok === false) throw new Error(out.error);
+      if (!out.configurada) { el.className = 'vl-cred-estado is-falta'; el.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Mercado Pago no está conectado.'; return; }
+      if (out.vencido) { el.className = 'vl-cred-estado is-falta'; el.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> El token venció: cargá el nuevo que generó el otro sistema.'; return; }
+      const vence = out.vence ? new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(out.vence)) : '';
+      el.className = 'vl-cred-estado is-ok';
+      el.innerHTML = `<i class="fa-solid fa-circle-check"></i> Conectado a la cuenta <b>${esc(out.cuenta?.nickname || out.cuenta?.id || '')}</b>${vence ? ` · el token vence el <b>${esc(vence)}</b>` : ''}.`;
+    } catch (e) { el.textContent = textoError(e); }
+  }
+  async function guardarMP() {
+    const btn = $('cfgMpGuardar'); btn.loading = true;
+    try {
+      const res = await window.laJamoneraProxy.postJson('/ventas/mp/credenciales', { access_token: String($('cfgMpToken').value ?? '').trim() });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || out.ok === false) throw new Error(out.error || `Error ${res.status}`);
+      $('cfgMpToken').value = '';
+      notify('success', 'Mercado Pago conectado', `Cuenta ${out.cuenta?.nickname || out.cuenta?.id || ''}.`);
+      cargarEstadoMP();
+    } catch (e) { notify('error', 'No se pudo conectar Mercado Pago', textoError(e)); } finally { btn.loading = false; }
   }
   async function guardarCred() {
     const btn = $('cfgCredGuardar'); btn.loading = true;
@@ -1166,6 +1236,7 @@
     $('cfgCancelar').addEventListener('click', () => $('vlConfigDialog').hide());
     $('cfgGuardar').addEventListener('click', guardarConfig);
     $('cfgCredGuardar').addEventListener('click', guardarCred);
+    $('cfgMpGuardar').addEventListener('click', guardarMP);
     $('cfgDias').addEventListener('click', (e) => { const b = e.target.closest('button[data-dia]'); if (!b) return; b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); actualizarResumenCfg(); });
     ['cfgActiva', 'cfgDesde', 'cfgHasta', 'cfgCada'].forEach((id) => $(id).addEventListener('sl-change', actualizarResumenCfg));
     $('cfgKpis').addEventListener('click', (e) => {

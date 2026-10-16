@@ -11,6 +11,7 @@
 //   POST /auto-egresos/cron        → corrida horaria (header x-cron-secret, lo llama pg_cron)
 //   POST /bootstrap                → alta del admin inicial + secretos (token de un solo uso)
 //   GET/POST /ventas/credenciales, POST /ventas/sync, POST /ventas/cron, POST /ventas/aviso-prueba → ver ventas-im5.ts
+//   POST /ventas/mp/pagos { ids }, GET/POST /ventas/mp/credenciales → ver mp.ts (Mercado Pago, solo lectura)
 // Claves (Gemini, Resend) en Supabase Vault: sólo esta función las lee, con service_role.
 import {
   admin, json, HttpError, str, EMAIL_RE, requireActive, requireAdmin, secretGet, secretSet, secretDelete,
@@ -20,6 +21,7 @@ import * as gemini from './gemini.ts';
 import { handleAdminUsers } from './admin-users.ts';
 import { runAutoEgresos } from './egresos.ts';
 import { runVentas, guardarCredenciales, estadoCredenciales, enviarAvisoPrueba } from './ventas-im5.ts';
+import { pagosMP, estadoMP, guardarCredMP } from './mp.ts';
 
 const puedeVerVentas = (p) => Boolean(p && (p.role === 'admin' || p.ver_ventas));
 async function requireVerVentas(req) {
@@ -210,6 +212,19 @@ async function route(req: Request, path: string) {
   if (path === '/ventas/sync' && method === 'POST') {
     const c = await requireVerVentas(req);
     return await runVentas({ modo: 'manual', quien: str(c.user.email || c.user.id) });
+  }
+  if (path === '/ventas/mp/pagos' && method === 'POST') {
+    await requireVerVentas(req);
+    return await pagosMP((await readBody(req)).ids);
+  }
+  if (path === '/ventas/mp/credenciales') {
+    const c = await requireAdmin(req);
+    if (method === 'GET') return await estadoMP();
+    if (method === 'POST') {
+      const out = await guardarCredMP(await readBody(req), c.user.email || c.user.id);
+      await audit(c.user.id, 'ventas_mp_credenciales', 'mercadopago', { cuenta: out.cuenta?.id });
+      return out;
+    }
   }
   if (path === '/ventas/aviso-prueba' && method === 'POST') {
     // Usuario con «Ver ventas» desde la página, o el cron secret (prueba lanzada desde la base).
