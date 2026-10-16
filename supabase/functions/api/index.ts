@@ -187,9 +187,11 @@ async function route(req: Request, path: string) {
   }
 
   if (path === '/auto-egresos/run' && method === 'POST') {
-    await requireAdmin(req);
     const body = await readBody(req);
     const dryRun = body.dryRun !== false;
+    // Simulación: también con el secreto del cron (no escribe). Aplicar de verdad: sólo admin.
+    const cronSecret = await secretGet('cron_secret');
+    if (!(dryRun && cronSecret && req.headers.get('x-cron-secret') === cronSecret)) await requireAdmin(req);
     const summary = await runAutoEgresos({ dryRun, onlyIngredients: Array.isArray(body.ingredientes) ? body.ingredientes.map(String) : undefined, aiChat: body.ai === false ? null : undefined });
     if (dryRun && body.full !== true) summary.lots = summary.lots.slice(0, 50);
     return { ok: true, dryRun, summary };
