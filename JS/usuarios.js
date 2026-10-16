@@ -219,6 +219,7 @@
         <div class="users-access-perms">
           <sl-switch size="small" data-access-perm="editar" ${l.puedeEditar ? 'checked' : ''} ${isAdminRole ? 'disabled' : ''}>Puede editar registros guardados</sl-switch>
           <sl-switch size="small" data-access-perm="borrar" ${l.puedeBorrar ? 'checked' : ''} ${isAdminRole ? 'disabled' : ''}>Puede borrar registros</sl-switch>
+          <sl-switch size="small" data-access-perm="ventas" ${l.verVentas ? 'checked' : ''} ${isAdminRole ? 'disabled' : ''}>Ver ventas del local</sl-switch>
           <small class="users-muted">${isAdminRole ? 'El administrador tiene todos los permisos.' : 'Siempre puede ver y crear (producir, ingresar stock, repartos, informes).'}</small>
         </div>
       </div>
@@ -789,7 +790,7 @@
     const perm = event.target.closest?.('[data-access-perm]');
     if (perm) {
       const sw = (k) => nodes.detail.querySelector(`[data-access-perm="${k}"]`)?.checked;
-      runAccessAction(user, () => adminApi('setPermisos', { personaId: user.id, puedeEditar: Boolean(sw('editar')), puedeBorrar: Boolean(sw('borrar')) }), 'Permisos actualizados');
+      runAccessAction(user, () => adminApi('setPermisos', { personaId: user.id, puedeEditar: Boolean(sw('editar')), puedeBorrar: Boolean(sw('borrar')), verVentas: Boolean(sw('ventas')) }), 'Permisos actualizados');
     }
   });
   nodes.detail.addEventListener('sl-select', async (event) => {

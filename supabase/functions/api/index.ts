@@ -10,6 +10,7 @@
 //   POST /auto-egresos/run         → corrida manual (dryRun por defecto)       (admin)
 //   POST /auto-egresos/cron        → corrida horaria (header x-cron-secret, lo llama pg_cron)
 //   POST /bootstrap                → alta del admin inicial + secretos (token de un solo uso)
+//   GET/POST /ventas/credenciales, POST /ventas/sync, POST /ventas/cron → ver ventas-im5.ts
 // Claves (Gemini, Resend) en Supabase Vault: sólo esta función las lee, con service_role.
 import {
   admin, json, HttpError, str, EMAIL_RE, requireActive, requireAdmin, secretGet, secretSet, secretDelete,
@@ -18,6 +19,14 @@ import {
 import * as gemini from './gemini.ts';
 import { handleAdminUsers } from './admin-users.ts';
 import { runAutoEgresos } from './egresos.ts';
+import { runVentas, guardarCredenciales, estadoCredenciales } from './ventas-im5.ts';
+
+const puedeVerVentas = (p) => Boolean(p && (p.role === 'admin' || p.ver_ventas));
+async function requireVerVentas(req) {
+  const c = await requireActive(req);
+  if (!puedeVerVentas(c.profile)) throw new HttpError(403, 'sin_permiso_ventas');
+  return c;
+}
 
 async function readAiConfig() {
   const cfg = await configGet('_ai');
@@ -70,7 +79,7 @@ async function route(req: Request, path: string) {
   if (path === '/me' && method === 'GET') {
     const c = await requireActive(req);
     const p = c.profile;
-    return { ok: true, uid: c.user.id, email: c.user.email, admin: p.role === 'admin', role: p.role, puede_editar: p.role === 'admin' || p.puede_editar, puede_borrar: p.role === 'admin' || p.puede_borrar, persona_id: p.persona_id, activo: p.activo, theme: p.theme, mustChangePassword: Boolean(c.user.user_metadata?.must_change_password) };
+    return { ok: true, uid: c.user.id, email: c.user.email, admin: p.role === 'admin', role: p.role, puede_editar: p.role === 'admin' || p.puede_editar, puede_borrar: p.role === 'admin' || p.puede_borrar, ver_ventas: puedeVerVentas(p), persona_id: p.persona_id, activo: p.activo, theme: p.theme, mustChangePassword: Boolean(c.user.user_metadata?.must_change_password) };
   }
 
   if (path === '/ia' && method === 'POST') {
@@ -187,6 +196,25 @@ async function route(req: Request, path: string) {
     const summary = await runAutoEgresos({ dryRun: false });
     summary.lots = summary.lots.length;
     return { ok: true, summary };
+  }
+
+  if (path === '/ventas/credenciales') {
+    const c = await requireAdmin(req);
+    if (method === 'GET') return await estadoCredenciales();
+    if (method === 'POST') {
+      const out = await guardarCredenciales(await readBody(req), c.user.email || c.user.id);
+      await audit(c.user.id, 'ventas_credenciales', 'im5', { base: out.base, usuario: out.usuario });
+      return out;
+    }
+  }
+  if (path === '/ventas/sync' && method === 'POST') {
+    const c = await requireVerVentas(req);
+    return await runVentas({ modo: 'manual', quien: str(c.user.email || c.user.id) });
+  }
+  if (path === '/ventas/cron' && method === 'POST') {
+    const secret = await secretGet('cron_secret');
+    if (!secret || req.headers.get('x-cron-secret') !== secret) throw new HttpError(403, 'cron_forbidden');
+    return await runVentas({ modo: 'cron' });
   }
 
   if (path === '/bootstrap' && method === 'POST') {

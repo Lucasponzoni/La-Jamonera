@@ -100,6 +100,7 @@ export async function handleAdminUsers(caller, body) {
         userId: uid, email: u?.email || p?.email || '', role: p?.role || null,
         puedeEditar: p ? (p.role === 'admin' || p.puede_editar) : false,
         puedeBorrar: p ? (p.role === 'admin' || p.puede_borrar) : false,
+        verVentas: p ? (p.role === 'admin' || p.ver_ventas) : false,
         activo: Boolean(p?.activo), lastSignInAt: u?.last_sign_in_at || null,
         confirmado: Boolean(u?.email_confirmed_at), baneado: Boolean(u?.banned_until && new Date(u.banned_until) > new Date())
       };
@@ -189,6 +190,8 @@ export async function handleAdminUsers(caller, body) {
   if (action === 'setPermisos') {
     const { persona, userId } = await resolveTarget(body);
     const patch = { puede_editar: body.puedeEditar !== false, puede_borrar: body.puedeBorrar === true, updated_at: new Date().toISOString() };
+    // Una pantalla vieja que no lo manda no lo toca.
+    if (typeof body.verVentas === 'boolean') patch.ver_ventas = body.verVentas;
     await admin.from('profiles').update(patch).eq('id', userId);
     await audit(actorId, 'setPermisos', persona?.id || userId, patch);
     return { ok: true };

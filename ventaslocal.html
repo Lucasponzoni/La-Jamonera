@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es" class="index-protected">
+<head>
+  <meta charset="UTF-8">
+  <script>try{if(localStorage.getItem('lj-theme')==='dark')document.documentElement.classList.add('sl-theme-dark')}catch(e){}</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>
+    (function earlyIndexGuard() {
+      const SESSION_KEY = 'laJamoneraSession';
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (!raw) { window.location.replace('./login.html'); return; }
+      try {
+        const session = JSON.parse(raw);
+        if (Date.now() < Number(session.expiresAt)) { document.documentElement.classList.add('auth-ok'); return; }
+      } catch (e) {}
+      localStorage.removeItem(SESSION_KEY);
+      window.location.replace('./login.html');
+    })();
+  </script>
+  <title>La Jamonera | Ventas del local</title>
+  <meta name="description" content="Back Office privado de La Jamonera para gestión interna.">
+  <link rel="shortcut icon" href="./IMG/La Jamonera App 180.png" type="image/x-icon">
+  <link rel="icon" type="image/webp" href="./IMG/La Jamonera Cerdito.webp">
+  <link rel="apple-touch-icon" href="./IMG/La Jamonera App 180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="La Jamonera">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202610161722">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202610161722">
+  <link rel="stylesheet" href="./CSS/theme.css?v=202610161722">
+  <link rel="stylesheet" href="./CSS/utilities.css?v=202610161722">
+  <script type="module">
+    import { setBasePath } from './vendor/shoelace/utilities/base-path.js?v=202608282255';
+    setBasePath(new URL('./vendor/shoelace/', document.baseURI).href.slice(0, -1));
+    import('./vendor/shoelace/shoelace-autoloader.js?v=202608282255');
+    const ljCore = [...new Set([...document.querySelectorAll('sl-button, sl-input, sl-icon, sl-dialog, sl-dropdown, sl-drawer, sl-spinner, sl-icon-button')].map((n) => n.localName))].map((t) => customElements.whenDefined(t));
+    Promise.race([Promise.allSettled(ljCore), new Promise((r) => setTimeout(r, 2500))]).then(() => document.documentElement.classList.add('lj-ready'));
+  </script>
+  <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202610161722">
+  <link rel="stylesheet" href="./CSS/legacy/03-componentes.css?v=202610161722">
+  <link rel="stylesheet" href="./CSS/legacy/04-informes.css?v=202610161722">
+  <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202610161722">
+  <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202610161722">
+  <link rel="stylesheet" href="./CSS/ventaslocal.css?v=202610161722">
+</head>
+<body>
+  <main class="app-shell container-fluid px-0">
+    <section id="appView" class="view view-app">
+      <header class="lj-header topbar">
+        <a class="lj-header-brand topbar-brand" href="./index.html" aria-label="Ir a inicio">
+          <img src="./IMG/La Jamonera Cerdito.webp" alt="Logo La Jamonera" class="topbar-brand-logo">
+          <span class="topbar-brand-text"><span class="brand-light">La</span> <span class="brand-bold">Jamonera</span></span>
+        </a>
+        <nav class="lj-header-nav" aria-label="Secciones">
+          <a class="lj-header-link topbar-link" href="./index.html">Mi Fabrica</a>
+          <a class="lj-header-link topbar-link" href="./informes.html">Informes bromatológicos</a>
+          <a class="lj-header-link topbar-link" href="./analisis.html">Análisis químicos</a>
+          <a class="lj-header-link topbar-link is-active active" href="./ventaslocal.html" aria-current="page" data-lj-ventas>Ventas del local</a>
+        </nav>
+        <div class="lj-header-actions">
+          <span class="lj-theme-slot" data-lj-theme-slot></span>
+          <sl-dropdown class="lj-user-menu topbar-user" placement="bottom-end" distance="6">
+            <button slot="trigger" class="lj-tile topbar-user-btn" type="button" aria-label="Abrir menú de usuario">
+              <span id="topbarUserInitials" class="topbar-user-initials">LJ</span>
+            </button>
+            <div class="lj-user-menu-panel topbar-user-menu">
+              <p class="topbar-user-name">Usuario: <strong>La Jamonera</strong></p>
+              <sl-button variant="default" class="w-100 js-open-config" hidden><i slot="prefix" class="fa-solid fa-gear"></i>Configuración</sl-button>
+              <sl-button variant="default" class="w-100 js-logout"><sl-icon slot="prefix" name="box-arrow-right"></sl-icon>Cerrar sesión</sl-button>
+            </div>
+          </sl-dropdown>
+          <sl-icon-button class="lj-header-burger" name="list" label="Abrir menú de navegación" data-lj-drawer-open></sl-icon-button>
+        </div>
+      </header>
+      <sl-drawer class="lj-header-drawer" label="La Jamonera" placement="start">
+        <nav class="lj-drawer-nav" aria-label="Secciones">
+          <a class="lj-header-link topbar-link" href="./index.html">Mi Fabrica</a>
+          <a class="lj-header-link topbar-link" href="./informes.html">Informes bromatológicos</a>
+          <a class="lj-header-link topbar-link" href="./analisis.html">Análisis químicos</a>
+          <a class="lj-header-link topbar-link is-active active" href="./ventaslocal.html" aria-current="page" data-lj-ventas>Ventas del local</a>
+        </nav>
+      </sl-drawer>
+
+      <div class="contenido vl-page">
+        <!-- Sin permiso -->
+        <div id="vlSinPermiso" class="vl-sin-permiso" hidden>
+          <i class="fa-solid fa-lock" aria-hidden="true"></i>
+          <p><strong>No tenés acceso a Ventas del local.</strong></p>
+          <p>Pedile a un administrador que te habilite «Ver ventas del local» en Usuarios.</p>
+        </div>
+
+        <div id="vlApp" hidden>
+          <!-- Encabezado + salud -->
+          <div class="vl-head">
+            <div class="vl-head-title">
+              <h1>Ventas del local</h1>
+              <p class="vl-sub">Comprobantes de InfoManager (IM5) de todas las cajas.</p>
+            </div>
+            <button id="vlSalud" class="vl-salud" type="button" aria-label="Ver la salud de la sincronización" data-estado="cargando">
+              <span class="vl-salud-pipe" aria-hidden="true">
+                <span class="vl-salud-nodo vl-salud-im5">IM5</span>
+                <span class="vl-salud-linea"><i></i><i></i><i></i></span>
+                <span class="vl-salud-nodo vl-salud-db"><i class="fa-solid fa-database"></i></span>
+              </span>
+              <span class="vl-salud-texto">
+                <strong id="vlSaludTitulo">Revisando…</strong>
+                <small id="vlSaludDetalle">&nbsp;</small>
+              </span>
+            </button>
+          </div>
+
+          <!-- Barra -->
+          <div class="vl-toolbar">
+            <div class="vl-rangos" role="group" aria-label="Período">
+              <sl-button size="small" data-rango="hoy" variant="primary">Hoy</sl-button>
+              <sl-button size="small" data-rango="ayer">Ayer</sl-button>
+              <sl-button size="small" data-rango="semana">Esta semana</sl-button>
+              <sl-button size="small" data-rango="mes">Este mes</sl-button>
+              <sl-button size="small" data-rango="mesant">Mes anterior</sl-button>
+              <sl-button size="small" data-rango="custom"><i slot="prefix" class="fa-regular fa-calendar"></i><span id="vlRangoTexto">Elegir…</span></sl-button>
+              <input id="vlRangoInput" type="text" class="vl-oculto" aria-hidden="true" tabindex="-1">
+            </div>
+            <div class="vl-toolbar-der">
+              <sl-select id="vlEmpresa" size="small" value="todas" hoist aria-label="Empresa">
+                <sl-option value="todas">Todas las empresas</sl-option>
+                <sl-option value="1">1 · Facturación</sl-option>
+                <sl-option value="2">2 · Registradoras</sl-option>
+              </sl-select>
+              <sl-switch id="vlComparar" size="small" checked>Comparar</sl-switch>
+              <sl-button size="small" id="vlActualizar" variant="success"><i slot="prefix" class="fa-solid fa-rotate"></i>Actualizar ahora</sl-button>
+              <sl-button size="small" id="vlExcel"><i slot="prefix" class="fa-solid fa-file-excel"></i>Excel</sl-button>
+              <sl-icon-button id="vlConfigBtn" name="gear" label="Configuración de ventas"></sl-icon-button>
+            </div>
+          </div>
+          <p class="vl-comparando" id="vlComparando"></p>
+
+          <!-- KPIs -->
+          <div id="vlKpis" class="vl-kpis" aria-live="polite"></div>
+
+          <!-- Gráficos -->
+          <div class="vl-graficos">
+            <section class="vl-card vl-g-ancho">
+              <header><h2>Ventas por día</h2></header>
+              <div id="vlGDia" class="vl-grafico"></div>
+            </section>
+            <section class="vl-card">
+              <header><h2>Por hora</h2></header>
+              <div id="vlGHora" class="vl-grafico"></div>
+            </section>
+            <section class="vl-card">
+              <header><h2>Medios de cobro</h2></header>
+              <div id="vlGMedios" class="vl-grafico"></div>
+            </section>
+            <section class="vl-card vl-g-ancho">
+              <header>
+                <h2>Productos más vendidos</h2>
+                <sl-radio-group id="vlTopModo" size="small" value="importe">
+                  <sl-radio-button value="importe">Por plata</sl-radio-button>
+                  <sl-radio-button value="cantidad">Por cantidad</sl-radio-button>
+                </sl-radio-group>
+              </header>
+              <div id="vlGTop" class="vl-grafico vl-grafico-alto"></div>
+            </section>
+          </div>
+
+          <!-- Tabla -->
+          <section class="vl-card vl-tabla-card">
+            <header class="vl-tabla-head">
+              <h2>Comprobantes <small id="vlTablaCuenta"></small></h2>
+              <sl-input id="vlBuscar" size="small" placeholder="Buscar cliente, cajera, número u observación" clearable>
+                <i slot="prefix" class="fa-solid fa-magnifying-glass"></i>
+              </sl-input>
+            </header>
+            <div class="vl-tabla-wrap">
+              <table class="vl-tabla">
+                <thead>
+                  <tr>
+                    <th class="vl-col-exp" aria-label="Detalle"></th>
+                    <th>Fecha</th>
+                    <th>Comprobante</th>
+                    <th>Cliente</th>
+                    <th>Caja / usuario</th>
+                    <th>Cobro</th>
+                    <th class="vl-num">Total</th>
+                  </tr>
+                </thead>
+                <tbody id="vlTablaBody"></tbody>
+              </table>
+            </div>
+            <div class="vl-tabla-pie">
+              <span id="vlPagInfo"></span>
+              <div>
+                <sl-button size="small" id="vlPagAnt"><i class="fa-solid fa-chevron-left"></i></sl-button>
+                <sl-button size="small" id="vlPagSig"><i class="fa-solid fa-chevron-right"></i></sl-button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- Salud: detalle -->
+      <sl-dialog id="vlSaludDialog" class="lj-modal vl-dialog" label="Salud de la sincronización">
+        <div id="vlSaludCuerpo"></div>
+      </sl-dialog>
+
+      <!-- Configuración -->
+      <sl-dialog id="vlConfigDialog" class="lj-modal vl-dialog" label="Configuración · Ventas del local">
+        <sl-tab-group id="vlConfigTabs">
+          <sl-tab slot="nav" panel="sync">Sincronización</sl-tab>
+          <sl-tab slot="nav" panel="kpis">Indicadores</sl-tab>
+          <sl-tab slot="nav" panel="cred" data-solo-admin>Conexión IM5</sl-tab>
+
+          <sl-tab-panel name="sync">
+            <div class="vl-form">
+              <sl-switch id="cfgActiva">Sincronización automática prendida</sl-switch>
+              <div>
+                <label class="lj-label">Días</label>
+                <div class="vl-dias" id="cfgDias" role="group" aria-label="Días">
+                  <button type="button" data-dia="1">Lun</button><button type="button" data-dia="2">Mar</button><button type="button" data-dia="3">Mié</button><button type="button" data-dia="4">Jue</button><button type="button" data-dia="5">Vie</button><button type="button" data-dia="6">Sáb</button><button type="button" data-dia="0">Dom</button>
+                </div>
+              </div>
+              <div class="vl-form-fila">
+                <sl-select id="cfgDesde" label="Desde las" hoist></sl-select>
+                <sl-select id="cfgHasta" label="Hasta las" hoist></sl-select>
+                <sl-select id="cfgCada" label="Cada" hoist>
+                  <sl-option value="10">10 minutos</sl-option>
+                  <sl-option value="30">30 minutos</sl-option>
+                  <sl-option value="60">1 hora</sl-option>
+                  <sl-option value="120">2 horas</sl-option>
+                  <sl-option value="180">3 horas</sl-option>
+                  <sl-option value="240">4 horas</sl-option>
+                  <sl-option value="360">6 horas</sl-option>
+                  <sl-option value="720">12 horas</sl-option>
+                  <sl-option value="1440">Una vez al día</sl-option>
+                </sl-select>
+              </div>
+              <p class="vl-ayuda" id="cfgResumen"></p>
+              <div>
+                <label class="lj-label">Empresas</label>
+                <div class="vl-checks">
+                  <sl-checkbox data-cfg-empresa="1">1 · Facturación - Administración</sl-checkbox>
+                  <sl-checkbox data-cfg-empresa="2">2 · Registradoras</sl-checkbox>
+                </div>
+              </div>
+              <div>
+                <label class="lj-label">Comprobantes</label>
+                <div class="vl-checks">
+                  <sl-checkbox data-cfg-tipo="FA">Facturas</sl-checkbox>
+                  <sl-checkbox data-cfg-tipo="NC">Notas de crédito</sl-checkbox>
+                  <sl-checkbox data-cfg-tipo="ND">Notas de débito</sl-checkbox>
+                </div>
+              </div>
+              <sl-input id="cfgMail" label="Avisar por mail si falla" placeholder="mail@ejemplo.com, otro@ejemplo.com" help-text="Uno o varios, separados por coma. Vacío = solo el aviso en la página."></sl-input>
+            </div>
+          </sl-tab-panel>
+
+          <sl-tab-panel name="kpis">
+            <p class="vl-ayuda">Prendé, apagá y ordená los indicadores de arriba. Se guarda para todos.</p>
+            <ul id="cfgKpis" class="vl-kpi-lista"></ul>
+          </sl-tab-panel>
+
+          <sl-tab-panel name="cred">
+            <div class="vl-form">
+              <p class="vl-ayuda">Con estos datos entra la sincronización a InfoManager. Se prueban antes de guardar y la contraseña queda cifrada: no se vuelve a mostrar.</p>
+              <p class="vl-cred-estado" id="cfgCredEstado"></p>
+              <sl-input id="cfgBase" label="Empresa / base de datos" placeholder="ej. frigolajamonera01_base" autocomplete="off"></sl-input>
+              <sl-input id="cfgUsuario" label="Usuario" autocomplete="off"></sl-input>
+              <sl-input id="cfgPassword" label="Contraseña" type="password" password-toggle autocomplete="new-password" help-text="Dejala vacía para conservar la guardada."></sl-input>
+              <div><sl-button id="cfgCredGuardar" variant="primary"><i slot="prefix" class="fa-solid fa-plug-circle-check"></i>Probar y guardar</sl-button></div>
+            </div>
+          </sl-tab-panel>
+        </sl-tab-group>
+        <div slot="footer" class="vl-dialog-pie">
+          <sl-button id="cfgCancelar">Cancelar</sl-button>
+          <sl-button id="cfgGuardar" variant="primary"><i slot="prefix" class="fa-solid fa-floppy-disk"></i>Guardar</sl-button>
+        </div>
+      </sl-dialog>
+
+      <footer class="lj-footer app-footer">
+        <div class="lj-footer-inner">
+          <section class="lj-footer-col lj-footer-brand" aria-label="La Jamonera">
+            <div class="lj-footer-brand-row">
+              <img src="./IMG/La Jamonera Cerdito.webp" alt="Logo La Jamonera" class="lj-footer-logo">
+              <div>
+                <p class="lj-footer-title"><span class="brand-light">La</span> <span class="brand-bold">Jamonera</span></p>
+                <p class="lj-footer-subtitle">Back Office · Panel de gestión</p>
+              </div>
+            </div>
+            <p class="lj-footer-text">Producción, inventario, recetas y trazabilidad de la planta en un solo lugar.</p>
+          </section>
+          <nav class="lj-footer-col" aria-label="Secciones">
+            <p class="lj-footer-heading">Secciones</p>
+            <ul class="lj-footer-links">
+              <li><a href="./index.html"><i class="fa-solid fa-industry" aria-hidden="true"></i>Mi Fabrica</a></li>
+              <li><a href="./informes.html"><i class="fa-solid fa-file-medical" aria-hidden="true"></i>Informes bromatológicos</a></li>
+              <li><a href="./analisis.html"><i class="fa-solid fa-flask" aria-hidden="true"></i>Análisis químicos</a></li>
+              <li data-lj-ventas><a href="./ventaslocal.html"><i class="fa-solid fa-cash-register" aria-hidden="true"></i>Ventas del local</a></li>
+            </ul>
+          </nav>
+          <section class="lj-footer-col" aria-label="Sesión y soporte">
+            <p class="lj-footer-heading">Tu sesión</p>
+            <div class="lj-footer-session" aria-live="polite">
+              <sl-icon name="clock-history" aria-hidden="true"></sl-icon>
+              <span>Vence en</span>
+              <strong id="sessionCountdown">--h --m</strong>
+            </div>
+            <div class="lj-footer-actions">
+              <sl-button variant="default" size="small" href="https://wa.me/543416292861?text=Nos%20contactamos%20de%20Frigorifico%20la%20Jamonera%20desde%20el%20back%20office." target="_blank" class="lj-footer-support">
+                <i slot="prefix" class="fa-brands fa-whatsapp" aria-hidden="true"></i>Soporte
+              </sl-button>
+              <sl-button variant="default" size="small" id="footerLogoutBtn" class="js-logout footer-logout-btn" type="button">
+                <sl-icon name="box-arrow-right" slot="prefix" aria-hidden="true"></sl-icon>Cerrar sesión
+              </sl-button>
+            </div>
+          </section>
+        </div>
+        <div class="lj-footer-bottom">
+          <p class="lj-footer-copy">
+            © <span id="currentYear"></span> La Jamonera · Back Office para empresas · powered by
+            <a href="https://asesoriabromatologicaros.com.ar/index.html" target="_blank" rel="noopener noreferrer">ABR</a>
+            · Ponzoni Lucas
+          </p>
+          <p class="lj-footer-maker">
+            <span>Software de</span>
+            <img class="ns-light" src="./IMG/ninja-soft-light.webp" alt="Ninja Soft" width="80" height="22">
+            <img class="ns-dark" src="./IMG/ninja-soft-dark.webp" alt="Ninja Soft" width="80" height="22">
+          </p>
+        </div>
+      </footer>
+    </section>
+  </main>
+
+  <script src="./JS/data/backend.js?v=202610161722"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+  <script src="./vendor/echarts/echarts.min.js?v=202610161722"></script>
+  <script src="./JS/ui/forms.js?v=202610161722"></script>
+  <script src="./JS/ui/theme.js?v=202610161722"></script>
+  <script src="./JS/ui/modal.js?v=202610161722"></script>
+  <script src="./JS/ui/lj-alert.js?v=202610161722"></script>
+  <script src="./JS/ui/header.js?v=202610161722"></script>
+  <script src="./JS/data/config.js?v=202610161722"></script>
+  <script src="./JS/data/supabase-init.js?v=202610161722"></script>
+  <script src="./JS/firebase-init.js?v=202610161722"></script>
+  <script src="./JS/data/security.js?v=202610161722"></script>
+  <script src="./JS/proxy-client.js?v=202610161722"></script>
+  <script src="./JS/data/authz.js?v=202610161722"></script>
+  <script src="./JS/configuracion.js?v=202610161722"></script>
+  <script src="./JS/Notificaciones.js?v=202610161722"></script>
+  <script src="./JS/app.js?v=202610161722"></script>
+  <script src="./JS/ventaslocal.js?v=202610161722"></script>
+</body>
+</html>

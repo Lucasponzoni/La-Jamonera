@@ -15,7 +15,8 @@
     'data-delete-comment'];
   const style = document.createElement('style');
   style.textContent = `html.lj-no-edit :is(${EDIT.map((a) => `[${a}]`).join(',')}) { display: none !important; }
-html.lj-no-delete :is(${DELETE.map((a) => `[${a}]`).join(',')}, sl-menu-item.is-danger, sl-menu-item[value="delete"]) { display: none !important; }`;
+html.lj-no-delete :is(${DELETE.map((a) => `[${a}]`).join(',')}, sl-menu-item.is-danger, sl-menu-item[value="delete"]) { display: none !important; }
+html:not(.lj-ver-ventas) [data-lj-ventas] { display: none !important; }`;
   document.head.appendChild(style);
 
   window.LJMe = (async () => {
@@ -29,6 +30,7 @@ html.lj-no-delete :is(${DELETE.map((a) => `[${a}]`).join(',')}, sl-menu-item.is-
       root.classList.toggle('lj-role-admin', Boolean(me.admin));
       root.classList.toggle('lj-no-edit', !me.puede_editar);
       root.classList.toggle('lj-no-delete', !me.puede_borrar);
+      root.classList.toggle('lj-ver-ventas', Boolean(me.ver_ventas));
       const onLogin = /login\.html$/.test(location.pathname);
       if (me.mustChangePassword && !onLogin) location.replace('./login.html?cambiar=1');
       return me;
