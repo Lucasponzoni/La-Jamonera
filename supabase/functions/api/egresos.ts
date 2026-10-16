@@ -29,6 +29,23 @@ export async function refreshInventoryIndex(ingredientId, todayIso, version) {
   return summary;
 }
 
+// Ingredientes vinculados (confirmados) a un artículo del POS que no son materia prima, si la sincronización está
+// prendida y ya empezó. Sin config o con error: conjunto vacío (el autoegreso sigue como siempre).
+export async function idsSincronizadosPos(todayIso) {
+  try {
+    const { data: vc } = await admin.from('ventas_config').select('config').eq('id', 1).maybeSingle();
+    const pos = vc?.config?.pos || {};
+    if (!pos.activo || pos.iaSoloVencidos === false || (pos.desde && todayIso < pos.desde)) return new Set();
+    const { data: vs } = await admin.from('im5_articulo_vinculos').select('ref_id').eq('tipo', 'ingrediente').eq('estado', 'confirmado');
+    const mp = new Set();
+    if (pos.excluirMateriaPrima !== false) {
+      const { data } = await admin.rpc('pos_materia_prima');
+      (data || []).forEach((x) => mp.add(typeof x === 'string' ? x : Object.values(x)[0]));
+    }
+    return new Set((vs || []).map((v) => v.ref_id).filter((id) => id && !mp.has(id)));
+  } catch { return new Set(); }
+}
+
 const JOB = 'auto_egresos';
 const LOCK_SECONDS = 9 * 60;
 const EDGE_DEFAULTS = { MAX_RUN_MILLIS: 110000, MAX_PRODUCTS_PER_RUN: 60 };
@@ -139,6 +156,8 @@ export async function runAutoEgresos({ dryRun = true, now = new Date(), aiChat, 
     const afterCap = allIds[startIndex + selectedIds.length] || '';
 
     const regBy = Object.fromEntries((regs || []).map((r) => [r.ingrediente_id, r]));
+    // Productos sincronizados con el POS (Ventas del local → Configuración → Inventario): la IA sólo resuelve vencidos.
+    const soloVencidos = await idsSincronizadosPos(todayIso);
     const { data: ingRows } = await admin.from('ingredientes').select('id, nombre, descripcion').in('id', selectedIds);
     const ingredientes = Object.fromEntries((ingRows || []).map((i) => [i.id, { name: i.nombre, description: i.descripcion }]));
 
@@ -147,7 +166,8 @@ export async function runAutoEgresos({ dryRun = true, now = new Date(), aiChat, 
       const r = regBy[id];
       scopedItems[id] = {
         stockUnit: r.stock_unit, infiniteStock: r.infinite_stock, packageQty: r.package_qty == null ? undefined : Number(r.package_qty),
-        weeklySheetConfig: r.weekly_sheet_config || undefined, entries: (lotsBy[id] || []).map(lotToEntry), __lots: lotsBy[id] || []
+        weeklySheetConfig: r.weekly_sheet_config || undefined, entries: (lotsBy[id] || []).map(lotToEntry), __lots: lotsBy[id] || [],
+        __soloVencidos: soloVencidos.has(id)
       };
     });
 
@@ -174,7 +194,8 @@ export async function runAutoEgresos({ dryRun = true, now = new Date(), aiChat, 
         try {
           const result = engine.processEntryAutoEgreso({
             ingredientId, ingredient, entry, weeklyCfg, todayIso, holidaySet, runId,
-            aiPlanByDay: safeObj(aiPlans[normalizeText(entry.id)])
+            aiPlanByDay: safeObj(aiPlans[normalizeText(entry.id)]),
+            soloVencidos: record.__soloVencidos
           });
           if (!result.changed) return;
           summary.movements += result.movementsCreated;

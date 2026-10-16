@@ -432,11 +432,17 @@ function createEngine({ cfg, random = Math.random, tz = TZ, log }) {
     return { atTs, dayIso: T.dateToIso(atTs), qty: roundedQty, qtyBase: roundedBase, unit: unitLabel, kind };
   }
 
-  function processEntryAutoEgreso({ ingredientId, ingredient, entry, weeklyCfg, todayIso, holidaySet, runId, aiPlanByDay = null }) {
+  // soloVencidos: producto sincronizado con el POS (las ventas reales ya bajan el stock). No hay egresos diarios:
+  // sólo, si el lote venció con stock, se resuelve igual que siempre (venta en mostrador o baja según cfg).
+  function processEntryAutoEgreso({ ingredientId, ingredient, entry, weeklyCfg, todayIso, holidaySet, runId, aiPlanByDay = null, soloVencidos = false }) {
     const out = { changed: false, movementsCreated: 0, entry, overdueFlush: false, movements: [] };
     const unitMeta = getUnitMeta(entry.unit);
     let availableBase = getAvailableBase(entry, unitMeta);
     if (availableBase <= EPS) return out;
+    if (soloVencidos) {
+      const vence = String(entry.expiryDate || '').slice(0, 10);
+      if (entry.noPerecedero || !/^\d{4}-\d{2}-\d{2}$/.test(vence) || vence >= todayIso) return out;
+    }
     const window = getEntryProcessingWindow(entry, weeklyCfg, todayIso, holidaySet);
     if (!window) return out;
     const { fromIso, toIso, limitIso, overdueFlush, expiredDrain } = window;
@@ -451,6 +457,12 @@ function createEngine({ cfg, random = Math.random, tz = TZ, log }) {
       if (bajaOnIso < fromIso) bajaOnIso = fromIso > todayIso ? todayIso : fromIso;
     } else {
       drainOnIso = overdueFlush ? processDays[processDays.length - 1] : limitIso;
+    }
+    if (soloVencidos) {
+      // Todo lo que queda del lote vencido se resuelve de una vez (sin reparto diario).
+      if (bajaMode) processDays = [];
+      else { processDays = [processDays.length ? processDays[processDays.length - 1] : toIso]; drainOnIso = processDays[0]; }
+      aiPlanByDay = null;
     }
     out.overdueFlush = Boolean(overdueFlush);
     const unitLabel = String(entry.unit || '');
@@ -553,7 +565,7 @@ function createEngine({ cfg, random = Math.random, tz = TZ, log }) {
       const record = items[ingredientId];
       if (!record || !Array.isArray(record.entries) || !record.entries.length) return;
       const weeklyCfg = withDefaultWeeklyConfig(record.weeklySheetConfig);
-      if (!weeklyCfg.egresoEnabled) return;
+      if (!weeklyCfg.egresoEnabled || record.__soloVencidos) return;
       const ingredient = safeObj(ingredientes[ingredientId]);
       record.entries.forEach((entry) => {
         const window = getEntryProcessingWindow(entry, weeklyCfg, todayIso, holidaySet);

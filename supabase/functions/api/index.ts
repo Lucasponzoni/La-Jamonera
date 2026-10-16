@@ -12,6 +12,7 @@
 //   POST /bootstrap                → alta del admin inicial + secretos (token de un solo uso)
 //   GET/POST /ventas/credenciales, POST /ventas/sync, POST /ventas/cron, POST /ventas/aviso-prueba → ver ventas-im5.ts
 //   POST /ventas/mp/pagos { ids }, GET/POST /ventas/mp/credenciales → ver mp.ts (Mercado Pago, solo lectura)
+//   POST /ventas/pos/simular|aplicar { desde, hasta } → ver pos.ts (ventas del POS → Inventario y Producción)
 // Claves (Gemini, Resend) en Supabase Vault: sólo esta función las lee, con service_role.
 import {
   admin, json, HttpError, str, EMAIL_RE, requireActive, requireAdmin, secretGet, secretSet, secretDelete,
@@ -22,6 +23,7 @@ import { handleAdminUsers } from './admin-users.ts';
 import { runAutoEgresos } from './egresos.ts';
 import { runVentas, guardarCredenciales, estadoCredenciales, enviarAvisoPrueba } from './ventas-im5.ts';
 import { pagosMP, estadoMP, guardarCredMP } from './mp.ts';
+import { aplicarVentasPos } from './pos.ts';
 
 const puedeVerVentas = (p) => Boolean(p && (p.role === 'admin' || p.ver_ventas));
 async function requireVerVentas(req) {
@@ -212,6 +214,17 @@ async function route(req: Request, path: string) {
   if (path === '/ventas/sync' && method === 'POST') {
     const c = await requireVerVentas(req);
     return await runVentas({ modo: 'manual', quien: str(c.user.email || c.user.id) });
+  }
+  // Ventas del POS → Inventario/Producción. Simular: cualquiera con «Ver ventas» (no escribe). Aplicar: admin o cron.
+  if ((path === '/ventas/pos/simular' || path === '/ventas/pos/aplicar') && method === 'POST') {
+    const secret = await secretGet('cron_secret');
+    const porCron = Boolean(secret && req.headers.get('x-cron-secret') === secret);
+    const simular = path.endsWith('/simular');
+    if (!porCron) { if (simular) await requireVerVentas(req); else await requireAdmin(req); }
+    const body = await readBody(req);
+    const out = await aplicarVentasPos({ simular, desde: str(body.desde), hasta: str(body.hasta) });
+    if (simular && body.detalle !== true) out.detalle = out.detalle.slice(0, 400);
+    return { ok: true, ...out };
   }
   if (path === '/ventas/mp/pagos' && method === 'POST') {
     await requireVerVentas(req);

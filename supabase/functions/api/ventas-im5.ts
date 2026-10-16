@@ -9,6 +9,7 @@
 //   POST /ventas/sync                                       (ver ventas) → corrida ya («Actualizar ahora»)
 //   POST /ventas/cron                                       (x-cron-secret, cada 10 min) → decide si toca
 import { admin, HttpError, str, secretGet, secretSet, readEmailConfig, sendResend, EMAIL_RE } from './shared.ts';
+import { aplicarVentasPos } from './pos.ts';
 
 const IM5_URL = 'https://app.infomanager.com.ar';
 const IM5_BASE_PATH = '/IM5_IMP';
@@ -400,6 +401,13 @@ export async function runVentas({ modo = 'cron', quien = '' } = {}) {
     await releaseLock(runId);
   }
 
+  // Ventas del POS → Inventario/Producción (si está prendido). Un error acá no marca la sincronización como fallida.
+  if (!error) {
+    try {
+      const pos = await aplicarVentasPos({ cfgVentas: cfg, runId: `pos_${runId}` });
+      if (!pos.apagado) resumen.pos = { comprobantes: pos.comprobantes, aplicados: pos.aplicados, sinStock: pos.sinStock, excluidos: pos.excluidos, repartos: pos.repartos, revertidos: pos.revertidos, conflictos: pos.conflictos };
+    } catch (e) { console.error('ventas pos', e?.message); resumen.pos = { error: str(e?.message).slice(0, 200) }; }
+  }
   const fin = new Date().toISOString();
   const pendientesItems = await contarSinItems();
   const corrida = { id: runId, inicio: new Date(t0).toISOString(), fin, ms: Date.now() - t0, ok: !error, error, ...resumen, pendientesItems };
