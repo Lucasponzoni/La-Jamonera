@@ -21,7 +21,7 @@ import {
 } from './shared.ts';
 import * as gemini from './gemini.ts';
 import { handleAdminUsers } from './admin-users.ts';
-import { runAutoEgresos } from './egresos.ts';
+import { runAutoEgresos, refreshInventoryIndex } from './egresos.ts';
 import { runVentas, guardarCredenciales, estadoCredenciales, enviarAvisoPrueba } from './ventas-im5.ts';
 import { pagosMP, estadoMP, guardarCredMP } from './mp.ts';
 import { aplicarVentasPos, revertirComprobantePos } from './pos.ts';
@@ -227,6 +227,21 @@ async function route(req: Request, path: string) {
     const out = await aplicarVentasPos({ simular, desde: str(body.desde), hasta: str(body.hasta), comprobante });
     if (simular && body.detalle !== true) out.detalle = out.detalle.slice(0, 400);
     return { ok: true, ...out };
+  }
+  // Recalcula el índice de Inventario (stock, vencimientos) de los ingredientes pedidos, p. ej. después de una
+  // corrección de lotes hecha por SQL. Admin o cron.
+  if (path === '/inventario/reindex' && method === 'POST') {
+    const secret = await secretGet('cron_secret');
+    if (!(secret && req.headers.get('x-cron-secret') === secret)) await requireAdmin(req);
+    const body = await readBody(req);
+    const ids = [...new Set((Array.isArray(body.ids) ? body.ids : []).map((x) => str(x)).filter(Boolean))].slice(0, 200);
+    if (!ids.length) throw new HttpError(400, 'ids_requeridos');
+    const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).format(new Date());
+    const errores = [];
+    for (const id of ids) {
+      try { await refreshInventoryIndex(id, hoy, 4); } catch (e) { errores.push({ id, error: str(e?.message).slice(0, 200) }); }
+    }
+    return { ok: true, actualizados: ids.length - errores.length, errores };
   }
   if (path === '/ventas/pos/revertir' && method === 'POST') {
     const secret = await secretGet('cron_secret');
