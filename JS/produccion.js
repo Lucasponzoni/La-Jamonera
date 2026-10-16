@@ -3747,6 +3747,23 @@
       });
     });
 
+    // Hacia adelante: a dónde fue lo producido (ventas del local por POS, repartos y lo que queda).
+    const salidas = state.salidasPos?.[normalizeValue(registro?.id)];
+    if (salidas && (Number(salidas.vendido_kg) > 0 || Number(salidas.repartos) > 0)) {
+      const ventas = Number(salidas.ventas || 0);
+      const nRep = Number(salidas.repartos || 0);
+      if (Number(salidas.vendido_kg) > 0) {
+        lines.push(`OUT_V["<b>fa:fa-cash-register VENDIDO EN EL LOCAL</b><br/>${Number(salidas.vendido_kg).toFixed(3)} KG · ${ventas} ${ventas === 1 ? 'venta' : 'ventas'}"]:::toneSale`);
+        lines.push('L ==>|VENTAS POS| OUT_V');
+      }
+      if (nRep > 0) {
+        lines.push(`OUT_R["<b>fa:fa-truck REPARTOS</b><br/>${nRep} ${nRep === 1 ? 'reparto' : 'repartos'} · ${Number(salidas.repartido_kg || 0).toFixed(3)} KG"]:::toneSale`);
+        lines.push('L ==>|REPARTO| OUT_R');
+      }
+      lines.push(`OUT_S["<b>EN STOCK</b><br/>${getDispatchAvailableByProductionId(registro?.id).toFixed(3)} KG"]:::toneStock`);
+      lines.push('L ==> OUT_S');
+    }
+
     lines.push('linkStyle default stroke:#6e83a7,stroke-width:1.8px;');
     lines.push('classDef toneCompany fill:#2f6ecf,stroke:#1f57ad,color:#ffffff,stroke-width:1.8px;');
     lines.push('classDef toneProduct fill:#3b82f6,stroke:#1f5ec4,color:#ffffff,stroke-width:1.7px;');
@@ -3758,6 +3775,8 @@
     lines.push('classDef toneIngredient fill:#eaf1ff,stroke:#9fb9e6,color:#173f78,stroke-width:1.35px;');
     lines.push('classDef toneRegistry fill:#e7efff,stroke:#8eaedf,color:#173d73,stroke-width:1.35px;');
     lines.push('classDef toneThaw fill:#d9ecff,stroke:#5b9bd5,color:#0c3a66,stroke-width:1.5px;');
+    lines.push('classDef toneSale fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-width:1.6px;');
+    lines.push('classDef toneStock fill:#f1f5f9,stroke:#94a3b8,color:#1e293b,stroke-width:1.4px;');
     return lines.join('\n');
   };
 
@@ -4693,6 +4712,23 @@
     const brand = normalizeValue(vehicle.brand || vehicle.type || 'Vehículo');
     return `${vehicle.number || '-'} - ${vehicle.patent || '-'} - ${brand} (${meta.text})`;
   };
+  // Salidas de cada producción fuera de Producción: ventas en el mostrador que bajó el POS (Ventas del local) y
+  // repartos (incluye los REP-POS creados desde el POS). Las ventas restan del disponible; los repartos ya restan
+  // por sus asignaciones. Sin la tabla o sin red: queda vacío y todo sigue como antes.
+  const cargarSalidasPos = async () => {
+    try {
+      const client = window.supabaseLaJamonera;
+      const ids = Object.keys(safeObject(state.registros));
+      if (!client?.rpc || !ids.length) { state.salidasPos = {}; return; }
+      const { data, error } = await client.rpc('produccion_salidas', { p_ids: ids });
+      if (error) throw error;
+      state.salidasPos = Object.fromEntries((data || []).map((r) => [r.produccion_id, r]));
+    } catch (error) {
+      state.salidasPos = state.salidasPos || {};
+      console.warn('[Producción] No se pudieron leer las ventas del POS.', error?.message || error);
+    }
+  };
+  const getPosSoldKg = (productionId) => Number(state.salidasPos?.[normalizeValue(productionId)]?.vendido_kg || 0);
   const getDispatchAvailableByProductionId = (productionId) => {
     const prod = safeObject(state.registros?.[productionId]);
     if (!prod.id || normalizeValue(prod.status) === 'anulada') return 0;
@@ -4705,7 +4741,7 @@
       .filter((movement) => normalizeValue(movement?.type) === 'egreso')
       .filter((movement) => [movement?.sourceId, movement?.sourceCode, movement?.lotNumber].some((value) => normalizeValue(value) === normalizeValue(productionId)))
       .reduce((acc, movement) => acc + Math.abs(Number(movement?.qtyKg || 0)), 0);
-    return Number(Math.max(0, producedKg - dispatchedKg - directEgressKg).toFixed(3));
+    return Number(Math.max(0, producedKg - dispatchedKg - directEgressKg - getPosSoldKg(productionId)).toFixed(3));
   };
   const getDispatchLotProductionDate = (reg = {}) => {
     const direct = normalizeDispatchDateToken(reg.productionDate || reg.elaborationDate || reg.fechaElaboracion);
@@ -10073,6 +10109,7 @@
     state.drafts = safeObject(drafts);
     state.registros = safeObject(registros);
     state.users = safeObject(users);
+    await cargarSalidasPos();
     const nextRepartoStore = Object.keys(safeObject(repartoStore)).length
       ? repartoStore
       : legacyRepartoStore;

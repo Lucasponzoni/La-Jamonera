@@ -34,6 +34,8 @@
     tipos_invalidos: 'Los tipos de comprobante no son válidos.',
     mail_invalido: 'Algún mail no es válido.',
     sin_mail_avisos: 'No hay mails guardados para los avisos.',
+    fecha_invalida: 'La fecha no es válida.',
+    antes_de_inicio: 'Esa fecha es anterior al inicio configurado.',
     mp_token_invalido: 'El token no tiene el formato de Mercado Pago (APP_USR-…).',
     mp_token_rechazado: 'Mercado Pago rechazó ese token.',
     mp_otra_cuenta: 'Ese token es de otra cuenta de Mercado Pago.',
@@ -138,7 +140,7 @@
     const W = 120; const H = 34; const max = Math.max(...v); const min = Math.min(...v, 0);
     const pts = v.map((y, i) => [(i / (v.length - 1)) * W, H - 3 - ((y - min) / (max - min || 1)) * (H - 6)]);
     const linea = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join('');
-    const id = `vlsg${Math.random().toString(36).slice(2, 7)}`;
+    const id = `vlsg${String(color).replace(/\W/g, '')}`; // fijo por color: repintar igual no cambia el HTML
     return `<svg class="vl-kpi-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
       <defs><linearGradient id="${id}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".28"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
       <path d="${linea}L${W},${H}L0,${H}Z" fill="url(#${id})"/><path d="${linea}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>`;
@@ -221,8 +223,23 @@
       ${foto}<div class="vl-kpi-valor ${chico ? 'is-chico' : ''}">${valor}</div><div class="vl-kpi-sub">${sub}</div>${extra ? `<div class="vl-kpi-extra">${extra}</div>` : ''}</article>`;
   }
   const kpisActivos = () => (Array.isArray(st.cfg.kpis) && st.cfg.kpis.length ? st.cfg.kpis : KPIS.map((k) => k.key)).filter((k) => KPI_POR_KEY[k]);
+  // Sólo se reemplazan las tarjetas que cambiaron: repintar todas hacía que la animación de entrada se
+  // repitiera (los KPIs «cargaban dos veces» al llegar el catálogo, la config o el tema).
   function pintarKpis() {
-    $('vlKpis').innerHTML = kpisActivos().map((k) => kpiHtml(k, st.resumen, st.comparar ? st.resumenComp : null)).join('');
+    const cont = $('vlKpis');
+    const htmls = kpisActivos().map((k) => kpiHtml(k, st.resumen, st.comparar ? st.resumenComp : null));
+    const previos = cont._htmls || [];
+    if (previos.length !== htmls.length) { cont.innerHTML = htmls.join(''); cont._htmls = htmls; return; }
+    htmls.forEach((h, i) => {
+      if (h === previos[i]) return;
+      const nodo = cont.children[i];
+      const t = document.createElement('template'); t.innerHTML = h;
+      const nuevo = t.content.firstElementChild;
+      // Ya visible (no viene del skeleton): sin animación de entrada.
+      if (nodo && !nodo.classList.contains('is-skeleton')) nuevo.style.animation = 'none';
+      if (nodo) nodo.replaceWith(nuevo); else cont.append(nuevo);
+    });
+    cont._htmls = htmls;
   }
 
   // ---------- Gráficos (ECharts) ----------
@@ -408,7 +425,9 @@
     const periodo = st.rango.desde === st.rango.hasta ? fechaCorta(st.rango.desde) : `${fechaCorta(st.rango.desde)} al ${fechaCorta(st.rango.hasta)}`;
     $('vlComparando').innerHTML = `<i class="fa-regular fa-calendar"></i>${esc(periodo)}${st.comparar ? ` · comparando con ${esc(comp.texto)} (${esc(fechaCorta(comp.desde))}${comp.desde !== comp.hasta ? ` al ${esc(fechaCorta(comp.hasta))}` : ''})` : ''}`;
     try {
-      const [r, c] = await Promise.all([resumen(st.rango.desde, st.rango.hasta), st.comparar ? resumen(comp.desde, comp.hasta) : Promise.resolve(null)]);
+      // El catálogo (foto y vínculo del producto más vendido) se espera junto: así la tarjeta sale completa de una.
+      const [r, c] = await Promise.all([resumen(st.rango.desde, st.rango.hasta), st.comparar ? resumen(comp.desde, comp.hasta) : Promise.resolve(null),
+        Promise.resolve(cargarCatalogo()).catch(() => null)]);
       st.resumen = r; st.resumenComp = c;
     } catch (e) {
       notify('error', 'No se pudieron leer las ventas', textoError(e));
@@ -529,7 +548,7 @@
       const [ing, rec, vin] = await Promise.all([
         st.sb.from('ingredientes').select('id,nombre,nombreRaw:raw->>name,img:raw->>imageUrl'),
         st.sb.from('recetas').select('id,titulo:raw->>title,comercial:raw->>nombreComercial,img:raw->>imageUrl'),
-        st.sb.from('im5_articulo_vinculos').select('cod_articulo,tipo,ref_id,estado,similitud')
+        st.sb.from('im5_articulo_vinculos').select('cod_articulo,tipo,ref_id,estado,similitud,factor')
       ]);
       const items = new Map();
       (rec.data || []).forEach((r) => items.set(`receta:${r.id}`, { tipo: 'receta', id: r.id, nombre: capital(r.comercial || r.titulo), sub: r.comercial && r.titulo !== r.comercial ? capital(r.titulo) : '', img: r.img || '' }));
@@ -632,7 +651,7 @@
       </div>`;
     }).join('');
   }
-  function htmlProductos(items, r, catalogo) {
+  function htmlProductos(items, r, catalogo, aplic = {}) {
     if (items.error) return `<p class="vl-ayuda">${esc(textoError(items.error))}</p>`;
     if (!items.length) return `<p class="vl-ayuda">${r.items_ok ? 'Sin productos.' : 'Los productos de este comprobante se bajan en la próxima actualización.'}</p>`;
     const editar = puedeEditar();
@@ -640,12 +659,26 @@
       const vk = catalogo ? vinculoDe(i.cod_articulo, catalogo) : { estado: 'sin' };
       return `<li class="vl-prod ${vk.estado === 'sin' ? 'is-sin' : ''}">
         ${imgHtml(vk)}
-        <span class="vl-prod-main"><b>${esc(i.descripcion || i.cod_articulo || '')}</b>${catalogo ? chipVinculo(vk) : ''}</span>
+        <span class="vl-prod-main"><b>${esc(i.descripcion || i.cod_articulo || '')}</b>${catalogo ? chipVinculo(vk) : ''}${htmlAplicacion(aplic[i.orden])}</span>
         <span class="vl-prod-cant"><b>${fmtNum.format(i.cantidad)} ${esc(i.unidad || '')}</b><small>× ${pesos2(i.precio_con_iva)}</small></span>
         <b class="vl-prod-imp">${pesos2(i.importe)}</b>
         ${editar && i.cod_articulo ? `<sl-icon-button class="vl-prod-edit" name="link-45deg" label="Vincular producto" data-vincular="${esc(i.cod_articulo)}" data-desc="${esc(i.descripcion || '')}"></sl-icon-button>` : ''}
       </li>`;
     }).join('')}</ul>`;
+  }
+  // Resultado de descontar el renglón del stock: lote/producción y cantidad, o por qué no.
+  function htmlAplicacion(lista) {
+    if (!lista?.length) return '';
+    const ok = lista.filter((a) => a.estado === 'aplicado');
+    const mal = lista.find((a) => a.estado === 'sin_stock');
+    const exc = lista.find((a) => a.estado === 'excluido');
+    const rev = lista.find((a) => a.estado === 'revertido');
+    const partes = [];
+    if (ok.length) partes.push(`<span class="vl-apl is-ok"><i class="fa-solid fa-arrow-down"></i>Descontado ${ok.map((a) => `${fmtNum.format(a.cantidad)} ${esc(a.unidad || '')} de ${esc(a.motivo || (a.destino === 'produccion' ? 'producción' : 'lote'))}`).join(' · ')}${ok[0].reparto_id ? ' (reparto)' : ''}</span>`);
+    if (mal) partes.push(`<span class="vl-apl is-esp"><i class="fa-solid fa-circle-exclamation"></i>Sin stock: ${fmtNum.format(mal.cantidad || 0)} ${esc(mal.unidad || '')} no se descontaron</span>`);
+    if (exc && !ok.length && !/sin vínculo/.test(exc.motivo || '')) partes.push(`<span class="vl-apl"><i class="fa-solid fa-ban"></i>${esc(capital(exc.motivo || 'No se descuenta'))}</span>`);
+    if (rev) partes.push('<span class="vl-apl"><i class="fa-solid fa-rotate-left"></i>Revertido (comprobante anulado)</span>');
+    return partes.join('');
   }
   async function pintarDetalle(det) {
     let catalogo = null;
@@ -657,7 +690,7 @@
       <div class="vl-det-grid">
         <section>
           <p class="vl-detalle-tit"><i class="fa-solid fa-basket-shopping"></i> Productos${Array.isArray(items) && items.length ? ` <span>${items.length}</span>` : ''}</p>
-          ${htmlProductos(items, r, catalogo)}
+          ${htmlProductos(items, r, catalogo, det._datos.aplic || {})}
           ${totalItems ? `<p class="vl-prods-total">Total productos <b>${pesos2(totalItems)}</b></p>` : ''}
         </section>
         <section>
@@ -685,12 +718,16 @@
     tr.after(det);
     const emp = Number(tr.dataset.emp); const id = Number(tr.dataset.id);
     const [{ data, error }, cobros] = await Promise.all([
-      st.sb.from('im5_items').select('cod_articulo,descripcion,cantidad,unidad,precio_con_iva,importe,iva_por')
+      st.sb.from('im5_items').select('orden,cod_articulo,descripcion,cantidad,unidad,precio_con_iva,importe,iva_por')
         .eq('empresa', emp).eq('comprobante_id', id).order('orden'),
       leerCobros(emp, id)
     ]);
     const items = error ? Object.assign([], { error }) : (data || []);
-    det._datos = { r, items, cobros, mp: {} };
+    // Qué se descontó de cada renglón (Inventario / Producción), si la sincronización con el stock ya lo procesó.
+    const { data: apl } = await st.sb.from('im5_aplicaciones').select('orden,destino,lote_id,cantidad,unidad,estado,motivo,reparto_id').eq('empresa', emp).eq('comprobante_id', id);
+    const aplic = {};
+    (apl || []).forEach((a) => { (aplic[a.orden] = aplic[a.orden] || []).push(a); });
+    det._datos = { r, items, cobros, mp: {}, aplic };
     await pintarDetalle(det);
     // Después, el detalle de Mercado Pago de los cobros que traen id de pago (no frena la apertura).
     const ids = (cobros.pagos || []).map((p) => p.id_pago_externo).filter(Boolean);
@@ -724,6 +761,7 @@
     $('vlVincBuscar').value = '';
     document.querySelectorAll('[data-vinc-tipo]').forEach((b) => b.classList.toggle('active', b.dataset.vincTipo === 'todos'));
     $('vlVincQuitar').hidden = vk.estado === 'sin';
+    $('vlVincFactor').value = vk.v?.factor ? String(vk.v.factor) : '';
     pintarVincLista();
     $('vlVincDialog').show();
   }
@@ -748,7 +786,9 @@
   }
   async function guardarVinculo(tipo, refId) {
     const e = st.vincEdit; if (!e) return;
-    const fila = { cod_articulo: e.cod, descripcion: e.desc || null, tipo, ref_id: tipo === 'ninguno' ? null : refId, estado: 'confirmado', similitud: null, updated_at: new Date().toISOString() };
+    const factor = Number(String($('vlVincFactor').value ?? '').replace(',', '.'));
+    const fila = { cod_articulo: e.cod, descripcion: e.desc || null, tipo, ref_id: tipo === 'ninguno' ? null : refId, estado: 'confirmado', similitud: null,
+      factor: tipo !== 'ninguno' && Number.isFinite(factor) && factor > 0 && factor !== 1 ? factor : null, updated_at: new Date().toISOString() };
     const { error } = await st.sb.from('im5_articulo_vinculos').upsert(fila, { onConflict: 'cod_articulo' });
     if (error) return notify('error', 'No se pudo guardar el vínculo', textoError(error));
     st.vinc.set(e.cod, fila);
@@ -957,6 +997,14 @@
       pintarKpisEdit();
       actualizarResumenCfg();
     });
+    customElements.whenDefined('sl-switch').then(() => {
+      const p = posCfg();
+      $('posActivo').checked = Boolean(p.activo); $('posDesde').value = p.desde || '';
+      $('posMateriaPrima').checked = p.excluirMateriaPrima !== false; $('posIaVencidos').checked = p.iaSoloVencidos !== false;
+      $('posSinStock').checked = p.avisarSinStock !== false; $('posRepartos').checked = p.repartos?.activo !== false;
+      $('posUsuario').value = p.repartos?.usuario || 'BRENDA'; $('posExigeObs').checked = p.repartos?.exigeObs !== false;
+      if (!$('posSimFecha').value) $('posSimFecha').value = isoAR();
+    });
     const esAdmin = Boolean(st.me?.admin);
     document.querySelectorAll('[data-solo-admin]').forEach((t) => { t.hidden = !esAdmin; });
     if (esAdmin) { cargarEstadoCred(); cargarEstadoMP(); }
@@ -998,6 +1046,11 @@
       const { data, error } = await st.sb.rpc('ventas_config_guardar', { p_config: f });
       if (error) throw error;
       st.cfg = data || f;
+      if (st.me?.admin || st.me?.puede_editar) {
+        const { data: pos, error: e2 } = await st.sb.rpc('ventas_pos_config_guardar', { p_pos: leerPosForm() });
+        if (e2) throw e2;
+        st.cfg.pos = pos;
+      }
       notify('success', 'Configuración guardada', resumenHorario(st.cfg));
       $('vlConfigDialog').hide();
       pintarKpis(); pintarSalud();
@@ -1022,6 +1075,43 @@
       }
     } catch (e) { el.textContent = textoError(e); }
   }
+  // ---------- Ventas del POS → Inventario / Producción ----------
+  const posCfg = () => ({ activo: false, desde: '', excluirMateriaPrima: true, iaSoloVencidos: true, avisarSinStock: true, repartos: { activo: true, usuario: 'BRENDA', exigeObs: true }, ...(st.cfg.pos || {}) });
+  function leerPosForm() {
+    return {
+      activo: $('posActivo').checked, desde: String($('posDesde').value || ''),
+      excluirMateriaPrima: $('posMateriaPrima').checked, iaSoloVencidos: $('posIaVencidos').checked, avisarSinStock: $('posSinStock').checked,
+      repartos: { activo: $('posRepartos').checked, usuario: String($('posUsuario').value ?? '').trim().toUpperCase() || 'BRENDA', exigeObs: $('posExigeObs').checked }
+    };
+  }
+  async function simularPos() {
+    const fecha = String($('posSimFecha').value || isoAR());
+    const btn = $('posSimular'); btn.loading = true;
+    const caja = $('posSimRes'); caja.innerHTML = '<sl-spinner></sl-spinner>';
+    try {
+      const res = await window.laJamoneraProxy.postJson('/ventas/pos/simular', { desde: fecha, hasta: fecha, detalle: true });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || out.ok === false) throw new Error(out.error || `Error ${res.status}`);
+      const grupos = {};
+      (out.detalle || []).filter((d) => d.estado !== 'reparto').forEach((d) => {
+        const k = `${d.estado}|${d.estado === 'aplicado' ? (d.destino === 'produccion' ? 'Producción' : 'Inventario') : d.motivo}`;
+        (grupos[k] = grupos[k] || { estado: d.estado, motivo: k.split('|')[1], n: 0, arts: new Set() }).n += 1;
+        grupos[k].arts.add(d.articulo);
+      });
+      const ETQ = { aplicado: ['Se descuenta', 'ok'], sin_stock: ['Sin stock (se ignora)', 'esp'], excluido: ['No se descuenta', 'neutro'] };
+      const repartos = (out.detalle || []).filter((d) => d.estado === 'reparto');
+      caja.innerHTML = `
+        <div class="vl-pos-sim-cifras">
+          <span><b>${fmtNum.format(out.comprobantes)}</b>ventas</span><span class="is-ok"><b>${fmtNum.format(out.aplicados)}</b>renglones se descuentan</span>
+          <span class="is-esp"><b>${fmtNum.format(out.sinStock)}</b>sin stock</span><span><b>${fmtNum.format(out.excluidos)}</b>no se descuentan</span><span><b>${fmtNum.format(out.repartos)}</b>repartos</span>
+        </div>
+        <ul class="vl-pos-sim-lista">${Object.values(grupos).sort((a, b) => b.n - a.n).map((g) => `<li><span class="vl-mp-estado is-${ETQ[g.estado]?.[1] || 'esp'}">${ETQ[g.estado]?.[0] || g.estado}</span>
+          <div><b>${esc(capital(g.motivo))} · ${g.n}</b><small>${esc([...g.arts].slice(0, 8).join(', '))}${g.arts.size > 8 ? ` y ${g.arts.size - 8} más` : ''}</small></div></li>`).join('')}
+          ${repartos.map((r) => `<li><span class="vl-mp-estado is-ok">Reparto</span><div><b>${esc(r.comp)}</b><small>${esc(r.motivo)}</small></div></li>`).join('')}</ul>
+        <p class="vl-ayuda">Simulación del ${esc(fechaCorta(fecha))}: no se tocó el stock. «Sin vínculo» se resuelve en el botón «Productos».</p>`;
+    } catch (e) { caja.innerHTML = `<p class="vl-ayuda">${esc(textoError(e))}</p>`; } finally { btn.loading = false; }
+  }
+
   async function cargarEstadoMP() {
     const el = $('cfgMpEstado');
     el.className = 'vl-cred-estado'; el.textContent = 'Revisando…';
@@ -1237,6 +1327,7 @@
     $('cfgGuardar').addEventListener('click', guardarConfig);
     $('cfgCredGuardar').addEventListener('click', guardarCred);
     $('cfgMpGuardar').addEventListener('click', guardarMP);
+    $('posSimular').addEventListener('click', simularPos);
     $('cfgDias').addEventListener('click', (e) => { const b = e.target.closest('button[data-dia]'); if (!b) return; b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); actualizarResumenCfg(); });
     ['cfgActiva', 'cfgDesde', 'cfgHasta', 'cfgCada'].forEach((id) => $(id).addEventListener('sl-change', actualizarResumenCfg));
     $('cfgKpis').addEventListener('click', (e) => {

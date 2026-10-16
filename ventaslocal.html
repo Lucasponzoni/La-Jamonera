@@ -30,10 +30,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202610162031">
-  <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202610162031">
-  <link rel="stylesheet" href="./CSS/theme.css?v=202610162031">
-  <link rel="stylesheet" href="./CSS/utilities.css?v=202610162031">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202610162056">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202610162056">
+  <link rel="stylesheet" href="./CSS/theme.css?v=202610162056">
+  <link rel="stylesheet" href="./CSS/utilities.css?v=202610162056">
   <script type="module">
     import { setBasePath } from './vendor/shoelace/utilities/base-path.js?v=202608282255';
     setBasePath(new URL('./vendor/shoelace/', document.baseURI).href.slice(0, -1));
@@ -41,12 +41,12 @@
     const ljCore = [...new Set([...document.querySelectorAll('sl-button, sl-input, sl-icon, sl-dialog, sl-dropdown, sl-drawer, sl-spinner, sl-icon-button')].map((n) => n.localName))].map((t) => customElements.whenDefined(t));
     Promise.race([Promise.allSettled(ljCore), new Promise((r) => setTimeout(r, 2500))]).then(() => document.documentElement.classList.add('lj-ready'));
   </script>
-  <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202610162031">
-  <link rel="stylesheet" href="./CSS/legacy/03-componentes.css?v=202610162031">
-  <link rel="stylesheet" href="./CSS/legacy/04-informes.css?v=202610162031">
-  <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202610162031">
-  <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202610162031">
-  <link rel="stylesheet" href="./CSS/ventaslocal.css?v=202610162031">
+  <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202610162056">
+  <link rel="stylesheet" href="./CSS/legacy/03-componentes.css?v=202610162056">
+  <link rel="stylesheet" href="./CSS/legacy/04-informes.css?v=202610162056">
+  <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202610162056">
+  <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202610162056">
+  <link rel="stylesheet" href="./CSS/ventaslocal.css?v=202610162056">
 </head>
 <body>
   <main class="app-shell container-fluid px-0">
@@ -285,6 +285,9 @@
             </div>
           </div>
           <ul id="vlVincLista" class="vl-vinc-lista" role="listbox" aria-label="Recetas e ingredientes"></ul>
+          <div class="vl-vinc-factor">
+            <sl-input id="vlVincFactor" type="number" min="0" step="0.0001" size="small" placeholder="1" label="Factor (opcional)" help-text="Cuánto del stock es 1 vendido. Ej.: «CARBON X 5 KG» → 5 (kg). Dulce vendido por kg contra lata de 5 kg → 0,2. Vacío = 1."></sl-input>
+          </div>
           <div class="vl-dialog-pie vl-vinc-pie">
             <sl-button variant="default" id="vlVincNinguno"><i slot="prefix" class="fa-solid fa-ban"></i>No es de la fábrica</sl-button>
             <sl-button variant="default" id="vlVincQuitar"><i slot="prefix" class="fa-solid fa-link-slash"></i>Quitar vínculo</sl-button>
@@ -303,6 +306,7 @@
         <div class="lj-dialog-body">
           <sl-tab-group id="vlConfigTabs" class="vl-tabs vl-tabs-config">
             <sl-tab slot="nav" panel="sync" active><i class="fa-solid fa-rotate" aria-hidden="true"></i>Sincronización</sl-tab>
+            <sl-tab slot="nav" panel="pos"><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i>Inventario</sl-tab>
             <sl-tab slot="nav" panel="kpis"><i class="fa-solid fa-gauge-high" aria-hidden="true"></i>Indicadores</sl-tab>
             <sl-tab slot="nav" panel="cred" data-solo-admin><i class="fa-solid fa-plug" aria-hidden="true"></i>Conexión IM5</sl-tab>
             <sl-tab slot="nav" panel="mp" data-solo-admin><img src="./IMG/pagos/mercadopago.svg" alt="" width="16" height="16" class="vl-tab-logo">Mercado Pago</sl-tab>
@@ -356,6 +360,37 @@
                     <i slot="prefix" class="fa-regular fa-envelope"></i>
                   </sl-input>
                   <div><sl-button size="small" variant="default" id="cfgMailPrueba"><i slot="prefix" class="fa-solid fa-paper-plane"></i>Mandar mail de prueba</sl-button></div>
+                </div>
+              </div>
+            </sl-tab-panel>
+
+            <sl-tab-panel name="pos">
+              <div class="vl-form">
+                <p class="vl-ayuda">Las ventas reales del local bajan el stock: los productos de reventa descuentan su lote de Inventario y los de Producción descuentan lo producido (el que vence primero). Si no hay stock, la venta se ignora.</p>
+                <div class="vl-bloque">
+                  <sl-switch id="posActivo">Descontar las ventas del inventario y la producción</sl-switch>
+                  <div class="vl-form-fila vl-form-fila-2">
+                    <div><label class="lj-label" for="posDesde">Desde</label><input id="posDesde" type="date" class="lj-input"></div>
+                  </div>
+                </div>
+                <div class="vl-bloque">
+                  <sl-switch id="posMateriaPrima">No descontar materia prima (ingredientes que se usan en recetas)</sl-switch>
+                  <sl-switch id="posIaVencidos">La IA del autoegreso solo resuelve vencidos en estos productos</sl-switch>
+                  <sl-switch id="posSinStock">Avisar las ventas sin stock</sl-switch>
+                </div>
+                <div class="vl-bloque">
+                  <sl-switch id="posRepartos">Registrar repartos en Producción</sl-switch>
+                  <div class="vl-form-fila vl-form-fila-2">
+                    <sl-input id="posUsuario" label="Usuario que carga los repartos" placeholder="BRENDA"></sl-input>
+                    <div><label class="lj-label">&nbsp;</label><sl-switch id="posExigeObs">Solo si la venta tiene observación (dirección)</sl-switch></div>
+                  </div>
+                </div>
+                <div class="vl-pos-sim">
+                  <div class="vl-pos-sim-barra">
+                    <div><label class="lj-label" for="posSimFecha">Simular un día (no toca el stock)</label><input id="posSimFecha" type="date" class="lj-input"></div>
+                    <sl-button id="posSimular" variant="default"><i slot="prefix" class="fa-solid fa-flask"></i>Simular</sl-button>
+                  </div>
+                  <div id="posSimRes" class="vl-pos-sim-res"></div>
                 </div>
               </div>
             </sl-tab-panel>
@@ -445,25 +480,25 @@
     </section>
   </main>
 
-  <script src="./JS/data/backend.js?v=202610162031"></script>
+  <script src="./JS/data/backend.js?v=202610162056"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-  <script src="./vendor/echarts/echarts.min.js?v=202610162031"></script>
-  <script src="./JS/ui/forms.js?v=202610162031"></script>
-  <script src="./JS/ui/theme.js?v=202610162031"></script>
-  <script src="./JS/ui/modal.js?v=202610162031"></script>
-  <script src="./JS/ui/lj-alert.js?v=202610162031"></script>
-  <script src="./JS/ui/header.js?v=202610162031"></script>
-  <script src="./JS/data/config.js?v=202610162031"></script>
-  <script src="./JS/data/supabase-init.js?v=202610162031"></script>
-  <script src="./JS/firebase-init.js?v=202610162031"></script>
-  <script src="./JS/data/security.js?v=202610162031"></script>
-  <script src="./JS/proxy-client.js?v=202610162031"></script>
-  <script src="./JS/data/authz.js?v=202610162031"></script>
-  <script src="./JS/configuracion.js?v=202610162031"></script>
-  <script src="./JS/Notificaciones.js?v=202610162031"></script>
-  <script src="./JS/app.js?v=202610162031"></script>
-  <script src="./JS/ventaslocal.js?v=202610162031"></script>
+  <script src="./vendor/echarts/echarts.min.js?v=202610162056"></script>
+  <script src="./JS/ui/forms.js?v=202610162056"></script>
+  <script src="./JS/ui/theme.js?v=202610162056"></script>
+  <script src="./JS/ui/modal.js?v=202610162056"></script>
+  <script src="./JS/ui/lj-alert.js?v=202610162056"></script>
+  <script src="./JS/ui/header.js?v=202610162056"></script>
+  <script src="./JS/data/config.js?v=202610162056"></script>
+  <script src="./JS/data/supabase-init.js?v=202610162056"></script>
+  <script src="./JS/firebase-init.js?v=202610162056"></script>
+  <script src="./JS/data/security.js?v=202610162056"></script>
+  <script src="./JS/proxy-client.js?v=202610162056"></script>
+  <script src="./JS/data/authz.js?v=202610162056"></script>
+  <script src="./JS/configuracion.js?v=202610162056"></script>
+  <script src="./JS/Notificaciones.js?v=202610162056"></script>
+  <script src="./JS/app.js?v=202610162056"></script>
+  <script src="./JS/ventaslocal.js?v=202610162056"></script>
 </body>
 </html>

@@ -12,7 +12,8 @@
 //   POST /bootstrap                → alta del admin inicial + secretos (token de un solo uso)
 //   GET/POST /ventas/credenciales, POST /ventas/sync, POST /ventas/cron, POST /ventas/aviso-prueba → ver ventas-im5.ts
 //   POST /ventas/mp/pagos { ids }, GET/POST /ventas/mp/credenciales → ver mp.ts (Mercado Pago, solo lectura)
-//   POST /ventas/pos/simular|aplicar { desde, hasta } → ver pos.ts (ventas del POS → Inventario y Producción)
+//   POST /ventas/pos/simular|aplicar { desde, hasta, comprobante? } → ver pos.ts (ventas del POS → Inventario y Producción)
+//   POST /ventas/pos/revertir { empresa, id, borrar? } → deshace un comprobante aplicado (admin o cron)
 // Claves (Gemini, Resend) en Supabase Vault: sólo esta función las lee, con service_role.
 import {
   admin, json, HttpError, str, EMAIL_RE, requireActive, requireAdmin, secretGet, secretSet, secretDelete,
@@ -23,7 +24,7 @@ import { handleAdminUsers } from './admin-users.ts';
 import { runAutoEgresos } from './egresos.ts';
 import { runVentas, guardarCredenciales, estadoCredenciales, enviarAvisoPrueba } from './ventas-im5.ts';
 import { pagosMP, estadoMP, guardarCredMP } from './mp.ts';
-import { aplicarVentasPos } from './pos.ts';
+import { aplicarVentasPos, revertirComprobantePos } from './pos.ts';
 
 const puedeVerVentas = (p) => Boolean(p && (p.role === 'admin' || p.ver_ventas));
 async function requireVerVentas(req) {
@@ -222,9 +223,17 @@ async function route(req: Request, path: string) {
     const simular = path.endsWith('/simular');
     if (!porCron) { if (simular) await requireVerVentas(req); else await requireAdmin(req); }
     const body = await readBody(req);
-    const out = await aplicarVentasPos({ simular, desde: str(body.desde), hasta: str(body.hasta) });
+    const comprobante = body.comprobante && typeof body.comprobante === 'object' ? body.comprobante : null;
+    const out = await aplicarVentasPos({ simular, desde: str(body.desde), hasta: str(body.hasta), comprobante });
     if (simular && body.detalle !== true) out.detalle = out.detalle.slice(0, 400);
     return { ok: true, ...out };
+  }
+  if (path === '/ventas/pos/revertir' && method === 'POST') {
+    const secret = await secretGet('cron_secret');
+    if (!(secret && req.headers.get('x-cron-secret') === secret)) await requireAdmin(req);
+    const body = await readBody(req);
+    if (!Number(body.empresa) || !Number(body.id)) throw new HttpError(400, 'comprobante_requerido');
+    return { ok: true, ...(await revertirComprobantePos({ empresa: body.empresa, id: body.id, borrar: body.borrar === true })) };
   }
   if (path === '/ventas/mp/pagos' && method === 'POST') {
     await requireVerVentas(req);

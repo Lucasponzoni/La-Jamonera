@@ -1223,3 +1223,22 @@ sl-dialog.lj-alert-dialog:has(.inventario-provider-rne-alert) { --width: min(960
   .inventario-status-filters.recetas-rnpa-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
   .inventario-status-filters.recetas-rnpa-filters > * { flex: 0 0 auto; }
 }
+
+/* Productos sincronizados con el POS (Ventas del local) */
+.recetas-tag.tone-pos { display: inline-flex; align-items: center; gap: 4px; background: var(--lj-accent-soft); color: #0057ff; font-weight: 700; }
+.sl-theme-dark .recetas-tag.tone-pos { color: var(--lj-accent); }
+.recetas-tag.tone-pos img { background: #fff; border-radius: 3px; padding: 1px; }
+.inv-pos { display: grid; gap: 10px; margin: 12px 0; padding: 12px 14px; background: var(--lj-surface); border: 1px solid var(--lj-border); border-radius: var(--lj-radius-lg); }
+.inv-pos header { display: flex; gap: 10px; align-items: center; }
+.inv-pos header div { display: flex; flex-direction: column; min-width: 0; }
+.inv-pos header b { font-size: .9rem; color: var(--lj-text); }
+.inv-pos header small { font-size: .78rem; color: var(--lj-muted); overflow-wrap: anywhere; }
+.inv-pos-logo { width: 32px; height: 32px; flex: none; display: grid; place-items: center; border-radius: 8px; background: #fff; border: 1px solid var(--lj-border); }
+.inv-pos-logo img { width: 18px; height: 18px; }
+.inv-pos-datos { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.inv-pos-datos div { background: var(--lj-surface-2); border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; }
+.inv-pos-datos span { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--lj-muted); }
+.inv-pos-datos b { font-size: .95rem; color: var(--lj-text); font-variant-numeric: tabular-nums; }
+.inv-pos-datos .is-esp b { color: var(--lj-warning); }
+.inventario-auto-egreso-badge.is-pos { display: inline-flex; align-items: center; gap: 5px; }
+.inventario-auto-egreso-badge.is-pos img { width: 12px; height: 12px; background: #fff; border-radius: 3px; padding: 1px; }

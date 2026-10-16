@@ -398,3 +398,27 @@ sl-dialog.vl-dialog { --width: min(760px, 96vw); }
 .vl-tab-logo { display: inline-block; vertical-align: -3px; }
 .vl-mp-aviso { display: flex; gap: 8px; align-items: flex-start; font-size: .8rem; color: var(--lj-text); background: var(--lj-accent-soft); border-radius: 6px; padding: 9px 12px; }
 .vl-mp-aviso i { color: var(--lj-accent); margin-top: 2px; }
+
+/* Configuración → Inventario (POS) */
+.vl-pos-sim { display: grid; gap: 10px; padding: 12px; background: var(--lj-surface-2); border: 1px solid var(--lj-border); border-radius: var(--lj-radius-lg); }
+.vl-pos-sim-barra { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+.vl-pos-sim-res:empty { display: none; }
+.vl-pos-sim-res { display: grid; gap: 10px; }
+.vl-pos-sim-cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+.vl-pos-sim-cifras span { display: flex; flex-direction: column; background: var(--lj-surface); border: 1px solid var(--lj-border); border-radius: 6px; padding: 8px 10px; font-size: .74rem; color: var(--lj-muted); }
+.vl-pos-sim-cifras b { font-size: 1.15rem; color: var(--lj-text); font-variant-numeric: tabular-nums; }
+.vl-pos-sim-cifras .is-ok b { color: var(--lj-success); }
+.vl-pos-sim-cifras .is-esp b { color: var(--lj-warning); }
+.vl-pos-sim-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 320px; overflow-y: auto; }
+.vl-pos-sim-lista li { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px; align-items: start; background: var(--lj-surface); border: 1px solid var(--lj-border); border-radius: 6px; padding: 8px 10px; }
+.vl-pos-sim-lista li > div { display: flex; flex-direction: column; min-width: 0; }
+.vl-pos-sim-lista b { font-size: .84rem; }
+.vl-pos-sim-lista small { color: var(--lj-muted); font-size: .76rem; overflow-wrap: anywhere; }
+.vl-pos-sim-lista .vl-mp-estado { margin-left: 0; justify-self: start; }
+.vl-mp-estado.is-neutro { background: var(--lj-surface-2); color: var(--lj-muted); }
+.vl-vinc-factor { margin-top: 10px; max-width: 360px; }
+@media (max-width: 767.98px) { .vl-pos-sim-lista li { grid-template-columns: minmax(0, 1fr); } }
+
+.vl-apl { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; font-size: .72rem; font-weight: 600; color: var(--lj-muted); }
+.vl-apl.is-ok { color: var(--lj-success); }
+.vl-apl.is-esp { color: var(--lj-warning); }

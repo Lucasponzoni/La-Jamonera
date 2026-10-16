@@ -38,30 +38,33 @@ const pideFactorKg = (desc) => /\bx\s*\d+\s*(u\b|un\b|unid|und)|\bx\s*\d+\s*$|pr
 async function sel(q) { const { data, error } = await q; if (error) throw new HttpError(500, error.message); return data || []; }
 
 // Ejecuta (o simula) la aplicación de ventas. Devuelve un resumen y, en simulación, el detalle por renglón.
-export async function aplicarVentasPos({ simular = false, desde = '', hasta = '', runId = `pos_${Date.now()}`, cfgVentas = null, log = console } = {}) {
+// comprobante { empresa, id }: sólo ese (prueba o corrección manual); no mira el interruptor ni la fecha de inicio.
+export async function aplicarVentasPos({ simular = false, desde = '', hasta = '', runId = `pos_${Date.now()}`, cfgVentas = null, log = console, comprobante = null } = {}) {
   if (!cfgVentas) {
     const { data } = await admin.from('ventas_config').select('config').eq('id', 1).maybeSingle();
     cfgVentas = data?.config || {};
   }
   const cfg = configPos(cfgVentas);
   const resumen = { runId, simular, comprobantes: 0, renglones: 0, aplicados: 0, sinStock: 0, excluidos: 0, repartos: 0, revertidos: 0, conflictos: 0, detalle: [] };
-  if (!simular && !cfg.activo) return { ...resumen, apagado: true };
+  const uno = comprobante?.id ? { empresa: Number(comprobante.empresa), id: Number(comprobante.id) } : null;
+  if (!simular && !cfg.activo && !uno) return { ...resumen, apagado: true };
   const d0 = desde || cfg.desde || hoyAR();
   const d1 = hasta || hoyAR();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d0) || !/^\d{4}-\d{2}-\d{2}$/.test(d1)) throw new HttpError(400, 'fechas_invalidas');
-  if (!simular && cfg.desde && d0 < cfg.desde) throw new HttpError(400, 'antes_de_inicio');
+  if (!simular && !uno && cfg.desde && d0 < cfg.desde) throw new HttpError(400, 'antes_de_inicio');
 
   // 1) Anuladas después de aplicadas: se revierten (devuelve stock a los mismos lotes).
-  if (!simular) resumen.revertidos = await revertirAnuladas(runId, log);
+  if (!simular && !uno) resumen.revertidos = await revertirAnuladas(runId, log);
 
   // 2) Vínculos confirmados, materia prima y comprobantes pendientes.
   const vinc = new Map((await sel(admin.from('im5_articulo_vinculos').select('cod_articulo,tipo,ref_id,factor').eq('estado', 'confirmado').neq('tipo', 'ninguno')))
     .map((v) => [v.cod_articulo, v]));
   const materiaPrima = new Set(cfg.excluirMateriaPrima ? (await sel(admin.rpc('pos_materia_prima'))).map((x) => (typeof x === 'string' ? x : Object.values(x)[0])) : []);
-  const comps = await sel(admin.from('im5_comprobantes')
+  let qc = admin.from('im5_comprobantes')
     .select('empresa,id,tipo,letra,punto_venta,numero,fecha,fecha_hora,usuario,cliente,cod_cliente,observaciones,anulada,items_ok')
-    .gte('fecha', d0).lte('fecha', d1).eq('items_ok', true).eq('anulada', false).in('tipo', ['FA', 'NC'])
-    .order('fecha').order('fecha_hora', { nullsFirst: true }).limit(5000));
+    .eq('items_ok', true).eq('anulada', false).in('tipo', ['FA', 'NC']);
+  qc = uno ? qc.eq('empresa', uno.empresa).eq('id', uno.id) : qc.gte('fecha', d0).lte('fecha', d1);
+  const comps = await sel(qc.order('fecha').order('fecha_hora', { nullsFirst: true }).limit(5000));
   const hechos = new Set();
   for (let i = 0; i < comps.length; i += 300) {
     const ids = comps.slice(i, i + 300).map((c) => c.id);
@@ -270,7 +273,20 @@ async function revertirAnuladas(runId, log) {
   return revertir.length ? revertirFilas(revertir, runId, log) : 0;
 }
 
-export async function revertirFilas(revertir, runId, log = console) {
+// Deshace a mano lo aplicado de un comprobante (devuelve stock, borra movimientos y reparto). borrar: además
+// quita sus filas para que pueda volver a aplicarse.
+export async function revertirComprobantePos({ empresa, id, borrar = false, runId = `pos_rev_${Date.now()}`, log = console }) {
+  const filas = await sel(admin.from('im5_aplicaciones').select('id,empresa,comprobante_id,orden,destino,ref_id,lote_id,cantidad,unidad,reparto_id')
+    .eq('empresa', Number(empresa)).eq('comprobante_id', Number(id)).eq('estado', 'aplicado'));
+  const revertidos = filas.length ? await revertirFilas(filas, runId, log, 'revertido a mano') : 0;
+  if (borrar) {
+    const { error } = await admin.from('im5_aplicaciones').delete().eq('empresa', Number(empresa)).eq('comprobante_id', Number(id)).neq('estado', 'aplicado');
+    if (error) throw new HttpError(500, error.message);
+  }
+  return { revertidos, filas: filas.length };
+}
+
+export async function revertirFilas(revertir, runId, log = console, motivo = 'comprobante anulado en IM5') {
   let n = 0;
   const porIng = new Map();
   revertir.filter((f) => f.destino === 'inventario' && f.lote_id).forEach((f) => { if (!porIng.has(f.ref_id)) porIng.set(f.ref_id, []); porIng.get(f.ref_id).push(f); });
@@ -291,11 +307,11 @@ export async function revertirFilas(revertir, runId, log = console) {
     for (let i = 0; i < movIds.length; i += 200) await admin.from('movimientos').delete().in('id', movIds.slice(i, i + 200)).eq('source', SOURCE);
     try { await refreshInventoryIndex(ingId, hoyAR(), 4); } catch { /* el índice se rehace en la próxima */ }
     const ids = fs.map((f) => f.id);
-    await admin.from('im5_aplicaciones').update({ estado: 'revertido', motivo: 'comprobante anulado en IM5', run_id: runId }).in('id', ids);
+    await admin.from('im5_aplicaciones').update({ estado: 'revertido', motivo, run_id: runId }).in('id', ids);
     n += ids.length;
   }
   const prodIds = revertir.filter((f) => f.destino !== 'inventario').map((f) => f.id);
-  if (prodIds.length) { await admin.from('im5_aplicaciones').update({ estado: 'revertido', motivo: 'comprobante anulado en IM5', run_id: runId }).in('id', prodIds); n += prodIds.length; }
+  if (prodIds.length) { await admin.from('im5_aplicaciones').update({ estado: 'revertido', motivo, run_id: runId }).in('id', prodIds); n += prodIds.length; }
   // El reparto creado desde ese comprobante se borra (sus asignaciones dejan de descontar lo producido).
   for (const id of [...new Set(revertir.map((f) => f.reparto_id).filter(Boolean))]) {
     const { error } = await admin.rpc('pos_borrar_reparto', { p_id: id });

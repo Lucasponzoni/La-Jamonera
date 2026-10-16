@@ -97,6 +97,19 @@
     if (!res.ok) throw new Error(`traza_publica ${res.status}`);
     return safeObject(await res.json());
   };
+  // Totales de salidas de la producción (ventas del local y repartos). Sin datos o error: no se muestran.
+  const leerSalidasPublicas = async (id) => {
+    const cfg = window.LJ_SUPABASE;
+    if (!SUPABASE || !cfg?.url || !id) return {};
+    try {
+      const res = await fetch(`${cfg.url}/rest/v1/rpc/traza_publica_salidas`, {
+        method: 'POST',
+        headers: { apikey: cfg.key, Authorization: `Bearer ${cfg.key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p_id: id })
+      });
+      return res.ok ? safeObject(await res.json()) : {};
+    } catch (_) { return {}; }
+  };
   const bundleRead = async (path) => {
     const parts = String(path || '').split('/').filter(Boolean);
     if (parts[0] === 'produccion' && parts[1] === 'config' && parts[2] === 'rne') return publicBundle?.rne ?? null;
@@ -371,6 +384,20 @@
         previousLotNodeId = lotNodeId;
       });
     });
+    // Hacia adelante (sólo totales; clientes y direcciones quedan dentro del sistema).
+    const salidas = safeObject(config?.salidas);
+    const vendidoKg = Number(salidas.vendidoKg || 0);
+    const nRep = Number(salidas.repartos || 0);
+    if (vendidoKg > 0) {
+      lines.push(`OUT_V["<b>VENDIDO EN EL LOCAL</b><br/>${vendidoKg.toFixed(3)} KG"]:::toneSale`);
+      lines.push('L ==> OUT_V');
+    }
+    if (nRep > 0) {
+      lines.push(`OUT_R["<b>REPARTOS</b><br/>${nRep} ${nRep === 1 ? 'reparto' : 'repartos'} · ${Number(salidas.repartidoKg || 0).toFixed(3)} KG"]:::toneSale`);
+      lines.push('L ==> OUT_R');
+    }
+    lines.push('classDef toneSale fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-width:1.6px;');
+
     lines.push('linkStyle default stroke:#6e83a7,stroke-width:1.8px;');
     lines.push('classDef toneCompany fill:#2f6ecf,stroke:#1f57ad,color:#ffffff,stroke-width:1.8px;');
     lines.push('classDef toneProduct fill:#3b82f6,stroke:#1f5ec4,color:#ffffff,stroke-width:1.7px;');
@@ -699,7 +726,7 @@
       if (hasMermaid) {
         try {
           // Visor compartido con Producción (JS/ui/trace-diagram.js).
-          await window.LJTraceDiagram.render(mermaidHost, buildDefinition(registro, config));
+          await window.LJTraceDiagram.render(mermaidHost, buildDefinition(registro, { ...config, salidas: await leerSalidasPublicas(registro?.id) }));
         } catch (error) {
           mermaidHost.innerHTML = '<p class="m-0">No se pudo renderizar el diagrama.</p>';
         }
