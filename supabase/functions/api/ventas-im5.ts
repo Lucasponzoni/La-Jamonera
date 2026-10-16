@@ -17,7 +17,10 @@ const TZ = 'America/Argentina/Buenos_Aires';
 const PRESUPUESTO_MS = 110_000;        // la función corta a los 150 s
 const DIAS_RECIENTES = 3;              // en cada corrida se revisan los últimos N días (cambios, anulaciones)
 const MESES_VACIOS_FIN = 6;            // el historial termina tras N meses seguidos sin comprobantes
-const PARALELO_ITEMS = 4;
+const PARALELO_ITEMS = 2;
+// IM5 corta con 429 («Demasiadas solicitudes») pasadas ~700 llamadas seguidas, y el límite puede pegarle
+// también a las cajas: cada corrida se queda bien por debajo y, si igual llega un 429, frena sin error.
+const MAX_LLAMADAS_CORRIDA = 400;
 const SECRETO = 'im5_credenciales';
 const JOB = 'ventas_im5';
 
@@ -264,14 +267,15 @@ async function guardarCobros(im5, empresa, id, d, recibos) {
 }
 
 async function bajarItems(im5, empresa, limiteMs) {
-  let hechos = 0; let fallas = 0;
+  let hechos = 0; let fallas = 0; let frenado = false;
   const recibos = new Map();
-  while (Date.now() < limiteMs) {
+  const seguir = () => !frenado && Date.now() < limiteMs && im5.llamadas < MAX_LLAMADAS_CORRIDA;
+  while (seguir()) {
     const { data, error } = await admin.from('im5_comprobantes').select('id').eq('empresa', empresa).eq('items_ok', false)
       .order('fecha', { ascending: false }).limit(PARALELO_ITEMS * 5);
     if (error) throw new HttpError(500, error.message);
     if (!data?.length) break;
-    for (let i = 0; i < data.length && Date.now() < limiteMs; i += PARALELO_ITEMS) {
+    for (let i = 0; i < data.length && seguir(); i += PARALELO_ITEMS) {
       const tanda = data.slice(i, i + PARALELO_ITEMS);
       const res = await Promise.allSettled(tanda.map(async ({ id }) => {
         let d;
@@ -290,11 +294,15 @@ async function bajarItems(im5, empresa, limiteMs) {
         const { error: e2 } = await admin.from('im5_comprobantes').update({ items_ok: true }).eq('empresa', empresa).eq('id', id);
         if (e2) throw new Error(e2.message);
       }));
-      for (const r of res) { if (r.status === 'fulfilled') hechos++; else { fallas++; console.error('ventas item', r.reason?.message); } }
+      for (const r of res) {
+        if (r.status === 'fulfilled') hechos++;
+        else if (r.reason?.im5Status === 429) frenado = true; // queda pendiente para la próxima corrida
+        else { fallas++; console.error('ventas item', r.reason?.message); }
+      }
       if (fallas > 20) throw new HttpError(502, 'im5_detalle_falla_repetida');
     }
   }
-  return { hechos, fallas };
+  return { hechos, fallas, frenado };
 }
 
 // ---------- Corrida ----------
@@ -380,6 +388,8 @@ export async function runVentas({ modo = 'cron', quien = '' } = {}) {
       await im5.usarEmpresa(emp);
       const r = await bajarItems(im5, emp, limite);
       resumen.items += r.hechos; resumen.fallasItems += r.fallas;
+      if (r.frenado) { resumen.frenadoIm5 = true; break; }
+      if (im5.llamadas >= MAX_LLAMADAS_CORRIDA) break;
     }
   } catch (e) {
     error = e?.message || String(e);
@@ -431,6 +441,7 @@ function motivoLegible(error) {
   if (/sin_credenciales/.test(m)) return 'Faltan las credenciales de InfoManager.';
   if (/im5_401|im5_403|im5_login/.test(m)) return 'InfoManager rechazó el usuario o la contraseña.';
   if (/im5_sin_respuesta|im5_5\d\d|timeout|abort/i.test(m)) return 'InfoManager no respondió a tiempo.';
+  if (/im5_429/.test(m)) return 'InfoManager pidió esperar por exceso de consultas.';
   if (/im5_dia_truncado/.test(m)) return 'Un día trajo más comprobantes de los que InfoManager entrega de una vez.';
   return 'La conexión con InfoManager devolvió un error.';
 }
@@ -448,38 +459,35 @@ function avisoDatos(cfg, estado, error) {
     pie: 'Si sigue fallando vas a recibir otro aviso dentro de 24 h, y uno cuando vuelva a funcionar.'
   };
 }
-// Mail con la estética del back office: banda azul, etiqueta de estado y datos en tabla. Todo inline
-// (los clientes de correo ignoran <style>); borde de color sin redondear.
+// Mail con la misma estética que los mails de informes bromatológicos (Informes.js · buildReportEmailHtml):
+// fondo celeste, tarjeta blanca redondeada, título azul, datos en un recuadro claro y botón píldora.
+// Todo con estilos en línea (los clientes de correo ignoran <style>).
 function plantillaMail({ tono = 'error', etiqueta, titulo, intro, filas = [], pie = '', prueba = false }) {
-  const C = tono === 'ok' ? { fuerte: '#1f7a4c', suave: '#e3f5ec' } : { fuerte: '#b42338', suave: '#ffecef' };
+  const C = tono === 'ok' ? { fuerte: '#1f7a4c', suave: '#e3f5ec', borde: '#bfe5cf' } : { fuerte: '#b42338', suave: '#ffecef', borde: '#f5c2cb' };
   const url = 'https://www.lajamonera.online/ventaslocal.html';
-  const fila = ([k, v], i) => `<tr><td style="padding:10px 14px;font-size:13px;color:#55607f;border-top:${i ? '1px solid #e1e5ec' : '0'};width:42%;vertical-align:top">${escapar(k)}</td>
-    <td style="padding:10px 14px;font-size:13px;color:#1f2a44;font-weight:600;border-top:${i ? '1px solid #e1e5ec' : '0'};word-break:break-word">${escapar(v)}</td></tr>`;
-  return `<!doctype html><html lang="es"><body style="margin:0;padding:0;background:#eef1f5">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f5;padding:24px 12px;font-family:Inter,Segoe UI,Arial,sans-serif">
-<tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border:1px solid #e1e5ec">
-  ${prueba ? `<tr><td style="background:#fff3dd;color:#9a6200;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:9px 24px;border-bottom:1px solid #f0d9a8">Mail de prueba · así llega el aviso cuando falla la conexión</td></tr>` : ''}
-  <tr><td style="background:#173d73;padding:18px 24px">
-    <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-      <td style="vertical-align:middle"><img src="https://www.lajamonera.online/IMG/La%20Jamonera%20App%20180.png" width="40" height="40" alt="La Jamonera" style="display:block;border:0"></td>
-      <td style="vertical-align:middle;padding-left:12px;color:#ffffff;font-size:17px"><span style="font-weight:400">La</span> <span style="font-weight:800">Jamonera</span>
-        <div style="font-size:12px;color:#cddcff;margin-top:2px">Ventas del local</div></td>
-    </tr></table>
-  </td></tr>
-  <tr><td style="padding:24px 24px 8px">
-    <div style="display:inline-block;background:${C.suave};color:${C.fuerte};font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:5px 10px;border-left:3px solid ${C.fuerte}">${escapar(etiqueta)}</div>
-    <h1 style="margin:14px 0 8px;font-size:20px;line-height:1.3;color:#1f2a44">${escapar(titulo)}</h1>
-    <p style="margin:0;font-size:14px;line-height:1.55;color:#55607f">${escapar(intro)}</p>
-  </td></tr>
-  ${filas.length ? `<tr><td style="padding:16px 24px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e1e5ec;background:#f4f6f9">${filas.map(fila).join('')}</table></td></tr>` : ''}
-  <tr><td style="padding:20px 24px 8px"><a href="${url}" style="display:inline-block;background:#1f5fbf;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:11px 20px">Abrir Ventas del local</a></td></tr>
-  ${pie ? `<tr><td style="padding:8px 24px 0;font-size:12px;line-height:1.5;color:#55607f">${escapar(pie)}</td></tr>` : ''}
-  <tr><td style="padding:22px 24px;margin-top:12px;border-top:1px solid #e1e5ec;font-size:11px;color:#8a94ad">
-    Aviso automático del Back Office de La Jamonera · powered by ABR. Los destinatarios se cambian en Ventas del local → Configuración.
-  </td></tr>
-</table>
-</td></tr></table></body></html>`;
+  const fila = ([k, v], i) => `<tr>
+      <td style="padding:9px 12px;font-size:13px;color:#4f638c;${i ? 'border-top:1px solid #e2e8fb;' : ''}width:42%;vertical-align:top">${escapar(k)}</td>
+      <td style="padding:9px 12px;font-size:13px;color:#1f2a44;font-weight:700;${i ? 'border-top:1px solid #e2e8fb;' : ''}word-break:break-word">${escapar(v)}</td></tr>`;
+  return `
+      <div style="font-family:Inter,Arial,sans-serif;background:#f4f7ff;padding:18px;">
+        <div style="max-width:720px;margin:0 auto;background:#fff;border:1px solid #dbe4fb;border-radius:18px;padding:18px;">
+          ${prueba ? `<p style="margin:0 0 14px;padding:8px 12px;border-radius:12px;background:#fff3dd;color:#9a6200;font-size:12px;font-weight:700;">Mail de prueba · así llega el aviso cuando falla la conexión con InfoManager</p>` : ''}
+          <p style="margin:0 0 10px;">
+            <img src="https://www.lajamonera.online/IMG/La%20Jamonera%20App%20180.png" alt="La Jamonera" width="36" height="36" style="vertical-align:middle;border-radius:10px;">
+            <span style="vertical-align:middle;margin-left:8px;font-size:16px;color:#2351a0;"><span style="font-weight:400">La</span> <strong>Jamonera</strong> · Ventas del local</span>
+          </p>
+          <span style="display:inline-block;background:${C.suave};color:${C.fuerte};border:1px solid ${C.borde};border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700;">${escapar(etiqueta)}</span>
+          <h2 style="margin:12px 0 6px;color:#2351a0;">${escapar(titulo)}</h2>
+          <p style="margin:0 0 14px;color:#4f638c;line-height:1.5;">${escapar(intro)}</p>
+          ${filas.length ? `<div style="border:1px solid #e2e8fb;border-radius:14px;padding:4px;background:#fbfdff;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${filas.map(fila).join('')}</table>
+          </div>` : ''}
+          <p style="margin:16px 0 12px;"><a href="${url}" style="display:inline-block;background:#1f7ae8;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:12px;font-weight:700;">Abrir Ventas del local</a></p>
+          ${pie ? `<p style="margin:0 0 10px;color:#5f729b;font-size:13px;line-height:1.5;">${escapar(pie)}</p>` : ''}
+          <p style="margin:14px 0 0;padding-top:12px;border-top:1px solid #e2e8fb;color:#7d8db0;font-size:12px;line-height:1.5;">Aviso automático del Back Office de La Jamonera · powered by ABR. Los destinatarios se cambian en Ventas del local → Configuración.</p>
+        </div>
+      </div>
+    `;
 }
 async function avisarFalla(cfg, estado, error) {
   const destinos = destinosAviso(cfg);

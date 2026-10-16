@@ -168,7 +168,7 @@
         sub = tot ? `${fmtNum.format((Number(a?.total || 0) / tot) * 100)}% a empresas` : '';
       }
     }
-    return `<article class="vl-kpi ${r ? '' : 'is-cargando'}" style="--k:${PALETA()[def.color]}"><div class="vl-kpi-tit"><span class="vl-kpi-ico"><i class="fa-solid ${def.icono}"></i></span>${esc(def.titulo)}</div>
+    return `<article class="vl-kpi ${r ? '' : 'is-cargando'}" style="--k:${PALETA()[def.color]}"><div class="vl-kpi-tit"><span class="vl-kpi-ico"><i class="fa-solid ${def.icono}"></i></span><span>${esc(def.titulo)}</span></div>
       <div class="vl-kpi-valor ${chico ? 'is-chico' : ''}">${valor}</div><div class="vl-kpi-sub">${sub}</div></article>`;
   }
   const kpisActivos = () => (Array.isArray(st.cfg.kpis) && st.cfg.kpis.length ? st.cfg.kpis : KPIS.map((k) => k.key)).filter((k) => KPI_POR_KEY[k]);
