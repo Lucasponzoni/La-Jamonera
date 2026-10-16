@@ -410,7 +410,9 @@ export async function runVentas({ modo = 'cron', quien = '' } = {}) {
     pendientesItems,
     historialTerminado: empresas.every((e) => backfill[e]?.terminado),
     ultimaCorridaDetalle: corrida,
-    corridas: [corrida, ...(Array.isArray(estado0.corridas) ? estado0.corridas : [])].slice(0, 30)
+    // Historial de corridas: sólo los últimos 3 días (con tope por las dudas, cada 10 min son ~430).
+    corridas: [corrida, ...(Array.isArray(estado0.corridas) ? estado0.corridas : [])]
+      .filter((c) => Date.parse(c.fin || c.inicio || 0) >= Date.now() - 3 * 86400e3).slice(0, 600)
   };
   if (!error && decision.toca) nuevoEstado.ultimaOk = fin;
   nuevoEstado.proxima = proximaCorrida(cfg, nuevoEstado);

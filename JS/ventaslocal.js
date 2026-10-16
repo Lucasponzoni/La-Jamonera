@@ -158,6 +158,13 @@
   function kpiHtml(key, r, c) {
     const def = KPI_POR_KEY[key];
     if (!def) return '';
+    // Cargando: skeleton como los indicadores del inicio (ícono, título, valor, nota y la franja de abajo).
+    if (!r) {
+      const w = [62, 48, 55, 70, 44, 58, 50, 66, 40, 60][KPIS.indexOf(def) % 10];
+      return `<article class="vl-kpi is-skeleton" aria-busy="true"><div class="vl-kpi-tit"><sl-skeleton effect="sheen" class="vl-sk-ico"></sl-skeleton><sl-skeleton effect="sheen" class="vl-sk-txt" style="width:${w}%"></sl-skeleton></div>
+        <sl-skeleton effect="sheen" class="vl-sk-valor"></sl-skeleton><sl-skeleton effect="sheen" class="vl-sk-txt vl-sk-chico" style="width:${w + 14}%"></sl-skeleton>
+        <sl-skeleton effect="sheen" class="vl-sk-extra"></sl-skeleton></article>`;
+    }
     const P = PALETA(); const color = P[def.color];
     let valor = '—'; let sub = ''; let chico = false; let extra = ''; let foto = '';
     if (r) {
@@ -565,18 +572,31 @@
       .eq('empresa', emp).in('recibo_id', recs.map((x) => x.recibo_id)).order('id');
     return e2 ? { error: e2 } : { pagos: pagos || [], recibos: recs };
   }
+  // Marca del medio de pago en grande (logo o ícono en su color) para la tarjeta de cobro.
+  function marcaPago(texto, cond) {
+    const m = medioPago(texto, cond);
+    const ico = m.logo ? `<img src="${LOGO(m.logo)}" alt="" width="26" height="26">` : `<i class="fa-solid ${m.icono}"></i>`;
+    return `<span class="vl-marca" style="--c:${m.color}"><span class="vl-marca-ico ${m.logo ? 'con-logo' : ''}">${ico}</span><span class="vl-marca-txt"><b>${esc(m.nombre)}</b>${m.det ? `<small>${esc(m.det)}</small>` : ''}</span></span>`;
+  }
   function htmlCobros(c, r) {
     if (c.error) return `<p class="vl-ayuda">${esc(textoError(c.error))}</p>`;
     if (!c.pagos.length) {
-      return `<div class="vl-pago-card is-vacio">${badgePago(r.condicion_venta)}<span class="vl-ayuda">${r.items_ok ? 'Sin recibo de cobro (cuenta corriente o pendiente).' : 'El detalle del cobro se baja en la próxima actualización.'}</span></div>`;
+      return `<div class="vl-pago-card"><div class="vl-pago-card-top">${marcaPago(r.condicion_venta)}<b class="vl-pago-imp">${pesos2(r.total)}</b></div>
+        <p class="vl-pago-nota">${r.items_ok ? 'Sin recibo de cobro: cuenta corriente o pendiente.' : 'El detalle del cobro se baja en la próxima actualización.'}</p></div>`;
     }
-    const dato = (t, v) => (v ? `<span>${t} <b>${esc(v)}</b></span>` : '');
+    const dato = (t, v) => (v ? `<div><dt>${t}</dt><dd>${esc(v)}</dd></div>` : '');
     return c.pagos.map((p) => {
-      const datos = [dato('ID de pago', p.id_pago_externo), dato('Cupón', p.cupon), dato('Tarjeta', p.tarjeta_numero ? `•••• ${String(p.tarjeta_numero).slice(-4)}` : ''), dato('Autorización', p.autorizacion), dato('Lote', p.lote),
-        Number(p.arancel) ? dato('Arancel', pesos2(p.arancel)) : '', Number(p.costo_financiero) ? dato('Costo financiero', pesos2(p.costo_financiero)) : ''].join('');
+      const datos = [dato('ID de pago', p.id_pago_externo), dato('Cupón', p.cupon), dato('Tarjeta', p.tarjeta_numero ? `•••• ${String(p.tarjeta_numero).slice(-4)}` : ''), dato('Autorización', p.autorizacion), dato('Lote', p.lote)].join('');
+      const arancel = Number(p.arancel) || 0; const costo = Number(p.costo_financiero) || 0;
+      const neto = Number(p.importe) - arancel - costo;
       return `<div class="vl-pago-card">
-        <div class="vl-pago-card-top">${badgePago(p.medio, p.cond_pago)}<b class="vl-pago-imp">${pesos2(p.importe)}</b></div>
-        ${datos ? `<div class="vl-cobro-datos">${datos}</div>` : ''}</div>`;
+        <div class="vl-pago-card-top">${marcaPago(p.medio, p.cond_pago)}<b class="vl-pago-imp">${pesos2(p.importe)}</b></div>
+        ${datos ? `<dl class="vl-pago-datos">${datos}</dl>` : ''}
+        ${arancel || costo ? `<div class="vl-pago-neto">
+          ${arancel ? `<span><small>Arancel</small><b>− ${pesos2(arancel)}</b></span>` : ''}
+          ${costo ? `<span><small>Costo financiero</small><b>− ${pesos2(costo)}</b></span>` : ''}
+          <span class="is-neto"><small>Neto recibido</small><b>${pesos2(neto)}</b></span></div>` : ''}
+      </div>`;
     }).join('');
   }
   function htmlProductos(items, r, catalogo) {
@@ -610,13 +630,14 @@
         <section>
           <p class="vl-detalle-tit"><i class="fa-solid fa-credit-card"></i> Cobro</p>
           <div class="vl-pagos">${htmlCobros(cobros, r)}</div>
-          <div class="vl-detalle-meta">
-            <span><i class="fa-solid fa-file-invoice"></i>${esc(nombreComp(r))}</span>
-            ${r.usuario ? `<span class="vl-caja">${avatar(r.usuario)}<b>${esc(r.usuario)}</b></span>` : ''}
-            ${r.cod_cliente ? `<span>Cliente <b>${esc(r.cod_cliente)}</b></span>` : ''}
-            ${r.vendedor ? `<span>Vendedor <b>${esc(r.vendedor)}</b></span>` : ''}
-            ${r.cae ? `<span>CAE <b>${esc(r.cae)}</b></span>` : ''}
-          </div>
+          <p class="vl-detalle-tit vl-detalle-tit-2"><i class="fa-solid fa-file-invoice"></i> Comprobante</p>
+          <dl class="vl-det-meta">
+            <div><dt>Número</dt><dd>${esc(nombreComp(r))}</dd></div>
+            ${r.usuario ? `<div><dt>Caja</dt><dd class="vl-caja">${avatar(r.usuario)}${esc(r.usuario)}</dd></div>` : ''}
+            ${r.cod_cliente ? `<div><dt>Cliente</dt><dd>${esc(r.cliente && !/^c\.?\s?f\.?$/i.test(r.cliente.trim()) ? r.cliente : 'Consumidor final')} <span class="vl-dim-in">#${esc(r.cod_cliente)}</span></dd></div>` : ''}
+            ${r.vendedor ? `<div><dt>Vendedor</dt><dd>${esc(r.vendedor)}</dd></div>` : ''}
+            ${r.cae ? `<div><dt>CAE</dt><dd>${esc(r.cae)}</dd></div>` : ''}
+          </dl>
         </section>
       </div>`;
   }
@@ -798,8 +819,13 @@
     const btn = $('vlSalud');
     btn.dataset.estado = s.estado;
     $('vlSaludTitulo').textContent = s.titulo;
-    const partes = s.partes || (s.detalle ? [[s.estado === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-info', textoError(s.detalle)]] : []);
-    $('vlSaludDetalle').innerHTML = partes.map(([ico, t]) => `<span><i class="fa-solid ${ico}"></i>${esc(t)}</span>`).join('');
+    // Renglón 2: cuándo se actualizó y la próxima. Renglón 3 (si hay): lo que falta completar.
+    const partes = s.partes || [];
+    const pend = partes.find(([ico]) => ico === 'fa-hourglass-half');
+    $('vlSaludDetalle').textContent = partes.length
+      ? partes.filter((p) => p !== pend).map(([ico, t]) => (ico === 'fa-clock' ? `Actualizado ${t}` : t)).join(' · ')
+      : (s.detalle ? textoError(s.detalle) : ' ');
+    $('vlSaludExtra').textContent = pend ? `Completando ${pend[1].replace(/^faltan detalles de /, '')} detalles de cobro` : '';
     btn.title = s.detalle ? `${s.titulo} · ${textoError(s.detalle)}` : s.titulo;
   }
   function pintarSaludDetalle() {
@@ -811,9 +837,18 @@
       return `<div class="vl-salud-dato"><small>Historial · empresa ${emp}</small><b>${b.terminado ? 'Completo' : b.hasta ? `Llegó a ${new Intl.DateTimeFormat('es-AR', { month: 'long', year: 'numeric' }).format(new Date(`${b.hasta}T12:00:00Z`))}` : 'Sin empezar'}</b>
         <span class="vl-dim">${fmtNum.format(b.total || 0)} comprobantes</span></div>`;
     }).join('');
-    const corridas = (e.corridas || []).slice(0, 15).map((c) => `<li class="${c.ok ? '' : 'is-mal'}"><span class="${c.ok ? 'ok' : 'mal'}"><i class="fa-solid ${c.ok ? 'fa-circle-check' : 'fa-circle-xmark'}"></i></span>
+    // Últimas corridas: las de los últimos 3 días (la sincronización borra las más viejas), de a 10 por página.
+    const todas = (e.corridas || []).filter((c) => Date.parse(c.fin) >= Date.now() - 3 * 86400e3);
+    const POR_PAG = 10;
+    const paginas = Math.max(1, Math.ceil(todas.length / POR_PAG));
+    st.corridasPag = Math.min(st.corridasPag || 0, paginas - 1);
+    const malas = todas.filter((c) => !c.ok).length;
+    const corridas = todas.slice(st.corridasPag * POR_PAG, (st.corridasPag + 1) * POR_PAG).map((c) => `<li class="${c.ok ? '' : 'is-mal'}"><span class="${c.ok ? 'ok' : 'mal'}"><i class="fa-solid ${c.ok ? 'fa-circle-check' : 'fa-circle-xmark'}"></i></span>
       <span>${esc(fmtFechaHora.format(new Date(c.fin)))} · ${c.modo === 'manual' ? 'manual' : 'automática'}</span>
-      <span>${c.ok ? `${c.nuevos} nuevos · ${c.items} con productos` : esc(c.error || 'error')} · ${Math.round((c.ms || 0) / 1000)} s</span></li>`).join('');
+      <span>${c.ok ? (c.frenadoIm5 ? 'pausa por límite de IM5' : `${c.nuevos} nuevos · ${c.items} con productos`) : esc(textoError(c.error || 'error'))} · ${Math.round((c.ms || 0) / 1000)} s</span></li>`).join('');
+    const pie = todas.length > POR_PAG ? `<div class="vl-corridas-pie"><span>${st.corridasPag * POR_PAG + 1}–${Math.min((st.corridasPag + 1) * POR_PAG, todas.length)} de ${fmtNum.format(todas.length)}</span>
+      <div><sl-button size="small" variant="default" data-corr-pag="-1" ${st.corridasPag === 0 ? 'disabled' : ''} aria-label="Más nuevas"><i class="fa-solid fa-chevron-left"></i></sl-button>
+      <sl-button size="small" variant="default" data-corr-pag="1" ${st.corridasPag >= paginas - 1 ? 'disabled' : ''} aria-label="Más viejas"><i class="fa-solid fa-chevron-right"></i></sl-button></div></div>` : '';
     const pend = Number(e.pendientesItems || 0);
     $('vlSaludCuerpo').innerHTML = `
       ${e.ok === false && e.error ? `<div class="vl-salud-error"><b>Último error:</b> ${esc(textoError(e.error))}${e.erroresSeguidos > 1 ? ` · ${e.erroresSeguidos} veces seguidas` : ''}</div>` : ''}
@@ -823,8 +858,8 @@
         ${historial}
         <div class="vl-salud-dato"><small>Productos por bajar</small><b>${pend ? `${fmtNum.format(pend)} comprobantes` : 'Al día'}</b><span class="vl-dim">${pend ? 'se completan en las próximas corridas' : '&nbsp;'}</span></div>
       </div>
-      <p class="vl-salud-sub">Últimas corridas</p>
-      <ul class="vl-corridas">${corridas || '<li><span>Todavía no hay corridas.</span></li>'}</ul>`;
+      <p class="vl-salud-sub">Últimas corridas <span class="vl-salud-sub-nota">· últimos 3 días · ${fmtNum.format(todas.length)} corridas${malas ? ` · ${malas} con error` : ''}</span></p>
+      <ul class="vl-corridas">${corridas || '<li><span>Todavía no hay corridas.</span></li>'}</ul>${pie}`;
   }
   function resumenHorario(cfg) {
     const nombres = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -1116,7 +1151,11 @@
     $('vlTablaBody').addEventListener('keydown', (e) => { if (e.key !== 'Enter' && e.key !== ' ') return; const tr = e.target.closest('tr.vl-fila'); if (tr) { e.preventDefault(); toggleDetalle(tr); } });
     $('vlActualizar').addEventListener('click', actualizarAhora);
     $('vlExcel').addEventListener('click', exportarExcel);
-    $('vlSalud').addEventListener('click', () => { pintarSaludDetalle(); $('vlSaludDialog').show(); });
+    $('vlSalud').addEventListener('click', () => { st.corridasPag = 0; pintarSaludDetalle(); $('vlSaludDialog').show(); });
+    $('vlSaludCuerpo').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-corr-pag]'); if (!b || b.disabled) return;
+      st.corridasPag = Math.max(0, (st.corridasPag || 0) + Number(b.dataset.corrPag)); pintarSaludDetalle();
+    });
     $('vlConfigBtn').addEventListener('click', abrirConfig);
     $('cfgMailPrueba').addEventListener('click', mandarMailPrueba);
     // Pestaña «Gráficos»: se dibujan al mostrarse (y se reajustan si ya estaban).
