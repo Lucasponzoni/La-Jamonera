@@ -166,6 +166,19 @@ a { color: var(--lj-accent); }
   color: var(--lj-text);
 }
 
+.lj-header-link > i {
+  margin-right: 8px;
+  font-size: 13px;
+  width: 15px;
+  text-align: center;
+  opacity: .75;
+}
+
+.lj-header-link:hover > i,
+.lj-header-link.is-active > i {
+  opacity: 1;
+}
+
 .lj-header-link.is-active {
   color: var(--lj-accent);
   font-weight: 600;
