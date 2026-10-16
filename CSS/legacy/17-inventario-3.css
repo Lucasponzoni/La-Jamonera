@@ -1242,3 +1242,23 @@ sl-dialog.lj-alert-dialog:has(.inventario-provider-rne-alert) { --width: min(960
 .inv-pos-datos .is-esp b { color: var(--lj-warning); }
 .inventario-auto-egreso-badge.is-pos { display: inline-flex; align-items: center; gap: 5px; }
 .inventario-auto-egreso-badge.is-pos img { width: 12px; height: 12px; background: #fff; border-radius: 3px; padding: 1px; }
+
+/* Planilla semanal: cómo baja el stock del producto */
+.inv-planilla .inv-modo { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--lj-border); background: var(--lj-surface-2); margin: 4px 0 6px; }
+.inv-planilla .inv-modo div { display: grid; gap: 2px; min-width: 0; }
+.inv-planilla .inv-modo b { font-size: .9rem; color: var(--lj-text); }
+.inv-planilla .inv-modo small { font-size: .8rem; color: var(--lj-muted); line-height: 1.4; overflow-wrap: anywhere; }
+.inv-planilla .inv-modo-ico { flex: none; width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center; background: #fff; border: 1px solid var(--lj-border); color: var(--lj-muted); }
+.inv-planilla .inv-modo-ico img { width: 16px; height: 16px; }
+.inv-planilla .inv-modo.is-pos { border-color: #0057ff55; background: var(--lj-accent-soft); }
+.inv-planilla .inv-modo.is-mp .inv-modo-ico { color: #b45309; }
+.inv-planilla .inv-modo.is-ia .inv-modo-ico { color: var(--lj-accent); }
+.inv-planilla .inv-ayuda { display: block; margin: -4px 0 6px 28px; font-size: .76rem; color: var(--lj-muted); line-height: 1.35; }
+.inv-planilla .inv-ayuda.is-nota { margin-left: 0; display: flex; gap: 6px; align-items: baseline; }
+.inv-planilla sl-input + .inv-ayuda { margin-left: 0; margin-top: 4px; }
+.inv-modo-chip { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 4px 8px; border-radius: 5px; font-size: .78rem; font-weight: 600; background: var(--lj-surface-2); color: var(--lj-muted); }
+.inv-modo-chip img { width: 14px; height: 14px; background: #fff; border-radius: 3px; padding: 1px; }
+.inv-modo-chip.is-pos { background: var(--lj-accent-soft); color: #0057ff; }
+.sl-theme-dark .inv-modo-chip.is-pos { color: var(--lj-accent); }
+.inv-modo-chip.is-mp { background: #fef3c7; color: #92400e; }
+.sl-theme-dark .inv-modo-chip.is-mp { background: #3a2a0c; color: #fbbf24; }

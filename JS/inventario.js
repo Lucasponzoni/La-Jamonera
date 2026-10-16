@@ -1286,13 +1286,22 @@
     try {
       const client = window.supabaseLaJamonera;
       if (!client?.rpc) return;
-      const { data, error } = await client.rpc('inventario_pos_sync');
+      const [{ data, error }, { data: mp }] = await Promise.all([client.rpc('inventario_pos_sync'), client.rpc('pos_materia_prima')]);
       if (error) return;
       state.posSync = Object.fromEntries((data || []).map((r) => [r.ingrediente_id, r]));
+      state.posActivo = Boolean((data || [])[0]?.activo);
+      state.materiaPrima = new Set((mp || []).map((x) => (typeof x === 'string' ? x : Object.values(x || {})[0])).filter(Boolean));
       if (document.querySelector('[data-inv-select]')) renderList();
     } catch (_) { /* sin POS: Inventario sigue igual */ }
   };
   const posSyncDe = (id) => { const r = state.posSync?.[id]; return r && r.activo ? r : null; };
+  // Cómo baja el stock de un producto: 'pos' (ventas reales), 'mp' (materia prima: producciones) o 'ia' (autoegreso).
+  // En 'pos' y 'mp' la IA sólo resuelve los lotes vencidos con stock.
+  const modoEgresoDe = (id) => {
+    if (posSyncDe(id)) return 'pos';
+    if (state.posActivo && state.materiaPrima?.has(id)) return 'mp';
+    return 'ia';
+  };
   const POS_LOGO = '<img src="./IMG/infomanager.svg" alt="" width="12" height="12" aria-hidden="true">';
   const fmtCant = (n, abbr) => `${Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })} ${abbr}`;
   const posDetalleHtml = (item, info) => {
@@ -2875,7 +2884,7 @@
     if (!force && current.configured) {
       const quick = await openIosSwal({
         title: 'Planilla semanal',
-        html: `<p><strong>${escapeHtml(capitalize(ingredient.name))}</strong></p><p><small>Perecedero: <strong>${current.perishable ? 'Sí' : 'No'}</strong> · Egreso: <strong>${current.egresoEnabled ? 'Sí' : 'No'}</strong> · Rotación: <strong>${Number(current.rotationDays || 0)} día(s)</strong></small></p>`,
+        html: `<p><strong>${escapeHtml(capitalize(ingredient.name))}</strong></p><p><small>Perecedero: <strong>${current.perishable ? 'Sí' : 'No'}</strong> · ${{ pos: 'Baja con <strong>ventas del POS</strong> (IA sólo vencidos)', mp: '<strong>Materia prima</strong>: baja con producciones (IA sólo vencidos)' }[modoEgresoDe(ingredientId)] || `Autoegreso IA: <strong>${current.egresoEnabled ? 'Sí' : 'No'}</strong> · Rotación: <strong>${Number(current.rotationDays || 0)} día(s)</strong>`}</small></p>`,
         showDenyButton: true,
         showCancelButton: true,
         confirmButtonText: 'Editar',
@@ -2885,14 +2894,30 @@
       if (!quick.isConfirmed) return quick.isDenied;
     }
 
+    const modo = modoEgresoDe(ingredientId);
+    const pos = posSyncDe(ingredientId);
+    const modoHtml = modo === 'pos'
+      ? `<div class="inv-modo is-pos"><span class="inv-modo-ico">${POS_LOGO}</span><div><b>Baja con las ventas del POS</b>
+          <small>Cada venta del local${pos?.articulos ? ` (${escapeHtml(pos.articulos)})` : ''} descuenta del lote más viejo. La IA no estima consumos: sólo, si un lote vence sin venderse, lo resuelve como venta en mostrador.</small></div></div>`
+      : modo === 'mp'
+        ? `<div class="inv-modo is-mp"><span class="inv-modo-ico"><i class="fa-solid fa-industry"></i></span><div><b>Materia prima: baja con las producciones</b>
+            <small>Se usa en recetas, así que no baja por ventas ni por la IA. Sólo, si un lote vence con stock, la IA lo resuelve.</small></div></div>`
+        : `<div class="inv-modo is-ia"><span class="inv-modo-ico"><i class="fa-solid fa-robot"></i></span><div><b>Baja con el autoegreso de la IA</b>
+            <small>No está vinculado al POS ni se usa en recetas. Si lo habilitás, la IA estima el consumo diario y descuenta cada lote como venta en mostrador.</small></div></div>`;
+    const ayudaIa = modo === 'ia';
     const result = await openIosSwal({
       title: 'Planilla Semanal',
-      html: `<div class="swal-stack-fields text-start">
+      html: `<div class="swal-stack-fields text-start inv-planilla">
         <p class="mb-1"><strong>${escapeHtml(capitalize(ingredient.name))}</strong></p>
+        ${modoHtml}
         <sl-checkbox class="inventario-check-row" id="invPerishable" ${current.perishable ? 'checked' : ''}>Producto perecedero</sl-checkbox>
-        <sl-checkbox class="inventario-check-row" id="invEgresoEnabled" ${current.egresoEnabled ? 'checked' : ''}><i class="fa-solid fa-robot"></i> Habilitado para egreso</sl-checkbox>
+        <small class="inv-ayuda">Tiene vencimiento. Si no, sus lotes nunca se resuelven por vencidos.</small>
+        ${ayudaIa ? `<sl-checkbox class="inventario-check-row" id="invEgresoEnabled" ${current.egresoEnabled ? 'checked' : ''}><i class="fa-solid fa-robot"></i> Habilitado para autoegreso</sl-checkbox>
+        <small class="inv-ayuda">La IA descuenta todos los días una parte del stock como venta en mostrador.</small>
         <label class="lj-label mt-2" for="invRotationDays">Días de rotación</label>
         <sl-input id="invRotationDays" class="swal2-input" type="number" min="0" step="1" value="${Number(current.rotationDays || 0)}"></sl-input>
+        <small class="inv-ayuda">En cuántos días hábiles desde el ingreso se termina un lote (o antes, si vence antes). Ej.: 2 → un lote que entra el lunes queda en 0 el martes.</small>`
+        : `<small class="inv-ayuda is-nota"><i class="fa-solid fa-circle-info"></i> «Habilitado para autoegreso» y «Días de rotación» no se usan en este producto.</small>`}
       </div>`,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
@@ -2908,16 +2933,17 @@
         syncRotationDisabled();
       },
       preConfirm: () => {
-        const rotationDays = Number(document.getElementById('invRotationDays')?.value || 0);
+        const rotationDays = ayudaIa ? Number(document.getElementById('invRotationDays')?.value || 0) : 0;
         if (!Number.isFinite(rotationDays) || rotationDays < 0) {
           Swal.showValidationMessage('Completá días de rotación con un número válido.');
           return false;
         }
+        // Fuera del modo IA los campos no se muestran: se conserva lo guardado.
         return {
           perishable: Boolean(document.getElementById('invPerishable')?.checked),
           counterOnly: Boolean(current.counterOnly),
-          egresoEnabled: Boolean(document.getElementById('invEgresoEnabled')?.checked),
-          rotationDays: Math.round(rotationDays)
+          egresoEnabled: ayudaIa ? Boolean(document.getElementById('invEgresoEnabled')?.checked) : Boolean(current.egresoEnabled),
+          rotationDays: ayudaIa ? Math.round(rotationDays) : Number(current.rotationDays || 0)
         };
       }
     });
@@ -2948,6 +2974,12 @@
       const cfg = { ...getDefaultWeeklySheetConfig(), ...safeObject(record.weeklySheetConfig) };
       const perishableClass = cfg.perishable ? 'is-perishable' : 'is-non-perishable';
       const suggestedVal = record.suggestedExpiryDays ?? 5;
+      const modo = modoEgresoDe(ingredient.id);
+      const egresoHtml = modo === 'pos'
+        ? `<span class="inv-modo-chip is-pos" title="Baja con las ventas del POS. La IA sólo resuelve los lotes vencidos.">${POS_LOGO}Baja con ventas del POS · IA sólo vencidos</span>`
+        : modo === 'mp'
+          ? '<span class="inv-modo-chip is-mp" title="Se usa en recetas: baja con las producciones. La IA sólo resuelve los lotes vencidos."><i class="fa-solid fa-industry"></i>Materia prima · IA sólo vencidos</span>'
+          : `<sl-checkbox class="inventario-check-row" data-weekly-egreso="${escapeHtml(ingredient.id)}" ${cfg.egresoEnabled ? 'checked' : ''}><i class="fa-solid fa-robot"></i> Habilitado para autoegreso</sl-checkbox>`;
       return `<article class="inventario-weekly-row ${perishableClass}" data-weekly-row="${escapeHtml(ingredient.id)}" data-weekly-name="${escapeHtml(normalizeLower(ingredient.name))}">
         <div class="inventario-weekly-product-head">
           <span class="inventario-print-photo-wrap inventario-weekly-thumb-wrap">${ingredient.imageUrl ? `<span class="thumb-loading"><sl-spinner class="meta-spinner" aria-label="Cargando"></sl-spinner></span><img class="thumb-image js-inventario-thumb" src="${escapeHtml(ingredient.imageUrl)}" alt="${escapeHtml(capitalize(ingredient.name))}">` : '<i class="fa-solid fa-drumstick-bite"></i>'}</span>
@@ -2959,12 +2991,12 @@
         <div class="inventario-weekly-grid inventario-weekly-grid-v2">
           <div class="inventario-weekly-checks">
             <sl-checkbox class="inventario-check-row" data-weekly-perishable="${escapeHtml(ingredient.id)}" ${cfg.perishable ? 'checked' : ''}>Producto perecedero</sl-checkbox>
-            <sl-checkbox class="inventario-check-row" data-weekly-egreso="${escapeHtml(ingredient.id)}" ${cfg.egresoEnabled ? 'checked' : ''}><i class="fa-solid fa-robot"></i> Habilitado para egreso</sl-checkbox>
+            ${egresoHtml}
           </div>
           <div class="inventario-weekly-inputs">
             <div class="inventario-weekly-field">
-              <label class="lj-label" for="weeklyRotation_${escapeHtml(ingredient.id)}">Días de rotación</label>
-              <sl-input id="weeklyRotation_${escapeHtml(ingredient.id)}" class="swal2-input" type="number" min="0" step="1" value="${Number(cfg.rotationDays || 0)}" data-weekly-rotation="${escapeHtml(ingredient.id)}"></sl-input>
+              <label class="lj-label" for="weeklyRotation_${escapeHtml(ingredient.id)}">Días de rotación${modo === 'ia' ? '' : ' <small>(no se usa)</small>'}</label>
+              <sl-input id="weeklyRotation_${escapeHtml(ingredient.id)}" class="swal2-input" type="number" min="0" step="1" value="${Number(cfg.rotationDays || 0)}" data-weekly-rotation="${escapeHtml(ingredient.id)}" ${modo === 'ia' ? '' : 'disabled'}></sl-input>
             </div>
             <div class="inventario-weekly-field">
               <label class="lj-label" for="weeklySuggested_${escapeHtml(ingredient.id)}">Vencimiento sugerido (días)</label>
