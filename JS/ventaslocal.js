@@ -120,56 +120,94 @@
     if (!st.comparar || antes == null) return '';
     const a = Number(actual) || 0; const b = Number(antes) || 0;
     if (!b && !a) return '<span class="vl-delta is-igual">= sin cambios</span>';
-    if (!b) return '<span class="vl-delta is-sube"><i class="fa-solid fa-arrow-up"></i> nuevo</span>';
+    if (!b) return '<span class="vl-delta is-sube"><i class="fa-solid fa-arrow-trend-up"></i> nuevo</span>';
     const p = ((a - b) / Math.abs(b)) * 100;
     if (Math.abs(p) < 0.5) return '<span class="vl-delta is-igual">= igual</span>';
     const sube = p > 0;
     const bien = invertir ? !sube : sube;
-    return `<span class="vl-delta ${bien ? 'is-sube' : 'is-baja'}"><i class="fa-solid fa-arrow-${sube ? 'up' : 'down'}"></i> ${fmtNum.format(Math.abs(p))}%</span>`;
+    return `<span class="vl-delta ${bien ? 'is-sube' : 'is-baja'}"><i class="fa-solid fa-arrow-trend-${sube ? 'up' : 'down'}"></i> ${fmtNum.format(Math.round(Math.abs(p) * 10) / 10)}%</span>`;
+  }
+  // Minigráfico (SVG en línea, sin librería): área + línea con la evolución del período.
+  function sparkline(valores, color) {
+    const v = valores.map((x) => Number(x) || 0);
+    if (v.length < 2 || !v.some(Boolean)) return '';
+    const W = 120; const H = 34; const max = Math.max(...v); const min = Math.min(...v, 0);
+    const pts = v.map((y, i) => [(i / (v.length - 1)) * W, H - 3 - ((y - min) / (max - min || 1)) * (H - 6)]);
+    const linea = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join('');
+    const id = `vlsg${Math.random().toString(36).slice(2, 7)}`;
+    return `<svg class="vl-kpi-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+      <defs><linearGradient id="${id}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".28"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+      <path d="${linea}L${W},${H}L0,${H}Z" fill="url(#${id})"/><path d="${linea}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>`;
+  }
+  // Barra de proporciones (medios, A/B, cajas) con leyenda corta.
+  function barraParte(partes) {
+    const tot = partes.reduce((s, p) => s + Math.max(0, Number(p.valor) || 0), 0);
+    if (!tot) return '';
+    return `<div class="vl-kpi-barra">${partes.map((p) => `<i style="width:${((Math.max(0, Number(p.valor) || 0) / tot) * 100).toFixed(2)}%;background:${p.color}" title="${esc(p.nombre)} · ${fmtNum.format(Math.round((p.valor / tot) * 1000) / 10)}%"></i>`).join('')}</div>`;
+  }
+  // Serie para los minigráficos: por día si el período tiene varios días, si no por hora.
+  function serie(r, campo) {
+    if (st.rango.desde !== st.rango.hasta && (r.por_dia || []).length > 1) {
+      const por = Object.fromEntries(r.por_dia.map((x) => [x.fecha, x]));
+      const out = []; for (let d = st.rango.desde; d <= st.rango.hasta; d = sumarDias(d, 1)) { const x = por[d]; out.push(x ? (campo === 'ticket' ? Number(x.total) / Math.max(1, Number(x.cant)) : Number(x[campo])) : 0); }
+      return out;
+    }
+    const horas = [...(r.por_hora || [])].sort((a, b) => a.hora - b.hora);
+    return horas.map((x) => (campo === 'ticket' ? Number(x.total) / Math.max(1, Number(x.cant)) : Number(x[campo])));
   }
   function kpiHtml(key, r, c) {
     const def = KPI_POR_KEY[key];
     if (!def) return '';
-    let valor = '—'; let sub = ''; let chico = false;
+    const P = PALETA(); const color = P[def.color];
+    let valor = '—'; let sub = ''; let chico = false; let extra = ''; let foto = '';
     if (r) {
-      if (key === 'total') { valor = pesos(r.neto); sub = `${delta(r.neto, c?.neto)} ${c ? `<span>antes ${pesos(c.neto)}</span>` : ''}`; }
-      if (key === 'comprobantes') { valor = fmtNum.format(r.comprobantes); sub = delta(r.comprobantes, c?.comprobantes); }
-      if (key === 'ticket') { valor = pesos2(r.ticket); sub = delta(r.ticket, c?.ticket); }
-      if (key === 'producto') {
-        const p = r.top_importe?.[0];
+      if (key === 'total') { valor = pesos(r.neto); sub = `${delta(r.neto, c?.neto)}${c ? `<span>antes ${pesos(c.neto)}</span>` : ''}`; extra = sparkline(serie(r, 'total'), color); }
+      if (key === 'comprobantes') { valor = fmtNum.format(r.comprobantes); sub = `${delta(r.comprobantes, c?.comprobantes)}${c ? `<span>antes ${fmtNum.format(c.comprobantes)}</span>` : ''}`; extra = sparkline(serie(r, 'cant'), color); }
+      if (key === 'ticket') { valor = pesos2(r.ticket); sub = `${delta(r.ticket, c?.ticket)}${c ? `<span>antes ${pesos(c.ticket)}</span>` : ''}`; extra = sparkline(serie(r, 'ticket'), color); }
+      if (key === 'producto' || key === 'productoCant') {
+        const p = (key === 'producto' ? r.top_importe : r.top_cantidad)?.[0];
         chico = true; valor = p ? esc(p.desc || p.cod) : 'Sin datos';
-        sub = p ? `${pesos(p.importe)} · ${fmtNum.format(p.cantidad)} ${esc(p.unidad || '')}` : (r.sin_items ? 'Faltan bajar productos' : '');
-      }
-      if (key === 'productoCant') {
-        const p = r.top_cantidad?.[0];
-        chico = true; valor = p ? esc(p.desc || p.cod) : 'Sin datos';
-        sub = p ? `${fmtNum.format(p.cantidad)} ${esc(p.unidad || '')} · ${pesos(p.importe)}` : '';
+        sub = p ? (key === 'producto' ? `${pesos(p.importe)} · ${fmtNum.format(p.cantidad)} ${esc(p.unidad || '')}` : `${fmtNum.format(p.cantidad)} ${esc(p.unidad || '')} · ${pesos(p.importe)}`) : (r.sin_items ? 'Faltan bajar productos' : '');
+        const vk = p && st.catalogoListo ? vinculoDe(p.cod, st.catalogoListo) : null;
+        if (vk?.item?.img) foto = `<img class="vl-kpi-foto" src="${esc((window.ljThumb || String)(vk.item.img, 160))}" alt="" loading="lazy">`;
+        if (vk?.item) sub += `<span class="vl-kpi-tag"><i class="fa-solid ${vk.item.tipo === 'receta' ? 'fa-industry' : 'fa-boxes-stacked'}"></i>${esc(vk.item.nombre)}</span>`;
       }
       if (key === 'medios') {
-        const m = r.por_medio?.[0]; const tot = (r.por_medio || []).reduce((s, x) => s + Number(x.total || 0), 0);
+        const ms = (r.por_medio || []).filter((x) => Number(x.total) > 0); const m = ms[0]; const tot = ms.reduce((s, x) => s + Number(x.total || 0), 0);
         chico = true; valor = m ? esc(m.medio) : 'Sin datos';
-        sub = m && tot ? `${fmtNum.format((Number(m.total) / tot) * 100)}% · ${pesos(m.total)}` : '';
+        sub = m && tot ? `${fmtNum.format(Math.round((Number(m.total) / tot) * 1000) / 10)}% · ${pesos(m.total)}` : '';
+        extra = barraParte(ms.map((x, i) => ({ nombre: x.medio, valor: Number(x.total), color: P[[1, 0, 2, 4, 5][i % 5]] })));
       }
-      if (key === 'nc') { valor = pesos(r.nc_total); sub = `${r.nc_cant} nota${r.nc_cant === 1 ? '' : 's'} ${delta(r.nc_total, c?.nc_total, { invertir: true })}`; }
+      if (key === 'nc') {
+        valor = pesos(r.nc_total); sub = `<span>${r.nc_cant} nota${r.nc_cant === 1 ? '' : 's'}</span>${delta(r.nc_total, c?.nc_total, { invertir: true })}`;
+        const pct = Number(r.facturado) ? (Number(r.nc_total) / Number(r.facturado)) * 100 : 0;
+        extra = `<div class="vl-kpi-medidor" title="${fmtNum.format(Math.round(pct * 10) / 10)}% de lo facturado"><i style="width:${Math.min(100, pct * 10).toFixed(1)}%;background:${color}"></i></div><small class="vl-kpi-mini">${fmtNum.format(Math.round(pct * 10) / 10)}% de lo facturado</small>`;
+      }
       if (key === 'cajas') {
-        const u = r.por_usuario?.[0];
-        chico = true; valor = u ? esc(u.usuario) : 'Sin datos';
-        sub = u ? `${pesos(u.total)} · ${u.cant} comp.` : '';
+        const us = (r.por_usuario || []).filter((x) => Number(x.total) > 0); const u = us[0];
+        chico = true; valor = u ? `${avatar(u.usuario)}${esc(u.usuario)}` : 'Sin datos';
+        sub = u ? `${pesos(u.total)} · ${fmtNum.format(u.cant)} comp.` : '';
+        extra = barraParte(us.slice(0, 6).map((x, i) => ({ nombre: x.usuario, valor: Number(x.total), color: P[(i + 3) % 10] })));
       }
       if (key === 'hora') {
-        const h = [...(r.por_hora || [])].sort((a, b) => Number(b.total) - Number(a.total))[0];
+        const hs = [...(r.por_hora || [])].sort((a, b) => a.hora - b.hora);
+        const h = [...hs].sort((a, b) => Number(b.total) - Number(a.total))[0];
         valor = h ? `${String(h.hora).padStart(2, '0')}–${String(h.hora + 1).padStart(2, '0')} h` : '—';
         sub = h ? `${pesos(h.total)} · ${h.cant} comp.` : '';
+        const max = Math.max(1, ...hs.map((x) => Number(x.total)));
+        extra = hs.length ? `<div class="vl-kpi-horas">${hs.map((x) => `<i style="height:${Math.max(8, (Number(x.total) / max) * 100).toFixed(0)}%;background:${x === h ? color : 'var(--lj-border-strong)'}" title="${x.hora} h · ${pesos(x.total)}"></i>`).join('')}</div>` : '';
       }
       if (key === 'letras') {
         const a = (r.por_letra || []).find((x) => x.letra === 'A'); const b = (r.por_letra || []).find((x) => x.letra === 'B');
-        chico = true; valor = `A ${pesos(a?.total || 0)} · B ${pesos(b?.total || 0)}`;
+        chico = true; valor = `<span class="vl-ab"><b style="color:${P[3]}">A</b> ${pesos(a?.total || 0)}</span><span class="vl-ab"><b style="color:${P[4]}">B</b> ${pesos(b?.total || 0)}</span>`;
         const tot = Number(a?.total || 0) + Number(b?.total || 0);
-        sub = tot ? `${fmtNum.format((Number(a?.total || 0) / tot) * 100)}% a empresas` : '';
+        sub = tot ? `${fmtNum.format(Math.round((Number(a?.total || 0) / tot) * 1000) / 10)}% a empresas` : '';
+        extra = barraParte([{ nombre: 'Factura A', valor: Number(a?.total || 0), color: P[3] }, { nombre: 'Factura B', valor: Number(b?.total || 0), color: P[4] }]);
       }
     }
-    return `<article class="vl-kpi ${r ? '' : 'is-cargando'}" style="--k:${PALETA()[def.color]}"><div class="vl-kpi-tit"><span class="vl-kpi-ico"><i class="fa-solid ${def.icono}"></i></span><span>${esc(def.titulo)}</span></div>
-      <div class="vl-kpi-valor ${chico ? 'is-chico' : ''}">${valor}</div><div class="vl-kpi-sub">${sub}</div></article>`;
+    return `<article class="vl-kpi ${r ? '' : 'is-cargando'} ${foto ? 'con-foto' : ''}" style="--k:${color}">
+      <div class="vl-kpi-tit"><span class="vl-kpi-ico"><i class="fa-solid ${def.icono}"></i></span><span>${esc(def.titulo)}</span></div>
+      ${foto}<div class="vl-kpi-valor ${chico ? 'is-chico' : ''}">${valor}</div><div class="vl-kpi-sub">${sub}</div>${extra ? `<div class="vl-kpi-extra">${extra}</div>` : ''}</article>`;
   }
   const kpisActivos = () => (Array.isArray(st.cfg.kpis) && st.cfg.kpis.length ? st.cfg.kpis : KPIS.map((k) => k.key)).filter((k) => KPI_POR_KEY[k]);
   function pintarKpis() {
@@ -380,18 +418,52 @@
     }
     return q.order('fecha', { ascending: false }).order('fecha_hora', { ascending: false, nullsFirst: false }).order('id', { ascending: false });
   }
+  // ---------- Medios de pago (logo de marca o ícono, con su color) ----------
+  const LOGO = (n) => `https://cdn.jsdelivr.net/npm/simple-icons@13.21.0/icons/${n}.svg`;
+  const COND_PAGO = { EF: 'Efectivo', TJ: 'Tarjeta', CH: 'Cheque', TR: 'Transferencia', DB: 'Débito', CC: 'Cuenta corriente' };
+  const normal = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  function medioPago(texto, cond) {
+    const t = normal(texto); const c = String(cond || '').toUpperCase();
+    if (/mercado ?pago/.test(t)) return { nombre: 'Mercado Pago', det: /qr/.test(t) ? 'QR' : /point/.test(t) ? 'Point' : '', logo: 'mercadopago', color: '#00B1EA' };
+    if (/visa/.test(t)) return { nombre: 'Visa', logo: 'visa', color: '#1A1F71' };
+    if (/master/.test(t)) return { nombre: 'Mastercard', logo: 'mastercard', color: '#EB001B' };
+    if (/amex|american/.test(t)) return { nombre: 'American Express', logo: 'americanexpress', color: '#2E77BC' };
+    if (/cuenta corriente/.test(t) || c === 'CC') return { nombre: 'Cuenta corriente', icono: 'fa-file-invoice-dollar', color: '#7c3aed' };
+    if (/banco|bco\.|cta\./.test(t) || c === 'TR') return { nombre: 'Transferencia', det: texto && !/transfer/.test(t) ? texto : '', icono: 'fa-building-columns', color: '#0891b2' };
+    if (/tarjeta|credito|debito/.test(t) || c === 'TJ' || c === 'DB') return { nombre: /debito/.test(t) || c === 'DB' ? 'Débito' : 'Tarjeta de crédito', icono: 'fa-credit-card', color: '#2563eb' };
+    if (/redondeo/.test(t)) return { nombre: 'Redondeo', icono: 'fa-scale-balanced', color: '#64748b' };
+    if (/anticipo/.test(t)) return { nombre: 'Anticipo de cliente', icono: 'fa-hand-holding-dollar', color: '#ea580c' };
+    if (/caja|efectivo/.test(t) || c === 'EF') return { nombre: 'Efectivo', det: /tesorer/.test(t) ? 'Tesorería' : '', icono: 'fa-money-bill-wave', color: '#16a34a' };
+    if (c === 'CH') return { nombre: 'Cheque', icono: 'fa-money-check', color: '#0d9488' };
+    return { nombre: texto || COND_PAGO[c] || 'Otro', icono: 'fa-wallet', color: '#64748b' };
+  }
+  function badgePago(texto, cond) {
+    const m = medioPago(texto, cond);
+    const ico = m.logo ? `<span class="vl-pago-logo" style="--m:url('${LOGO(m.logo)}')"></span>` : `<i class="fa-solid ${m.icono}"></i>`;
+    return `<span class="vl-pago" style="--c:${m.color}"><span class="vl-pago-ico">${ico}</span><span class="vl-pago-txt">${esc(m.nombre)}${m.det ? `<small>${esc(m.det)}</small>` : ''}</span></span>`;
+  }
+  // Avatar con iniciales y un color estable por nombre (cajas / usuarios).
+  function avatar(nombre) {
+    const n = String(nombre || '').trim();
+    if (!n) return '';
+    const ini = n.replace(/^cajera?\s+/i, '').split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase();
+    let h = 0; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return `<span class="vl-avatar" style="--c:${PALETA()[h % 10]}">${esc(ini)}</span>`;
+  }
+
   const nombreComp = (r) => `${r.tipo === 'FA' ? 'Factura' : r.tipo === 'NC' ? 'N. crédito' : 'N. débito'} ${r.letra || ''} ${String(r.punto_venta || 0).padStart(4, '0')}-${String(r.numero || 0).padStart(8, '0')}`;
   function filaHtml(r) {
     const chip = r.tipo === 'NC' ? 'is-nc' : r.tipo === 'ND' ? 'is-nd' : 'is-fa';
-    const cuando = r.fecha_hora ? fmtFechaHora.format(new Date(r.fecha_hora)) : fechaCorta(r.fecha);
+    const d = r.fecha_hora ? new Date(r.fecha_hora) : null;
+    const cliente = !r.cliente || /^c\.?\s?f\.?$/i.test(r.cliente.trim()) ? '<span class="vl-cf">Consumidor final</span>' : esc(r.cliente);
     return `<tr class="vl-fila ${r.anulada ? 'is-anulada' : ''}" data-emp="${r.empresa}" data-id="${r.id}" tabindex="0">
       <td><i class="fa-solid fa-chevron-right vl-exp"></i></td>
-      <td class="vl-fecha">${esc(cuando)}<span class="vl-dim vl-ocultar-movil">Empresa ${r.empresa}</span></td>
+      <td class="vl-fecha"><b>${d ? esc(fmtHora.format(d)) : '—'}</b><span class="vl-dim">${esc(fechaCorta(r.fecha))}<span class="vl-ocultar-movil"> · Emp. ${r.empresa}</span></span></td>
       <td><span class="vl-chip ${chip}">${r.tipo}${r.letra ? ` ${esc(r.letra)}` : ''}</span><span class="vl-comp">${esc(String(r.punto_venta || 0).padStart(4, '0'))}-${esc(String(r.numero || 0).padStart(8, '0'))}</span>${r.anulada ? '<span class="vl-dim">Anulada</span>' : ''}</td>
-      <td>${esc(r.cliente || '—')}${r.observaciones ? '<i class="fa-solid fa-comment-dots vl-obs-ico" title="Tiene observaciones"></i>' : ''}</td>
-      <td class="vl-ocultar-movil">${esc(r.usuario || '—')}${r.vendedor ? `<span class="vl-dim">${esc(r.vendedor)}</span>` : ''}</td>
-      <td class="vl-ocultar-movil">${esc(r.condicion_venta || '—')}</td>
-      <td class="vl-num ${r.tipo === 'NC' ? 'vl-total-nc' : ''}"><b>${r.tipo === 'NC' ? '−' : ''}${pesos2(r.total)}</b></td></tr>`;
+      <td class="vl-cliente">${cliente}${r.observaciones && !/^factura im5$/i.test(r.observaciones.trim()) ? '<i class="fa-solid fa-comment-dots vl-obs-ico" title="Tiene observaciones"></i>' : ''}</td>
+      <td class="vl-ocultar-movil"><span class="vl-caja">${avatar(r.usuario)}<span>${esc(r.usuario || '—')}${r.vendedor ? `<span class="vl-dim">${esc(r.vendedor)}</span>` : ''}</span></span></td>
+      <td class="vl-ocultar-movil">${badgePago(r.condicion_venta)}</td>
+      <td class="vl-num ${r.tipo === 'NC' ? 'vl-total-nc' : ''}"><b class="vl-total">${r.tipo === 'NC' ? '−' : ''}${pesos2(r.total)}</b></td></tr>`;
   }
   async function cargarTabla() {
     const body = $('vlTablaBody');
@@ -409,6 +481,51 @@
     $('vlPagAnt').disabled = st.pagina === 0;
     $('vlPagSig').disabled = hasta >= st.total;
   }
+
+  // ---------- Vínculos: artículo de IM5 → receta (Producción) o ingrediente (Inventario) ----------
+  const capital = (s) => String(s || '').replace(/^\p{Ll}/u, (c) => c.toUpperCase());
+  function cargarCatalogo(forzar = false) {
+    if (st.catalogo && !forzar) return st.catalogo;
+    st.catalogo = (async () => {
+      const [ing, rec, vin] = await Promise.all([
+        st.sb.from('ingredientes').select('id,nombre,nombreRaw:raw->>name,img:raw->>imageUrl'),
+        st.sb.from('recetas').select('id,titulo:raw->>title,comercial:raw->>nombreComercial,img:raw->>imageUrl'),
+        st.sb.from('im5_articulo_vinculos').select('cod_articulo,tipo,ref_id,estado,similitud')
+      ]);
+      const items = new Map();
+      (rec.data || []).forEach((r) => items.set(`receta:${r.id}`, { tipo: 'receta', id: r.id, nombre: capital(r.comercial || r.titulo), sub: r.comercial && r.titulo !== r.comercial ? capital(r.titulo) : '', img: r.img || '' }));
+      (ing.data || []).forEach((r) => {
+        const n = r.nombre || r.nombreRaw;
+        if (!n || /^\(ingrediente eliminado/i.test(n)) return;
+        items.set(`ingrediente:${r.id}`, { tipo: 'ingrediente', id: r.id, nombre: capital(n), sub: '', img: r.img || '' });
+      });
+      st.vinc = new Map((vin.data || []).map((v) => [v.cod_articulo, v]));
+      st.catalogoListo = items;
+      return items;
+    })().catch((e) => { st.catalogo = null; throw e; });
+    return st.catalogo;
+  }
+  const puedeEditar = () => Boolean(st.me?.admin || st.me?.puede_editar);
+  function vinculoDe(cod, items) {
+    const v = st.vinc?.get(String(cod));
+    if (!v) return { estado: 'sin' };
+    if (v.tipo === 'ninguno') return { estado: 'ninguno', v };
+    const item = items.get(`${v.tipo}:${v.ref_id}`);
+    if (!item) return { estado: 'sin', v };
+    return { estado: v.estado === 'sugerido' ? 'sugerido' : 'ok', v, item };
+  }
+  function chipVinculo(vk) {
+    if (vk.estado === 'sin') return '<span class="vl-vinc is-sin"><i class="fa-solid fa-link-slash"></i>Sin vincular</span>';
+    if (vk.estado === 'ninguno') return '<span class="vl-vinc is-ninguno"><i class="fa-solid fa-ban"></i>No es de la fábrica</span>';
+    const r = vk.item.tipo === 'receta';
+    return `<span class="vl-vinc ${r ? 'is-receta' : 'is-ing'} ${vk.estado === 'sugerido' ? 'is-sugerido' : ''}"><i class="fa-solid ${r ? 'fa-industry' : 'fa-boxes-stacked'}"></i>${vk.estado === 'sugerido' ? 'Sugerido · ' : ''}${r ? 'Producción' : 'Inventario'} · ${esc(vk.item.nombre)}</span>`;
+  }
+  const imgHtml = (vk, clase = 'vl-prod-img') => {
+    const url = vk.item?.img;
+    const ph = vk.estado === 'ninguno' ? 'fa-tag' : vk.item?.tipo === 'receta' ? 'fa-industry' : 'fa-box-open';
+    return `<span class="${clase}">${url ? `<img src="${esc((window.ljThumb || String)(url, 96))}" alt="" loading="lazy">` : `<i class="fa-solid ${ph}"></i>`}</span>`;
+  };
+
   // Cobros del comprobante: recibos que lo cancelan → renglones de cobro (medio, cupón, id de pago de MP…).
   async function leerCobros(emp, id) {
     const { data: recs, error } = await st.sb.from('im5_comprobante_recibos').select('recibo_id,recibo_punto_venta,recibo_numero,importe_pagado')
@@ -420,18 +537,60 @@
       .eq('empresa', emp).in('recibo_id', recs.map((x) => x.recibo_id)).order('id');
     return e2 ? { error: e2 } : { pagos: pagos || [], recibos: recs };
   }
-  const COND_PAGO = { EF: 'Efectivo', TJ: 'Tarjeta', CH: 'Cheque', TR: 'Transferencia', DB: 'Débito', CC: 'Cuenta corriente' };
   function htmlCobros(c, r) {
     if (c.error) return `<p class="vl-ayuda">${esc(textoError(c.error))}</p>`;
-    if (!c.pagos.length) return `<p class="vl-ayuda">${r.items_ok ? 'Sin cobros registrados (cuenta corriente o pendiente).' : 'Los cobros de este comprobante se bajan en la próxima actualización.'}</p>`;
+    if (!c.pagos.length) {
+      return `<div class="vl-pago-card is-vacio">${badgePago(r.condicion_venta)}<span class="vl-ayuda">${r.items_ok ? 'Sin recibo de cobro (cuenta corriente o pendiente).' : 'El detalle del cobro se baja en la próxima actualización.'}</span></div>`;
+    }
     const dato = (t, v) => (v ? `<span>${t} <b>${esc(v)}</b></span>` : '');
-    return `<div class="vl-cobros"><p class="vl-detalle-tit"><i class="fa-solid fa-credit-card"></i> Cobro</p>
-      <div class="vl-items-wrap"><table class="vl-items"><thead><tr><th>Medio</th><th>Datos del pago</th><th class="vl-num">Importe</th></tr></thead><tbody>
-      ${c.pagos.map((p) => `<tr><td>${esc(p.medio || COND_PAGO[p.cond_pago] || p.cond_pago || '—')}</td>
-        <td class="vl-cobro-datos">${[dato('ID pago MP', p.id_pago_externo), dato('Cupón', p.cupon), dato('Tarjeta', p.tarjeta_numero), dato('Autorización', p.autorizacion), dato('Lote', p.lote),
-          Number(p.arancel) ? dato('Arancel', pesos2(p.arancel)) : '', Number(p.costo_financiero) ? dato('Costo financiero', pesos2(p.costo_financiero)) : ''].join('') || '—'}</td>
-        <td class="vl-num">${pesos2(p.importe)}</td></tr>`).join('')}
-      </tbody></table></div></div>`;
+    return c.pagos.map((p) => {
+      const datos = [dato('ID de pago', p.id_pago_externo), dato('Cupón', p.cupon), dato('Tarjeta', p.tarjeta_numero ? `•••• ${String(p.tarjeta_numero).slice(-4)}` : ''), dato('Autorización', p.autorizacion), dato('Lote', p.lote),
+        Number(p.arancel) ? dato('Arancel', pesos2(p.arancel)) : '', Number(p.costo_financiero) ? dato('Costo financiero', pesos2(p.costo_financiero)) : ''].join('');
+      return `<div class="vl-pago-card">
+        <div class="vl-pago-card-top">${badgePago(p.medio, p.cond_pago)}<b class="vl-pago-imp">${pesos2(p.importe)}</b></div>
+        ${datos ? `<div class="vl-cobro-datos">${datos}</div>` : ''}</div>`;
+    }).join('');
+  }
+  function htmlProductos(items, r, catalogo) {
+    if (items.error) return `<p class="vl-ayuda">${esc(textoError(items.error))}</p>`;
+    if (!items.length) return `<p class="vl-ayuda">${r.items_ok ? 'Sin productos.' : 'Los productos de este comprobante se bajan en la próxima actualización.'}</p>`;
+    const editar = puedeEditar();
+    return `<ul class="vl-prods">${items.map((i) => {
+      const vk = catalogo ? vinculoDe(i.cod_articulo, catalogo) : { estado: 'sin' };
+      return `<li class="vl-prod ${vk.estado === 'sin' ? 'is-sin' : ''}">
+        ${imgHtml(vk)}
+        <span class="vl-prod-main"><b>${esc(i.descripcion || i.cod_articulo || '')}</b>${catalogo ? chipVinculo(vk) : ''}</span>
+        <span class="vl-prod-cant"><b>${fmtNum.format(i.cantidad)} ${esc(i.unidad || '')}</b><small>× ${pesos2(i.precio_con_iva)}</small></span>
+        <b class="vl-prod-imp">${pesos2(i.importe)}</b>
+        ${editar && i.cod_articulo ? `<sl-icon-button class="vl-prod-edit" name="link-45deg" label="Vincular producto" data-vincular="${esc(i.cod_articulo)}" data-desc="${esc(i.descripcion || '')}"></sl-icon-button>` : ''}
+      </li>`;
+    }).join('')}</ul>`;
+  }
+  async function pintarDetalle(det) {
+    let catalogo = null;
+    try { catalogo = await cargarCatalogo(); } catch { /* sin catálogo: se muestra sin vínculos */ }
+    const { r, items, cobros } = det._datos;
+    const totalItems = Array.isArray(items) ? items.reduce((s, i) => s + Number(i.importe || 0), 0) : 0;
+    det.querySelector('.vl-detalle-in').innerHTML = `
+      ${r.observaciones && !/^factura im5$/i.test(r.observaciones.trim()) ? `<div class="vl-detalle-obs"><b>Observaciones:</b> ${esc(r.observaciones)}</div>` : ''}
+      <div class="vl-det-grid">
+        <section>
+          <p class="vl-detalle-tit"><i class="fa-solid fa-basket-shopping"></i> Productos${Array.isArray(items) && items.length ? ` <span>${items.length}</span>` : ''}</p>
+          ${htmlProductos(items, r, catalogo)}
+          ${totalItems ? `<p class="vl-prods-total">Total productos <b>${pesos2(totalItems)}</b></p>` : ''}
+        </section>
+        <section>
+          <p class="vl-detalle-tit"><i class="fa-solid fa-credit-card"></i> Cobro</p>
+          <div class="vl-pagos">${htmlCobros(cobros, r)}</div>
+          <div class="vl-detalle-meta">
+            <span><i class="fa-solid fa-file-invoice"></i>${esc(nombreComp(r))}</span>
+            ${r.usuario ? `<span class="vl-caja">${avatar(r.usuario)}<b>${esc(r.usuario)}</b></span>` : ''}
+            ${r.cod_cliente ? `<span>Cliente <b>${esc(r.cod_cliente)}</b></span>` : ''}
+            ${r.vendedor ? `<span>Vendedor <b>${esc(r.vendedor)}</b></span>` : ''}
+            ${r.cae ? `<span>CAE <b>${esc(r.cae)}</b></span>` : ''}
+          </div>
+        </section>
+      </div>`;
   }
   async function toggleDetalle(tr) {
     const sig = tr.nextElementSibling;
@@ -448,24 +607,136 @@
         .eq('empresa', emp).eq('comprobante_id', id).order('orden'),
       leerCobros(emp, id)
     ]);
-    const items = data || [];
-    const tablaItems = error ? `<p class="vl-ayuda">${esc(textoError(error))}</p>`
-      : !items.length ? `<p class="vl-ayuda">${r.items_ok ? 'Sin productos.' : 'Los productos de este comprobante se bajan en la próxima actualización.'}</p>`
-      : `<div><p class="vl-detalle-tit"><i class="fa-solid fa-box-open"></i> Productos</p><div class="vl-items-wrap"><table class="vl-items"><thead><tr><th class="vl-ocultar-movil">Código</th><th>Producto</th><th class="vl-num">Cantidad</th><th class="vl-num vl-ocultar-movil">Precio</th><th class="vl-num">Importe</th></tr></thead><tbody>
-        ${items.map((i) => `<tr><td class="vl-ocultar-movil">${esc(i.cod_articulo || '')}</td><td>${esc(i.descripcion || '')}</td><td class="vl-num">${fmtNum.format(i.cantidad)} ${esc(i.unidad || '')}</td><td class="vl-num vl-ocultar-movil">${pesos2(i.precio_con_iva)}</td><td class="vl-num">${pesos2(i.importe)}</td></tr>`).join('')}
-        </tbody></table></div></div>`;
-    det.querySelector('.vl-detalle-in').innerHTML = `
-      ${r.observaciones ? `<div class="vl-detalle-obs"><b>Observaciones:</b> ${esc(r.observaciones)}</div>` : ''}
-      ${tablaItems}
-      ${htmlCobros(cobros, r)}
-      <div class="vl-detalle-meta">
-        <span>${esc(nombreComp(r))}</span>
-        ${r.usuario ? `<span>Caja <b>${esc(r.usuario)}</b></span>` : ''}
-        ${r.condicion_venta ? `<span>Condición <b>${esc(r.condicion_venta)}</b></span>` : ''}
-        ${r.cod_cliente ? `<span>Cliente <b>${esc(r.cod_cliente)}</b></span>` : ''}
-        ${r.vendedor ? `<span>Vendedor <b>${esc(r.vendedor)}</b></span>` : ''}
-        ${r.cae ? `<span>CAE <b>${esc(r.cae)}</b></span>` : ''}
-      </div>`;
+    const items = error ? Object.assign([], { error }) : (data || []);
+    det._datos = { r, items, cobros };
+    await pintarDetalle(det);
+  }
+  const repintarDetalles = () => document.querySelectorAll('tr.vl-detalle').forEach((det) => { if (det._datos) pintarDetalle(det); });
+
+  // Modal «Vincular producto»: elige la receta o el ingrediente de un artículo de IM5.
+  const palabras = (s) => normal(s).replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter((w) => w.length > 2).map((w) => w.replace(/(es|s)$/, ''));
+  function puntaje(desc, item) {
+    const a = new Set(palabras(desc)); if (!a.size) return 0;
+    const b = palabras(`${item.nombre} ${item.sub}`);
+    return b.filter((w) => a.has(w)).length / Math.max(a.size, 1) + (item.tipo === 'receta' ? 0.01 : 0);
+  }
+  async function abrirVincular(cod, desc) {
+    if (!puedeEditar()) return notify('warning', 'Sin permiso', 'Necesitás permiso de edición para vincular productos.');
+    let catalogo;
+    try { catalogo = await cargarCatalogo(); } catch (e) { return notify('error', 'No se pudo leer el catálogo', textoError(e)); }
+    const vk = vinculoDe(cod, catalogo);
+    st.vincEdit = { cod: String(cod), desc: desc || st.vinc?.get(String(cod))?.descripcion || '', sel: vk.item ? `${vk.item.tipo}:${vk.item.id}` : '', filtro: 'todos', catalogo };
+    $('vlVincArt').innerHTML = `${imgHtml(vk, 'vl-vinc-art-img')}<div><small>Producto de InfoManager · código ${esc(cod)}</small><b>${esc(st.vincEdit.desc)}</b>${chipVinculo(vk)}</div>`;
+    $('vlVincBuscar').value = '';
+    document.querySelectorAll('[data-vinc-tipo]').forEach((b) => b.classList.toggle('active', b.dataset.vincTipo === 'todos'));
+    $('vlVincQuitar').hidden = vk.estado === 'sin';
+    pintarVincLista();
+    $('vlVincDialog').show();
+  }
+  function pintarVincLista() {
+    const e = st.vincEdit; if (!e) return;
+    const q = normal(String($('vlVincBuscar').value ?? '').trim());
+    let lista = [...e.catalogo.values()].filter((it) => e.filtro === 'todos' || it.tipo === e.filtro);
+    if (q) lista = lista.filter((it) => normal(`${it.nombre} ${it.sub}`).includes(q));
+    lista = lista.map((it) => ({ it, p: `${it.tipo}:${it.id}` === e.sel ? 9 : puntaje(e.desc, it) }))
+      .sort((a, b) => b.p - a.p || a.it.nombre.localeCompare(b.it.nombre)).slice(0, 80);
+    $('vlVincLista').innerHTML = lista.length ? lista.map(({ it, p }) => {
+      const k = `${it.tipo}:${it.id}`;
+      const r = it.tipo === 'receta';
+      return `<li><button type="button" class="vl-vinc-op ${k === e.sel ? 'is-sel' : ''}" data-k="${esc(k)}" role="option" aria-selected="${k === e.sel}">
+        <span class="vl-prod-img">${it.img ? `<img src="${esc((window.ljThumb || String)(it.img, 96))}" alt="" loading="lazy">` : `<i class="fa-solid ${r ? 'fa-industry' : 'fa-box-open'}"></i>`}</span>
+        <span class="vl-vinc-op-txt"><b>${esc(it.nombre)}</b>${it.sub ? `<small>${esc(it.sub)}</small>` : ''}</span>
+        <span class="vl-vinc ${r ? 'is-receta' : 'is-ing'}"><i class="fa-solid ${r ? 'fa-industry' : 'fa-boxes-stacked'}"></i>${r ? 'Producción' : 'Inventario'}</span>
+        ${p >= 0.5 && k !== e.sel ? '<span class="vl-vinc-parecido">Parecido</span>' : ''}
+        <i class="fa-solid fa-circle-check vl-vinc-check"></i>
+      </button></li>`;
+    }).join('') : '<li class="vl-ayuda vl-vinc-vacio">Nada coincide con la búsqueda.</li>';
+  }
+  async function guardarVinculo(tipo, refId) {
+    const e = st.vincEdit; if (!e) return;
+    const fila = { cod_articulo: e.cod, descripcion: e.desc || null, tipo, ref_id: tipo === 'ninguno' ? null : refId, estado: 'confirmado', similitud: null, updated_at: new Date().toISOString() };
+    const { error } = await st.sb.from('im5_articulo_vinculos').upsert(fila, { onConflict: 'cod_articulo' });
+    if (error) return notify('error', 'No se pudo guardar el vínculo', textoError(error));
+    st.vinc.set(e.cod, fila);
+    $('vlVincDialog').hide();
+    notify('success', 'Producto vinculado', tipo === 'ninguno' ? `${e.desc}: marcado como «no es de la fábrica».` : `${e.desc} → ${e.catalogo.get(`${tipo}:${refId}`)?.nombre || ''}`);
+    despuesDeVincular();
+  }
+  async function quitarVinculo() {
+    const e = st.vincEdit; if (!e) return;
+    const { error } = await st.sb.from('im5_articulo_vinculos').delete().eq('cod_articulo', e.cod);
+    if (error) return notify('error', 'No se pudo quitar el vínculo', textoError(error));
+    st.vinc.delete(e.cod);
+    $('vlVincDialog').hide();
+    despuesDeVincular();
+  }
+  function despuesDeVincular() { pintarKpis(); repintarDetalles(); if ($('vlArtDialog').open) pintarArticulos(); actualizarPendientes(); }
+
+  // Modal «Productos de InfoManager»: todos los artículos vendidos, con su vínculo; para ir completando.
+  async function abrirArticulos() {
+    $('vlArtDialog').show();
+    $('vlArtLista').innerHTML = '<li class="vl-art-cargando"><sl-spinner></sl-spinner></li>';
+    try {
+      const [{ data, error }] = await Promise.all([st.sb.rpc('ventas_articulos'), cargarCatalogo(true)]);
+      if (error) throw error;
+      st.articulos = (data || []).sort((a, b) => Number(b.importe) - Number(a.importe));
+      $('vlArtSugerir').hidden = !puedeEditar();
+      pintarArticulos();
+    } catch (e) { $('vlArtLista').innerHTML = `<li class="vl-ayuda">${esc(textoError(e))}</li>`; }
+  }
+  function estadoArticulo(a, catalogo) { return vinculoDe(a.cod_articulo, catalogo).estado; }
+  async function pintarArticulos() {
+    const catalogo = await cargarCatalogo();
+    const arts = st.articulos || [];
+    const cuenta = { sin: 0, sugerido: 0, ok: 0, ninguno: 0 };
+    arts.forEach((a) => { cuenta[estadoArticulo(a, catalogo)] += 1; });
+    Object.entries(cuenta).forEach(([k, n]) => { const el = document.querySelector(`[data-art-cuenta="${k}"]`); if (el) el.textContent = fmtNum.format(n); });
+    const todos = document.querySelector('[data-art-cuenta="todos"]'); if (todos) todos.textContent = fmtNum.format(arts.length);
+    const filtro = st.artFiltro || 'sin';
+    const q = normal(String($('vlArtBuscar').value ?? '').trim());
+    const editar = puedeEditar();
+    const lista = arts.filter((a) => (filtro === 'todos' || estadoArticulo(a, catalogo) === filtro) && (!q || normal(`${a.descripcion} ${a.cod_articulo}`).includes(q)));
+    $('vlArtConfirmarTodos').hidden = !(editar && filtro === 'sugerido' && lista.length);
+    $('vlArtLista').innerHTML = lista.length ? lista.map((a) => {
+      const vk = vinculoDe(a.cod_articulo, catalogo);
+      return `<li class="vl-art">
+        ${imgHtml(vk)}
+        <span class="vl-art-main"><b>${esc(a.descripcion || a.cod_articulo)}</b>
+          <small>Código ${esc(a.cod_articulo)} · ${pesos(a.importe)} vendidos · ${fmtNum.format(a.comprobantes)} comp.${a.ultima_venta ? ` · última ${esc(fechaCorta(a.ultima_venta))}` : ''}</small>
+          ${chipVinculo(vk)}</span>
+        <span class="vl-art-acc">
+          ${editar && vk.estado === 'sugerido' ? `<sl-button size="small" variant="success" data-art-confirmar="${esc(a.cod_articulo)}"><i slot="prefix" class="fa-solid fa-check"></i>Confirmar</sl-button>` : ''}
+          ${editar ? `<sl-button size="small" variant="default" data-vincular="${esc(a.cod_articulo)}" data-desc="${esc(a.descripcion || '')}"><i slot="prefix" class="fa-solid fa-link"></i>${vk.estado === 'sin' ? 'Vincular' : 'Cambiar'}</sl-button>` : ''}
+        </span></li>`;
+    }).join('') : `<li class="vl-ayuda vl-vinc-vacio">${filtro === 'sin' ? '¡Todos los productos tienen vínculo!' : 'No hay productos en este grupo.'}</li>`;
+  }
+  async function confirmarSugeridos(cods) {
+    if (!cods.length) return;
+    const ahora = new Date().toISOString();
+    const { error } = await st.sb.from('im5_articulo_vinculos').update({ estado: 'confirmado', updated_at: ahora }).in('cod_articulo', cods);
+    if (error) return notify('error', 'No se pudo confirmar', textoError(error));
+    cods.forEach((c) => { const v = st.vinc.get(c); if (v) v.estado = 'confirmado'; });
+    notify('success', 'Vínculos confirmados', `${cods.length} producto${cods.length === 1 ? '' : 's'}.`);
+    despuesDeVincular();
+  }
+  async function sugerirAutomatico() {
+    const btn = $('vlArtSugerir'); btn.loading = true;
+    try {
+      const { data, error } = await st.sb.rpc('ventas_articulos_sugerir', { p_umbral: 0.5 });
+      if (error) throw error;
+      await cargarCatalogo(true);
+      notify('success', 'Sugerencias listas', data ? `${data} producto${data === 1 ? '' : 's'} con sugerencia nueva. Revisalos en «Sugeridos».` : 'No hay productos nuevos para sugerir.');
+      pintarArticulos(); actualizarPendientes();
+    } catch (e) { notify('error', 'No se pudo sugerir', textoError(e)); } finally { btn.loading = false; }
+  }
+  async function actualizarPendientes() {
+    try {
+      const catalogo = await cargarCatalogo();
+      const { data } = await st.sb.rpc('ventas_articulos');
+      if (data) st.articulos = data.sort((a, b) => Number(b.importe) - Number(a.importe));
+      const n = (st.articulos || []).filter((a) => ['sin', 'sugerido'].includes(estadoArticulo(a, catalogo))).length;
+      $('vlArtPend').textContent = n ? fmtNum.format(n) : '';
+    } catch { /* sin datos: sin contador */ }
   }
 
   // ---------- Salud ----------
@@ -760,7 +1031,52 @@
     $('vlBuscar').addEventListener('sl-clear', onBuscar);
     $('vlPagAnt').addEventListener('click', () => { if (st.pagina > 0) { st.pagina -= 1; cargarTabla(); } });
     $('vlPagSig').addEventListener('click', () => { st.pagina += 1; cargarTabla(); });
-    $('vlTablaBody').addEventListener('click', (e) => { const tr = e.target.closest('tr.vl-fila'); if (tr) toggleDetalle(tr); });
+    $('vlTablaBody').addEventListener('click', (e) => {
+      const v = e.target.closest('[data-vincular]');
+      if (v) { e.stopPropagation(); abrirVincular(v.dataset.vincular, v.dataset.desc); return; }
+      const tr = e.target.closest('tr.vl-fila'); if (tr) toggleDetalle(tr);
+    });
+    // Vínculos de productos
+    $('vlArtBtn').addEventListener('click', abrirArticulos);
+    document.querySelectorAll('[data-art-filtro]').forEach((b) => b.addEventListener('click', () => {
+      st.artFiltro = b.dataset.artFiltro;
+      document.querySelectorAll('[data-art-filtro]').forEach((x) => x.classList.toggle('active', x === b));
+      pintarArticulos();
+    }));
+    let tArt = 0;
+    $('vlArtBuscar').addEventListener('sl-input', () => { clearTimeout(tArt); tArt = setTimeout(pintarArticulos, 200); });
+    $('vlArtBuscar').addEventListener('sl-clear', pintarArticulos);
+    $('vlArtLista').addEventListener('click', (e) => {
+      const v = e.target.closest('[data-vincular]'); if (v) { abrirVincular(v.dataset.vincular, v.dataset.desc); return; }
+      const c = e.target.closest('[data-art-confirmar]'); if (c) confirmarSugeridos([c.dataset.artConfirmar]);
+    });
+    $('vlArtSugerir').addEventListener('click', sugerirAutomatico);
+    $('vlArtConfirmarTodos').addEventListener('click', async () => {
+      const catalogo = await cargarCatalogo();
+      const q = normal(String($('vlArtBuscar').value ?? '').trim());
+      confirmarSugeridos((st.articulos || []).filter((a) => estadoArticulo(a, catalogo) === 'sugerido' && (!q || normal(`${a.descripcion} ${a.cod_articulo}`).includes(q))).map((a) => a.cod_articulo));
+    });
+    document.querySelectorAll('[data-vinc-tipo]').forEach((b) => b.addEventListener('click', () => {
+      if (!st.vincEdit) return;
+      st.vincEdit.filtro = b.dataset.vincTipo;
+      document.querySelectorAll('[data-vinc-tipo]').forEach((x) => x.classList.toggle('active', x === b));
+      pintarVincLista();
+    }));
+    $('vlVincBuscar').addEventListener('sl-input', pintarVincLista);
+    $('vlVincBuscar').addEventListener('sl-clear', pintarVincLista);
+    $('vlVincLista').addEventListener('click', (e) => {
+      const op = e.target.closest('.vl-vinc-op'); if (!op || !st.vincEdit) return;
+      st.vincEdit.sel = op.dataset.k;
+      document.querySelectorAll('.vl-vinc-op').forEach((x) => { const on = x === op; x.classList.toggle('is-sel', on); x.setAttribute('aria-selected', String(on)); });
+    });
+    $('vlVincLista').addEventListener('dblclick', (e) => { const op = e.target.closest('.vl-vinc-op'); if (op) { const i = op.dataset.k.indexOf(':'); guardarVinculo(op.dataset.k.slice(0, i), op.dataset.k.slice(i + 1)); } });
+    $('vlVincGuardar').addEventListener('click', () => {
+      const k = st.vincEdit?.sel; if (!k) return notify('warning', 'Elegí un producto', 'Tocá la receta o el ingrediente que corresponde, o marcá «No es de la fábrica».');
+      const i = k.indexOf(':'); guardarVinculo(k.slice(0, i), k.slice(i + 1));
+    });
+    $('vlVincNinguno').addEventListener('click', () => guardarVinculo('ninguno', null));
+    $('vlVincQuitar').addEventListener('click', quitarVinculo);
+    $('vlVincCancelar').addEventListener('click', () => $('vlVincDialog').hide());
     $('vlTablaBody').addEventListener('keydown', (e) => { if (e.key !== 'Enter' && e.key !== ' ') return; const tr = e.target.closest('tr.vl-fila'); if (tr) { e.preventDefault(); toggleDetalle(tr); } });
     $('vlActualizar').addEventListener('click', actualizarAhora);
     $('vlExcel').addEventListener('click', exportarExcel);
@@ -841,6 +1157,8 @@
     pintarSalud();
     cablear();
     await Promise.all([cargarResumen(), cargarTabla()]);
+    actualizarPendientes();
+    cargarCatalogo().then(pintarKpis).catch(() => {});
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
 })();

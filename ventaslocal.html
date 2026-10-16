@@ -30,10 +30,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202610161926">
-  <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202610161926">
-  <link rel="stylesheet" href="./CSS/theme.css?v=202610161926">
-  <link rel="stylesheet" href="./CSS/utilities.css?v=202610161926">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202610161940">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202610161940">
+  <link rel="stylesheet" href="./CSS/theme.css?v=202610161940">
+  <link rel="stylesheet" href="./CSS/utilities.css?v=202610161940">
   <script type="module">
     import { setBasePath } from './vendor/shoelace/utilities/base-path.js?v=202608282255';
     setBasePath(new URL('./vendor/shoelace/', document.baseURI).href.slice(0, -1));
@@ -41,12 +41,12 @@
     const ljCore = [...new Set([...document.querySelectorAll('sl-button, sl-input, sl-icon, sl-dialog, sl-dropdown, sl-drawer, sl-spinner, sl-icon-button')].map((n) => n.localName))].map((t) => customElements.whenDefined(t));
     Promise.race([Promise.allSettled(ljCore), new Promise((r) => setTimeout(r, 2500))]).then(() => document.documentElement.classList.add('lj-ready'));
   </script>
-  <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202610161926">
-  <link rel="stylesheet" href="./CSS/legacy/03-componentes.css?v=202610161926">
-  <link rel="stylesheet" href="./CSS/legacy/04-informes.css?v=202610161926">
-  <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202610161926">
-  <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202610161926">
-  <link rel="stylesheet" href="./CSS/ventaslocal.css?v=202610161926">
+  <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202610161940">
+  <link rel="stylesheet" href="./CSS/legacy/03-componentes.css?v=202610161940">
+  <link rel="stylesheet" href="./CSS/legacy/04-informes.css?v=202610161940">
+  <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202610161940">
+  <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202610161940">
+  <link rel="stylesheet" href="./CSS/ventaslocal.css?v=202610161940">
 </head>
 <body>
   <main class="app-shell container-fluid px-0">
@@ -131,6 +131,7 @@
               </sl-select>
               <div class="informes-page-actions">
                 <sl-switch id="vlComparar" class="vl-comparar" checked>Comparar</sl-switch>
+                <sl-button variant="default" id="vlArtBtn" type="button"><i slot="prefix" class="fa-solid fa-link"></i>Productos<span slot="suffix" class="vl-pend" id="vlArtPend"></span></sl-button>
                 <sl-button variant="default" id="vlExcel" type="button"><i slot="prefix" class="fa-solid fa-file-excel"></i>Excel</sl-button>
                 <sl-button variant="default" id="vlConfigBtn" type="button"><i slot="prefix" class="fa-solid fa-gear"></i>Configuración</sl-button>
                 <span class="informes-toolbar-divider" aria-hidden="true"></span>
@@ -240,6 +241,56 @@
         </div>
         <div class="lj-dialog-body">
           <div id="vlSaludCuerpo"></div>
+        </div>
+      </sl-dialog>
+
+      <!-- Productos de InfoManager: vínculos con Producción / Inventario -->
+      <sl-dialog id="vlArtDialog" class="lj-modal informes-modal vl-dialog vl-dialog-art" label="Productos de InfoManager">
+        <div slot="label" class="lj-dialog-title">
+          <h5 class="lj-dialog-heading"><i class="fa-solid fa-link" aria-hidden="true"></i> Productos de InfoManager</h5>
+        </div>
+        <div class="lj-dialog-body">
+          <p class="vl-ayuda">Cada producto que se vende en el local, con lo que es en la fábrica: una receta de Producción o un ingrediente de Inventario. Los <b>sugeridos</b> se armaron por el nombre: confirmalos o cambialos.</p>
+          <div class="analisis-type-chips vl-art-filtros" role="group" aria-label="Filtrar productos">
+            <sl-button variant="default" size="small" class="analisis-type-chip active" data-art-filtro="sin"><i slot="prefix" class="fa-solid fa-link-slash"></i>Sin vincular<span slot="suffix" class="analisis-chip-count" data-art-cuenta="sin">0</span></sl-button>
+            <sl-button variant="default" size="small" class="analisis-type-chip" data-art-filtro="sugerido"><i slot="prefix" class="fa-solid fa-wand-magic-sparkles"></i>Sugeridos<span slot="suffix" class="analisis-chip-count" data-art-cuenta="sugerido">0</span></sl-button>
+            <sl-button variant="default" size="small" class="analisis-type-chip" data-art-filtro="ok"><i slot="prefix" class="fa-solid fa-circle-check"></i>Vinculados<span slot="suffix" class="analisis-chip-count" data-art-cuenta="ok">0</span></sl-button>
+            <sl-button variant="default" size="small" class="analisis-type-chip" data-art-filtro="ninguno"><i slot="prefix" class="fa-solid fa-ban"></i>No son de la fábrica<span slot="suffix" class="analisis-chip-count" data-art-cuenta="ninguno">0</span></sl-button>
+            <sl-button variant="default" size="small" class="analisis-type-chip" data-art-filtro="todos"><i slot="prefix" class="fa-solid fa-layer-group"></i>Todos<span slot="suffix" class="analisis-chip-count" data-art-cuenta="todos">0</span></sl-button>
+          </div>
+          <div class="vl-art-barra">
+            <sl-input id="vlArtBuscar" class="informes-search" placeholder="Buscar por nombre o código" clearable autocomplete="off"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input>
+            <sl-button variant="default" size="small" id="vlArtSugerir"><i slot="prefix" class="fa-solid fa-wand-magic-sparkles"></i>Sugerir automáticamente</sl-button>
+            <sl-button variant="success" size="small" id="vlArtConfirmarTodos" hidden><i slot="prefix" class="fa-solid fa-check-double"></i>Confirmar los sugeridos</sl-button>
+          </div>
+          <ul id="vlArtLista" class="vl-art-lista"></ul>
+        </div>
+      </sl-dialog>
+
+      <!-- Vincular un producto -->
+      <sl-dialog id="vlVincDialog" class="lj-modal informes-modal vl-dialog vl-dialog-vinc" label="Vincular producto">
+        <div slot="label" class="lj-dialog-title">
+          <h5 class="lj-dialog-heading"><i class="fa-solid fa-link" aria-hidden="true"></i> Vincular producto</h5>
+        </div>
+        <div class="lj-dialog-body">
+          <div id="vlVincArt" class="vl-vinc-art"></div>
+          <p class="vl-ayuda">¿Qué es en la fábrica? Elegí la receta de Producción o el ingrediente de Inventario (doble clic guarda directo).</p>
+          <div class="vl-vinc-barra">
+            <sl-input id="vlVincBuscar" class="informes-search" placeholder="Buscar en Producción e Inventario" clearable autocomplete="off"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input>
+            <div class="analisis-type-chips" role="group" aria-label="Tipo">
+              <sl-button variant="default" size="small" class="analisis-type-chip active" data-vinc-tipo="todos">Todos</sl-button>
+              <sl-button variant="default" size="small" class="analisis-type-chip" data-vinc-tipo="receta"><i slot="prefix" class="fa-solid fa-industry"></i>Producción</sl-button>
+              <sl-button variant="default" size="small" class="analisis-type-chip" data-vinc-tipo="ingrediente"><i slot="prefix" class="fa-solid fa-boxes-stacked"></i>Inventario</sl-button>
+            </div>
+          </div>
+          <ul id="vlVincLista" class="vl-vinc-lista" role="listbox" aria-label="Recetas e ingredientes"></ul>
+          <div class="vl-dialog-pie vl-vinc-pie">
+            <sl-button variant="default" id="vlVincNinguno"><i slot="prefix" class="fa-solid fa-ban"></i>No es de la fábrica</sl-button>
+            <sl-button variant="default" id="vlVincQuitar"><i slot="prefix" class="fa-solid fa-link-slash"></i>Quitar vínculo</sl-button>
+            <span class="vl-flex"></span>
+            <sl-button variant="default" id="vlVincCancelar">Cancelar</sl-button>
+            <sl-button variant="success" id="vlVincGuardar"><i slot="prefix" class="fa-solid fa-floppy-disk"></i>Guardar</sl-button>
+          </div>
         </div>
       </sl-dialog>
 
@@ -383,25 +434,25 @@
     </section>
   </main>
 
-  <script src="./JS/data/backend.js?v=202610161926"></script>
+  <script src="./JS/data/backend.js?v=202610161940"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-  <script src="./vendor/echarts/echarts.min.js?v=202610161926"></script>
-  <script src="./JS/ui/forms.js?v=202610161926"></script>
-  <script src="./JS/ui/theme.js?v=202610161926"></script>
-  <script src="./JS/ui/modal.js?v=202610161926"></script>
-  <script src="./JS/ui/lj-alert.js?v=202610161926"></script>
-  <script src="./JS/ui/header.js?v=202610161926"></script>
-  <script src="./JS/data/config.js?v=202610161926"></script>
-  <script src="./JS/data/supabase-init.js?v=202610161926"></script>
-  <script src="./JS/firebase-init.js?v=202610161926"></script>
-  <script src="./JS/data/security.js?v=202610161926"></script>
-  <script src="./JS/proxy-client.js?v=202610161926"></script>
-  <script src="./JS/data/authz.js?v=202610161926"></script>
-  <script src="./JS/configuracion.js?v=202610161926"></script>
-  <script src="./JS/Notificaciones.js?v=202610161926"></script>
-  <script src="./JS/app.js?v=202610161926"></script>
-  <script src="./JS/ventaslocal.js?v=202610161926"></script>
+  <script src="./vendor/echarts/echarts.min.js?v=202610161940"></script>
+  <script src="./JS/ui/forms.js?v=202610161940"></script>
+  <script src="./JS/ui/theme.js?v=202610161940"></script>
+  <script src="./JS/ui/modal.js?v=202610161940"></script>
+  <script src="./JS/ui/lj-alert.js?v=202610161940"></script>
+  <script src="./JS/ui/header.js?v=202610161940"></script>
+  <script src="./JS/data/config.js?v=202610161940"></script>
+  <script src="./JS/data/supabase-init.js?v=202610161940"></script>
+  <script src="./JS/firebase-init.js?v=202610161940"></script>
+  <script src="./JS/data/security.js?v=202610161940"></script>
+  <script src="./JS/proxy-client.js?v=202610161940"></script>
+  <script src="./JS/data/authz.js?v=202610161940"></script>
+  <script src="./JS/configuracion.js?v=202610161940"></script>
+  <script src="./JS/Notificaciones.js?v=202610161940"></script>
+  <script src="./JS/app.js?v=202610161940"></script>
+  <script src="./JS/ventaslocal.js?v=202610161940"></script>
 </body>
 </html>
