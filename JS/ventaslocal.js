@@ -419,7 +419,8 @@
     return q.order('fecha', { ascending: false }).order('fecha_hora', { ascending: false, nullsFirst: false }).order('id', { ascending: false });
   }
   // ---------- Medios de pago (logo de marca o ícono, con su color) ----------
-  const LOGO = (n) => `https://cdn.jsdelivr.net/npm/simple-icons@13.21.0/icons/${n}.svg`;
+  // Logos a color guardados en el sitio (IMG/pagos/): Mercado Pago, Visa, Mastercard, American Express.
+  const LOGO = (n) => `./IMG/pagos/${n}.svg`;
   const COND_PAGO = { EF: 'Efectivo', TJ: 'Tarjeta', CH: 'Cheque', TR: 'Transferencia', DB: 'Débito', CC: 'Cuenta corriente' };
   const normal = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   function medioPago(texto, cond) {
@@ -427,7 +428,7 @@
     if (/mercado ?pago/.test(t)) return { nombre: 'Mercado Pago', det: /qr/.test(t) ? 'QR' : /point/.test(t) ? 'Point' : '', logo: 'mercadopago', color: '#00B1EA' };
     if (/visa/.test(t)) return { nombre: 'Visa', logo: 'visa', color: '#1A1F71' };
     if (/master/.test(t)) return { nombre: 'Mastercard', logo: 'mastercard', color: '#EB001B' };
-    if (/amex|american/.test(t)) return { nombre: 'American Express', logo: 'americanexpress', color: '#2E77BC' };
+    if (/amex|american/.test(t)) return { nombre: 'American Express', logo: 'amex', color: '#2E77BC' };
     if (/cuenta corriente/.test(t) || c === 'CC') return { nombre: 'Cuenta corriente', icono: 'fa-file-invoice-dollar', color: '#7c3aed' };
     if (/banco|bco\.|cta\./.test(t) || c === 'TR') return { nombre: 'Transferencia', det: texto && !/transfer/.test(t) ? texto : '', icono: 'fa-building-columns', color: '#0891b2' };
     if (/tarjeta|credito|debito/.test(t) || c === 'TJ' || c === 'DB') return { nombre: /debito/.test(t) || c === 'DB' ? 'Débito' : 'Tarjeta de crédito', icono: 'fa-credit-card', color: '#2563eb' };
@@ -437,10 +438,10 @@
     if (c === 'CH') return { nombre: 'Cheque', icono: 'fa-money-check', color: '#0d9488' };
     return { nombre: texto || COND_PAGO[c] || 'Otro', icono: 'fa-wallet', color: '#64748b' };
   }
-  function badgePago(texto, cond) {
+  function badgePago(texto, cond, extra = '') {
     const m = medioPago(texto, cond);
-    const ico = m.logo ? `<span class="vl-pago-logo" style="--m:url('${LOGO(m.logo)}')"></span>` : `<i class="fa-solid ${m.icono}"></i>`;
-    return `<span class="vl-pago" style="--c:${m.color}"><span class="vl-pago-ico">${ico}</span><span class="vl-pago-txt">${esc(m.nombre)}${m.det ? `<small>${esc(m.det)}</small>` : ''}</span></span>`;
+    const ico = m.logo ? `<img class="vl-pago-logo is-${m.logo}" src="${LOGO(m.logo)}" alt="" width="18" height="18">` : `<i class="fa-solid ${m.icono}"></i>`;
+    return `<span class="vl-pago ${m.logo ? 'con-logo' : ''}" style="--c:${m.color}"><span class="vl-pago-ico">${ico}</span><span class="vl-pago-txt">${esc(m.nombre)}${m.det ? `<small>${esc(m.det)}</small>` : ''}</span>${extra ? `<small class="vl-pago-mas">${esc(extra)}</small>` : ''}</span>`;
   }
   // Avatar con iniciales y un color estable por nombre (cajas / usuarios).
   function avatar(nombre) {
@@ -462,7 +463,7 @@
       <td><span class="vl-chip ${chip}">${r.tipo}${r.letra ? ` ${esc(r.letra)}` : ''}</span><span class="vl-comp">${esc(String(r.punto_venta || 0).padStart(4, '0'))}-${esc(String(r.numero || 0).padStart(8, '0'))}</span>${r.anulada ? '<span class="vl-dim">Anulada</span>' : ''}</td>
       <td class="vl-cliente">${cliente}${r.observaciones && !/^factura im5$/i.test(r.observaciones.trim()) ? '<i class="fa-solid fa-comment-dots vl-obs-ico" title="Tiene observaciones"></i>' : ''}</td>
       <td class="vl-ocultar-movil"><span class="vl-caja">${avatar(r.usuario)}<span>${esc(r.usuario || '—')}${r.vendedor ? `<span class="vl-dim">${esc(r.vendedor)}</span>` : ''}</span></span></td>
-      <td class="vl-ocultar-movil">${badgePago(r.condicion_venta)}</td>
+      <td class="vl-ocultar-movil vl-cobro-celda" data-cobro="${r.empresa}:${r.id}">${badgePago(r.condicion_venta)}</td>
       <td class="vl-num ${r.tipo === 'NC' ? 'vl-total-nc' : ''}"><b class="vl-total">${r.tipo === 'NC' ? '−' : ''}${pesos2(r.total)}</b></td></tr>`;
   }
   async function cargarTabla() {
@@ -476,10 +477,37 @@
       : `<tr class="vl-tabla-vacia"><td colspan="7">${st.buscar ? 'Nada coincide con la búsqueda.' : 'No hay comprobantes en este período.'}</td></tr>`;
     body._filas = Object.fromEntries((data || []).map((r) => [`${r.empresa}:${r.id}`, r]));
     $('vlTablaCuenta').textContent = st.total ? fmtNum.format(st.total) : '';
+    completarMedios(data || []);
     const hasta = Math.min(desde + POR_PAGINA, st.total);
     $('vlPagInfo').textContent = st.total ? `${desde + 1}–${hasta} de ${fmtNum.format(st.total)}` : '';
     $('vlPagAnt').disabled = st.pagina === 0;
     $('vlPagSig').disabled = hasta >= st.total;
+  }
+
+  // Columna «Cobro»: con qué se cobró de verdad (Mercado Pago, efectivo…), sacado de los recibos de la página.
+  // Mientras tanto queda la condición de venta del comprobante.
+  async function completarMedios(filas) {
+    const porEmp = {};
+    filas.forEach((f) => { (porEmp[f.empresa] = porEmp[f.empresa] || []).push(f.id); });
+    try {
+      for (const [emp, ids] of Object.entries(porEmp)) {
+        const { data: recs } = await st.sb.from('im5_comprobante_recibos').select('comprobante_id,recibo_id').eq('empresa', Number(emp)).in('comprobante_id', ids);
+        if (!recs?.length) continue;
+        const { data: pagos } = await st.sb.from('im5_pagos').select('recibo_id,medio,cond_pago,importe').eq('empresa', Number(emp)).in('recibo_id', [...new Set(recs.map((x) => x.recibo_id))]);
+        const porRecibo = {};
+        (pagos || []).forEach((p) => { (porRecibo[p.recibo_id] = porRecibo[p.recibo_id] || []).push(p); });
+        const porComp = {};
+        recs.forEach((x) => { (porComp[x.comprobante_id] = porComp[x.comprobante_id] || []).push(...(porRecibo[x.recibo_id] || [])); });
+        Object.entries(porComp).forEach(([id, ps]) => {
+          const celda = document.querySelector(`[data-cobro="${emp}:${id}"]`);
+          const reales = ps.filter((p) => !/redondeo/i.test(p.medio || ''));
+          if (!celda || !reales.length) return;
+          const principal = [...reales].sort((a, b) => Number(b.importe) - Number(a.importe))[0];
+          const otros = new Set(reales.map((p) => medioPago(p.medio, p.cond_pago).nombre)).size - 1;
+          celda.innerHTML = badgePago(principal.medio, principal.cond_pago, otros > 0 ? `+${otros}` : '');
+        });
+      }
+    } catch { /* queda la condición de venta */ }
   }
 
   // ---------- Vínculos: artículo de IM5 → receta (Producción) o ingrediente (Inventario) ----------
@@ -750,11 +778,18 @@
     if (st.corriendo || (e.corriendo && Date.now() - Date.parse(e.corriendo.desde) < 5 * 60000)) return { estado: 'corriendo', titulo: 'Actualizando…', detalle: 'Bajando ventas de IM5' };
     if (!e.ultimaCorrida && !e.ultimaOk) return { estado: 'atrasada', titulo: 'Sin datos todavía', detalle: e.error || 'Todavía no corrió ninguna actualización' };
     if (e.ok === false) return { estado: 'error', titulo: 'Falló la última actualización', detalle: e.error || '' };
-    const pendiente = !e.historialTerminado ? 'trayendo el historial' : e.pendientesItems ? `faltan productos de ${fmtNum.format(e.pendientesItems)} comprobantes` : '';
+    const pendiente = !e.historialTerminado ? 'trayendo el historial' : e.pendientesItems ? `faltan detalles de ${fmtNum.format(e.pendientesItems)}` : '';
     const atrasada = st.cfg.activa !== false && e.proxima && Date.now() - Date.parse(e.proxima) > 40 * 60000;
+    // Etiquetas cortas del widget: [ícono, texto]
+    const partes = [
+      ['fa-clock', haceCuanto(e.ultimaOk || e.ultimaCorrida)],
+      st.cfg.activa === false ? ['fa-pause', 'automática apagada'] : e.proxima ? ['fa-forward', `próxima ${enCuanto(e.proxima)}`] : null,
+      pendiente ? ['fa-hourglass-half', pendiente] : null
+    ].filter(Boolean);
     return {
       estado: atrasada ? 'atrasada' : 'ok',
       titulo: atrasada ? 'Atrasada' : 'Sincronizada',
+      partes,
       detalle: [`Actualizado ${haceCuanto(e.ultimaOk || e.ultimaCorrida)}`, st.cfg.activa === false ? 'automática apagada' : e.proxima ? `próxima ${enCuanto(e.proxima)}` : '', pendiente].filter(Boolean).join(' · ')
     };
   }
@@ -763,8 +798,9 @@
     const btn = $('vlSalud');
     btn.dataset.estado = s.estado;
     $('vlSaludTitulo').textContent = s.titulo;
-    $('vlSaludDetalle').textContent = s.detalle || ' ';
-    btn.title = s.detalle || s.titulo;
+    const partes = s.partes || (s.detalle ? [[s.estado === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-info', textoError(s.detalle)]] : []);
+    $('vlSaludDetalle').innerHTML = partes.map(([ico, t]) => `<span><i class="fa-solid ${ico}"></i>${esc(t)}</span>`).join('');
+    btn.title = s.detalle ? `${s.titulo} · ${textoError(s.detalle)}` : s.titulo;
   }
   function pintarSaludDetalle() {
     const e = st.estado || {};

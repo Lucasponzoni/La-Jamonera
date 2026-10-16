@@ -30,10 +30,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202610161940">
-  <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202610161940">
-  <link rel="stylesheet" href="./CSS/theme.css?v=202610161940">
-  <link rel="stylesheet" href="./CSS/utilities.css?v=202610161940">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202610161959">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202610161959">
+  <link rel="stylesheet" href="./CSS/theme.css?v=202610161959">
+  <link rel="stylesheet" href="./CSS/utilities.css?v=202610161959">
   <script type="module">
     import { setBasePath } from './vendor/shoelace/utilities/base-path.js?v=202608282255';
     setBasePath(new URL('./vendor/shoelace/', document.baseURI).href.slice(0, -1));
@@ -41,12 +41,12 @@
     const ljCore = [...new Set([...document.querySelectorAll('sl-button, sl-input, sl-icon, sl-dialog, sl-dropdown, sl-drawer, sl-spinner, sl-icon-button')].map((n) => n.localName))].map((t) => customElements.whenDefined(t));
     Promise.race([Promise.allSettled(ljCore), new Promise((r) => setTimeout(r, 2500))]).then(() => document.documentElement.classList.add('lj-ready'));
   </script>
-  <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202610161940">
-  <link rel="stylesheet" href="./CSS/legacy/03-componentes.css?v=202610161940">
-  <link rel="stylesheet" href="./CSS/legacy/04-informes.css?v=202610161940">
-  <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202610161940">
-  <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202610161940">
-  <link rel="stylesheet" href="./CSS/ventaslocal.css?v=202610161940">
+  <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202610161959">
+  <link rel="stylesheet" href="./CSS/legacy/03-componentes.css?v=202610161959">
+  <link rel="stylesheet" href="./CSS/legacy/04-informes.css?v=202610161959">
+  <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202610161959">
+  <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202610161959">
+  <link rel="stylesheet" href="./CSS/ventaslocal.css?v=202610161959">
 </head>
 <body>
   <main class="app-shell container-fluid px-0">
@@ -109,13 +109,13 @@
               </div>
               <button id="vlSalud" class="vl-salud" type="button" aria-label="Ver la salud de la sincronización" data-estado="cargando">
                 <span class="vl-salud-pipe" aria-hidden="true">
-                  <span class="vl-salud-nodo vl-salud-im5">IM5</span>
+                  <span class="vl-salud-nodo vl-salud-im5" title="InfoManager (punto de venta)"><img src="./IMG/infomanager.svg" alt="" width="20" height="20"></span>
                   <span class="vl-salud-linea"><i></i><i></i><i></i></span>
-                  <span class="vl-salud-nodo vl-salud-db"><i class="fa-solid fa-database"></i></span>
+                  <span class="vl-salud-nodo vl-salud-db" title="La Jamonera"><img src="./IMG/La Jamonera Cerdito.webp" alt="" width="22" height="22"></span>
                 </span>
                 <span class="vl-salud-texto">
-                  <strong id="vlSaludTitulo">Revisando…</strong>
-                  <small id="vlSaludDetalle">&nbsp;</small>
+                  <span class="vl-salud-estado"><span class="vl-salud-punto"></span><strong id="vlSaludTitulo">Revisando…</strong><small class="vl-salud-de">InfoManager → La Jamonera</small></span>
+                  <span class="vl-salud-chips" id="vlSaludDetalle"></span>
                 </span>
                 <i class="fa-solid fa-chevron-right vl-salud-ir" aria-hidden="true"></i>
               </button>
@@ -131,7 +131,7 @@
               </sl-select>
               <div class="informes-page-actions">
                 <sl-switch id="vlComparar" class="vl-comparar" checked>Comparar</sl-switch>
-                <sl-button variant="default" id="vlArtBtn" type="button"><i slot="prefix" class="fa-solid fa-link"></i>Productos<span slot="suffix" class="vl-pend" id="vlArtPend"></span></sl-button>
+                <sl-button variant="default" id="vlArtBtn" type="button"><i slot="prefix" class="fa-solid fa-link"></i>Productos <span class="vl-pend" id="vlArtPend" title="Productos sin vincular o por confirmar"></span></sl-button>
                 <sl-button variant="default" id="vlExcel" type="button"><i slot="prefix" class="fa-solid fa-file-excel"></i>Excel</sl-button>
                 <sl-button variant="default" id="vlConfigBtn" type="button"><i slot="prefix" class="fa-solid fa-gear"></i>Configuración</sl-button>
                 <span class="informes-toolbar-divider" aria-hidden="true"></span>
@@ -434,25 +434,25 @@
     </section>
   </main>
 
-  <script src="./JS/data/backend.js?v=202610161940"></script>
+  <script src="./JS/data/backend.js?v=202610161959"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-  <script src="./vendor/echarts/echarts.min.js?v=202610161940"></script>
-  <script src="./JS/ui/forms.js?v=202610161940"></script>
-  <script src="./JS/ui/theme.js?v=202610161940"></script>
-  <script src="./JS/ui/modal.js?v=202610161940"></script>
-  <script src="./JS/ui/lj-alert.js?v=202610161940"></script>
-  <script src="./JS/ui/header.js?v=202610161940"></script>
-  <script src="./JS/data/config.js?v=202610161940"></script>
-  <script src="./JS/data/supabase-init.js?v=202610161940"></script>
-  <script src="./JS/firebase-init.js?v=202610161940"></script>
-  <script src="./JS/data/security.js?v=202610161940"></script>
-  <script src="./JS/proxy-client.js?v=202610161940"></script>
-  <script src="./JS/data/authz.js?v=202610161940"></script>
-  <script src="./JS/configuracion.js?v=202610161940"></script>
-  <script src="./JS/Notificaciones.js?v=202610161940"></script>
-  <script src="./JS/app.js?v=202610161940"></script>
-  <script src="./JS/ventaslocal.js?v=202610161940"></script>
+  <script src="./vendor/echarts/echarts.min.js?v=202610161959"></script>
+  <script src="./JS/ui/forms.js?v=202610161959"></script>
+  <script src="./JS/ui/theme.js?v=202610161959"></script>
+  <script src="./JS/ui/modal.js?v=202610161959"></script>
+  <script src="./JS/ui/lj-alert.js?v=202610161959"></script>
+  <script src="./JS/ui/header.js?v=202610161959"></script>
+  <script src="./JS/data/config.js?v=202610161959"></script>
+  <script src="./JS/data/supabase-init.js?v=202610161959"></script>
+  <script src="./JS/firebase-init.js?v=202610161959"></script>
+  <script src="./JS/data/security.js?v=202610161959"></script>
+  <script src="./JS/proxy-client.js?v=202610161959"></script>
+  <script src="./JS/data/authz.js?v=202610161959"></script>
+  <script src="./JS/configuracion.js?v=202610161959"></script>
+  <script src="./JS/Notificaciones.js?v=202610161959"></script>
+  <script src="./JS/app.js?v=202610161959"></script>
+  <script src="./JS/ventaslocal.js?v=202610161959"></script>
 </body>
 </html>
