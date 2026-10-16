@@ -29,20 +29,22 @@ export async function refreshInventoryIndex(ingredientId, todayIso, version) {
   return summary;
 }
 
-// Ingredientes vinculados (confirmados) a un artículo del POS que no son materia prima, si la sincronización está
-// prendida y ya empezó. Sin config o con error: conjunto vacío (el autoegreso sigue como siempre).
-export async function idsSincronizadosPos(todayIso) {
+// Ingredientes en los que la IA sólo resuelve vencidos (sin egresos diarios), con la sincronización POS prendida
+// y «IA solo para vencidos» activo (rige desde ya, sin esperar la fecha de inicio de las ventas):
+//  · vinculados (confirmados) a un artículo del POS: las ventas reales bajan el stock;
+//  · materia prima (se usa en alguna receta): baja con las producciones.
+// Entran a la corrida aunque tengan el autoegreso apagado, para que un lote vencido con stock se resuelva igual.
+// Sin config o con error: conjunto vacío (el autoegreso sigue como siempre).
+export async function idsSincronizadosPos(_todayIso) {
   try {
     const { data: vc } = await admin.from('ventas_config').select('config').eq('id', 1).maybeSingle();
     const pos = vc?.config?.pos || {};
-    if (!pos.activo || pos.iaSoloVencidos === false || (pos.desde && todayIso < pos.desde)) return new Set();
+    if (!pos.activo || pos.iaSoloVencidos === false) return new Set();
     const { data: vs } = await admin.from('im5_articulo_vinculos').select('ref_id').eq('tipo', 'ingrediente').eq('estado', 'confirmado');
-    const mp = new Set();
-    if (pos.excluirMateriaPrima !== false) {
-      const { data } = await admin.rpc('pos_materia_prima');
-      (data || []).forEach((x) => mp.add(typeof x === 'string' ? x : Object.values(x)[0]));
-    }
-    return new Set((vs || []).map((v) => v.ref_id).filter((id) => id && !mp.has(id)));
+    const { data: mp } = await admin.rpc('pos_materia_prima');
+    const ids = new Set((vs || []).map((v) => v.ref_id).filter(Boolean));
+    (mp || []).forEach((x) => ids.add(typeof x === 'string' ? x : Object.values(x)[0]));
+    return ids;
   } catch { return new Set(); }
 }
 
@@ -60,6 +62,7 @@ function lotToEntry(l) {
   if (l.raw && typeof l.raw === 'object') {
     const e = JSON.parse(JSON.stringify(l.raw));
     e.productionUsage = []; e.expiryResolutions = []; e.movementHistory = [];
+    if (l.congelado) e.isFrozen = true;
     return e;
   }
   return lotToEntryFromColumns(l);
@@ -68,7 +71,7 @@ function lotToEntryFromColumns(l) {
   const entry = {
     id: l.id, entryDate: str(l.fecha_ingreso), expiryDate: str(l.vencimiento), unit: l.unidad,
     qty: Number(l.cantidad), availableQty: Number(l.disponible), availableKg: Number(l.disponible_kg),
-    noPerecedero: Boolean(l.no_perecedero), packageQty: l.package_qty == null ? undefined : Number(l.package_qty),
+    noPerecedero: Boolean(l.no_perecedero), isFrozen: Boolean(l.congelado), packageQty: l.package_qty == null ? undefined : Number(l.package_qty),
     provider: l.proveedor || '', lotNumber: l.lote || '', invoiceNumber: l.factura || '',
     autoEgresoState: l.auto_egreso_state || undefined, lotStatus: l.estado || undefined,
     status: l.status || undefined, expiryResolutionStatus: l.resolucion_estado || undefined,
@@ -142,9 +145,11 @@ export async function runAutoEgresos({ dryRun = true, now = new Date(), aiChat, 
     const lotsBy = {};
     lots.forEach((l) => { (lotsBy[l.ingrediente_id] = lotsBy[l.ingrediente_id] || []).push(l); });
     const todayIso = engine.T.dateToIso(now);
+    // Productos sincronizados con el POS y materia prima: la IA sólo resuelve vencidos (ver idsSincronizadosPos).
+    const soloVencidos = await idsSincronizadosPos(todayIso);
 
     const allIds = (regs || [])
-      .filter((r) => withDefaultWeeklyConfig(r.weekly_sheet_config).egresoEnabled && !r.infinite_stock && (lotsBy[r.ingrediente_id] || []).length)
+      .filter((r) => (withDefaultWeeklyConfig(r.weekly_sheet_config).egresoEnabled || soloVencidos.has(r.ingrediente_id)) && !r.infinite_stock && (lotsBy[r.ingrediente_id] || []).length)
       .map((r) => r.ingrediente_id);
     if (!allIds.length) { await setCursor(''); return summary; }
 
@@ -156,8 +161,6 @@ export async function runAutoEgresos({ dryRun = true, now = new Date(), aiChat, 
     const afterCap = allIds[startIndex + selectedIds.length] || '';
 
     const regBy = Object.fromEntries((regs || []).map((r) => [r.ingrediente_id, r]));
-    // Productos sincronizados con el POS (Ventas del local → Configuración → Inventario): la IA sólo resuelve vencidos.
-    const soloVencidos = await idsSincronizadosPos(todayIso);
     const { data: ingRows } = await admin.from('ingredientes').select('id, nombre, descripcion').in('id', selectedIds);
     const ingredientes = Object.fromEntries((ingRows || []).map((i) => [i.id, { name: i.nombre, description: i.descripcion }]));
 

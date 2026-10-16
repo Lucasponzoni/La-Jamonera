@@ -441,7 +441,8 @@ function createEngine({ cfg, random = Math.random, tz = TZ, log }) {
     if (availableBase <= EPS) return out;
     if (soloVencidos) {
       const vence = String(entry.expiryDate || '').slice(0, 10);
-      if (entry.noPerecedero || !/^\d{4}-\d{2}-\d{2}$/.test(vence) || vence >= todayIso) return out;
+      // Congelado: a -18 °C se extiende la vida útil; no se resuelve solo.
+      if (entry.noPerecedero || entry.isFrozen || entry.frozen || !/^\d{4}-\d{2}-\d{2}$/.test(vence) || vence >= todayIso) return out;
     }
     const window = getEntryProcessingWindow(entry, weeklyCfg, todayIso, holidaySet);
     if (!window) return out;
