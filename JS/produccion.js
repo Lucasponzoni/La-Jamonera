@@ -1519,7 +1519,7 @@
     }
     return Number(low.toFixed(4));
   };
-  const allocateAcrossFefoGroup = ({ entries = [], remaining = 0, requirement, productionDateIso, warnings, loteAntiguo = false }) => {
+  const allocateAcrossFefoGroup = ({ entries = [], remaining = 0, requirement, productionDateIso, warnings, loteAntiguo = false, takenInPlan = null }) => {
     const lots = [];
     let pending = Number(remaining || 0);
     if (pending <= 0 || !entries.length) return { lots, remaining: 0 };
@@ -1529,7 +1529,8 @@
       // no se descuenta stock, sólo se arma la trazabilidad histórica.
       const entryQty = loteAntiguo ? getEntryOriginalQty(entry) : getEntryAvailableQty(entry);
       const reservedByOther = loteAntiguo ? 0 : reservedByOthersForEntry(requirement.ingredientId, entry.id, entryUnit);
-      const available = Math.max(0, entryQty - reservedByOther);
+      const takenByThisPlan = takenInPlan ? takenInPlan(requirement.ingredientId, entry, entryUnit) : 0;
+      const available = Math.max(0, entryQty - reservedByOther - takenByThisPlan);
       const expiryIso = isEntryNoPerecedero(entry) ? '' : normalizeValue(entry.expiryDate);
       const futureForDate = isEntryFutureForProductionDate(entry, productionDateIso);
       const status = futureForDate ? 'future' : (!expiryIso || expiryIso >= productionDateIso ? 'ok' : 'expired');
@@ -1880,6 +1881,20 @@
     const ingredientPlans = [];
     const conflicts = [];
     const warnings = [];
+    // Lo que este mismo plan ya tomó de cada lote (unidad base). Varias filas de la receta pueden caer en el
+    // mismo ingrediente (p. ej. "Carne de res" y "Recortes" sustituidas por cuarto delantero): sin esto cada
+    // fila veía el lote entero y se asignaba dos veces el mismo stock. En lote antiguo no se descuenta stock.
+    const takenInPlanBase = {};
+    const takenKey = (ingredientId, entryId) => `${normalizeValue(ingredientId)}::${normalizeValue(entryId)}`;
+    const takenInPlan = options.loteAntiguo
+      ? null
+      : (ingredientId, entry, entryUnit) => fromBase(Number(takenInPlanBase[takenKey(ingredientId, entry.id)] || 0), entryUnit);
+    const registerTaken = (lot) => {
+      const base = Number(lot?.takeBaseQty || 0);
+      if (base <= 0) return;
+      const key = takenKey(lot.ingredientId, lot.entryId);
+      takenInPlanBase[key] = Number((Number(takenInPlanBase[key] || 0) + base).toFixed(6));
+    };
     analysis.requirements.forEach((requirement) => {
       const rowNeed = requirement.neededPerKg * qtyKg;
       let remaining = rowNeed;
@@ -1938,11 +1953,13 @@
             },
             productionDateIso,
             warnings,
-            loteAntiguo: Boolean(options.loteAntiguo)
+            loteAntiguo: Boolean(options.loteAntiguo),
+            takenInPlan
           });
           localRemaining = allocation.remaining;
           lots.push(...allocation.lots);
         });
+        lots.forEach(registerTaken);
         const plannedUsed = Math.max(0, Number((plannedNeed - localRemaining).toFixed(4)));
         remaining = Math.max(0, Number((remaining - plannedUsed).toFixed(6)));
         const availableQty = lots
@@ -1992,7 +2009,8 @@
           if (isEntryFutureForProductionDate(entry, productionDateIso)) return sum;
           const entryQty = options.loteAntiguo ? getEntryOriginalQty(entry) : getEntryAvailableQty(entry);
           const reservedByOther = options.loteAntiguo ? 0 : reservedByOthersForEntry(ingredientId, entry.id, entryUnit);
-          return sum + Math.max(0, fromBase(toBase(Math.max(0, entryQty - reservedByOther), entryUnit), requirement.unit));
+          const takenByThisPlan = takenInPlan ? takenInPlan(ingredientId, entry, entryUnit) : 0;
+          return sum + Math.max(0, fromBase(toBase(Math.max(0, entryQty - reservedByOther - takenByThisPlan), entryUnit), requirement.unit));
         }, 0);
       };
 
@@ -2046,7 +2064,8 @@
             const entryUnit = normalizeLower(entry.unit || requirement.unit);
             const entryQty = options.loteAntiguo ? getEntryOriginalQty(entry) : getEntryAvailableQty(entry);
             const reservedByOther = options.loteAntiguo ? 0 : reservedByOthersForEntry(related.ingredientId, entry.id, entryUnit);
-            const available = Math.max(0, entryQty - reservedByOther);
+            const takenByThisPlan = takenInPlan ? takenInPlan(related.ingredientId, entry, entryUnit) : 0;
+            const available = Math.max(0, entryQty - reservedByOther - takenByThisPlan);
             const expiryIso = isEntryNoPerecedero(entry) ? '' : normalizeValue(entry.expiryDate);
             const futureForDate = isEntryFutureForProductionDate(entry, productionDateIso);
             const status = futureForDate ? 'future' : (!expiryIso || expiryIso >= productionDateIso ? 'ok' : 'expired');
@@ -2145,6 +2164,7 @@
               });
             }
             if (plannedUsed > 0.0001) {
+              registerTaken(lot);
               usageByRelated[item.related.ingredientId] = Number((Number(usageByRelated[item.related.ingredientId] || 0) + plannedUsed).toFixed(4));
               remaining = Math.max(0, Number((remaining - plannedUsed).toFixed(6)));
             }
