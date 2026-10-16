@@ -171,8 +171,32 @@ export function filasItems(empresa, comprobanteId, items) {
     precio_con_iva: numONull(it.precio_con_iva), importe: num(it.importe), iva_por: numONull(it.iva_por), raw: it
   }));
 }
-// Huella de lo que importa de la cabecera: si cambia, se vuelve a bajar el detalle.
-const huella = (f) => `${f.total}|${f.anulada}|${f.fecha}|${f.condicion_venta}`;
+// Recibos que cancelan el comprobante (detalle.pagos) y renglones de cobro de cada recibo (detalle.rc_pagos).
+export function filasRecibos(empresa, comprobanteId, pagos) {
+  const vistos = new Set();
+  return (Array.isArray(pagos) ? pagos : []).filter((p) => str(p.anulada).toUpperCase() !== 'S').map((p) => ({
+    empresa, comprobante_id: Number(comprobanteId), recibo_id: Number(p.id_recibo),
+    recibo_tipo: str(p.tipo) || null, recibo_punto_venta: numONull(p.punto_de_venta), recibo_numero: numONull(p.numero),
+    importe_pagado: numONull(p.importe_pagado)
+  })).filter((r) => r.recibo_id && !vistos.has(r.recibo_id) && vistos.add(r.recibo_id));
+}
+const strONull = (v) => { const s = str(v).trim(); return s && s !== '0' ? s : null; };
+export function filasPagos(empresa, reciboId, rcPagos) {
+  return (Array.isArray(rcPagos) ? rcPagos : []).map((p) => ({
+    empresa, id: Number(p.id), recibo_id: Number(reciboId), cond_pago: str(p.cond_pago) || null,
+    medio: str(p.tarjeta_nombre || p.banco_descripcion || p.cuenta_descripcion) || null, cuenta: str(p.cuenta_descripcion) || null,
+    importe: num(p.importe), cupon: strONull(p.tarjeta_num_cupon), tarjeta_numero: strONull(p.tarjeta_numero),
+    autorizacion: strONull(p.tarjeta_cod_autorizacion), lote: strONull(p.tarjeta_lote_numero),
+    cod_tarjeta: numONull(p.cod_tarjeta), cod_plan: numONull(p.cod_tarjeta_plan),
+    id_pago_externo: strONull(p.id_pago_externo), estado_pago: str(p.estado_de_pago) || null,
+    sistema_externo: str(p.id_sistema_externo_accion) || null,
+    arancel: numONull(p.importe_arancel), costo_financiero: numONull(p.importe_cf), costo_financiero_impuesto: numONull(p.importe_cf_impuesto),
+    raw: p, sync_at: new Date().toISOString()
+  })).filter((p) => p.id);
+}
+// Huella de lo que importa de la cabecera: si cambia, se vuelve a bajar el detalle (importe_pago cambia cuando
+// se cobra una venta en cuenta corriente, así se traen los recibos nuevos).
+const huella = (f) => `${f.total}|${f.anulada}|${f.fecha}|${f.condicion_venta}|${f.importe_pago == null ? '' : num(f.importe_pago)}`;
 
 // ---------- Base ----------
 async function leerConfig() {
@@ -195,7 +219,7 @@ async function upsertCabeceras(filas) {
   const claves = filas.map((f) => f.id);
   const previos = new Map();
   for (let i = 0; i < claves.length; i += 500) {
-    const { data, error } = await admin.from('im5_comprobantes').select('empresa, id, total, anulada, fecha, condicion_venta, items_ok')
+    const { data, error } = await admin.from('im5_comprobantes').select('empresa, id, total, anulada, fecha, condicion_venta, importe_pago, items_ok')
       .eq('empresa', filas[0].empresa).in('id', claves.slice(i, i + 500));
     if (error) throw new HttpError(500, error.message);
     for (const r of data || []) previos.set(r.id, r);
@@ -215,8 +239,33 @@ async function upsertCabeceras(filas) {
   return { nuevos, cambiados };
 }
 
+// Recibos de un comprobante y sus cobros. `recibos` cachea por corrida (un recibo puede cancelar varias facturas).
+async function guardarCobros(im5, empresa, id, d, recibos) {
+  const links = filasRecibos(empresa, id, d.pagos);
+  await admin.from('im5_comprobante_recibos').delete().eq('empresa', empresa).eq('comprobante_id', id);
+  if (!links.length) return;
+  const { error: e1 } = await admin.from('im5_comprobante_recibos').insert(links);
+  if (e1) throw new Error(e1.message);
+  for (const { recibo_id } of links) {
+    if (!recibos.has(recibo_id)) {
+      recibos.set(recibo_id, (async () => {
+        let rc;
+        try { rc = await im5.detalle(recibo_id); } catch (e) { if (e?.im5Status === 404) return; throw e; }
+        const pagos = filasPagos(empresa, recibo_id, rc.rc_pagos);
+        await admin.from('im5_pagos').delete().eq('empresa', empresa).eq('recibo_id', recibo_id);
+        if (pagos.length) {
+          const { error } = await admin.from('im5_pagos').upsert(pagos, { onConflict: 'empresa,id' });
+          if (error) throw new Error(error.message);
+        }
+      })());
+    }
+    await recibos.get(recibo_id);
+  }
+}
+
 async function bajarItems(im5, empresa, limiteMs) {
   let hechos = 0; let fallas = 0;
+  const recibos = new Map();
   while (Date.now() < limiteMs) {
     const { data, error } = await admin.from('im5_comprobantes').select('id').eq('empresa', empresa).eq('items_ok', false)
       .order('fecha', { ascending: false }).limit(PARALELO_ITEMS * 5);
@@ -237,6 +286,7 @@ async function bajarItems(im5, empresa, limiteMs) {
           const { error: e1 } = await admin.from('im5_items').insert(items);
           if (e1) throw new Error(e1.message);
         }
+        await guardarCobros(im5, empresa, id, d, recibos);
         const { error: e2 } = await admin.from('im5_comprobantes').update({ items_ok: true }).eq('empresa', empresa).eq('id', id);
         if (e2) throw new Error(e2.message);
       }));
@@ -373,24 +423,96 @@ async function releaseLock(run) { try { await admin.rpc('job_release', { p_job: 
 
 // ---------- Avisos por mail ----------
 // Uno al pasar a error y, si sigue fallando, uno cada 24 h. Uno cuando se recupera.
+const destinosAviso = (cfg) => str(cfg.mailAvisos).split(',').map((s) => s.trim()).filter((s) => EMAIL_RE.test(s));
+const fechaHoraAR = (iso) => (iso ? new Intl.DateTimeFormat('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(iso)).replace(',', ' ·') + ' h' : 'nunca');
+// Motivo técnico → frase para quien lee el mail (el técnico va abajo, chico).
+function motivoLegible(error) {
+  const m = str(error);
+  if (/sin_credenciales/.test(m)) return 'Faltan las credenciales de InfoManager.';
+  if (/im5_401|im5_403|im5_login/.test(m)) return 'InfoManager rechazó el usuario o la contraseña.';
+  if (/im5_sin_respuesta|im5_5\d\d|timeout|abort/i.test(m)) return 'InfoManager no respondió a tiempo.';
+  if (/im5_dia_truncado/.test(m)) return 'Un día trajo más comprobantes de los que InfoManager entrega de una vez.';
+  return 'La conexión con InfoManager devolvió un error.';
+}
+const aviso = (cfg, estado, error) => plantillaMail(avisoDatos(cfg, estado, error));
+function avisoDatos(cfg, estado, error) {
+  return {
+    tono: 'error', etiqueta: 'Sincronización con falla', titulo: 'No se pudieron bajar las ventas de InfoManager',
+    intro: `${motivoLegible(error)} Mientras tanto, Ventas del local muestra lo último que se llegó a bajar.`,
+    filas: [
+      ['Errores seguidos', String(estado.erroresSeguidos || 1)],
+      ['Última vez que anduvo', fechaHoraAR(estado.ultimaOk)],
+      ['Próximo intento', cfg.activa === false ? 'Automática apagada' : fechaHoraAR(estado.proxima)],
+      ['Detalle técnico', error]
+    ],
+    pie: 'Si sigue fallando vas a recibir otro aviso dentro de 24 h, y uno cuando vuelva a funcionar.'
+  };
+}
+// Mail con la estética del back office: banda azul, etiqueta de estado y datos en tabla. Todo inline
+// (los clientes de correo ignoran <style>); borde de color sin redondear.
+function plantillaMail({ tono = 'error', etiqueta, titulo, intro, filas = [], pie = '', prueba = false }) {
+  const C = tono === 'ok' ? { fuerte: '#1f7a4c', suave: '#e3f5ec' } : { fuerte: '#b42338', suave: '#ffecef' };
+  const url = 'https://www.lajamonera.online/ventaslocal.html';
+  const fila = ([k, v], i) => `<tr><td style="padding:10px 14px;font-size:13px;color:#55607f;border-top:${i ? '1px solid #e1e5ec' : '0'};width:42%;vertical-align:top">${escapar(k)}</td>
+    <td style="padding:10px 14px;font-size:13px;color:#1f2a44;font-weight:600;border-top:${i ? '1px solid #e1e5ec' : '0'};word-break:break-word">${escapar(v)}</td></tr>`;
+  return `<!doctype html><html lang="es"><body style="margin:0;padding:0;background:#eef1f5">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f5;padding:24px 12px;font-family:Inter,Segoe UI,Arial,sans-serif">
+<tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border:1px solid #e1e5ec">
+  ${prueba ? `<tr><td style="background:#fff3dd;color:#9a6200;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:9px 24px;border-bottom:1px solid #f0d9a8">Mail de prueba · así llega el aviso cuando falla la conexión</td></tr>` : ''}
+  <tr><td style="background:#173d73;padding:18px 24px">
+    <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+      <td style="vertical-align:middle"><img src="https://www.lajamonera.online/IMG/La%20Jamonera%20App%20180.png" width="40" height="40" alt="La Jamonera" style="display:block;border:0"></td>
+      <td style="vertical-align:middle;padding-left:12px;color:#ffffff;font-size:17px"><span style="font-weight:400">La</span> <span style="font-weight:800">Jamonera</span>
+        <div style="font-size:12px;color:#cddcff;margin-top:2px">Ventas del local</div></td>
+    </tr></table>
+  </td></tr>
+  <tr><td style="padding:24px 24px 8px">
+    <div style="display:inline-block;background:${C.suave};color:${C.fuerte};font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:5px 10px;border-left:3px solid ${C.fuerte}">${escapar(etiqueta)}</div>
+    <h1 style="margin:14px 0 8px;font-size:20px;line-height:1.3;color:#1f2a44">${escapar(titulo)}</h1>
+    <p style="margin:0;font-size:14px;line-height:1.55;color:#55607f">${escapar(intro)}</p>
+  </td></tr>
+  ${filas.length ? `<tr><td style="padding:16px 24px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e1e5ec;background:#f4f6f9">${filas.map(fila).join('')}</table></td></tr>` : ''}
+  <tr><td style="padding:20px 24px 8px"><a href="${url}" style="display:inline-block;background:#1f5fbf;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:11px 20px">Abrir Ventas del local</a></td></tr>
+  ${pie ? `<tr><td style="padding:8px 24px 0;font-size:12px;line-height:1.5;color:#55607f">${escapar(pie)}</td></tr>` : ''}
+  <tr><td style="padding:22px 24px;margin-top:12px;border-top:1px solid #e1e5ec;font-size:11px;color:#8a94ad">
+    Aviso automático del Back Office de La Jamonera · powered by ABR. Los destinatarios se cambian en Ventas del local → Configuración.
+  </td></tr>
+</table>
+</td></tr></table></body></html>`;
+}
 async function avisarFalla(cfg, estado, error) {
-  const destinos = str(cfg.mailAvisos).split(',').map((s) => s.trim()).filter((s) => EMAIL_RE.test(s));
+  const destinos = destinosAviso(cfg);
   if (!destinos.length) return;
   const ultimo = estado.ultimoAvisoMail ? Date.parse(estado.ultimoAvisoMail) : 0;
   if (estado.erroresSeguidos > 1 && Date.now() - ultimo < 24 * 3600e3) return;
-  await mandar(destinos, 'Ventas del local: la sincronización con IM5 falló',
-    `<p>La sincronización de ventas con InfoManager falló.</p><p><b>Motivo:</b> ${escapar(error)}</p>
-     <p>Errores seguidos: ${estado.erroresSeguidos}. Última vez que anduvo: ${escapar(estado.ultimaOk || 'nunca')}.</p>
-     <p><a href="https://www.lajamonera.online/ventaslocal.html">Abrir Ventas del local</a></p>`);
+  await mandar(destinos, 'Ventas del local: la sincronización con IM5 falló', aviso(cfg, estado, error));
   estado.ultimoAvisoMail = new Date().toISOString();
   await guardarEstado(estado);
 }
 async function avisarRecuperada(cfg, estado) {
-  const destinos = str(cfg.mailAvisos).split(',').map((s) => s.trim()).filter((s) => EMAIL_RE.test(s));
+  const destinos = destinosAviso(cfg);
   if (!destinos.length || !estado.ultimoAvisoMail) return;
-  await mandar(destinos, 'Ventas del local: la sincronización volvió a andar', '<p>La sincronización de ventas con InfoManager volvió a funcionar.</p>');
+  await mandar(destinos, 'Ventas del local: la sincronización volvió a andar', plantillaMail({
+    tono: 'ok', etiqueta: 'Sincronización normal', titulo: 'Las ventas de InfoManager se vuelven a bajar',
+    intro: 'La conexión volvió a funcionar y Ventas del local ya tiene los datos al día.',
+    filas: [['Actualizado', fechaHoraAR(estado.ultimaOk || estado.ultimaCorrida)], ['Próxima automática', cfg.activa === false ? 'Apagada' : fechaHoraAR(estado.proxima)]]
+  }));
   estado.ultimoAvisoMail = null;
   await guardarEstado(estado);
+}
+// Prueba: manda el aviso de falla (con una franja «Mail de prueba») a los mails configurados.
+// No toca el estado de la sincronización ni el control de «un aviso cada 24 h».
+export async function enviarAvisoPrueba() {
+  const { cfg, estado } = await leerConfig();
+  const destinos = destinosAviso(cfg);
+  if (!destinos.length) throw new HttpError(400, 'sin_mail_avisos');
+  const mail = await readEmailConfig();
+  if (!mail.apiKey || !mail.fromEmail) throw new HttpError(400, 'email_no_configurado');
+  const ejemplo = { ...estado, erroresSeguidos: 1, proxima: estado.proxima || new Date(Date.now() + 3600e3).toISOString() };
+  const html = plantillaMail({ ...avisoDatos(cfg, ejemplo, 'im5_sin_respuesta: ejemplo de prueba (la conexión está bien)'), prueba: true });
+  for (const to of destinos) await sendResend(mail, { fromName: mail.fromName, to, subject: '[Prueba] Ventas del local: la sincronización con IM5 falló', html });
+  return { ok: true, destinos };
 }
 async function mandar(destinos, asunto, html) {
   try {

@@ -30,10 +30,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202610161722">
-  <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202610161722">
-  <link rel="stylesheet" href="./CSS/theme.css?v=202610161722">
-  <link rel="stylesheet" href="./CSS/utilities.css?v=202610161722">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202610161901">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202610161901">
+  <link rel="stylesheet" href="./CSS/theme.css?v=202610161901">
+  <link rel="stylesheet" href="./CSS/utilities.css?v=202610161901">
   <script type="module">
     import { setBasePath } from './vendor/shoelace/utilities/base-path.js?v=202608282255';
     setBasePath(new URL('./vendor/shoelace/', document.baseURI).href.slice(0, -1));
@@ -41,12 +41,12 @@
     const ljCore = [...new Set([...document.querySelectorAll('sl-button, sl-input, sl-icon, sl-dialog, sl-dropdown, sl-drawer, sl-spinner, sl-icon-button')].map((n) => n.localName))].map((t) => customElements.whenDefined(t));
     Promise.race([Promise.allSettled(ljCore), new Promise((r) => setTimeout(r, 2500))]).then(() => document.documentElement.classList.add('lj-ready'));
   </script>
-  <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202610161722">
-  <link rel="stylesheet" href="./CSS/legacy/03-componentes.css?v=202610161722">
-  <link rel="stylesheet" href="./CSS/legacy/04-informes.css?v=202610161722">
-  <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202610161722">
-  <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202610161722">
-  <link rel="stylesheet" href="./CSS/ventaslocal.css?v=202610161722">
+  <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202610161901">
+  <link rel="stylesheet" href="./CSS/legacy/03-componentes.css?v=202610161901">
+  <link rel="stylesheet" href="./CSS/legacy/04-informes.css?v=202610161901">
+  <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202610161901">
+  <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202610161901">
+  <link rel="stylesheet" href="./CSS/ventaslocal.css?v=202610161901">
 </head>
 <body>
   <main class="app-shell container-fluid px-0">
@@ -87,6 +87,11 @@
       </sl-drawer>
 
       <div class="contenido vl-page">
+        <!-- Mientras se valida el permiso: ocupa la pantalla para que el pie no suba -->
+        <div id="vlCargando" class="informes-board-loading vl-cargando" aria-live="polite">
+          <sl-spinner class="meta-spinner-login informes-board-spinner" aria-label="Cargando ventas"></sl-spinner>
+        </div>
+
         <!-- Sin permiso -->
         <div id="vlSinPermiso" class="vl-sin-permiso" hidden>
           <i class="fa-solid fa-lock" aria-hidden="true"></i>
@@ -95,192 +100,235 @@
         </div>
 
         <div id="vlApp" hidden>
-          <!-- Encabezado + salud -->
-          <div class="vl-head">
-            <div class="vl-head-title">
-              <h1>Ventas del local</h1>
-              <p class="vl-sub">Comprobantes de InfoManager (IM5) de todas las cajas.</p>
+          <div class="header-content">
+            <!-- Título + salud de la sincronización -->
+            <div class="vl-head">
+              <div class="vl-head-title">
+                <h1><i class="fa-solid fa-cash-register" aria-hidden="true"></i>Ventas del local</h1>
+                <p class="vl-sub">Comprobantes de InfoManager (IM5) de todas las cajas.</p>
+              </div>
+              <button id="vlSalud" class="vl-salud" type="button" aria-label="Ver la salud de la sincronización" data-estado="cargando">
+                <span class="vl-salud-pipe" aria-hidden="true">
+                  <span class="vl-salud-nodo vl-salud-im5">IM5</span>
+                  <span class="vl-salud-linea"><i></i><i></i><i></i></span>
+                  <span class="vl-salud-nodo vl-salud-db"><i class="fa-solid fa-database"></i></span>
+                </span>
+                <span class="vl-salud-texto">
+                  <strong id="vlSaludTitulo">Revisando…</strong>
+                  <small id="vlSaludDetalle">&nbsp;</small>
+                </span>
+                <i class="fa-solid fa-chevron-right vl-salud-ir" aria-hidden="true"></i>
+              </button>
             </div>
-            <button id="vlSalud" class="vl-salud" type="button" aria-label="Ver la salud de la sincronización" data-estado="cargando">
-              <span class="vl-salud-pipe" aria-hidden="true">
-                <span class="vl-salud-nodo vl-salud-im5">IM5</span>
-                <span class="vl-salud-linea"><i></i><i></i><i></i></span>
-                <span class="vl-salud-nodo vl-salud-db"><i class="fa-solid fa-database"></i></span>
-              </span>
-              <span class="vl-salud-texto">
-                <strong id="vlSaludTitulo">Revisando…</strong>
-                <small id="vlSaludDetalle">&nbsp;</small>
-              </span>
-            </button>
-          </div>
 
-          <!-- Barra -->
-          <div class="vl-toolbar">
-            <div class="vl-rangos" role="group" aria-label="Período">
-              <sl-button size="small" data-rango="hoy" variant="primary">Hoy</sl-button>
-              <sl-button size="small" data-rango="ayer">Ayer</sl-button>
-              <sl-button size="small" data-rango="semana">Esta semana</sl-button>
-              <sl-button size="small" data-rango="mes">Este mes</sl-button>
-              <sl-button size="small" data-rango="mesant">Mes anterior</sl-button>
-              <sl-button size="small" data-rango="custom"><i slot="prefix" class="fa-regular fa-calendar"></i><span id="vlRangoTexto">Elegir…</span></sl-button>
-              <input id="vlRangoInput" type="text" class="vl-oculto" aria-hidden="true" tabindex="-1">
-            </div>
-            <div class="vl-toolbar-der">
-              <sl-select id="vlEmpresa" size="small" value="todas" hoist aria-label="Empresa">
+            <!-- Barra (misma que Análisis) -->
+            <div class="informes-page-toolbar vl-toolbar" aria-label="Acciones disponibles">
+              <sl-select id="vlEmpresa" class="vl-empresa" value="todas" hoist aria-label="Empresa">
+                <i slot="prefix" class="fa-solid fa-building"></i>
                 <sl-option value="todas">Todas las empresas</sl-option>
                 <sl-option value="1">1 · Facturación</sl-option>
                 <sl-option value="2">2 · Registradoras</sl-option>
               </sl-select>
-              <sl-switch id="vlComparar" size="small" checked>Comparar</sl-switch>
-              <sl-button size="small" id="vlActualizar" variant="success"><i slot="prefix" class="fa-solid fa-rotate"></i>Actualizar ahora</sl-button>
-              <sl-button size="small" id="vlExcel"><i slot="prefix" class="fa-solid fa-file-excel"></i>Excel</sl-button>
-              <sl-icon-button id="vlConfigBtn" name="gear" label="Configuración de ventas"></sl-icon-button>
+              <div class="informes-page-actions">
+                <sl-switch id="vlComparar" class="vl-comparar" checked>Comparar</sl-switch>
+                <sl-button variant="default" id="vlExcel" type="button"><i slot="prefix" class="fa-solid fa-file-excel"></i>Excel</sl-button>
+                <sl-button variant="default" id="vlConfigBtn" type="button"><i slot="prefix" class="fa-solid fa-gear"></i>Configuración</sl-button>
+                <span class="informes-toolbar-divider" aria-hidden="true"></span>
+                <sl-button variant="success" id="vlActualizar" type="button"><i slot="prefix" class="fa-solid fa-rotate"></i>Actualizar ahora</sl-button>
+              </div>
             </div>
-          </div>
-          <p class="vl-comparando" id="vlComparando"></p>
 
+            <!-- Período (chips como los tipos de Análisis) -->
+            <div class="analisis-type-chips vl-rangos" role="group" aria-label="Período">
+              <sl-button variant="default" size="small" class="analisis-type-chip active" data-rango="hoy"><i slot="prefix" class="fa-solid fa-sun"></i>Hoy</sl-button>
+              <sl-button variant="default" size="small" class="analisis-type-chip" data-rango="ayer"><i slot="prefix" class="fa-solid fa-clock-rotate-left"></i>Ayer</sl-button>
+              <sl-button variant="default" size="small" class="analisis-type-chip" data-rango="semana"><i slot="prefix" class="fa-solid fa-calendar-week"></i>Esta semana</sl-button>
+              <sl-button variant="default" size="small" class="analisis-type-chip" data-rango="mes"><i slot="prefix" class="fa-solid fa-calendar-days"></i>Este mes</sl-button>
+              <sl-button variant="default" size="small" class="analisis-type-chip" data-rango="mesant"><i slot="prefix" class="fa-solid fa-calendar-minus"></i>Mes anterior</sl-button>
+              <sl-button variant="default" size="small" class="analisis-type-chip" data-rango="custom"><i slot="prefix" class="fa-regular fa-calendar"></i><span id="vlRangoTexto">Elegir fechas</span></sl-button>
+              <input id="vlRangoInput" type="text" class="vl-oculto" aria-hidden="true" tabindex="-1">
+            </div>
+            <p class="vl-comparando" id="vlComparando"></p>
+          </div>
+
+          <div class="home-content vl-home">
           <!-- KPIs -->
           <div id="vlKpis" class="vl-kpis" aria-live="polite"></div>
 
-          <!-- Gráficos -->
-          <div class="vl-graficos">
-            <section class="vl-card vl-g-ancho">
-              <header><h2>Ventas por día</h2></header>
-              <div id="vlGDia" class="vl-grafico"></div>
-            </section>
-            <section class="vl-card">
-              <header><h2>Por hora</h2></header>
-              <div id="vlGHora" class="vl-grafico"></div>
-            </section>
-            <section class="vl-card">
-              <header><h2>Medios de cobro</h2></header>
-              <div id="vlGMedios" class="vl-grafico"></div>
-            </section>
-            <section class="vl-card vl-g-ancho">
-              <header>
-                <h2>Productos más vendidos</h2>
-                <sl-radio-group id="vlTopModo" size="small" value="importe">
-                  <sl-radio-button value="importe">Por plata</sl-radio-button>
-                  <sl-radio-button value="cantidad">Por cantidad</sl-radio-button>
-                </sl-radio-group>
-              </header>
-              <div id="vlGTop" class="vl-grafico vl-grafico-alto"></div>
-            </section>
-          </div>
+          <!-- Pestañas: comprobantes / gráficos -->
+          <sl-tab-group id="vlTabs" class="vl-tabs">
+            <sl-tab slot="nav" panel="comprobantes" active><i class="fa-solid fa-receipt" aria-hidden="true"></i>Comprobantes<span class="vl-tab-cuenta" id="vlTablaCuenta"></span></sl-tab>
+            <sl-tab slot="nav" panel="graficos"><i class="fa-solid fa-chart-column" aria-hidden="true"></i>Gráficos</sl-tab>
 
-          <!-- Tabla -->
-          <section class="vl-card vl-tabla-card">
-            <header class="vl-tabla-head">
-              <h2>Comprobantes <small id="vlTablaCuenta"></small></h2>
-              <sl-input id="vlBuscar" size="small" placeholder="Buscar cliente, cajera, número u observación" clearable>
-                <i slot="prefix" class="fa-solid fa-magnifying-glass"></i>
-              </sl-input>
-            </header>
-            <div class="vl-tabla-wrap">
-              <table class="vl-tabla">
-                <thead>
-                  <tr>
-                    <th class="vl-col-exp" aria-label="Detalle"></th>
-                    <th>Fecha</th>
-                    <th>Comprobante</th>
-                    <th>Cliente</th>
-                    <th>Caja / usuario</th>
-                    <th>Cobro</th>
-                    <th class="vl-num">Total</th>
-                  </tr>
-                </thead>
-                <tbody id="vlTablaBody"></tbody>
-              </table>
-            </div>
-            <div class="vl-tabla-pie">
-              <span id="vlPagInfo"></span>
-              <div>
-                <sl-button size="small" id="vlPagAnt"><i class="fa-solid fa-chevron-left"></i></sl-button>
-                <sl-button size="small" id="vlPagSig"><i class="fa-solid fa-chevron-right"></i></sl-button>
+            <sl-tab-panel name="comprobantes" active>
+              <section class="vl-card vl-tabla-card">
+                <header class="vl-tabla-head">
+                  <sl-input id="vlBuscar" class="informes-search" placeholder="Buscar cliente, cajera, número u observación" clearable autocomplete="off">
+                    <i slot="prefix" class="fa-solid fa-magnifying-glass"></i>
+                  </sl-input>
+                  <span class="vl-ayuda vl-tabla-ayuda"><i class="fa-solid fa-hand-pointer" aria-hidden="true"></i> Tocá un comprobante para ver productos y cobro</span>
+                </header>
+                <div class="vl-tabla-wrap">
+                  <table class="vl-tabla">
+                    <thead>
+                      <tr>
+                        <th class="vl-col-exp" aria-label="Detalle"></th>
+                        <th>Fecha</th>
+                        <th>Comprobante</th>
+                        <th>Cliente</th>
+                        <th class="vl-ocultar-movil">Caja / usuario</th>
+                        <th class="vl-ocultar-movil">Cobro</th>
+                        <th class="vl-num">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody id="vlTablaBody"></tbody>
+                  </table>
+                </div>
+                <div class="vl-tabla-pie">
+                  <span id="vlPagInfo"></span>
+                  <div>
+                    <sl-button size="small" variant="default" id="vlPagAnt" aria-label="Página anterior"><i class="fa-solid fa-chevron-left"></i></sl-button>
+                    <sl-button size="small" variant="default" id="vlPagSig" aria-label="Página siguiente"><i class="fa-solid fa-chevron-right"></i></sl-button>
+                  </div>
+                </div>
+              </section>
+            </sl-tab-panel>
+
+            <sl-tab-panel name="graficos">
+              <div class="vl-graficos">
+                <section class="vl-card vl-g-ancho">
+                  <header><h2><i class="fa-solid fa-chart-column" aria-hidden="true"></i>Ventas por día</h2><small class="vl-card-nota" id="vlNotaDia"></small></header>
+                  <div id="vlGDia" class="vl-grafico vl-grafico-alto"></div>
+                </section>
+                <section class="vl-card">
+                  <header><h2><i class="fa-solid fa-clock" aria-hidden="true"></i>Ventas por hora</h2></header>
+                  <div id="vlGHora" class="vl-grafico"></div>
+                </section>
+                <section class="vl-card">
+                  <header><h2><i class="fa-solid fa-credit-card" aria-hidden="true"></i>Medios de cobro</h2></header>
+                  <div id="vlGMedios" class="vl-grafico"></div>
+                </section>
+                <section class="vl-card vl-g-ancho">
+                  <header>
+                    <h2><i class="fa-solid fa-star" aria-hidden="true"></i>Productos más vendidos</h2>
+                    <sl-radio-group id="vlTopModo" size="small" value="importe">
+                      <sl-radio-button value="importe">Por plata</sl-radio-button>
+                      <sl-radio-button value="cantidad">Por cantidad</sl-radio-button>
+                    </sl-radio-group>
+                  </header>
+                  <div id="vlGTop" class="vl-grafico vl-grafico-top"></div>
+                </section>
+                <section class="vl-card">
+                  <header><h2><i class="fa-solid fa-user-tag" aria-hidden="true"></i>Ventas por caja</h2></header>
+                  <div id="vlGCajas" class="vl-grafico"></div>
+                </section>
+                <section class="vl-card">
+                  <header><h2><i class="fa-solid fa-file-invoice" aria-hidden="true"></i>Empresa y tipo de factura</h2></header>
+                  <div id="vlGEmpresa" class="vl-grafico"></div>
+                </section>
               </div>
-            </div>
-          </section>
+            </sl-tab-panel>
+          </sl-tab-group>
+          </div>
         </div>
       </div>
 
       <!-- Salud: detalle -->
-      <sl-dialog id="vlSaludDialog" class="lj-modal vl-dialog" label="Salud de la sincronización">
-        <div id="vlSaludCuerpo"></div>
-      </sl-dialog>
-
-      <!-- Configuración -->
-      <sl-dialog id="vlConfigDialog" class="lj-modal vl-dialog" label="Configuración · Ventas del local">
-        <sl-tab-group id="vlConfigTabs">
-          <sl-tab slot="nav" panel="sync">Sincronización</sl-tab>
-          <sl-tab slot="nav" panel="kpis">Indicadores</sl-tab>
-          <sl-tab slot="nav" panel="cred" data-solo-admin>Conexión IM5</sl-tab>
-
-          <sl-tab-panel name="sync">
-            <div class="vl-form">
-              <sl-switch id="cfgActiva">Sincronización automática prendida</sl-switch>
-              <div>
-                <label class="lj-label">Días</label>
-                <div class="vl-dias" id="cfgDias" role="group" aria-label="Días">
-                  <button type="button" data-dia="1">Lun</button><button type="button" data-dia="2">Mar</button><button type="button" data-dia="3">Mié</button><button type="button" data-dia="4">Jue</button><button type="button" data-dia="5">Vie</button><button type="button" data-dia="6">Sáb</button><button type="button" data-dia="0">Dom</button>
-                </div>
-              </div>
-              <div class="vl-form-fila">
-                <sl-select id="cfgDesde" label="Desde las" hoist></sl-select>
-                <sl-select id="cfgHasta" label="Hasta las" hoist></sl-select>
-                <sl-select id="cfgCada" label="Cada" hoist>
-                  <sl-option value="10">10 minutos</sl-option>
-                  <sl-option value="30">30 minutos</sl-option>
-                  <sl-option value="60">1 hora</sl-option>
-                  <sl-option value="120">2 horas</sl-option>
-                  <sl-option value="180">3 horas</sl-option>
-                  <sl-option value="240">4 horas</sl-option>
-                  <sl-option value="360">6 horas</sl-option>
-                  <sl-option value="720">12 horas</sl-option>
-                  <sl-option value="1440">Una vez al día</sl-option>
-                </sl-select>
-              </div>
-              <p class="vl-ayuda" id="cfgResumen"></p>
-              <div>
-                <label class="lj-label">Empresas</label>
-                <div class="vl-checks">
-                  <sl-checkbox data-cfg-empresa="1">1 · Facturación - Administración</sl-checkbox>
-                  <sl-checkbox data-cfg-empresa="2">2 · Registradoras</sl-checkbox>
-                </div>
-              </div>
-              <div>
-                <label class="lj-label">Comprobantes</label>
-                <div class="vl-checks">
-                  <sl-checkbox data-cfg-tipo="FA">Facturas</sl-checkbox>
-                  <sl-checkbox data-cfg-tipo="NC">Notas de crédito</sl-checkbox>
-                  <sl-checkbox data-cfg-tipo="ND">Notas de débito</sl-checkbox>
-                </div>
-              </div>
-              <sl-input id="cfgMail" label="Avisar por mail si falla" placeholder="mail@ejemplo.com, otro@ejemplo.com" help-text="Uno o varios, separados por coma. Vacío = solo el aviso en la página."></sl-input>
-            </div>
-          </sl-tab-panel>
-
-          <sl-tab-panel name="kpis">
-            <p class="vl-ayuda">Prendé, apagá y ordená los indicadores de arriba. Se guarda para todos.</p>
-            <ul id="cfgKpis" class="vl-kpi-lista"></ul>
-          </sl-tab-panel>
-
-          <sl-tab-panel name="cred">
-            <div class="vl-form">
-              <p class="vl-ayuda">Con estos datos entra la sincronización a InfoManager. Se prueban antes de guardar y la contraseña queda cifrada: no se vuelve a mostrar.</p>
-              <p class="vl-cred-estado" id="cfgCredEstado"></p>
-              <sl-input id="cfgBase" label="Empresa / base de datos" placeholder="ej. frigolajamonera01_base" autocomplete="off"></sl-input>
-              <sl-input id="cfgUsuario" label="Usuario" autocomplete="off"></sl-input>
-              <sl-input id="cfgPassword" label="Contraseña" type="password" password-toggle autocomplete="new-password" help-text="Dejala vacía para conservar la guardada."></sl-input>
-              <div><sl-button id="cfgCredGuardar" variant="primary"><i slot="prefix" class="fa-solid fa-plug-circle-check"></i>Probar y guardar</sl-button></div>
-            </div>
-          </sl-tab-panel>
-        </sl-tab-group>
-        <div slot="footer" class="vl-dialog-pie">
-          <sl-button id="cfgCancelar">Cancelar</sl-button>
-          <sl-button id="cfgGuardar" variant="primary"><i slot="prefix" class="fa-solid fa-floppy-disk"></i>Guardar</sl-button>
+      <sl-dialog id="vlSaludDialog" class="lj-modal informes-modal vl-dialog" label="Salud de la sincronización">
+        <div slot="label" class="lj-dialog-title">
+          <h5 class="lj-dialog-heading"><i class="fa-solid fa-heart-pulse" aria-hidden="true"></i> Salud de la sincronización</h5>
+        </div>
+        <div class="lj-dialog-body">
+          <div id="vlSaludCuerpo"></div>
         </div>
       </sl-dialog>
 
+      <!-- Configuración -->
+      <sl-dialog id="vlConfigDialog" class="lj-modal informes-modal vl-dialog" label="Configuración · Ventas del local">
+        <div slot="label" class="lj-dialog-title">
+          <h5 class="lj-dialog-heading"><i class="fa-solid fa-gear" aria-hidden="true"></i> Configuración · Ventas del local</h5>
+        </div>
+        <div class="lj-dialog-body">
+          <sl-tab-group id="vlConfigTabs" class="vl-tabs vl-tabs-config">
+            <sl-tab slot="nav" panel="sync" active><i class="fa-solid fa-rotate" aria-hidden="true"></i>Sincronización</sl-tab>
+            <sl-tab slot="nav" panel="kpis"><i class="fa-solid fa-gauge-high" aria-hidden="true"></i>Indicadores</sl-tab>
+            <sl-tab slot="nav" panel="cred" data-solo-admin><i class="fa-solid fa-plug" aria-hidden="true"></i>Conexión IM5</sl-tab>
+
+            <sl-tab-panel name="sync" active>
+              <div class="vl-form">
+                <div class="vl-bloque">
+                  <sl-switch id="cfgActiva">Sincronización automática prendida</sl-switch>
+                  <p class="vl-ayuda" id="cfgResumen"></p>
+                </div>
+                <div>
+                  <label class="lj-label">Días</label>
+                  <div class="vl-dias" id="cfgDias" role="group" aria-label="Días">
+                    <button type="button" data-dia="1">Lun</button><button type="button" data-dia="2">Mar</button><button type="button" data-dia="3">Mié</button><button type="button" data-dia="4">Jue</button><button type="button" data-dia="5">Vie</button><button type="button" data-dia="6">Sáb</button><button type="button" data-dia="0">Dom</button>
+                  </div>
+                </div>
+                <div class="vl-form-fila">
+                  <sl-select id="cfgDesde" label="Desde las" hoist></sl-select>
+                  <sl-select id="cfgHasta" label="Hasta las" hoist></sl-select>
+                  <sl-select id="cfgCada" label="Cada" hoist>
+                    <sl-option value="10">10 minutos</sl-option>
+                    <sl-option value="30">30 minutos</sl-option>
+                    <sl-option value="60">1 hora</sl-option>
+                    <sl-option value="120">2 horas</sl-option>
+                    <sl-option value="180">3 horas</sl-option>
+                    <sl-option value="240">4 horas</sl-option>
+                    <sl-option value="360">6 horas</sl-option>
+                    <sl-option value="720">12 horas</sl-option>
+                    <sl-option value="1440">Una vez al día</sl-option>
+                  </sl-select>
+                </div>
+                <div class="vl-form-fila vl-form-fila-2">
+                  <div>
+                    <label class="lj-label">Empresas</label>
+                    <div class="vl-checks">
+                      <sl-checkbox data-cfg-empresa="1">1 · Facturación - Administración</sl-checkbox>
+                      <sl-checkbox data-cfg-empresa="2">2 · Registradoras</sl-checkbox>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="lj-label">Comprobantes</label>
+                    <div class="vl-checks">
+                      <sl-checkbox data-cfg-tipo="FA">Facturas</sl-checkbox>
+                      <sl-checkbox data-cfg-tipo="NC">Notas de crédito</sl-checkbox>
+                      <sl-checkbox data-cfg-tipo="ND">Notas de débito</sl-checkbox>
+                    </div>
+                  </div>
+                </div>
+                <div class="vl-bloque">
+                  <sl-input id="cfgMail" label="Avisar por mail si falla" placeholder="mail@ejemplo.com, otro@ejemplo.com" help-text="Uno o varios, separados por coma. Vacío = solo el aviso en la página.">
+                    <i slot="prefix" class="fa-regular fa-envelope"></i>
+                  </sl-input>
+                  <div><sl-button size="small" variant="default" id="cfgMailPrueba"><i slot="prefix" class="fa-solid fa-paper-plane"></i>Mandar mail de prueba</sl-button></div>
+                </div>
+              </div>
+            </sl-tab-panel>
+
+            <sl-tab-panel name="kpis">
+              <p class="vl-ayuda">Prendé, apagá y ordená los indicadores de arriba. Se guarda para todos.</p>
+              <ul id="cfgKpis" class="vl-kpi-lista"></ul>
+            </sl-tab-panel>
+
+            <sl-tab-panel name="cred">
+              <div class="vl-form">
+                <p class="vl-ayuda">Con estos datos entra la sincronización a InfoManager. Se prueban antes de guardar y la contraseña queda cifrada: no se vuelve a mostrar.</p>
+                <p class="vl-cred-estado" id="cfgCredEstado"></p>
+                <sl-input id="cfgBase" label="Empresa / base de datos" placeholder="ej. frigolajamonera01_base" autocomplete="off"></sl-input>
+                <sl-input id="cfgUsuario" label="Usuario" autocomplete="off"></sl-input>
+                <sl-input id="cfgPassword" label="Contraseña" type="password" password-toggle autocomplete="new-password" help-text="Dejala vacía para conservar la guardada."></sl-input>
+                <div><sl-button id="cfgCredGuardar" variant="primary"><i slot="prefix" class="fa-solid fa-plug-circle-check"></i>Probar y guardar</sl-button></div>
+              </div>
+            </sl-tab-panel>
+          </sl-tab-group>
+          <div class="vl-dialog-pie">
+            <sl-button variant="default" id="cfgCancelar">Cancelar</sl-button>
+            <sl-button id="cfgGuardar" variant="success"><i slot="prefix" class="fa-solid fa-floppy-disk"></i>Guardar</sl-button>
+          </div>
+        </div>
+      </sl-dialog>
       <footer class="lj-footer app-footer">
         <div class="lj-footer-inner">
           <section class="lj-footer-col lj-footer-brand" aria-label="La Jamonera">
@@ -335,25 +383,25 @@
     </section>
   </main>
 
-  <script src="./JS/data/backend.js?v=202610161722"></script>
+  <script src="./JS/data/backend.js?v=202610161901"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-  <script src="./vendor/echarts/echarts.min.js?v=202610161722"></script>
-  <script src="./JS/ui/forms.js?v=202610161722"></script>
-  <script src="./JS/ui/theme.js?v=202610161722"></script>
-  <script src="./JS/ui/modal.js?v=202610161722"></script>
-  <script src="./JS/ui/lj-alert.js?v=202610161722"></script>
-  <script src="./JS/ui/header.js?v=202610161722"></script>
-  <script src="./JS/data/config.js?v=202610161722"></script>
-  <script src="./JS/data/supabase-init.js?v=202610161722"></script>
-  <script src="./JS/firebase-init.js?v=202610161722"></script>
-  <script src="./JS/data/security.js?v=202610161722"></script>
-  <script src="./JS/proxy-client.js?v=202610161722"></script>
-  <script src="./JS/data/authz.js?v=202610161722"></script>
-  <script src="./JS/configuracion.js?v=202610161722"></script>
-  <script src="./JS/Notificaciones.js?v=202610161722"></script>
-  <script src="./JS/app.js?v=202610161722"></script>
-  <script src="./JS/ventaslocal.js?v=202610161722"></script>
+  <script src="./vendor/echarts/echarts.min.js?v=202610161901"></script>
+  <script src="./JS/ui/forms.js?v=202610161901"></script>
+  <script src="./JS/ui/theme.js?v=202610161901"></script>
+  <script src="./JS/ui/modal.js?v=202610161901"></script>
+  <script src="./JS/ui/lj-alert.js?v=202610161901"></script>
+  <script src="./JS/ui/header.js?v=202610161901"></script>
+  <script src="./JS/data/config.js?v=202610161901"></script>
+  <script src="./JS/data/supabase-init.js?v=202610161901"></script>
+  <script src="./JS/firebase-init.js?v=202610161901"></script>
+  <script src="./JS/data/security.js?v=202610161901"></script>
+  <script src="./JS/proxy-client.js?v=202610161901"></script>
+  <script src="./JS/data/authz.js?v=202610161901"></script>
+  <script src="./JS/configuracion.js?v=202610161901"></script>
+  <script src="./JS/Notificaciones.js?v=202610161901"></script>
+  <script src="./JS/app.js?v=202610161901"></script>
+  <script src="./JS/ventaslocal.js?v=202610161901"></script>
 </body>
 </html>

@@ -6,15 +6,15 @@
 (function ventasLocalModule() {
   const $ = (id) => document.getElementById(id);
   const TZ = 'America/Argentina/Buenos_Aires';
-  const POR_PAGINA = 50;
+  const POR_PAGINA = window.matchMedia('(max-width: 767.98px)').matches ? 25 : 50;
   const notify = (type, title, message) => window.laJamoneraNotify?.show({ type, title, message });
   const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   const fmtPesos = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
   const fmtPesos2 = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtNum = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 });
-  const fmtFechaHora = new Intl.DateTimeFormat('es-AR', { timeZone: TZ, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-  const fmtHora = new Intl.DateTimeFormat('es-AR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
+  const fmtFechaHora = new Intl.DateTimeFormat('es-AR', { timeZone: TZ, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  const fmtHora = new Intl.DateTimeFormat('es-AR', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
   const pesos = (n) => fmtPesos.format(Number(n) || 0);
   const pesos2 = (n) => fmtPesos2.format(Number(n) || 0);
 
@@ -32,7 +32,8 @@
     dias_invalidos: 'Elegí al menos un día válido.',
     empresas_invalidas: 'Elegí al menos una empresa.',
     tipos_invalidos: 'Los tipos de comprobante no son válidos.',
-    mail_invalido: 'Algún mail no es válido.'
+    mail_invalido: 'Algún mail no es válido.',
+    sin_mail_avisos: 'No hay mails guardados para los avisos.'
   };
   const textoError = (e) => {
     const m = String(e?.message || e?.error || e || '');
@@ -100,17 +101,18 @@
   };
 
   // ---------- KPIs ----------
+  // color: franja de arriba de la tarjeta (índice de la paleta de los gráficos).
   const KPIS = [
-    { key: 'total', titulo: 'Total vendido', icono: 'fa-sack-dollar' },
-    { key: 'comprobantes', titulo: 'Comprobantes', icono: 'fa-receipt' },
-    { key: 'ticket', titulo: 'Ticket promedio', icono: 'fa-basket-shopping' },
-    { key: 'producto', titulo: 'Producto estrella ($)', icono: 'fa-star' },
-    { key: 'productoCant', titulo: 'Más vendido (cantidad)', icono: 'fa-weight-hanging' },
-    { key: 'medios', titulo: 'Medio de cobro principal', icono: 'fa-credit-card' },
-    { key: 'nc', titulo: 'Notas de crédito', icono: 'fa-rotate-left' },
-    { key: 'cajas', titulo: 'Caja que más vendió', icono: 'fa-cash-register' },
-    { key: 'hora', titulo: 'Hora pico', icono: 'fa-clock' },
-    { key: 'letras', titulo: 'Factura A / B', icono: 'fa-file-invoice' }
+    { key: 'total', titulo: 'Total vendido', icono: 'fa-sack-dollar', color: 0 },
+    { key: 'comprobantes', titulo: 'Comprobantes', icono: 'fa-receipt', color: 5 },
+    { key: 'ticket', titulo: 'Ticket promedio', icono: 'fa-basket-shopping', color: 4 },
+    { key: 'producto', titulo: 'Producto estrella ($)', icono: 'fa-star', color: 2 },
+    { key: 'productoCant', titulo: 'Más vendido (cantidad)', icono: 'fa-weight-hanging', color: 6 },
+    { key: 'medios', titulo: 'Medio de cobro principal', icono: 'fa-credit-card', color: 1 },
+    { key: 'nc', titulo: 'Notas de crédito', icono: 'fa-rotate-left', color: 8 },
+    { key: 'cajas', titulo: 'Caja que más vendió', icono: 'fa-cash-register', color: 3 },
+    { key: 'hora', titulo: 'Hora pico', icono: 'fa-clock', color: 9 },
+    { key: 'letras', titulo: 'Factura A / B', icono: 'fa-file-invoice', color: 7 }
   ];
   const KPI_POR_KEY = Object.fromEntries(KPIS.map((k) => [k.key, k]));
 
@@ -166,7 +168,7 @@
         sub = tot ? `${fmtNum.format((Number(a?.total || 0) / tot) * 100)}% a empresas` : '';
       }
     }
-    return `<article class="vl-kpi ${r ? '' : 'is-cargando'}"><div class="vl-kpi-tit"><i class="fa-solid ${def.icono}"></i>${esc(def.titulo)}</div>
+    return `<article class="vl-kpi ${r ? '' : 'is-cargando'}" style="--k:${PALETA()[def.color]}"><div class="vl-kpi-tit"><span class="vl-kpi-ico"><i class="fa-solid ${def.icono}"></i></span>${esc(def.titulo)}</div>
       <div class="vl-kpi-valor ${chico ? 'is-chico' : ''}">${valor}</div><div class="vl-kpi-sub">${sub}</div></article>`;
   }
   const kpisActivos = () => (Array.isArray(st.cfg.kpis) && st.cfg.kpis.length ? st.cfg.kpis : KPIS.map((k) => k.key)).filter((k) => KPI_POR_KEY[k]);
@@ -174,22 +176,37 @@
     $('vlKpis').innerHTML = kpisActivos().map((k) => kpiHtml(k, st.resumen, st.comparar ? st.resumenComp : null)).join('');
   }
 
-  // ---------- Gráficos ----------
+  // ---------- Gráficos (ECharts) ----------
+  // Se dibujan sólo con la pestaña «Gráficos» a la vista: un gráfico iniciado en un panel oculto mide 0 y
+  // queda aplastado. Al mostrar la pestaña se dibuja (o se ajusta el tamaño).
   const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || undefined;
+  const oscuro = () => document.documentElement.classList.contains('sl-theme-dark');
+  const PALETA = () => (oscuro()
+    ? ['#60a5fa', '#4ade80', '#fbbf24', '#f472b6', '#a78bfa', '#22d3ee', '#fb923c', '#a3e635', '#fb7185', '#2dd4bf']
+    : ['#2563eb', '#16a34a', '#f59e0b', '#db2777', '#7c3aed', '#0891b2', '#ea580c', '#65a30d', '#e11d48', '#0d9488']);
+  const DIAS_SEM = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+  const esMovil = () => window.matchMedia('(max-width: 767.98px)').matches;
+  const graficosVisibles = () => $('vlTabs')?.querySelector('sl-tab[panel="graficos"]')?.active;
+  const corto = (v) => (Math.abs(v) >= 1e6 ? `${fmtNum.format(Math.round(v / 1e5) / 10)} M` : Math.abs(v) >= 1e3 ? `${fmtNum.format(Math.round(v / 1e3))} k` : fmtNum.format(v));
+  const degrade = (c1, c2, horizontal = false) => new window.echarts.graphic.LinearGradient(0, 0, horizontal ? 1 : 0, horizontal ? 0 : 1, [{ offset: 0, color: c1 }, { offset: 1, color: c2 }]);
+  const aclarar = (hex, a) => `${hex}${Math.round(a * 255).toString(16).padStart(2, '0')}`;
+
   function chart(id) {
     const el = $(id);
     if (!window.echarts || !el) return null;
+    if (el.querySelector('.vl-vacio')) el.innerHTML = '';
     if (!st.charts[id]) st.charts[id] = window.echarts.init(el, null, { renderer: 'canvas' });
     return st.charts[id];
   }
   function baseOpts() {
     const texto = css('--lj-muted'); const borde = css('--lj-border');
     return {
+      color: PALETA(),
       textStyle: { fontFamily: 'Inter, sans-serif', color: texto },
-      grid: { left: 8, right: 12, top: 24, bottom: 4, containLabel: true },
-      tooltip: { trigger: 'axis', backgroundColor: css('--lj-surface'), borderColor: borde, textStyle: { color: css('--lj-text') } },
-      xAxis: { axisLine: { lineStyle: { color: borde } }, axisLabel: { color: texto }, splitLine: { show: false } },
-      yAxis: { axisLabel: { color: texto, formatter: (v) => (Math.abs(v) >= 1e6 ? `${fmtNum.format(v / 1e6)} M` : Math.abs(v) >= 1e3 ? `${fmtNum.format(v / 1e3)} k` : v) }, splitLine: { lineStyle: { color: borde } } }
+      grid: { left: 8, right: 14, top: 28, bottom: 6, containLabel: true },
+      tooltip: { trigger: 'axis', backgroundColor: css('--lj-surface'), borderColor: borde, borderWidth: 1, padding: [8, 12], textStyle: { color: css('--lj-text'), fontSize: 12 }, extraCssText: 'border-radius:0;box-shadow:0 6px 18px rgba(0,0,0,.12)' },
+      xAxis: { axisLine: { lineStyle: { color: borde } }, axisTick: { show: false }, axisLabel: { color: texto }, splitLine: { show: false } },
+      yAxis: { axisLabel: { color: texto, formatter: corto }, splitLine: { lineStyle: { color: borde, type: 'dashed' } } }
     };
   }
   function vacio(id, texto = 'Sin ventas en este período') {
@@ -197,73 +214,138 @@
     $(id).innerHTML = `<div class="vl-vacio">${esc(texto)}</div>`;
   }
   function pintarGraficos() {
-    const r = st.resumen; const c = st.comparar ? st.resumenComp : null;
-    const acento = css('--lj-accent'); const suave = css('--lj-border-strong');
-    if (!r) return;
+    const r = st.resumen;
+    if (!r || !graficosVisibles()) { st.graficosPendientes = true; return; }
+    st.graficosPendientes = false;
+    const c = st.comparar ? st.resumenComp : null;
+    const P = PALETA();
+    const texto = css('--lj-text'); const muted = css('--lj-muted'); const superficie = css('--lj-surface');
 
-    // Por día: barras del período; la comparación como línea, día por día.
-    if (!(r.por_dia || []).length) vacio('vlGDia');
+    // Por día: cada barra con el color de su día de la semana; la comparación como línea con área.
+    // Con un solo día no aporta: se oculta («por hora» y «medios» quedan lado a lado).
+    const unDia = st.rango.desde === st.rango.hasta;
+    $('vlGDia').closest('.vl-card').hidden = unDia;
+    if (unDia) { const c0 = st.charts.vlGDia; if (c0) { c0.dispose(); delete st.charts.vlGDia; } }
+    else if (!(r.por_dia || []).length) vacio('vlGDia');
     else {
-      if ($('vlGDia').querySelector('.vl-vacio')) $('vlGDia').innerHTML = '';
       const dias = []; for (let d = st.rango.desde; d <= st.rango.hasta; d = sumarDias(d, 1)) dias.push(d);
       const porDia = Object.fromEntries((r.por_dia || []).map((x) => [x.fecha, Number(x.total)]));
-      const series = [{ name: 'Período', type: 'bar', data: dias.map((d) => porDia[d] || 0), itemStyle: { color: acento, borderRadius: [3, 3, 0, 0] }, barMaxWidth: 34 }];
+      const conVenta = dias.filter((d) => porDia[d]);
+      const promedio = conVenta.length ? conVenta.reduce((s, d) => s + porDia[d], 0) / conVenta.length : 0;
+      $('vlNotaDia').textContent = conVenta.length > 1 ? `Promedio por día con ventas: ${pesos(promedio)}` : '';
+      const series = [{
+        name: 'Período', type: 'bar', barMaxWidth: 38,
+        data: dias.map((d) => { const col = P[(diaSemana(d) + 6) % 7]; return { value: porDia[d] || 0, itemStyle: { color: degrade(col, aclarar(col, 0.55)), borderRadius: [4, 4, 0, 0] } }; }),
+        markLine: conVenta.length > 1 ? { symbol: 'none', silent: true, data: [{ yAxis: promedio }], lineStyle: { color: muted, type: 'dotted', width: 1.5 }, label: { formatter: () => 'promedio', color: muted, fontSize: 11, position: 'insideEndTop' } } : undefined
+      }];
       if (c && (c.por_dia || []).length) {
         const cr = rangoComparar(st.rango, st.clave);
         const cd = Object.fromEntries((c.por_dia || []).map((x) => [x.fecha, Number(x.total)]));
-        series.push({ name: 'Comparación', type: 'line', smooth: true, symbol: 'circle', symbolSize: 5, data: dias.map((_, i) => cd[sumarDias(cr.desde, i)] || 0), lineStyle: { color: suave, type: 'dashed' }, itemStyle: { color: suave } });
+        series.push({ name: 'Comparación', type: 'line', smooth: true, symbol: 'circle', symbolSize: 6, z: 3,
+          data: dias.map((_, i) => cd[sumarDias(cr.desde, i)] || 0),
+          lineStyle: { color: P[4], width: 2, type: 'dashed' }, itemStyle: { color: P[4] },
+          areaStyle: { color: degrade(aclarar(P[4], 0.22), aclarar(P[4], 0)) } });
       }
       const o = baseOpts();
-      chart('vlGDia')?.setOption({ ...o, tooltip: { ...o.tooltip, valueFormatter: pesos }, xAxis: { ...o.xAxis, type: 'category', data: dias.map(fechaCorta) }, yAxis: { ...o.yAxis, type: 'value' }, series }, true);
+      chart('vlGDia')?.setOption({ ...o,
+        legend: series.length > 1 ? { top: 0, right: 0, textStyle: { color: muted }, itemWidth: 14, itemHeight: 8, data: [{ name: 'Período', itemStyle: { color: P[0] } }, 'Comparación'] } : undefined,
+        tooltip: { ...o.tooltip, valueFormatter: pesos, formatter: undefined, axisPointer: { type: 'shadow' } },
+        xAxis: { ...o.xAxis, type: 'category', data: dias.map((d) => `${DIAS_SEM[diaSemana(d)]} ${fechaCorta(d)}`), axisLabel: { color: muted, hideOverlap: true } },
+        yAxis: { ...o.yAxis, type: 'value' }, series }, true);
     }
 
-    // Por hora
+    // Por hora: barras que van de frío a caliente según cuánto se vendió.
     if (!(r.por_hora || []).length) vacio('vlGHora', 'Sin horas registradas');
     else {
-      if ($('vlGHora').querySelector('.vl-vacio')) $('vlGHora').innerHTML = '';
       const horas = r.por_hora.map((x) => x.hora); const min = Math.min(...horas); const max = Math.max(...horas);
       const lista = []; for (let h = min; h <= max; h++) lista.push(h);
       const por = Object.fromEntries(r.por_hora.map((x) => [x.hora, Number(x.total)]));
+      const tope = Math.max(...Object.values(por));
       const o = baseOpts();
-      chart('vlGHora')?.setOption({ ...o, tooltip: { ...o.tooltip, valueFormatter: pesos }, xAxis: { ...o.xAxis, type: 'category', data: lista.map((h) => `${h} h`) }, yAxis: { ...o.yAxis, type: 'value' },
-        series: [{ type: 'bar', data: lista.map((h) => por[h] || 0), itemStyle: { color: acento, borderRadius: [3, 3, 0, 0] }, barMaxWidth: 26 }] }, true);
+      chart('vlGHora')?.setOption({ ...o,
+        tooltip: { ...o.tooltip, valueFormatter: pesos, axisPointer: { type: 'shadow' } },
+        visualMap: { show: false, min: 0, max: tope || 1, dimension: 1, inRange: { color: oscuro() ? ['#22d3ee', '#60a5fa', '#a78bfa', '#f472b6', '#fbbf24'] : ['#67e8f9', '#2563eb', '#7c3aed', '#db2777', '#f59e0b'] } },
+        xAxis: { ...o.xAxis, type: 'category', data: lista.map((h) => `${String(h).padStart(2, '0')} h`) }, yAxis: { ...o.yAxis, type: 'value' },
+        series: [{ type: 'bar', data: lista.map((h) => por[h] || 0), barMaxWidth: 28, itemStyle: { borderRadius: [4, 4, 0, 0] } }] }, true);
     }
 
-    // Medios de cobro
+    // Medios de cobro: anillo con el total en el centro.
     const medios = (r.por_medio || []).filter((m) => Number(m.total) > 0);
     if (!medios.length) vacio('vlGMedios');
     else {
-      if ($('vlGMedios').querySelector('.vl-vacio')) $('vlGMedios').innerHTML = '';
-      const paleta = [acento, css('--lj-success'), css('--lj-warning'), css('--lj-danger'), css('--lj-muted'), css('--lj-brand')];
+      const tot = medios.reduce((s, m) => s + Number(m.total), 0);
       chart('vlGMedios')?.setOption({
-        textStyle: { fontFamily: 'Inter, sans-serif', color: css('--lj-muted') },
-        tooltip: { trigger: 'item', valueFormatter: pesos, backgroundColor: css('--lj-surface'), borderColor: css('--lj-border'), textStyle: { color: css('--lj-text') } },
-        legend: { bottom: 0, textStyle: { color: css('--lj-muted') }, type: 'scroll' },
-        color: paleta,
-        series: [{ type: 'pie', radius: ['48%', '72%'], center: ['50%', '44%'], avoidLabelOverlap: true, label: { show: false },
-          itemStyle: { borderColor: css('--lj-surface'), borderWidth: 2 }, data: medios.map((m) => ({ name: m.medio, value: Number(m.total) })) }]
+        color: P, textStyle: { fontFamily: 'Inter, sans-serif', color: muted },
+        tooltip: { ...baseOpts().tooltip, trigger: 'item', formatter: (p) => `<b>${esc(p.name)}</b><br>${pesos(p.value)} · ${fmtNum.format(p.percent)}%` },
+        legend: { bottom: 0, type: 'plain', textStyle: { color: muted }, itemWidth: 12, itemHeight: 12, icon: 'rect' },
+        title: { text: corto(tot), subtext: 'cobrado', left: 'center', top: '35%', textStyle: { color: texto, fontSize: 18, fontWeight: 800 }, subtextStyle: { color: muted, fontSize: 11 } },
+        series: [{ type: 'pie', radius: ['50%', '74%'], center: ['50%', '44%'], padAngle: 2, itemStyle: { borderRadius: 0, borderColor: superficie, borderWidth: 2 },
+          label: { show: true, formatter: (p) => `${fmtNum.format(Math.round(p.percent))}%`, color: texto, fontWeight: 700, fontSize: 11 },
+          labelLine: { length: 6, length2: 6 },
+          data: medios.map((m) => ({ name: m.medio, value: Number(m.total) })) }]
       }, true);
     }
 
-    // Top productos
+    // Top productos: cada barra de un color, con el importe/cantidad al final.
     const top = (st.topModo === 'cantidad' ? r.top_cantidad : r.top_importe) || [];
     if (!top.length) vacio('vlGTop', r.sin_items ? 'Todavía se están bajando los productos de estas ventas' : 'Sin productos en este período');
     else {
-      if ($('vlGTop').querySelector('.vl-vacio')) $('vlGTop').innerHTML = '';
       const filas = [...top].reverse();
       const campo = st.topModo === 'cantidad' ? 'cantidad' : 'importe';
       const o = baseOpts();
       chart('vlGTop')?.setOption({ ...o,
-        tooltip: { ...o.tooltip, trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (ps) => { const p = filas[ps[0].dataIndex]; return `<b>${esc(p.desc || p.cod)}</b><br>${pesos(p.importe)} · ${fmtNum.format(p.cantidad)} ${esc(p.unidad || '')}`; } },
-        grid: { ...o.grid, left: 8 },
-        xAxis: { ...o.yAxis, type: 'value' },
-        yAxis: { type: 'category', data: filas.map((p) => { const t = String(p.desc || p.cod || ''); return t.length > 28 ? `${t.slice(0, 27)}…` : t; }), axisLabel: { color: css('--lj-text') }, axisLine: { lineStyle: { color: css('--lj-border') } } },
-        series: [{ type: 'bar', data: filas.map((p) => Number(p[campo])), itemStyle: { color: acento, borderRadius: [0, 3, 3, 0] }, barMaxWidth: 18,
-          label: { show: true, position: 'right', color: css('--lj-muted'), formatter: (x) => (campo === 'importe' ? pesos(x.value) : fmtNum.format(x.value)) } }]
+        tooltip: { ...o.tooltip, axisPointer: { type: 'shadow' }, formatter: (ps) => { const p = filas[ps[0].dataIndex]; return `<b>${esc(p.desc || p.cod)}</b><br>${pesos(p.importe)} · ${fmtNum.format(p.cantidad)} ${esc(p.unidad || '')}`; } },
+        grid: { ...o.grid, right: 70 },
+        xAxis: { ...o.yAxis, type: 'value', axisLabel: { ...o.yAxis.axisLabel, show: !esMovil() } },
+        yAxis: { type: 'category', data: filas.map((p) => { const t = String(p.desc || p.cod || ''); return t.length > 26 ? `${t.slice(0, 25)}…` : t; }), axisLabel: { color: texto, fontSize: 11 }, axisLine: { lineStyle: { color: css('--lj-border') } }, axisTick: { show: false } },
+        series: [{ type: 'bar', barMaxWidth: 20,
+          data: filas.map((p, i) => { const col = P[(filas.length - 1 - i) % P.length]; return { value: Number(p[campo]), itemStyle: { color: degrade(aclarar(col, 0.55), col, true), borderRadius: [0, 4, 4, 0] } }; }),
+          label: { show: true, position: 'right', color: muted, fontSize: 11, formatter: (x) => (campo === 'importe' ? corto(x.value) : fmtNum.format(x.value)) } }]
       }, true);
     }
+
+    // Ventas por caja: barras horizontales por usuario.
+    const cajas = (r.por_usuario || []).filter((u) => Number(u.total) > 0);
+    if (!cajas.length) vacio('vlGCajas');
+    else {
+      const filas = [...cajas].slice(0, 8).reverse();
+      const o = baseOpts();
+      chart('vlGCajas')?.setOption({ ...o,
+        tooltip: { ...o.tooltip, axisPointer: { type: 'shadow' }, formatter: (ps) => { const u = filas[ps[0].dataIndex]; return `<b>${esc(u.usuario)}</b><br>${pesos(u.total)} · ${fmtNum.format(u.cant)} comprobantes`; } },
+        grid: { ...o.grid, right: 64 },
+        xAxis: { ...o.yAxis, type: 'value', axisLabel: { ...o.yAxis.axisLabel, show: !esMovil() } },
+        yAxis: { type: 'category', data: filas.map((u) => u.usuario), axisLabel: { color: texto, fontSize: 11 }, axisLine: { lineStyle: { color: css('--lj-border') } }, axisTick: { show: false } },
+        series: [{ type: 'bar', barMaxWidth: 22,
+          data: filas.map((u, i) => { const col = P[(filas.length - 1 - i + 3) % P.length]; return { value: Number(u.total), itemStyle: { color: degrade(aclarar(col, 0.55), col, true), borderRadius: [0, 4, 4, 0] } }; }),
+          label: { show: true, position: 'right', color: muted, fontSize: 11, formatter: (x) => corto(x.value) } }]
+      }, true);
+    }
+
+    // Empresa (anillo interno) y factura A / B (anillo externo).
+    const emps = (r.por_empresa || []).filter((e) => Number(e.total) > 0);
+    const letras = (r.por_letra || []).filter((l) => Number(l.total) > 0);
+    if (!emps.length && !letras.length) vacio('vlGEmpresa');
+    else {
+      const nombreEmp = { 1: 'Facturación', 2: 'Registradoras' };
+      chart('vlGEmpresa')?.setOption({
+        textStyle: { fontFamily: 'Inter, sans-serif', color: muted },
+        tooltip: { ...baseOpts().tooltip, trigger: 'item', formatter: (p) => `<b>${esc(p.name)}</b><br>${pesos(p.value)} · ${fmtNum.format(p.percent)}%` },
+        legend: { bottom: 0, type: 'plain', textStyle: { color: muted }, itemWidth: 12, itemHeight: 12, icon: 'rect' },
+        series: [
+          { name: 'Empresa', type: 'pie', radius: ['0%', '38%'], center: ['50%', '45%'], itemStyle: { borderColor: superficie, borderWidth: 2 },
+            label: { position: 'inner', color: '#fff', fontWeight: 700, fontSize: 11, formatter: (p) => `${fmtNum.format(Math.round(p.percent))}%` },
+            data: emps.map((e, i) => ({ name: esMovil() ? `Emp. ${e.empresa}` : `Empresa ${e.empresa} · ${nombreEmp[e.empresa] || ''}`.trim(), value: Number(e.total), itemStyle: { color: [P[0], P[5], P[2]][i % 3] } })) },
+          { name: 'Factura', type: 'pie', radius: ['50%', '72%'], center: ['50%', '45%'], padAngle: 2, itemStyle: { borderColor: superficie, borderWidth: 2 },
+            label: { color: texto, fontWeight: 700, fontSize: 11, formatter: (p) => `${p.name.replace('Factura ', '')} ${fmtNum.format(Math.round(p.percent))}%` },
+            labelLine: { length: 6, length2: 6 },
+            data: letras.map((l) => ({ name: `Factura ${l.letra}`, value: Number(l.total), itemStyle: { color: l.letra === 'A' ? P[3] : P[4] } })) }
+        ]
+      }, true);
+    }
+    requestAnimationFrame(ajustarGraficos);
   }
-  window.addEventListener('resize', () => Object.values(st.charts).forEach((c) => c.resize()));
+  const ajustarGraficos = () => Object.values(st.charts).forEach((c) => c.resize());
+  window.addEventListener('resize', ajustarGraficos);
 
   // ---------- Datos ----------
   async function resumen(desde, hasta) {
@@ -274,7 +356,8 @@
   async function cargarResumen() {
     st.resumen = null; st.resumenComp = null; pintarKpis();
     const comp = rangoComparar(st.rango, st.clave);
-    $('vlComparando').textContent = st.comparar ? `Comparando con ${comp.texto} (${fechaCorta(comp.desde)}${comp.desde !== comp.hasta ? ` al ${fechaCorta(comp.hasta)}` : ''}).` : '';
+    const periodo = st.rango.desde === st.rango.hasta ? fechaCorta(st.rango.desde) : `${fechaCorta(st.rango.desde)} al ${fechaCorta(st.rango.hasta)}`;
+    $('vlComparando').innerHTML = `<i class="fa-regular fa-calendar"></i>${esc(periodo)}${st.comparar ? ` · comparando con ${esc(comp.texto)} (${esc(fechaCorta(comp.desde))}${comp.desde !== comp.hasta ? ` al ${esc(fechaCorta(comp.hasta))}` : ''})` : ''}`;
     try {
       const [r, c] = await Promise.all([resumen(st.rango.desde, st.rango.hasta), st.comparar ? resumen(comp.desde, comp.hasta) : Promise.resolve(null)]);
       st.resumen = r; st.resumenComp = c;
@@ -303,11 +386,11 @@
     const cuando = r.fecha_hora ? fmtFechaHora.format(new Date(r.fecha_hora)) : fechaCorta(r.fecha);
     return `<tr class="vl-fila ${r.anulada ? 'is-anulada' : ''}" data-emp="${r.empresa}" data-id="${r.id}" tabindex="0">
       <td><i class="fa-solid fa-chevron-right vl-exp"></i></td>
-      <td>${esc(cuando)}<span class="vl-dim">Empresa ${r.empresa}</span></td>
+      <td class="vl-fecha">${esc(cuando)}<span class="vl-dim vl-ocultar-movil">Empresa ${r.empresa}</span></td>
       <td><span class="vl-chip ${chip}">${r.tipo}${r.letra ? ` ${esc(r.letra)}` : ''}</span><span class="vl-comp">${esc(String(r.punto_venta || 0).padStart(4, '0'))}-${esc(String(r.numero || 0).padStart(8, '0'))}</span>${r.anulada ? '<span class="vl-dim">Anulada</span>' : ''}</td>
       <td>${esc(r.cliente || '—')}${r.observaciones ? '<i class="fa-solid fa-comment-dots vl-obs-ico" title="Tiene observaciones"></i>' : ''}</td>
-      <td>${esc(r.usuario || '—')}${r.vendedor ? `<span class="vl-dim">${esc(r.vendedor)}</span>` : ''}</td>
-      <td>${esc(r.condicion_venta || '—')}</td>
+      <td class="vl-ocultar-movil">${esc(r.usuario || '—')}${r.vendedor ? `<span class="vl-dim">${esc(r.vendedor)}</span>` : ''}</td>
+      <td class="vl-ocultar-movil">${esc(r.condicion_venta || '—')}</td>
       <td class="vl-num ${r.tipo === 'NC' ? 'vl-total-nc' : ''}"><b>${r.tipo === 'NC' ? '−' : ''}${pesos2(r.total)}</b></td></tr>`;
   }
   async function cargarTabla() {
@@ -320,11 +403,35 @@
     body.innerHTML = (data || []).length ? data.map(filaHtml).join('')
       : `<tr class="vl-tabla-vacia"><td colspan="7">${st.buscar ? 'Nada coincide con la búsqueda.' : 'No hay comprobantes en este período.'}</td></tr>`;
     body._filas = Object.fromEntries((data || []).map((r) => [`${r.empresa}:${r.id}`, r]));
-    $('vlTablaCuenta').textContent = st.total ? `· ${fmtNum.format(st.total)}` : '';
+    $('vlTablaCuenta').textContent = st.total ? fmtNum.format(st.total) : '';
     const hasta = Math.min(desde + POR_PAGINA, st.total);
     $('vlPagInfo').textContent = st.total ? `${desde + 1}–${hasta} de ${fmtNum.format(st.total)}` : '';
     $('vlPagAnt').disabled = st.pagina === 0;
     $('vlPagSig').disabled = hasta >= st.total;
+  }
+  // Cobros del comprobante: recibos que lo cancelan → renglones de cobro (medio, cupón, id de pago de MP…).
+  async function leerCobros(emp, id) {
+    const { data: recs, error } = await st.sb.from('im5_comprobante_recibos').select('recibo_id,recibo_punto_venta,recibo_numero,importe_pagado')
+      .eq('empresa', emp).eq('comprobante_id', id);
+    if (error) return { error };
+    if (!recs?.length) return { pagos: [] };
+    const { data: pagos, error: e2 } = await st.sb.from('im5_pagos')
+      .select('id,recibo_id,cond_pago,medio,importe,cupon,tarjeta_numero,autorizacion,lote,id_pago_externo,arancel,costo_financiero')
+      .eq('empresa', emp).in('recibo_id', recs.map((x) => x.recibo_id)).order('id');
+    return e2 ? { error: e2 } : { pagos: pagos || [], recibos: recs };
+  }
+  const COND_PAGO = { EF: 'Efectivo', TJ: 'Tarjeta', CH: 'Cheque', TR: 'Transferencia', DB: 'Débito', CC: 'Cuenta corriente' };
+  function htmlCobros(c, r) {
+    if (c.error) return `<p class="vl-ayuda">${esc(textoError(c.error))}</p>`;
+    if (!c.pagos.length) return `<p class="vl-ayuda">${r.items_ok ? 'Sin cobros registrados (cuenta corriente o pendiente).' : 'Los cobros de este comprobante se bajan en la próxima actualización.'}</p>`;
+    const dato = (t, v) => (v ? `<span>${t} <b>${esc(v)}</b></span>` : '');
+    return `<div class="vl-cobros"><p class="vl-detalle-tit"><i class="fa-solid fa-credit-card"></i> Cobro</p>
+      <div class="vl-items-wrap"><table class="vl-items"><thead><tr><th>Medio</th><th>Datos del pago</th><th class="vl-num">Importe</th></tr></thead><tbody>
+      ${c.pagos.map((p) => `<tr><td>${esc(p.medio || COND_PAGO[p.cond_pago] || p.cond_pago || '—')}</td>
+        <td class="vl-cobro-datos">${[dato('ID pago MP', p.id_pago_externo), dato('Cupón', p.cupon), dato('Tarjeta', p.tarjeta_numero), dato('Autorización', p.autorizacion), dato('Lote', p.lote),
+          Number(p.arancel) ? dato('Arancel', pesos2(p.arancel)) : '', Number(p.costo_financiero) ? dato('Costo financiero', pesos2(p.costo_financiero)) : ''].join('') || '—'}</td>
+        <td class="vl-num">${pesos2(p.importe)}</td></tr>`).join('')}
+      </tbody></table></div></div>`;
   }
   async function toggleDetalle(tr) {
     const sig = tr.nextElementSibling;
@@ -335,19 +442,26 @@
     det.className = 'vl-detalle';
     det.innerHTML = '<td colspan="7"><div class="vl-detalle-in"><sl-spinner></sl-spinner></div></td>';
     tr.after(det);
-    const { data, error } = await st.sb.from('im5_items').select('cod_articulo,descripcion,cantidad,unidad,precio_con_iva,importe,iva_por')
-      .eq('empresa', Number(tr.dataset.emp)).eq('comprobante_id', Number(tr.dataset.id)).order('orden');
+    const emp = Number(tr.dataset.emp); const id = Number(tr.dataset.id);
+    const [{ data, error }, cobros] = await Promise.all([
+      st.sb.from('im5_items').select('cod_articulo,descripcion,cantidad,unidad,precio_con_iva,importe,iva_por')
+        .eq('empresa', emp).eq('comprobante_id', id).order('orden'),
+      leerCobros(emp, id)
+    ]);
     const items = data || [];
     const tablaItems = error ? `<p class="vl-ayuda">${esc(textoError(error))}</p>`
       : !items.length ? `<p class="vl-ayuda">${r.items_ok ? 'Sin productos.' : 'Los productos de este comprobante se bajan en la próxima actualización.'}</p>`
-      : `<table class="vl-items"><thead><tr><th>Código</th><th>Producto</th><th class="vl-num">Cantidad</th><th class="vl-num vl-ocultar-movil">Precio</th><th class="vl-num">Importe</th></tr></thead><tbody>
-        ${items.map((i) => `<tr><td>${esc(i.cod_articulo || '')}</td><td>${esc(i.descripcion || '')}</td><td class="vl-num">${fmtNum.format(i.cantidad)} ${esc(i.unidad || '')}</td><td class="vl-num vl-ocultar-movil">${pesos2(i.precio_con_iva)}</td><td class="vl-num">${pesos2(i.importe)}</td></tr>`).join('')}
-        </tbody></table>`;
+      : `<div><p class="vl-detalle-tit"><i class="fa-solid fa-box-open"></i> Productos</p><div class="vl-items-wrap"><table class="vl-items"><thead><tr><th class="vl-ocultar-movil">Código</th><th>Producto</th><th class="vl-num">Cantidad</th><th class="vl-num vl-ocultar-movil">Precio</th><th class="vl-num">Importe</th></tr></thead><tbody>
+        ${items.map((i) => `<tr><td class="vl-ocultar-movil">${esc(i.cod_articulo || '')}</td><td>${esc(i.descripcion || '')}</td><td class="vl-num">${fmtNum.format(i.cantidad)} ${esc(i.unidad || '')}</td><td class="vl-num vl-ocultar-movil">${pesos2(i.precio_con_iva)}</td><td class="vl-num">${pesos2(i.importe)}</td></tr>`).join('')}
+        </tbody></table></div></div>`;
     det.querySelector('.vl-detalle-in').innerHTML = `
       ${r.observaciones ? `<div class="vl-detalle-obs"><b>Observaciones:</b> ${esc(r.observaciones)}</div>` : ''}
       ${tablaItems}
+      ${htmlCobros(cobros, r)}
       <div class="vl-detalle-meta">
         <span>${esc(nombreComp(r))}</span>
+        ${r.usuario ? `<span>Caja <b>${esc(r.usuario)}</b></span>` : ''}
+        ${r.condicion_venta ? `<span>Condición <b>${esc(r.condicion_venta)}</b></span>` : ''}
         ${r.cod_cliente ? `<span>Cliente <b>${esc(r.cod_cliente)}</b></span>` : ''}
         ${r.vendedor ? `<span>Vendedor <b>${esc(r.vendedor)}</b></span>` : ''}
         ${r.cae ? `<span>CAE <b>${esc(r.cae)}</b></span>` : ''}
@@ -390,7 +504,7 @@
       return `<div class="vl-salud-dato"><small>Historial · empresa ${emp}</small><b>${b.terminado ? 'Completo' : b.hasta ? `Llegó a ${new Intl.DateTimeFormat('es-AR', { month: 'long', year: 'numeric' }).format(new Date(`${b.hasta}T12:00:00Z`))}` : 'Sin empezar'}</b>
         <span class="vl-dim">${fmtNum.format(b.total || 0)} comprobantes</span></div>`;
     }).join('');
-    const corridas = (e.corridas || []).slice(0, 15).map((c) => `<li><span class="${c.ok ? 'ok' : 'mal'}"><i class="fa-solid ${c.ok ? 'fa-circle-check' : 'fa-circle-xmark'}"></i></span>
+    const corridas = (e.corridas || []).slice(0, 15).map((c) => `<li class="${c.ok ? '' : 'is-mal'}"><span class="${c.ok ? 'ok' : 'mal'}"><i class="fa-solid ${c.ok ? 'fa-circle-check' : 'fa-circle-xmark'}"></i></span>
       <span>${esc(fmtFechaHora.format(new Date(c.fin)))} · ${c.modo === 'manual' ? 'manual' : 'automática'}</span>
       <span>${c.ok ? `${c.nuevos} nuevos · ${c.items} con productos` : esc(c.error || 'error')} · ${Math.round((c.ms || 0) / 1000)} s</span></li>`).join('');
     const pend = Number(e.pendientesItems || 0);
@@ -402,7 +516,7 @@
         ${historial}
         <div class="vl-salud-dato"><small>Productos por bajar</small><b>${pend ? `${fmtNum.format(pend)} comprobantes` : 'Al día'}</b><span class="vl-dim">${pend ? 'se completan en las próximas corridas' : '&nbsp;'}</span></div>
       </div>
-      <h3 class="vl-ayuda" style="font-weight:700">Últimas corridas</h3>
+      <p class="vl-salud-sub">Últimas corridas</p>
       <ul class="vl-corridas">${corridas || '<li><span>Todavía no hay corridas.</span></li>'}</ul>`;
   }
   function resumenHorario(cfg) {
@@ -615,8 +729,8 @@
   // ---------- Eventos ----------
   function elegirRango(clave, rango) {
     st.clave = clave; st.rango = rango; st.pagina = 0;
-    document.querySelectorAll('[data-rango]').forEach((b) => { b.variant = b.dataset.rango === clave ? 'primary' : 'default'; });
-    $('vlRangoTexto').textContent = clave === 'custom' ? `${fechaCorta(rango.desde)} – ${fechaCorta(rango.hasta)}` : 'Elegir…';
+    document.querySelectorAll('[data-rango]').forEach((b) => b.classList.toggle('active', b.dataset.rango === clave));
+    $('vlRangoTexto').textContent = clave === 'custom' ? `${fechaCorta(rango.desde)} – ${fechaCorta(rango.hasta)}` : 'Elegir fechas';
     cargarResumen(); cargarTabla();
   }
   function cablear() {
@@ -652,6 +766,12 @@
     $('vlExcel').addEventListener('click', exportarExcel);
     $('vlSalud').addEventListener('click', () => { pintarSaludDetalle(); $('vlSaludDialog').show(); });
     $('vlConfigBtn').addEventListener('click', abrirConfig);
+    $('cfgMailPrueba').addEventListener('click', mandarMailPrueba);
+    // Pestaña «Gráficos»: se dibujan al mostrarse (y se reajustan si ya estaban).
+    $('vlTabs').addEventListener('sl-tab-show', (e) => {
+      if (e.detail?.name !== 'graficos') return;
+      requestAnimationFrame(() => { if (st.graficosPendientes || !Object.keys(st.charts).length) pintarGraficos(); else ajustarGraficos(); });
+    });
     $('cfgCancelar').addEventListener('click', () => $('vlConfigDialog').hide());
     $('cfgGuardar').addEventListener('click', guardarConfig);
     $('cfgCredGuardar').addEventListener('click', guardarCred);
@@ -674,21 +794,49 @@
     setInterval(() => { if (document.visibilityState === 'visible') refrescarSalud(); }, 20000);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refrescarSalud(); });
     // Cambio de tema: ECharts no lee CSS, se vuelven a dibujar con los colores nuevos.
-    let oscuro = document.documentElement.classList.contains('sl-theme-dark');
+    let temaOscuro = oscuro();
     new MutationObserver(() => {
-      const ahora = document.documentElement.classList.contains('sl-theme-dark');
-      if (ahora === oscuro) return;
-      oscuro = ahora;
+      const ahora = oscuro();
+      if (ahora === temaOscuro) return;
+      temaOscuro = ahora;
+      pintarKpis();
       Object.values(st.charts).forEach((c) => c.dispose()); st.charts = {}; pintarGraficos();
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+  }
+
+  // Manda el aviso de falla (marcado «prueba») a los mails guardados. Si el campo cambió y no se guardó, avisa.
+  async function mandarMailPrueba() {
+    const btn = $('cfgMailPrueba');
+    const enCampo = String($('cfgMail').value ?? '').trim();
+    if (enCampo !== String(st.cfg.mailAvisos || '').trim()) return notify('warning', 'Guardá primero', 'La prueba va a los mails guardados: tocá «Guardar» y después probá.');
+    if (!enCampo) return notify('warning', 'Falta el mail', 'Cargá al menos un mail para los avisos.');
+    btn.loading = true;
+    try {
+      const res = await window.laJamoneraProxy.postJson('/ventas/aviso-prueba', {});
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || out.ok === false) throw new Error(out.error || `Error ${res.status}`);
+      notify('success', 'Mail de prueba enviado', `Llega a ${(out.destinos || []).join(', ')} en unos segundos.`);
+    } catch (e) {
+      notify('error', 'No se pudo mandar la prueba', /email_no_configurado/.test(String(e?.message)) ? 'Falta configurar el envío de mails (Configuración → Email).' : textoError(e));
+    } finally { btn.loading = false; }
   }
 
   async function iniciar() {
     await window.laJamoneraReady;
     st.me = await window.LJMe;
+    $('vlCargando').remove();
     if (!st.me?.ver_ventas) { $('vlSinPermiso').hidden = false; return; }
     st.sb = window.supabaseLaJamonera;
     $('vlApp').hidden = false;
+    // Shoelace puede activar la pestaña antes de definir sl-tab-panel (carga diferida): el panel queda
+    // oculto. Cuando están los tres componentes se alinean los paneles con la pestaña activa.
+    Promise.all(['sl-tab-group', 'sl-tab', 'sl-tab-panel'].map((t) => customElements.whenDefined(t))).then(() => requestAnimationFrame(() => {
+      document.querySelectorAll('sl-tab-group').forEach((g) => {
+        const activa = g.querySelector(':scope > sl-tab[active]')?.panel || g.querySelector(':scope > sl-tab')?.panel;
+        g.querySelectorAll(':scope > sl-tab').forEach((t) => { t.active = t.panel === activa; });
+        g.querySelectorAll(':scope > sl-tab-panel').forEach((p) => { p.active = p.name === activa; });
+      });
+    }));
     try { await cargarConfig(); } catch (e) { notify('error', 'No se pudo leer la configuración', textoError(e)); }
     pintarSalud();
     cablear();
