@@ -65,7 +65,11 @@ export async function aplicarVentasPos({ simular = false, desde = '', hasta = ''
     .forEach((v) => {
       if (!v.ref_id || !['ingrediente', 'receta'].includes(v.tipo)) return;
       if (!vinc.has(v.cod_articulo)) vinc.set(v.cod_articulo, []);
-      vinc.get(v.cod_articulo).push({ tipo: v.tipo, ref_id: v.ref_id, factor: v.cantidad == null ? null : num(v.cantidad) });
+      const lista = vinc.get(v.cod_articulo);
+      // El mismo producto dos veces se suma en uno (los movimientos se identifican por lote y no pueden repetirse).
+      const dup = lista.find((x) => x.tipo === v.tipo && x.ref_id === v.ref_id);
+      if (dup) { dup.factor = (dup.factor ?? 1) + (v.cantidad == null ? 1 : num(v.cantidad)); return; }
+      lista.push({ tipo: v.tipo, ref_id: v.ref_id, factor: v.cantidad == null ? null : num(v.cantidad) });
     });
   const materiaPrima = new Set(cfg.excluirMateriaPrima ? (await sel(admin.rpc('pos_materia_prima'))).map((x) => (typeof x === 'string' ? x : Object.values(x)[0])) : []);
   let qc = admin.from('im5_comprobantes')

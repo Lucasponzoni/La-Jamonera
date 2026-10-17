@@ -1323,7 +1323,7 @@
     });
     const combo = grupos.length > 1;
     const facturaHtml = (c) => {
-      const urls = Array.isArray(c.factura_urls) ? c.factura_urls.filter(Boolean) : [];
+      const urls = Array.isArray(c.factura_urls) ? c.factura_urls.filter((u) => /^https:\/\//i.test(String(u || ''))) : [];
       return [c.proveedor ? escapeHtml(c.proveedor) : '', c.factura ? `Factura <b>${escapeHtml(c.factura)}</b>` : '', c.remito ? `Remito ${escapeHtml(c.remito)}` : '',
         c.lote ? `Lote ${escapeHtml(c.lote)}` : '', c.fecha_ingreso ? `ingresó ${fechaIso(c.fecha_ingreso)}` : '', c.vencimiento ? `vence ${fechaIso(c.vencimiento)}` : '',
         urls.length ? `<a href="${escapeHtml(urls[0])}" target="_blank" rel="noopener"><i class="fa-solid fa-file-invoice"></i> Ver factura</a>` : ''].filter(Boolean).join(' · ');

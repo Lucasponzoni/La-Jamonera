@@ -24,6 +24,15 @@ const digitos = (s) => str(s).replace(/\D/g, '');
 const codigoComp = (c) => `${c.tipo} ${c.letra || ''} ${String(c.punto_venta || 0).padStart(4, '0')}-${String(c.numero || 0).padStart(8, '0')}`.replace(/\s+/g, ' ');
 
 async function sel(q) { const { data, error } = await q; if (error) throw new HttpError(500, error.message); return data || []; }
+// Supabase devuelve como mucho 1000 filas por consulta: se pagina hasta traer todo.
+async function selTodo(armar, tam = 1000) {
+  const out = [];
+  for (let i = 0; ; i += tam) {
+    const filas = await sel(armar().range(i, i + tam - 1));
+    out.push(...filas);
+    if (filas.length < tam) return out;
+  }
+}
 const chunks = (arr, n) => Array.from({ length: Math.ceil(arr.length / n) }, (_, i) => arr.slice(i * n, i * n + n));
 
 // ---------- 1) Mercado Pago ----------
@@ -77,18 +86,17 @@ export async function cruzar({ desde, hasta, bajarMP = true, log = console } = {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || !/^\d{4}-\d{2}-\d{2}$/.test(hasta) || desde > hasta) throw new HttpError(400, 'fechas_invalidas');
   if (bajarMP) await bajarPagosMP(desde, hasta, log);
 
-  // Cobros con MP de IM5: pago → recibo → comprobante (fecha y hora de la venta).
-  const recibos = await sel(admin.from('im5_comprobante_recibos').select('empresa,comprobante_id,recibo_id,recibo_tipo,recibo_punto_venta,recibo_numero'));
+  // Cobros con MP de IM5: comprobante del rango → recibos que lo cancelan → pagos con MP del recibo.
   const comps = new Map();
-  const reciboDe = new Map();
-  const idsComp = [...new Set(recibos.map((r) => `${r.empresa}:${r.comprobante_id}`))];
+  (await selTodo(() => admin.from('im5_comprobantes').select('empresa,id,tipo,letra,punto_venta,numero,fecha,fecha_hora,anulada')
+    .gte('fecha', desde).lte('fecha', hasta).order('empresa').order('id'))).forEach((x) => comps.set(`${x.empresa}:${x.id}`, x));
+  const recibos = [];
   for (const emp of [1, 2]) {
-    const ids = idsComp.filter((k) => k.startsWith(`${emp}:`)).map((k) => Number(k.split(':')[1]));
-    for (const c of chunks(ids, 300)) {
-      (await sel(admin.from('im5_comprobantes').select('empresa,id,tipo,letra,punto_venta,numero,fecha,fecha_hora,anulada').eq('empresa', emp).in('id', c).gte('fecha', sumarDias(desde, -3)).lte('fecha', hasta)))
-        .forEach((x) => comps.set(`${x.empresa}:${x.id}`, x));
-    }
+    const ids = [...comps.values()].filter((c) => c.empresa === emp).map((c) => c.id);
+    for (const c of chunks(ids, 300)) recibos.push(...await selTodo(() => admin.from('im5_comprobante_recibos').select('empresa,comprobante_id,recibo_id,recibo_tipo,recibo_punto_venta,recibo_numero').eq('empresa', emp).in('comprobante_id', c).order('recibo_id')));
   }
+  // Un recibo puede cancelar varios comprobantes: se toma el primero (fecha y hora de la venta).
+  const reciboDe = new Map();
   recibos.forEach((r) => {
     const c = comps.get(`${r.empresa}:${r.comprobante_id}`);
     if (!c) return;
@@ -96,20 +104,19 @@ export async function cruzar({ desde, hasta, bajarMP = true, log = console } = {
     const prev = reciboDe.get(k);
     if (!prev || str(c.fecha_hora) < str(prev.c.fecha_hora)) reciboDe.set(k, { c, r });
   });
-  const recIds = [...new Set([...reciboDe.keys()])];
   const pagosIm5 = [];
   for (const emp of [1, 2]) {
-    const ids = recIds.filter((k) => k.startsWith(`${emp}:`)).map((k) => Number(k.split(':')[1]));
+    const ids = [...reciboDe.keys()].filter((k) => k.startsWith(`${emp}:`)).map((k) => Number(k.split(':')[1]));
     for (const c of chunks(ids, 300)) {
-      pagosIm5.push(...await sel(admin.from('im5_pagos').select('empresa,id,recibo_id,medio,importe,cupon,id_pago_externo,cod_tarjeta').eq('empresa', emp).in('recibo_id', c).in('cod_tarjeta', TARJETAS_MP)));
+      pagosIm5.push(...await selTodo(() => admin.from('im5_pagos').select('empresa,id,recibo_id,medio,importe,cupon,id_pago_externo,cod_tarjeta').eq('empresa', emp).in('recibo_id', c).in('cod_tarjeta', TARJETAS_MP).order('id')));
     }
   }
   const enRango = pagosIm5.map((p) => ({ p, ...reciboDe.get(`${p.empresa}:${p.recibo_id}`) }))
     .filter((x) => x.c && !x.c.anulada && x.c.fecha >= desde && x.c.fecha <= hasta);
 
   // Pagos de MP del rango (± 1 día por la hora) + los que IM5 nombra por id aunque sean de otra fecha.
-  const mpRango = await sel(admin.from('im5_mp_pagos').select('id_pago,estado,monto,neto,comision,aprobado_at,acreditacion_at,origen,raw')
-    .gte('aprobado_at', isoAR(sumarDias(desde, -1))).lte('aprobado_at', isoAR(sumarDias(hasta, 1), true)));
+  const mpRango = await selTodo(() => admin.from('im5_mp_pagos').select('id_pago,estado,monto,neto,comision,aprobado_at,acreditacion_at,origen,raw')
+    .gte('aprobado_at', isoAR(sumarDias(desde, -1))).lte('aprobado_at', isoAR(sumarDias(hasta, 1), true)).order('id_pago'));
   const mpPorId = new Map(mpRango.map((m) => [m.id_pago, m]));
   const pedidos = [...new Set(enRango.map(({ p }) => str(p.id_pago_externo) || digitos(p.cupon)).filter((id) => /^\d{6,20}$/.test(id) && !mpPorId.has(id)))];
   for (const c of chunks(pedidos, 300)) (await sel(admin.from('im5_mp_pagos').select('id_pago,estado,monto,neto,comision,aprobado_at,acreditacion_at,origen,raw').in('id_pago', c))).forEach((m) => mpPorId.set(m.id_pago, m));
@@ -192,7 +199,7 @@ export async function cruzar({ desde, hasta, bajarMP = true, log = console } = {
     const { error } = await admin.from('conciliacion_mp').upsert(c, { onConflict: 'clave' });
     if (error) throw new HttpError(500, error.message);
   }
-  const viejas = await sel(admin.from('conciliacion_mp').select('clave').gte('fecha', desde).lte('fecha', hasta).is('grabado_im5_at', null));
+  const viejas = await selTodo(() => admin.from('conciliacion_mp').select('clave').gte('fecha', desde).lte('fecha', hasta).is('grabado_im5_at', null).order('clave'));
   const borrar = viejas.map((v) => v.clave).filter((k) => !claves.has(k));
   for (const c of chunks(borrar, 300)) await admin.from('conciliacion_mp').delete().in('clave', c);
 

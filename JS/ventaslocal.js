@@ -586,7 +586,7 @@
   }
   // Unidad en la que baja cada componente: el ingrediente en su unidad de stock; lo producido, siempre en kilos.
   const UNIDAD_CORTA = { kilos: 'kg', kilo: 'kg', kg: 'kg', gramos: 'g', g: 'g', litros: 'l', litro: 'l', l: 'l', ml: 'ml', unidades: 'u.', unidad: 'u.', u: 'u.', paquete: 'paq.', paquetes: 'paq.', lata: 'lata', rollos: 'rollo' };
-  const unidadComp = (it) => (it.tipo === 'receta' ? 'kg' : UNIDAD_CORTA[normal(it.unidad)] || it.unidad || 'u.');
+  const unidadComp = (it) => (it.tipo === 'receta' ? 'kg' : UNIDAD_CORTA[normal(it.unidad)] || it.unidad || 'unid. de stock');
   const fmtCant = (n) => fmtNum.format(Math.round(Number(n) * 1000) / 1000);
   // «3 u. Pebete super pancho x12 + 6 u. Salchichas» (por cada 1 vendido).
   const textoComps = (comps) => comps.map((c) => (c.cantidad == null ? `${c.item.nombre} (lo vendido)` : `${fmtCant(c.cantidad)} ${unidadComp(c.item)} ${c.item.nombre}`)).join(' + ');
@@ -813,6 +813,15 @@
   }
   // Panel «Se descuenta»: los productos elegidos con cuánto baja cada uno por cada 1 vendido.
   const leerCant = (s) => { const n = Number(String(s ?? '').trim().replace(',', '.')); return String(s ?? '').trim() && Number.isFinite(n) && n > 0 ? n : null; };
+  // Ayuda de cada componente: cuánto baja, o aviso si una promo por unidad deja vacío algo que va en kilos.
+  function hintComp(c, it, porUnidad) {
+    const r = it.tipo === 'receta';
+    const u = unidadComp(it);
+    const uTxt = esc(u.replace(/\.$/, ''));
+    const vacio = leerCant(c.cantidad) == null;
+    if (vacio && porUnidad && (r || u !== 'u.')) return `<small class="vl-comp-aviso"><i class="fa-solid fa-triangle-exclamation"></i>Se vende por unidad: poné cuántos ${r ? 'kg' : uTxt} trae cada una.</small>`;
+    return `<small>${vacio ? `Vacío: baja lo mismo que se vende (en ${uTxt}).` : `Por cada 1 vendido baja ${esc(fmtCant(leerCant(c.cantidad)))} ${uTxt}.`}</small>`;
+  }
   function pintarVincComps() {
     const e = st.vincEdit; if (!e) return;
     const porUnidad = pideCantidad(e.desc);
@@ -820,10 +829,7 @@
       const it = e.catalogo.get(c.k); if (!it) return '';
       const r = it.tipo === 'receta';
       const u = unidadComp(it);
-      const vacio = leerCant(c.cantidad) == null;
-      const aviso = vacio && porUnidad && (r || u !== 'u.')
-        ? `<small class="vl-comp-aviso"><i class="fa-solid fa-triangle-exclamation"></i>Se vende por unidad: poné cuántos ${r ? 'kg' : u} trae cada una.</small>`
-        : `<small>${vacio ? `Vacío: baja lo mismo que se vende (en ${u.replace(/\.$/, '')}).` : `Por cada 1 vendido baja ${esc(fmtCant(leerCant(c.cantidad)))} ${esc(u.replace(/\.$/, ''))}.`}</small>`;
+      const aviso = `<span class="vl-comp-hint">${hintComp(c, it, porUnidad)}</span>`;
       return `<li class="vl-cmpt">
         <span class="vl-prod-img">${it.img ? `<img src="${esc((window.ljThumb || String)(it.img, 96))}" alt="" loading="lazy">` : `<i class="fa-solid ${r ? 'fa-industry' : 'fa-box-open'}"></i>`}</span>
         <span class="vl-comp-txt"><b>${esc(it.nombre)}</b><span class="vl-vinc ${r ? 'is-receta' : 'is-ing'}"><i class="fa-solid ${r ? 'fa-industry' : 'fa-boxes-stacked'}"></i>${r ? 'Producción' : 'Inventario'}</span>${aviso}</span>
@@ -854,7 +860,8 @@
     if (tipo === 'ninguno') {
       fila = { cod_articulo: e.cod, descripcion: e.desc || null, tipo: 'ninguno', ref_id: null, factor: null, componentes: null };
     } else {
-      const comps = e.comps.map((c) => { const i = c.k.indexOf(':'); return { tipo: c.k.slice(0, i), ref_id: c.k.slice(i + 1), cantidad: leerCant(c.cantidad) }; });
+      // Sólo productos que siguen existiendo (un ingrediente borrado no se guarda en silencio).
+      const comps = e.comps.filter((c) => e.catalogo.has(c.k)).map((c) => { const i = c.k.indexOf(':'); return { tipo: c.k.slice(0, i), ref_id: c.k.slice(i + 1), cantidad: leerCant(c.cantidad) }; });
       if (!comps.length) return notify('warning', 'Elegí un producto', 'Tocá en la lista lo que es en la fábrica (para una promo, cada producto que trae), o marcá «No es de la fábrica».');
       const malos = e.comps.filter((c) => String(c.cantidad ?? '').trim() && leerCant(c.cantidad) == null);
       if (malos.length) return notify('warning', 'Cantidad inválida', 'Las cantidades tienen que ser números mayores a 0 (o vacías).');
@@ -1394,10 +1401,13 @@
     });
     $('vlVincComps').addEventListener('sl-input', (e) => {
       const i = Number(e.target.closest('[data-comp-cant]')?.dataset.compCant); if (!st.vincEdit || !Number.isInteger(i)) return;
-      st.vincEdit.comps[i].cantidad = String(e.target.value ?? '');
+      const c = st.vincEdit.comps[i];
+      c.cantidad = String(e.target.value ?? '');
+      const it = st.vincEdit.catalogo.get(c.k);
+      const hint = e.target.closest('.vl-cmpt')?.querySelector('.vl-comp-hint');
+      if (it && hint) hint.innerHTML = hintComp(c, it, pideCantidad(st.vincEdit.desc));
       pintarVincPrevia();
     });
-    $('vlVincComps').addEventListener('sl-change', () => { const f = document.activeElement; pintarVincComps(); if (f?.dataset?.compCant) $('vlVincComps').querySelector(`[data-comp-cant="${f.dataset.compCant}"]`)?.focus(); });
     $('vlVincComps').addEventListener('click', (e) => {
       const b = e.target.closest('[data-comp-quitar]'); if (!b || !st.vincEdit) return;
       st.vincEdit.comps.splice(Number(b.dataset.compQuitar), 1);
