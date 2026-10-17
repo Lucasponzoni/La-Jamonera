@@ -505,3 +505,74 @@ sl-dialog.vl-dialog { --width: min(760px, 96vw); }
   .vc-acciones { width: 100%; }
   .vc-acciones sl-button { flex: 1; }
 }
+
+/* Conciliación v2: cabecera, explicación, resolver, config */
+.vc-head { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.vc-head-tit { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.vc-head-tit h2 { margin: 0; font-size: 1.05rem; color: var(--lj-text); }
+.vc-head-logo { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: #fff; border: 1px solid var(--lj-border); flex: none; }
+.vc-cron { margin: 3px 0 0; display: flex; gap: 6px 14px; flex-wrap: wrap; align-items: center; font-size: .78rem; color: var(--lj-muted); }
+.vc-cron b { color: var(--lj-text); font-weight: 600; }
+.vc-cron-chip { display: inline-flex; gap: 6px; align-items: center; padding: 2px 9px; border-radius: 999px; background: var(--lj-accent-soft); color: var(--lj-accent); font-weight: 600; }
+.vc-cron-chip.is-off { background: var(--lj-surface-2); color: var(--lj-muted); }
+.vc-cron-mal { color: var(--lj-danger); font-weight: 600; }
+.vc-explica { border: 1px solid var(--lj-border); border-radius: var(--lj-radius-lg); background: var(--lj-surface-2); }
+.vc-explica > summary { cursor: pointer; list-style: none; padding: 10px 12px; font-size: .86rem; font-weight: 600; color: var(--lj-text); display: flex; gap: 8px; align-items: center; }
+.vc-explica > summary::-webkit-details-marker { display: none; }
+.vc-explica > summary i { color: var(--lj-accent); }
+.vc-explica-ver { margin-left: auto; font-size: .76rem; color: var(--lj-accent); }
+.vc-explica[open] .vc-explica-ver { display: none; }
+.vc-pasos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 0 12px 12px; }
+.vc-paso { display: flex; gap: 10px; padding: 10px; border-radius: 10px; background: var(--lj-surface); border: 1px solid var(--lj-border); }
+.vc-paso b { font-size: .84rem; color: var(--lj-text); }
+.vc-paso p { margin: 4px 0 0; font-size: .78rem; line-height: 1.45; color: var(--lj-muted); }
+.vc-paso-n { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: .8rem; font-weight: 800; background: var(--lj-accent-soft); color: var(--lj-accent); }
+.vc-paso.is-no .vc-paso-n { background: var(--lj-danger-soft); color: var(--lj-danger); }
+.vc-estado.is-res { background: #ede9fe; color: #6d28d9; }
+.sl-theme-dark .vc-estado.is-res { background: #2e1f57; color: #c4b5fd; }
+.vc-col-acc { width: 1%; white-space: nowrap; text-align: right; }
+.vc-res-lados { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: center; }
+.vc-res-lados > div { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--lj-border); border-radius: 10px; background: var(--lj-surface-2); min-width: 0; }
+.vc-res-lados > div > span { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; color: var(--lj-muted); }
+.vc-res-lados small { color: var(--lj-muted); font-size: .76rem; overflow-wrap: anywhere; }
+.vc-res-lados > i { color: var(--lj-muted); }
+.vc-res-imp { font-size: 1.05rem; }
+.vc-res-estado { font-size: .82rem; color: var(--lj-muted); margin: 10px 0; line-height: 1.5; }
+.vc-cands { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; max-height: 34vh; overflow-y: auto; }
+.vc-cands li:not(.vl-ayuda) { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--lj-border); border-radius: 10px; }
+.vc-cands li.is-usado { opacity: .65; }
+.vc-cands li > div { display: grid; gap: 2px; min-width: 0; }
+.vc-cands small { font-size: .74rem; color: var(--lj-muted); }
+.vc-cands li > b { text-align: right; display: grid; font-size: .86rem; }
+.vc-cands .vc-igual small { color: var(--lj-success); }
+.vc-cands .vc-dif small { color: var(--lj-danger); }
+.vc-res-manual { display: flex; gap: 8px; margin-bottom: 6px; }
+.vc-res-manual sl-input { flex: 1; }
+.vc-motivos { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; margin-bottom: 8px; }
+.vc-motivo { display: grid; gap: 2px; text-align: left; padding: 8px 10px; border: 1px solid var(--lj-border); border-radius: 10px; background: var(--lj-surface); color: var(--lj-text); font: inherit; cursor: pointer; }
+.vc-motivo i { color: var(--lj-muted); }
+.vc-motivo b { font-size: .82rem; }
+.vc-motivo small { font-size: .72rem; color: var(--lj-muted); line-height: 1.35; }
+.vc-motivo.is-sel { border-color: var(--lj-accent); background: var(--lj-accent-soft); }
+.vc-motivo.is-sel i { color: var(--lj-accent); }
+.vc-mail-dialog { --width: min(820px, 96vw); }
+.vc-mail-frame { width: 100%; height: 70vh; border: 1px solid var(--lj-border); border-radius: 10px; background: #f4f7ff; }
+.vc-cfg-fila { flex-wrap: wrap; margin-top: 10px; }
+.vc-cfg-fila [hidden], .vl-dias[hidden] { display: none !important; }
+.vc-cfg-atras { max-width: 260px; margin-top: 10px; }
+#cfgConcDias { margin-top: 10px; }
+.vc-avisos { display: grid; gap: 6px; margin-bottom: 10px; }
+.vc-aviso { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "chk dia acc" "txt txt txt"; gap: 2px 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--lj-border); border-radius: 10px; background: var(--lj-surface); }
+.vc-aviso sl-checkbox { grid-area: chk; }
+.vc-aviso small { grid-area: txt; font-size: .74rem; color: var(--lj-muted); }
+.vc-aviso-dia { grid-area: dia; width: 130px; }
+.vc-aviso-acc { grid-area: acc; display: inline-flex; }
+@media (max-width: 1100px) { .vc-pasos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+  .vc-pasos { grid-template-columns: 1fr; }
+  .vc-res-lados { grid-template-columns: 1fr; }
+  .vc-res-lados > i { justify-self: center; transform: rotate(90deg); }
+  .vc-cands li:not(.vl-ayuda) { grid-template-columns: minmax(0, 1fr) auto; }
+  .vc-cands li sl-button { grid-column: 1 / 3; }
+}
+.vc-tabla .vl-fecha b { white-space: nowrap; }

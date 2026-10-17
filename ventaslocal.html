@@ -30,10 +30,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202610170120">
-  <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202610170120">
-  <link rel="stylesheet" href="./CSS/theme.css?v=202610170120">
-  <link rel="stylesheet" href="./CSS/utilities.css?v=202610170120">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202610170142">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202610170142">
+  <link rel="stylesheet" href="./CSS/theme.css?v=202610170142">
+  <link rel="stylesheet" href="./CSS/utilities.css?v=202610170142">
   <script type="module">
     import { setBasePath } from './vendor/shoelace/utilities/base-path.js?v=202608282255';
     setBasePath(new URL('./vendor/shoelace/', document.baseURI).href.slice(0, -1));
@@ -41,12 +41,12 @@
     const ljCore = [...new Set([...document.querySelectorAll('sl-button, sl-input, sl-icon, sl-dialog, sl-dropdown, sl-drawer, sl-spinner, sl-icon-button')].map((n) => n.localName))].map((t) => customElements.whenDefined(t));
     Promise.race([Promise.allSettled(ljCore), new Promise((r) => setTimeout(r, 2500))]).then(() => document.documentElement.classList.add('lj-ready'));
   </script>
-  <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202610170120">
-  <link rel="stylesheet" href="./CSS/legacy/03-componentes.css?v=202610170120">
-  <link rel="stylesheet" href="./CSS/legacy/04-informes.css?v=202610170120">
-  <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202610170120">
-  <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202610170120">
-  <link rel="stylesheet" href="./CSS/ventaslocal.css?v=202610170120">
+  <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202610170142">
+  <link rel="stylesheet" href="./CSS/legacy/03-componentes.css?v=202610170142">
+  <link rel="stylesheet" href="./CSS/legacy/04-informes.css?v=202610170142">
+  <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202610170142">
+  <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202610170142">
+  <link rel="stylesheet" href="./CSS/ventaslocal.css?v=202610170142">
 </head>
 <body>
   <main class="app-shell container-fluid px-0">
@@ -234,14 +234,28 @@
 
             <sl-tab-panel name="conciliacion">
               <section class="vl-card vc-card">
-                <div class="vc-intro">
-                  <p class="vl-ayuda"><b>Cobros con Mercado Pago de InfoManager contra la cuenta real de Mercado Pago</b> (Point, QR y MERCADO PAGO 1/2), para el período elegido arriba. Se cruza solo todos los días a las 7:00; los lunes llega el resumen para grabar y el día 1, el cierre del mes.</p>
+                <header class="vc-head">
+                  <div class="vc-head-tit">
+                    <span class="vc-head-logo"><img src="./IMG/pagos/mercadopago.svg" alt="" width="22" height="22"></span>
+                    <div>
+                      <h2>Conciliación Mercado Pago ↔ InfoManager</h2>
+                      <p class="vc-cron" id="vcCron"></p>
+                    </div>
+                  </div>
                   <div class="vc-acciones">
-                    <span class="vl-ayuda" id="vcActualizado"></span>
-                    <sl-button size="small" variant="default" id="vcActualizar"><i slot="prefix" class="fa-solid fa-arrows-rotate"></i>Actualizar cruce</sl-button>
+                    <sl-button size="small" variant="default" id="vcActualizar"><i slot="prefix" class="fa-solid fa-arrows-rotate"></i>Cruzar ahora</sl-button>
                     <sl-button size="small" variant="primary" id="vcGrabar" data-solo-admin disabled><i slot="prefix" class="fa-solid fa-file-signature"></i>Grabar en IM5<span class="vc-sel-n" id="vcSelN"></span></sl-button>
                   </div>
-                </div>
+                </header>
+                <details class="vc-explica" id="vcExplica">
+                  <summary><i class="fa-solid fa-circle-info"></i> Qué hace la conciliación y qué registra en InfoManager <span class="vc-explica-ver">Ver</span></summary>
+                  <div class="vc-pasos">
+                    <div class="vc-paso"><span class="vc-paso-n">1</span><div><b>Cruza (sólo lee)</b><p>Trae los pagos de la cuenta de Mercado Pago y los cobros con MP de InfoManager (Point, QR y MERCADO PAGO 1/2) del período y los une por id de pago, por el n° de operación del cupón o, si no hay número, por importe y hora. No escribe nada.</p></div></div>
+                    <div class="vc-paso"><span class="vc-paso-n">2</span><div><b>Vos resolvés lo que no cierra</b><p>Cada diferencia tiene «Resolver»: vincular con el pago correcto, aceptar la diferencia o marcar el motivo (otro canal, fuera de IM5, error de la cajera). Queda quién y cuándo, y el próximo cruce lo respeta.</p></div></div>
+                    <div class="vc-paso"><span class="vc-paso-n">3</span><div><b>Graba en IM5, con tu confirmación</b><p>En <b>Contabilidad → Conciliación de Tarjetas</b> marca cada cupón elegido como <b>conciliado</b>, con fecha de conciliación = hoy, <b>fecha de acreditación = la real de Mercado Pago</b> y <b>resumen = AAAAMMDD de la liberación</b> (agrupa el día). Lote y liquidación quedan en 0. Después relee IM5 para verificar.</p></div></div>
+                    <div class="vc-paso is-no"><span class="vc-paso-n"><i class="fa-solid fa-ban"></i></span><div><b>Nunca toca</b><p>Ventas, recibos, cobros, caja ni asientos de InfoManager, y la cuenta de Mercado Pago es sólo lectura (no cobra, no devuelve, no renueva el token). Sólo graba lo conciliado y ya liberado por MP.</p></div></div>
+                  </div>
+                </details>
                 <div id="vcKpis" class="vc-kpis"></div>
                 <div class="analisis-type-chips vc-filtros" id="vcFiltros" role="group" aria-label="Filtrar por estado"></div>
                 <div class="vl-tabla-wrap">
@@ -256,6 +270,7 @@
                         <th class="vl-num">Bruto / neto</th>
                         <th class="vl-ocultar-movil">Se libera</th>
                         <th>Estado</th>
+                        <th class="vc-col-acc"></th>
                       </tr>
                     </thead>
                     <tbody id="vcBody"></tbody>
@@ -268,6 +283,23 @@
           </div>
         </div>
       </div>
+
+      <!-- Conciliación: resolver una diferencia -->
+      <sl-dialog id="vcResDialog" class="lj-modal informes-modal vl-dialog vc-res-dialog" label="Resolver diferencia">
+        <div slot="label" class="lj-dialog-title">
+          <h5 class="lj-dialog-heading"><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i> Resolver</h5>
+        </div>
+        <div class="lj-dialog-body">
+          <div id="vcResCuerpo"></div>
+        </div>
+      </sl-dialog>
+      <!-- Conciliación: vista previa de un aviso por mail -->
+      <sl-dialog id="vcMailDialog" class="lj-modal informes-modal vl-dialog vc-mail-dialog" label="Vista previa del aviso">
+        <div slot="label" class="lj-dialog-title">
+          <h5 class="lj-dialog-heading"><i class="fa-solid fa-envelope-open-text" aria-hidden="true"></i> Vista previa del aviso</h5>
+        </div>
+        <div class="lj-dialog-body"><iframe id="vcMailFrame" title="Vista previa del mail" class="vc-mail-frame"></iframe></div>
+      </sl-dialog>
 
       <!-- Conciliación: vista previa antes de grabar en IM5 -->
       <sl-dialog id="vcDialog" class="lj-modal informes-modal vl-dialog" label="Grabar conciliación en InfoManager">
@@ -460,14 +492,39 @@
               <div class="vl-form">
                 <p class="vl-ayuda">Cruza los cobros con Mercado Pago de InfoManager contra la cuenta de Mercado Pago (el token sale de la pestaña Mercado Pago). Grabar en InfoManager lo hace siempre un admin, con vista previa y confirmación.</p>
                 <div class="vl-bloque">
-                  <sl-switch id="cfgConcActiva">Cruce automático todos los días a las 7:00</sl-switch>
-                  <p class="vl-ayuda">Revisa los últimos 35 días: devoluciones y contracargos pueden aparecer tarde.</p>
+                  <sl-switch id="cfgConcActiva">Cruce automático prendido</sl-switch>
+                  <p class="vl-ayuda" id="cfgConcResumen"></p>
                 </div>
                 <div class="vl-bloque">
-                  <sl-switch id="cfgConcAvisos">Mandar avisos por mail</sl-switch>
-                  <p class="vl-ayuda">Los lunes: cuántos cobros están listos para grabar y las diferencias abiertas. El día 1: cierre del mes anterior. Van a los mails de la pestaña Sincronización.</p>
+                  <sl-radio-group id="cfgConcModo" label="Frecuencia" size="small" value="diario">
+                    <sl-radio-button value="diario">Todos los días</sl-radio-button>
+                    <sl-radio-button value="cada_dias">Cada X días</sl-radio-button>
+                    <sl-radio-button value="semanal">Días de la semana</sl-radio-button>
+                    <sl-radio-button value="horas">Cada X horas</sl-radio-button>
+                  </sl-radio-group>
+                  <div class="vl-form-fila vc-cfg-fila">
+                    <sl-select id="cfgConcHora" label="A las" hoist data-conc-modo="diario cada_dias semanal"></sl-select>
+                    <sl-input id="cfgConcCadaDias" type="number" min="1" max="31" label="Cada (días)" data-conc-modo="cada_dias"></sl-input>
+                    <sl-input id="cfgConcCadaHoras" type="number" min="1" max="24" label="Cada (horas)" data-conc-modo="horas"></sl-input>
+                    <sl-select id="cfgConcDesde" label="Desde las" hoist data-conc-modo="horas"></sl-select>
+                    <sl-select id="cfgConcHasta" label="Hasta las" hoist data-conc-modo="horas"></sl-select>
+                  </div>
+                  <div class="vl-dias" id="cfgConcDias" role="group" aria-label="Días del cruce" data-conc-modo="semanal">
+                    <button type="button" data-cdia="1">Lun</button><button type="button" data-cdia="2">Mar</button><button type="button" data-cdia="3">Mié</button><button type="button" data-cdia="4">Jue</button><button type="button" data-cdia="5">Vie</button><button type="button" data-cdia="6">Sáb</button><button type="button" data-cdia="0">Dom</button>
+                  </div>
+                  <sl-input id="cfgConcDiasAtras" type="number" min="3" max="90" label="Revisar los últimos (días)" help-text="Devoluciones y contracargos aparecen tarde: 35 días es lo recomendado." class="vc-cfg-atras"></sl-input>
                 </div>
-                <div class="vl-mp-aviso"><i class="fa-solid fa-circle-info"></i><span><b>Cómo se cruza:</b> por el id de pago del Point o QR; si no, por el número de operación que la cajera carga en el cupón (MERCADO PAGO 1/2); si no hay número, por importe y hora (± 10 min), y sólo si hay un único pago que coincide (queda «Revisar»). Sólo se graba lo conciliado y ya liberado por Mercado Pago.</span></div>
+                <div class="vl-bloque">
+                  <p class="vl-detalle-tit"><i class="fa-solid fa-envelope"></i> Avisos por mail</p>
+                  <div class="vc-avisos">
+                    <div class="vc-aviso"><sl-checkbox id="cfgAvDif">Diferencias nuevas</sl-checkbox><small>Cuando un cruce encuentra cobros que no coinciden, con el detalle.</small><span class="vc-aviso-acc"><sl-icon-button name="eye" label="Vista previa" data-av-previa="diferencias"></sl-icon-button><sl-icon-button name="send" label="Enviar prueba" data-av-prueba="diferencias"></sl-icon-button></span></div>
+                    <div class="vc-aviso"><sl-checkbox id="cfgAvListos">Listos para grabar</sl-checkbox><small>Una vez por semana, el día elegido: cuántos cupones están para grabar.</small><sl-select id="cfgAvListosDia" size="small" hoist class="vc-aviso-dia"><sl-option value="1">Lunes</sl-option><sl-option value="2">Martes</sl-option><sl-option value="3">Miércoles</sl-option><sl-option value="4">Jueves</sl-option><sl-option value="5">Viernes</sl-option><sl-option value="6">Sábado</sl-option><sl-option value="0">Domingo</sl-option></sl-select><span class="vc-aviso-acc"><sl-icon-button name="eye" label="Vista previa" data-av-previa="listos"></sl-icon-button><sl-icon-button name="send" label="Enviar prueba" data-av-prueba="listos"></sl-icon-button></span></div>
+                    <div class="vc-aviso"><sl-checkbox id="cfgAvCierre">Cierre del mes</sl-checkbox><small>El día 1: cómo cerró el mes anterior.</small><span class="vc-aviso-acc"><sl-icon-button name="eye" label="Vista previa" data-av-previa="cierre"></sl-icon-button><sl-icon-button name="send" label="Enviar prueba" data-av-prueba="cierre"></sl-icon-button></span></div>
+                    <div class="vc-aviso"><sl-checkbox id="cfgAvResumen">Resumen de cada cruce</sl-checkbox><small>Después de cada corrida automática (puede ser mucho si es cada pocas horas).</small><span class="vc-aviso-acc"><sl-icon-button name="eye" label="Vista previa" data-av-previa="resumen"></sl-icon-button><sl-icon-button name="send" label="Enviar prueba" data-av-prueba="resumen"></sl-icon-button></span></div>
+                    <div class="vc-aviso"><sl-checkbox id="cfgAvFalla">Falla del cruce</sl-checkbox><small>Si no se pudo conciliar (como mucho uno por día).</small><span class="vc-aviso-acc"><sl-icon-button name="eye" label="Vista previa" data-av-previa="falla"></sl-icon-button><sl-icon-button name="send" label="Enviar prueba" data-av-prueba="falla"></sl-icon-button></span></div>
+                  </div>
+                  <sl-input id="cfgConcMails" label="Mandar a" placeholder="Vacío = los mails de la pestaña Sincronización" help-text="Separados por coma." autocomplete="off"></sl-input>
+                </div>
               </div>
             </sl-tab-panel>
 
@@ -561,25 +618,25 @@
     </section>
   </main>
 
-  <script src="./JS/data/backend.js?v=202610170120"></script>
+  <script src="./JS/data/backend.js?v=202610170142"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-  <script src="./vendor/echarts/echarts.min.js?v=202610170120"></script>
-  <script src="./JS/ui/forms.js?v=202610170120"></script>
-  <script src="./JS/ui/theme.js?v=202610170120"></script>
-  <script src="./JS/ui/modal.js?v=202610170120"></script>
-  <script src="./JS/ui/lj-alert.js?v=202610170120"></script>
-  <script src="./JS/ui/header.js?v=202610170120"></script>
-  <script src="./JS/data/config.js?v=202610170120"></script>
-  <script src="./JS/data/supabase-init.js?v=202610170120"></script>
-  <script src="./JS/firebase-init.js?v=202610170120"></script>
-  <script src="./JS/data/security.js?v=202610170120"></script>
-  <script src="./JS/proxy-client.js?v=202610170120"></script>
-  <script src="./JS/data/authz.js?v=202610170120"></script>
-  <script src="./JS/configuracion.js?v=202610170120"></script>
-  <script src="./JS/Notificaciones.js?v=202610170120"></script>
-  <script src="./JS/app.js?v=202610170120"></script>
-  <script src="./JS/ventaslocal.js?v=202610170120"></script>
+  <script src="./vendor/echarts/echarts.min.js?v=202610170142"></script>
+  <script src="./JS/ui/forms.js?v=202610170142"></script>
+  <script src="./JS/ui/theme.js?v=202610170142"></script>
+  <script src="./JS/ui/modal.js?v=202610170142"></script>
+  <script src="./JS/ui/lj-alert.js?v=202610170142"></script>
+  <script src="./JS/ui/header.js?v=202610170142"></script>
+  <script src="./JS/data/config.js?v=202610170142"></script>
+  <script src="./JS/data/supabase-init.js?v=202610170142"></script>
+  <script src="./JS/firebase-init.js?v=202610170142"></script>
+  <script src="./JS/data/security.js?v=202610170142"></script>
+  <script src="./JS/proxy-client.js?v=202610170142"></script>
+  <script src="./JS/data/authz.js?v=202610170142"></script>
+  <script src="./JS/configuracion.js?v=202610170142"></script>
+  <script src="./JS/Notificaciones.js?v=202610170142"></script>
+  <script src="./JS/app.js?v=202610170142"></script>
+  <script src="./JS/ventaslocal.js?v=202610170142"></script>
 </body>
 </html>

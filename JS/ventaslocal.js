@@ -1069,8 +1069,7 @@
     $('cfgDesde').innerHTML = horas; $('cfgHasta').innerHTML = horas;
     customElements.whenDefined('sl-option').then(() => {
       $('cfgActiva').checked = cfg.activa !== false;
-      $('cfgConcActiva').checked = cfg.conciliacion?.activa !== false;
-      $('cfgConcAvisos').checked = cfg.conciliacion?.avisos !== false;
+      pintarCfgConc(cfg.conciliacion || {});
       $('cfgDesde').value = String(cfg.desde ?? 8);
       $('cfgHasta').value = String(cfg.hasta ?? 19);
       $('cfgCada').value = String(cfg.cadaMin ?? 120);
@@ -1137,7 +1136,10 @@
         st.cfg.pos = pos;
       }
       if (st.me?.admin) {
-        const { data: conc, error: e3 } = await st.sb.rpc('conciliacion_config_guardar', { p_conc: { activa: Boolean($('cfgConcActiva').checked), avisos: Boolean($('cfgConcAvisos').checked) } });
+        const cc = leerCfgConc();
+        if (cc.modo === 'semanal' && !cc.dias.length) throw new Error('Elegí al menos un día para el cruce.');
+        if (cc.modo === 'horas' && cc.desde > cc.hasta) throw new Error('La franja del cruce está al revés (desde > hasta).');
+        const { data: conc, error: e3 } = await st.sb.rpc('conciliacion_config_guardar', { p_conc: cc });
         if (e3) throw e3;
         st.cfg.conciliacion = conc;
       }
@@ -1343,8 +1345,25 @@
     devuelto: ['Devuelto en MP', 'is-esp', 'fa-rotate-left', 'Mercado Pago lo devolvió o canceló.'],
     devolucion: ['Devolución', 'is-neu', 'fa-rotate-left', 'Renglón negativo de IM5 (nota de crédito devuelta).']
   };
-  const ORDEN_CONC = ['todos', 'listos', 'conciliado', 'pendiente_liberacion', 'revisar', 'dif_importe', 'falta_en_mp', 'falta_en_im5', 'devuelto', 'devolucion', 'grabados'];
+  const ORDEN_CONC = ['todos', 'listos', 'conciliado', 'pendiente_liberacion', 'revisar', 'dif_importe', 'falta_en_mp', 'falta_en_im5', 'devuelto', 'devolucion', 'resueltos', 'grabados'];
   st.conc = { filtro: 'todos', filas: [], sel: new Set(), cargando: false, limite: 100 };
+  const RESOL = {
+    aceptado: ['Aceptar la diferencia', 'fa-handshake', 'El importe o el pago no coinciden pero está bien así.'],
+    otro_canal: ['Es de otro canal', 'fa-store-slash', 'Pago de MP que no es del local (web, otro punto de venta, transferencia).'],
+    fuera_de_im5: ['Se registra fuera de IM5', 'fa-file-circle-xmark', 'Cobro que no va a tener comprobante en InfoManager.'],
+    error_cajera: ['Error de la cajera', 'fa-user-pen', 'Medio o cupón mal cargado: se corrige en InfoManager.'],
+    ignorado: ['Ignorar', 'fa-eye-slash', 'No hace falta conciliarlo.']
+  };
+  const DIAS_TXT = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+  const hh = (n) => `${String(n).padStart(2, '0')}:00`;
+  function textoFrecuencia(c = {}) {
+    if (c.activa === false) return 'Cruce automático apagado';
+    const m = c.modo || 'diario';
+    if (m === 'horas') return `Automática cada ${c.cadaHoras || 6} h, de ${hh(c.desde ?? 8)} a ${hh(c.hasta ?? 21)}`;
+    if (m === 'semanal') return `Automática los ${(c.dias || [1, 2, 3, 4, 5, 6]).map((d) => DIAS_TXT[d]).join(', ')} a las ${hh(c.hora ?? 7)}`;
+    if (m === 'cada_dias') return `Automática cada ${c.cadaDias || 1} día${Number(c.cadaDias) === 1 ? '' : 's'} a las ${hh(c.hora ?? 7)}`;
+    return `Automática todos los días a las ${hh(c.hora ?? 7)}`;
+  }
   const esAdmin = () => Boolean(st.me?.admin);
   const liberado = (f) => f.mp_liberacion_at && Date.parse(f.mp_liberacion_at) <= Date.now();
   // «Revisar» con el mismo importe y pago aprobado también se puede grabar: elegirlo es la revisión.
@@ -1364,19 +1383,21 @@
     if (st.conc.cargando) return;
     st.conc.cargando = true;
     const { desde, hasta } = st.rango;
-    $('vcBody').innerHTML = '<tr><td colspan="8" class="vl-cargando"><sl-spinner></sl-spinner></td></tr>';
+    $('vcBody').innerHTML = '<tr><td colspan="9" class="vl-cargando"><sl-spinner></sl-spinner></td></tr>';
     try {
-      const [res, filas] = await Promise.all([
+      const [res, filas, est] = await Promise.all([
         st.sb.rpc('conciliacion_mp_resumen', { p_desde: desde, p_hasta: hasta }),
-        leerTodo(() => st.sb.from('conciliacion_mp').select('*').gte('fecha', desde).lte('fecha', hasta).order('fecha_hora', { ascending: false, nullsFirst: false }).order('clave'))
+        leerTodo(() => st.sb.from('conciliacion_mp').select('*').gte('fecha', desde).lte('fecha', hasta).order('fecha_hora', { ascending: false, nullsFirst: false }).order('clave')),
+        st.sb.from('conciliacion_mp_estado').select('*').eq('id', 1).maybeSingle()
       ]);
+      st.conc.estado = est?.data || {};
       if (res.error) throw res.error;
       st.conc.resumen = res.data || {};
       st.conc.filas = (st.empresa ? filas.filter((f) => f.empresa == null || f.empresa === st.empresa) : filas);
       st.conc.sel = new Set([...st.conc.sel].filter((k) => st.conc.filas.some((f) => f.clave === k && grabable(f))));
       pintarConciliacion();
     } catch (e) {
-      $('vcBody').innerHTML = `<tr><td colspan="8" class="vl-ayuda">${esc(textoError(e))}</td></tr>`;
+      $('vcBody').innerHTML = `<tr><td colspan="9" class="vl-ayuda">${esc(textoError(e))}</td></tr>`;
     } finally { st.conc.cargando = false; }
   }
   function pintarConciliacion() {
@@ -1387,19 +1408,23 @@
       kpi('fa-building-columns', 'Acreditado (MP)', pesos(r.acreditado_mp), 'neto de lo conciliado'),
       kpi('fa-percent', 'Comisiones', pesos(r.comisiones), 'cargos de Mercado Pago'),
       kpi('fa-hourglass-half', 'A liberar', pesos(r.pendiente_liberar), 'todavía no disponible'),
-      kpi('fa-triangle-exclamation', 'Diferencias', fmtNum.format(r.diferencias || 0), 'para revisar', r.diferencias ? 'is-mal' : 'is-ok'),
+      kpi('fa-triangle-exclamation', 'Diferencias', fmtNum.format(r.diferencias || 0), r.resueltos ? `${fmtNum.format(r.resueltos)} resueltas a mano` : 'para resolver', r.diferencias ? 'is-mal' : 'is-ok'),
       kpi('fa-file-signature', 'Listos para grabar', fmtNum.format(filas.filter(grabable).length), `${fmtNum.format(r.grabados || 0)} ya en IM5`, filas.some(grabable) ? 'is-info' : '')
     ].join('');
-    $('vcActualizado').textContent = r.actualizado ? `Cruce: ${fmtDiaHora(r.actualizado)}` : 'Todavía sin cruce para este período';
-    const cuenta = { todos: filas.length, listos: filas.filter(grabable).length, grabados: filas.filter((f) => f.grabado_im5_at || f.im5_conciliado).length };
-    filas.forEach((f) => { cuenta[f.estado] = (cuenta[f.estado] || 0) + 1; });
-    const nombreFiltro = { todos: ['Todos', 'fa-layer-group'], listos: ['Listos para grabar', 'fa-file-signature'], grabados: ['Ya en IM5', 'fa-check-double'] };
+    const e = st.conc.estado || {};
+    const c = st.cfg?.conciliacion || {};
+    $('vcCron').innerHTML = `<span class="vc-cron-chip ${c.activa === false ? 'is-off' : ''}"><i class="fa-solid ${c.activa === false ? 'fa-pause' : 'fa-clock-rotate-left'}"></i>${esc(textoFrecuencia(c))}</span>`
+      + `<span>Último cruce: <b>${r.actualizado ? esc(fmtDiaHora(r.actualizado)) : '—'}</b>${e.ultima_at && e.ultima_ok === false ? ` <span class="vc-cron-mal" title="${esc(e.ultimo_error || '')}"><i class="fa-solid fa-triangle-exclamation"></i> falló el último automático</span>` : ''}</span>`
+      + (c.activa === false ? '' : `<span>Próximo: <b>${e.proxima_at ? esc(fmtDiaHora(e.proxima_at)) : '—'}</b></span>`);
+    const cuenta = { todos: filas.length, listos: filas.filter(grabable).length, grabados: filas.filter((f) => f.grabado_im5_at || f.im5_conciliado).length, resueltos: filas.filter((f) => f.resuelto_at).length };
+    filas.forEach((f) => { if (!f.resuelto_at) cuenta[f.estado] = (cuenta[f.estado] || 0) + 1; });
+    const nombreFiltro = { todos: ['Todos', 'fa-layer-group'], listos: ['Listos para grabar', 'fa-file-signature'], grabados: ['Ya en IM5', 'fa-check-double'], resueltos: ['Resueltos a mano', 'fa-screwdriver-wrench'] };
     $('vcFiltros').innerHTML = ORDEN_CONC.filter((k) => k === 'todos' || cuenta[k]).map((k) => {
       const [txt, ico] = nombreFiltro[k] || [EST_CONC[k][0], EST_CONC[k][2]];
       return `<sl-button variant="default" size="small" class="analisis-type-chip ${st.conc.filtro === k ? 'active' : ''}" data-vc-filtro="${k}"><i slot="prefix" class="fa-solid ${ico}"></i>${txt}<span slot="suffix" class="analisis-chip-count">${fmtNum.format(cuenta[k] || 0)}</span></sl-button>`;
     }).join('');
     const f0 = st.conc.filtro;
-    const lista = filas.filter((f) => f0 === 'todos' || (f0 === 'listos' ? grabable(f) : f0 === 'grabados' ? (f.grabado_im5_at || f.im5_conciliado) : f.estado === f0));
+    const lista = filas.filter((f) => f0 === 'todos' || (f0 === 'listos' ? grabable(f) : f0 === 'grabados' ? (f.grabado_im5_at || f.im5_conciliado) : f0 === 'resueltos' ? Boolean(f.resuelto_at) : f.estado === f0 && !f.resuelto_at));
     const admin = esAdmin();
     $('vcBody').innerHTML = lista.length ? lista.slice(0, st.conc.limite).map((f) => {
       const [txt, clase, ico, ayuda] = EST_CONC[f.estado] || [f.estado, '', 'fa-circle', ''];
@@ -1414,9 +1439,10 @@
         <td class="vc-mp">${mp}</td>
         <td class="vl-num">${f.mp_monto != null ? `<b>${pesos2(f.mp_monto)}</b><span class="vl-dim">neto ${pesos2(f.mp_neto)}</span>` : '—'}</td>
         <td class="vl-ocultar-movil">${f.mp_liberacion_at ? `${esc(fmtDia(f.mp_liberacion_at))}${liberado(f) ? '' : ' <span class="vl-dim">(pendiente)</span>'}` : '—'}</td>
-        <td><span class="vc-estado ${clase}" title="${esc(ayuda)}"><i class="fa-solid ${ico}"></i>${esc(txt)}</span>${f.estado === 'dif_importe' ? `<span class="vl-dim">dif. ${pesos2(f.diferencia)}</span>` : ''}${enIm5 ? '<span class="vl-dim">Conciliado en IM5</span>' : ''}</td>
+        <td>${f.resuelto_at ? `<span class="vc-estado is-res" title="${esc(f.resolucion_nota || '')}"><i class="fa-solid ${RESOL[f.resolucion]?.[1] || 'fa-check'}"></i>${esc(RESOL[f.resolucion]?.[0] || 'Resuelto')}</span><span class="vl-dim">era: ${esc(txt)}${f.resuelto_por ? ` · ${esc(String(f.resuelto_por).split('@')[0])}` : ''}</span>` : `<span class="vc-estado ${clase}" title="${esc(ayuda)}"><i class="fa-solid ${ico}"></i>${esc(txt)}</span>`}${f.estado === 'dif_importe' && !f.resuelto_at ? `<span class="vl-dim">dif. ${pesos2(f.diferencia)}</span>` : ''}${f.motivo_match === 'cupon_mal' && !f.resuelto_at ? `<span class="vl-dim">corregir cupón en IM5: ${esc(f.mp_pago_id)}</span>` : ''}${f.motivo_match === 'manual' ? '<span class="vl-dim">vinculado a mano</span>' : ''}${enIm5 ? '<span class="vl-dim">Conciliado en IM5</span>' : ''}</td>
+        <td class="vc-col-acc">${admin && (f.resuelto_at || f.motivo_match === 'manual' || ['revisar', 'dif_importe', 'falta_en_mp', 'falta_en_im5', 'devuelto'].includes(f.estado)) && !enIm5 ? `<sl-button size="small" variant="${f.resuelto_at ? 'text' : 'default'}" data-vc-resolver="${esc(f.clave)}">${f.resuelto_at || f.motivo_match === 'manual' ? 'Ver' : 'Resolver'}</sl-button>` : ''}</td>
       </tr>`;
-    }).join('') : `<tr><td colspan="8" class="vl-ayuda vc-vacio">${filas.length ? 'No hay cobros en este grupo.' : 'Todavía no hay cruce para este período: tocá «Actualizar cruce».'}</td></tr>`;
+    }).join('') : `<tr><td colspan="9" class="vl-ayuda vc-vacio">${filas.length ? 'No hay cobros en este grupo.' : 'Todavía no hay cruce para este período: tocá «Actualizar cruce».'}</td></tr>`;
     $('vcPie').innerHTML = lista.length > st.conc.limite ? `Se muestran ${fmtNum.format(st.conc.limite)} de ${fmtNum.format(lista.length)}. <sl-button size="small" variant="default" id="vcMas">Mostrar 100 más</sl-button>` : '';
     const listos = filas.filter(grabable);
     $('vcSelTodos').checked = Boolean(listos.length) && listos.every((f) => st.conc.sel.has(f.clave));
@@ -1470,10 +1496,103 @@
       if (!res.ok || out.ok === false) throw new Error(out.error || `Error ${res.status}`);
       $('vcDialog').hide();
       if (out.errores?.length) notify('warning', `Grabados ${out.grabadas} de ${out.cantidad}`, `IM5 respondió: ${out.errores[0]}`);
-      else notify('success', 'Grabado en InfoManager', `${fmtNum.format(out.grabadas)} cupones conciliados. Revisalos en la pantalla de IM5.`);
+      else {
+        const v = Array.isArray(out.verificados) ? out.verificados : [];
+        const okv = v.filter((x) => x.conciliado === 'S').length;
+        notify(okv === out.grabadas ? 'success' : 'warning', 'Grabado en InfoManager', `${fmtNum.format(out.grabadas)} cupón${out.grabadas === 1 ? '' : 'es'} grabado${out.grabadas === 1 ? '' : 's'}. Verificado en IM5: ${fmtNum.format(okv)} de ${fmtNum.format(out.grabadas)} con conciliado = S.`);
+      }
       st.conc.sel.clear();
       await cargarConciliacion();
     } catch (e) { notify('error', 'No se pudo grabar en IM5', textoError(e)); } finally { btn.loading = false; }
+  }
+  // Resolver una diferencia: vincular con el pago/cobro correcto, aceptar, marcar el motivo o deshacer.
+  async function abrirResolver(clave) {
+    const f = st.conc.filas.find((x) => x.clave === clave); if (!f) return;
+    st.conc.res = { f, motivo: f.resolucion || '' };
+    const [txt, clase, ico, ayuda] = EST_CONC[f.estado] || [f.estado, '', 'fa-circle', ''];
+    const im5 = clave.startsWith('im5:');
+    $('vcResCuerpo').innerHTML = `
+      <div class="vc-res-lados">
+        <div><span>InfoManager</span>${f.comprobante ? `<b>${esc(f.comprobante)}</b><small>${esc(f.medio || '')}${f.cupon ? ` · ${esc(f.cupon)}` : ''}</small><b class="vc-res-imp">${pesos2(f.importe)}</b>` : '<small>Sin cobro en IM5</small>'}</div>
+        <i class="fa-solid fa-arrows-left-right"></i>
+        <div><span>Mercado Pago</span>${f.mp_pago_id ? `<b>#${esc(f.mp_pago_id)}</b><small>${esc(fmtDiaHora(f.mp_aprobado_at))} · ${esc(f.mp_estado || '')}</small><b class="vc-res-imp">${pesos2(f.mp_monto)}</b>` : '<small>Sin pago en MP</small>'}</div>
+      </div>
+      <p class="vc-res-estado"><span class="vc-estado ${clase}"><i class="fa-solid ${ico}"></i>${esc(txt)}</span> ${esc(ayuda)}${f.motivo_match === 'cupon_mal' ? ` <b>En IM5 el cupón dice ${esc(f.cupon)} y en Mercado Pago es ${esc(f.mp_pago_id)}: corregilo en IM5.</b>` : ''}</p>
+      ${f.resuelto_at || f.motivo_match === 'manual' ? `<div class="vl-mp-aviso"><i class="fa-solid fa-circle-check"></i><span>${f.resuelto_at ? `Resuelto: <b>${esc(RESOL[f.resolucion]?.[0] || f.resolucion)}</b> por ${esc(f.resuelto_por || '—')} el ${esc(fmtDiaHora(f.resuelto_at))}${f.resolucion_nota ? ` · «${esc(f.resolucion_nota)}»` : ''}` : 'Vinculado a mano.'} <sl-button size="small" variant="default" id="vcResDeshacer"><i slot="prefix" class="fa-solid fa-rotate-left"></i>Deshacer</sl-button></span></div>` : ''}
+      <p class="vl-detalle-tit"><i class="fa-solid fa-link"></i> ${im5 ? 'Vincular con el pago correcto de Mercado Pago' : 'Vincular con un cobro de InfoManager'}</p>
+      <ul class="vc-cands" id="vcCands"><li class="vl-ayuda"><sl-spinner></sl-spinner> Buscando parecidos…</li></ul>
+      ${im5 ? '<div class="vc-res-manual"><sl-input id="vcResMpId" size="small" placeholder="O pegá el n° de operación de MP" inputmode="numeric"></sl-input><sl-button size="small" variant="default" id="vcResVincular">Vincular</sl-button></div>' : ''}
+      <p class="vl-detalle-tit vl-detalle-tit-2"><i class="fa-solid fa-flag"></i> O marcarlo como resuelto</p>
+      <div class="vc-motivos">${Object.entries(RESOL).map(([k, [t, i, d]]) => `<button type="button" class="vc-motivo ${st.conc.res.motivo === k ? 'is-sel' : ''}" data-motivo="${k}"><i class="fa-solid ${i}"></i><b>${esc(t)}</b><small>${esc(d)}</small></button>`).join('')}</div>
+      <sl-textarea id="vcResNota" rows="2" resize="auto" placeholder="Nota (opcional): por qué, qué se corrigió…" value="${esc(f.resolucion_nota || '')}"></sl-textarea>
+      <div class="vl-dialog-pie"><span class="vl-flex"></span><sl-button variant="default" id="vcResCerrar">Cerrar</sl-button><sl-button variant="primary" id="vcResGuardar" ${st.conc.res.motivo ? '' : 'disabled'}><i slot="prefix" class="fa-solid fa-check"></i>Marcar resuelto</sl-button></div>`;
+    $('vcResDialog').show();
+    try {
+      const res = await window.laJamoneraProxy.postJson('/conciliacion/candidatos', { clave });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || out.ok === false) throw new Error(out.error || `Error ${res.status}`);
+      const cs = out.candidatos || [];
+      $('vcCands').innerHTML = cs.length ? cs.map((c) => `<li class="${c.usado ? 'is-usado' : ''}">
+        <div><b>${c.tipo === 'mp' ? `#${esc(c.id)}` : esc(c.comprobante)}</b><small>${esc(fmtDiaHora(c.fecha_hora))}${c.tipo === 'mp' ? ` · ${esc(c.origen || '')}` : ` · ${esc(c.medio || '')}${c.cupon ? ` · ${esc(c.cupon)}` : ''}`} · ${c.minutos < 120 ? `${c.minutos} min` : `${Math.round(c.minutos / 60)} h`} de diferencia${c.parecido <= 3 ? ` · número ${c.parecido ? 'parecido' : 'igual'}` : ''}${c.usado ? ' · ya está cruzado con otro cobro' : ''}</small></div>
+        <b class="${Math.abs(c.dif) > 0.01 ? 'vc-dif' : 'vc-igual'}">${pesos2(c.monto)}${Math.abs(c.dif) > 0.01 ? `<small>dif. ${pesos2(c.dif)}</small>` : '<small>mismo importe</small>'}</b>
+        <sl-button size="small" variant="${Math.abs(c.dif) <= 0.01 && !c.usado ? 'primary' : 'default'}" data-vc-vincular="${esc(c.id)}">Vincular</sl-button></li>`).join('') : '<li class="vl-ayuda">No hay pagos parecidos (± 2 días, importe o número cercano).</li>';
+    } catch (e) { $('vcCands').innerHTML = `<li class="vl-ayuda">${esc(textoError(e))}</li>`; }
+  }
+  async function accionResolver(accion, extra = {}) {
+    const r = st.conc.res; if (!r) return;
+    try {
+      const res = await window.laJamoneraProxy.postJson('/conciliacion/resolver', { clave: r.f.clave, accion, nota: String($('vcResNota')?.value ?? ''), ...extra });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || out.ok === false) throw new Error(out.error || `Error ${res.status}`);
+      $('vcResDialog').hide();
+      notify('success', accion === 'vincular' ? 'Vinculado' : accion === 'deshacer' ? 'Se deshizo' : 'Marcado como resuelto', accion === 'vincular' && out.fila ? `Quedó ${EST_CONC[out.fila.estado]?.[0] || out.fila.estado}.` : '');
+      await cargarConciliacion();
+    } catch (e) { notify('error', 'No se pudo resolver', textoError(e)); }
+  }
+
+  // ---- Configuración de la conciliación ----
+  function pintarCfgConc(c = {}) {
+    const horas = (id) => { const s = $(id); if (!s.children.length) s.innerHTML = Array.from({ length: 24 }, (_, i) => `<sl-option value="${i}">${hh(i)}</sl-option>`).join(''); };
+    ['cfgConcHora', 'cfgConcDesde', 'cfgConcHasta'].forEach(horas);
+    $('cfgConcActiva').checked = c.activa !== false;
+    $('cfgConcModo').value = c.modo || 'diario';
+    $('cfgConcHora').value = String(c.hora ?? 7);
+    $('cfgConcCadaDias').value = String(c.cadaDias || 1);
+    $('cfgConcCadaHoras').value = String(c.cadaHoras || 6);
+    $('cfgConcDesde').value = String(c.desde ?? 8);
+    $('cfgConcHasta').value = String(c.hasta ?? 21);
+    $('cfgConcDiasAtras').value = String(c.diasAtras || 35);
+    document.querySelectorAll('#cfgConcDias button').forEach((b) => b.setAttribute('aria-pressed', String((c.dias || [1, 2, 3, 4, 5, 6]).map(Number).includes(Number(b.dataset.cdia)))));
+    const av = { diferencias: true, listos: true, cierre: true, resumen: false, falla: true, ...(c.avisos || {}) };
+    $('cfgAvDif').checked = av.diferencias; $('cfgAvListos').checked = av.listos; $('cfgAvCierre').checked = av.cierre; $('cfgAvResumen').checked = av.resumen; $('cfgAvFalla').checked = av.falla;
+    $('cfgAvListosDia').value = String(c.diaListos ?? 1);
+    $('cfgConcMails').value = c.mails || '';
+    modoCfgConc();
+  }
+  function leerCfgConc() {
+    const n = (id, d) => { const v = Number(String($(id).value ?? '').trim()); return Number.isFinite(v) && v > 0 ? Math.round(v) : d; };
+    return {
+      activa: Boolean($('cfgConcActiva').checked), modo: String($('cfgConcModo').value || 'diario'),
+      hora: Number($('cfgConcHora').value ?? 7), cadaDias: n('cfgConcCadaDias', 1), cadaHoras: n('cfgConcCadaHoras', 6),
+      desde: Number($('cfgConcDesde').value ?? 8), hasta: Number($('cfgConcHasta').value ?? 21), diasAtras: n('cfgConcDiasAtras', 35),
+      dias: [...document.querySelectorAll('#cfgConcDias button[aria-pressed="true"]')].map((b) => Number(b.dataset.cdia)),
+      avisos: { diferencias: Boolean($('cfgAvDif').checked), listos: Boolean($('cfgAvListos').checked), cierre: Boolean($('cfgAvCierre').checked), resumen: Boolean($('cfgAvResumen').checked), falla: Boolean($('cfgAvFalla').checked) },
+      diaListos: Number($('cfgAvListosDia').value ?? 1), mails: String($('cfgConcMails').value ?? '').trim()
+    };
+  }
+  function modoCfgConc() {
+    const m = String($('cfgConcModo').value || 'diario');
+    document.querySelectorAll('[data-conc-modo]').forEach((el) => { el.hidden = !el.dataset.concModo.split(' ').includes(m); });
+    $('cfgConcResumen').textContent = textoFrecuencia(leerCfgConc());
+  }
+  async function avisoConc(tipo, enviar) {
+    try {
+      const res = await window.laJamoneraProxy.postJson('/conciliacion/aviso', { tipo, enviar });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || out.ok === false) throw new Error(out.error || `Error ${res.status}`);
+      if (enviar) return notify('success', 'Mail de prueba enviado', (out.destinos || []).join(', '));
+      $('vcMailFrame').srcdoc = out.html; $('vcMailDialog').show();
+    } catch (e) { notify('error', enviar ? 'No se pudo enviar' : 'No se pudo armar la vista previa', textoError(e)); }
   }
   const concVisible = () => $('vlTabs')?.querySelector('sl-tab[panel="conciliacion"]')?.active;
 
@@ -1587,6 +1706,24 @@
     $('vcActualizar').addEventListener('click', actualizarCruce);
     $('vcGrabar').addEventListener('click', previaGrabar);
     $('vcConfirmar').addEventListener('click', confirmarGrabar);
+    $('vcBody').addEventListener('click', (e) => { const b = e.target.closest('[data-vc-resolver]'); if (b) abrirResolver(b.dataset.vcResolver); });
+    $('vcResCuerpo').addEventListener('click', (e) => {
+      const m = e.target.closest('[data-motivo]');
+      if (m && st.conc.res) { st.conc.res.motivo = m.dataset.motivo; $('vcResCuerpo').querySelectorAll('.vc-motivo').forEach((x) => x.classList.toggle('is-sel', x === m)); $('vcResGuardar').disabled = false; return; }
+      const v = e.target.closest('[data-vc-vincular]'); if (v) return accionResolver('vincular', { mp_pago_id: v.dataset.vcVincular });
+      if (e.target.closest('#vcResVincular')) { const id = String($('vcResMpId').value ?? '').replace(/\D/g, ''); if (!id) return notify('warning', 'Falta el número', 'Pegá el n° de operación de Mercado Pago.'); return accionResolver('vincular', { mp_pago_id: id }); }
+      if (e.target.closest('#vcResGuardar')) return accionResolver(st.conc.res.motivo);
+      if (e.target.closest('#vcResDeshacer')) return accionResolver('deshacer');
+      if (e.target.closest('#vcResCerrar')) $('vcResDialog').hide();
+    });
+    $('cfgConcModo').addEventListener('sl-change', modoCfgConc);
+    ['cfgConcHora', 'cfgConcDesde', 'cfgConcHasta', 'cfgConcActiva'].forEach((id) => $(id).addEventListener('sl-change', modoCfgConc));
+    ['cfgConcCadaDias', 'cfgConcCadaHoras'].forEach((id) => $(id).addEventListener('sl-input', modoCfgConc));
+    $('cfgConcDias').addEventListener('click', (e) => { const b = e.target.closest('button[data-cdia]'); if (!b) return; b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); modoCfgConc(); });
+    document.querySelector('.vc-avisos').addEventListener('click', (e) => {
+      const p = e.target.closest('[data-av-previa]'); if (p) return avisoConc(p.dataset.avPrevia, false);
+      const t = e.target.closest('[data-av-prueba]'); if (t) return avisoConc(t.dataset.avPrueba, true);
+    });
     $('vcCancelar').addEventListener('click', () => $('vcDialog').hide());
     $('vcConfirmo').addEventListener('sl-change', (e) => { $('vcConfirmar').disabled = !e.target.checked; });
     $('vcFiltros').addEventListener('click', (e) => { const b = e.target.closest('[data-vc-filtro]'); if (!b) return; st.conc.filtro = b.dataset.vcFiltro; st.conc.limite = 100; pintarConciliacion(); });

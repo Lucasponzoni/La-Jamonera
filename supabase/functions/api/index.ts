@@ -284,8 +284,10 @@ async function route(req: Request, path: string) {
     return await candidatos({ clave: (await readBody(req)).clave });
   }
   if (path === '/conciliacion/aviso' && method === 'POST') {
-    await requireAdmin(req);
+    // Vista previa: admin o cron (prueba desde la base). Enviar: sólo admin.
     const body = await readBody(req);
+    const secret = await secretGet('cron_secret');
+    if (body.enviar === true || !(secret && req.headers.get('x-cron-secret') === secret)) await requireAdmin(req);
     return await avisoPrueba({ tipo: str(body.tipo), enviar: body.enviar === true });
   }
   if (path === '/ventas/mp/pagos' && method === 'POST') {
