@@ -622,3 +622,11 @@ sl-dialog.vl-dialog { --width: min(760px, 96vw); }
 
 .vc-auto-tit { display: flex; align-items: center; gap: 10px; }
 .vc-auto-logo { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: #fff; border: 1px solid var(--lj-border); flex: none; }
+
+/* Salud de la sync: mientras corre, una línea de datos que fluye de IM5 a La Jamonera (sin ícono girando encima). */
+.vl-salud[data-estado="corriendo"] .vl-salud-enlace { width: 18px; height: 3px; margin: 0 -1px; border: 0; border-radius: 999px; background: repeating-linear-gradient(90deg, var(--vl-c) 0 3px, transparent 3px 6px); background-size: 12px 3px; animation: vl-flujo .7s linear infinite; }
+.vl-salud[data-estado="corriendo"] .vl-salud-enlace i { display: none; }
+.vl-salud[data-estado="corriendo"] .vl-salud-nodo:first-child { animation: vl-pulso-nodo 1.6s ease-in-out infinite; }
+@keyframes vl-flujo { to { background-position: 12px 0; } }
+@keyframes vl-pulso-nodo { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--vl-c) 22%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .vl-salud[data-estado="corriendo"] .vl-salud-enlace, .vl-salud[data-estado="corriendo"] .vl-salud-nodo:first-child { animation: none; } }
