@@ -33,6 +33,14 @@ async function selTodo(armar, tam = 1000) {
     if (filas.length < tam) return out;
   }
 }
+// Distancia de edición entre dos números (dígitos de más, de menos o cambiados): detecta cupones mal tipeados.
+function distancia(a, b) {
+  if (Math.abs(a.length - b.length) > 2) return 9;
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
 const chunks = (arr, n) => Array.from({ length: Math.ceil(arr.length / n) }, (_, i) => arr.slice(i * n, i * n + n));
 
 // ---------- 1) Mercado Pago ----------
@@ -156,30 +164,37 @@ export async function cruzar({ desde, hasta, bajarMP = true, log = console } = {
     else if (Math.abs(dif) > TOL_IMPORTE) estado = 'dif_importe';
     else if (m.estado !== 'approved') estado = 'revisar';
     else if (lib && lib > ahora) estado = 'pendiente_liberacion';
-    if (motivo === 'importe_hora' && estado === 'conciliado') estado = 'revisar';
+    if ((motivo === 'importe_hora' || motivo === 'cupon_mal') && (estado === 'conciliado' || estado === 'pendiente_liberacion')) estado = 'revisar';
     return { ...f, mp_pago_id: m.id_pago, mp_estado: m.estado, mp_monto: m.monto, mp_neto: m.neto, mp_comision: m.comision, mp_aprobado_at: m.aprobado_at,
       mp_liberacion_at: m.acreditacion_at, mp_origen: m.origen, estado, motivo_match: motivo, diferencia: estado === 'dif_importe' ? dif : 0 };
   };
   const sinMP = (f, estado) => ({ ...f, mp_pago_id: null, mp_estado: null, mp_monto: null, mp_neto: null, mp_comision: null, mp_aprobado_at: null, mp_liberacion_at: null, mp_origen: null,
     estado, motivo_match: null, diferencia: estado === 'falta_en_mp' ? r2(f.importe) : 0 });
 
-  // Por id (Point/QR) o cupón primero; después importe + hora para los que no traen id.
+  // Por id (Point/QR) o cupón primero. Los que no cruzan por número (sin cupón o cupón mal tipeado por la cajera)
+  // se buscan después entre los pagos libres: mismo importe y hora (± 10 min), o mismo importe en el día con un
+  // número parecido (hasta 2 dígitos distintos). Sólo con un candidato único, y siempre queda «Revisar».
   const sinId = [];
   for (const x of enRango) {
     const f = base(x);
     const idExt = str(x.p.id_pago_externo);
     const idCup = digitos(x.p.cupon);
     const m = (idExt && mpPorId.get(idExt)) || (idCup && mpPorId.get(idCup));
-    if (m) { filas.push(conMP(f, m, idExt && mpPorId.get(idExt) ? 'id_externo' : 'cupon')); continue; }
-    if (Number(f.importe) < 0) { filas.push(sinMP(f, 'devolucion')); continue; }
-    if ((idExt || idCup.length >= 6) && !errIm5) { filas.push(sinMP(f, 'falta_en_mp')); continue; }
-    sinId.push({ x, f });
+    if (m && Math.abs(Number(m.monto || 0) - Number(f.importe)) <= TOL_IMPORTE) { filas.push(conMP(f, m, idExt && mpPorId.get(idExt) ? 'id_externo' : 'cupon')); continue; }
+    if (Number(f.importe) < 0) { filas.push(m ? conMP(f, m, 'cupon') : sinMP(f, 'devolucion')); continue; }
+    sinId.push({ x, f, m, num: idExt || idCup });
   }
   const libres = () => [...mpPorId.values()].filter((m) => !usados.has(m.id_pago) && m.estado === 'approved' && m.aprobado_at);
-  for (const { x, f } of sinId) {
+  for (const { x, f, m: mNum, num } of sinId) {
     const t = x.c.fecha_hora ? Date.parse(x.c.fecha_hora) : 0;
-    const cand = t ? libres().filter((m) => Math.abs(Number(m.monto) - Number(f.importe)) <= TOL_IMPORTE && Math.abs(Date.parse(m.aprobado_at) - t) <= TOL_MIN * 60e3) : [];
-    filas.push(cand.length === 1 ? conMP(f, cand[0], 'importe_hora') : sinMP(f, cand.length > 1 ? 'revisar' : 'falta_en_mp'));
+    const mismoImporte = libres().filter((m) => Math.abs(Number(m.monto) - Number(f.importe)) <= TOL_IMPORTE);
+    const porHora = t ? mismoImporte.filter((m) => Math.abs(Date.parse(m.aprobado_at) - t) <= TOL_MIN * 60e3) : [];
+    const porNumero = num.length >= 6 && t ? mismoImporte.filter((m) => Math.abs(Date.parse(m.aprobado_at) - t) <= 18 * 3600e3 && distancia(num, m.id_pago) <= 2) : [];
+    if (porNumero.length === 1) { const r = conMP(f, porNumero[0], 'cupon_mal'); filas.push({ ...r, estado: r.estado === 'conciliado' || r.estado === 'pendiente_liberacion' ? 'revisar' : r.estado }); continue; }
+    if (porHora.length === 1) { filas.push(conMP(f, porHora[0], 'importe_hora')); continue; }
+    // El número existe en MP pero con otro importe: diferencia real (no se busca otro pago).
+    if (mNum) { filas.push(conMP(f, mNum, 'cupon')); continue; }
+    filas.push(sinMP(f, porHora.length > 1 || porNumero.length > 1 ? 'revisar' : 'falta_en_mp'));
   }
   // Pagos aprobados de MP del rango que no aparecen en IM5.
   for (const m of mpRango) {
@@ -219,13 +234,15 @@ export async function grabarIm5({ claves = [], confirmar = false, quien = '', us
   const ok = []; const descartadas = [];
   for (const f of filas) {
     const lib = f.mp_liberacion_at ? new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(f.mp_liberacion_at)) : '';
-    const motivo = f.estado !== 'conciliado' ? `estado ${f.estado}` : f.grabado_im5_at || f.im5_conciliado ? 'ya conciliado en IM5' : !lib || lib > hoy ? 'todavía no se liberó' : '';
+    // «Revisar» (cruzó por importe/hora o cupón mal cargado) se graba si el admin lo eligió: mismo importe y pago aprobado.
+    const revisable = f.estado === 'revisar' && f.mp_pago_id && f.mp_estado === 'approved' && Math.abs(Number(f.importe) - Number(f.mp_monto)) <= TOL_IMPORTE;
+    const motivo = f.estado !== 'conciliado' && !revisable ? `estado ${f.estado}` : f.grabado_im5_at || f.im5_conciliado ? 'ya conciliado en IM5' : !lib || lib > hoy ? 'todavía no se liberó' : '';
     if (motivo) { descartadas.push({ clave: f.clave, comprobante: f.comprobante, motivo }); continue; }
     ok.push({ f, tarjeta: { id_pago: Number(f.im5_pago_id), conciliado: 'S', fec_conciliacion: hoy, lote: 0, liquidacion: 0, resumen: Number(lib.replace(/-/g, '')), fec_acreditacion: lib } });
   }
   const total = r2(ok.reduce((s, x) => s + Number(x.f.importe || 0), 0));
   const neto = r2(ok.reduce((s, x) => s + Number(x.f.mp_neto || 0), 0));
-  const previa = { ok: true, confirmar, cantidad: ok.length, total, neto, tarjetas: ok.map((x) => ({ ...x.tarjeta, comprobante: x.f.comprobante, importe: x.f.importe, mp_pago_id: x.f.mp_pago_id })), descartadas };
+  const previa = { ok: true, confirmar, cantidad: ok.length, total, neto, tarjetas: ok.map((x) => ({ ...x.tarjeta, clave: x.f.clave, comprobante: x.f.comprobante, importe: x.f.importe, mp_pago_id: x.f.mp_pago_id })), descartadas };
   if (!confirmar || !ok.length) return previa;
 
   const cred = await leerCredenciales();
@@ -247,6 +264,8 @@ export async function grabarIm5({ claves = [], confirmar = false, quien = '', us
     }
   } finally { await im5.cerrar(); }
   if (userId) await audit(userId, 'conciliacion_mp_grabar', 'im5', { cantidad: grabadas.length, total, errores });
+  // Contador de grabados (la página avisa «primera vez: grabá uno solo» mientras sea 0).
+  if (grabadas.length) await admin.rpc('conciliacion_contar_grabados', { p_n: grabadas.length });
   return { ...previa, grabadas: grabadas.length, errores };
 }
 

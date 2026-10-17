@@ -161,6 +161,7 @@
           <sl-tab-group id="vlTabs" class="vl-tabs">
             <sl-tab slot="nav" panel="comprobantes" active><i class="fa-solid fa-receipt" aria-hidden="true"></i>Comprobantes<span class="vl-tab-cuenta" id="vlTablaCuenta"></span></sl-tab>
             <sl-tab slot="nav" panel="graficos"><i class="fa-solid fa-chart-column" aria-hidden="true"></i>Gráficos</sl-tab>
+            <sl-tab slot="nav" panel="conciliacion"><img src="./IMG/pagos/mercadopago.svg" alt="" width="16" height="16" class="vl-tab-logo">Conciliación<span class="vl-tab-cuenta" id="vcTabCuenta"></span></sl-tab>
 
             <sl-tab-panel name="comprobantes" active>
               <section class="vl-card vl-tabla-card">
@@ -230,10 +231,59 @@
                 </section>
               </div>
             </sl-tab-panel>
+
+            <sl-tab-panel name="conciliacion">
+              <section class="vl-card vc-card">
+                <div class="vc-intro">
+                  <p class="vl-ayuda"><b>Cobros con Mercado Pago de InfoManager contra la cuenta real de Mercado Pago</b> (Point, QR y MERCADO PAGO 1/2), para el período elegido arriba. Se cruza solo todos los días a las 7:00; los lunes llega el resumen para grabar y el día 1, el cierre del mes.</p>
+                  <div class="vc-acciones">
+                    <span class="vl-ayuda" id="vcActualizado"></span>
+                    <sl-button size="small" variant="default" id="vcActualizar"><i slot="prefix" class="fa-solid fa-arrows-rotate"></i>Actualizar cruce</sl-button>
+                    <sl-button size="small" variant="primary" id="vcGrabar" data-solo-admin disabled><i slot="prefix" class="fa-solid fa-file-signature"></i>Grabar en IM5<span class="vc-sel-n" id="vcSelN"></span></sl-button>
+                  </div>
+                </div>
+                <div id="vcKpis" class="vc-kpis"></div>
+                <div class="analisis-type-chips vc-filtros" id="vcFiltros" role="group" aria-label="Filtrar por estado"></div>
+                <div class="vl-tabla-wrap">
+                  <table class="vl-tabla vc-tabla">
+                    <thead>
+                      <tr>
+                        <th class="vc-col-sel"><sl-checkbox id="vcSelTodos" size="small" aria-label="Elegir los listos para grabar"></sl-checkbox></th>
+                        <th>Fecha</th>
+                        <th>Cobro en IM5</th>
+                        <th class="vl-num">IM5</th>
+                        <th>Mercado Pago</th>
+                        <th class="vl-num">Bruto / neto</th>
+                        <th class="vl-ocultar-movil">Se libera</th>
+                        <th>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody id="vcBody"></tbody>
+                  </table>
+                </div>
+                <p class="vl-ayuda vc-pie" id="vcPie"></p>
+              </section>
+            </sl-tab-panel>
           </sl-tab-group>
           </div>
         </div>
       </div>
+
+      <!-- Conciliación: vista previa antes de grabar en IM5 -->
+      <sl-dialog id="vcDialog" class="lj-modal informes-modal vl-dialog" label="Grabar conciliación en InfoManager">
+        <div slot="label" class="lj-dialog-title">
+          <h5 class="lj-dialog-heading"><i class="fa-solid fa-file-signature" aria-hidden="true"></i> Grabar en InfoManager</h5>
+        </div>
+        <div class="lj-dialog-body">
+          <div id="vcPrevia"></div>
+          <sl-checkbox id="vcConfirmo" class="vc-confirmo">Revisé la lista: marcar estos cupones como conciliados en IM5 (Conciliación de Tarjetas).</sl-checkbox>
+          <div class="vl-dialog-pie">
+            <span class="vl-flex"></span>
+            <sl-button variant="default" id="vcCancelar">Cancelar</sl-button>
+            <sl-button variant="primary" id="vcConfirmar" disabled><i slot="prefix" class="fa-solid fa-check"></i>Grabar en IM5</sl-button>
+          </div>
+        </div>
+      </sl-dialog>
 
       <!-- Salud: detalle -->
       <sl-dialog id="vlSaludDialog" class="lj-modal informes-modal vl-dialog" label="Salud de la sincronización">
@@ -320,6 +370,7 @@
             <sl-tab slot="nav" panel="kpis"><i class="fa-solid fa-gauge-high" aria-hidden="true"></i>Indicadores</sl-tab>
             <sl-tab slot="nav" panel="cred" data-solo-admin><i class="fa-solid fa-plug" aria-hidden="true"></i>Conexión IM5</sl-tab>
             <sl-tab slot="nav" panel="mp" data-solo-admin><img src="./IMG/pagos/mercadopago.svg" alt="" width="16" height="16" class="vl-tab-logo">Mercado Pago</sl-tab>
+            <sl-tab slot="nav" panel="conc" data-solo-admin><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>Conciliación</sl-tab>
 
             <sl-tab-panel name="sync" active>
               <div class="vl-form">
@@ -402,6 +453,21 @@
                   </div>
                   <div id="posSimRes" class="vl-pos-sim-res"></div>
                 </div>
+              </div>
+            </sl-tab-panel>
+
+            <sl-tab-panel name="conc">
+              <div class="vl-form">
+                <p class="vl-ayuda">Cruza los cobros con Mercado Pago de InfoManager contra la cuenta de Mercado Pago (el token sale de la pestaña Mercado Pago). Grabar en InfoManager lo hace siempre un admin, con vista previa y confirmación.</p>
+                <div class="vl-bloque">
+                  <sl-switch id="cfgConcActiva">Cruce automático todos los días a las 7:00</sl-switch>
+                  <p class="vl-ayuda">Revisa los últimos 35 días: devoluciones y contracargos pueden aparecer tarde.</p>
+                </div>
+                <div class="vl-bloque">
+                  <sl-switch id="cfgConcAvisos">Mandar avisos por mail</sl-switch>
+                  <p class="vl-ayuda">Los lunes: cuántos cobros están listos para grabar y las diferencias abiertas. El día 1: cierre del mes anterior. Van a los mails de la pestaña Sincronización.</p>
+                </div>
+                <div class="vl-mp-aviso"><i class="fa-solid fa-circle-info"></i><span><b>Cómo se cruza:</b> por el id de pago del Point o QR; si no, por el número de operación que la cajera carga en el cupón (MERCADO PAGO 1/2); si no hay número, por importe y hora (± 10 min), y sólo si hay un único pago que coincide (queda «Revisar»). Sólo se graba lo conciliado y ya liberado por Mercado Pago.</span></div>
               </div>
             </sl-tab-panel>
 

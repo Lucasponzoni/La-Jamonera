@@ -1069,6 +1069,8 @@
     $('cfgDesde').innerHTML = horas; $('cfgHasta').innerHTML = horas;
     customElements.whenDefined('sl-option').then(() => {
       $('cfgActiva').checked = cfg.activa !== false;
+      $('cfgConcActiva').checked = cfg.conciliacion?.activa !== false;
+      $('cfgConcAvisos').checked = cfg.conciliacion?.avisos !== false;
       $('cfgDesde').value = String(cfg.desde ?? 8);
       $('cfgHasta').value = String(cfg.hasta ?? 19);
       $('cfgCada').value = String(cfg.cadaMin ?? 120);
@@ -1133,6 +1135,11 @@
         const { data: pos, error: e2 } = await st.sb.rpc('ventas_pos_config_guardar', { p_pos: leerPosForm() });
         if (e2) throw e2;
         st.cfg.pos = pos;
+      }
+      if (st.me?.admin) {
+        const { data: conc, error: e3 } = await st.sb.rpc('conciliacion_config_guardar', { p_conc: { activa: Boolean($('cfgConcActiva').checked), avisos: Boolean($('cfgConcAvisos').checked) } });
+        if (e3) throw e3;
+        st.cfg.conciliacion = conc;
       }
       notify('success', 'Configuración guardada', resumenHorario(st.cfg));
       $('vlConfigDialog').hide();
@@ -1323,12 +1330,160 @@
     } finally { btn.loading = false; }
   }
 
+
+  // ---------- Conciliación Mercado Pago ↔ IM5 ----------
+  // Lee conciliacion_mp (la calcula la función api a diario o con «Actualizar cruce») para el período elegido.
+  const EST_CONC = {
+    conciliado: ['Conciliado', 'is-ok', 'fa-circle-check', 'Mismo cobro en IM5 y en Mercado Pago, ya liberado.'],
+    pendiente_liberacion: ['A liberar', 'is-info', 'fa-hourglass-half', 'Cruza bien, pero Mercado Pago todavía no liberó la plata.'],
+    revisar: ['Revisar', 'is-esp', 'fa-eye', 'Cruzó por importe y hora, o el cupón de IM5 está mal cargado y se encontró por un número parecido. Revisalo: si está bien, se puede grabar.'],
+    dif_importe: ['Diferencia', 'is-mal', 'fa-scale-unbalanced', 'El importe de IM5 no coincide con el de Mercado Pago.'],
+    falta_en_mp: ['No está en MP', 'is-mal', 'fa-circle-question', 'IM5 dice que se cobró con Mercado Pago pero no aparece ese pago.'],
+    falta_en_im5: ['No está en IM5', 'is-esp', 'fa-file-circle-plus', 'Pago aprobado en Mercado Pago que no tiene cobro en IM5 (puede ser de otro canal).'],
+    devuelto: ['Devuelto en MP', 'is-esp', 'fa-rotate-left', 'Mercado Pago lo devolvió o canceló.'],
+    devolucion: ['Devolución', 'is-neu', 'fa-rotate-left', 'Renglón negativo de IM5 (nota de crédito devuelta).']
+  };
+  const ORDEN_CONC = ['todos', 'listos', 'conciliado', 'pendiente_liberacion', 'revisar', 'dif_importe', 'falta_en_mp', 'falta_en_im5', 'devuelto', 'devolucion', 'grabados'];
+  st.conc = { filtro: 'todos', filas: [], sel: new Set(), cargando: false };
+  const esAdmin = () => Boolean(st.me?.admin);
+  const liberado = (f) => f.mp_liberacion_at && Date.parse(f.mp_liberacion_at) <= Date.now();
+  // «Revisar» con el mismo importe y pago aprobado también se puede grabar: elegirlo es la revisión.
+  const grabable = (f) => (f.estado === 'conciliado' || (f.estado === 'revisar' && f.mp_pago_id && f.mp_estado === 'approved' && Math.abs(Number(f.importe) - Number(f.mp_monto)) <= 0.01)) && !f.grabado_im5_at && !f.im5_conciliado && liberado(f) && String(f.clave).startsWith('im5:');
+  const fmtDiaHora = (ts) => (ts ? new Intl.DateTimeFormat('es-AR', { timeZone: TZ, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(ts)) : '—');
+  const fmtDia = (ts) => (ts ? new Intl.DateTimeFormat('es-AR', { timeZone: TZ, day: '2-digit', month: '2-digit' }).format(new Date(ts)) : '—');
+  async function leerTodo(armar) {
+    const out = [];
+    for (let i = 0; ; i += 1000) {
+      const { data, error } = await armar().range(i, i + 999);
+      if (error) throw error;
+      out.push(...(data || []));
+      if (!data || data.length < 1000) return out;
+    }
+  }
+  async function cargarConciliacion() {
+    if (st.conc.cargando) return;
+    st.conc.cargando = true;
+    const { desde, hasta } = st.rango;
+    $('vcBody').innerHTML = '<tr><td colspan="8" class="vl-cargando"><sl-spinner></sl-spinner></td></tr>';
+    try {
+      const [res, filas] = await Promise.all([
+        st.sb.rpc('conciliacion_mp_resumen', { p_desde: desde, p_hasta: hasta }),
+        leerTodo(() => st.sb.from('conciliacion_mp').select('*').gte('fecha', desde).lte('fecha', hasta).order('fecha_hora', { ascending: false, nullsFirst: false }).order('clave'))
+      ]);
+      if (res.error) throw res.error;
+      st.conc.resumen = res.data || {};
+      st.conc.filas = (st.empresa ? filas.filter((f) => f.empresa == null || f.empresa === st.empresa) : filas);
+      st.conc.sel = new Set([...st.conc.sel].filter((k) => st.conc.filas.some((f) => f.clave === k && grabable(f))));
+      pintarConciliacion();
+    } catch (e) {
+      $('vcBody').innerHTML = `<tr><td colspan="8" class="vl-ayuda">${esc(textoError(e))}</td></tr>`;
+    } finally { st.conc.cargando = false; }
+  }
+  function pintarConciliacion() {
+    const { filas, resumen: r = {} } = st.conc;
+    const kpi = (ico, tit, val, sub, clase = '') => `<div class="vc-kpi ${clase}"><span><i class="fa-solid ${ico}"></i>${tit}</span><b>${val}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
+    $('vcKpis').innerHTML = [
+      kpi('fa-cash-register', 'Cobrado con MP (IM5)', pesos(r.cobrado_im5), `${fmtNum.format(r.cobros || 0)} cobros`),
+      kpi('fa-building-columns', 'Acreditado (MP)', pesos(r.acreditado_mp), 'neto de lo conciliado'),
+      kpi('fa-percent', 'Comisiones', pesos(r.comisiones), 'cargos de Mercado Pago'),
+      kpi('fa-hourglass-half', 'A liberar', pesos(r.pendiente_liberar), 'todavía no disponible'),
+      kpi('fa-triangle-exclamation', 'Diferencias', fmtNum.format(r.diferencias || 0), 'para revisar', r.diferencias ? 'is-mal' : 'is-ok'),
+      kpi('fa-file-signature', 'Listos para grabar', fmtNum.format(filas.filter(grabable).length), `${fmtNum.format(r.grabados || 0)} ya en IM5`, filas.some(grabable) ? 'is-info' : '')
+    ].join('');
+    $('vcActualizado').textContent = r.actualizado ? `Cruce: ${fmtDiaHora(r.actualizado)}` : 'Todavía sin cruce para este período';
+    const cuenta = { todos: filas.length, listos: filas.filter(grabable).length, grabados: filas.filter((f) => f.grabado_im5_at || f.im5_conciliado).length };
+    filas.forEach((f) => { cuenta[f.estado] = (cuenta[f.estado] || 0) + 1; });
+    const nombreFiltro = { todos: ['Todos', 'fa-layer-group'], listos: ['Listos para grabar', 'fa-file-signature'], grabados: ['Ya en IM5', 'fa-check-double'] };
+    $('vcFiltros').innerHTML = ORDEN_CONC.filter((k) => k === 'todos' || cuenta[k]).map((k) => {
+      const [txt, ico] = nombreFiltro[k] || [EST_CONC[k][0], EST_CONC[k][2]];
+      return `<sl-button variant="default" size="small" class="analisis-type-chip ${st.conc.filtro === k ? 'active' : ''}" data-vc-filtro="${k}"><i slot="prefix" class="fa-solid ${ico}"></i>${txt}<span slot="suffix" class="analisis-chip-count">${fmtNum.format(cuenta[k] || 0)}</span></sl-button>`;
+    }).join('');
+    const f0 = st.conc.filtro;
+    const lista = filas.filter((f) => f0 === 'todos' || (f0 === 'listos' ? grabable(f) : f0 === 'grabados' ? (f.grabado_im5_at || f.im5_conciliado) : f.estado === f0));
+    const admin = esAdmin();
+    $('vcBody').innerHTML = lista.length ? lista.slice(0, 600).map((f) => {
+      const [txt, clase, ico, ayuda] = EST_CONC[f.estado] || [f.estado, '', 'fa-circle', ''];
+      const g = grabable(f);
+      const enIm5 = f.grabado_im5_at || f.im5_conciliado;
+      const mp = f.mp_pago_id ? `<b>#${esc(f.mp_pago_id)}</b><span class="vl-dim">${esc(f.mp_origen === 'PSP_TRANSFER' ? 'Transferencia' : f.mp_origen || f.mp_estado || '')}${f.motivo_match ? ` · cruzó por ${esc({ id_externo: 'id del Point', cupon: 'n° de operación', importe_hora: 'importe y hora', cupon_mal: 'importe y n° parecido (cupón mal cargado)' }[f.motivo_match] || f.motivo_match)}` : ''}</span>` : '<span class="vl-dim">—</span>';
+      return `<tr class="${g ? 'is-grabable' : ''}">
+        <td class="vc-col-sel">${g && admin ? `<sl-checkbox size="small" data-vc-sel="${esc(f.clave)}" ${st.conc.sel.has(f.clave) ? 'checked' : ''} aria-label="Elegir"></sl-checkbox>` : enIm5 ? '<i class="fa-solid fa-check-double vc-ok" title="Ya conciliado en IM5"></i>' : ''}</td>
+        <td class="vl-fecha"><b>${esc(fmtDiaHora(f.fecha_hora))}</b>${f.empresa ? `<span class="vl-dim">Emp. ${f.empresa}</span>` : ''}</td>
+        <td>${f.comprobante ? `<b>${esc(f.comprobante)}</b><span class="vl-dim">${esc(f.medio || '')}${f.cupon ? ` · cupón ${esc(f.cupon)}` : ''}</span>` : '<span class="vl-dim">Sin cobro en IM5</span>'}</td>
+        <td class="vl-num">${f.importe != null ? `<b>${pesos2(f.importe)}</b>` : '—'}</td>
+        <td class="vc-mp">${mp}</td>
+        <td class="vl-num">${f.mp_monto != null ? `<b>${pesos2(f.mp_monto)}</b><span class="vl-dim">neto ${pesos2(f.mp_neto)}</span>` : '—'}</td>
+        <td class="vl-ocultar-movil">${f.mp_liberacion_at ? `${esc(fmtDia(f.mp_liberacion_at))}${liberado(f) ? '' : ' <span class="vl-dim">(pendiente)</span>'}` : '—'}</td>
+        <td><span class="vc-estado ${clase}" title="${esc(ayuda)}"><i class="fa-solid ${ico}"></i>${esc(txt)}</span>${f.estado === 'dif_importe' ? `<span class="vl-dim">dif. ${pesos2(f.diferencia)}</span>` : ''}${enIm5 ? '<span class="vl-dim">Conciliado en IM5</span>' : ''}</td>
+      </tr>`;
+    }).join('') : `<tr><td colspan="8" class="vl-ayuda vc-vacio">${filas.length ? 'No hay cobros en este grupo.' : 'Todavía no hay cruce para este período: tocá «Actualizar cruce».'}</td></tr>`;
+    $('vcPie').textContent = lista.length > 600 ? `Se muestran 600 de ${fmtNum.format(lista.length)}. Achicá el período o filtrá por estado.` : '';
+    const listos = filas.filter(grabable);
+    $('vcSelTodos').checked = Boolean(listos.length) && listos.every((f) => st.conc.sel.has(f.clave));
+    $('vcSelTodos').disabled = !admin || !listos.length;
+    $('vcGrabar').disabled = !st.conc.sel.size;
+    $('vcSelN').textContent = st.conc.sel.size ? ` (${fmtNum.format(st.conc.sel.size)})` : '';
+    $('vcTabCuenta').textContent = r.diferencias ? fmtNum.format(r.diferencias) : '';
+  }
+  async function actualizarCruce() {
+    const { desde, hasta } = st.rango;
+    if (diasEntre(desde, hasta) > 62) return notify('warning', 'Período muy largo', 'El cruce se actualiza de a 2 meses como mucho. Elegí un período más corto.');
+    const btn = $('vcActualizar'); btn.loading = true;
+    try {
+      const res = await window.laJamoneraProxy.postJson('/conciliacion/cruzar', { desde, hasta });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || out.ok === false) throw new Error(out.error || `Error ${res.status}`);
+      notify('success', 'Cruce actualizado', `${fmtNum.format(out.filas || 0)} cobros revisados${out.im5?.error ? ' (no se pudo leer lo conciliado en IM5)' : ''}.`);
+      await cargarConciliacion();
+    } catch (e) { notify('error', 'No se pudo cruzar', textoError(e)); } finally { btn.loading = false; }
+  }
+  async function previaGrabar() {
+    const claves = [...st.conc.sel];
+    if (!claves.length) return;
+    const btn = $('vcGrabar'); btn.loading = true;
+    try {
+      const res = await window.laJamoneraProxy.postJson('/conciliacion/grabar', { claves, confirmar: false });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || out.ok === false) throw new Error(out.error || `Error ${res.status}`);
+      st.conc.previa = out;
+      $('vcPrevia').innerHTML = `
+        <p class="vl-ayuda">Se marcan como <b>conciliados</b> en IM5 (Conciliación de Tarjetas), con la fecha de acreditación real de Mercado Pago y el resumen = día de liberación. Es contabilidad: revisá antes de confirmar.</p>
+        <div class="vc-previa-tot"><div><span>Cupones</span><b>${fmtNum.format(out.cantidad)}</b></div><div><span>Total cobrado</span><b>${pesos2(out.total)}</b></div><div><span>Neto acreditado</span><b>${pesos2(out.neto)}</b></div></div>
+        ${out.cantidad ? `<ul class="vc-previa-lista">${out.tarjetas.map((t) => `<li><b>${esc(t.comprobante || '')}</b><span>MP #${esc(t.mp_pago_id || '')} · acreditado ${esc(fechaCorta(t.fec_acreditacion))}</span><b>${pesos2(t.importe)}</b></li>`).join('')}</ul>` : ''}
+        ${out.descartadas?.length ? `<p class="vl-apl is-esp"><i class="fa-solid fa-circle-exclamation"></i>${fmtNum.format(out.descartadas.length)} no se graban: ${esc([...new Set(out.descartadas.map((d) => d.motivo))].join(', '))}.</p>` : ''}
+        ${!(st.cfg?.conciliacion?.grabados > 0) ? '<p class="vl-apl is-esp"><i class="fa-solid fa-flask"></i>Primera vez: conviene grabar uno solo y revisarlo en la pantalla de IM5 antes de grabar el resto.</p>' : ''}`;
+      $('vcConfirmo').checked = false;
+      $('vcConfirmar').disabled = true;
+      $('vcConfirmar').hidden = !out.cantidad;
+      $('vcConfirmo').hidden = !out.cantidad;
+      $('vcDialog').show();
+    } catch (e) { notify('error', 'No se pudo armar la vista previa', textoError(e)); } finally { btn.loading = false; }
+  }
+  async function confirmarGrabar() {
+    // Se graba exactamente lo que mostró la vista previa.
+    const claves = (st.conc.previa?.tarjetas || []).map((t) => t.clave).filter(Boolean);
+    if (!claves.length) return;
+    const btn = $('vcConfirmar'); btn.loading = true;
+    try {
+      const res = await window.laJamoneraProxy.postJson('/conciliacion/grabar', { claves, confirmar: true });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || out.ok === false) throw new Error(out.error || `Error ${res.status}`);
+      $('vcDialog').hide();
+      if (out.errores?.length) notify('warning', `Grabados ${out.grabadas} de ${out.cantidad}`, `IM5 respondió: ${out.errores[0]}`);
+      else notify('success', 'Grabado en InfoManager', `${fmtNum.format(out.grabadas)} cupones conciliados. Revisalos en la pantalla de IM5.`);
+      st.conc.sel.clear();
+      await cargarConciliacion();
+    } catch (e) { notify('error', 'No se pudo grabar en IM5', textoError(e)); } finally { btn.loading = false; }
+  }
+  const concVisible = () => $('vlTabs')?.querySelector('sl-tab[panel="conciliacion"]')?.active;
+
   // ---------- Eventos ----------
   function elegirRango(clave, rango) {
     st.clave = clave; st.rango = rango; st.pagina = 0;
     document.querySelectorAll('[data-rango]').forEach((b) => b.classList.toggle('active', b.dataset.rango === clave));
     $('vlRangoTexto').textContent = clave === 'custom' ? `${fechaCorta(rango.desde)} – ${fechaCorta(rango.hasta)}` : 'Elegir fechas';
     cargarResumen(); cargarTabla();
+    if (concVisible()) cargarConciliacion();
   }
   function cablear() {
     let fp = null;
@@ -1428,6 +1583,23 @@
     $('vlConfigBtn').addEventListener('click', abrirConfig);
     $('cfgMailPrueba').addEventListener('click', mandarMailPrueba);
     // Pestaña «Gráficos»: se dibujan al mostrarse (y se reajustan si ya estaban).
+    $('vlTabs').addEventListener('sl-tab-show', (e) => { if (e.detail?.name === 'conciliacion') cargarConciliacion(); });
+    $('vcActualizar').addEventListener('click', actualizarCruce);
+    $('vcGrabar').addEventListener('click', previaGrabar);
+    $('vcConfirmar').addEventListener('click', confirmarGrabar);
+    $('vcCancelar').addEventListener('click', () => $('vcDialog').hide());
+    $('vcConfirmo').addEventListener('sl-change', (e) => { $('vcConfirmar').disabled = !e.target.checked; });
+    $('vcFiltros').addEventListener('click', (e) => { const b = e.target.closest('[data-vc-filtro]'); if (!b) return; st.conc.filtro = b.dataset.vcFiltro; pintarConciliacion(); });
+    $('vcBody').addEventListener('sl-change', (e) => {
+      const k = e.target.closest('[data-vc-sel]')?.dataset.vcSel; if (!k) return;
+      if (e.target.checked) st.conc.sel.add(k); else st.conc.sel.delete(k);
+      $('vcGrabar').disabled = !st.conc.sel.size; $('vcSelN').textContent = st.conc.sel.size ? ` (${fmtNum.format(st.conc.sel.size)})` : '';
+      const listos = st.conc.filas.filter(grabable); $('vcSelTodos').checked = Boolean(listos.length) && listos.every((f) => st.conc.sel.has(f.clave));
+    });
+    $('vcSelTodos').addEventListener('sl-change', (e) => {
+      st.conc.sel = e.target.checked ? new Set(st.conc.filas.filter(grabable).map((f) => f.clave)) : new Set();
+      pintarConciliacion();
+    });
     $('vlTabs').addEventListener('sl-tab-show', (e) => {
       if (e.detail?.name !== 'graficos') return;
       requestAnimationFrame(() => { if (st.graficosPendientes || !Object.keys(st.charts).length) pintarGraficos(); else ajustarGraficos(); });
