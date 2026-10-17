@@ -48,20 +48,23 @@ async function bajarPagosMP(desde, hasta, log) {
   const cred = await leerCred();
   if (!cred?.access_token) throw new HttpError(400, 'mp_sin_credenciales');
   const filas = [];
-  for (let pag = 0, offset = 0; pag < MAX_PAGINAS; pag++) {
-    const q = new URLSearchParams({ range: 'date_created', begin_date: isoAR(sumarDias(desde, -1)), end_date: isoAR(sumarDias(hasta, 1), true),
-      sort: 'date_created', criteria: 'asc', limit: '100', offset: String(offset) });
-    let r;
-    for (let i = 0; i < 3; i++) {
-      r = await mpGet(cred.access_token, `/v1/payments/search?${q}`);
-      if (r.status !== 429 && r.status < 500) break;
-      await new Promise((ok) => setTimeout(ok, 2000 * (i + 1)));
+  // De a un día: la búsqueda de MP no pagina bien rangos largos (deja pagos afuera pasado cierto offset).
+  for (let dia = sumarDias(desde, -1); dia <= sumarDias(hasta, 1); dia = sumarDias(dia, 1)) {
+    for (let pag = 0, offset = 0; pag < MAX_PAGINAS; pag++) {
+      const q = new URLSearchParams({ range: 'date_created', begin_date: isoAR(dia), end_date: isoAR(dia, true),
+        sort: 'date_created', criteria: 'asc', limit: '100', offset: String(offset) });
+      let r;
+      for (let i = 0; i < 3; i++) {
+        r = await mpGet(cred.access_token, `/v1/payments/search?${q}`);
+        if (r.status !== 429 && r.status < 500) break;
+        await new Promise((ok) => setTimeout(ok, 2000 * (i + 1)));
+      }
+      if (r.status !== 200) throw new HttpError(502, `mp_search_${r.status}`);
+      const res = Array.isArray(r.data?.results) ? r.data.results : [];
+      res.forEach((p) => filas.push(filaMP(String(p.id), p)));
+      offset += res.length;
+      if (res.length < 100 || offset >= Number(r.data?.paging?.total || 0)) break;
     }
-    if (r.status !== 200) throw new HttpError(502, `mp_search_${r.status}`);
-    const res = Array.isArray(r.data?.results) ? r.data.results : [];
-    res.forEach((p) => filas.push(filaMP(String(p.id), p)));
-    offset += res.length;
-    if (res.length < 100 || offset >= Number(r.data?.paging?.total || 0)) break;
   }
   // La paginación de MP puede repetir pagos entre páginas: uno por id.
   const unicos = [...new Map(filas.map((f) => [f.id_pago, f])).values()];
@@ -129,15 +132,25 @@ export async function cruzar({ desde, hasta, bajarMP = true, log = console } = {
   const pedidos = [...new Set(enRango.map(({ p }) => str(p.id_pago_externo) || digitos(p.cupon)).filter((id) => /^\d{6,20}$/.test(id) && !mpPorId.has(id)))];
   for (const c of chunks(pedidos, 300)) (await sel(admin.from('im5_mp_pagos').select('id_pago,estado,monto,neto,comision,aprobado_at,acreditacion_at,origen,raw').in('id_pago', c))).forEach((m) => mpPorId.set(m.id_pago, m));
   // Los que IM5 nombra y MP todavía no devolvió en la búsqueda: se piden de a uno (pocos).
-  const faltan = pedidos.filter((id) => !mpPorId.has(id)).slice(0, 80);
+  // Los que IM5 nombra y la búsqueda no trajo (p. ej. cobros del Point): se piden por id, de a 4. Los que MP no
+  // conoce (cupón mal tipeado) quedan guardados como «no_encontrado» para no preguntar en cada corrida.
+  const faltan = pedidos.filter((id) => !mpPorId.has(id)).slice(0, 600);
   if (faltan.length) {
     const cred = await leerCred();
-    for (const id of faltan) {
-      try {
+    const nuevas = [];
+    for (const tanda of chunks(faltan, 4)) {
+      const res = await Promise.allSettled(tanda.map(async (id) => {
         const { status, data } = await mpGet(cred.access_token, `/v1/payments/${id}`);
-        if (status === 200) { const f = filaMP(id, data); mpPorId.set(id, f); await admin.from('im5_mp_pagos').upsert(f, { onConflict: 'id_pago' }); }
-      } catch (e) { if (e?.message === 'mp_token_vencido') throw e; }
+        if (status === 200) return filaMP(id, data);
+        if (status === 404) return { id_pago: id, estado: 'no_encontrado', raw: null, consultado_at: new Date().toISOString() };
+        return null;
+      }));
+      for (const r of res) {
+        if (r.status === 'fulfilled' && r.value) { nuevas.push(r.value); mpPorId.set(r.value.id_pago, r.value); }
+        else if (r.status === 'rejected' && r.reason?.message === 'mp_token_vencido') throw r.reason;
+      }
     }
+    for (const c of chunks(nuevas, 500)) await admin.from('im5_mp_pagos').upsert(c, { onConflict: 'id_pago' });
   }
 
   const { mapa: im5Conc, error: errIm5, truncado } = await leerIm5Conciliados(desde, hasta);
