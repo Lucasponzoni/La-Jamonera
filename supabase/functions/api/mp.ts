@@ -38,7 +38,7 @@ async function leerManual() {
 }
 
 // estricto: el error de NinjaPos se propaga (para mostrarlo en el estado); si no, cae al token manual.
-async function leerCred({ estricto = false } = {}) {
+export async function leerCred({ estricto = false } = {}) {
   const clave = await secretGet(SECRETO_NINJA);
   if (clave) {
     try { return await credDeNinjaPos(clave); }
@@ -47,16 +47,17 @@ async function leerCred({ estricto = false } = {}) {
   return leerManual();
 }
 
-async function mpGet(token, path) {
+export async function mpGet(token, path) {
   let res;
   try { res = await fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(12_000) }); }
   catch (e) { throw new HttpError(502, `mp_sin_respuesta: ${e?.message || e}`); }
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401) throw new HttpError(401, 'mp_token_vencido');
+  // Token rechazado: si vino de NinjaPos se olvida, así el próximo pedido trae el vigente.
+  if (res.status === 401) { cacheBroker = null; throw new HttpError(401, 'mp_token_vencido'); }
   return { status: res.status, data };
 }
 
-const fila = (id, p) => ({
+export const filaMP = (id, p) => ({
   id_pago: String(id),
   estado: str(p.status) || null,
   estado_detalle: str(p.status_detail) || null,
@@ -97,7 +98,7 @@ export async function pagosMP(ids) {
     for (let i = 0; i < faltan.length; i += PARALELO) {
       const res = await Promise.allSettled(faltan.slice(i, i + PARALELO).map(async (id) => {
         const { status, data } = await mpGet(cred.access_token, `/v1/payments/${id}`);
-        if (status === 200) return fila(id, data);
+        if (status === 200) return filaMP(id, data);
         if (status === 404) return { id_pago: id, estado: 'no_encontrado', raw: null, consultado_at: new Date().toISOString() };
         throw new HttpError(502, `mp_${status}`);
       }));

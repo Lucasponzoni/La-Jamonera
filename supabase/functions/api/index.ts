@@ -14,6 +14,7 @@
 //   POST /ventas/mp/pagos { ids }, GET/POST /ventas/mp/credenciales → ver mp.ts (Mercado Pago, solo lectura)
 //   POST /ventas/pos/simular|aplicar { desde, hasta, comprobante? } → ver pos.ts (ventas del POS → Inventario y Producción)
 //   POST /ventas/pos/revertir { empresa, id, borrar? } → deshace un comprobante aplicado (admin o cron)
+//   POST /conciliacion/cruzar { desde, hasta }, POST /conciliacion/grabar { claves, confirmar }, POST /conciliacion/cron → ver conciliacion-mp.ts
 // Claves (Gemini, Resend) en Supabase Vault: sólo esta función las lee, con service_role.
 import {
   admin, json, HttpError, str, EMAIL_RE, requireActive, requireAdmin, secretGet, secretSet, secretDelete,
@@ -25,6 +26,7 @@ import { runAutoEgresos, refreshInventoryIndex } from './egresos.ts';
 import { runVentas, guardarCredenciales, estadoCredenciales, enviarAvisoPrueba } from './ventas-im5.ts';
 import { pagosMP, estadoMP, guardarCredMP, guardarClaveNinjaPos } from './mp.ts';
 import { aplicarVentasPos, revertirComprobantePos } from './pos.ts';
+import { cruzar, grabarIm5, cronConciliacion } from './conciliacion-mp.ts';
 
 const puedeVerVentas = (p) => Boolean(p && (p.role === 'admin' || p.ver_ventas));
 async function requireVerVentas(req) {
@@ -251,6 +253,23 @@ async function route(req: Request, path: string) {
     const body = await readBody(req);
     if (!Number(body.empresa) || !Number(body.id)) throw new HttpError(400, 'comprobante_requerido');
     return { ok: true, ...(await revertirComprobantePos({ empresa: body.empresa, id: body.id, borrar: body.borrar === true })) };
+  }
+  // Conciliación Mercado Pago ↔ IM5. Cruzar: «Ver ventas» o cron. Grabar en IM5: sólo admin (vista previa sin confirmar).
+  if (path === '/conciliacion/cruzar' && method === 'POST') {
+    const secret = await secretGet('cron_secret');
+    if (!(secret && req.headers.get('x-cron-secret') === secret)) await requireVerVentas(req);
+    const body = await readBody(req);
+    return await cruzar({ desde: str(body.desde), hasta: str(body.hasta), bajarMP: body.bajarMP !== false });
+  }
+  if (path === '/conciliacion/grabar' && method === 'POST') {
+    const c = await requireAdmin(req);
+    const body = await readBody(req);
+    return await grabarIm5({ claves: body.claves, confirmar: body.confirmar === true, quien: str(c.user.email || c.user.id), userId: c.user.id });
+  }
+  if (path === '/conciliacion/cron' && method === 'POST') {
+    const secret = await secretGet('cron_secret');
+    if (!secret || req.headers.get('x-cron-secret') !== secret) throw new HttpError(403, 'cron_forbidden');
+    return await cronConciliacion();
   }
   if (path === '/ventas/mp/pagos' && method === 'POST') {
     await requireVerVentas(req);

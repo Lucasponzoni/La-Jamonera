@@ -66,7 +66,7 @@ export function proximaCorrida(cfg, estado, now = new Date()) {
 }
 
 // ---------- Cliente IM5 ----------
-class Im5 {
+export class Im5 {
   constructor(cred) {
     this.cred = cred; this.token = ''; this.empresa = null;
     this.cliente = cred.clienteId || crypto.randomUUID();
@@ -443,7 +443,7 @@ async function releaseLock(run) { try { await admin.rpc('job_release', { p_job: 
 
 // ---------- Avisos por mail ----------
 // Uno al pasar a error y, si sigue fallando, uno cada 24 h. Uno cuando se recupera.
-const destinosAviso = (cfg) => str(cfg.mailAvisos).split(',').map((s) => s.trim()).filter((s) => EMAIL_RE.test(s));
+export const destinosAviso = (cfg) => str(cfg.mailAvisos).split(',').map((s) => s.trim()).filter((s) => EMAIL_RE.test(s));
 const fechaHoraAR = (iso) => (iso ? new Intl.DateTimeFormat('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(iso)).replace(',', ' ·') + ' h' : 'nunca');
 // Motivo técnico → frase para quien lee el mail (el técnico va abajo, chico).
 function motivoLegible(error) {
@@ -472,7 +472,7 @@ function avisoDatos(cfg, estado, error) {
 // Mail con la misma estética que los mails de informes bromatológicos (Informes.js · buildReportEmailHtml):
 // fondo celeste, tarjeta blanca redondeada, título azul, datos en un recuadro claro y botón píldora.
 // Todo con estilos en línea (los clientes de correo ignoran <style>).
-function plantillaMail({ tono = 'error', etiqueta, titulo, intro, filas = [], pie = '', prueba = false }) {
+export function plantillaMail({ tono = 'error', etiqueta, titulo, intro, filas = [], pie = '', prueba = false }) {
   const C = tono === 'ok' ? { fuerte: '#1f7a4c', suave: '#e3f5ec', borde: '#bfe5cf' } : { fuerte: '#b42338', suave: '#ffecef', borde: '#f5c2cb' };
   const url = 'https://www.lajamonera.online/ventaslocal.html';
   const fila = ([k, v], i) => `<tr>
@@ -532,7 +532,7 @@ export async function enviarAvisoPrueba() {
   for (const to of destinos) await sendResend(mail, { fromName: mail.fromName, to, subject: '[Prueba] Ventas del local: la sincronización con IM5 falló', html });
   return { ok: true, destinos };
 }
-async function mandar(destinos, asunto, html) {
+export async function mandar(destinos, asunto, html) {
   try {
     const cfg = await readEmailConfig();
     if (!cfg.apiKey || !cfg.fromEmail) return;
