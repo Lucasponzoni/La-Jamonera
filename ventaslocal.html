@@ -30,10 +30,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202610170143">
-  <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202610170143">
-  <link rel="stylesheet" href="./CSS/theme.css?v=202610170143">
-  <link rel="stylesheet" href="./CSS/utilities.css?v=202610170143">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202610170226">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202610170226">
+  <link rel="stylesheet" href="./CSS/theme.css?v=202610170226">
+  <link rel="stylesheet" href="./CSS/utilities.css?v=202610170226">
   <script type="module">
     import { setBasePath } from './vendor/shoelace/utilities/base-path.js?v=202608282255';
     setBasePath(new URL('./vendor/shoelace/', document.baseURI).href.slice(0, -1));
@@ -41,12 +41,12 @@
     const ljCore = [...new Set([...document.querySelectorAll('sl-button, sl-input, sl-icon, sl-dialog, sl-dropdown, sl-drawer, sl-spinner, sl-icon-button')].map((n) => n.localName))].map((t) => customElements.whenDefined(t));
     Promise.race([Promise.allSettled(ljCore), new Promise((r) => setTimeout(r, 2500))]).then(() => document.documentElement.classList.add('lj-ready'));
   </script>
-  <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202610170143">
-  <link rel="stylesheet" href="./CSS/legacy/03-componentes.css?v=202610170143">
-  <link rel="stylesheet" href="./CSS/legacy/04-informes.css?v=202610170143">
-  <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202610170143">
-  <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202610170143">
-  <link rel="stylesheet" href="./CSS/ventaslocal.css?v=202610170143">
+  <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202610170226">
+  <link rel="stylesheet" href="./CSS/legacy/03-componentes.css?v=202610170226">
+  <link rel="stylesheet" href="./CSS/legacy/04-informes.css?v=202610170226">
+  <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202610170226">
+  <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202610170226">
+  <link rel="stylesheet" href="./CSS/ventaslocal.css?v=202610170226">
 </head>
 <body>
   <main class="app-shell container-fluid px-0">
@@ -252,7 +252,7 @@
                   <div class="vc-pasos">
                     <div class="vc-paso"><span class="vc-paso-n">1</span><div><b>Cruza (sólo lee)</b><p>Trae los pagos de la cuenta de Mercado Pago y los cobros con MP de InfoManager (Point, QR y MERCADO PAGO 1/2) del período y los une por id de pago, por el n° de operación del cupón o, si no hay número, por importe y hora. No escribe nada.</p></div></div>
                     <div class="vc-paso"><span class="vc-paso-n">2</span><div><b>Vos resolvés lo que no cierra</b><p>Cada diferencia tiene «Resolver»: vincular con el pago correcto, aceptar la diferencia o marcar el motivo (otro canal, fuera de IM5, error de la cajera). Queda quién y cuándo, y el próximo cruce lo respeta.</p></div></div>
-                    <div class="vc-paso"><span class="vc-paso-n">3</span><div><b>Graba en IM5, con tu confirmación</b><p>En <b>Contabilidad → Conciliación de Tarjetas</b> marca cada cupón elegido como <b>conciliado</b>, con fecha de conciliación = hoy, <b>fecha de acreditación = la real de Mercado Pago</b> y <b>resumen = AAAAMMDD de la liberación</b> (agrupa el día). Lote y liquidación quedan en 0. Después relee IM5 para verificar.</p></div></div>
+                    <div class="vc-paso"><span class="vc-paso-n">3</span><div><b>Graba en IM5 (con tu confirmación o automático)</b><p>En <b>Contabilidad → Conciliación de Tarjetas</b> marca cada cupón elegido como <b>conciliado</b>, con fecha de conciliación = hoy, <b>fecha de acreditación = la real de Mercado Pago</b> y <b>resumen = AAAAMMDD de la liberación</b> (agrupa el día). Lote y liquidación quedan en 0. Después relee IM5 para verificar. Si prendés «Grabar automáticamente» (Configuración → Conciliación), lo conciliado por número exacto se graba solo en cada cruce, desde el servidor.</p></div></div>
                     <div class="vc-paso is-no"><span class="vc-paso-n"><i class="fa-solid fa-ban"></i></span><div><b>Nunca toca</b><p>Ventas, recibos, cobros, caja ni asientos de InfoManager, y la cuenta de Mercado Pago es sólo lectura (no cobra, no devuelve, no renueva el token). Sólo graba lo conciliado y ya liberado por MP.</p></div></div>
                   </div>
                 </details>
@@ -495,6 +495,10 @@
                   <sl-switch id="cfgConcActiva">Cruce automático prendido</sl-switch>
                   <p class="vl-ayuda" id="cfgConcResumen"></p>
                 </div>
+                <div class="vl-bloque vc-auto">
+                  <sl-switch id="cfgConcGrabarAuto">Grabar automáticamente en InfoManager</sl-switch>
+                  <p class="vl-ayuda">En cada cruce automático, marca como conciliados en IM5 (Conciliación de Tarjetas) los cobros que cruzaron por <b>número exacto</b> (id del Point, cupón o vínculo manual), con el mismo importe y ya liberados por Mercado Pago. Lo que queda en «Revisar» o con diferencias <b>nunca</b> se graba solo. Corre en el servidor con el usuario de la pestaña Conexión IM5: no hace falta tener ninguna PC prendida. Cada corrida relee IM5 para verificar y, si falla, avisa por mail.</p>
+                </div>
                 <div class="vl-bloque">
                   <sl-radio-group id="cfgConcModo" label="Frecuencia" size="small" value="diario">
                     <sl-radio-button value="diario">Todos los días</sl-radio-button>
@@ -618,25 +622,25 @@
     </section>
   </main>
 
-  <script src="./JS/data/backend.js?v=202610170143"></script>
+  <script src="./JS/data/backend.js?v=202610170226"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-  <script src="./vendor/echarts/echarts.min.js?v=202610170143"></script>
-  <script src="./JS/ui/forms.js?v=202610170143"></script>
-  <script src="./JS/ui/theme.js?v=202610170143"></script>
-  <script src="./JS/ui/modal.js?v=202610170143"></script>
-  <script src="./JS/ui/lj-alert.js?v=202610170143"></script>
-  <script src="./JS/ui/header.js?v=202610170143"></script>
-  <script src="./JS/data/config.js?v=202610170143"></script>
-  <script src="./JS/data/supabase-init.js?v=202610170143"></script>
-  <script src="./JS/firebase-init.js?v=202610170143"></script>
-  <script src="./JS/data/security.js?v=202610170143"></script>
-  <script src="./JS/proxy-client.js?v=202610170143"></script>
-  <script src="./JS/data/authz.js?v=202610170143"></script>
-  <script src="./JS/configuracion.js?v=202610170143"></script>
-  <script src="./JS/Notificaciones.js?v=202610170143"></script>
-  <script src="./JS/app.js?v=202610170143"></script>
-  <script src="./JS/ventaslocal.js?v=202610170143"></script>
+  <script src="./vendor/echarts/echarts.min.js?v=202610170226"></script>
+  <script src="./JS/ui/forms.js?v=202610170226"></script>
+  <script src="./JS/ui/theme.js?v=202610170226"></script>
+  <script src="./JS/ui/modal.js?v=202610170226"></script>
+  <script src="./JS/ui/lj-alert.js?v=202610170226"></script>
+  <script src="./JS/ui/header.js?v=202610170226"></script>
+  <script src="./JS/data/config.js?v=202610170226"></script>
+  <script src="./JS/data/supabase-init.js?v=202610170226"></script>
+  <script src="./JS/firebase-init.js?v=202610170226"></script>
+  <script src="./JS/data/security.js?v=202610170226"></script>
+  <script src="./JS/proxy-client.js?v=202610170226"></script>
+  <script src="./JS/data/authz.js?v=202610170226"></script>
+  <script src="./JS/configuracion.js?v=202610170226"></script>
+  <script src="./JS/Notificaciones.js?v=202610170226"></script>
+  <script src="./JS/app.js?v=202610170226"></script>
+  <script src="./JS/ventaslocal.js?v=202610170226"></script>
 </body>
 </html>

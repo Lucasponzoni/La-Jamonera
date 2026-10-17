@@ -263,9 +263,12 @@ async function route(req: Request, path: string) {
     return await cruzar({ desde: str(body.desde), hasta: str(body.hasta), bajarMP: body.bajarMP !== false });
   }
   if (path === '/conciliacion/grabar' && method === 'POST') {
-    const c = await requireAdmin(req);
+    // Admin desde la página, o el cron secret (grabado sin la PC de nadie: usa el usuario de IM5 guardado).
+    const secret = await secretGet('cron_secret');
+    const porCron = Boolean(secret && req.headers.get('x-cron-secret') === secret);
+    const c = porCron ? null : await requireAdmin(req);
     const body = await readBody(req);
-    return await grabarIm5({ claves: body.claves, confirmar: body.confirmar === true, quien: str(c.user.email || c.user.id), userId: c.user.id });
+    return await grabarIm5({ claves: body.claves, confirmar: body.confirmar === true, quien: c ? str(c.user.email || c.user.id) : 'sistema', userId: c?.user.id || null });
   }
   if (path === '/conciliacion/cron' && method === 'POST') {
     const secret = await secretGet('cron_secret');

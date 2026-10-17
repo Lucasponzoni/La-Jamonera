@@ -371,7 +371,7 @@ export async function candidatos({ clave } = {}) {
 }
 
 // ---------- 6) Programación ----------
-const CONC_DEF = { activa: true, modo: 'diario', cadaHoras: 6, cadaDias: 1, dias: [1, 2, 3, 4, 5, 6], hora: 7, desde: 8, hasta: 21, diasAtras: DIAS_CRON, mails: '', diaListos: 1,
+const CONC_DEF = { activa: true, grabarAuto: false, modo: 'diario', cadaHoras: 6, cadaDias: 1, dias: [1, 2, 3, 4, 5, 6], hora: 7, desde: 8, hasta: 21, diasAtras: DIAS_CRON, mails: '', diaListos: 1,
   avisos: { diferencias: true, resumen: false, listos: true, cierre: true, falla: true } };
 export const configConc = (cfg) => { const c = (cfg && cfg.conciliacion) || {}; return { ...CONC_DEF, ...c, avisos: { ...CONC_DEF.avisos, ...(c.avisos || {}) } }; };
 const partesAR = (d) => {
@@ -525,10 +525,26 @@ export async function cronConciliacion({ forzar = false, log = console } = {}) {
       }
     }
   } catch (e) { log.error?.(`[conc] avisos: ${e?.message}`); }
-  const resultado = error ? { error } : { filas: out.filas, porEstado: out.porEstado, nuevasDif: out.nuevasDif?.length || 0, im5: out.im5 };
+  // Grabado automático en IM5 (si está prendido): sólo lo conciliado por número exacto (id del Point, cupón o
+  // vínculo manual) y ya liberado. Nunca lo que está en «Revisar». Respeta la regla de «primera vez: uno solo».
+  let grabado = null;
+  if (!error && c.grabarAuto) {
+    try {
+      const listos = (await selTodo(() => admin.from('conciliacion_mp').select('clave,mp_liberacion_at').eq('estado', 'conciliado').in('motivo_match', ['id_externo', 'cupon', 'manual'])
+        .is('grabado_im5_at', null).not('im5_conciliado', 'is', true).like('clave', 'im5:%').lte('mp_liberacion_at', now.toISOString()).order('clave')))
+        .map((r) => r.clave);
+      if (listos.length) {
+        const g = await grabarIm5({ claves: listos.slice(0, 300), confirmar: true, quien: 'automático' });
+        const ok = (g.verificados || []).filter?.((v) => v.conciliado === 'S').length ?? 0;
+        grabado = { grabadas: g.grabadas, verificadas: ok, errores: g.errores || [], total: g.total };
+        if (g.errores?.length && c.avisos.falla) await enviarAviso(cfg, c, 'falla', { desde, hasta, error: `grabado automático en IM5: ${g.errores[0]}` });
+      } else grabado = { grabadas: 0 };
+    } catch (e) { grabado = { error: str(e?.message).slice(0, 200) }; log.error?.(`[conc] grabado auto: ${e?.message}`); }
+  }
+  const resultado = error ? { error } : { filas: out.filas, porEstado: out.porEstado, nuevasDif: out.nuevasDif?.length || 0, im5: out.im5, grabado };
   const historial = [{ at: now.toISOString(), ok: !error, ...resultado }, ...(Array.isArray(est.historial) ? est.historial : [])].slice(0, 20);
   await admin.from('conciliacion_mp_estado').update({ ultima_at: now.toISOString(), ultima_ok: !error, ultimo_error: error || null, ultimo_resultado: resultado,
     proxima_at: proximaConciliacion(c, now.toISOString(), new Date(now.getTime() + 60e3)), ultimo_aviso: avisos, historial, updated_at: now.toISOString() }).eq('id', 1);
   if (error) throw new HttpError(502, error);
-  return { ...out, toca: true };
+  return { ...out, toca: true, grabado };
 }

@@ -1415,7 +1415,8 @@
     const c = st.cfg?.conciliacion || {};
     $('vcCron').innerHTML = `<span class="vc-cron-chip ${c.activa === false ? 'is-off' : ''}"><i class="fa-solid ${c.activa === false ? 'fa-pause' : 'fa-clock-rotate-left'}"></i>${esc(textoFrecuencia(c))}</span>`
       + `<span>Último cruce: <b>${r.actualizado ? esc(fmtDiaHora(r.actualizado)) : '—'}</b>${e.ultima_at && e.ultima_ok === false ? ` <span class="vc-cron-mal" title="${esc(e.ultimo_error || '')}"><i class="fa-solid fa-triangle-exclamation"></i> falló el último automático</span>` : ''}</span>`
-      + (c.activa === false ? '' : `<span>Próximo: <b>${e.proxima_at ? esc(fmtDiaHora(e.proxima_at)) : '—'}</b></span>`);
+      + (c.activa === false ? '' : `<span>Próximo: <b>${e.proxima_at ? esc(fmtDiaHora(e.proxima_at)) : '—'}</b></span>`)
+      + (c.activa !== false && c.grabarAuto ? `<span class="vc-cron-chip"><i class="fa-solid fa-robot"></i>Graba solo en IM5${e.ultimo_resultado?.grabado?.grabadas ? ` · último: ${fmtNum.format(e.ultimo_resultado.grabado.grabadas)}` : ''}</span>` : '');
     const cuenta = { todos: filas.length, listos: filas.filter(grabable).length, grabados: filas.filter((f) => f.grabado_im5_at || f.im5_conciliado).length, resueltos: filas.filter((f) => f.resuelto_at).length };
     filas.forEach((f) => { if (!f.resuelto_at) cuenta[f.estado] = (cuenta[f.estado] || 0) + 1; });
     const nombreFiltro = { todos: ['Todos', 'fa-layer-group'], listos: ['Listos para grabar', 'fa-file-signature'], grabados: ['Ya en IM5', 'fa-check-double'], resueltos: ['Resueltos a mano', 'fa-screwdriver-wrench'] };
@@ -1555,6 +1556,7 @@
     const horas = (id) => { const s = $(id); if (!s.children.length) s.innerHTML = Array.from({ length: 24 }, (_, i) => `<sl-option value="${i}">${hh(i)}</sl-option>`).join(''); };
     ['cfgConcHora', 'cfgConcDesde', 'cfgConcHasta'].forEach(horas);
     $('cfgConcActiva').checked = c.activa !== false;
+    $('cfgConcGrabarAuto').checked = c.grabarAuto === true;
     $('cfgConcModo').value = c.modo || 'diario';
     $('cfgConcHora').value = String(c.hora ?? 7);
     $('cfgConcCadaDias').value = String(c.cadaDias || 1);
@@ -1572,7 +1574,7 @@
   function leerCfgConc() {
     const n = (id, d) => { const v = Number(String($(id).value ?? '').trim()); return Number.isFinite(v) && v > 0 ? Math.round(v) : d; };
     return {
-      activa: Boolean($('cfgConcActiva').checked), modo: String($('cfgConcModo').value || 'diario'),
+      activa: Boolean($('cfgConcActiva').checked), grabarAuto: Boolean($('cfgConcGrabarAuto').checked), modo: String($('cfgConcModo').value || 'diario'),
       hora: Number($('cfgConcHora').value ?? 7), cadaDias: n('cfgConcCadaDias', 1), cadaHoras: n('cfgConcCadaHoras', 6),
       desde: Number($('cfgConcDesde').value ?? 8), hasta: Number($('cfgConcHasta').value ?? 21), diasAtras: n('cfgConcDiasAtras', 35),
       dias: [...document.querySelectorAll('#cfgConcDias button[aria-pressed="true"]')].map((b) => Number(b.dataset.cdia)),
