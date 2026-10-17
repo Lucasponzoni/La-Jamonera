@@ -209,11 +209,13 @@ export async function cruzar({ desde, hasta, bajarMP = true, log = console } = {
     if (mNum) { filas.push(conMP(f, mNum, 'cupon')); continue; }
     filas.push(sinMP(f, porHora.length > 1 || porNumero.length > 1 ? 'revisar' : 'falta_en_mp'));
   }
-  // Pagos aprobados de MP del rango que no aparecen en IM5.
+  // Pagos aprobados de MP del rango que no aparecen en IM5 (sólo desde el primer día con cobros de IM5 bajados:
+  // antes de eso no hay con qué cruzar).
+  const desdeIm5 = [...reciboDe.values()].reduce((min, x) => (!min || x.c.fecha < min ? x.c.fecha : min), '');
   for (const m of mpRango) {
     if (usados.has(m.id_pago) || m.estado !== 'approved') continue;
     const fecha = new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(m.aprobado_at));
-    if (fecha < desde || fecha > hasta) continue;
+    if (fecha < desde || fecha > hasta || !desdeIm5 || fecha < desdeIm5) continue;
     filas.push({ clave: `mp:${m.id_pago}`, empresa: null, im5_pago_id: null, fecha, fecha_hora: m.aprobado_at, medio: m.raw?.payment_method_id || null, comprobante: null, recibo: null,
       importe: null, cupon: null, mp_pago_id: m.id_pago, mp_estado: m.estado, mp_monto: m.monto, mp_neto: m.neto, mp_comision: m.comision, mp_aprobado_at: m.aprobado_at,
       mp_liberacion_at: m.acreditacion_at, mp_origen: m.origen, estado: 'falta_en_im5', motivo_match: null, diferencia: r2(m.monto),
