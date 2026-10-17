@@ -630,3 +630,19 @@ sl-dialog.vl-dialog { --width: min(760px, 96vw); }
 @keyframes vl-flujo { to { background-position: 12px 0; } }
 @keyframes vl-pulso-nodo { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--vl-c) 22%, transparent); } }
 @media (prefers-reduced-motion: reduce) { .vl-salud[data-estado="corriendo"] .vl-salud-enlace, .vl-salud[data-estado="corriendo"] .vl-salud-nodo:first-child { animation: none; } }
+
+/* Cupón IM5 vs n° de MP, dígito por dígito */
+.vc-dif { display: grid; gap: 4px; margin-top: 6px; justify-items: start; }
+.vc-dif-filas { display: grid; grid-template-columns: auto auto; gap: 2px 6px; align-items: center; padding: 5px 7px; border-radius: 8px; background: var(--lj-surface-2); border: 1px solid var(--lj-border); }
+.vc-dif-lbl { font-size: .64rem; font-weight: 800; letter-spacing: .04em; color: var(--lj-muted); }
+.vc-dif-num { display: inline-flex; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .82rem; line-height: 1; }
+.vc-dg { display: inline-block; width: 1.05ch; padding: 3px 1px; text-align: center; box-sizing: content-box; border-radius: 3px; color: var(--lj-text); }
+.vc-dg.is-mal { background: color-mix(in srgb, var(--lj-danger) 18%, transparent); color: var(--lj-danger); font-weight: 800; }
+.vc-dg.is-bien { background: color-mix(in srgb, var(--lj-success) 20%, transparent); color: var(--lj-success); font-weight: 800; }
+.vc-dg.is-sobra { color: var(--lj-danger); text-decoration: line-through 2px; font-weight: 800; background: color-mix(in srgb, var(--lj-danger) 10%, transparent); }
+.vc-dg.is-falta { box-shadow: inset 0 0 0 1.5px var(--lj-danger); background: color-mix(in srgb, var(--lj-danger) 6%, transparent); }
+.vc-dg.is-hueco { opacity: .35; }
+.vc-dif-frase { display: inline-flex; gap: 5px; align-items: center; font-size: .74rem; font-weight: 700; color: var(--lj-warning); }
+.vc-copiar { display: inline-flex; gap: 5px; align-items: center; font: inherit; font-size: .72rem; font-weight: 600; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--lj-border); background: var(--lj-surface); color: var(--lj-accent); cursor: pointer; }
+.vc-copiar:hover { background: var(--lj-accent-soft); }
+.vc-res-dlg .vc-dif, #vcResCuerpo .vc-dif { margin: 0 0 10px; }

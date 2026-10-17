@@ -425,7 +425,7 @@ export function plantillaConc({ tono = 'info', etiqueta, titulo, intro, kpis = [
       <tr style="background:#f1f5fe;">${['Fecha', 'Cobro en IM5', 'IM5', 'Mercado Pago', 'Estado'].map((h, i) => `<th align="${i === 2 ? 'right' : 'left'}" style="padding:8px 10px;color:#4f638c;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">${h}</th>`).join('')}</tr>
       ${filas.map((f, i) => { const [t, c, b] = ESTADO_TXT[f.estado] || [f.estado, '#4f638c', '#eef2fb']; return `<tr style="background:${i % 2 ? '#fbfcff' : '#ffffff'};">
         <td style="padding:8px 10px;border-top:1px solid #eef2fb;color:#1f2a44;white-space:nowrap;">${esc(diaHoraM(f.fecha_hora))}</td>
-        <td style="padding:8px 10px;border-top:1px solid #eef2fb;color:#1f2a44;"><b>${esc(f.comprobante || 'Sin cobro en IM5')}</b><br><span style="color:#6b7da3;">${esc(f.medio || '')}${f.cupon ? ` · ${esc(f.cupon)}` : ''}</span></td>
+        <td style="padding:8px 10px;border-top:1px solid #eef2fb;color:#1f2a44;"><b>${esc(f.comprobante || 'Sin cobro en IM5')}</b><br><span style="color:#6b7da3;">${esc(f.medio || '')}${f.cupon ? ` · ${esc(f.cupon)}` : ''}</span>${f.cupon && f.mp_pago_id && ['cupon_mal', 'importe_hora'].includes(f.motivo_match) ? difMail(f.cupon, f.mp_pago_id) : ''}</td>
         <td align="right" style="padding:8px 10px;border-top:1px solid #eef2fb;color:#1f2a44;white-space:nowrap;font-weight:700;">${esc(pesosM(f.importe))}</td>
         <td style="padding:8px 10px;border-top:1px solid #eef2fb;color:#1f2a44;">${f.mp_pago_id ? `#${esc(f.mp_pago_id)}<br><span style="color:#6b7da3;">${esc(pesosM(f.mp_monto))}</span>` : '<span style="color:#6b7da3;">—</span>'}</td>
         <td style="padding:8px 10px;border-top:1px solid #eef2fb;"><span style="display:inline-block;background:${b};color:${c};border-radius:999px;padding:3px 9px;font-weight:700;white-space:nowrap;">${esc(t)}</span></td></tr>`; }).join('')}
@@ -448,12 +448,44 @@ export function plantillaConc({ tono = 'info', etiqueta, titulo, intro, kpis = [
       </div>
     </div>`;
 }
+// Cupón de IM5 vs n° de MP dígito por dígito (para el mail): IM5 arriba, MP abajo, distintos en color.
+function opsDigitos(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  const ops = []; let i = a.length; let j = b.length;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && d[i][j] === d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)) { ops.push({ t: a[i - 1] === b[j - 1] ? 'eq' : 'sub', a: a[i - 1], b: b[j - 1] }); i--; j--; }
+    else if (i > 0 && d[i][j] === d[i - 1][j] + 1) { ops.push({ t: 'del', a: a[i - 1], b: '' }); i--; }
+    else { ops.push({ t: 'ins', a: '', b: b[j - 1] }); j--; }
+  }
+  return ops.reverse();
+}
+function fraseDigitos(ops) {
+  const dif = ops.filter((o) => o.t !== 'eq');
+  if (dif.length === 1) { const o = dif[0]; return o.t === 'ins' ? `Le falta un ${o.b}` : o.t === 'del' ? `Tiene un ${o.a} de más` : `Tipeó ${o.a} en vez de ${o.b}`; }
+  return `${dif.length} dígitos distintos`;
+}
+function difMail(cupon, mpId) {
+  const a = digitos(cupon); const b = digitos(mpId);
+  if (!a || !b || a === b) return '';
+  const ops = opsDigitos(a, b);
+  const st = (o, lado) => {
+    const base = 'display:inline-block;min-width:8px;padding:1px 1px;text-align:center;border-radius:3px;';
+    if (o.t === 'eq') return base;
+    if (o.t === 'sub') return base + (lado === 'a' ? 'background:#ffe0e5;color:#b42338;font-weight:800;' : 'background:#dcf3e6;color:#1f7a4c;font-weight:800;');
+    if (o.t === 'del') return base + (lado === 'a' ? 'color:#b42338;text-decoration:line-through;font-weight:800;background:#fff0f2;' : 'opacity:.3;');
+    return base + (lado === 'a' ? 'box-shadow:inset 0 0 0 1px #b42338;' : 'background:#dcf3e6;color:#1f7a4c;font-weight:800;');
+  };
+  const fila = (lbl, lado) => `<div style="white-space:nowrap;"><span style="display:inline-block;width:26px;font-size:10px;font-weight:800;color:#6b7da3;">${lbl}</span><span style="font-family:Consolas,Menlo,monospace;font-size:12px;">${ops.map((o) => `<span style="${st(o, lado)}">${esc((lado === 'a' ? o.a : o.b) || ' ')}</span>`).join('')}</span></div>`;
+  return `<div style="margin-top:5px;padding:4px 6px;background:#f6f9ff;border:1px solid #e2e8fb;border-radius:6px;display:inline-block;">${fila('IM5', 'a')}${fila('MP', 'b')}<div style="font-size:11px;font-weight:700;color:#9a6200;margin-top:2px;">${esc(fraseDigitos(ops))}</div></div>`;
+}
 const destinosConc = (cfg, c) => (str(c.mails).trim() ? str(c.mails).split(',').map((x) => x.trim()).filter(Boolean) : destinosAviso(cfg));
 const fmt0 = (n) => `$ ${Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
 async function datosAviso(tipo, { claves = null, desde, hasta, error = '' } = {}) {
   const r = (await admin.rpc('conciliacion_mp_resumen', { p_desde: desde, p_hasta: hasta })).data || {};
   const DIFS = ['dif_importe', 'falta_en_mp', 'falta_en_im5', 'revisar'];
-  let q = admin.from('conciliacion_mp').select('fecha_hora,comprobante,medio,cupon,importe,mp_pago_id,mp_monto,estado').gte('fecha', desde).lte('fecha', hasta).order('fecha_hora', { ascending: false }).limit(25);
+  let q = admin.from('conciliacion_mp').select('fecha_hora,comprobante,medio,cupon,importe,mp_pago_id,mp_monto,estado,motivo_match').gte('fecha', desde).lte('fecha', hasta).order('fecha_hora', { ascending: false }).limit(25);
   if (claves) q = q.in('clave', claves.slice(0, 300));
   else if (tipo === 'listos') q = q.eq('estado', 'conciliado').is('grabado_im5_at', null);
   else q = q.in('estado', DIFS).is('resuelto_at', null);

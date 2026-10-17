@@ -1444,7 +1444,7 @@
       const [txt, clase, ico, ayuda] = EST_CONC[f.estado] || [f.estado, '', 'fa-circle', ''];
       const g = grabable(f);
       const enIm5 = f.grabado_im5_at || f.im5_conciliado;
-      const mp = f.mp_pago_id ? `<b>#${esc(f.mp_pago_id)}</b><span class="vl-dim">${esc(f.mp_origen === 'PSP_TRANSFER' ? 'Transferencia' : f.mp_origen || f.mp_estado || '')}${f.motivo_match ? ` · cruzó por ${esc({ id_externo: 'id del Point', cupon: 'n° de operación', importe_hora: 'importe y hora', cupon_mal: 'importe y n° parecido (cupón mal cargado)' }[f.motivo_match] || f.motivo_match)}` : ''}</span>` : '<span class="vl-dim">—</span>';
+      const mp = f.mp_pago_id ? `<b>#${esc(f.mp_pago_id)}</b><span class="vl-dim">${esc(f.mp_origen === 'PSP_TRANSFER' ? 'Transferencia' : f.mp_origen || f.mp_estado || '')}${f.motivo_match ? ` · cruzó por ${esc({ id_externo: 'id del Point', cupon: 'n° de operación', importe_hora: 'importe y hora', cupon_mal: 'número mal tipeado por la cajera · mismo importe' }[f.motivo_match] || f.motivo_match)}` : ''}</span>` : '<span class="vl-dim">—</span>';
       return `<tr class="${g ? 'is-grabable' : ''}">
         <td class="vc-col-sel">${g && admin ? `<sl-checkbox size="small" data-vc-sel="${esc(f.clave)}" ${st.conc.sel.has(f.clave) ? 'checked' : ''} aria-label="Elegir"></sl-checkbox>` : enIm5 ? '<i class="fa-solid fa-check-double vc-ok" title="Ya conciliado en IM5"></i>' : ''}</td>
         <td class="vl-fecha"><b>${esc(fmtDiaHora(f.fecha_hora))}</b>${f.empresa ? `<span class="vl-dim">Emp. ${f.empresa}</span>` : ''}</td>
@@ -1453,7 +1453,7 @@
         <td class="vc-mp">${mp}</td>
         <td class="vl-num">${f.mp_monto != null ? `<b>${pesos2(f.mp_monto)}</b><span class="vl-dim">neto ${pesos2(f.mp_neto)}</span>` : '—'}</td>
         <td class="vl-ocultar-movil">${f.mp_liberacion_at ? `${esc(fmtDia(f.mp_liberacion_at))}${liberado(f) ? '' : ' <span class="vl-dim">(pendiente)</span>'}` : '—'}</td>
-        <td>${f.resuelto_at ? `<span class="vc-estado is-res" title="${esc(f.resolucion_nota || '')}"><i class="fa-solid ${RESOL[f.resolucion]?.[1] || 'fa-check'}"></i>${esc(RESOL[f.resolucion]?.[0] || 'Resuelto')}</span><span class="vl-dim">era: ${esc(txt)}${f.resuelto_por ? ` · ${esc(String(f.resuelto_por).split('@')[0])}` : ''}</span>` : `<span class="vc-estado ${clase}" title="${esc(ayuda)}"><i class="fa-solid ${ico}"></i>${esc(txt)}</span>`}${f.estado === 'dif_importe' && !f.resuelto_at ? `<span class="vl-dim">dif. ${pesos2(f.diferencia)}</span>` : ''}${f.motivo_match === 'cupon_mal' && !f.resuelto_at ? `<span class="vl-dim">corregir cupón en IM5: ${esc(f.mp_pago_id)}</span>` : ''}${f.motivo_match === 'manual' ? '<span class="vl-dim">vinculado a mano</span>' : ''}${enIm5 ? '<span class="vl-dim">Conciliado en IM5</span>' : ''}</td>
+        <td>${f.resuelto_at ? `<span class="vc-estado is-res" title="${esc(f.resolucion_nota || '')}"><i class="fa-solid ${RESOL[f.resolucion]?.[1] || 'fa-check'}"></i>${esc(RESOL[f.resolucion]?.[0] || 'Resuelto')}</span><span class="vl-dim">era: ${esc(txt)}${f.resuelto_por ? ` · ${esc(String(f.resuelto_por).split('@')[0])}` : ''}</span>` : `<span class="vc-estado ${clase}" title="${esc(ayuda)}"><i class="fa-solid ${ico}"></i>${esc(txt)}</span>`}${f.estado === 'dif_importe' && !f.resuelto_at ? `<span class="vl-dim">dif. ${pesos2(f.diferencia)}</span>` : ''}${!f.resuelto_at && f.cupon && f.mp_pago_id && ['cupon_mal', 'importe_hora'].includes(f.motivo_match) ? htmlDifCupon(f.cupon, f.mp_pago_id) : ''}${f.motivo_match === 'manual' ? '<span class="vl-dim">vinculado a mano</span>' : ''}${enIm5 ? '<span class="vl-dim">Conciliado en IM5</span>' : ''}</td>
         <td class="vc-col-acc">${admin && (f.resuelto_at || f.motivo_match === 'manual' || ['revisar', 'dif_importe', 'falta_en_mp', 'falta_en_im5', 'devuelto'].includes(f.estado)) && !enIm5 ? `<sl-button size="small" variant="${f.resuelto_at ? 'text' : 'default'}" data-vc-resolver="${esc(f.clave)}">${f.resuelto_at || f.motivo_match === 'manual' ? 'Ver' : 'Resolver'}</sl-button>` : ''}</td>
       </tr>`;
     }).join('') : `<tr><td colspan="9" class="vl-ayuda vc-vacio">${filas.length ? 'No hay cobros en este grupo.' : 'Todavía no hay cruce para este período: tocá «Actualizar cruce».'}</td></tr>`;
@@ -1531,7 +1531,7 @@
         <i class="fa-solid fa-arrows-left-right"></i>
         <div><span>Mercado Pago</span>${f.mp_pago_id ? `<b>#${esc(f.mp_pago_id)}</b><small>${esc(fmtDiaHora(f.mp_aprobado_at))} · ${esc(f.mp_estado || '')}</small><b class="vc-res-imp">${pesos2(f.mp_monto)}</b>` : '<small>Sin pago en MP</small>'}</div>
       </div>
-      <p class="vc-res-estado"><span class="vc-estado ${clase}"><i class="fa-solid ${ico}"></i>${esc(txt)}</span> ${esc(ayuda)}${f.motivo_match === 'cupon_mal' ? ` <b>En IM5 el cupón dice ${esc(f.cupon)} y en Mercado Pago es ${esc(f.mp_pago_id)}: corregilo en IM5.</b>` : ''}</p>
+      <p class="vc-res-estado"><span class="vc-estado ${clase}"><i class="fa-solid ${ico}"></i>${esc(txt)}</span> ${esc(ayuda)}</p>${f.cupon && f.mp_pago_id ? htmlDifCupon(f.cupon, f.mp_pago_id) : ''}
       ${f.resuelto_at || f.motivo_match === 'manual' ? `<div class="vl-mp-aviso"><i class="fa-solid fa-circle-check"></i><span>${f.resuelto_at ? `Resuelto: <b>${esc(RESOL[f.resolucion]?.[0] || f.resolucion)}</b> por ${esc(f.resuelto_por || '—')} el ${esc(fmtDiaHora(f.resuelto_at))}${f.resolucion_nota ? ` · «${esc(f.resolucion_nota)}»` : ''}` : 'Vinculado a mano.'} <sl-button size="small" variant="default" id="vcResDeshacer"><i slot="prefix" class="fa-solid fa-rotate-left"></i>Deshacer</sl-button></span></div>` : ''}
       <p class="vl-detalle-tit"><i class="fa-solid fa-link"></i> ${im5 ? 'Vincular con el pago correcto de Mercado Pago' : 'Vincular con un cobro de InfoManager'}</p>
       <ul class="vc-cands" id="vcCands"><li class="vl-ayuda"><sl-spinner></sl-spinner> Buscando parecidos…</li></ul>
@@ -1608,6 +1608,58 @@
       if (enviar) return notify('success', 'Mail de prueba enviado', (out.destinos || []).join(', '));
       $('vcMailFrame').srcdoc = out.html; $('vcMailDialog').show();
     } catch (e) { notify('error', enviar ? 'No se pudo enviar' : 'No se pudo armar la vista previa', textoError(e)); }
+  }
+
+  // ---- Cupón de IM5 vs n° de pago de MP, dígito por dígito (Levenshtein con backtrace) ----
+  // Devuelve las operaciones para pasar de a (IM5) a b (MP): eq, sub (cambiado), del (sobra en IM5), ins (falta en IM5).
+  function difDigitos(a, b) {
+    a = String(a || '').replace(/\D/g, ''); b = String(b || '').replace(/\D/g, '');
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    const ops = [];
+    let i = a.length; let j = b.length;
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && d[i][j] === d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)) { ops.push({ t: a[i - 1] === b[j - 1] ? 'eq' : 'sub', a: a[i - 1], b: b[j - 1] }); i--; j--; }
+      else if (i > 0 && d[i][j] === d[i - 1][j] + 1) { ops.push({ t: 'del', a: a[i - 1], b: '' }); i--; }
+      else { ops.push({ t: 'ins', a: '', b: b[j - 1] }); j--; }
+    }
+    return ops.reverse();
+  }
+  // Frase humana del error de tipeo.
+  function fraseDif(ops) {
+    const dif = ops.filter((o) => o.t !== 'eq');
+    if (!dif.length) return 'Mismo número';
+    if (dif.length === 1) {
+      const o = dif[0];
+      if (o.t === 'ins') return `Le falta un ${o.b}`;
+      if (o.t === 'del') return `Tiene un ${o.a} de más`;
+      return `Tipeó ${o.a} en vez de ${o.b}`;
+    }
+    // Dos dígitos vecinos invertidos (54 en vez de 45).
+    const k = ops.findIndex((o) => o.t === 'sub');
+    if (dif.length === 2 && ops[k + 1]?.t === 'sub' && ops[k].a === ops[k + 1].b && ops[k].b === ops[k + 1].a) return `Invirtió ${ops[k].b}${ops[k + 1].b} (puso ${ops[k].a}${ops[k + 1].a})`;
+    const de = dif.filter((o) => o.t === 'del').length; const fa = dif.filter((o) => o.t === 'ins').length; const ca = dif.filter((o) => o.t === 'sub').length;
+    return [ca && `${ca} cambiado${ca === 1 ? '' : 's'}`, fa && `${fa} faltante${fa === 1 ? '' : 's'}`, de && `${de} de más`].filter(Boolean).join(' · ').replace(/^/, `${dif.length} dígitos distintos: `);
+  }
+  // Bloque: IM5 arriba, MP abajo, alineados; distintos en rojo/verde, sobrante tachado, faltante como hueco.
+  function htmlDifCupon(cupon, mpId, { copiar = true } = {}) {
+    const a = String(cupon || '').replace(/\D/g, ''); const b = String(mpId || '').replace(/\D/g, '');
+    if (!a || !b || a === b) return '';
+    const ops = difDigitos(a, b);
+    const celda = (o, lado) => {
+      const v = lado === 'a' ? o.a : o.b;
+      const cls = o.t === 'eq' ? '' : o.t === 'sub' ? (lado === 'a' ? 'is-mal' : 'is-bien') : o.t === 'del' ? (lado === 'a' ? 'is-sobra' : 'is-hueco') : (lado === 'a' ? 'is-falta' : 'is-bien');
+      return `<span class="vc-dg ${cls}">${v ? esc(v) : '&nbsp;'}</span>`;
+    };
+    return `<div class="vc-dif">
+      <div class="vc-dif-filas" role="img" aria-label="${esc(`Cupón en IM5 ${a}, pago en Mercado Pago ${b}: ${fraseDif(ops)}`)}">
+        <span class="vc-dif-lbl">IM5</span><span class="vc-dif-num">${ops.map((o) => celda(o, 'a')).join('')}</span>
+        <span class="vc-dif-lbl">MP</span><span class="vc-dif-num">${ops.map((o) => celda(o, 'b')).join('')}</span>
+      </div>
+      <span class="vc-dif-frase"><i class="fa-solid fa-keyboard"></i>${esc(fraseDif(ops))}</span>
+      ${copiar ? `<button type="button" class="vc-copiar" data-copiar="${esc(b)}" title="Copiar el número correcto para corregirlo en IM5"><i class="fa-regular fa-copy"></i>Copiar ${esc(b)}</button>` : ''}
+    </div>`;
   }
   const concVisible = () => $('vlTabs')?.querySelector('sl-tab[panel="conciliacion"]')?.active;
 
@@ -1722,6 +1774,12 @@
     $('vcGrabar').addEventListener('click', previaGrabar);
     $('vcConfirmar').addEventListener('click', confirmarGrabar);
     $('vcBody').addEventListener('click', (e) => { const b = e.target.closest('[data-vc-resolver]'); if (b) abrirResolver(b.dataset.vcResolver); });
+    // Copiar el n° correcto de MP (para corregir el cupón en IM5), en la tabla y en Resolver.
+    document.addEventListener('click', async (e) => {
+      const b = e.target.closest?.('[data-copiar]'); if (!b) return;
+      try { await navigator.clipboard.writeText(b.dataset.copiar); notify('success', 'Copiado', `${b.dataset.copiar}: pegalo en el cupón del cobro en IM5.`); }
+      catch { notify('warning', 'No se pudo copiar', b.dataset.copiar); }
+    });
     $('vcResCuerpo').addEventListener('click', (e) => {
       const m = e.target.closest('[data-motivo]');
       if (m && st.conc.res) { st.conc.res.motivo = m.dataset.motivo; $('vcResCuerpo').querySelectorAll('.vc-motivo').forEach((x) => x.classList.toggle('is-sel', x === m)); $('vcResGuardar').disabled = false; return; }
