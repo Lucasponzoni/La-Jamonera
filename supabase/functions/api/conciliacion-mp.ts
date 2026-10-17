@@ -253,9 +253,13 @@ export async function grabarIm5({ claves = [], confirmar = false, quien = '', us
     if (motivo) { descartadas.push({ clave: f.clave, comprobante: f.comprobante, motivo }); continue; }
     ok.push({ f, tarjeta: { id_pago: Number(f.im5_pago_id), conciliado: 'S', fec_conciliacion: hoy, lote: 0, liquidacion: 0, resumen: Number(lib.replace(/-/g, '')), fec_acreditacion: lib } });
   }
+  // Primera vez: se graba uno solo, para revisarlo en la pantalla de IM5 antes de mandar el resto.
+  const { data: vc } = await admin.from('ventas_config').select('config').eq('id', 1).maybeSingle();
+  const primeraVez = !(Number(vc?.config?.conciliacion?.grabados) > 0);
+  if (primeraVez && ok.length > 1) ok.splice(1);
   const total = r2(ok.reduce((s, x) => s + Number(x.f.importe || 0), 0));
   const neto = r2(ok.reduce((s, x) => s + Number(x.f.mp_neto || 0), 0));
-  const previa = { ok: true, confirmar, cantidad: ok.length, total, neto, tarjetas: ok.map((x) => ({ ...x.tarjeta, clave: x.f.clave, comprobante: x.f.comprobante, importe: x.f.importe, mp_pago_id: x.f.mp_pago_id })), descartadas };
+  const previa = { ok: true, confirmar, primeraVez, cantidad: ok.length, total, neto, tarjetas: ok.map((x) => ({ ...x.tarjeta, clave: x.f.clave, comprobante: x.f.comprobante, importe: x.f.importe, mp_pago_id: x.f.mp_pago_id })), descartadas };
   if (!confirmar || !ok.length) return previa;
 
   const cred = await leerCredenciales();

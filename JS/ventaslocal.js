@@ -1344,12 +1344,12 @@
     devolucion: ['Devolución', 'is-neu', 'fa-rotate-left', 'Renglón negativo de IM5 (nota de crédito devuelta).']
   };
   const ORDEN_CONC = ['todos', 'listos', 'conciliado', 'pendiente_liberacion', 'revisar', 'dif_importe', 'falta_en_mp', 'falta_en_im5', 'devuelto', 'devolucion', 'grabados'];
-  st.conc = { filtro: 'todos', filas: [], sel: new Set(), cargando: false };
+  st.conc = { filtro: 'todos', filas: [], sel: new Set(), cargando: false, limite: 100 };
   const esAdmin = () => Boolean(st.me?.admin);
   const liberado = (f) => f.mp_liberacion_at && Date.parse(f.mp_liberacion_at) <= Date.now();
   // «Revisar» con el mismo importe y pago aprobado también se puede grabar: elegirlo es la revisión.
   const grabable = (f) => (f.estado === 'conciliado' || (f.estado === 'revisar' && f.mp_pago_id && f.mp_estado === 'approved' && Math.abs(Number(f.importe) - Number(f.mp_monto)) <= 0.01)) && !f.grabado_im5_at && !f.im5_conciliado && liberado(f) && String(f.clave).startsWith('im5:');
-  const fmtDiaHora = (ts) => (ts ? new Intl.DateTimeFormat('es-AR', { timeZone: TZ, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(ts)) : '—');
+  const fmtDiaHora = (ts) => (ts ? `${fmtDia(ts)} ${fmtHora.format(new Date(ts))}` : '—');
   const fmtDia = (ts) => (ts ? new Intl.DateTimeFormat('es-AR', { timeZone: TZ, day: '2-digit', month: '2-digit' }).format(new Date(ts)) : '—');
   async function leerTodo(armar) {
     const out = [];
@@ -1401,7 +1401,7 @@
     const f0 = st.conc.filtro;
     const lista = filas.filter((f) => f0 === 'todos' || (f0 === 'listos' ? grabable(f) : f0 === 'grabados' ? (f.grabado_im5_at || f.im5_conciliado) : f.estado === f0));
     const admin = esAdmin();
-    $('vcBody').innerHTML = lista.length ? lista.slice(0, 600).map((f) => {
+    $('vcBody').innerHTML = lista.length ? lista.slice(0, st.conc.limite).map((f) => {
       const [txt, clase, ico, ayuda] = EST_CONC[f.estado] || [f.estado, '', 'fa-circle', ''];
       const g = grabable(f);
       const enIm5 = f.grabado_im5_at || f.im5_conciliado;
@@ -1409,7 +1409,7 @@
       return `<tr class="${g ? 'is-grabable' : ''}">
         <td class="vc-col-sel">${g && admin ? `<sl-checkbox size="small" data-vc-sel="${esc(f.clave)}" ${st.conc.sel.has(f.clave) ? 'checked' : ''} aria-label="Elegir"></sl-checkbox>` : enIm5 ? '<i class="fa-solid fa-check-double vc-ok" title="Ya conciliado en IM5"></i>' : ''}</td>
         <td class="vl-fecha"><b>${esc(fmtDiaHora(f.fecha_hora))}</b>${f.empresa ? `<span class="vl-dim">Emp. ${f.empresa}</span>` : ''}</td>
-        <td>${f.comprobante ? `<b>${esc(f.comprobante)}</b><span class="vl-dim">${esc(f.medio || '')}${f.cupon ? ` · cupón ${esc(f.cupon)}` : ''}</span>` : '<span class="vl-dim">Sin cobro en IM5</span>'}</td>
+        <td>${f.comprobante ? `<b>${esc(f.comprobante)}</b><span class="vl-dim">${esc(f.medio || '')}${f.cupon ? ` · ${/point/i.test(f.medio || '') ? 'id' : 'cupón'} ${esc(f.cupon)}` : ''}</span>` : '<span class="vl-dim">Sin cobro en IM5</span>'}</td>
         <td class="vl-num">${f.importe != null ? `<b>${pesos2(f.importe)}</b>` : '—'}</td>
         <td class="vc-mp">${mp}</td>
         <td class="vl-num">${f.mp_monto != null ? `<b>${pesos2(f.mp_monto)}</b><span class="vl-dim">neto ${pesos2(f.mp_neto)}</span>` : '—'}</td>
@@ -1417,7 +1417,7 @@
         <td><span class="vc-estado ${clase}" title="${esc(ayuda)}"><i class="fa-solid ${ico}"></i>${esc(txt)}</span>${f.estado === 'dif_importe' ? `<span class="vl-dim">dif. ${pesos2(f.diferencia)}</span>` : ''}${enIm5 ? '<span class="vl-dim">Conciliado en IM5</span>' : ''}</td>
       </tr>`;
     }).join('') : `<tr><td colspan="8" class="vl-ayuda vc-vacio">${filas.length ? 'No hay cobros en este grupo.' : 'Todavía no hay cruce para este período: tocá «Actualizar cruce».'}</td></tr>`;
-    $('vcPie').textContent = lista.length > 600 ? `Se muestran 600 de ${fmtNum.format(lista.length)}. Achicá el período o filtrá por estado.` : '';
+    $('vcPie').innerHTML = lista.length > st.conc.limite ? `Se muestran ${fmtNum.format(st.conc.limite)} de ${fmtNum.format(lista.length)}. <sl-button size="small" variant="default" id="vcMas">Mostrar 100 más</sl-button>` : '';
     const listos = filas.filter(grabable);
     $('vcSelTodos').checked = Boolean(listos.length) && listos.every((f) => st.conc.sel.has(f.clave));
     $('vcSelTodos').disabled = !admin || !listos.length;
@@ -1451,7 +1451,7 @@
         <div class="vc-previa-tot"><div><span>Cupones</span><b>${fmtNum.format(out.cantidad)}</b></div><div><span>Total cobrado</span><b>${pesos2(out.total)}</b></div><div><span>Neto acreditado</span><b>${pesos2(out.neto)}</b></div></div>
         ${out.cantidad ? `<ul class="vc-previa-lista">${out.tarjetas.map((t) => `<li><b>${esc(t.comprobante || '')}</b><span>MP #${esc(t.mp_pago_id || '')} · acreditado ${esc(fechaCorta(t.fec_acreditacion))}</span><b>${pesos2(t.importe)}</b></li>`).join('')}</ul>` : ''}
         ${out.descartadas?.length ? `<p class="vl-apl is-esp"><i class="fa-solid fa-circle-exclamation"></i>${fmtNum.format(out.descartadas.length)} no se graban: ${esc([...new Set(out.descartadas.map((d) => d.motivo))].join(', '))}.</p>` : ''}
-        ${!(st.cfg?.conciliacion?.grabados > 0) ? '<p class="vl-apl is-esp"><i class="fa-solid fa-flask"></i>Primera vez: conviene grabar uno solo y revisarlo en la pantalla de IM5 antes de grabar el resto.</p>' : ''}`;
+        ${out.primeraVez ? '<p class="vl-apl is-esp"><i class="fa-solid fa-flask"></i>Primera vez: se graba <b>uno solo</b> (el primero de la lista) para revisarlo en la pantalla de IM5 (Contabilidad → Conciliación de Tarjetas). Si está bien, después se graba el resto.</p>' : ''}`;
       $('vcConfirmo').checked = false;
       $('vcConfirmar').disabled = true;
       $('vcConfirmar').hidden = !out.cantidad;
@@ -1589,7 +1589,8 @@
     $('vcConfirmar').addEventListener('click', confirmarGrabar);
     $('vcCancelar').addEventListener('click', () => $('vcDialog').hide());
     $('vcConfirmo').addEventListener('sl-change', (e) => { $('vcConfirmar').disabled = !e.target.checked; });
-    $('vcFiltros').addEventListener('click', (e) => { const b = e.target.closest('[data-vc-filtro]'); if (!b) return; st.conc.filtro = b.dataset.vcFiltro; pintarConciliacion(); });
+    $('vcFiltros').addEventListener('click', (e) => { const b = e.target.closest('[data-vc-filtro]'); if (!b) return; st.conc.filtro = b.dataset.vcFiltro; st.conc.limite = 100; pintarConciliacion(); });
+    $('vcPie').addEventListener('click', (e) => { if (!e.target.closest('#vcMas')) return; st.conc.limite += 100; pintarConciliacion(); });
     $('vcBody').addEventListener('sl-change', (e) => {
       const k = e.target.closest('[data-vc-sel]')?.dataset.vcSel; if (!k) return;
       if (e.target.checked) st.conc.sel.add(k); else st.conc.sel.delete(k);
