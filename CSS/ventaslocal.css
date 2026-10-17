@@ -619,3 +619,6 @@ sl-dialog.vl-dialog { --width: min(760px, 96vw); }
 .vc-nunca i { color: var(--lj-danger); margin-top: 2px; }
 .vc-nunca b { color: var(--lj-text); }
 @media (max-width: 1100px) { .vc-flujo { grid-template-columns: 1fr; } .vc-flecha { justify-self: center; transform: rotate(90deg); } }
+
+.vc-auto-tit { display: flex; align-items: center; gap: 10px; }
+.vc-auto-logo { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: #fff; border: 1px solid var(--lj-border); flex: none; }
