@@ -291,10 +291,10 @@ async function route(req: Request, path: string) {
     return await candidatos({ clave: (await readBody(req)).clave });
   }
   if (path === '/conciliacion/aviso' && method === 'POST') {
-    // Vista previa: admin o cron (prueba desde la base). Enviar: sólo admin.
+    // Vista previa o prueba: admin, o el cron secret (pruebas desde la base; sólo va a los mails configurados).
     const body = await readBody(req);
     const secret = await secretGet('cron_secret');
-    if (body.enviar === true || !(secret && req.headers.get('x-cron-secret') === secret)) await requireAdmin(req);
+    if (!(secret && req.headers.get('x-cron-secret') === secret)) await requireAdmin(req);
     return await avisoPrueba({ tipo: str(body.tipo), enviar: body.enviar === true });
   }
   if (path === '/ventas/mp/pagos' && method === 'POST') {
