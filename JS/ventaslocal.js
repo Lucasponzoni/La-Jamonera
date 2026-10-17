@@ -785,6 +785,7 @@
     $('vlVincBuscar').value = '';
     document.querySelectorAll('[data-vinc-tipo]').forEach((b) => b.classList.toggle('active', b.dataset.vincTipo === 'todos'));
     $('vlVincQuitar').hidden = vk.estado === 'sin';
+    $('vlVincComo').open = window.innerWidth > 640;
     pintarVincComps();
     pintarVincLista();
     $('vlVincDialog').show();
@@ -822,8 +823,8 @@
       const vacio = leerCant(c.cantidad) == null;
       const aviso = vacio && porUnidad && (r || u !== 'u.')
         ? `<small class="vl-comp-aviso"><i class="fa-solid fa-triangle-exclamation"></i>Se vende por unidad: poné cuántos ${r ? 'kg' : u} trae cada una.</small>`
-        : `<small>${vacio ? `Vacío: baja lo mismo que se vende (en ${u}).` : `Por cada 1 vendido baja ${esc(fmtCant(leerCant(c.cantidad)))} ${esc(u)}.`}</small>`;
-      return `<li class="vl-comp">
+        : `<small>${vacio ? `Vacío: baja lo mismo que se vende (en ${u.replace(/\.$/, '')}).` : `Por cada 1 vendido baja ${esc(fmtCant(leerCant(c.cantidad)))} ${esc(u.replace(/\.$/, ''))}.`}</small>`;
+      return `<li class="vl-cmpt">
         <span class="vl-prod-img">${it.img ? `<img src="${esc((window.ljThumb || String)(it.img, 96))}" alt="" loading="lazy">` : `<i class="fa-solid ${r ? 'fa-industry' : 'fa-box-open'}"></i>`}</span>
         <span class="vl-comp-txt"><b>${esc(it.nombre)}</b><span class="vl-vinc ${r ? 'is-receta' : 'is-ing'}"><i class="fa-solid ${r ? 'fa-industry' : 'fa-boxes-stacked'}"></i>${r ? 'Producción' : 'Inventario'}</span>${aviso}</span>
         <sl-input class="vl-comp-cant" size="small" inputmode="decimal" placeholder="= vendido" value="${esc(c.cantidad)}" data-comp-cant="${i}"><span slot="suffix">${esc(u)}</span></sl-input>

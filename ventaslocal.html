@@ -275,15 +275,16 @@
         </div>
         <div class="lj-dialog-body">
           <div id="vlVincArt" class="vl-vinc-art"></div>
-          <div class="vl-vinc-como">
-            <p><i class="fa-solid fa-circle-info"></i> <b>Cómo se descuenta.</b> Por cada <b>1 vendido</b> en el POS baja la cantidad de cada producto de la lista, igual que al sacar a reparto en Producción.</p>
+          <details class="vl-vinc-como" id="vlVincComo" open>
+            <summary><i class="fa-solid fa-circle-info"></i> <b>Cómo se descuenta</b></summary>
+            <p>Por cada <b>1 vendido</b> en el POS baja la cantidad de cada producto de la lista, igual que al sacar a reparto en Producción.</p>
             <ul>
               <li><b>Inventario</b> (reventa): en su unidad de stock, unidades o kilos.</li>
               <li><b>Producción</b>: siempre en kilos (cuántos kg trae cada 1 vendido).</li>
               <li><b>Vacío</b> = lo mismo que se vende: sirve para lo que se vende por kilo (1,5 kg vendidos bajan 1,5 kg).</li>
               <li><b>Promos y combos</b>: sumá cada producto que trae. Ej.: «PROMO SUP. PANCHO X 36» = 3 u. pebete super pancho x12 + 6 u. salchichas; 2 promos bajan 6 + 12.</li>
             </ul>
-          </div>
+          </details>
           <p class="vl-detalle-tit"><i class="fa-solid fa-arrow-down"></i> Se descuenta (por cada 1 vendido)</p>
           <ul id="vlVincComps" class="vl-comps"></ul>
           <p id="vlVincPrevia" class="vl-vinc-previa"></p>
