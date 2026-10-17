@@ -46,12 +46,14 @@ async function bajarPagosMP(desde, hasta, log) {
     offset += res.length;
     if (res.length < 100 || offset >= Number(r.data?.paging?.total || 0)) break;
   }
-  for (const c of chunks(filas, 500)) {
+  // La paginación de MP puede repetir pagos entre páginas: uno por id.
+  const unicos = [...new Map(filas.map((f) => [f.id_pago, f])).values()];
+  for (const c of chunks(unicos, 500)) {
     const { error } = await admin.from('im5_mp_pagos').upsert(c, { onConflict: 'id_pago' });
     if (error) throw new HttpError(500, error.message);
   }
-  log.info?.(`[conc] MP ${filas.length} pagos ${desde}..${hasta}`);
-  return filas;
+  log.info?.(`[conc] MP ${unicos.length} pagos ${desde}..${hasta}`);
+  return unicos;
 }
 
 // ---------- 2) IM5: qué está conciliado ----------
@@ -184,8 +186,9 @@ export async function cruzar({ desde, hasta, bajarMP = true, log = console } = {
   }
 
   // Guardado: reemplaza lo calculado del rango sin tocar lo grabado (grabado_im5_at / grabado_por / grabado_resumen).
-  const claves = new Set(filas.map((f) => f.clave));
-  for (const c of chunks(filas, 500)) {
+  const unicas = [...new Map(filas.map((f) => [f.clave, f])).values()];
+  const claves = new Set(unicas.map((f) => f.clave));
+  for (const c of chunks(unicas, 500)) {
     const { error } = await admin.from('conciliacion_mp').upsert(c, { onConflict: 'clave' });
     if (error) throw new HttpError(500, error.message);
   }
