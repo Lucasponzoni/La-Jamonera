@@ -646,3 +646,18 @@ sl-dialog.vl-dialog { --width: min(760px, 96vw); }
 .vc-copiar { display: inline-flex; gap: 5px; align-items: center; font: inherit; font-size: .72rem; font-weight: 600; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--lj-border); background: var(--lj-surface); color: var(--lj-accent); cursor: pointer; }
 .vc-copiar:hover { background: var(--lj-accent-soft); }
 .vc-res-dlg .vc-dif, #vcResCuerpo .vc-dif { margin: 0 0 10px; }
+
+/* Conciliación: pendientes de antes del período */
+.vc-tabla tr.vc-sep td { background: color-mix(in srgb, var(--lj-warning) 9%, var(--lj-surface)); color: var(--lj-text); font-size: .8rem; font-weight: 600; padding: 7px 14px; }
+.vc-tabla tr.vc-sep td i { color: var(--lj-warning); margin-right: 4px; }
+.vc-tabla tr.vc-sep td b { margin: 0 6px; padding: 1px 7px; border-radius: 999px; background: var(--lj-warning-soft); color: var(--lj-warning); }
+.vc-tabla tr.vc-sep td span { color: var(--lj-muted); font-weight: 400; }
+.vc-tabla tr.vc-sep.is-periodo td { background: var(--lj-surface-2); }
+.vc-tabla tr.vc-sep.is-periodo td i { color: var(--lj-accent); }
+.vc-tabla tr.is-antes td:first-child { box-shadow: inset 3px 0 0 var(--lj-warning); }
+.vc-antes-tag { display: inline-block !important; margin-top: 2px; font-size: .68rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: var(--lj-warning-soft); color: var(--lj-warning); white-space: nowrap; }
+.vc-ocultar { margin-left: 8px; align-self: center; white-space: nowrap; flex: none; }
+.vc-chip-antes::part(base) { border-color: color-mix(in srgb, var(--lj-warning) 45%, var(--lj-border)); }
+.vc-tabla tr.vc-sep td b, .vc-tabla tr.vc-sep td span { display: inline !important; }
+.vc-tabla tr.vc-sep td span { margin-left: 4px; }
+.vc-tabla td:nth-child(3) > b { white-space: nowrap; }

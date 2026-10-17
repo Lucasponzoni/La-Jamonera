@@ -240,8 +240,12 @@ export async function cruzar({ desde, hasta, bajarMP = true, log = console } = {
     (data || []).forEach((r) => nuevas.push(r));
   }
   const viejas = await selTodo(() => admin.from('conciliacion_mp').select('clave').gte('fecha', desde).lte('fecha', hasta).is('grabado_im5_at', null).is('resuelto_at', null).order('clave'));
-  const borrar = viejas.map((v) => v.clave).filter((k) => !claves.has(k));
-  for (const c of chunks(borrar, 300)) await admin.from('conciliacion_mp').delete().in('clave', c);
+  // Lo que ya no aparece en el cruce: un cobro de IM5 se marca «anulado en IM5» (nunca se borra); un pago de MP
+  // suelto que ahora cruzó con un cobro (o se devolvió) sí se quita. Lo resuelto o grabado no se toca.
+  const fuera = viejas.map((v) => v.clave).filter((k) => !claves.has(k));
+  const anulados = fuera.filter((k) => k.startsWith('im5:'));
+  for (const c of chunks(anulados, 300)) await admin.from('conciliacion_mp').update({ estado: 'anulado_im5', actualizado_at: new Date().toISOString() }).in('clave', c);
+  for (const c of chunks(fuera.filter((k) => k.startsWith('mp:')), 300)) await admin.from('conciliacion_mp').delete().in('clave', c);
 
   const cuenta = {};
   filas.forEach((f) => { cuenta[f.estado] = (cuenta[f.estado] || 0) + 1; });
@@ -540,8 +544,20 @@ export async function cronConciliacion({ forzar = false, log = console } = {}) {
   const hoy = hoyAR(); const hasta = sumarDias(hoy, -1); const desde = sumarDias(hoy, -c.diasAtras);
   const avisos = { ...(est.ultimo_aviso || {}) };
   let out; let error = '';
-  try { out = await cruzar({ desde, hasta: c.modo === 'horas' ? hoy : hasta, log }); }
+  // Hasta hoy inclusive: los cobros del día se ven desde el primer cruce (antes recién al día siguiente).
+  try { out = await cruzar({ desde, hasta: hoy, log }); }
   catch (e) { error = str(e?.message).slice(0, 300); }
+  // Pendientes más viejos que la ventana: se siguen recruzando (los 10 días más viejos por corrida) hasta que se
+  // concilien en IM5 o se resuelvan a mano.
+  if (!error) {
+    try {
+      const viejos = await sel(admin.from('conciliacion_mp').select('fecha').lt('fecha', desde).is('grabado_im5_at', null).is('resuelto_at', null)
+        .not('im5_conciliado', 'is', true).not('estado', 'in', '(devolucion,anulado_im5)').order('fecha').limit(5000));
+      const dias = [...new Set(viejos.map((v) => v.fecha))].slice(0, 10);
+      for (const d of dias) await cruzar({ desde: d, hasta: d, log });
+      if (dias.length) out.viejos = dias;
+    } catch (e) { log.error?.(`[conc] pendientes viejos: ${e?.message}`); }
+  }
   const a = partesAR(now);
   try {
     if (error) {

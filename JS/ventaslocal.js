@@ -1343,9 +1343,10 @@
     falta_en_mp: ['No está en MP', 'is-mal', 'fa-circle-question', 'IM5 dice que se cobró con Mercado Pago pero no aparece ese pago.'],
     falta_en_im5: ['No está en IM5', 'is-esp', 'fa-file-circle-plus', 'Pago aprobado en Mercado Pago que no tiene cobro en IM5 (puede ser de otro canal).'],
     devuelto: ['Devuelto en MP', 'is-esp', 'fa-rotate-left', 'Mercado Pago lo devolvió o canceló.'],
-    devolucion: ['Devolución', 'is-neu', 'fa-rotate-left', 'Renglón negativo de IM5 (nota de crédito devuelta).']
+    devolucion: ['Devolución', 'is-neu', 'fa-rotate-left', 'Renglón negativo de IM5 (nota de crédito devuelta).'],
+    anulado_im5: ['Anulado en IM5', 'is-neu', 'fa-ban', 'El comprobante se anuló en InfoManager: no hay nada que conciliar.']
   };
-  const ORDEN_CONC = ['todos', 'listos', 'conciliado', 'pendiente_liberacion', 'revisar', 'dif_importe', 'falta_en_mp', 'falta_en_im5', 'devuelto', 'devolucion', 'resueltos', 'grabados'];
+  const ORDEN_CONC = ['todos', 'antes', 'listos', 'conciliado', 'pendiente_liberacion', 'revisar', 'dif_importe', 'falta_en_mp', 'falta_en_im5', 'devuelto', 'devolucion', 'resueltos', 'grabados'];
   st.conc = { filtro: 'todos', filas: [], sel: new Set(), cargando: false, limite: 100 };
   const RESOL = {
     aceptado: ['Aceptar la diferencia', 'fa-handshake', 'El importe o el pago no coinciden pero está bien así.'],
@@ -1385,15 +1386,21 @@
     const { desde, hasta } = st.rango;
     $('vcBody').innerHTML = '<tr><td colspan="9" class="vl-cargando"><sl-spinner></sl-spinner></td></tr>';
     try {
-      const [res, filas, est] = await Promise.all([
+      // Además del período: lo pendiente de fechas anteriores (no conciliado en IM5, no grabado, no resuelto a mano)
+      // sigue visible hasta que se cierre.
+      const [res, filas, est, antes] = await Promise.all([
         st.sb.rpc('conciliacion_mp_resumen', { p_desde: desde, p_hasta: hasta }),
         leerTodo(() => st.sb.from('conciliacion_mp').select('*').gte('fecha', desde).lte('fecha', hasta).order('fecha_hora', { ascending: false, nullsFirst: false }).order('clave')),
-        st.sb.from('conciliacion_mp_estado').select('*').eq('id', 1).maybeSingle()
+        st.sb.from('conciliacion_mp_estado').select('*').eq('id', 1).maybeSingle(),
+        leerTodo(() => st.sb.from('conciliacion_mp').select('*').lt('fecha', desde).is('grabado_im5_at', null).is('resuelto_at', null)
+          .or('im5_conciliado.is.null,im5_conciliado.eq.false').not('estado', 'in', '(devolucion,anulado_im5)').order('fecha_hora', { ascending: false, nullsFirst: false }).order('clave'))
       ]);
       st.conc.estado = est?.data || {};
       if (res.error) throw res.error;
       st.conc.resumen = res.data || {};
-      st.conc.filas = (st.empresa ? filas.filter((f) => f.empresa == null || f.empresa === st.empresa) : filas);
+      const deEmpresa = (arr) => (st.empresa ? arr.filter((f) => f.empresa == null || f.empresa === st.empresa) : arr);
+      st.conc.antes = deEmpresa(antes).map((f) => ({ ...f, _antes: true }));
+      st.conc.filas = [...st.conc.antes, ...deEmpresa(filas)];
       st.conc.sel = new Set([...st.conc.sel].filter((k) => st.conc.filas.some((f) => f.clave === k && grabable(f))));
       pintarConciliacion();
     } catch (e) {
@@ -1401,8 +1408,14 @@
     } finally { st.conc.cargando = false; }
   }
   function pintarConciliacion() {
-    const { filas, resumen: r = {} } = st.conc;
+    const { filas } = st.conc;
+    let r = st.conc.resumen || {};
     // Mismo diseño que los indicadores de arriba (vl-kpi): ícono de color, valor grande y una barra de proporción.
+    // Los pendientes de antes del período suman a A liberar y Diferencias (lo resuelto o cerrado no).
+    const ant = st.conc.antes || [];
+    const difAntes = ant.filter((f) => ['dif_importe', 'falta_en_mp', 'falta_en_im5', 'revisar'].includes(f.estado)).length;
+    const libAntes = ant.filter((f) => f.estado === 'pendiente_liberacion').reduce((s2, f) => s2 + Number(f.mp_neto || 0), 0);
+    r = { ...r, diferencias: Number(r.diferencias || 0) + difAntes, pendiente_liberar: Number(r.pendiente_liberar || 0) + libAntes };
     const cobrado = Number(r.cobrado_im5) || 0;
     const pctDe = (n, tot) => (tot > 0 ? Math.max(0, Math.min(100, (Number(n) || 0) / tot * 100)) : 0);
     const medidor = (pct, color, txt) => `<div class="vl-kpi-medidor" title="${esc(txt)}"><i style="width:${pct.toFixed(1)}%;background:${color}"></i></div><small class="vl-kpi-mini">${esc(txt)}</small>`;
@@ -1430,24 +1443,30 @@
       + `<span>Último cruce: <b>${r.actualizado ? esc(fmtDiaHora(r.actualizado)) : '—'}</b>${e.ultima_at && e.ultima_ok === false ? ` <span class="vc-cron-mal" title="${esc(e.ultimo_error || '')}"><i class="fa-solid fa-triangle-exclamation"></i> falló el último automático</span>` : ''}</span>`
       + (c.activa === false ? '' : `<span>Próximo: <b>${e.proxima_at ? esc(fmtDiaHora(e.proxima_at)) : '—'}</b></span>`)
       + (c.activa !== false && c.grabarAuto ? `<span class="vc-cron-chip"><i class="fa-solid fa-robot"></i>Graba solo en IM5${e.ultimo_resultado?.grabado?.grabadas ? ` · último: ${fmtNum.format(e.ultimo_resultado.grabado.grabadas)}` : ''}</span>` : '');
-    const cuenta = { todos: filas.length, listos: filas.filter(grabable).length, grabados: filas.filter((f) => f.grabado_im5_at || f.im5_conciliado).length, resueltos: filas.filter((f) => f.resuelto_at).length };
+    const cuenta = { antes: (st.conc.antes || []).length, todos: filas.length, listos: filas.filter(grabable).length, grabados: filas.filter((f) => f.grabado_im5_at || f.im5_conciliado).length, resueltos: filas.filter((f) => f.resuelto_at).length };
     filas.forEach((f) => { if (!f.resuelto_at) cuenta[f.estado] = (cuenta[f.estado] || 0) + 1; });
-    const nombreFiltro = { todos: ['Todos', 'fa-layer-group'], listos: ['Listos para grabar', 'fa-file-signature'], grabados: ['Ya en IM5', 'fa-check-double'], resueltos: ['Resueltos a mano', 'fa-screwdriver-wrench'] };
+    const nombreFiltro = { antes: ['Pendientes de antes', 'fa-clock-rotate-left'], todos: ['Todos', 'fa-layer-group'], listos: ['Listos para grabar', 'fa-file-signature'], grabados: ['Ya en IM5', 'fa-check-double'], resueltos: ['Resueltos a mano', 'fa-screwdriver-wrench'] };
     $('vcFiltros').innerHTML = ORDEN_CONC.filter((k) => k === 'todos' || cuenta[k]).map((k) => {
       const [txt, ico] = nombreFiltro[k] || [EST_CONC[k][0], EST_CONC[k][2]];
-      return `<sl-button variant="default" size="small" class="analisis-type-chip ${st.conc.filtro === k ? 'active' : ''}" data-vc-filtro="${k}"><i slot="prefix" class="fa-solid ${ico}"></i>${txt}<span slot="suffix" class="analisis-chip-count">${fmtNum.format(cuenta[k] || 0)}</span></sl-button>`;
-    }).join('');
+      return `<sl-button variant="default" size="small" class="analisis-type-chip ${st.conc.filtro === k ? 'active' : ''} ${k === 'antes' ? 'vc-chip-antes' : ''}" data-vc-filtro="${k}"><i slot="prefix" class="fa-solid ${ico}"></i>${txt}<span slot="suffix" class="analisis-chip-count">${fmtNum.format(cuenta[k] || 0)}</span></sl-button>`;
+    }).join('') + `<sl-switch size="small" class="vc-ocultar" id="vcOcultarConc" ${st.conc.ocultarConc ? 'checked' : ''}>Ocultar conciliados</sl-switch>`;
     const f0 = st.conc.filtro;
-    const lista = filas.filter((f) => f0 === 'todos' || (f0 === 'listos' ? grabable(f) : f0 === 'grabados' ? (f.grabado_im5_at || f.im5_conciliado) : f0 === 'resueltos' ? Boolean(f.resuelto_at) : f.estado === f0 && !f.resuelto_at));
+    const ocultarConc = Boolean(st.conc.ocultarConc);
+    const lista = filas.filter((f) => !(ocultarConc && (f.estado === 'conciliado' || f.grabado_im5_at || f.im5_conciliado)) && (f0 === 'todos' || f0 === 'antes' ? (f0 === 'todos' || f._antes) : f0 === 'listos' ? grabable(f) : f0 === 'grabados' ? (f.grabado_im5_at || f.im5_conciliado) : f0 === 'resueltos' ? Boolean(f.resuelto_at) : f.estado === f0 && !f.resuelto_at));
     const admin = esAdmin();
-    $('vcBody').innerHTML = lista.length ? lista.slice(0, st.conc.limite).map((f) => {
+    const nAntes = lista.filter((f) => f._antes).length;
+    let sepPeriodo = false;
+    $('vcBody').innerHTML = lista.length ? lista.slice(0, st.conc.limite).map((f, idx) => {
+      const sep = idx === 0 && f._antes
+        ? `<tr class="vc-sep"><td colspan="9"><i class="fa-solid fa-clock-rotate-left"></i> Pendientes de antes del período <b>${fmtNum.format(nAntes)}</b><span>Siguen acá hasta que se concilien en IM5 o los resuelvas.</span></td></tr>`
+        : (!f._antes && !sepPeriodo && nAntes && (sepPeriodo = true)) ? '<tr class="vc-sep is-periodo"><td colspan="9"><i class="fa-solid fa-calendar-day"></i> Del período elegido</td></tr>' : '';
       const [txt, clase, ico, ayuda] = EST_CONC[f.estado] || [f.estado, '', 'fa-circle', ''];
       const g = grabable(f);
       const enIm5 = f.grabado_im5_at || f.im5_conciliado;
       const mp = f.mp_pago_id ? `<b>#${esc(f.mp_pago_id)}</b><span class="vl-dim">${esc(f.mp_origen === 'PSP_TRANSFER' ? 'Transferencia' : f.mp_origen || f.mp_estado || '')}${f.motivo_match ? ` · cruzó por ${esc({ id_externo: 'id del Point', cupon: 'n° de operación', importe_hora: 'importe y hora', cupon_mal: 'número mal tipeado por la cajera · mismo importe' }[f.motivo_match] || f.motivo_match)}` : ''}</span>` : '<span class="vl-dim">—</span>';
-      return `<tr class="${g ? 'is-grabable' : ''}">
+      return `${sep}<tr class="${g ? 'is-grabable' : ''} ${f._antes ? 'is-antes' : ''}">
         <td class="vc-col-sel">${g && admin ? `<sl-checkbox size="small" data-vc-sel="${esc(f.clave)}" ${st.conc.sel.has(f.clave) ? 'checked' : ''} aria-label="Elegir"></sl-checkbox>` : enIm5 ? '<i class="fa-solid fa-check-double vc-ok" title="Ya conciliado en IM5"></i>' : ''}</td>
-        <td class="vl-fecha"><b>${esc(fmtDiaHora(f.fecha_hora))}</b>${f.empresa ? `<span class="vl-dim">Emp. ${f.empresa}</span>` : ''}</td>
+        <td class="vl-fecha"><b>${esc(fmtDiaHora(f.fecha_hora))}</b>${f._antes ? `<span class="vc-antes-tag">${esc(String(f.fecha).slice(8, 10))}/${esc(String(f.fecha).slice(5, 7))}/${esc(String(f.fecha).slice(2, 4))} · ${f.estado === 'conciliado' ? 'falta grabar en IM5' : 'pendiente'}</span>` : ''}${f.empresa ? `<span class="vl-dim">Emp. ${f.empresa}</span>` : ''}</td>
         <td>${f.comprobante ? `<b>${esc(f.comprobante)}</b><span class="vl-dim">${esc(f.medio || '')}${f.cupon ? ` · ${/point/i.test(f.medio || '') ? 'id' : 'cupón'} ${esc(f.cupon)}` : ''}</span>` : '<span class="vl-dim">Sin cobro en IM5</span>'}</td>
         <td class="vl-num">${f.importe != null ? `<b>${pesos2(f.importe)}</b>` : '—'}</td>
         <td class="vc-mp">${mp}</td>
@@ -1799,6 +1818,7 @@
     });
     $('vcCancelar').addEventListener('click', () => $('vcDialog').hide());
     $('vcConfirmo').addEventListener('sl-change', (e) => { $('vcConfirmar').disabled = !e.target.checked; });
+    $('vcFiltros').addEventListener('sl-change', (e) => { if (e.target.id !== 'vcOcultarConc') return; st.conc.ocultarConc = e.target.checked; st.conc.limite = 100; pintarConciliacion(); });
     $('vcFiltros').addEventListener('click', (e) => { const b = e.target.closest('[data-vc-filtro]'); if (!b) return; st.conc.filtro = b.dataset.vcFiltro; st.conc.limite = 100; pintarConciliacion(); });
     $('vcPie').addEventListener('click', (e) => { if (!e.target.closest('#vcMas')) return; st.conc.limite += 100; pintarConciliacion(); });
     $('vcBody').addEventListener('sl-change', (e) => {
