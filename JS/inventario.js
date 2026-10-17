@@ -6286,7 +6286,8 @@
         const entryId = btn.dataset.toggleEntryCollapse;
         if (!entryId) return;
         const map = { ...(state.entryCollapseByIngredient[ingredientId] || {}) };
-        map[entryId] = !map[entryId];
+        // Sin valor guardado la fila está colapsada (!== false): el toggle parte del estado visible, no de undefined.
+        map[entryId] = map[entryId] === false;
         state.entryCollapseByIngredient[ingredientId] = map;
         rerenderEditorKeepViewport(ingredientId, state.editorDraft, '#inventarioEntriesSearch');
       });
@@ -6344,7 +6345,7 @@
             const entryCollapseBtn = event.target.closest('[data-expanded-entry-collapse]');
             if (entryCollapseBtn) {
               const entryId = entryCollapseBtn.dataset.expandedEntryCollapse;
-              collapseMap[entryId] = !collapseMap[entryId];
+              collapseMap[entryId] = collapseMap[entryId] === false;
               renderContent();
               return;
             }
@@ -8415,7 +8416,7 @@
         popup.addEventListener('click', async (event) => {
           const toggleBtn = event.target.closest('[data-expand-toggle-collapse]');
           if (toggleBtn) {
-            collapseMap[toggleBtn.dataset.expandToggleCollapse] = !collapseMap[toggleBtn.dataset.expandToggleCollapse];
+            collapseMap[toggleBtn.dataset.expandToggleCollapse] = collapseMap[toggleBtn.dataset.expandToggleCollapse] === false;
             renderExpandedContent(popup);
             return;
           }
