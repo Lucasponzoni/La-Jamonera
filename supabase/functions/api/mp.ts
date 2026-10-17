@@ -1,20 +1,50 @@
 // @ts-nocheck
 // Mercado Pago (solo lectura): detalle de los pagos que IM5 registra con id de pago externo (Point / QR).
-// Las credenciales son las mismas del otro sistema de La Jamonera (OAuth). Acá NUNCA se renueva el token:
-// en Mercado Pago el refresh_token es de un solo uso y renovarlo rompería al otro sistema. Cuando el otro
-// sistema lo renueve, se carga el access_token nuevo desde Configuración → Mercado Pago.
+// Token: se pide a la conexión de NinjaPos (el sistema que maneja el OAuth de MP) con la clave guardada en Vault
+// (`ninjasoft_mp_key`). NinjaPos es el único que renueva y nunca entrega el refresh_token. Acá NUNCA se renueva:
+// en Mercado Pago el refresh_token es de un solo uso y renovarlo rompería el POS. Sin clave cargada se usa el
+// access_token guardado a mano (`mp_credenciales`), como antes.
 import { admin, HttpError, str, secretGet, secretSet } from './shared.ts';
 
 const SECRETO = 'mp_credenciales';
+const SECRETO_NINJA = 'ninjasoft_mp_key';
+const BROKER = 'https://hrkditzrsavehnhngakb.supabase.co/functions/v1/mp_token_broker';
+const ERR_BROKER = { 401: 'ninjapos_clave_invalida', 403: 'ninjapos_ip_no_permitida', 404: 'ninjapos_mp_desconectado' };
+let cacheBroker = null; // { cred, hasta } en memoria de la función
+
+// Pide el token vigente a NinjaPos. Se reusa mientras falten más de 3 días para que venza (y como mucho 6 h).
+async function credDeNinjaPos(clave, { forzar = false } = {}) {
+  if (!forzar && cacheBroker && cacheBroker.hasta > Date.now()) return cacheBroker.cred;
+  let res;
+  try { res = await fetch(BROKER, { headers: { 'x-api-key': clave }, signal: AbortSignal.timeout(12_000) }); }
+  catch (e) { throw new HttpError(502, `ninjapos_sin_respuesta: ${e?.message || e}`); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new HttpError(res.status === 401 ? 400 : 502, ERR_BROKER[res.status] || `ninjapos_${res.status}`);
+  if (!str(data.access_token)) throw new HttpError(502, 'ninjapos_sin_token');
+  const cred = { access_token: data.access_token, mp_user_id: str(data.mp_user_id), expires_at: str(data.expires_at), origen: 'NinjaPos' };
+  const vence = Date.parse(cred.expires_at) || 0;
+  cacheBroker = { cred, hasta: Math.min(Date.now() + 6 * 3600e3, vence ? vence - 3 * 24 * 3600e3 : Date.now() + 3600e3) };
+  return cred;
+}
 const API = 'https://api.mercadopago.com';
 const LOTE = 25;           // ids por llamada desde la página
 const PARALELO = 4;
 const REVISAR_PENDIENTE_MS = 30 * 60e3;
 
-async function leerCred() {
+async function leerManual() {
   const raw = await secretGet(SECRETO);
   if (!raw) return null;
   try { return JSON.parse(raw); } catch { return null; }
+}
+
+// estricto: el error de NinjaPos se propaga (para mostrarlo en el estado); si no, cae al token manual.
+async function leerCred({ estricto = false } = {}) {
+  const clave = await secretGet(SECRETO_NINJA);
+  if (clave) {
+    try { return await credDeNinjaPos(clave); }
+    catch (e) { const manual = estricto ? null : await leerManual(); if (manual?.access_token) return manual; throw e; }
+  }
+  return leerManual();
 }
 
 async function mpGet(token, path) {
@@ -87,14 +117,29 @@ export async function pagosMP(ids) {
 
 // Estado de la conexión (sin devolver el token).
 export async function estadoMP() {
-  const cred = await leerCred();
+  let cred;
+  try { cred = await leerCred({ estricto: true }); }
+  catch (e) { return { ok: true, configurada: true, ninjapos: true, error: str(e?.message) }; }
   if (!cred?.access_token) return { ok: true, configurada: false };
   let cuenta = null;
   try {
     const { status, data } = await mpGet(cred.access_token, '/users/me');
     if (status === 200) cuenta = { id: data.id, nickname: data.nickname, site: data.site_id };
   } catch (e) { if (e?.message === 'mp_token_vencido') return { ok: true, configurada: true, vencido: true, vence: cred.expires_at || '' }; }
-  return { ok: true, configurada: true, cuenta, vence: cred.expires_at || '', origen: cred.origen || '' };
+  return { ok: true, configurada: true, cuenta, vence: cred.expires_at || '', origen: cred.origen || '', ninjapos: cred.origen === 'NinjaPos' };
+}
+
+// Guarda la clave de la conexión de NinjaPos. Se prueba antes: tiene que entregar un token de la misma cuenta.
+export async function guardarClaveNinjaPos(body) {
+  const clave = str(body?.ninjasoft_key).trim();
+  if (clave.length < 20 || /\s/.test(clave)) throw new HttpError(400, 'ninjapos_clave_formato');
+  const cred = await credDeNinjaPos(clave, { forzar: true });
+  const { status, data } = await mpGet(cred.access_token, '/users/me');
+  if (status !== 200) throw new HttpError(400, 'mp_token_rechazado');
+  const actual = await (async () => { const raw = await secretGet(SECRETO); try { return raw ? JSON.parse(raw) : {}; } catch { return {}; } })();
+  if (actual.mp_user_id && String(actual.mp_user_id) !== String(data.id)) throw new HttpError(400, 'mp_otra_cuenta');
+  await secretSet(SECRETO_NINJA, clave);
+  return { ok: true, cuenta: { id: data.id, nickname: data.nickname, site: data.site_id }, vence: cred.expires_at };
 }
 
 // Carga un access_token nuevo (cuando el otro sistema lo renovó). Se prueba antes de guardar.

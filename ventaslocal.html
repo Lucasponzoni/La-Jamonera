@@ -414,9 +414,14 @@
               <div class="vl-form">
                 <p class="vl-ayuda">Se usa para ver, en cada cobro con Mercado Pago (Point / QR), la tarjeta real, el estado, la comisión y el neto que se acredita. <b>Solo lectura</b>: no cobra, no devuelve y no renueva el token.</p>
                 <p class="vl-cred-estado" id="cfgMpEstado"></p>
-                <div class="vl-mp-aviso"><i class="fa-solid fa-circle-info"></i><span>Son las mismas credenciales del otro sistema de La Jamonera. Ese sistema es el que renueva el token: cuando lo haga, pegá acá el <b>access token</b> nuevo. Desde acá nunca se renueva, para no romper el otro.</span></div>
-                <sl-input id="cfgMpToken" label="Access token nuevo" type="password" password-toggle autocomplete="off" placeholder="APP_USR-…" help-text="Se prueba contra Mercado Pago antes de guardar y queda cifrado: no se vuelve a mostrar."></sl-input>
-                <div><sl-button id="cfgMpGuardar" variant="primary"><i slot="prefix" class="fa-solid fa-plug-circle-check"></i>Probar y guardar</sl-button></div>
+                <div class="vl-mp-aviso"><i class="fa-solid fa-circle-info"></i><span>El token de Mercado Pago lo maneja <b>NinjaPos</b>: lo renueva solo y nunca entrega el refresh token, así que desde acá no se puede romper el POS. Pegá la <b>clave de conexión</b> que te dio NinjaSoft (archivo «la-jamonera-mp-token-broker»).</span></div>
+                <sl-input id="cfgMpNinja" label="Clave de conexión de NinjaPos" type="password" password-toggle autocomplete="off" help-text="Se prueba pidiendo el token a NinjaPos antes de guardar y queda cifrada: no se vuelve a mostrar."></sl-input>
+                <div><sl-button id="cfgMpNinjaGuardar" variant="primary"><i slot="prefix" class="fa-solid fa-plug-circle-check"></i>Probar y guardar</sl-button></div>
+                <details class="vl-mp-manual">
+                  <summary>Cargar un access token a mano (sin NinjaPos)</summary>
+                  <sl-input id="cfgMpToken" label="Access token" type="password" password-toggle autocomplete="off" placeholder="APP_USR-…" help-text="Sólo se usa si no hay clave de NinjaPos. Desde acá nunca se renueva."></sl-input>
+                  <div><sl-button id="cfgMpGuardar" size="small"><i slot="prefix" class="fa-solid fa-plug-circle-check"></i>Probar y guardar token</sl-button></div>
+                </details>
               </div>
             </sl-tab-panel>
           </sl-tab-group>

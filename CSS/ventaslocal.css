@@ -422,3 +422,7 @@ sl-dialog.vl-dialog { --width: min(760px, 96vw); }
 .vl-apl { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; font-size: .72rem; font-weight: 600; color: var(--lj-muted); }
 .vl-apl.is-ok { color: var(--lj-success); }
 .vl-apl.is-esp { color: var(--lj-warning); }
+
+.vl-mp-manual { border-top: 1px solid var(--lj-border); padding-top: 10px; }
+.vl-mp-manual summary { cursor: pointer; font-size: .82rem; color: var(--lj-muted); font-weight: 600; }
+.vl-mp-manual[open] { display: grid; gap: 10px; }

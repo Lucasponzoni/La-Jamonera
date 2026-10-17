@@ -23,7 +23,7 @@ import * as gemini from './gemini.ts';
 import { handleAdminUsers } from './admin-users.ts';
 import { runAutoEgresos, refreshInventoryIndex } from './egresos.ts';
 import { runVentas, guardarCredenciales, estadoCredenciales, enviarAvisoPrueba } from './ventas-im5.ts';
-import { pagosMP, estadoMP, guardarCredMP } from './mp.ts';
+import { pagosMP, estadoMP, guardarCredMP, guardarClaveNinjaPos } from './mp.ts';
 import { aplicarVentasPos, revertirComprobantePos } from './pos.ts';
 
 const puedeVerVentas = (p) => Boolean(p && (p.role === 'admin' || p.ver_ventas));
@@ -260,8 +260,10 @@ async function route(req: Request, path: string) {
     const c = await requireAdmin(req);
     if (method === 'GET') return await estadoMP();
     if (method === 'POST') {
-      const out = await guardarCredMP(await readBody(req), c.user.email || c.user.id);
-      await audit(c.user.id, 'ventas_mp_credenciales', 'mercadopago', { cuenta: out.cuenta?.id });
+      const body = await readBody(req);
+      // Clave de la conexión de NinjaPos (recomendado) o, como antes, un access_token pegado a mano.
+      const out = body.ninjasoft_key ? await guardarClaveNinjaPos(body) : await guardarCredMP(body, c.user.email || c.user.id);
+      await audit(c.user.id, body.ninjasoft_key ? 'ventas_mp_ninjapos' : 'ventas_mp_credenciales', 'mercadopago', { cuenta: out.cuenta?.id });
       return out;
     }
   }

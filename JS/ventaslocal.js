@@ -39,7 +39,12 @@
     mp_token_invalido: 'El token no tiene el formato de Mercado Pago (APP_USR-…).',
     mp_token_rechazado: 'Mercado Pago rechazó ese token.',
     mp_otra_cuenta: 'Ese token es de otra cuenta de Mercado Pago.',
-    mp_token_vencido: 'El token de Mercado Pago venció: cargá el nuevo en Configuración → Mercado Pago.'
+    mp_token_vencido: 'El token de Mercado Pago venció: cargá el nuevo en Configuración → Mercado Pago.',
+    ninjapos_clave_formato: 'Esa no parece la clave de NinjaPos: copiala completa del archivo.',
+    ninjapos_clave_invalida: 'NinjaPos rechazó la clave (mal copiada o revocada).',
+    ninjapos_ip_no_permitida: 'NinjaPos no permite pedidos desde este servidor (lista de IP).',
+    ninjapos_mp_desconectado: 'Mercado Pago está desconectado en NinjaPos.',
+    ninjapos_sin_token: 'NinjaPos no entregó el token.'
   };
   const textoError = (e) => {
     const m = String(e?.message || e?.error || e || '');
@@ -1120,11 +1125,23 @@
       const out = await res.json();
       if (!res.ok || out.ok === false) throw new Error(out.error);
       if (!out.configurada) { el.className = 'vl-cred-estado is-falta'; el.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Mercado Pago no está conectado.'; return; }
+      if (out.error) { el.className = 'vl-cred-estado is-falta'; el.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> NinjaPos: ${esc(textoError(new Error(out.error)))}`; return; }
       if (out.vencido) { el.className = 'vl-cred-estado is-falta'; el.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> El token venció: cargá el nuevo que generó el otro sistema.'; return; }
       const vence = out.vence ? new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(out.vence)) : '';
       el.className = 'vl-cred-estado is-ok';
-      el.innerHTML = `<i class="fa-solid fa-circle-check"></i> Conectado a la cuenta <b>${esc(out.cuenta?.nickname || out.cuenta?.id || '')}</b>${vence ? ` · el token vence el <b>${esc(vence)}</b>` : ''}.`;
+      el.innerHTML = `<i class="fa-solid fa-circle-check"></i> Conectado a la cuenta <b>${esc(out.cuenta?.nickname || out.cuenta?.id || '')}</b>${out.ninjapos ? ' · token vía <b>NinjaPos</b> (se renueva solo)' : vence ? ` · token cargado a mano, vence el <b>${esc(vence)}</b>` : ''}.`;
     } catch (e) { el.textContent = textoError(e); }
+  }
+  async function guardarNinjaPos() {
+    const btn = $('cfgMpNinjaGuardar'); btn.loading = true;
+    try {
+      const res = await window.laJamoneraProxy.postJson('/ventas/mp/credenciales', { ninjasoft_key: String($('cfgMpNinja').value ?? '').trim() });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || out.ok === false) throw new Error(out.error || `Error ${res.status}`);
+      $('cfgMpNinja').value = '';
+      notify('success', 'Conectado vía NinjaPos', `Cuenta ${out.cuenta?.nickname || out.cuenta?.id || ''}. Ya podés borrar el archivo del escritorio.`);
+      cargarEstadoMP();
+    } catch (e) { notify('error', 'No se pudo conectar con NinjaPos', textoError(e)); } finally { btn.loading = false; }
   }
   async function guardarMP() {
     const btn = $('cfgMpGuardar'); btn.loading = true;
@@ -1327,6 +1344,7 @@
     $('cfgGuardar').addEventListener('click', guardarConfig);
     $('cfgCredGuardar').addEventListener('click', guardarCred);
     $('cfgMpGuardar').addEventListener('click', guardarMP);
+    $('cfgMpNinjaGuardar').addEventListener('click', guardarNinjaPos);
     $('posSimular').addEventListener('click', simularPos);
     $('cfgDias').addEventListener('click', (e) => { const b = e.target.closest('button[data-dia]'); if (!b) return; b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); actualizarResumenCfg(); });
     ['cfgActiva', 'cfgDesde', 'cfgHasta', 'cfgCada'].forEach((id) => $(id).addEventListener('sl-change', actualizarResumenCfg));
