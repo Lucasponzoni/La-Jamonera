@@ -129,7 +129,9 @@ export async function cruzar({ desde, hasta, bajarMP = true, log = console } = {
   const mpRango = await selTodo(() => admin.from('im5_mp_pagos').select('id_pago,estado,monto,neto,comision,aprobado_at,acreditacion_at,origen,raw')
     .gte('aprobado_at', isoAR(sumarDias(desde, -1))).lte('aprobado_at', isoAR(sumarDias(hasta, 1), true)).order('id_pago'));
   const mpPorId = new Map(mpRango.map((m) => [m.id_pago, m]));
-  const pedidos = [...new Set(enRango.map(({ p }) => str(p.id_pago_externo) || digitos(p.cupon)).filter((id) => /^\d{6,20}$/.test(id) && !mpPorId.has(id)))];
+  // Vínculos hechos a mano desde la página (cobro IM5 → pago MP): mandan sobre cualquier otra regla.
+  const manual = new Map((await selTodo(() => admin.from('conciliacion_mp_vinculos').select('clave,mp_pago_id').order('clave'))).map((v) => [v.clave, v.mp_pago_id]));
+  const pedidos = [...new Set([...enRango.map(({ p }) => str(p.id_pago_externo) || digitos(p.cupon)), ...manual.values()].filter((id) => /^\d{6,20}$/.test(id) && !mpPorId.has(id)))];
   for (const c of chunks(pedidos, 300)) (await sel(admin.from('im5_mp_pagos').select('id_pago,estado,monto,neto,comision,aprobado_at,acreditacion_at,origen,raw').in('id_pago', c))).forEach((m) => mpPorId.set(m.id_pago, m));
   // Los que IM5 nombra y MP todavía no devolvió en la búsqueda: se piden de a uno (pocos).
   // Los que IM5 nombra y la búsqueda no trajo (p. ej. cobros del Point): se piden por id, de a 4. Los que MP no
@@ -154,7 +156,7 @@ export async function cruzar({ desde, hasta, bajarMP = true, log = console } = {
   }
 
   const { mapa: im5Conc, error: errIm5, truncado } = await leerIm5Conciliados(desde, hasta);
-  const usados = new Set();
+  const usados = new Set([...manual.values()]);
   const ahora = Date.now();
   const filas = [];
   const base = (x) => {
@@ -190,6 +192,8 @@ export async function cruzar({ desde, hasta, bajarMP = true, log = console } = {
   const sinId = [];
   for (const x of enRango) {
     const f = base(x);
+    const vm = manual.get(f.clave);
+    if (vm && mpPorId.get(vm)) { filas.push(conMP(f, mpPorId.get(vm), 'manual')); continue; }
     const idExt = str(x.p.id_pago_externo);
     const idCup = digitos(x.p.cupon);
     const m = (idExt && mpPorId.get(idExt)) || (idCup && mpPorId.get(idCup));
@@ -229,13 +233,21 @@ export async function cruzar({ desde, hasta, bajarMP = true, log = console } = {
     const { error } = await admin.from('conciliacion_mp').upsert(c, { onConflict: 'clave' });
     if (error) throw new HttpError(500, error.message);
   }
-  const viejas = await selTodo(() => admin.from('conciliacion_mp').select('clave').gte('fecha', desde).lte('fecha', hasta).is('grabado_im5_at', null).order('clave'));
+  // Primera vez que el cruce ve cada fila (sirve para avisar sólo las diferencias nuevas).
+  const nuevas = [];
+  for (const c of chunks([...claves], 300)) {
+    const { data } = await admin.from('conciliacion_mp').update({ visto_at: new Date().toISOString() }).in('clave', c).is('visto_at', null).select('clave,estado,resuelto_at');
+    (data || []).forEach((r) => nuevas.push(r));
+  }
+  const viejas = await selTodo(() => admin.from('conciliacion_mp').select('clave').gte('fecha', desde).lte('fecha', hasta).is('grabado_im5_at', null).is('resuelto_at', null).order('clave'));
   const borrar = viejas.map((v) => v.clave).filter((k) => !claves.has(k));
   for (const c of chunks(borrar, 300)) await admin.from('conciliacion_mp').delete().in('clave', c);
 
   const cuenta = {};
   filas.forEach((f) => { cuenta[f.estado] = (cuenta[f.estado] || 0) + 1; });
-  return { ok: true, desde, hasta, filas: filas.length, porEstado: cuenta, im5: errIm5 ? { error: errIm5 } : { leidos: im5Conc.size, truncado: Boolean(truncado) } };
+  const DIFS = ['dif_importe', 'falta_en_mp', 'falta_en_im5', 'revisar'];
+  return { ok: true, desde, hasta, filas: filas.length, porEstado: cuenta, nuevasDif: nuevas.filter((r) => DIFS.includes(r.estado) && !r.resuelto_at).map((r) => r.clave),
+    im5: errIm5 ? { error: errIm5 } : { leidos: im5Conc.size, truncado: Boolean(truncado) } };
 }
 
 // ---------- 4) Grabar en IM5 ----------
@@ -285,41 +297,238 @@ export async function grabarIm5({ claves = [], confirmar = false, quien = '', us
   if (userId) await audit(userId, 'conciliacion_mp_grabar', 'im5', { cantidad: grabadas.length, total, errores });
   // Contador de grabados (la página avisa «primera vez: grabá uno solo» mientras sea 0).
   if (grabadas.length) await admin.rpc('conciliacion_contar_grabados', { p_n: grabadas.length });
-  return { ...previa, grabadas: grabadas.length, errores };
+  // Verificación: se vuelve a leer IM5 y cada cupón grabado tiene que venir conciliado = S.
+  let verificados = null;
+  if (grabadas.length) {
+    const fechas = ok.filter((x) => grabadas.includes(x.f.clave)).map((x) => x.f.fecha).sort();
+    const { mapa, error } = await leerIm5Conciliados(fechas[0], fechas[fechas.length - 1]);
+    verificados = error ? { error } : ok.filter((x) => grabadas.includes(x.f.clave)).map((x) => ({ id_pago: x.tarjeta.id_pago, comprobante: x.f.comprobante, conciliado: mapa.get(String(x.tarjeta.id_pago))?.conciliado || null, fec_conciliacion: mapa.get(String(x.tarjeta.id_pago))?.fec_conciliacion || null, fec_acreditacion_real: mapa.get(String(x.tarjeta.id_pago))?.fec_acreditacion_real || null }));
+  }
+  return { ...previa, grabadas: grabadas.length, errores, verificados };
 }
 
-// ---------- 5) Cron diario + avisos ----------
-export async function cronConciliacion({ log = console } = {}) {
+// ---------- 5) Resolver a mano ----------
+const RESOLUCIONES = ['aceptado', 'otro_canal', 'fuera_de_im5', 'error_cajera', 'ignorado'];
+export async function resolver({ clave, accion, mp_pago_id = '', nota = '', quien = '' } = {}) {
+  clave = str(clave);
+  const fila = (await sel(admin.from('conciliacion_mp').select('*').eq('clave', clave)))[0];
+  if (!fila) throw new HttpError(404, 'fila_no_encontrada');
+  const ahora = new Date().toISOString();
+  nota = str(nota).trim().slice(0, 300) || null;
+  if (accion === 'vincular') {
+    // Vincula un cobro de IM5 con un pago de MP (desde cualquiera de las dos filas).
+    const mpId = digitos(mp_pago_id || fila.mp_pago_id);
+    const im5Clave = clave.startsWith('im5:') ? clave : str(mp_pago_id);
+    const pagoId = clave.startsWith('im5:') ? mpId : digitos(fila.mp_pago_id);
+    if (!/^im5:\d+:\d+$/.test(im5Clave) || !/^\d{6,20}$/.test(pagoId)) throw new HttpError(400, 'vinculo_invalido');
+    await admin.from('conciliacion_mp_vinculos').delete().eq('mp_pago_id', pagoId);
+    const { error } = await admin.from('conciliacion_mp_vinculos').upsert({ clave: im5Clave, mp_pago_id: pagoId, nota, creado_por: quien || null, creado_at: ahora }, { onConflict: 'clave' });
+    if (error) throw new HttpError(500, error.message);
+    await admin.from('conciliacion_mp').update({ resolucion: null, resolucion_nota: null, resuelto_por: null, resuelto_at: null }).eq('clave', im5Clave);
+    if (fila.clave.startsWith('mp:')) await admin.from('conciliacion_mp').delete().eq('clave', fila.clave).is('grabado_im5_at', null);
+    else await admin.from('conciliacion_mp').delete().eq('clave', `mp:${pagoId}`).is('grabado_im5_at', null);
+    const im5Fila = clave.startsWith('im5:') ? fila : (await sel(admin.from('conciliacion_mp').select('fecha').eq('clave', im5Clave)))[0];
+    const d = im5Fila?.fecha || fila.fecha;
+    await cruzar({ desde: d, hasta: d, bajarMP: false });
+    return { ok: true, fila: (await sel(admin.from('conciliacion_mp').select('*').eq('clave', im5Clave)))[0] || null };
+  }
+  if (accion === 'deshacer') {
+    await admin.from('conciliacion_mp_vinculos').delete().eq('clave', clave);
+    await admin.from('conciliacion_mp').update({ resolucion: null, resolucion_nota: null, resuelto_por: null, resuelto_at: null }).eq('clave', clave);
+    await cruzar({ desde: fila.fecha, hasta: fila.fecha, bajarMP: false });
+    return { ok: true, fila: (await sel(admin.from('conciliacion_mp').select('*').eq('clave', clave)))[0] || null };
+  }
+  if (!RESOLUCIONES.includes(accion)) throw new HttpError(400, 'accion_invalida');
+  const { error } = await admin.from('conciliacion_mp').update({ resolucion: accion, resolucion_nota: nota, resuelto_por: quien || null, resuelto_at: ahora }).eq('clave', clave);
+  if (error) throw new HttpError(500, error.message);
+  return { ok: true, fila: { ...fila, resolucion: accion, resolucion_nota: nota, resuelto_por: quien, resuelto_at: ahora } };
+}
+
+// Candidatos para vincular: pagos de MP libres ± 2 días con importe y número parecidos (o, desde un pago de MP,
+// cobros de IM5 sin pago).
+export async function candidatos({ clave } = {}) {
+  const fila = (await sel(admin.from('conciliacion_mp').select('*').eq('clave', str(clave))))[0];
+  if (!fila) throw new HttpError(404, 'fila_no_encontrada');
+  const t = Date.parse(fila.fecha_hora || `${fila.fecha}T15:00:00-03:00`);
+  const d0 = new Date(t - 2 * 86400e3).toISOString(); const d1 = new Date(t + 2 * 86400e3).toISOString();
+  if (fila.clave.startsWith('im5:')) {
+    const usados = new Set((await selTodo(() => admin.from('conciliacion_mp').select('mp_pago_id').not('mp_pago_id', 'is', null).like('clave', 'im5:%').gte('fecha', fila.fecha.slice(0, 8) + '01').order('clave'))).map((r) => r.mp_pago_id));
+    const mps = await sel(admin.from('im5_mp_pagos').select('id_pago,estado,monto,neto,aprobado_at,acreditacion_at,origen').gte('aprobado_at', d0).lte('aprobado_at', d1).eq('estado', 'approved').limit(2000));
+    const cup = digitos(fila.cupon);
+    const lista = mps.filter((m) => m.id_pago !== fila.mp_pago_id || fila.estado !== 'conciliado').map((m) => ({
+      tipo: 'mp', id: m.id_pago, monto: m.monto, neto: m.neto, fecha_hora: m.aprobado_at, liberacion: m.acreditacion_at, origen: m.origen, usado: usados.has(m.id_pago) && m.id_pago !== fila.mp_pago_id,
+      dif: r2(Number(m.monto) - Number(fila.importe)), minutos: Math.round(Math.abs(Date.parse(m.aprobado_at) - t) / 60e3), parecido: cup ? distancia(cup, m.id_pago) : 9
+    })).filter((c) => Math.abs(c.dif) <= Math.max(1, Math.abs(Number(fila.importe)) * 0.05) || c.parecido <= 3)
+      .sort((a, b) => (a.usado - b.usado) || (Math.abs(a.dif) > 0.01) - (Math.abs(b.dif) > 0.01) || a.parecido - b.parecido || a.minutos - b.minutos).slice(0, 10);
+    return { ok: true, fila, candidatos: lista };
+  }
+  const im5 = await sel(admin.from('conciliacion_mp').select('clave,comprobante,medio,importe,cupon,fecha_hora,estado').like('clave', 'im5:%').in('estado', ['falta_en_mp', 'revisar', 'dif_importe']).gte('fecha_hora', d0).lte('fecha_hora', d1).limit(500));
+  const lista = im5.map((x) => ({ tipo: 'im5', id: x.clave, comprobante: x.comprobante, medio: x.medio, monto: x.importe, cupon: x.cupon, fecha_hora: x.fecha_hora, estado: x.estado,
+    dif: r2(Number(fila.mp_monto) - Number(x.importe)), minutos: Math.round(Math.abs(Date.parse(x.fecha_hora) - t) / 60e3), parecido: x.cupon ? distancia(digitos(x.cupon), fila.mp_pago_id) : 9 }))
+    .filter((c) => Math.abs(c.dif) <= Math.max(1, Math.abs(Number(fila.mp_monto)) * 0.05) || c.parecido <= 3)
+    .sort((a, b) => (Math.abs(a.dif) > 0.01) - (Math.abs(b.dif) > 0.01) || a.parecido - b.parecido || a.minutos - b.minutos).slice(0, 10);
+  return { ok: true, fila, candidatos: lista };
+}
+
+// ---------- 6) Programación ----------
+const CONC_DEF = { activa: true, modo: 'diario', cadaHoras: 6, cadaDias: 1, dias: [1, 2, 3, 4, 5, 6], hora: 7, desde: 8, hasta: 21, diasAtras: DIAS_CRON, mails: '', diaListos: 1,
+  avisos: { diferencias: true, resumen: false, listos: true, cierre: true, falla: true } };
+export const configConc = (cfg) => { const c = (cfg && cfg.conciliacion) || {}; return { ...CONC_DEF, ...c, avisos: { ...CONC_DEF.avisos, ...(c.avisos || {}) } }; };
+const partesAR = (d) => {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23', weekday: 'short' }).formatToParts(d).map((x) => [x.type, x.value]));
+  return { dia: `${p.year}-${p.month}-${p.day}`, hora: Number(p.hour) % 24, dow: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(p.weekday) };
+};
+export function tocaConciliar(c, ultimaAt, now = new Date()) {
+  if (c.activa === false) return false;
+  const a = partesAR(now);
+  const u = ultimaAt ? partesAR(new Date(ultimaAt)) : null;
+  const desdeUltima = ultimaAt ? (now.getTime() - Date.parse(ultimaAt)) / 3600e3 : Infinity;
+  if (c.modo === 'horas') return a.hora >= c.desde && a.hora <= c.hasta && desdeUltima >= c.cadaHoras - 0.2;
+  if (a.hora !== Number(c.hora)) return false;
+  if (u && u.dia === a.dia) return false;
+  if (c.modo === 'semanal') return (c.dias || []).includes(a.dow);
+  if (c.modo === 'cada_dias') return desdeUltima >= c.cadaDias * 24 - 1.5;
+  return true; // diario
+}
+export function proximaConciliacion(c, ultimaAt, now = new Date()) {
+  if (c.activa === false) return null;
+  let t = Math.ceil(now.getTime() / 3600e3) * 3600e3 + 20 * 60e3; // el job corre a los :20
+  for (let i = 0; i < 24 * 40; i++, t += 3600e3) if (tocaConciliar(c, ultimaAt, new Date(t))) return new Date(t).toISOString();
+  return null;
+}
+export function textoFrecuencia(c) {
+  if (c.activa === false) return 'Apagada';
+  const h = (n) => `${String(n).padStart(2, '0')}:00`;
+  if (c.modo === 'horas') return `Cada ${c.cadaHoras} h, de ${h(c.desde)} a ${h(c.hasta)}`;
+  if (c.modo === 'semanal') return `Los ${(c.dias || []).map((d) => ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'][d]).join(', ')} a las ${h(c.hora)}`;
+  if (c.modo === 'cada_dias') return `Cada ${c.cadaDias} día${c.cadaDias === 1 ? '' : 's'} a las ${h(c.hora)}`;
+  return `Todos los días a las ${h(c.hora)}`;
+}
+
+// ---------- 7) Avisos por mail ----------
+const ESTADO_TXT = { conciliado: ['Conciliado', '#1f7a4c', '#e3f5ec'], pendiente_liberacion: ['A liberar', '#1f5fbf', '#e6efff'], revisar: ['Revisar', '#9a6200', '#fff3dd'],
+  dif_importe: ['Diferencia', '#b42338', '#ffecef'], falta_en_mp: ['No está en MP', '#b42338', '#ffecef'], falta_en_im5: ['No está en IM5', '#9a6200', '#fff3dd'],
+  devuelto: ['Devuelto en MP', '#9a6200', '#fff3dd'], devolucion: ['Devolución', '#4f638c', '#eef2fb'] };
+const esc = (v) => str(v).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const pesosM = (n) => (n == null ? '—' : `$ ${Number(n).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+const diaHoraM = (ts) => (ts ? new Intl.DateTimeFormat('es-AR', { timeZone: TZ, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(ts)) : '—');
+// Plantilla de los mails de conciliación: tarjeta blanca sobre celeste, chip de estado, KPIs en fila, tabla de
+// detalle con estados en color y botón a la página. Estilos en línea (los clientes de correo ignoran <style>).
+export function plantillaConc({ tono = 'info', etiqueta, titulo, intro, kpis = [], filas = [], masFilas = 0, pie = '', prueba = false }) {
+  const C = { ok: ['#1f7a4c', '#e3f5ec', '#bfe5cf'], error: ['#b42338', '#ffecef', '#f5c2cb'], aviso: ['#9a6200', '#fff3dd', '#f3d9a4'], info: ['#1f5fbf', '#e6efff', '#c5d8fb'] }[tono] || ['#1f5fbf', '#e6efff', '#c5d8fb'];
+  const url = 'https://www.lajamonera.online/ventaslocal.html#conciliacion';
+  const kpiHtml = kpis.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:8px 0;margin:4px -8px 14px;"><tr>${kpis.map(([k, v, color]) => `
+      <td style="background:#f6f9ff;border:1px solid #e2e8fb;border-radius:12px;padding:10px 12px;vertical-align:top;">
+        <div style="font-size:11px;color:#6b7da3;text-transform:uppercase;letter-spacing:.04em;font-weight:700;">${esc(k)}</div>
+        <div style="font-size:18px;font-weight:800;color:${color || '#1f2a44'};margin-top:3px;white-space:nowrap;">${esc(v)}</div></td>`).join('')}</tr></table>` : '';
+  const tabla = filas.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #e2e8fb;border-radius:12px;overflow:hidden;font-size:12px;">
+      <tr style="background:#f1f5fe;">${['Fecha', 'Cobro en IM5', 'IM5', 'Mercado Pago', 'Estado'].map((h, i) => `<th align="${i === 2 ? 'right' : 'left'}" style="padding:8px 10px;color:#4f638c;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">${h}</th>`).join('')}</tr>
+      ${filas.map((f, i) => { const [t, c, b] = ESTADO_TXT[f.estado] || [f.estado, '#4f638c', '#eef2fb']; return `<tr style="background:${i % 2 ? '#fbfcff' : '#ffffff'};">
+        <td style="padding:8px 10px;border-top:1px solid #eef2fb;color:#1f2a44;white-space:nowrap;">${esc(diaHoraM(f.fecha_hora))}</td>
+        <td style="padding:8px 10px;border-top:1px solid #eef2fb;color:#1f2a44;"><b>${esc(f.comprobante || 'Sin cobro en IM5')}</b><br><span style="color:#6b7da3;">${esc(f.medio || '')}${f.cupon ? ` · ${esc(f.cupon)}` : ''}</span></td>
+        <td align="right" style="padding:8px 10px;border-top:1px solid #eef2fb;color:#1f2a44;white-space:nowrap;font-weight:700;">${esc(pesosM(f.importe))}</td>
+        <td style="padding:8px 10px;border-top:1px solid #eef2fb;color:#1f2a44;">${f.mp_pago_id ? `#${esc(f.mp_pago_id)}<br><span style="color:#6b7da3;">${esc(pesosM(f.mp_monto))}</span>` : '<span style="color:#6b7da3;">—</span>'}</td>
+        <td style="padding:8px 10px;border-top:1px solid #eef2fb;"><span style="display:inline-block;background:${b};color:${c};border-radius:999px;padding:3px 9px;font-weight:700;white-space:nowrap;">${esc(t)}</span></td></tr>`; }).join('')}
+    </table>${masFilas ? `<p style="margin:6px 0 0;color:#6b7da3;font-size:12px;">y ${masFilas} más en la página.</p>` : ''}` : '';
+  return `
+    <div style="font-family:Inter,Arial,sans-serif;background:#f4f7ff;padding:18px;">
+      <div style="max-width:760px;margin:0 auto;background:#fff;border:1px solid #dbe4fb;border-radius:18px;padding:20px;">
+        ${prueba ? '<p style="margin:0 0 14px;padding:8px 12px;border-radius:12px;background:#fff3dd;color:#9a6200;font-size:12px;font-weight:700;">Mail de prueba · así llegan los avisos de conciliación (datos reales de los últimos días)</p>' : ''}
+        <p style="margin:0 0 12px;">
+          <img src="https://www.lajamonera.online/IMG/La%20Jamonera%20App%20180.png" alt="La Jamonera" width="36" height="36" style="vertical-align:middle;border-radius:10px;">
+          <span style="vertical-align:middle;margin-left:8px;font-size:16px;color:#2351a0;"><span style="font-weight:400">La</span> <strong>Jamonera</strong> · Conciliación Mercado Pago</span>
+        </p>
+        <span style="display:inline-block;background:${C[1]};color:${C[0]};border:1px solid ${C[2]};border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700;">${esc(etiqueta)}</span>
+        <h2 style="margin:12px 0 6px;color:#2351a0;font-size:22px;">${esc(titulo)}</h2>
+        <p style="margin:0 0 14px;color:#4f638c;line-height:1.55;">${esc(intro)}</p>
+        ${kpiHtml}${tabla}
+        <p style="margin:18px 0 12px;"><a href="${url}" style="display:inline-block;background:#1f7ae8;color:#ffffff;text-decoration:none;padding:11px 18px;border-radius:12px;font-weight:700;">Abrir Conciliación</a></p>
+        ${pie ? `<p style="margin:0 0 10px;color:#5f729b;font-size:13px;line-height:1.5;">${esc(pie)}</p>` : ''}
+        <p style="margin:14px 0 0;padding-top:12px;border-top:1px solid #e2e8fb;color:#7d8db0;font-size:12px;line-height:1.5;">Aviso automático del Back Office de La Jamonera · powered by ABR. Los avisos y destinatarios se cambian en Ventas del local → Configuración → Conciliación.</p>
+      </div>
+    </div>`;
+}
+const destinosConc = (cfg, c) => (str(c.mails).trim() ? str(c.mails).split(',').map((x) => x.trim()).filter(Boolean) : destinosAviso(cfg));
+const fmt0 = (n) => `$ ${Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+async function datosAviso(tipo, { claves = null, desde, hasta, error = '' } = {}) {
+  const r = (await admin.rpc('conciliacion_mp_resumen', { p_desde: desde, p_hasta: hasta })).data || {};
+  const DIFS = ['dif_importe', 'falta_en_mp', 'falta_en_im5', 'revisar'];
+  let q = admin.from('conciliacion_mp').select('fecha_hora,comprobante,medio,cupon,importe,mp_pago_id,mp_monto,estado').gte('fecha', desde).lte('fecha', hasta).order('fecha_hora', { ascending: false }).limit(25);
+  if (claves) q = q.in('clave', claves.slice(0, 300));
+  else if (tipo === 'listos') q = q.eq('estado', 'conciliado').is('grabado_im5_at', null);
+  else q = q.in('estado', DIFS).is('resuelto_at', null);
+  const filas = (tipo === 'falla') ? [] : await sel(q);
+  const kpisBase = [['Cobrado con MP', fmt0(r.cobrado_im5)], ['Comisiones', fmt0(r.comisiones)], ['Diferencias', String(r.diferencias || 0), r.diferencias ? '#b42338' : '#1f7a4c'], ['Listos para grabar', String(r.listos_grabar || 0), '#1f5fbf']];
+  const total = claves ? claves.length : tipo === 'listos' ? Number(r.listos_grabar || 0) : Number(r.diferencias || 0);
+  const mas = Math.max(0, total - filas.length);
+  const T = {
+    diferencias: { tono: 'error', etiqueta: 'Diferencias nuevas', titulo: `${total} cobro${total === 1 ? '' : 's'} con diferencias`, intro: 'El último cruce encontró cobros que no coinciden entre InfoManager y Mercado Pago. Revisalos y resolvelos desde la página (vincular, aceptar o marcar el motivo).' },
+    resumen: { tono: r.diferencias ? 'aviso' : 'ok', etiqueta: 'Cruce terminado', titulo: r.diferencias ? `Conciliación al día con ${r.diferencias} diferencias` : 'Conciliación al día', intro: `Se cruzaron los cobros del ${desde.split('-').reverse().join('/')} al ${hasta.split('-').reverse().join('/')}.` },
+    listos: { tono: 'info', etiqueta: 'Listos para grabar', titulo: `${r.listos_grabar || 0} cupones listos para grabar en InfoManager`, intro: 'Están conciliados y Mercado Pago ya liberó la plata. Entrá, revisá la vista previa y tocá «Grabar en IM5».' },
+    cierre: { tono: r.diferencias || r.listos_grabar ? 'aviso' : 'ok', etiqueta: 'Cierre del mes', titulo: r.diferencias || r.listos_grabar ? 'Quedan cobros sin cerrar' : 'Mes conciliado', intro: 'Antes del cierre contable, todo lo del mes tiene que estar grabado en InfoManager o resuelto con su motivo.' },
+    falla: { tono: 'error', etiqueta: 'Falló el cruce', titulo: 'No se pudo conciliar', intro: `El cruce automático falló: ${error || 'sin detalle'}. Se vuelve a intentar en la próxima corrida programada.` }
+  }[tipo];
+  return { ...T, kpis: tipo === 'falla' ? [] : kpisBase, filas, masFilas: mas, pie: tipo === 'listos' ? 'Al grabar se marca cada cupón como conciliado en IM5 (Conciliación de Tarjetas) con la fecha de acreditación real de Mercado Pago.' : '' };
+}
+async function enviarAviso(cfg, c, tipo, opts) {
+  const destinos = destinosConc(cfg, c);
+  if (!destinos.length) return false;
+  const d = await datosAviso(tipo, opts);
+  const asunto = { diferencias: 'Conciliación MP: diferencias nuevas', resumen: 'Conciliación MP: cruce terminado', listos: 'Conciliación MP: cupones listos para grabar', cierre: `Conciliación MP: cierre de ${opts.hasta.slice(0, 7)}`, falla: 'Conciliación MP: falló el cruce' }[tipo];
+  await mandar(destinos, asunto, plantillaConc(d));
+  return true;
+}
+// Vista previa o prueba de un aviso desde Configuración (datos reales de los últimos 7 días).
+export async function avisoPrueba({ tipo = 'diferencias', enviar = false } = {}) {
+  if (!['diferencias', 'resumen', 'listos', 'cierre', 'falla'].includes(tipo)) throw new HttpError(400, 'tipo_invalido');
+  const { data } = await admin.from('ventas_config').select('config').eq('id', 1).maybeSingle();
+  const cfg = data?.config || {}; const c = configConc(cfg);
+  const hasta = sumarDias(hoyAR(), -1); const desde = sumarDias(hasta, -6);
+  const d = await datosAviso(tipo, { desde, hasta, error: 'mp_sin_respuesta: ejemplo de prueba' });
+  const html = plantillaConc({ ...d, prueba: true });
+  if (!enviar) return { ok: true, html };
+  const destinos = destinosConc(cfg, c);
+  if (!destinos.length) throw new HttpError(400, 'sin_mail_avisos');
+  await mandar(destinos, `[Prueba] Conciliación MP: ${d.etiqueta.toLowerCase()}`, html);
+  return { ok: true, destinos };
+}
+
+// ---------- 8) Cron (cada hora; decide según la config) ----------
+export async function cronConciliacion({ forzar = false, log = console } = {}) {
   const { data } = await admin.from('ventas_config').select('config').eq('id', 1).maybeSingle();
   const cfg = data?.config || {};
-  const conc = cfg.conciliacion || {};
-  if (conc.activa === false) return { ok: true, apagada: true };
-  const hoy = hoyAR();
-  const ayer = sumarDias(hoy, -1);
-  const out = await cruzar({ desde: sumarDias(hoy, -DIAS_CRON), hasta: ayer, log });
-  const dia = new Date(`${hoy}T12:00:00Z`);
-  const destinos = destinosAviso(cfg);
-  if (destinos.length && conc.avisos !== false) {
-    const fmt = (n) => `$ ${Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
-    // Lunes: lo listo para grabar de la semana anterior + diferencias abiertas.
-    if (dia.getUTCDay() === 1) {
-      const r = (await admin.rpc('conciliacion_mp_resumen', { p_desde: sumarDias(hoy, -DIAS_CRON), p_hasta: ayer })).data || {};
-      await mandar(destinos, 'Conciliación Mercado Pago: resumen semanal', plantillaMail({
-        tono: r.diferencias ? 'error' : 'ok', etiqueta: 'Conciliación semanal', titulo: `${r.listos_grabar || 0} cobros listos para grabar en InfoManager`,
-        intro: 'Entrá a Ventas del local → Conciliación, revisá y tocá «Grabar en IM5». Las diferencias necesitan que alguien las mire.',
-        filas: [['Listos para grabar', String(r.listos_grabar || 0)], ['Diferencias abiertas', String(r.diferencias || 0)], ['Pendiente de liberar', fmt(r.pendiente_liberar)], ['Comisiones del período', fmt(r.comisiones)]]
-      }));
-    }
-    // Día 1: cierre del mes anterior.
-    if (dia.getUTCDate() === 1) {
-      const d0 = `${sumarDias(hoy, -1).slice(0, 7)}-01`;
-      const r = (await admin.rpc('conciliacion_mp_resumen', { p_desde: d0, p_hasta: ayer })).data || {};
-      await mandar(destinos, `Conciliación Mercado Pago: cierre de ${d0.slice(0, 7)}`, plantillaMail({
-        tono: r.diferencias || r.listos_grabar ? 'error' : 'ok', etiqueta: 'Cierre mensual', titulo: r.diferencias || r.listos_grabar ? 'Quedan cobros sin cerrar' : 'Mes conciliado',
-        intro: 'Antes del cierre contable, todo lo del mes tiene que estar conciliado en InfoManager o con su motivo.',
-        filas: [['Cobrado con MP (IM5)', fmt(r.cobrado_im5)], ['Acreditado (MP)', fmt(r.acreditado_mp)], ['Comisiones', fmt(r.comisiones)], ['Sin grabar en IM5', String(r.listos_grabar || 0)], ['Diferencias', String(r.diferencias || 0)]]
-      }));
-    }
+  const c = configConc(cfg);
+  const est = (await sel(admin.from('conciliacion_mp_estado').select('*').eq('id', 1)))[0] || {};
+  const now = new Date();
+  if (!forzar && !tocaConciliar(c, est.ultima_at, now)) {
+    const proxima = proximaConciliacion(c, est.ultima_at, now);
+    if (proxima !== est.proxima_at) await admin.from('conciliacion_mp_estado').update({ proxima_at: proxima, updated_at: now.toISOString() }).eq('id', 1);
+    return { ok: true, toca: false, proxima };
   }
-  return out;
+  const hoy = hoyAR(); const hasta = sumarDias(hoy, -1); const desde = sumarDias(hoy, -c.diasAtras);
+  const avisos = { ...(est.ultimo_aviso || {}) };
+  let out; let error = '';
+  try { out = await cruzar({ desde, hasta: c.modo === 'horas' ? hoy : hasta, log }); }
+  catch (e) { error = str(e?.message).slice(0, 300); }
+  const a = partesAR(now);
+  try {
+    if (error) {
+      const ult = avisos.falla ? Date.parse(avisos.falla) : 0;
+      if (c.avisos.falla && Date.now() - ult > 24 * 3600e3 && await enviarAviso(cfg, c, 'falla', { desde, hasta, error })) avisos.falla = now.toISOString();
+    } else {
+      if (c.avisos.diferencias && out.nuevasDif?.length) await enviarAviso(cfg, c, 'diferencias', { claves: out.nuevasDif, desde, hasta: hoy });
+      if (c.avisos.resumen) await enviarAviso(cfg, c, 'resumen', { desde, hasta });
+      if (c.avisos.listos && a.dow === Number(c.diaListos) && avisos.listos !== a.dia && await enviarAviso(cfg, c, 'listos', { desde, hasta })) avisos.listos = a.dia;
+      if (c.avisos.cierre && a.dia.endsWith('-01') && avisos.cierre !== a.dia.slice(0, 7)) {
+        const d0 = `${sumarDias(a.dia, -1).slice(0, 7)}-01`;
+        if (await enviarAviso(cfg, c, 'cierre', { desde: d0, hasta: sumarDias(a.dia, -1) })) avisos.cierre = a.dia.slice(0, 7);
+      }
+    }
+  } catch (e) { log.error?.(`[conc] avisos: ${e?.message}`); }
+  const resultado = error ? { error } : { filas: out.filas, porEstado: out.porEstado, nuevasDif: out.nuevasDif?.length || 0, im5: out.im5 };
+  const historial = [{ at: now.toISOString(), ok: !error, ...resultado }, ...(Array.isArray(est.historial) ? est.historial : [])].slice(0, 20);
+  await admin.from('conciliacion_mp_estado').update({ ultima_at: now.toISOString(), ultima_ok: !error, ultimo_error: error || null, ultimo_resultado: resultado,
+    proxima_at: proximaConciliacion(c, now.toISOString(), new Date(now.getTime() + 60e3)), ultimo_aviso: avisos, historial, updated_at: now.toISOString() }).eq('id', 1);
+  if (error) throw new HttpError(502, error);
+  return { ...out, toca: true };
 }
