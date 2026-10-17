@@ -576,3 +576,46 @@ sl-dialog.vl-dialog { --width: min(760px, 96vw); }
   .vc-cands li sl-button { grid-column: 1 / 3; }
 }
 .vc-tabla .vl-fecha b { white-space: nowrap; }
+
+/* KPIs de la conciliación con el diseño de los de arriba */
+.vl-kpis.vc-kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); margin-bottom: 0; gap: 12px; }
+.vl-kpis.vc-kpis .vl-kpi-valor { font-size: clamp(17px, 1.45vw, 22px); white-space: nowrap; }
+.vl-kpis.vc-kpis .vl-kpi { padding: 12px; }
+@media (max-width: 1100px) { .vl-kpis.vc-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .vl-kpis.vc-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .vl-kpis.vc-kpis .vl-kpi-valor { font-size: 20px; } }
+
+/* «Qué hace la conciliación»: flujo en 3 pasos */
+.vc-explica { border: 1px solid var(--lj-border); border-radius: var(--lj-radius-lg); background: var(--lj-surface); overflow: hidden; }
+.vc-explica > summary { cursor: pointer; list-style: none; padding: 12px 14px; display: flex; gap: 12px; align-items: center; }
+.vc-explica > summary::-webkit-details-marker { display: none; }
+.vc-explica > summary > span:nth-child(2) { display: grid; gap: 2px; min-width: 0; }
+.vc-explica > summary b { font-size: .9rem; color: var(--lj-text); }
+.vc-explica > summary small { font-size: .78rem; color: var(--lj-muted); font-weight: 400; }
+.vc-explica-ico { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--lj-accent-soft); color: var(--lj-accent); }
+.vc-explica-ver { margin-left: auto; color: var(--lj-muted); transition: transform .2s ease; }
+.vc-explica[open] .vc-explica-ver { display: inline; transform: rotate(180deg); }
+.vc-explica[open] > summary { border-bottom: 1px solid var(--lj-border); }
+.vc-flujo { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1.15fr); gap: 10px; align-items: stretch; padding: 14px; }
+.vc-flecha { align-self: center; color: var(--lj-border-strong); font-size: 18px; }
+.vc-etapa { --e: var(--lj-accent); position: relative; display: grid; align-content: start; gap: 6px; padding: 14px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--e) 25%, var(--lj-border)); background: radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--e) 10%, transparent) 0%, transparent 60%), var(--lj-surface); }
+.vc-etapa.is-cruza { --e: #0ea5e9; }
+.vc-etapa.is-resuelve { --e: #d97706; }
+.vc-etapa.is-graba { --e: #16a34a; }
+.vc-etapa-ico { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; color: var(--e); background: color-mix(in srgb, var(--e) 14%, var(--lj-surface)); }
+.vc-etapa-n { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--e); }
+.vc-etapa > b { font-size: .98rem; color: var(--lj-text); }
+.vc-etapa p { margin: 0; font-size: .8rem; line-height: 1.45; color: var(--lj-muted); }
+.vc-etapa p b { color: var(--lj-text); }
+.vc-etapa-nota { font-style: italic; }
+.vc-reglas { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: .78rem; color: var(--lj-text); }
+.vc-chips-txt { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 5px; }
+.vc-chips-txt li { display: inline-flex; gap: 5px; align-items: center; font-size: .74rem; font-weight: 600; padding: 3px 8px; border-radius: 999px; color: var(--e); background: color-mix(in srgb, var(--e) 11%, transparent); }
+.vc-campos { margin: 0; display: grid; border: 1px solid var(--lj-border); border-radius: 8px; overflow: hidden; font-size: .76rem; }
+.vc-campos div { display: flex; justify-content: space-between; gap: 10px; padding: 5px 9px; }
+.vc-campos div + div { border-top: 1px solid var(--lj-border); }
+.vc-campos dt { color: var(--lj-muted); }
+.vc-campos dd { margin: 0; font-weight: 700; color: var(--lj-text); text-align: right; }
+.vc-nunca { display: flex; gap: 10px; align-items: flex-start; margin: 0 14px 14px; padding: 10px 12px; border-radius: 10px; font-size: .8rem; line-height: 1.45; color: var(--lj-muted); background: color-mix(in srgb, var(--lj-danger) 6%, var(--lj-surface)); border: 1px solid color-mix(in srgb, var(--lj-danger) 22%, var(--lj-border)); }
+.vc-nunca i { color: var(--lj-danger); margin-top: 2px; }
+.vc-nunca b { color: var(--lj-text); }
+@media (max-width: 1100px) { .vc-flujo { grid-template-columns: 1fr; } .vc-flecha { justify-self: center; transform: rotate(90deg); } }

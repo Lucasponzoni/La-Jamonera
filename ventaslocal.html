@@ -30,10 +30,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202610170226">
-  <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202610170226">
-  <link rel="stylesheet" href="./CSS/theme.css?v=202610170226">
-  <link rel="stylesheet" href="./CSS/utilities.css?v=202610170226">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202610170235">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202610170235">
+  <link rel="stylesheet" href="./CSS/theme.css?v=202610170235">
+  <link rel="stylesheet" href="./CSS/utilities.css?v=202610170235">
   <script type="module">
     import { setBasePath } from './vendor/shoelace/utilities/base-path.js?v=202608282255';
     setBasePath(new URL('./vendor/shoelace/', document.baseURI).href.slice(0, -1));
@@ -41,12 +41,12 @@
     const ljCore = [...new Set([...document.querySelectorAll('sl-button, sl-input, sl-icon, sl-dialog, sl-dropdown, sl-drawer, sl-spinner, sl-icon-button')].map((n) => n.localName))].map((t) => customElements.whenDefined(t));
     Promise.race([Promise.allSettled(ljCore), new Promise((r) => setTimeout(r, 2500))]).then(() => document.documentElement.classList.add('lj-ready'));
   </script>
-  <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202610170226">
-  <link rel="stylesheet" href="./CSS/legacy/03-componentes.css?v=202610170226">
-  <link rel="stylesheet" href="./CSS/legacy/04-informes.css?v=202610170226">
-  <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202610170226">
-  <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202610170226">
-  <link rel="stylesheet" href="./CSS/ventaslocal.css?v=202610170226">
+  <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202610170235">
+  <link rel="stylesheet" href="./CSS/legacy/03-componentes.css?v=202610170235">
+  <link rel="stylesheet" href="./CSS/legacy/04-informes.css?v=202610170235">
+  <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202610170235">
+  <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202610170235">
+  <link rel="stylesheet" href="./CSS/ventaslocal.css?v=202610170235">
 </head>
 <body>
   <main class="app-shell container-fluid px-0">
@@ -248,15 +248,43 @@
                   </div>
                 </header>
                 <details class="vc-explica" id="vcExplica">
-                  <summary><i class="fa-solid fa-circle-info"></i> Qué hace la conciliación y qué registra en InfoManager <span class="vc-explica-ver">Ver</span></summary>
-                  <div class="vc-pasos">
-                    <div class="vc-paso"><span class="vc-paso-n">1</span><div><b>Cruza (sólo lee)</b><p>Trae los pagos de la cuenta de Mercado Pago y los cobros con MP de InfoManager (Point, QR y MERCADO PAGO 1/2) del período y los une por id de pago, por el n° de operación del cupón o, si no hay número, por importe y hora. No escribe nada.</p></div></div>
-                    <div class="vc-paso"><span class="vc-paso-n">2</span><div><b>Vos resolvés lo que no cierra</b><p>Cada diferencia tiene «Resolver»: vincular con el pago correcto, aceptar la diferencia o marcar el motivo (otro canal, fuera de IM5, error de la cajera). Queda quién y cuándo, y el próximo cruce lo respeta.</p></div></div>
-                    <div class="vc-paso"><span class="vc-paso-n">3</span><div><b>Graba en IM5 (con tu confirmación o automático)</b><p>En <b>Contabilidad → Conciliación de Tarjetas</b> marca cada cupón elegido como <b>conciliado</b>, con fecha de conciliación = hoy, <b>fecha de acreditación = la real de Mercado Pago</b> y <b>resumen = AAAAMMDD de la liberación</b> (agrupa el día). Lote y liquidación quedan en 0. Después relee IM5 para verificar. Si prendés «Grabar automáticamente» (Configuración → Conciliación), lo conciliado por número exacto se graba solo en cada cruce, desde el servidor.</p></div></div>
-                    <div class="vc-paso is-no"><span class="vc-paso-n"><i class="fa-solid fa-ban"></i></span><div><b>Nunca toca</b><p>Ventas, recibos, cobros, caja ni asientos de InfoManager, y la cuenta de Mercado Pago es sólo lectura (no cobra, no devuelve, no renueva el token). Sólo graba lo conciliado y ya liberado por MP.</p></div></div>
+                  <summary><span class="vc-explica-ico"><i class="fa-solid fa-route"></i></span><span><b>Qué hace la conciliación y qué registra en InfoManager</b><small>Cruza, vos resolvés, graba en IM5. Nunca toca ventas, caja ni la cuenta de MP.</small></span><span class="vc-explica-ver"><i class="fa-solid fa-chevron-down"></i></span></summary>
+                  <div class="vc-flujo">
+                    <div class="vc-etapa is-cruza">
+                      <span class="vc-etapa-ico"><i class="fa-solid fa-code-compare"></i></span>
+                      <span class="vc-etapa-n">Paso 1 · sólo lee</span>
+                      <b>Cruza</b>
+                      <p>Trae los pagos de la cuenta de Mercado Pago y los cobros con MP de InfoManager (Point, QR y MERCADO PAGO 1/2) y los une:</p>
+                      <ol class="vc-reglas"><li>por id de pago del Point / QR</li><li>por n° de operación del cupón</li><li>por importe y hora (± 10 min) o n° parecido → queda en «Revisar»</li></ol>
+                    </div>
+                    <i class="fa-solid fa-chevron-right vc-flecha" aria-hidden="true"></i>
+                    <div class="vc-etapa is-resuelve">
+                      <span class="vc-etapa-ico"><i class="fa-solid fa-screwdriver-wrench"></i></span>
+                      <span class="vc-etapa-n">Paso 2 · vos decidís</span>
+                      <b>Resolvés lo que no cierra</b>
+                      <p>Cada diferencia tiene <b>Resolver</b>:</p>
+                      <ul class="vc-chips-txt"><li><i class="fa-solid fa-link"></i>vincular con el pago correcto</li><li><i class="fa-solid fa-handshake"></i>aceptar la diferencia</li><li><i class="fa-solid fa-flag"></i>marcar el motivo</li></ul>
+                      <p class="vc-etapa-nota">Queda quién y cuándo; el próximo cruce lo respeta.</p>
+                    </div>
+                    <i class="fa-solid fa-chevron-right vc-flecha" aria-hidden="true"></i>
+                    <div class="vc-etapa is-graba">
+                      <span class="vc-etapa-ico"><i class="fa-solid fa-file-signature"></i></span>
+                      <span class="vc-etapa-n">Paso 3 · con confirmación o automático</span>
+                      <b>Graba en IM5</b>
+                      <p>En <b>Contabilidad → Conciliación de Tarjetas</b>, cada cupón conciliado y ya liberado queda así:</p>
+                      <dl class="vc-campos">
+                        <div><dt>Conciliado</dt><dd>S</dd></div>
+                        <div><dt>Fecha de conciliación</dt><dd>hoy</dd></div>
+                        <div><dt>Fecha de acreditación</dt><dd>la real de MP</dd></div>
+                        <div><dt>Resumen</dt><dd>AAAAMMDD de la liberación</dd></div>
+                        <div><dt>Lote / liquidación</dt><dd>0</dd></div>
+                      </dl>
+                      <p class="vc-etapa-nota">Después relee IM5 para verificar cada uno.</p>
+                    </div>
                   </div>
+                  <div class="vc-nunca"><i class="fa-solid fa-shield-halved"></i><span><b>Nunca toca:</b> ventas, recibos, cobros, caja ni asientos de InfoManager. La cuenta de Mercado Pago es sólo lectura: no cobra, no devuelve, no renueva el token. Lo que está en «Revisar» o con diferencias no se graba solo.</span></div>
                 </details>
-                <div id="vcKpis" class="vc-kpis"></div>
+                <div id="vcKpis" class="vl-kpis vc-kpis"></div>
                 <div class="analisis-type-chips vc-filtros" id="vcFiltros" role="group" aria-label="Filtrar por estado"></div>
                 <div class="vl-tabla-wrap">
                   <table class="vl-tabla vc-tabla">
@@ -622,25 +650,25 @@
     </section>
   </main>
 
-  <script src="./JS/data/backend.js?v=202610170226"></script>
+  <script src="./JS/data/backend.js?v=202610170235"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-  <script src="./vendor/echarts/echarts.min.js?v=202610170226"></script>
-  <script src="./JS/ui/forms.js?v=202610170226"></script>
-  <script src="./JS/ui/theme.js?v=202610170226"></script>
-  <script src="./JS/ui/modal.js?v=202610170226"></script>
-  <script src="./JS/ui/lj-alert.js?v=202610170226"></script>
-  <script src="./JS/ui/header.js?v=202610170226"></script>
-  <script src="./JS/data/config.js?v=202610170226"></script>
-  <script src="./JS/data/supabase-init.js?v=202610170226"></script>
-  <script src="./JS/firebase-init.js?v=202610170226"></script>
-  <script src="./JS/data/security.js?v=202610170226"></script>
-  <script src="./JS/proxy-client.js?v=202610170226"></script>
-  <script src="./JS/data/authz.js?v=202610170226"></script>
-  <script src="./JS/configuracion.js?v=202610170226"></script>
-  <script src="./JS/Notificaciones.js?v=202610170226"></script>
-  <script src="./JS/app.js?v=202610170226"></script>
-  <script src="./JS/ventaslocal.js?v=202610170226"></script>
+  <script src="./vendor/echarts/echarts.min.js?v=202610170235"></script>
+  <script src="./JS/ui/forms.js?v=202610170235"></script>
+  <script src="./JS/ui/theme.js?v=202610170235"></script>
+  <script src="./JS/ui/modal.js?v=202610170235"></script>
+  <script src="./JS/ui/lj-alert.js?v=202610170235"></script>
+  <script src="./JS/ui/header.js?v=202610170235"></script>
+  <script src="./JS/data/config.js?v=202610170235"></script>
+  <script src="./JS/data/supabase-init.js?v=202610170235"></script>
+  <script src="./JS/firebase-init.js?v=202610170235"></script>
+  <script src="./JS/data/security.js?v=202610170235"></script>
+  <script src="./JS/proxy-client.js?v=202610170235"></script>
+  <script src="./JS/data/authz.js?v=202610170235"></script>
+  <script src="./JS/configuracion.js?v=202610170235"></script>
+  <script src="./JS/Notificaciones.js?v=202610170235"></script>
+  <script src="./JS/app.js?v=202610170235"></script>
+  <script src="./JS/ventaslocal.js?v=202610170235"></script>
 </body>
 </html>

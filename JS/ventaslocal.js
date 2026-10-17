@@ -1402,14 +1402,27 @@
   }
   function pintarConciliacion() {
     const { filas, resumen: r = {} } = st.conc;
-    const kpi = (ico, tit, val, sub, clase = '') => `<div class="vc-kpi ${clase}"><span><i class="fa-solid ${ico}"></i>${tit}</span><b>${val}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
+    // Mismo diseño que los indicadores de arriba (vl-kpi): ícono de color, valor grande y una barra de proporción.
+    const cobrado = Number(r.cobrado_im5) || 0;
+    const pctDe = (n, tot) => (tot > 0 ? Math.max(0, Math.min(100, (Number(n) || 0) / tot * 100)) : 0);
+    const medidor = (pct, color, txt) => `<div class="vl-kpi-medidor" title="${esc(txt)}"><i style="width:${pct.toFixed(1)}%;background:${color}"></i></div><small class="vl-kpi-mini">${esc(txt)}</small>`;
+    const pe = r.por_estado || {};
+    const nListos = filas.filter(grabable).length;
+    const kpi = (ico, tit, val, sub, color, extra = '') => `<article class="vl-kpi" style="--k:${color}">
+      <div class="vl-kpi-tit"><span class="vl-kpi-ico"><i class="fa-solid ${ico}"></i></span><span>${esc(tit)}</span></div>
+      <div class="vl-kpi-valor">${val}</div><div class="vl-kpi-sub">${sub}</div>${extra ? `<div class="vl-kpi-extra">${extra}</div>` : ''}</article>`;
+    const barraEstados = (() => {
+      const partes = [['conciliado', '#16a34a'], ['pendiente_liberacion', '#2563eb'], ['revisar', '#d97706'], ['dif_importe', '#dc2626'], ['falta_en_mp', '#b91c1c']].map(([k, color]) => ({ nombre: EST_CONC[k][0], valor: Number(pe[k]) || 0, color })).filter((x) => x.valor);
+      return partes.length ? barraParte(partes) : '';
+    })();
     $('vcKpis').innerHTML = [
-      kpi('fa-cash-register', 'Cobrado con MP (IM5)', pesos(r.cobrado_im5), `${fmtNum.format(r.cobros || 0)} cobros`),
-      kpi('fa-building-columns', 'Acreditado (MP)', pesos(r.acreditado_mp), 'neto de lo conciliado'),
-      kpi('fa-percent', 'Comisiones', pesos(r.comisiones), 'cargos de Mercado Pago'),
-      kpi('fa-hourglass-half', 'A liberar', pesos(r.pendiente_liberar), 'todavía no disponible'),
-      kpi('fa-triangle-exclamation', 'Diferencias', fmtNum.format(r.diferencias || 0), r.resueltos ? `${fmtNum.format(r.resueltos)} resueltas a mano` : 'para resolver', r.diferencias ? 'is-mal' : 'is-ok'),
-      kpi('fa-file-signature', 'Listos para grabar', fmtNum.format(filas.filter(grabable).length), `${fmtNum.format(r.grabados || 0)} ya en IM5`, filas.some(grabable) ? 'is-info' : '')
+      kpi('fa-cash-register', 'Cobrado en IM5', pesos(r.cobrado_im5), `${fmtNum.format(r.cobros || 0)} cobros`, '#0ea5e9', barraEstados),
+      kpi('fa-building-columns', 'Acreditado (MP)', pesos(r.acreditado_mp), 'neto de lo conciliado', '#16a34a', medidor(pctDe(r.acreditado_mp, cobrado), '#16a34a', `${fmtNum.format(Math.round(pctDe(r.acreditado_mp, cobrado)))}% de lo cobrado`)),
+      kpi('fa-percent', 'Comisiones', pesos(r.comisiones), 'cargos de Mercado Pago', '#9333ea', medidor(pctDe(r.comisiones, cobrado) * 10, '#9333ea', `${fmtNum.format(Math.round(pctDe(r.comisiones, cobrado) * 10) / 10)}% de lo cobrado`)),
+      kpi('fa-hourglass-half', 'A liberar', pesos(r.pendiente_liberar), 'todavía no disponible', '#2563eb', medidor(pctDe(r.pendiente_liberar, cobrado), '#2563eb', `${fmtNum.format(Math.round(pctDe(r.pendiente_liberar, cobrado)))}% de lo cobrado`)),
+      kpi('fa-triangle-exclamation', 'Diferencias', fmtNum.format(r.diferencias || 0), r.resueltos ? `${fmtNum.format(r.resueltos)} resueltas a mano` : 'para resolver', r.diferencias ? '#dc2626' : '#16a34a',
+        medidor(pctDe(r.diferencias, r.cobros), r.diferencias ? '#dc2626' : '#16a34a', `${fmtNum.format(Math.round(pctDe(r.diferencias, r.cobros) * 10) / 10)}% de los cobros`)),
+      kpi('fa-file-signature', 'Para grabar', fmtNum.format(nListos), `${fmtNum.format(r.grabados || 0)} ya en IM5`, '#0057ff', medidor(pctDe(r.grabados, (Number(r.grabados) || 0) + nListos), '#0057ff', `${fmtNum.format(Math.round(pctDe(r.grabados, (Number(r.grabados) || 0) + nListos)))}% ya grabado`))
     ].join('');
     const e = st.conc.estado || {};
     const c = st.cfg?.conciliacion || {};
