@@ -1262,3 +1262,20 @@ sl-dialog.lj-alert-dialog:has(.inventario-provider-rne-alert) { --width: min(960
 .sl-theme-dark .inv-modo-chip.is-pos { color: var(--lj-accent); }
 .inv-modo-chip.is-mp { background: #fef3c7; color: #92400e; }
 .sl-theme-dark .inv-modo-chip.is-mp { background: #3a2a0c; color: #fbbf24; }
+
+/* Trazabilidad de una venta POS: ingreso → venta → desglose */
+.inv-traza { display: grid; gap: 0; }
+.inv-traza-paso { display: flex; gap: 12px; position: relative; padding-bottom: 14px; }
+.inv-traza-paso:not(:last-child)::before { content: ''; position: absolute; left: 15px; top: 32px; bottom: 0; width: 2px; background: var(--lj-border); }
+.inv-traza-paso > div { display: grid; gap: 2px; min-width: 0; font-size: .82rem; }
+.inv-traza-paso b { color: var(--lj-text); }
+.inv-traza-paso small { color: var(--lj-muted); line-height: 1.4; overflow-wrap: anywhere; }
+.inv-traza-paso small.is-esp { color: var(--lj-warning); }
+.inv-traza-ico { flex: none; width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; background: var(--lj-accent-soft); color: var(--lj-accent); }
+.inv-traza-ico.is-pos { background: #fff; border: 1px solid var(--lj-border); }
+.inv-traza-ico img { width: 16px; height: 16px; }
+.inv-traza-comps { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.inv-traza-comps li { display: grid; gap: 2px; padding: 7px 10px; border: 1px solid var(--lj-border); border-radius: 8px; background: var(--lj-surface-2); }
+.inv-traza-comps li.is-este { border-color: var(--lj-accent); background: var(--lj-accent-soft); }
+.inv-traza-este { font-size: .7rem; font-weight: 700; color: var(--lj-accent); }
+.inv-traza-link { border: 0; background: none; padding: 0; color: var(--lj-accent); text-decoration: underline; cursor: pointer; font: inherit; }

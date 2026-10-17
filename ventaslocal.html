@@ -275,7 +275,19 @@
         </div>
         <div class="lj-dialog-body">
           <div id="vlVincArt" class="vl-vinc-art"></div>
-          <p class="vl-ayuda">¿Qué es en la fábrica? Elegí la receta de Producción o el ingrediente de Inventario (doble clic guarda directo).</p>
+          <div class="vl-vinc-como">
+            <p><i class="fa-solid fa-circle-info"></i> <b>Cómo se descuenta.</b> Por cada <b>1 vendido</b> en el POS baja la cantidad de cada producto de la lista, igual que al sacar a reparto en Producción.</p>
+            <ul>
+              <li><b>Inventario</b> (reventa): en su unidad de stock, unidades o kilos.</li>
+              <li><b>Producción</b>: siempre en kilos (cuántos kg trae cada 1 vendido).</li>
+              <li><b>Vacío</b> = lo mismo que se vende: sirve para lo que se vende por kilo (1,5 kg vendidos bajan 1,5 kg).</li>
+              <li><b>Promos y combos</b>: sumá cada producto que trae. Ej.: «PROMO SUP. PANCHO X 36» = 3 u. pebete super pancho x12 + 6 u. salchichas; 2 promos bajan 6 + 12.</li>
+            </ul>
+          </div>
+          <p class="vl-detalle-tit"><i class="fa-solid fa-arrow-down"></i> Se descuenta (por cada 1 vendido)</p>
+          <ul id="vlVincComps" class="vl-comps"></ul>
+          <p id="vlVincPrevia" class="vl-vinc-previa"></p>
+          <p class="vl-detalle-tit vl-detalle-tit-2"><i class="fa-solid fa-magnifying-glass"></i> Agregar o quitar productos</p>
           <div class="vl-vinc-barra">
             <sl-input id="vlVincBuscar" class="informes-search" placeholder="Buscar en Producción e Inventario" clearable autocomplete="off"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i></sl-input>
             <div class="analisis-type-chips" role="group" aria-label="Tipo">
@@ -285,9 +297,6 @@
             </div>
           </div>
           <ul id="vlVincLista" class="vl-vinc-lista" role="listbox" aria-label="Recetas e ingredientes"></ul>
-          <div class="vl-vinc-factor">
-            <sl-input id="vlVincFactor" type="number" min="0" step="0.0001" size="small" placeholder="1" label="Factor (opcional)" help-text="Cuánto del stock es 1 vendido. Ej.: «CARBON X 5 KG» → 5 (kg). Dulce vendido por kg contra lata de 5 kg → 0,2. Vacío = 1."></sl-input>
-          </div>
           <div class="vl-dialog-pie vl-vinc-pie">
             <sl-button variant="default" id="vlVincNinguno"><i slot="prefix" class="fa-solid fa-ban"></i>No es de la fábrica</sl-button>
             <sl-button variant="default" id="vlVincQuitar"><i slot="prefix" class="fa-solid fa-link-slash"></i>Quitar vínculo</sl-button>

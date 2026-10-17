@@ -550,17 +550,19 @@
   function cargarCatalogo(forzar = false) {
     if (st.catalogo && !forzar) return st.catalogo;
     st.catalogo = (async () => {
-      const [ing, rec, vin] = await Promise.all([
+      const [ing, rec, vin, reg] = await Promise.all([
         st.sb.from('ingredientes').select('id,nombre,nombreRaw:raw->>name,img:raw->>imageUrl'),
         st.sb.from('recetas').select('id,titulo:raw->>title,comercial:raw->>nombreComercial,img:raw->>imageUrl'),
-        st.sb.from('im5_articulo_vinculos').select('cod_articulo,tipo,ref_id,estado,similitud,factor')
+        st.sb.from('im5_articulo_vinculos').select('cod_articulo,descripcion,tipo,ref_id,estado,similitud,factor,componentes'),
+        st.sb.from('inventario_registros').select('ingrediente_id,stock_unit')
       ]);
+      const unidadDe = new Map((reg.data || []).map((r) => [r.ingrediente_id, r.stock_unit || '']));
       const items = new Map();
       (rec.data || []).forEach((r) => items.set(`receta:${r.id}`, { tipo: 'receta', id: r.id, nombre: capital(r.comercial || r.titulo), sub: r.comercial && r.titulo !== r.comercial ? capital(r.titulo) : '', img: r.img || '' }));
       (ing.data || []).forEach((r) => {
         const n = r.nombre || r.nombreRaw;
         if (!n || /^\(ingrediente eliminado/i.test(n)) return;
-        items.set(`ingrediente:${r.id}`, { tipo: 'ingrediente', id: r.id, nombre: capital(n), sub: '', img: r.img || '' });
+        items.set(`ingrediente:${r.id}`, { tipo: 'ingrediente', id: r.id, nombre: capital(n), sub: '', img: r.img || '', unidad: unidadDe.get(r.id) || '' });
       });
       st.vinc = new Map((vin.data || []).map((v) => [v.cod_articulo, v]));
       st.catalogoListo = items;
@@ -569,19 +571,35 @@
     return st.catalogo;
   }
   const puedeEditar = () => Boolean(st.me?.admin || st.me?.puede_editar);
+  // Componentes de un vínculo: [{ item, cantidad }] (cantidad null = lo mismo que se vende). Un vínculo simple es
+  // un componente con su factor; una promo o combo trae varios (igual que «Sacar a reparto» en Producción).
+  const componentesDe = (v, items) => (Array.isArray(v?.componentes) && v.componentes.length
+    ? v.componentes.map((c) => ({ item: items.get(`${c.tipo}:${c.ref_id}`), cantidad: c.cantidad == null || c.cantidad === '' ? null : Number(c.cantidad) }))
+    : v?.ref_id ? [{ item: items.get(`${v.tipo}:${v.ref_id}`), cantidad: v.factor ? Number(v.factor) : null }] : []).filter((c) => c.item);
   function vinculoDe(cod, items) {
     const v = st.vinc?.get(String(cod));
     if (!v) return { estado: 'sin' };
     if (v.tipo === 'ninguno') return { estado: 'ninguno', v };
-    const item = items.get(`${v.tipo}:${v.ref_id}`);
-    if (!item) return { estado: 'sin', v };
-    return { estado: v.estado === 'sugerido' ? 'sugerido' : 'ok', v, item };
+    const comps = componentesDe(v, items);
+    if (!comps.length) return { estado: 'sin', v };
+    return { estado: v.estado === 'sugerido' ? 'sugerido' : 'ok', v, item: comps[0].item, comps };
   }
+  // Unidad en la que baja cada componente: el ingrediente en su unidad de stock; lo producido, siempre en kilos.
+  const UNIDAD_CORTA = { kilos: 'kg', kilo: 'kg', kg: 'kg', gramos: 'g', g: 'g', litros: 'l', litro: 'l', l: 'l', ml: 'ml', unidades: 'u.', unidad: 'u.', u: 'u.', paquete: 'paq.', paquetes: 'paq.', lata: 'lata', rollos: 'rollo' };
+  const unidadComp = (it) => (it.tipo === 'receta' ? 'kg' : UNIDAD_CORTA[normal(it.unidad)] || it.unidad || 'u.');
+  const fmtCant = (n) => fmtNum.format(Math.round(Number(n) * 1000) / 1000);
+  // «3 u. Pebete super pancho x12 + 6 u. Salchichas» (por cada 1 vendido).
+  const textoComps = (comps) => comps.map((c) => (c.cantidad == null ? `${c.item.nombre} (lo vendido)` : `${fmtCant(c.cantidad)} ${unidadComp(c.item)} ${c.item.nombre}`)).join(' + ');
   function chipVinculo(vk) {
     if (vk.estado === 'sin') return '<span class="vl-vinc is-sin"><i class="fa-solid fa-link-slash"></i>Sin vincular</span>';
     if (vk.estado === 'ninguno') return '<span class="vl-vinc is-ninguno"><i class="fa-solid fa-ban"></i>No es de la fábrica</span>';
+    const sug = vk.estado === 'sugerido' ? 'Sugerido · ' : '';
+    if (vk.comps?.length > 1) {
+      return `<span class="vl-vinc is-combo ${sug ? 'is-sugerido' : ''}" title="Por cada 1 vendido: ${esc(textoComps(vk.comps))}"><i class="fa-solid fa-layer-group"></i>${sug}Combo · ${esc(textoComps(vk.comps))}</span>`;
+    }
     const r = vk.item.tipo === 'receta';
-    return `<span class="vl-vinc ${r ? 'is-receta' : 'is-ing'} ${vk.estado === 'sugerido' ? 'is-sugerido' : ''}"><i class="fa-solid ${r ? 'fa-industry' : 'fa-boxes-stacked'}"></i>${vk.estado === 'sugerido' ? 'Sugerido · ' : ''}${r ? 'Producción' : 'Inventario'} · ${esc(vk.item.nombre)}</span>`;
+    const cant = vk.comps?.[0]?.cantidad;
+    return `<span class="vl-vinc ${r ? 'is-receta' : 'is-ing'} ${sug ? 'is-sugerido' : ''}"><i class="fa-solid ${r ? 'fa-industry' : 'fa-boxes-stacked'}"></i>${sug}${r ? 'Producción' : 'Inventario'} · ${cant != null ? `${esc(fmtCant(cant))} ${esc(unidadComp(vk.item))} ` : ''}${esc(vk.item.nombre)}</span>`;
   }
   const imgHtml = (vk, clase = 'vl-prod-img') => {
     const url = vk.item?.img;
@@ -761,12 +779,13 @@
     let catalogo;
     try { catalogo = await cargarCatalogo(); } catch (e) { return notify('error', 'No se pudo leer el catálogo', textoError(e)); }
     const vk = vinculoDe(cod, catalogo);
-    st.vincEdit = { cod: String(cod), desc: desc || st.vinc?.get(String(cod))?.descripcion || '', sel: vk.item ? `${vk.item.tipo}:${vk.item.id}` : '', filtro: 'todos', catalogo };
+    st.vincEdit = { cod: String(cod), desc: desc || st.vinc?.get(String(cod))?.descripcion || '', filtro: 'todos', catalogo,
+      comps: (vk.comps || []).map((c) => ({ k: `${c.item.tipo}:${c.item.id}`, cantidad: c.cantidad == null ? '' : String(c.cantidad) })) };
     $('vlVincArt').innerHTML = `${imgHtml(vk, 'vl-vinc-art-img')}<div><small>Producto de InfoManager · código ${esc(cod)}</small><b>${esc(st.vincEdit.desc)}</b>${chipVinculo(vk)}</div>`;
     $('vlVincBuscar').value = '';
     document.querySelectorAll('[data-vinc-tipo]').forEach((b) => b.classList.toggle('active', b.dataset.vincTipo === 'todos'));
     $('vlVincQuitar').hidden = vk.estado === 'sin';
-    $('vlVincFactor').value = vk.v?.factor ? String(vk.v.factor) : '';
+    pintarVincComps();
     pintarVincLista();
     $('vlVincDialog').show();
   }
@@ -775,30 +794,81 @@
     const q = normal(String($('vlVincBuscar').value ?? '').trim());
     let lista = [...e.catalogo.values()].filter((it) => e.filtro === 'todos' || it.tipo === e.filtro);
     if (q) lista = lista.filter((it) => normal(`${it.nombre} ${it.sub}`).includes(q));
-    lista = lista.map((it) => ({ it, p: `${it.tipo}:${it.id}` === e.sel ? 9 : puntaje(e.desc, it) }))
+    const elegidos = new Set(e.comps.map((c) => c.k));
+    lista = lista.map((it) => ({ it, p: elegidos.has(`${it.tipo}:${it.id}`) ? 9 : puntaje(e.desc, it) }))
       .sort((a, b) => b.p - a.p || a.it.nombre.localeCompare(b.it.nombre)).slice(0, 80);
     $('vlVincLista').innerHTML = lista.length ? lista.map(({ it, p }) => {
       const k = `${it.tipo}:${it.id}`;
       const r = it.tipo === 'receta';
-      return `<li><button type="button" class="vl-vinc-op ${k === e.sel ? 'is-sel' : ''}" data-k="${esc(k)}" role="option" aria-selected="${k === e.sel}">
+      const sel = elegidos.has(k);
+      return `<li><button type="button" class="vl-vinc-op ${sel ? 'is-sel' : ''}" data-k="${esc(k)}" role="option" aria-selected="${sel}">
         <span class="vl-prod-img">${it.img ? `<img src="${esc((window.ljThumb || String)(it.img, 96))}" alt="" loading="lazy">` : `<i class="fa-solid ${r ? 'fa-industry' : 'fa-box-open'}"></i>`}</span>
         <span class="vl-vinc-op-txt"><b>${esc(it.nombre)}</b>${it.sub ? `<small>${esc(it.sub)}</small>` : ''}</span>
-        <span class="vl-vinc ${r ? 'is-receta' : 'is-ing'}"><i class="fa-solid ${r ? 'fa-industry' : 'fa-boxes-stacked'}"></i>${r ? 'Producción' : 'Inventario'}</span>
-        ${p >= 0.5 && k !== e.sel ? '<span class="vl-vinc-parecido">Parecido</span>' : ''}
+        <span class="vl-vinc ${r ? 'is-receta' : 'is-ing'}"><i class="fa-solid ${r ? 'fa-industry' : 'fa-boxes-stacked'}"></i>${r ? 'Producción · kg' : `Inventario · ${esc(unidadComp(it))}`}</span>
+        ${p >= 0.5 && !sel ? '<span class="vl-vinc-parecido">Parecido</span>' : ''}
         <i class="fa-solid fa-circle-check vl-vinc-check"></i>
       </button></li>`;
     }).join('') : '<li class="vl-ayuda vl-vinc-vacio">Nada coincide con la búsqueda.</li>';
   }
-  async function guardarVinculo(tipo, refId) {
+  // Panel «Se descuenta»: los productos elegidos con cuánto baja cada uno por cada 1 vendido.
+  const leerCant = (s) => { const n = Number(String(s ?? '').trim().replace(',', '.')); return String(s ?? '').trim() && Number.isFinite(n) && n > 0 ? n : null; };
+  function pintarVincComps() {
     const e = st.vincEdit; if (!e) return;
-    const factor = Number(String($('vlVincFactor').value ?? '').replace(',', '.'));
-    const fila = { cod_articulo: e.cod, descripcion: e.desc || null, tipo, ref_id: tipo === 'ninguno' ? null : refId, estado: 'confirmado', similitud: null,
-      factor: tipo !== 'ninguno' && Number.isFinite(factor) && factor > 0 && factor !== 1 ? factor : null, updated_at: new Date().toISOString() };
+    const porUnidad = pideCantidad(e.desc);
+    $('vlVincComps').innerHTML = e.comps.length ? e.comps.map((c, i) => {
+      const it = e.catalogo.get(c.k); if (!it) return '';
+      const r = it.tipo === 'receta';
+      const u = unidadComp(it);
+      const vacio = leerCant(c.cantidad) == null;
+      const aviso = vacio && porUnidad && (r || u !== 'u.')
+        ? `<small class="vl-comp-aviso"><i class="fa-solid fa-triangle-exclamation"></i>Se vende por unidad: poné cuántos ${r ? 'kg' : u} trae cada una.</small>`
+        : `<small>${vacio ? `Vacío: baja lo mismo que se vende (en ${u}).` : `Por cada 1 vendido baja ${esc(fmtCant(leerCant(c.cantidad)))} ${esc(u)}.`}</small>`;
+      return `<li class="vl-comp">
+        <span class="vl-prod-img">${it.img ? `<img src="${esc((window.ljThumb || String)(it.img, 96))}" alt="" loading="lazy">` : `<i class="fa-solid ${r ? 'fa-industry' : 'fa-box-open'}"></i>`}</span>
+        <span class="vl-comp-txt"><b>${esc(it.nombre)}</b><span class="vl-vinc ${r ? 'is-receta' : 'is-ing'}"><i class="fa-solid ${r ? 'fa-industry' : 'fa-boxes-stacked'}"></i>${r ? 'Producción' : 'Inventario'}</span>${aviso}</span>
+        <sl-input class="vl-comp-cant" size="small" inputmode="decimal" placeholder="= vendido" value="${esc(c.cantidad)}" data-comp-cant="${i}"><span slot="suffix">${esc(u)}</span></sl-input>
+        <sl-icon-button name="x-lg" label="Quitar" data-comp-quitar="${i}"></sl-icon-button>
+      </li>`;
+    }).join('') : '<li class="vl-ayuda vl-comp-vacio">Elegí abajo uno o más productos. Para una promo o combo, sumá cada producto que trae.</li>';
+    pintarVincPrevia();
+  }
+  function pintarVincPrevia() {
+    const e = st.vincEdit; if (!e) return;
+    const comps = e.comps.map((c) => ({ item: e.catalogo.get(c.k), cantidad: leerCant(c.cantidad) })).filter((c) => c.item);
+    $('vlVincPrevia').innerHTML = comps.length
+      ? `<i class="fa-solid fa-calculator"></i><span>Si se venden <b>2</b>, baja: ${comps.map((c) => `<b>${c.cantidad == null ? '2' : esc(fmtCant(c.cantidad * 2))} ${esc(unidadComp(c.item))}</b> ${esc(c.item.nombre)}`).join(' + ')}.</span>`
+      : '';
+  }
+  // Artículos que se venden por unidad (promos, cajas, «x 12 u»): sus componentes en kilos necesitan cantidad.
+  const pideCantidad = (desc) => /\bx\s*\d+\s*(u\b|un\b|unid|und)|\bx\s*\d+\s*$|promo|combo|caja|oferta/i.test(String(desc || ''));
+  function alternarComp(k) {
+    const e = st.vincEdit; if (!e) return;
+    const i = e.comps.findIndex((c) => c.k === k);
+    if (i >= 0) e.comps.splice(i, 1); else e.comps.push({ k, cantidad: '' });
+    pintarVincComps(); pintarVincLista();
+  }
+  async function guardarVinculo(tipo) {
+    const e = st.vincEdit; if (!e) return;
+    let fila;
+    if (tipo === 'ninguno') {
+      fila = { cod_articulo: e.cod, descripcion: e.desc || null, tipo: 'ninguno', ref_id: null, factor: null, componentes: null };
+    } else {
+      const comps = e.comps.map((c) => { const i = c.k.indexOf(':'); return { tipo: c.k.slice(0, i), ref_id: c.k.slice(i + 1), cantidad: leerCant(c.cantidad) }; });
+      if (!comps.length) return notify('warning', 'Elegí un producto', 'Tocá en la lista lo que es en la fábrica (para una promo, cada producto que trae), o marcá «No es de la fábrica».');
+      const malos = e.comps.filter((c) => String(c.cantidad ?? '').trim() && leerCant(c.cantidad) == null);
+      if (malos.length) return notify('warning', 'Cantidad inválida', 'Las cantidades tienen que ser números mayores a 0 (o vacías).');
+      // Un solo producto: vínculo simple (tipo, ref_id, factor). Varios: lista de componentes; tipo/ref_id = el primero.
+      fila = { cod_articulo: e.cod, descripcion: e.desc || null, tipo: comps[0].tipo, ref_id: comps[0].ref_id,
+        factor: comps.length === 1 && comps[0].cantidad && comps[0].cantidad !== 1 ? comps[0].cantidad : null,
+        componentes: comps.length > 1 ? comps : null };
+    }
+    Object.assign(fila, { estado: 'confirmado', similitud: null, updated_at: new Date().toISOString() });
     const { error } = await st.sb.from('im5_articulo_vinculos').upsert(fila, { onConflict: 'cod_articulo' });
     if (error) return notify('error', 'No se pudo guardar el vínculo', textoError(error));
     st.vinc.set(e.cod, fila);
     $('vlVincDialog').hide();
-    notify('success', 'Producto vinculado', tipo === 'ninguno' ? `${e.desc}: marcado como «no es de la fábrica».` : `${e.desc} → ${e.catalogo.get(`${tipo}:${refId}`)?.nombre || ''}`);
+    const vk = vinculoDe(e.cod, e.catalogo);
+    notify('success', 'Producto vinculado', tipo === 'ninguno' ? `${e.desc}: marcado como «no es de la fábrica».` : `${e.desc} → por cada 1 vendido: ${textoComps(vk.comps || [])}`);
     despuesDeVincular();
   }
   async function quitarVinculo() {
@@ -1294,6 +1364,11 @@
     let tArt = 0;
     $('vlArtBuscar').addEventListener('sl-input', () => { clearTimeout(tArt); tArt = setTimeout(pintarArticulos, 200); });
     $('vlArtBuscar').addEventListener('sl-clear', pintarArticulos);
+    // Rueda vertical sobre los chips de filtro → scroll lateral (en compu no hay barra táctil).
+    document.querySelectorAll('.vl-dialog .analisis-type-chips').forEach((el) => el.addEventListener('wheel', (e) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || el.scrollWidth <= el.clientWidth) return;
+      e.preventDefault(); el.scrollLeft += e.deltaY;
+    }, { passive: false }));
     $('vlArtLista').addEventListener('click', (e) => {
       const v = e.target.closest('[data-vincular]'); if (v) { abrirVincular(v.dataset.vincular, v.dataset.desc); return; }
       const c = e.target.closest('[data-art-confirmar]'); if (c) confirmarSugeridos([c.dataset.artConfirmar]);
@@ -1314,15 +1389,21 @@
     $('vlVincBuscar').addEventListener('sl-clear', pintarVincLista);
     $('vlVincLista').addEventListener('click', (e) => {
       const op = e.target.closest('.vl-vinc-op'); if (!op || !st.vincEdit) return;
-      st.vincEdit.sel = op.dataset.k;
-      document.querySelectorAll('.vl-vinc-op').forEach((x) => { const on = x === op; x.classList.toggle('is-sel', on); x.setAttribute('aria-selected', String(on)); });
+      alternarComp(op.dataset.k);
     });
-    $('vlVincLista').addEventListener('dblclick', (e) => { const op = e.target.closest('.vl-vinc-op'); if (op) { const i = op.dataset.k.indexOf(':'); guardarVinculo(op.dataset.k.slice(0, i), op.dataset.k.slice(i + 1)); } });
-    $('vlVincGuardar').addEventListener('click', () => {
-      const k = st.vincEdit?.sel; if (!k) return notify('warning', 'Elegí un producto', 'Tocá la receta o el ingrediente que corresponde, o marcá «No es de la fábrica».');
-      const i = k.indexOf(':'); guardarVinculo(k.slice(0, i), k.slice(i + 1));
+    $('vlVincComps').addEventListener('sl-input', (e) => {
+      const i = Number(e.target.closest('[data-comp-cant]')?.dataset.compCant); if (!st.vincEdit || !Number.isInteger(i)) return;
+      st.vincEdit.comps[i].cantidad = String(e.target.value ?? '');
+      pintarVincPrevia();
     });
-    $('vlVincNinguno').addEventListener('click', () => guardarVinculo('ninguno', null));
+    $('vlVincComps').addEventListener('sl-change', () => { const f = document.activeElement; pintarVincComps(); if (f?.dataset?.compCant) $('vlVincComps').querySelector(`[data-comp-cant="${f.dataset.compCant}"]`)?.focus(); });
+    $('vlVincComps').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-comp-quitar]'); if (!b || !st.vincEdit) return;
+      st.vincEdit.comps.splice(Number(b.dataset.compQuitar), 1);
+      pintarVincComps(); pintarVincLista();
+    });
+    $('vlVincGuardar').addEventListener('click', () => guardarVinculo('combo'));
+    $('vlVincNinguno').addEventListener('click', () => guardarVinculo('ninguno'));
     $('vlVincQuitar').addEventListener('click', quitarVinculo);
     $('vlVincCancelar').addEventListener('click', () => $('vlVincDialog').hide());
     $('vlTablaBody').addEventListener('keydown', (e) => { if (e.key !== 'Enter' && e.key !== ' ') return; const tr = e.target.closest('tr.vl-fila'); if (tr) { e.preventDefault(); toggleDetalle(tr); } });

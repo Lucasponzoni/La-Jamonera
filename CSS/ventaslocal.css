@@ -426,3 +426,30 @@ sl-dialog.vl-dialog { --width: min(760px, 96vw); }
 .vl-mp-manual { border-top: 1px solid var(--lj-border); padding-top: 10px; }
 .vl-mp-manual summary { cursor: pointer; font-size: .82rem; color: var(--lj-muted); font-weight: 600; }
 .vl-mp-manual[open] { display: grid; gap: 10px; }
+
+/* Vincular: varios productos por artículo (promos y combos) */
+.vl-vinc.is-combo { background: #ede9fe; color: #6d28d9; white-space: normal; }
+.sl-theme-dark .vl-vinc.is-combo { background: #2e1f57; color: #c4b5fd; }
+.vl-vinc-como { padding: 10px 12px; margin-bottom: 10px; border: 1px solid var(--lj-border); border-radius: var(--lj-radius-lg); background: var(--lj-surface-2); font-size: .82rem; color: var(--lj-muted); }
+.vl-vinc-como p { margin: 0 0 4px; color: var(--lj-text); }
+.vl-vinc-como ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
+.vl-comps { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 6px; }
+.vl-comp { display: grid; grid-template-columns: 44px minmax(0, 1fr) 130px auto; align-items: center; gap: 10px; padding: 7px 10px; border: 1px solid var(--lj-accent); background: var(--lj-accent-soft); border-radius: var(--lj-radius-lg); }
+.vl-comp-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.vl-comp-txt b { font-size: .88rem; }
+.vl-comp-txt small { font-size: .74rem; color: var(--lj-muted); }
+.vl-comp-txt .vl-comp-aviso { color: var(--lj-warning); font-weight: 600; }
+.vl-comp-vacio { padding: 10px; text-align: center; border: 1px dashed var(--lj-border); border-radius: var(--lj-radius-lg); }
+.vl-vinc-previa { display: flex; gap: 8px; align-items: baseline; margin: 0 0 8px; font-size: .82rem; color: var(--lj-text); }
+.vl-vinc-previa:empty { display: none; }
+.vl-vinc-previa i { color: var(--lj-accent); }
+@media (max-width: 640px) {
+  .vl-comp { grid-template-columns: 40px minmax(0, 1fr) auto; }
+  .vl-comp .vl-comp-cant { grid-column: 2 / 4; }
+}
+
+/* Filtros en chips: scroll lateral visible (rueda del mouse incluida) */
+.vl-dialog .analisis-type-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; padding-bottom: 6px; overscroll-behavior-x: contain; }
+.vl-dialog .analisis-type-chips > * { flex: none; }
+.vl-dialog .analisis-type-chips::-webkit-scrollbar { height: 6px; }
+.vl-dialog .analisis-type-chips::-webkit-scrollbar-thumb { background: var(--lj-border); border-radius: 3px; }

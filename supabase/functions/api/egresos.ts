@@ -40,7 +40,7 @@ export async function idsSincronizadosPos(_todayIso) {
     const { data: vc } = await admin.from('ventas_config').select('config').eq('id', 1).maybeSingle();
     const pos = vc?.config?.pos || {};
     if (!pos.activo || pos.iaSoloVencidos === false) return new Set();
-    const { data: vs } = await admin.from('im5_articulo_vinculos').select('ref_id').eq('tipo', 'ingrediente').eq('estado', 'confirmado');
+    const { data: vs } = await admin.from('im5_vinculo_componentes').select('ref_id').eq('tipo', 'ingrediente').eq('estado', 'confirmado');
     const { data: mp } = await admin.rpc('pos_materia_prima');
     const ids = new Set((vs || []).map((v) => v.ref_id).filter(Boolean));
     (mp || []).forEach((x) => ids.add(typeof x === 'string' ? x : Object.values(x)[0]));

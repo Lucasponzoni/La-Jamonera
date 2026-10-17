@@ -1303,6 +1303,69 @@
     return 'ia';
   };
   const POS_LOGO = '<img src="./IMG/infomanager.svg" alt="" width="12" height="12" aria-hidden="true">';
+  // Trazabilidad de una salida POS: factura de ingreso del lote → venta en el local → en qué se desglosó la venta
+  // (en una promo o combo, los otros productos con su lote y factura). Datos de la RPC inventario_traza_pos.
+  const fechaIso = (d) => (/^\d{4}-\d{2}-\d{2}/.test(String(d || '')) ? `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}` : '-');
+  const abrirTrazaPos = async (movId) => {
+    const client = window.supabaseLaJamonera;
+    if (!client?.rpc) return;
+    Swal.fire({ title: 'Trazabilidad', html: '<sl-spinner style="font-size:28px"></sl-spinner>', showConfirmButton: false, allowOutsideClick: true });
+    const { data: t, error } = await client.rpc('inventario_traza_pos', { p_mov: movId });
+    if (error || !t) { Swal.close(); return openIosSwal({ icon: 'error', title: 'Sin datos', html: '<p>No se encontró la venta de este movimiento.</p>', confirmButtonText: 'Cerrar' }); }
+    const loteId = String(t.lote_id || '');
+    const comps = Array.isArray(t.componentes) ? t.componentes : [];
+    const propio = comps.find((c) => c.lote_id === loteId) || {};
+    const grupos = [];
+    comps.forEach((c) => {
+      let g = grupos.find((x) => x.ref_id === c.ref_id && x.destino === c.destino);
+      if (!g) { g = { ref_id: c.ref_id, destino: c.destino, nombre: c.nombre, filas: [] }; grupos.push(g); }
+      g.filas.push(c);
+    });
+    const combo = grupos.length > 1;
+    const facturaHtml = (c) => {
+      const urls = Array.isArray(c.factura_urls) ? c.factura_urls.filter(Boolean) : [];
+      return [c.proveedor ? escapeHtml(c.proveedor) : '', c.factura ? `Factura <b>${escapeHtml(c.factura)}</b>` : '', c.remito ? `Remito ${escapeHtml(c.remito)}` : '',
+        c.lote ? `Lote ${escapeHtml(c.lote)}` : '', c.fecha_ingreso ? `ingresó ${fechaIso(c.fecha_ingreso)}` : '', c.vencimiento ? `vence ${fechaIso(c.vencimiento)}` : '',
+        urls.length ? `<a href="${escapeHtml(urls[0])}" target="_blank" rel="noopener"><i class="fa-solid fa-file-invoice"></i> Ver factura</a>` : ''].filter(Boolean).join(' · ');
+    };
+    const cantTxt = (c) => `${Number(c.cantidad || 0).toLocaleString('es-AR', { maximumFractionDigits: 3 })} ${escapeHtml(c.unidad || '')}`;
+    const cuando = t.fecha_hora ? new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(t.fecha_hora)) : fechaIso(t.fecha);
+    const desglose = grupos.map((g) => `<li class="${g.filas.some((f) => f.lote_id === loteId) ? 'is-este' : ''}">
+        <b>${escapeHtml(capitalize(g.nombre || (g.destino === 'produccion' ? 'Producción' : 'Ingrediente')))}</b>${g.filas.some((f) => f.lote_id === loteId) ? ' <span class="inv-traza-este">este lote</span>' : ''}
+        ${g.filas.map((f) => (f.estado === 'sin_stock'
+          ? `<small class="is-esp"><i class="fa-solid fa-circle-exclamation"></i> ${cantTxt(f)} sin stock: no se descontaron</small>`
+          : g.destino === 'produccion'
+            ? `<small>${cantTxt(f)} de la producción <button type="button" class="inv-traza-link" data-traza-prod="${escapeHtml(f.lote_id)}">${escapeHtml(f.lote_id)}</button></small>`
+            : `<small>${cantTxt(f)} · ${facturaHtml(f)}</small>`)).join('')}
+      </li>`).join('');
+    Swal.close();
+    await openIosSwal({
+      title: 'Trazabilidad',
+      width: 640,
+      confirmButtonText: 'Cerrar',
+      html: `<div class="inv-traza text-start">
+        <div class="inv-traza-paso"><span class="inv-traza-ico"><i class="fa-solid fa-truck-ramp-box"></i></span><div>
+          <b>Ingreso</b><small>${escapeHtml(capitalize(propio.nombre || ''))}</small><small>${facturaHtml(propio) || 'Sin datos de la factura'}</small></div></div>
+        <div class="inv-traza-paso"><span class="inv-traza-ico is-pos">${POS_LOGO}</span><div>
+          <b>${t.reparto ? 'Reparto desde el POS' : 'Venta en el local'}</b>
+          <small>${escapeHtml(t.comprobante || '')} · ${escapeHtml(cuando)}${t.caja ? ` · caja ${escapeHtml(t.caja)}` : ''}</small>
+          <small>Se vendió <b>${escapeHtml(t.articulo || t.cod_articulo || '')}</b> × ${Number(t.cantidad || 0).toLocaleString('es-AR', { maximumFractionDigits: 3 })}${t.unidad ? ` ${escapeHtml(t.unidad)}` : ''}${propio.cantidad ? `: de este lote salieron ${cantTxt(propio)}` : ''}.</small></div></div>
+        ${combo ? `<div class="inv-traza-paso"><span class="inv-traza-ico"><i class="fa-solid fa-layer-group"></i></span><div>
+          <b>Se desglosó en</b><small>Es una promo o combo: estos son todos los productos que bajaron con esa venta.</small>
+          <ul class="inv-traza-comps">${desglose}</ul></div></div>` : ''}
+      </div>`,
+      didOpen: (popup) => popup.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-traza-prod]');
+        if (b) { Swal.close(); window.laJamoneraProduccionAPI?.openTraceabilityById?.(b.dataset.trazaProd); }
+      })
+    });
+  };
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest?.('[data-open-pos-trace]');
+    if (!b) return;
+    e.preventDefault(); e.stopPropagation();
+    abrirTrazaPos(b.dataset.openPosTrace);
+  }, true);
   const fmtCant = (n, abbr) => `${Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })} ${abbr}`;
   const posDetalleHtml = (item, info) => {
     const p = posSyncDe(item.id);
@@ -2652,7 +2715,7 @@
         <td>${getTraceTypeLabelHtml(trace)}</td>
         <td>${escapeHtml(trace.ingredientLot)}</td>
         <td>${escapeHtml((trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? row.provider : trace.productionId)}</td>
-        <td>${(trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? '<span class="recetas-tag tone-neu">Sin trazabilidad</span>' : `<sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i slot="prefix" class="fa-solid fa-users-viewfinder"></i><span>Trazabilidad</span></sl-button>`}</td>
+        <td>${traceActionHtml(trace)}</td>
       </tr>`).join('') : '';
     const resolutionHtml = resolutionRow ? `<tr class="inventario-resolution-row" data-global-detail-of="${escapeHtml(row.entryId)}"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(resolutionRow.at))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="is-num inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><span class="recetas-tag tone-neu">Sin trazabilidad</span></td></tr>` : '';
     return resolutionHtml + traceHtml;
@@ -3428,6 +3491,15 @@
     : isAutoGeneratedCounterTrace(trace)
     ? `<span class="inventario-resolution-badge inventario-auto-egreso-badge ${getAutoGeneratedTraceLabel(trace) === 'Reparto a domicilio' ? 'is-home-delivery' : ''}"><i class="fa-solid ${getAutoGeneratedTraceLabel(trace) === 'Reparto a domicilio' ? 'fa-truck' : 'fa-robot'}"></i>${escapeHtml(getAutoGeneratedTraceLabel(trace))}</span>`
     : (trace.internalUse ? '<span class="inventario-resolution-badge">Uso interno en empresa</span>' : escapeHtml(trace.expiryDateAtProduction || 'No perecedero'));
+
+  // Botón de la columna «Trazabilidad» de un consumo: producción → su trazabilidad; venta POS → ingreso → venta →
+  // desglose (combos); autoegreso o uso interno → sin trazabilidad.
+  const traceActionHtml = (trace = {}) => {
+    const btn = (attr, val) => `<sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" ${attr}="${escapeHtml(val)}"><i slot="prefix" class="fa-solid fa-users-viewfinder"></i><span>Trazabilidad</span></sl-button>`;
+    if (isPosTrace(trace) && /^usage_pos_/.test(normalizeValue(trace.id))) return btn('data-open-pos-trace', trace.id);
+    if (trace.internalUse || isAutoGeneratedCounterTrace(trace)) return '<span class="recetas-tag tone-neu">Sin trazabilidad</span>';
+    return btn('data-open-production-trace', trace.productionId);
+  };
 
   const hasEntryDetailRows = (entry) => getEntryTraceRows(entry).length > 0 || Boolean(getEntryResolutionRowData(entry)) || Boolean(entry?.isLite && entry.liteUsageCount);
 
@@ -4539,7 +4611,7 @@
           <td></td>
           <td>${escapeHtml(trace.ingredientLot)}</td>
           <td>${escapeHtml((trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? providerLabel(entry.provider) : trace.productionId)}</td>
-          <td>${(trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? '<span class="recetas-tag tone-neu">Sin trazabilidad</span>' : `<sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i slot="prefix" class="fa-solid fa-users-viewfinder"></i><span>Trazabilidad</span></sl-button>`}</td>
+          <td>${traceActionHtml(trace)}</td>
           <td></td>
         </tr>`).join('') : '';
 
@@ -6241,7 +6313,7 @@
         const resolutionLabel = resolutionMeta.badge;
         const resolutionRow = getEntryResolutionRowData(entry);
         const traceHtml = (!isCollapsed && traceRows.length)
-          ? traceRows.map((trace) => `<tr class="${getTraceRowClass(trace)}"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(trace.createdAt)}</div></td><td>${getTraceTypeLabelHtml(trace)}</td><td class="is-num inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td></td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml((trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? providerLabel(entry.provider) : trace.productionId)}</td><td>${(trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? '<span class="recetas-tag tone-neu">Sin trazabilidad</span>' : `<sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i slot="prefix" class="fa-solid fa-users-viewfinder"></i><span>Trazabilidad</span></sl-button>`}</td></tr>`).join('')
+          ? traceRows.map((trace) => `<tr class="${getTraceRowClass(trace)}"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(trace.createdAt)}</div></td><td>${getTraceTypeLabelHtml(trace)}</td><td class="is-num inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td></td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml((trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? providerLabel(entry.provider) : trace.productionId)}</td><td>${traceActionHtml(trace)}</td></tr>`).join('')
           : '';
         const availableQtyInUnit = getAvailableInUnit(entry, entry.unit || '');
         const availableClass = availableQtyInUnit <= 0.0001 ? 'is-zero' : '';
@@ -8315,7 +8387,7 @@
       const resolutionRow = getEntryResolutionRowData(row);
       const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
       const traceHtml = (!isCollapsed && traceRows.length)
-        ? traceRows.map((trace) => `<tr class="${getTraceRowClass(trace)}"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(trace.createdAt))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="is-num inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td>${getTraceTypeLabelHtml(trace)}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml((trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? row.provider : trace.productionId)}</td><td>${(trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? '<span class="recetas-tag tone-neu">Sin trazabilidad</span>' : `<sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-open-production-trace="${escapeHtml(trace.productionId)}"><i slot="prefix" class="fa-solid fa-users-viewfinder"></i><span>Trazabilidad</span></sl-button>`}</td></tr>`).join('') : '';
+        ? traceRows.map((trace) => `<tr class="${getTraceRowClass(trace)}"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(trace.createdAt))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="is-num inventario-trace-kilos">-${trace.displayAmount || formatUsageAmount(trace.kilosUsed)}</td><td>${getTraceTypeLabelHtml(trace)}</td><td>${escapeHtml(trace.ingredientLot)}</td><td>${escapeHtml((trace.internalUse || isAutoGeneratedCounterTrace(trace)) ? row.provider : trace.productionId)}</td><td>${traceActionHtml(trace)}</td></tr>`).join('') : '';
       const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${escapeHtml(formatDateTime(resolutionRow.at))}</div></td><td>${escapeHtml(row.ingredientName)}</td><td class="is-num inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><span class="recetas-tag tone-neu">Sin trazabilidad</span></td></tr>` : '';
       return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${escapeHtml(row.entryDateTime)}${getExpiryBadgeHtml(row) ? `<br><small>${getExpiryBadgeHtml(row)}</small>` : ''}</td><td>${escapeHtml(row.ingredientName)}</td><td><span class="${expiredQtyClass}">${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</span></td><td><span class="${expiredQtyClass}">${row.qty.toFixed(2)} ${escapeHtml(row.unit)}</span><br><span class="inventario-available-line ${Number(row.availableQty || 0) <= 0 ? 'is-zero' : ''} ${expiredQtyClass}">disp. ${Number(row.availableQty || 0).toFixed(2)} ${escapeHtml(getMeasureAbbr(row.unit || ''))}${row.packageQty ? ` x${row.packageQty}` : ''}</span></td><td>${escapeHtml(row.invoiceNumber)}</td><td class="inventario-provider-cell">${escapeHtml(row.provider)}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRow) ? `<sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-icon-only-btn" data-expand-toggle-collapse="${row.entryId}" aria-label="Ver detalle" title="Ver detalle"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></sl-button>` : ''}${buildExpandedImageCell(row.invoiceImageUrls)}</div></td></tr>${resolutionHtml}${traceHtml}`;
     }).join('') : '<tr><td colspan="7" class="text-center">Sin ingresos en ese rango.</td></tr>';

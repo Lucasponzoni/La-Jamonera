@@ -1,6 +1,8 @@
 // @ts-nocheck
 // Ventas del POS (InfoManager) → Inventario y Producción.
-// Cada renglón vendido de un artículo vinculado (Ventas del local → Productos) descuenta stock real:
+// Cada renglón vendido de un artículo vinculado (Ventas del local → Productos) descuenta stock real. Un artículo
+// puede tener varios componentes (promos y combos, igual que «Sacar a reparto»): cada uno baja su cantidad por
+// cada 1 vendido (vacía = lo mismo que se vende). Cada componente:
 //  · ingrediente de reventa → lotes de Inventario, el que vence primero (FEFO), con el mismo guardado atómico que el
 //    autoegreso (auto_egreso_aplicar) y movimientos que la app ya muestra;
 //  · receta → lotes producidos (FEFO sobre producido − repartos − egresos − ventas POS);
@@ -57,8 +59,14 @@ export async function aplicarVentasPos({ simular = false, desde = '', hasta = ''
   if (!simular && !uno) resumen.revertidos = await revertirAnuladas(runId, log);
 
   // 2) Vínculos confirmados, materia prima y comprobantes pendientes.
-  const vinc = new Map((await sel(admin.from('im5_articulo_vinculos').select('cod_articulo,tipo,ref_id,factor').eq('estado', 'confirmado').neq('tipo', 'ninguno')))
-    .map((v) => [v.cod_articulo, v]));
+  // Un artículo → sus componentes [{ tipo, ref_id, factor }] (factor null = lo mismo que se vende).
+  const vinc = new Map();
+  (await sel(admin.from('im5_vinculo_componentes').select('cod_articulo,tipo,ref_id,cantidad,idx').eq('estado', 'confirmado').order('idx')))
+    .forEach((v) => {
+      if (!v.ref_id || !['ingrediente', 'receta'].includes(v.tipo)) return;
+      if (!vinc.has(v.cod_articulo)) vinc.set(v.cod_articulo, []);
+      vinc.get(v.cod_articulo).push({ tipo: v.tipo, ref_id: v.ref_id, factor: v.cantidad == null ? null : num(v.cantidad) });
+    });
   const materiaPrima = new Set(cfg.excluirMateriaPrima ? (await sel(admin.rpc('pos_materia_prima'))).map((x) => (typeof x === 'string' ? x : Object.values(x)[0])) : []);
   let qc = admin.from('im5_comprobantes')
     .select('empresa,id,tipo,letra,punto_venta,numero,fecha,fecha_hora,usuario,cliente,cod_cliente,observaciones,anulada,items_ok')
@@ -85,8 +93,9 @@ export async function aplicarVentasPos({ simular = false, desde = '', hasta = ''
   items.forEach((it) => { const k = `${it.empresa}:${it.comprobante_id}`; if (!itemsDe.has(k)) itemsDe.set(k, []); itemsDe.get(k).push(it); });
 
   // 3) Datos de stock que hacen falta (cargados una vez, descontados en memoria a medida que se asigna).
-  const ingIds = [...new Set(items.map((it) => vinc.get(it.cod_articulo)).filter((v) => v?.tipo === 'ingrediente').map((v) => v.ref_id))];
-  const recIds = [...new Set(items.map((it) => vinc.get(it.cod_articulo)).filter((v) => v?.tipo === 'receta').map((v) => v.ref_id))];
+  const compsVend = items.flatMap((it) => vinc.get(it.cod_articulo) || []);
+  const ingIds = [...new Set(compsVend.filter((v) => v.tipo === 'ingrediente').map((v) => v.ref_id))];
+  const recIds = [...new Set(compsVend.filter((v) => v.tipo === 'receta').map((v) => v.ref_id))];
   const registros = new Map((ingIds.length ? await sel(admin.from('inventario_registros').select('ingrediente_id,stock_unit,infinite_stock').in('ingrediente_id', ingIds)) : []).map((r) => [r.ingrediente_id, r]));
   const lotesDe = new Map();
   for (let i = 0; i < ingIds.length; i += 100) {
@@ -127,14 +136,18 @@ export async function aplicarVentasPos({ simular = false, desde = '', hasta = ''
     for (const it of its) {
       resumen.renglones += 1;
       const base = { empresa: c.empresa, comprobante_id: c.id, orden: it.orden, cod_articulo: it.cod_articulo, fecha: c.fecha, run_id: runId };
-      const v = vinc.get(it.cod_articulo);
+      const comps = vinc.get(it.cod_articulo);
       const det = { comp, articulo: it.descripcion, cantidad: num(it.cantidad), reparto: Boolean(reparto) };
       const marca = (extra, estado, motivo) => {
         filas.push({ ...base, ...extra, estado, motivo });
         if (estado === 'aplicado') resumen.aplicados += 1; else if (estado === 'sin_stock') resumen.sinStock += 1; else resumen.excluidos += 1;
         if (simular) resumen.detalle.push({ ...det, estado, motivo, ...extra });
       };
-      if (!v) { marca({ destino: 'inventario', ref_id: null }, 'excluido', 'sin vínculo'); continue; }
+      if (!comps?.length) { marca({ destino: 'inventario', ref_id: null }, 'excluido', 'sin vínculo'); continue; }
+      const combo = comps.length > 1;
+      for (const v of comps) {
+      // En un combo cada fila dice de qué producto es (el detalle del comprobante y la trazabilidad lo muestran).
+      const nomComp = combo ? `${v.tipo === 'receta' ? (nombres.get(v.ref_id)?.comercial || nombres.get(v.ref_id)?.titulo || 'producción') : (nombres.get(v.ref_id) || 'ingrediente')} · ` : '';
       if (c.tipo === 'NC') { marca({ destino: v.tipo === 'receta' ? 'produccion' : 'inventario', ref_id: v.ref_id }, 'excluido', 'nota de crédito: no se devuelve stock automáticamente'); continue; }
       const cant = num(it.cantidad) * (v.factor ? num(v.factor) : 1);
       if (cant <= EPS) { marca({ destino: v.tipo === 'receta' ? 'produccion' : 'inventario', ref_id: v.ref_id }, 'excluido', 'cantidad 0'); continue; }
@@ -155,7 +168,7 @@ export async function aplicarVentasPos({ simular = false, desde = '', hasta = ''
           const toma = Math.min(l._base, pend);
           l._base = r6(l._base - toma); pend = r6(pend - toma);
           const qty = toma / meta.factor;
-          marca({ ...destino, lote_id: l.id, cantidad: r4(qty), unidad: reg.stock_unit, reparto_id: reparto ? 'pendiente' : null }, 'aplicado', `lote ${l.lote || l.factura || l.id}`);
+          marca({ ...destino, lote_id: l.id, cantidad: r4(qty), unidad: reg.stock_unit, reparto_id: reparto ? 'pendiente' : null }, 'aplicado', `${nomComp}lote ${l.lote || l.factura || l.id}`);
           if (!movPorIng.has(v.ref_id)) movPorIng.set(v.ref_id, { meta, unidad: reg.stock_unit, lotes: new Map(), movs: [] });
           const g = movPorIng.get(v.ref_id);
           g.lotes.set(l.id, l);
@@ -163,13 +176,14 @@ export async function aplicarVentasPos({ simular = false, desde = '', hasta = ''
           const kg = meta.category === 'peso' ? r4(toma / 1000) : 0;
           g.movs.push({ lote: l.id, origen: 'productionUsage', m: { id: `usage_pos_${k}`, createdAt: atTs, producedAt: atTs, productionDate: c.fecha, expiryDateAtProduction: reparto ? 'Reparto a domicilio (POS)' : 'Venta en mostrador (POS)',
             kilosUsed: kg, usedQty: roundQty(qty, meta), usedUnit: reg.stock_unit, usedBaseQty: r6(toma), lotNumber: l.lote || l.factura || '', ingredientLot: l.lote || '', productionId: `POS ${comp}`,
-            internalUse: true, generatedAutomatically: true, source: SOURCE, note: `${reparto ? 'Reparto' : 'Venta POS'} · ${comp}` } });
+            internalUse: true, generatedAutomatically: true, source: SOURCE, posArticulo: str(it.descripcion), posCantidad: num(it.cantidad), posCombo: combo,
+            note: `${reparto ? 'Reparto' : 'Venta POS'}${combo ? ` · ${str(it.descripcion)}` : ''} · ${comp}` } });
           g.movs.push({ lote: l.id, origen: 'movementHistory', m: { id: `mh_pos_${k}`, createdAt: atTs, type: reparto ? 'egreso_reparto_pos' : 'egreso_venta_pos', reason: reparto ? 'Reparto a domicilio (POS)' : 'Venta en mostrador (POS)',
             qty: roundQty(qty, meta), qtyBase: r6(toma), qtyKg: kg, qtyUnit: reg.stock_unit, generatedAutomatically: true, source: SOURCE, reference: comp } });
           if (reparto) reparto.productos.push({ tipo: 'ingrediente', id: v.ref_id, nombre: nombres.get(v.ref_id) || '', qty: roundQty(qty, meta), unidad: reg.stock_unit, qtyKg: kg,
             alloc: { ingredientId: v.ref_id, entryId: l.id, lotNumber: l.lote || l.factura || '', qty: roundQty(qty, meta), unit: reg.stock_unit, qtyKg: kg, expiryDate: str(l.vencimiento) } });
         }
-        if (pend > EPS) marca({ ...destino, cantidad: r4(pend / meta.factor), unidad: reg.stock_unit }, 'sin_stock', lotes.length ? 'no alcanzó el stock' : 'sin stock disponible');
+        if (pend > EPS) marca({ ...destino, cantidad: r4(pend / meta.factor), unidad: reg.stock_unit }, 'sin_stock', `${nomComp}${lotes.length ? 'no alcanzó el stock' : 'sin stock disponible'}`);
       } else {
         const destino = { destino: 'produccion', ref_id: v.ref_id };
         if (!v.factor && pideFactorKg(it.descripcion) && Math.abs(num(it.cantidad) - Math.round(num(it.cantidad))) <= EPS) {
@@ -182,14 +196,15 @@ export async function aplicarVentasPos({ simular = false, desde = '', hasta = ''
           if (pend <= EPS) break;
           const toma = Math.min(p._kg, pend);
           p._kg = r4(p._kg - toma); pend = r4(pend - toma);
-          marca({ ...destino, lote_id: p.produccion_id, cantidad: r4(toma), unidad: 'kilos', reparto_id: reparto ? 'pendiente' : null }, 'aplicado', `producción ${p.produccion_id}`);
+          marca({ ...destino, lote_id: p.produccion_id, cantidad: r4(toma), unidad: 'kilos', reparto_id: reparto ? 'pendiente' : null }, 'aplicado', `${nomComp}producción ${p.produccion_id}`);
           allocs.push({ productionId: p.produccion_id, lotNumber: p.produccion_id, productionDate: str(p.fecha), expiryDate: str(p.vence), availableKg: r4(p._kg + toma), qtyKg: r4(toma) });
         }
-        if (pend > EPS) marca({ ...destino, cantidad: r4(pend), unidad: 'kilos' }, 'sin_stock', prods.length ? 'no alcanzó lo producido' : 'sin producción disponible (o vencida)');
+        if (pend > EPS) marca({ ...destino, cantidad: r4(pend), unidad: 'kilos' }, 'sin_stock', `${nomComp}${prods.length ? 'no alcanzó lo producido' : 'sin producción disponible (o vencida)'}`);
         if (reparto && allocs.length) {
           const n = nombres.get(v.ref_id) || {};
           reparto.productos.push({ tipo: 'receta', id: v.ref_id, nombre: n.comercial || n.titulo || '', titulo: n.titulo || '', img: n.img || '', qtyKg: r4(allocs.reduce((s, a) => s + a.qtyKg, 0)), allocs });
         }
+      }
       }
     }
     if (reparto && reparto.productos.length) {
