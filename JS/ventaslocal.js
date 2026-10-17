@@ -1451,7 +1451,7 @@
         <div class="vc-previa-tot"><div><span>Cupones</span><b>${fmtNum.format(out.cantidad)}</b></div><div><span>Total cobrado</span><b>${pesos2(out.total)}</b></div><div><span>Neto acreditado</span><b>${pesos2(out.neto)}</b></div></div>
         ${out.cantidad ? `<ul class="vc-previa-lista">${out.tarjetas.map((t) => `<li><b>${esc(t.comprobante || '')}</b><span>MP #${esc(t.mp_pago_id || '')} · acreditado ${esc(fechaCorta(t.fec_acreditacion))}</span><b>${pesos2(t.importe)}</b></li>`).join('')}</ul>` : ''}
         ${out.descartadas?.length ? `<p class="vl-apl is-esp"><i class="fa-solid fa-circle-exclamation"></i>${fmtNum.format(out.descartadas.length)} no se graban: ${esc([...new Set(out.descartadas.map((d) => d.motivo))].join(', '))}.</p>` : ''}
-        ${out.primeraVez ? '<p class="vl-apl is-esp"><i class="fa-solid fa-flask"></i>Primera vez: se graba <b>uno solo</b> (el primero de la lista) para revisarlo en la pantalla de IM5 (Contabilidad → Conciliación de Tarjetas). Si está bien, después se graba el resto.</p>' : ''}`;
+        ${out.primeraVez ? '<p class="vl-apl is-esp"><i class="fa-solid fa-flask"></i><span>Primera vez: se graba <b>uno solo</b> (el primero de la lista) para revisarlo en la pantalla de IM5 (Contabilidad → Conciliación de Tarjetas). Si está bien, después se graba el resto.</span></p>' : ''}`;
       $('vcConfirmo').checked = false;
       $('vcConfirmar').disabled = true;
       $('vcConfirmar').hidden = !out.cantidad;
