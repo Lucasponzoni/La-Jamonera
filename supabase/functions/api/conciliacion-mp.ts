@@ -13,7 +13,7 @@ import { Im5, leerCredenciales, plantillaMail, mandar, destinosAviso, ahoraAR, s
 
 const TZ = 'America/Argentina/Buenos_Aires';
 const TARJETAS_MP = [1, 3, 6, 7];                 // MERCADO PAGO 1, MERCADO PAGO 2, Point, QR en Point
-const TOL_IMPORTE = 0.01;
+const TOL_IMPORTE = 0.10;                          // MP redondea a 10 centavos; IM5 guarda centavos
 const TOL_MIN = 10;
 const DIAS_CRON = 35;                              // devoluciones y contracargos aparecen tarde
 const MAX_PAGINAS = 60;                            // 6000 pagos por corrida
