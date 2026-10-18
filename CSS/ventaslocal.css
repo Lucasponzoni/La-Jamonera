@@ -661,3 +661,50 @@ sl-dialog.vl-dialog { --width: min(760px, 96vw); }
 .vc-tabla tr.vc-sep td b, .vc-tabla tr.vc-sep td span { display: inline !important; }
 .vc-tabla tr.vc-sep td span { margin-left: 4px; }
 .vc-tabla td:nth-child(3) > b { white-space: nowrap; }
+
+/* Conciliación: chips en grupos que bajan de renglón (sin scroll lateral) */
+.vc-filtros.analisis-type-chips { flex-wrap: wrap; overflow: visible; gap: 8px 14px; align-items: center; padding-bottom: 0; }
+.vc-grupo { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
+.vc-grupo + .vc-grupo { padding-left: 14px; border-left: 1px solid var(--lj-border); }
+.vc-grupo-lbl { font-size: .66rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--lj-muted); margin-right: 2px; }
+.vc-grupo sl-button { flex: none; }
+.vc-ocultar { margin-left: auto; }
+.vc-chip-mal::part(base) { border-color: color-mix(in srgb, var(--lj-danger) 45%, var(--lj-border)); }
+.vc-chip-mal .analisis-chip-count { background: var(--lj-danger-soft); color: var(--lj-danger); }
+@media (max-width: 760px) {
+  .vc-grupo + .vc-grupo { padding-left: 0; border-left: 0; }
+  .vc-grupo { width: 100%; }
+  .vc-ocultar { margin-left: 0; }
+}
+/* Tabla de la conciliación: sin scroll lateral en desktop (el detalle se acomoda en varias líneas) */
+@media (min-width: 761px) {
+  .vc-tabla { table-layout: auto; }
+  .vc-tabla td, .vc-tabla th { padding-left: 8px; padding-right: 8px; }
+  .vc-tabla .vc-mp { max-width: 200px; }
+  .vc-tabla td:nth-child(3) > b { white-space: normal; }
+}
+/* Conciliación en celular: cada cobro como tarjeta (sin scroll lateral) */
+@media (max-width: 760px) {
+  .vc-card .vl-tabla-wrap { overflow-x: visible; }
+  .vc-tabla, .vc-tabla tbody { display: block; width: 100%; min-width: 0 !important; }
+  .vc-tabla thead { display: none; }
+  .vc-tabla tr:not(.vc-sep) { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; grid-template-areas: "sel fecha estado" "sel cobro imp" "sel mp bruto" "sel acc acc"; gap: 4px 8px; padding: 10px 6px; border-bottom: 1px solid var(--lj-border); }
+  .vc-tabla tr:not(.vc-sep) > td { display: block; padding: 0 !important; border: 0; min-width: 0; box-shadow: none !important; }
+  .vc-tabla tr.is-antes { box-shadow: inset 3px 0 0 var(--lj-warning); }
+  .vc-tabla tr > td:nth-child(1) { grid-area: sel; padding-top: 2px !important; }
+  .vc-tabla tr > td:nth-child(2) { grid-area: fecha; }
+  .vc-tabla tr > td:nth-child(3) { grid-area: cobro; }
+  .vc-tabla tr > td:nth-child(4) { grid-area: imp; text-align: right; }
+  .vc-tabla tr > td:nth-child(5) { grid-area: mp; max-width: none; }
+  .vc-tabla tr > td:nth-child(6) { grid-area: bruto; text-align: right; }
+  .vc-tabla tr > td:nth-child(7) { display: none; }
+  .vc-tabla tr > td:nth-child(8) { grid-area: estado; text-align: right; }
+  .vc-tabla tr > td:nth-child(9) { grid-area: acc; text-align: left; }
+  .vc-tabla tr > td:nth-child(8) .vc-dif { justify-items: end; }
+  .vc-tabla tr:not(.vc-sep) > td:only-child { grid-column: 1 / -1; }
+  .vc-tabla tr.vc-sep { display: block; }
+  .vc-tabla tr.vc-sep td { display: block; }
+}
+.vc-card { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 760px) { .vc-tabla tr.vc-sep td, .vc-tabla tr.vc-sep td span { white-space: normal !important; overflow-wrap: anywhere; } .vc-tabla td { overflow-wrap: anywhere; } }
+@media (max-width: 760px) { .vc-card .vl-tabla-wrap { overflow-x: hidden !important; } }

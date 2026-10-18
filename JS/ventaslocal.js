@@ -1366,6 +1366,8 @@
     return `Automática todos los días a las ${hh(c.hora ?? 7)}`;
   }
   const esAdmin = () => Boolean(st.me?.admin);
+  const PROBLEMAS = ['revisar', 'dif_importe', 'falta_en_mp', 'falta_en_im5', 'devuelto'];
+  const conProblema = (f) => !f.resuelto_at && !f.grabado_im5_at && !f.im5_conciliado && PROBLEMAS.includes(f.estado);
   const liberado = (f) => f.mp_liberacion_at && Date.parse(f.mp_liberacion_at) <= Date.now();
   // «Revisar» con el mismo importe y pago aprobado también se puede grabar: elegirlo es la revisión.
   const grabable = (f) => (f.estado === 'conciliado' || (f.estado === 'revisar' && f.mp_pago_id && f.mp_estado === 'approved' && Math.abs(Number(f.importe) - Number(f.mp_monto)) <= 0.10)) && !f.grabado_im5_at && !f.im5_conciliado && liberado(f) && String(f.clave).startsWith('im5:');
@@ -1421,6 +1423,7 @@
     const medidor = (pct, color, txt) => `<div class="vl-kpi-medidor" title="${esc(txt)}"><i style="width:${pct.toFixed(1)}%;background:${color}"></i></div><small class="vl-kpi-mini">${esc(txt)}</small>`;
     const pe = r.por_estado || {};
     const nListos = filas.filter(grabable).length;
+    const nProb = filas.filter(conProblema).length;
     const kpi = (ico, tit, val, sub, color, extra = '') => `<article class="vl-kpi" style="--k:${color}">
       <div class="vl-kpi-tit"><span class="vl-kpi-ico"><i class="fa-solid ${ico}"></i></span><span>${esc(tit)}</span></div>
       <div class="vl-kpi-valor">${val}</div><div class="vl-kpi-sub">${sub}</div>${extra ? `<div class="vl-kpi-extra">${extra}</div>` : ''}</article>`;
@@ -1433,9 +1436,10 @@
       kpi('fa-building-columns', 'Acreditado (MP)', pesos(r.acreditado_mp), 'neto de lo conciliado', '#16a34a', medidor(pctDe(r.acreditado_mp, cobrado), '#16a34a', `${fmtNum.format(Math.round(pctDe(r.acreditado_mp, cobrado)))}% de lo cobrado`)),
       kpi('fa-percent', 'Comisiones', pesos(r.comisiones), 'cargos de Mercado Pago', '#9333ea', medidor(pctDe(r.comisiones, cobrado) * 10, '#9333ea', `${fmtNum.format(Math.round(pctDe(r.comisiones, cobrado) * 10) / 10)}% de lo cobrado`)),
       kpi('fa-hourglass-half', 'A liberar', pesos(r.pendiente_liberar), 'todavía no disponible', '#2563eb', medidor(pctDe(r.pendiente_liberar, cobrado), '#2563eb', `${fmtNum.format(Math.round(pctDe(r.pendiente_liberar, cobrado)))}% de lo cobrado`)),
-      kpi('fa-triangle-exclamation', 'Diferencias', fmtNum.format(r.diferencias || 0), r.resueltos ? `${fmtNum.format(r.resueltos)} resueltas a mano` : 'para resolver', r.diferencias ? '#dc2626' : '#16a34a',
-        medidor(pctDe(r.diferencias, r.cobros), r.diferencias ? '#dc2626' : '#16a34a', `${fmtNum.format(Math.round(pctDe(r.diferencias, r.cobros) * 10) / 10)}% de los cobros`)),
-      kpi('fa-file-signature', 'Para grabar', fmtNum.format(nListos), `${fmtNum.format(r.grabados || 0)} ya en IM5`, '#0057ff', medidor(pctDe(r.grabados, (Number(r.grabados) || 0) + nListos), '#0057ff', `${fmtNum.format(Math.round(pctDe(r.grabados, (Number(r.grabados) || 0) + nListos)))}% ya grabado`))
+      // Mismo criterio que el chip «Con problema» (período + días anteriores, sin lo resuelto ni lo ya en IM5).
+      kpi('fa-triangle-exclamation', 'Con problema', fmtNum.format(nProb), r.resueltos ? `${fmtNum.format(r.resueltos)} resueltos a mano` : 'para revisar o resolver', nProb ? '#dc2626' : '#16a34a',
+        medidor(pctDe(nProb, filas.length), nProb ? '#dc2626' : '#16a34a', `${fmtNum.format(Math.round(pctDe(nProb, filas.length) * 10) / 10)}% de lo que se ve`)),
+      kpi('fa-file-signature', 'Por grabar en IM5', fmtNum.format(nListos), `${fmtNum.format(r.grabados || 0)} ya en IM5`, '#0057ff', medidor(pctDe(r.grabados, (Number(r.grabados) || 0) + nListos), '#0057ff', `${fmtNum.format(Math.round(pctDe(r.grabados, (Number(r.grabados) || 0) + nListos)))}% ya grabado`))
     ].join('');
     const e = st.conc.estado || {};
     const c = st.cfg?.conciliacion || {};
@@ -1446,19 +1450,28 @@
     const cuenta = { antes: (st.conc.antes || []).length, todos: filas.length, listos: filas.filter(grabable).length, grabados: filas.filter((f) => f.grabado_im5_at || f.im5_conciliado).length, resueltos: filas.filter((f) => f.resuelto_at).length };
     filas.forEach((f) => { if (!f.resuelto_at) cuenta[f.estado] = (cuenta[f.estado] || 0) + 1; });
     const nombreFiltro = { antes: ['Pendientes de antes', 'fa-clock-rotate-left'], todos: ['Todos', 'fa-layer-group'], listos: ['Listos para grabar', 'fa-file-signature'], grabados: ['Ya en IM5', 'fa-check-double'], resueltos: ['Resueltos a mano', 'fa-screwdriver-wrench'] };
-    $('vcFiltros').innerHTML = ORDEN_CONC.filter((k) => k === 'todos' || cuenta[k]).map((k) => {
-      const [txt, ico] = nombreFiltro[k] || [EST_CONC[k][0], EST_CONC[k][2]];
-      return `<sl-button variant="default" size="small" class="analisis-type-chip ${st.conc.filtro === k ? 'active' : ''} ${k === 'antes' ? 'vc-chip-antes' : ''}" data-vc-filtro="${k}"><i slot="prefix" class="fa-solid ${ico}"></i>${txt}<span slot="suffix" class="analisis-chip-count">${fmtNum.format(cuenta[k] || 0)}</span></sl-button>`;
-    }).join('') + `<sl-switch size="small" class="vc-ocultar" id="vcOcultarConc" ${st.conc.ocultarConc ? 'checked' : ''}>Ocultar conciliados</sl-switch>`;
+    cuenta.problemas = filas.filter(conProblema).length;
+    // Dos grupos que bajan de renglón (sin scroll lateral): qué ver y por estado del cruce.
+    const nombres = { todos: ['Todos', 'fa-layer-group'], problemas: ['Con problema', 'fa-triangle-exclamation'], listos: ['Por grabar en IM5', 'fa-file-signature'],
+      antes: ['Días anteriores', 'fa-clock-rotate-left'], grabados: ['Ya en IM5', 'fa-check-double'], resueltos: ['Resueltos a mano', 'fa-screwdriver-wrench'] };
+    const chip = (k) => {
+      const [txt, ico] = nombres[k] || [EST_CONC[k][0], EST_CONC[k][2]];
+      return `<sl-button variant="default" size="small" class="analisis-type-chip ${st.conc.filtro === k ? 'active' : ''} ${k === 'problemas' && cuenta.problemas ? 'vc-chip-mal' : ''}" data-vc-filtro="${k}"><i slot="prefix" class="fa-solid ${ico}"></i>${txt}<span slot="suffix" class="analisis-chip-count">${fmtNum.format(cuenta[k] || 0)}</span></sl-button>`;
+    };
+    const ver = ['todos', 'problemas', 'listos', 'antes', 'grabados', 'resueltos'].filter((k) => k === 'todos' || cuenta[k]);
+    const estados = ['conciliado', 'pendiente_liberacion', 'revisar', 'dif_importe', 'falta_en_mp', 'falta_en_im5', 'devuelto', 'devolucion', 'anulado_im5'].filter((k) => cuenta[k]);
+    $('vcFiltros').innerHTML = `<div class="vc-grupo"><span class="vc-grupo-lbl">Ver</span>${ver.map(chip).join('')}</div>`
+      + (estados.length ? `<div class="vc-grupo"><span class="vc-grupo-lbl">Estado</span>${estados.map(chip).join('')}</div>` : '')
+      + `<sl-switch size="small" class="vc-ocultar" id="vcOcultarConc" ${st.conc.ocultarConc ? 'checked' : ''}>Ocultar conciliados</sl-switch>`;
     const f0 = st.conc.filtro;
     const ocultarConc = Boolean(st.conc.ocultarConc);
-    const lista = filas.filter((f) => !(ocultarConc && (f.estado === 'conciliado' || f.grabado_im5_at || f.im5_conciliado)) && (f0 === 'todos' || f0 === 'antes' ? (f0 === 'todos' || f._antes) : f0 === 'listos' ? grabable(f) : f0 === 'grabados' ? (f.grabado_im5_at || f.im5_conciliado) : f0 === 'resueltos' ? Boolean(f.resuelto_at) : f.estado === f0 && !f.resuelto_at));
+    const lista = filas.filter((f) => !(ocultarConc && (f.estado === 'conciliado' || f.grabado_im5_at || f.im5_conciliado)) && (f0 === 'todos' || f0 === 'antes' ? (f0 === 'todos' || f._antes) : f0 === 'problemas' ? conProblema(f) : f0 === 'listos' ? grabable(f) : f0 === 'grabados' ? (f.grabado_im5_at || f.im5_conciliado) : f0 === 'resueltos' ? Boolean(f.resuelto_at) : f.estado === f0 && !f.resuelto_at));
     const admin = esAdmin();
     const nAntes = lista.filter((f) => f._antes).length;
     let sepPeriodo = false;
     $('vcBody').innerHTML = lista.length ? lista.slice(0, st.conc.limite).map((f, idx) => {
       const sep = idx === 0 && f._antes
-        ? `<tr class="vc-sep"><td colspan="9"><i class="fa-solid fa-clock-rotate-left"></i> Pendientes de antes del período <b>${fmtNum.format(nAntes)}</b><span>Siguen acá hasta que se concilien en IM5 o los resuelvas.</span></td></tr>`
+        ? `<tr class="vc-sep"><td colspan="9"><i class="fa-solid fa-clock-rotate-left"></i> De días anteriores <b>${fmtNum.format(nAntes)}</b><span>${fmtNum.format(lista.filter((x) => x._antes && conProblema(x)).length)} con problema · ${fmtNum.format(lista.filter((x) => x._antes && grabable(x)).length)} por grabar en IM5 · siguen acá hasta que se concilien en IM5 o los resuelvas.</span></td></tr>`
         : (!f._antes && !sepPeriodo && nAntes && (sepPeriodo = true)) ? '<tr class="vc-sep is-periodo"><td colspan="9"><i class="fa-solid fa-calendar-day"></i> Del período elegido</td></tr>' : '';
       const [txt, clase, ico, ayuda] = EST_CONC[f.estado] || [f.estado, '', 'fa-circle', ''];
       const g = grabable(f);
