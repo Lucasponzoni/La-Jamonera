@@ -413,6 +413,134 @@
         ]
       }, true);
     }
+    pintarGraficosConc();
+    requestAnimationFrame(ajustarGraficos);
+  }
+
+  // ---- Gráficos de la conciliación MP ↔ IM5 (mismo período y empresa que arriba) ----
+  const VC_COL = { en_im5: '#15803d', por_grabar: '#22c55e', a_liberar: '#2563eb', revisar: '#d97706', diferencia: '#dc2626', faltantes: '#991b1b', resueltos: '#7c3aed' };
+  const VC_NOM = { en_im5: 'Ya en IM5', por_grabar: 'Por grabar en IM5', a_liberar: 'A liberar', revisar: 'Revisar', diferencia: 'Diferencia', faltantes: 'No está en MP / IM5', resueltos: 'Resueltos a mano' };
+  const VC_IDS = ['vcGEstado', 'vcGPlata', 'vcGComision', 'vcGDias', 'vcGLiberar', 'vcGErrores'];
+  async function pintarGraficosConc() {
+    const clave = `${st.rango.desde}|${st.rango.hasta}|${st.empresa || ''}`;
+    if (!st.gconc || st.gconc.clave !== clave) {
+      VC_IDS.forEach((id) => { const c = st.charts[id]; if (c) { c.dispose(); delete st.charts[id]; } const el = $(id); if (el) el.innerHTML = '<sl-skeleton effect="sheen" class="vc-g-sk"></sl-skeleton>'; });
+      st.gconc = { clave, cargando: true };
+      const { data, error } = await st.sb.rpc('conciliacion_mp_graficos', { p_desde: st.rango.desde, p_hasta: st.rango.hasta, p_empresa: st.empresa || null });
+      if (st.gconc.clave !== clave) return;
+      st.gconc = { clave, data: error ? null : data, error };
+    }
+    if (st.gconc.cargando || !graficosVisibles()) return;
+    const g = st.gconc.data;
+    VC_IDS.forEach((id) => $(id)?.querySelector('.vc-g-sk')?.remove());
+    if (!g) { VC_IDS.forEach((id) => vacio(id, st.gconc.error ? textoError(st.gconc.error) : 'Sin datos de conciliación')); return; }
+    const texto = css('--lj-text'); const muted = css('--lj-muted');
+    const pct = (n) => `${fmtNum.format(Math.round(n * 10) / 10)}%`;
+    const dias = g.por_dia || [];
+    const etiqueta = (d) => `${DIAS_SEM[diaSemana(d)]} ${fechaCorta(d)}`;
+
+    // 1. Estado por día (barras apiladas, colores de los chips).
+    if (!dias.length) vacio('vcGEstado', 'Todavía no hay cruce para este período');
+    else {
+      const o = baseOpts();
+      const claves = ['en_im5', 'por_grabar', 'a_liberar', 'revisar', 'diferencia', 'faltantes', 'resueltos'].filter((k) => dias.some((d) => Number(d[k])));
+      const tot = dias.reduce((s, d) => s + claves.reduce((a2, k) => a2 + Number(d[k] || 0), 0), 0);
+      $('vcGEstadoNota').textContent = `${fmtNum.format(tot)} cobros`;
+      chart('vcGEstado')?.setOption({ ...o,
+        legend: { top: 0, left: 0, type: 'scroll', textStyle: { color: muted }, itemWidth: 12, itemHeight: 8 },
+        grid: { ...o.grid, top: 34 },
+        tooltip: { ...o.tooltip, axisPointer: { type: 'shadow' }, valueFormatter: (v) => `${fmtNum.format(v)} cobros` },
+        xAxis: { ...o.xAxis, type: 'category', data: dias.map((d) => etiqueta(d.fecha)), axisLabel: { color: muted, hideOverlap: true } },
+        yAxis: { ...o.yAxis, type: 'value', axisLabel: { color: muted, formatter: (v) => fmtNum.format(v) } },
+        series: claves.map((k, i) => ({ name: VC_NOM[k], type: 'bar', stack: 'e', barMaxWidth: 34, itemStyle: { color: VC_COL[k], borderRadius: i === claves.length - 1 ? [3, 3, 0, 0] : 0 }, data: dias.map((d) => Number(d[k] || 0)) }))
+      }, true);
+    }
+
+    // 2. Cobrado vs acreditado neto, con la comisión como línea.
+    if (!dias.some((d) => Number(d.cobrado))) vacio('vcGPlata', 'Sin cobros con Mercado Pago en este período');
+    else {
+      const o = baseOpts(); const P = PALETA();
+      const cob = dias.reduce((s, d) => s + Number(d.cobrado || 0), 0); const com = dias.reduce((s, d) => s + Number(d.comision || 0), 0);
+      $('vcGPlataNota').textContent = `Comisión: ${pesos(com)} (${pct(cob ? com / cob * 100 : 0)})`;
+      chart('vcGPlata')?.setOption({ ...o,
+        legend: { top: 0, right: 0, textStyle: { color: muted }, itemWidth: 12, itemHeight: 8 },
+        tooltip: { ...o.tooltip, axisPointer: { type: 'shadow' }, valueFormatter: pesos },
+        xAxis: { ...o.xAxis, type: 'category', data: dias.map((d) => etiqueta(d.fecha)), axisLabel: { color: muted, hideOverlap: true } },
+        yAxis: [{ ...o.yAxis, type: 'value' }, { ...o.yAxis, type: 'value', splitLine: { show: false }, axisLabel: { color: muted, formatter: corto } }],
+        series: [
+          { name: 'Cobrado en IM5', type: 'bar', barMaxWidth: 22, itemStyle: { color: degrade(P[0], aclarar(P[0], 0.5)), borderRadius: [3, 3, 0, 0] }, data: dias.map((d) => Number(d.cobrado || 0)) },
+          { name: 'Acreditado neto (MP)', type: 'bar', barMaxWidth: 22, itemStyle: { color: degrade(P[1], aclarar(P[1], 0.5)), borderRadius: [3, 3, 0, 0] }, data: dias.map((d) => Number(d.neto || 0)) },
+          { name: 'Comisión', type: 'line', yAxisIndex: 1, smooth: true, symbol: 'circle', symbolSize: 5, lineStyle: { color: P[3], width: 2 }, itemStyle: { color: P[3] }, areaStyle: { color: degrade(aclarar(P[3], 0.25), aclarar(P[3], 0)) }, data: dias.map((d) => Number(d.comision || 0)) }
+        ]
+      }, true);
+    }
+
+    // 3. Comisión efectiva por medio.
+    const medios = (g.por_medio || []).filter((m) => Number(m.cobrado_mp) > 0);
+    if (!medios.length) vacio('vcGComision', 'Sin cobros cruzados con Mercado Pago');
+    else {
+      const o = baseOpts(); const P = PALETA();
+      const filas = [...medios].reverse();
+      const tc = medios.reduce((s, m) => s + Number(m.comision), 0); const tb = medios.reduce((s, m) => s + Number(m.cobrado_mp), 0);
+      $('vcGComisionNota').textContent = `Total ${pesos(tc)} · ${pct(tb ? tc / tb * 100 : 0)}`;
+      chart('vcGComision')?.setOption({ ...o,
+        tooltip: { ...o.tooltip, axisPointer: { type: 'shadow' }, formatter: (ps) => { const m = filas[ps[0].dataIndex]; return `<b>${esc(m.medio)}</b><br>Comisión ${pesos(m.comision)} sobre ${pesos(m.cobrado_mp)}<br>${pct(Number(m.comision) / Number(m.cobrado_mp) * 100)} · ${fmtNum.format(m.cobros)} cobros`; } },
+        grid: { ...o.grid, right: 64 },
+        xAxis: { ...o.yAxis, type: 'value', axisLabel: { color: muted, formatter: (v) => `${v}%`, show: !esMovil() } },
+        yAxis: { type: 'category', data: filas.map((m) => m.medio), axisLabel: { color: texto, fontSize: 11 }, axisLine: { lineStyle: { color: css('--lj-border') } }, axisTick: { show: false } },
+        series: [{ type: 'bar', barMaxWidth: 22, data: filas.map((m, i) => { const col = P[(i + 4) % P.length]; return { value: Math.round(Number(m.comision) / Number(m.cobrado_mp) * 1000) / 10, itemStyle: { color: degrade(aclarar(col, 0.55), col, true), borderRadius: [0, 4, 4, 0] } }; }),
+          label: { show: true, position: 'right', color: muted, fontSize: 11, formatter: (x) => `${pct(x.value)}` } }]
+      }, true);
+    }
+
+    // 4. Días hasta la liberación por medio.
+    const conDias = (g.por_medio || []).filter((m) => m.dias_lib != null);
+    if (!conDias.length) vacio('vcGDias', 'Sin liberaciones registradas');
+    else {
+      const o = baseOpts(); const P = PALETA();
+      const filas = [...conDias].reverse();
+      chart('vcGDias')?.setOption({ ...o,
+        tooltip: { ...o.tooltip, axisPointer: { type: 'shadow' }, formatter: (ps) => { const m = filas[ps[0].dataIndex]; return `<b>${esc(m.medio)}</b><br>${fmtNum.format(m.dias_lib)} días en promedio`; } },
+        grid: { ...o.grid, right: 64 },
+        xAxis: { ...o.yAxis, type: 'value', axisLabel: { color: muted, formatter: (v) => `${v} d`, show: !esMovil() } },
+        yAxis: { type: 'category', data: filas.map((m) => m.medio), axisLabel: { color: texto, fontSize: 11 }, axisLine: { lineStyle: { color: css('--lj-border') } }, axisTick: { show: false } },
+        series: [{ type: 'bar', barMaxWidth: 22, data: filas.map((m, i) => { const col = P[(i + 5) % P.length]; return { value: Number(m.dias_lib), itemStyle: { color: degrade(aclarar(col, 0.55), col, true), borderRadius: [0, 4, 4, 0] } }; }),
+          label: { show: true, position: 'right', color: muted, fontSize: 11, formatter: (x) => (Number(x.value) < 1 ? 'en el día' : `${fmtNum.format(x.value)} días`) } }]
+      }, true);
+    }
+
+    // 5. Calendario de liberaciones (próximos 30 días).
+    const lib = g.liberaciones || [];
+    if (!lib.length) vacio('vcGLiberar', 'No hay plata pendiente de liberar');
+    else {
+      const o = baseOpts(); const P = PALETA();
+      const tot = lib.reduce((s, x) => s + Number(x.neto), 0);
+      $('vcGLiberarNota').textContent = `Total ${pesos(tot)}`;
+      chart('vcGLiberar')?.setOption({ ...o,
+        tooltip: { ...o.tooltip, axisPointer: { type: 'shadow' }, formatter: (ps) => { const x = lib[ps[0].dataIndex]; return `<b>${esc(etiqueta(x.fecha))}</b><br>${pesos(x.neto)} · ${fmtNum.format(x.n)} cobros`; } },
+        xAxis: { ...o.xAxis, type: 'category', data: lib.map((x) => etiqueta(x.fecha)), axisLabel: { color: muted, hideOverlap: true } },
+        yAxis: { ...o.yAxis, type: 'value' },
+        series: [{ type: 'bar', barMaxWidth: 34, itemStyle: { color: degrade(P[0], aclarar(P[0], 0.45)), borderRadius: [4, 4, 0, 0] }, data: lib.map((x) => Number(x.neto)),
+          label: { show: lib.length <= 10, position: 'top', color: muted, fontSize: 11, formatter: (x) => corto(x.value) } }]
+      }, true);
+    }
+
+    // 6. Cupones mal tipeados por caja.
+    const err = g.errores_caja || [];
+    $('vcGErroresNota').textContent = g.errores_total ? `${fmtNum.format(g.errores_total)} en el período` : '';
+    if (!err.length) vacio('vcGErrores', 'Sin cupones mal tipeados en este período');
+    else {
+      const o = baseOpts();
+      const filas = [...err].slice(0, 8).reverse();
+      chart('vcGErrores')?.setOption({ ...o,
+        tooltip: { ...o.tooltip, axisPointer: { type: 'shadow' }, formatter: (ps) => { const u = filas[ps[0].dataIndex]; return `<b>${esc(u.usuario)}</b><br>${fmtNum.format(u.n)} cupones mal tipeados<br><span style="opacity:.7">ej.: ${esc(u.ejemplo || '')}</span>`; } },
+        grid: { ...o.grid, right: 48 },
+        xAxis: { ...o.yAxis, type: 'value', axisLabel: { color: muted, formatter: (v) => fmtNum.format(v), show: !esMovil() } },
+        yAxis: { type: 'category', data: filas.map((u) => u.usuario), axisLabel: { color: texto, fontSize: 11 }, axisLine: { lineStyle: { color: css('--lj-border') } }, axisTick: { show: false } },
+        series: [{ type: 'bar', barMaxWidth: 22, data: filas.map((u) => ({ value: Number(u.n), itemStyle: { color: degrade(aclarar('#d97706', 0.5), '#d97706', true), borderRadius: [0, 4, 4, 0] } })),
+          label: { show: true, position: 'right', color: muted, fontSize: 11, formatter: (x) => fmtNum.format(x.value) } }]
+      }, true);
+    }
     requestAnimationFrame(ajustarGraficos);
   }
   const ajustarGraficos = () => Object.values(st.charts).forEach((c) => c.resize());
@@ -1638,6 +1766,8 @@
       const out = await res.json().catch(() => ({}));
       if (!res.ok || out.ok === false) throw new Error(out.error || `Error ${res.status}`);
       if (enviar) return notify('success', 'Mail de prueba enviado', (out.destinos || []).join(', '));
+      // Se abre desde Configuración (otro sl-dialog): al final del body para quedar por encima de ese modal.
+      document.body.appendChild($('vcMailDialog'));
       $('vcMailFrame').srcdoc = out.html; $('vcMailDialog').show();
     } catch (e) { notify('error', enviar ? 'No se pudo enviar' : 'No se pudo armar la vista previa', textoError(e)); }
   }
