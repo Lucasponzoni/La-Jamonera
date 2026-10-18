@@ -2250,7 +2250,9 @@
         } else if (sinTrazForThis) {
           const existingPlan = ingredientPlans.find((p) => normalizeValue(p.ingredientId) === normalizeValue(requirement.ingredientId) && !p.isSubstitute);
           if (existingPlan) {
-            existingPlan.missingQty = Number((Number(existingPlan.missingQty || 0) + missing).toFixed(4));
+            // `missing` ya es el faltante total del insumo (lo que no cubrieron lotes ni sustitutos); el plan del
+            // original pudo traer su propio faltante parcial: se reemplaza, no se suma (antes quedaba duplicado).
+            existingPlan.missingQty = Number(missing.toFixed(4));
             existingPlan.noTraceability = true;
             existingPlan.sinTrazabilidad = true;
           } else {
