@@ -556,12 +556,26 @@
     st.resumen = null; st.resumenComp = null; pintarKpis();
     const comp = rangoComparar(st.rango, st.clave);
     const periodo = st.rango.desde === st.rango.hasta ? fechaCorta(st.rango.desde) : `${fechaCorta(st.rango.desde)} al ${fechaCorta(st.rango.hasta)}`;
-    $('vlComparando').innerHTML = `<i class="fa-regular fa-calendar"></i>${esc(periodo)}${st.comparar ? ` · comparando con ${esc(comp.texto)} (${esc(fechaCorta(comp.desde))}${comp.desde !== comp.hasta ? ` al ${esc(fechaCorta(comp.hasta))}` : ''})` : ''}`;
+    $('vlComparando').innerHTML = `${st.notaUltimo ? `<span class="vl-nota-ultimo"><i class="fa-solid fa-circle-info"></i>${esc(st.notaUltimo)}</span>` : ''}<i class="fa-regular fa-calendar"></i>${esc(periodo)}${st.comparar ? ` · comparando con ${esc(comp.texto)} (${esc(fechaCorta(comp.desde))}${comp.desde !== comp.hasta ? ` al ${esc(fechaCorta(comp.hasta))}` : ''})` : ''}`;
     try {
       // El catálogo (foto y vínculo del producto más vendido) se espera junto: así la tarjeta sale completa de una.
       const [r, c] = await Promise.all([resumen(st.rango.desde, st.rango.hasta), st.comparar ? resumen(comp.desde, comp.hasta) : Promise.resolve(null),
         Promise.resolve(cargarCatalogo()).catch(() => null)]);
       st.resumen = r; st.resumenComp = c;
+      // «Hoy» sin ventas todavía (temprano, domingo, feriado): se muestra el último día con ventas, aclarado arriba.
+      if (st.clave === 'hoy' && !Number(r?.comprobantes || 0)) {
+        let q = st.sb.from('im5_comprobantes').select('fecha').lt('fecha', st.rango.desde).eq('anulada', false).eq('tipo', 'FA');
+        if (st.empresa) q = q.eq('empresa', st.empresa);
+        const { data: ult } = await q.order('fecha', { ascending: false }).limit(1);
+        const f = ult?.[0]?.fecha;
+        if (f) {
+          const nombreDia = (d) => `${DIAS_SEM[diaSemana(d)]} ${fechaCorta(d)}`;
+          st.notaUltimo = `Hoy (${nombreDia(st.rango.desde)}) todavía no hay ventas: se muestran las del último día con ventas, ${nombreDia(f)}.`;
+          st.clave = 'ultimo'; st.rango = { desde: f, hasta: f }; st.pagina = 0;
+          cargarTabla(); if (concVisible()) cargarConciliacion();
+          return cargarResumen();
+        }
+      }
     } catch (e) {
       notify('error', 'No se pudieron leer las ventas', textoError(e));
       st.resumen = {};
@@ -1186,6 +1200,8 @@
     } finally {
       st.corriendo = false; btn.loading = false;
       await refrescarSalud();
+      // Si se estaba mostrando el último día con ventas porque hoy no había, se vuelve a probar con hoy.
+      if (st.notaUltimo) { st.clave = 'hoy'; st.rango = rangoDe('hoy'); st.notaUltimo = ''; st.pagina = 0; }
       await Promise.all([cargarResumen(), cargarTabla()]);
     }
   }
@@ -1827,7 +1843,7 @@
 
   // ---------- Eventos ----------
   function elegirRango(clave, rango) {
-    st.clave = clave; st.rango = rango; st.pagina = 0;
+    st.clave = clave; st.rango = rango; st.pagina = 0; st.notaUltimo = '';
     document.querySelectorAll('[data-rango]').forEach((b) => b.classList.toggle('active', b.dataset.rango === clave));
     $('vlRangoTexto').textContent = clave === 'custom' ? `${fechaCorta(rango.desde)} – ${fechaCorta(rango.hasta)}` : 'Elegir fechas';
     cargarResumen(); cargarTabla();

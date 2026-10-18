@@ -30,10 +30,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202610182106">
-  <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202610182106">
-  <link rel="stylesheet" href="./CSS/theme.css?v=202610182106">
-  <link rel="stylesheet" href="./CSS/utilities.css?v=202610182106">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/light.css?v=202610182109">
+  <link rel="stylesheet" href="./vendor/shoelace/themes/dark.css?v=202610182109">
+  <link rel="stylesheet" href="./CSS/theme.css?v=202610182109">
+  <link rel="stylesheet" href="./CSS/utilities.css?v=202610182109">
   <script type="module">
     import { setBasePath } from './vendor/shoelace/utilities/base-path.js?v=202608282255';
     setBasePath(new URL('./vendor/shoelace/', document.baseURI).href.slice(0, -1));
@@ -41,12 +41,12 @@
     const ljCore = [...new Set([...document.querySelectorAll('sl-button, sl-input, sl-icon, sl-dialog, sl-dropdown, sl-drawer, sl-spinner, sl-icon-button')].map((n) => n.localName))].map((t) => customElements.whenDefined(t));
     Promise.race([Promise.allSettled(ljCore), new Promise((r) => setTimeout(r, 2500))]).then(() => document.documentElement.classList.add('lj-ready'));
   </script>
-  <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202610182106">
-  <link rel="stylesheet" href="./CSS/legacy/03-componentes.css?v=202610182106">
-  <link rel="stylesheet" href="./CSS/legacy/04-informes.css?v=202610182106">
-  <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202610182106">
-  <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202610182106">
-  <link rel="stylesheet" href="./CSS/ventaslocal.css?v=202610182106">
+  <link rel="stylesheet" href="./CSS/legacy/00-base.css?v=202610182109">
+  <link rel="stylesheet" href="./CSS/legacy/03-componentes.css?v=202610182109">
+  <link rel="stylesheet" href="./CSS/legacy/04-informes.css?v=202610182109">
+  <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202610182109">
+  <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202610182109">
+  <link rel="stylesheet" href="./CSS/ventaslocal.css?v=202610182109">
 </head>
 <body>
   <main class="app-shell container-fluid px-0">
@@ -681,25 +681,25 @@
     </section>
   </main>
 
-  <script src="./JS/data/backend.js?v=202610182106"></script>
+  <script src="./JS/data/backend.js?v=202610182109"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-  <script src="./vendor/echarts/echarts.min.js?v=202610182106"></script>
-  <script src="./JS/ui/forms.js?v=202610182106"></script>
-  <script src="./JS/ui/theme.js?v=202610182106"></script>
-  <script src="./JS/ui/modal.js?v=202610182106"></script>
-  <script src="./JS/ui/lj-alert.js?v=202610182106"></script>
-  <script src="./JS/ui/header.js?v=202610182106"></script>
-  <script src="./JS/data/config.js?v=202610182106"></script>
-  <script src="./JS/data/supabase-init.js?v=202610182106"></script>
-  <script src="./JS/firebase-init.js?v=202610182106"></script>
-  <script src="./JS/data/security.js?v=202610182106"></script>
-  <script src="./JS/proxy-client.js?v=202610182106"></script>
-  <script src="./JS/data/authz.js?v=202610182106"></script>
-  <script src="./JS/configuracion.js?v=202610182106"></script>
-  <script src="./JS/Notificaciones.js?v=202610182106"></script>
-  <script src="./JS/app.js?v=202610182106"></script>
-  <script src="./JS/ventaslocal.js?v=202610182106"></script>
+  <script src="./vendor/echarts/echarts.min.js?v=202610182109"></script>
+  <script src="./JS/ui/forms.js?v=202610182109"></script>
+  <script src="./JS/ui/theme.js?v=202610182109"></script>
+  <script src="./JS/ui/modal.js?v=202610182109"></script>
+  <script src="./JS/ui/lj-alert.js?v=202610182109"></script>
+  <script src="./JS/ui/header.js?v=202610182109"></script>
+  <script src="./JS/data/config.js?v=202610182109"></script>
+  <script src="./JS/data/supabase-init.js?v=202610182109"></script>
+  <script src="./JS/firebase-init.js?v=202610182109"></script>
+  <script src="./JS/data/security.js?v=202610182109"></script>
+  <script src="./JS/proxy-client.js?v=202610182109"></script>
+  <script src="./JS/data/authz.js?v=202610182109"></script>
+  <script src="./JS/configuracion.js?v=202610182109"></script>
+  <script src="./JS/Notificaciones.js?v=202610182109"></script>
+  <script src="./JS/app.js?v=202610182109"></script>
+  <script src="./JS/ventaslocal.js?v=202610182109"></script>
 </body>
 </html>
