@@ -1491,7 +1491,7 @@
     anulado_im5: ['Anulado en IM5', 'is-neu', 'fa-ban', 'El comprobante se anuló en InfoManager: no hay nada que conciliar.']
   };
   const ORDEN_CONC = ['todos', 'antes', 'listos', 'conciliado', 'pendiente_liberacion', 'revisar', 'dif_importe', 'falta_en_mp', 'falta_en_im5', 'devuelto', 'devolucion', 'resueltos', 'grabados'];
-  st.conc = { filtro: 'todos', filas: [], sel: new Set(), cargando: false, limite: 100 };
+  st.conc = { filtro: 'todos', filas: [], sel: new Set(), cargando: false, limite: 100, grab: null, nGrab: 0 };
   const RESOL = {
     aceptado: ['Aceptar la diferencia', 'fa-handshake', 'El importe o el pago no coinciden pero está bien así.'],
     otro_canal: ['Es de otro canal', 'fa-store-slash', 'Pago de MP que no es del local (web, otro punto de venta, transferencia).'],
@@ -1534,13 +1534,17 @@
     try {
       // Además del período: lo pendiente de fechas anteriores (no conciliado en IM5, no grabado, no resuelto a mano)
       // sigue visible hasta que se cierre.
-      const [res, filas, est, antes] = await Promise.all([
+      // «Ya en IM5» no depende del período: es el historial completo de lo conciliado en InfoManager.
+      st.conc.grab = null;
+      const [res, filas, est, antes, nGrab] = await Promise.all([
         st.sb.rpc('conciliacion_mp_resumen', { p_desde: desde, p_hasta: hasta }),
         leerTodo(() => st.sb.from('conciliacion_mp').select('*').gte('fecha', desde).lte('fecha', hasta).order('fecha_hora', { ascending: false, nullsFirst: false }).order('clave')),
         st.sb.from('conciliacion_mp_estado').select('*').eq('id', 1).maybeSingle(),
         leerTodo(() => st.sb.from('conciliacion_mp').select('*').lt('fecha', desde).is('grabado_im5_at', null).is('resuelto_at', null)
-          .or('im5_conciliado.is.null,im5_conciliado.eq.false').not('estado', 'in', '(devolucion,anulado_im5)').order('fecha_hora', { ascending: false, nullsFirst: false }).order('clave'))
+          .or('im5_conciliado.is.null,im5_conciliado.eq.false').not('estado', 'in', '(devolucion,anulado_im5)').order('fecha_hora', { ascending: false, nullsFirst: false }).order('clave')),
+        st.sb.from('conciliacion_mp').select('clave', { count: 'exact', head: true }).or('grabado_im5_at.not.is.null,im5_conciliado.eq.true')
       ]);
+      st.conc.nGrab = nGrab?.count || 0;
       st.conc.estado = est?.data || {};
       if (res.error) throw res.error;
       st.conc.resumen = res.data || {};
@@ -1552,6 +1556,57 @@
     } catch (e) {
       $('vcBody').innerHTML = `<tr><td colspan="9" class="vl-ayuda">${esc(textoError(e))}</td></tr>`;
     } finally { st.conc.cargando = false; }
+    if (st.conc.filtro === 'grabados') cargarGrabados();
+  }
+  // Todo lo conciliado en IM5 (grabado desde acá o conciliado allá), de cualquier fecha, lo último grabado primero.
+  async function cargarGrabados() {
+    if (st.conc.grab || st.conc.cargandoGrab) return;
+    st.conc.cargandoGrab = true;
+    $('vcBody').innerHTML = '<tr><td colspan="9" class="vl-cargando"><sl-spinner></sl-spinner></td></tr>';
+    try {
+      const filas = await leerTodo(() => st.sb.from('conciliacion_mp').select('*').or('grabado_im5_at.not.is.null,im5_conciliado.eq.true')
+        .order('grabado_im5_at', { ascending: false, nullsFirst: false }).order('fecha_hora', { ascending: false, nullsFirst: false }).order('clave'));
+      st.conc.grab = st.empresa ? filas.filter((f) => f.empresa == null || f.empresa === st.empresa) : filas;
+      st.conc.nGrab = st.conc.grab.length;
+    } catch (e) {
+      st.conc.grab = [];
+      notify('error', 'No se pudo leer lo conciliado en IM5', textoError(e));
+    } finally { st.conc.cargandoGrab = false; }
+    if (st.conc.filtro === 'grabados') pintarConciliacion();
+  }
+  // Grupo de una grabación: día + quién (el automático graba de a tandas en la misma corrida).
+  const grupoGrab = (f) => (f.grabado_im5_at ? `${fmtDia(f.grabado_im5_at)}|${f.grabado_por || ''}` : 'im5');
+  const nombreQuien = (q) => (!q ? '' : q === 'automático' ? 'automático' : String(q).split('@')[0]);
+  async function excelGrabados() {
+    if (!window.ExcelJS) return notify('error', 'Excel', 'No se pudo cargar la librería de Excel.');
+    const filas = st.conc.grab || [];
+    const wb = new window.ExcelJS.Workbook();
+    wb.creator = 'La Jamonera';
+    const ws = wb.addWorksheet('Ya en IM5');
+    ws.columns = [
+      { header: 'Grabado en IM5', key: 'grab', width: 18 }, { header: 'Por', key: 'por', width: 16 }, { header: 'Fecha cobro', key: 'fecha', width: 12 },
+      { header: 'Empresa', key: 'emp', width: 9 }, { header: 'Comprobante', key: 'comp', width: 22 }, { header: 'Medio', key: 'medio', width: 18 },
+      { header: 'Cupón / id', key: 'cupon', width: 16 }, { header: 'Importe', key: 'imp', width: 14 }, { header: 'Pago MP', key: 'mp', width: 16 },
+      { header: 'Neto MP', key: 'neto', width: 14 }, { header: 'Liberado MP', key: 'lib', width: 12 }, { header: 'Resumen IM5', key: 'res', width: 12 }
+    ];
+    filas.forEach((f) => ws.addRow({
+      grab: f.grabado_im5_at ? new Date(f.grabado_im5_at) : null, por: f.grabado_im5_at ? nombreQuien(f.grabado_por) : 'conciliado en IM5',
+      fecha: f.fecha ? new Date(`${f.fecha}T12:00:00Z`) : null, emp: f.empresa, comp: f.comprobante, medio: f.medio, cupon: f.cupon,
+      imp: f.importe == null ? null : Number(f.importe), mp: f.mp_pago_id, neto: f.mp_neto == null ? null : Number(f.mp_neto),
+      lib: f.mp_liberacion_at ? new Date(f.mp_liberacion_at) : null, res: f.grabado_resumen
+    }));
+    ws.getColumn('grab').numFmt = 'dd/mm/yyyy hh:mm'; ws.getColumn('fecha').numFmt = 'dd/mm/yyyy'; ws.getColumn('lib').numFmt = 'dd/mm/yyyy';
+    ws.getColumn('imp').numFmt = '"$" #,##0.00'; ws.getColumn('neto').numFmt = '"$" #,##0.00';
+    ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0057FF' } };
+    ws.views = [{ state: 'frozen', ySplit: 1 }];
+    ws.autoFilter = { from: 'A1', to: 'L1' };
+    const buf = await wb.xlsx.writeBuffer();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.download = `conciliado-en-im5_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
   function pintarConciliacion() {
     const { filas } = st.conc;
@@ -1583,7 +1638,7 @@
       // Mismo criterio que el chip «Con problema» (período + días anteriores, sin lo resuelto ni lo ya en IM5).
       kpi('fa-triangle-exclamation', 'Con problema', fmtNum.format(nProb), r.resueltos ? `${fmtNum.format(r.resueltos)} resueltos a mano` : 'para revisar o resolver', nProb ? '#dc2626' : '#16a34a',
         medidor(pctDe(nProb, filas.length), nProb ? '#dc2626' : '#16a34a', `${fmtNum.format(Math.round(pctDe(nProb, filas.length) * 10) / 10)}% de lo que se ve`)),
-      kpi('fa-file-signature', 'Por grabar en IM5', fmtNum.format(nListos), `${fmtNum.format(r.grabados || 0)} ya en IM5`, '#0057ff', medidor(pctDe(r.grabados, (Number(r.grabados) || 0) + nListos), '#0057ff', `${fmtNum.format(Math.round(pctDe(r.grabados, (Number(r.grabados) || 0) + nListos)))}% ya grabado`))
+      kpi('fa-file-signature', 'Por grabar en IM5', fmtNum.format(nListos), `${fmtNum.format(st.conc.nGrab)} ya en IM5 en total`, '#0057ff', medidor(pctDe(st.conc.nGrab, st.conc.nGrab + nListos), '#0057ff', `${fmtNum.format(Math.round(pctDe(st.conc.nGrab, st.conc.nGrab + nListos)))}% ya grabado`))
     ].join('');
     const e = st.conc.estado || {};
     const c = st.cfg?.conciliacion || {};
@@ -1591,7 +1646,7 @@
       + `<span>Último cruce: <b>${r.actualizado ? esc(fmtDiaHora(r.actualizado)) : '—'}</b>${e.ultima_at && e.ultima_ok === false ? ` <span class="vc-cron-mal" title="${esc(e.ultimo_error || '')}"><i class="fa-solid fa-triangle-exclamation"></i> falló el último automático</span>` : ''}</span>`
       + (c.activa === false ? '' : `<span>Próximo: <b>${e.proxima_at ? esc(fmtDiaHora(e.proxima_at)) : '—'}</b></span>`)
       + (c.activa !== false && c.grabarAuto ? `<span class="vc-cron-chip"><i class="fa-solid fa-robot"></i>Graba solo en IM5${e.ultimo_resultado?.grabado?.grabadas ? ` · último: ${fmtNum.format(e.ultimo_resultado.grabado.grabadas)}` : ''}</span>` : '');
-    const cuenta = { antes: (st.conc.antes || []).length, todos: filas.length, listos: filas.filter(grabable).length, grabados: filas.filter((f) => f.grabado_im5_at || f.im5_conciliado).length, resueltos: filas.filter((f) => f.resuelto_at).length };
+    const cuenta = { antes: (st.conc.antes || []).length, todos: filas.length, listos: filas.filter(grabable).length, grabados: st.conc.nGrab, resueltos: filas.filter((f) => f.resuelto_at).length };
     filas.forEach((f) => { if (!f.resuelto_at) cuenta[f.estado] = (cuenta[f.estado] || 0) + 1; });
     const nombreFiltro = { antes: ['Pendientes de antes', 'fa-clock-rotate-left'], todos: ['Todos', 'fa-layer-group'], listos: ['Listos para grabar', 'fa-file-signature'], grabados: ['Ya en IM5', 'fa-check-double'], resueltos: ['Resueltos a mano', 'fa-screwdriver-wrench'] };
     cuenta.problemas = filas.filter(conProblema).length;
@@ -1608,13 +1663,21 @@
       + (estados.length ? `<div class="vc-grupo"><span class="vc-grupo-lbl">Estado</span>${estados.map(chip).join('')}</div>` : '')
       + `<sl-switch size="small" class="vc-ocultar" id="vcOcultarConc" ${st.conc.ocultarConc ? 'checked' : ''}>Ocultar conciliados</sl-switch>`;
     const f0 = st.conc.filtro;
-    const ocultarConc = Boolean(st.conc.ocultarConc);
-    const lista = filas.filter((f) => !(ocultarConc && (f.estado === 'conciliado' || f.grabado_im5_at || f.im5_conciliado)) && (f0 === 'todos' || f0 === 'antes' ? (f0 === 'todos' || f._antes) : f0 === 'problemas' ? conProblema(f) : f0 === 'listos' ? grabable(f) : f0 === 'grabados' ? (f.grabado_im5_at || f.im5_conciliado) : f0 === 'resueltos' ? Boolean(f.resuelto_at) : f.estado === f0 && !f.resuelto_at));
+    const verGrab = f0 === 'grabados';
+    if (verGrab && !st.conc.grab) { cargarGrabados(); return; }
+    const ocultarConc = Boolean(st.conc.ocultarConc) && !verGrab;
+    const lista = verGrab ? st.conc.grab : filas.filter((f) => !(ocultarConc && (f.estado === 'conciliado' || f.grabado_im5_at || f.im5_conciliado)) && (f0 === 'todos' || f0 === 'antes' ? (f0 === 'todos' || f._antes) : f0 === 'problemas' ? conProblema(f) : f0 === 'listos' ? grabable(f) : f0 === 'grabados' ? (f.grabado_im5_at || f.im5_conciliado) : f0 === 'resueltos' ? Boolean(f.resuelto_at) : f.estado === f0 && !f.resuelto_at));
     const admin = esAdmin();
-    const nAntes = lista.filter((f) => f._antes).length;
+    const nAntes = verGrab ? 0 : lista.filter((f) => f._antes).length;
     let sepPeriodo = false;
-    $('vcBody').innerHTML = lista.length ? lista.slice(0, st.conc.limite).map((f, idx) => {
-      const sep = idx === 0 && f._antes
+    // Vista «Ya en IM5»: encabezado con el total y un separador por grabación (día + quién) con su cantidad e importe.
+    const grupos = new Map();
+    if (verGrab) lista.forEach((f) => { const g = grupos.get(grupoGrab(f)) || { n: 0, imp: 0 }; g.n += 1; g.imp += Number(f.importe || 0); grupos.set(grupoGrab(f), g); });
+    const cabGrab = verGrab ? `<tr class="vc-sep vc-grab-cab"><td colspan="9"><div class="vc-grab-fila"><div><i class="fa-solid fa-check-double"></i> Conciliado en InfoManager <b>${fmtNum.format(lista.length)}</b><span>${pesos2(lista.reduce((s2, f) => s2 + Number(f.importe || 0), 0))} · de todas las fechas (no depende del período elegido) · lo último grabado arriba.</span></div>${lista.length ? '<sl-button size="small" variant="default" id="vcGrabExcel"><i slot="prefix" class="fa-solid fa-file-excel"></i>Descargar Excel</sl-button>' : ''}</div></td></tr>` : '';
+    $('vcBody').innerHTML = lista.length ? cabGrab + lista.slice(0, st.conc.limite).map((f, idx) => {
+      const gAct = verGrab ? grupoGrab(f) : null;
+      const sep = verGrab ? (idx === 0 || gAct !== grupoGrab(lista[idx - 1]) ? `<tr class="vc-sep is-periodo"><td colspan="9"><i class="fa-solid fa-file-signature"></i> ${f.grabado_im5_at ? `Grabado el ${esc(fmtDia(f.grabado_im5_at))}${f.grabado_por ? ` · ${esc(nombreQuien(f.grabado_por))}` : ''}` : 'Conciliado directo en IM5'} <b>${fmtNum.format(grupos.get(gAct).n)}</b><span>${pesos2(grupos.get(gAct).imp)}</span></td></tr>` : '')
+        : idx === 0 && f._antes
         ? `<tr class="vc-sep"><td colspan="9"><i class="fa-solid fa-clock-rotate-left"></i> De días anteriores <b>${fmtNum.format(nAntes)}</b><span>${fmtNum.format(lista.filter((x) => x._antes && conProblema(x)).length)} con problema · ${fmtNum.format(lista.filter((x) => x._antes && grabable(x)).length)} por grabar en IM5 · siguen acá hasta que se concilien en IM5 o los resuelvas.</span></td></tr>`
         : (!f._antes && !sepPeriodo && nAntes && (sepPeriodo = true)) ? '<tr class="vc-sep is-periodo"><td colspan="9"><i class="fa-solid fa-calendar-day"></i> Del período elegido</td></tr>' : '';
       const [txt, clase, ico, ayuda] = EST_CONC[f.estado] || [f.estado, '', 'fa-circle', ''];
@@ -1629,7 +1692,7 @@
         <td class="vc-mp">${mp}</td>
         <td class="vl-num">${f.mp_monto != null ? `<b>${pesos2(f.mp_monto)}</b><span class="vl-dim">neto ${pesos2(f.mp_neto)}</span>` : '—'}</td>
         <td class="vl-ocultar-movil">${f.mp_liberacion_at ? `${esc(fmtDia(f.mp_liberacion_at))}${liberado(f) ? '' : ' <span class="vl-dim">(pendiente)</span>'}` : '—'}</td>
-        <td>${f.resuelto_at ? `<span class="vc-estado is-res" title="${esc(f.resolucion_nota || '')}"><i class="fa-solid ${RESOL[f.resolucion]?.[1] || 'fa-check'}"></i>${esc(RESOL[f.resolucion]?.[0] || 'Resuelto')}</span><span class="vl-dim">era: ${esc(txt)}${f.resuelto_por ? ` · ${esc(String(f.resuelto_por).split('@')[0])}` : ''}</span>` : `<span class="vc-estado ${clase}" title="${esc(ayuda)}"><i class="fa-solid ${ico}"></i>${esc(txt)}</span>`}${f.estado === 'dif_importe' && !f.resuelto_at ? `<span class="vl-dim">dif. ${pesos2(f.diferencia)}</span>` : ''}${!f.resuelto_at && f.cupon && f.mp_pago_id && ['cupon_mal', 'importe_hora'].includes(f.motivo_match) ? htmlDifCupon(f.cupon, f.mp_pago_id) : ''}${f.motivo_match === 'manual' ? '<span class="vl-dim">vinculado a mano</span>' : ''}${enIm5 ? '<span class="vl-dim">Conciliado en IM5</span>' : ''}</td>
+        <td>${f.resuelto_at ? `<span class="vc-estado is-res" title="${esc(f.resolucion_nota || '')}"><i class="fa-solid ${RESOL[f.resolucion]?.[1] || 'fa-check'}"></i>${esc(RESOL[f.resolucion]?.[0] || 'Resuelto')}</span><span class="vl-dim">era: ${esc(txt)}${f.resuelto_por ? ` · ${esc(String(f.resuelto_por).split('@')[0])}` : ''}</span>` : `<span class="vc-estado ${clase}" title="${esc(ayuda)}"><i class="fa-solid ${ico}"></i>${esc(txt)}</span>`}${f.estado === 'dif_importe' && !f.resuelto_at ? `<span class="vl-dim">dif. ${pesos2(f.diferencia)}</span>` : ''}${!f.resuelto_at && f.cupon && f.mp_pago_id && ['cupon_mal', 'importe_hora'].includes(f.motivo_match) ? htmlDifCupon(f.cupon, f.mp_pago_id) : ''}${f.motivo_match === 'manual' ? '<span class="vl-dim">vinculado a mano</span>' : ''}${enIm5 ? `<span class="vl-dim">${f.grabado_im5_at ? `Grabado en IM5 ${esc(fmtDiaHora(f.grabado_im5_at))}${f.grabado_resumen ? ` · resumen ${esc(String(f.grabado_resumen))}` : ''}` : 'Conciliado en IM5'}</span>` : ''}</td>
         <td class="vc-col-acc">${admin && (f.resuelto_at || f.motivo_match === 'manual' || ['revisar', 'dif_importe', 'falta_en_mp', 'falta_en_im5', 'devuelto'].includes(f.estado)) && !enIm5 ? `<sl-button size="small" variant="${f.resuelto_at ? 'text' : 'default'}" data-vc-resolver="${esc(f.clave)}">${f.resuelto_at || f.motivo_match === 'manual' ? 'Ver' : 'Resolver'}</sl-button>` : ''}</td>
       </tr>`;
     }).join('') : `<tr><td colspan="9" class="vl-ayuda vc-vacio">${filas.length ? 'No hay cobros en este grupo.' : 'Todavía no hay cruce para este período: tocá «Actualizar cruce».'}</td></tr>`;
@@ -1980,6 +2043,10 @@
     $('vcFiltros').addEventListener('sl-change', (e) => { if (e.target.id !== 'vcOcultarConc') return; st.conc.ocultarConc = e.target.checked; st.conc.limite = 100; pintarConciliacion(); });
     $('vcFiltros').addEventListener('click', (e) => { const b = e.target.closest('[data-vc-filtro]'); if (!b) return; st.conc.filtro = b.dataset.vcFiltro; st.conc.limite = 100; pintarConciliacion(); });
     $('vcPie').addEventListener('click', (e) => { if (!e.target.closest('#vcMas')) return; st.conc.limite += 100; pintarConciliacion(); });
+    $('vcBody').addEventListener('click', (e) => {
+      if (!e.target.closest('#vcGrabExcel')) return;
+      excelGrabados().catch((err) => notify('error', 'No se pudo armar el Excel', textoError(err)));
+    });
     $('vcBody').addEventListener('sl-change', (e) => {
       const k = e.target.closest('[data-vc-sel]')?.dataset.vcSel; if (!k) return;
       if (e.target.checked) st.conc.sel.add(k); else st.conc.sel.delete(k);

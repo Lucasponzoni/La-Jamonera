@@ -661,6 +661,11 @@ sl-dialog.vl-dialog { --width: min(760px, 96vw); }
 .vc-tabla tr.vc-sep td b, .vc-tabla tr.vc-sep td span { display: inline !important; }
 .vc-tabla tr.vc-sep td span { margin-left: 4px; }
 .vc-tabla td:nth-child(3) > b { white-space: nowrap; }
+/* Conciliación: vista «Ya en IM5» (historial completo, agrupado por grabación) */
+.vc-tabla tr.vc-grab-cab td { background: color-mix(in srgb, var(--lj-success, #16a34a) 10%, var(--lj-surface)); font-size: .86rem; padding: 10px 14px; }
+.vc-grab-fila { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.vc-tabla tr.vc-grab-cab td i { color: var(--lj-success, #16a34a); }
+.vc-tabla tr.vc-grab-cab td b { background: color-mix(in srgb, var(--lj-success, #16a34a) 16%, transparent); color: var(--lj-success, #16a34a); }
 
 /* Conciliación: chips en grupos que bajan de renglón (sin scroll lateral) */
 .vc-filtros.analisis-type-chips { flex-wrap: wrap; overflow: visible; gap: 8px 14px; align-items: center; padding-bottom: 0; }
