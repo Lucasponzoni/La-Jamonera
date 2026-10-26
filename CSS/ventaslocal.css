@@ -485,6 +485,7 @@ sl-dialog.vl-dialog { --width: min(760px, 96vw); }
 .vc-estado.is-info { background: var(--lj-accent-soft); color: var(--lj-accent); }
 .vc-estado.is-esp { background: var(--lj-warning-soft); color: var(--lj-warning); }
 .vc-estado.is-mal { background: var(--lj-danger-soft); color: var(--lj-danger); }
+.vc-estado.is-neu { background: var(--lj-surface-2); color: var(--lj-muted); }
 .vc-mp { max-width: 260px; }
 .vc-vacio { padding: 24px; text-align: center; }
 .vc-pie:empty { display: none; }

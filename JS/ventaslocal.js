@@ -1485,7 +1485,7 @@
     revisar: ['Revisar', 'is-esp', 'fa-eye', 'Cruzó por importe y hora, o el cupón de IM5 está mal cargado y se encontró por un número parecido. Revisalo: si está bien, se puede grabar.'],
     dif_importe: ['Diferencia', 'is-mal', 'fa-scale-unbalanced', 'El importe de IM5 no coincide con el de Mercado Pago.'],
     falta_en_mp: ['No está en MP', 'is-mal', 'fa-circle-question', 'IM5 dice que se cobró con Mercado Pago pero no aparece ese pago.'],
-    falta_en_im5: ['No está en IM5', 'is-esp', 'fa-file-circle-plus', 'Pago aprobado en Mercado Pago que no tiene cobro en IM5 (puede ser de otro canal).'],
+    falta_en_im5: ['Sin venta en IM5', 'is-neu', 'fa-file-circle-plus', 'Pago de Mercado Pago que no tiene una venta en IM5 (otro canal, transferencia, etc.). No es un error: si después aparece la venta, se cruza solo.'],
     devuelto: ['Devuelto en MP', 'is-esp', 'fa-rotate-left', 'Mercado Pago lo devolvió o canceló.'],
     devolucion: ['Devolución', 'is-neu', 'fa-rotate-left', 'Renglón negativo de IM5 (nota de crédito devuelta).'],
     anulado_im5: ['Anulado en IM5', 'is-neu', 'fa-ban', 'El comprobante se anuló en InfoManager: no hay nada que conciliar.']
@@ -1510,7 +1510,8 @@
     return `Automática todos los días a las ${hh(c.hora ?? 7)}`;
   }
   const esAdmin = () => Boolean(st.me?.admin);
-  const PROBLEMAS = ['revisar', 'dif_importe', 'falta_en_mp', 'falta_en_im5', 'devuelto'];
+  // Problema = una venta real de IM5 que no cierra con MP. Un pago de MP sin venta (falta_en_im5) no es error.
+  const PROBLEMAS = ['revisar', 'dif_importe', 'falta_en_mp', 'devuelto'];
   const conProblema = (f) => !f.resuelto_at && !f.grabado_im5_at && !f.im5_conciliado && PROBLEMAS.includes(f.estado);
   const liberado = (f) => f.mp_liberacion_at && Date.parse(f.mp_liberacion_at) <= Date.now();
   // «Revisar» con el mismo importe y pago aprobado también se puede grabar: elegirlo es la revisión.
@@ -1541,7 +1542,7 @@
         leerTodo(() => st.sb.from('conciliacion_mp').select('*').gte('fecha', desde).lte('fecha', hasta).order('fecha_hora', { ascending: false, nullsFirst: false }).order('clave')),
         st.sb.from('conciliacion_mp_estado').select('*').eq('id', 1).maybeSingle(),
         leerTodo(() => st.sb.from('conciliacion_mp').select('*').lt('fecha', desde).is('grabado_im5_at', null).is('resuelto_at', null)
-          .or('im5_conciliado.is.null,im5_conciliado.eq.false').not('estado', 'in', '(devolucion,anulado_im5)').order('fecha_hora', { ascending: false, nullsFirst: false }).order('clave')),
+          .or('im5_conciliado.is.null,im5_conciliado.eq.false').not('estado', 'in', '(devolucion,anulado_im5,falta_en_im5)').order('fecha_hora', { ascending: false, nullsFirst: false }).order('clave')),
         st.sb.from('conciliacion_mp').select('clave', { count: 'exact', head: true }).or('grabado_im5_at.not.is.null,im5_conciliado.eq.true')
       ]);
       st.conc.nGrab = nGrab?.count || 0;
@@ -1614,7 +1615,7 @@
     // Mismo diseño que los indicadores de arriba (vl-kpi): ícono de color, valor grande y una barra de proporción.
     // Los pendientes de antes del período suman a A liberar y Diferencias (lo resuelto o cerrado no).
     const ant = st.conc.antes || [];
-    const difAntes = ant.filter((f) => ['dif_importe', 'falta_en_mp', 'falta_en_im5', 'revisar'].includes(f.estado)).length;
+    const difAntes = ant.filter((f) => ['dif_importe', 'falta_en_mp', 'revisar'].includes(f.estado)).length;
     const libAntes = ant.filter((f) => f.estado === 'pendiente_liberacion').reduce((s2, f) => s2 + Number(f.mp_neto || 0), 0);
     r = { ...r, diferencias: Number(r.diferencias || 0) + difAntes, pendiente_liberar: Number(r.pendiente_liberar || 0) + libAntes };
     const cobrado = Number(r.cobrado_im5) || 0;

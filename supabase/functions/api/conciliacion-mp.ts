@@ -249,7 +249,7 @@ export async function cruzar({ desde, hasta, bajarMP = true, log = console } = {
 
   const cuenta = {};
   filas.forEach((f) => { cuenta[f.estado] = (cuenta[f.estado] || 0) + 1; });
-  const DIFS = ['dif_importe', 'falta_en_mp', 'falta_en_im5', 'revisar'];
+  const DIFS = ['dif_importe', 'falta_en_mp', 'revisar']; // falta_en_im5 (pago de MP sin venta) no es diferencia
   return { ok: true, desde, hasta, filas: filas.length, porEstado: cuenta, nuevasDif: nuevas.filter((r) => DIFS.includes(r.estado) && !r.resuelto_at).map((r) => r.clave),
     im5: errIm5 ? { error: errIm5 } : { leidos: im5Conc.size, truncado: Boolean(truncado) } };
 }
@@ -411,7 +411,7 @@ export function textoFrecuencia(c) {
 
 // ---------- 7) Avisos por mail ----------
 const ESTADO_TXT = { conciliado: ['Conciliado', '#1f7a4c', '#e3f5ec'], pendiente_liberacion: ['A liberar', '#1f5fbf', '#e6efff'], revisar: ['Revisar', '#9a6200', '#fff3dd'],
-  dif_importe: ['Diferencia', '#b42338', '#ffecef'], falta_en_mp: ['No está en MP', '#b42338', '#ffecef'], falta_en_im5: ['No está en IM5', '#9a6200', '#fff3dd'],
+  dif_importe: ['Diferencia', '#b42338', '#ffecef'], falta_en_mp: ['No está en MP', '#b42338', '#ffecef'], falta_en_im5: ['Sin venta en IM5', '#4f638c', '#eef2fb'],
   devuelto: ['Devuelto en MP', '#9a6200', '#fff3dd'], devolucion: ['Devolución', '#4f638c', '#eef2fb'] };
 const esc = (v) => str(v).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const pesosM = (n) => (n == null ? '—' : `$ ${Number(n).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
@@ -488,7 +488,7 @@ const destinosConc = (cfg, c) => (str(c.mails).trim() ? str(c.mails).split(',').
 const fmt0 = (n) => `$ ${Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
 async function datosAviso(tipo, { claves = null, desde, hasta, error = '' } = {}) {
   const r = (await admin.rpc('conciliacion_mp_resumen', { p_desde: desde, p_hasta: hasta })).data || {};
-  const DIFS = ['dif_importe', 'falta_en_mp', 'falta_en_im5', 'revisar'];
+  const DIFS = ['dif_importe', 'falta_en_mp', 'revisar']; // falta_en_im5 (pago de MP sin venta) no es diferencia
   let q = admin.from('conciliacion_mp').select('fecha_hora,comprobante,medio,cupon,importe,mp_pago_id,mp_monto,estado,motivo_match').gte('fecha', desde).lte('fecha', hasta).order('fecha_hora', { ascending: false }).limit(25);
   if (claves) q = q.in('clave', claves.slice(0, 300));
   else if (tipo === 'listos') q = q.eq('estado', 'conciliado').is('grabado_im5_at', null);
@@ -548,11 +548,11 @@ export async function cronConciliacion({ forzar = false, log = console } = {}) {
   try { out = await cruzar({ desde, hasta: hoy, log }); }
   catch (e) { error = str(e?.message).slice(0, 300); }
   // Pendientes más viejos que la ventana: se siguen recruzando (los 10 días más viejos por corrida) hasta que se
-  // concilien en IM5 o se resuelvan a mano.
+  // concilien en IM5 o se resuelvan a mano. Los pagos de MP sin venta en IM5 no son pendientes.
   if (!error) {
     try {
       const viejos = await sel(admin.from('conciliacion_mp').select('fecha').lt('fecha', desde).is('grabado_im5_at', null).is('resuelto_at', null)
-        .not('im5_conciliado', 'is', true).not('estado', 'in', '(devolucion,anulado_im5)').order('fecha').limit(5000));
+        .not('im5_conciliado', 'is', true).not('estado', 'in', '(devolucion,anulado_im5,falta_en_im5)').order('fecha').limit(5000));
       const dias = [...new Set(viejos.map((v) => v.fecha))].slice(0, 10);
       for (const d of dias) await cruzar({ desde: d, hasta: d, log });
       if (dias.length) out.viejos = dias;
