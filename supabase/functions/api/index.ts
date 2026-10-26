@@ -15,7 +15,8 @@
 //   POST /ventas/pos/simular|aplicar { desde, hasta, comprobante? } → ver pos.ts (ventas del POS → Inventario y Producción)
 //   POST /ventas/pos/revertir { empresa, id, borrar? } → deshace un comprobante aplicado (admin o cron)
 //   POST /conciliacion/cruzar { desde, hasta }, POST /conciliacion/grabar { claves, confirmar }, POST /conciliacion/cron,
-//   POST /conciliacion/resolver { clave, accion, mp_pago_id?, nota? }, POST /conciliacion/candidatos { clave }, POST /conciliacion/aviso { tipo, enviar } → ver conciliacion-mp.ts
+//   POST /conciliacion/resolver { clave, accion, mp_pago_id?, nota? }, POST /conciliacion/candidatos { clave }, POST /conciliacion/aviso { tipo, enviar },
+//   POST /conciliacion/verificar { claves? } → ver conciliacion-mp.ts
 // Claves (Gemini, Resend) en Supabase Vault: sólo esta función las lee, con service_role.
 import {
   admin, json, HttpError, str, EMAIL_RE, requireActive, requireAdmin, secretGet, secretSet, secretDelete,
@@ -27,7 +28,7 @@ import { runAutoEgresos, refreshInventoryIndex } from './egresos.ts';
 import { runVentas, guardarCredenciales, estadoCredenciales, enviarAvisoPrueba } from './ventas-im5.ts';
 import { pagosMP, estadoMP, guardarCredMP, guardarClaveNinjaPos } from './mp.ts';
 import { aplicarVentasPos, revertirComprobantePos } from './pos.ts';
-import { cruzar, grabarIm5, cronConciliacion, resolver, candidatos, avisoPrueba } from './conciliacion-mp.ts';
+import { cruzar, grabarIm5, cronConciliacion, resolver, candidatos, avisoPrueba, verificarIm5 } from './conciliacion-mp.ts';
 
 const puedeVerVentas = (p) => Boolean(p && (p.role === 'admin' || p.ver_ventas));
 async function requireVerVentas(req) {
@@ -284,6 +285,13 @@ async function route(req: Request, path: string) {
     const out = await resolver({ clave: body.clave, accion: str(body.accion), mp_pago_id: str(body.mp_pago_id), nota: str(body.nota), quien: c ? str(c.user.email || c.user.id) : 'sistema (prueba)' });
     if (c) await audit(c.user.id, 'conciliacion_mp_resolver', 'conciliacion', { clave: str(body.clave), accion: str(body.accion) });
     return out;
+  }
+  if (path === '/conciliacion/verificar' && method === 'POST') {
+    // Relee IM5 y compara lo grabado (sólo lectura en IM5). «Ver ventas» o cron.
+    const secret = await secretGet('cron_secret');
+    if (!(secret && req.headers.get('x-cron-secret') === secret)) await requireVerVentas(req);
+    const body = await readBody(req);
+    return await verificarIm5({ claves: Array.isArray(body.claves) ? body.claves : null });
   }
   if (path === '/conciliacion/candidatos' && method === 'POST') {
     const secret = await secretGet('cron_secret');

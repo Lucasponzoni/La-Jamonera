@@ -664,6 +664,15 @@ sl-dialog.vl-dialog { --width: min(760px, 96vw); }
 .vc-tabla td:nth-child(3) > b { white-space: nowrap; }
 /* Conciliación: vista «Ya en IM5» (historial completo, agrupado por grabación) */
 .vc-tabla tr.vc-grab-cab td { background: color-mix(in srgb, var(--lj-success, #16a34a) 10%, var(--lj-surface)); font-size: .86rem; padding: 10px 14px; }
+.vc-grab-acc { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+/* Detalle de un cobro conciliado en IM5 */
+.vc-kv { display: grid; grid-template-columns: minmax(120px, 38%) 1fr; gap: 4px 12px; margin: 0 0 6px; padding: 8px 12px; border: 1px solid var(--lj-border); border-radius: 10px; background: var(--lj-surface-2); font-size: .84rem; }
+.vc-kv dt { color: var(--lj-muted); font-weight: 600; }
+.vc-kv dd { margin: 0; color: var(--lj-text); font-weight: 600; overflow-wrap: anywhere; }
+.vc-chks { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.vc-chk { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: .76rem; font-weight: 700; background: var(--lj-surface-2); color: var(--lj-muted); }
+.vc-chk.is-ok { background: var(--lj-success-soft); color: var(--lj-success); }
+.vc-chk.is-mal { background: var(--lj-danger-soft); color: var(--lj-danger); }
 .vc-grab-fila { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .vc-tabla tr.vc-grab-cab td i { color: var(--lj-success, #16a34a); }
 .vc-tabla tr.vc-grab-cab td b { background: color-mix(in srgb, var(--lj-success, #16a34a) 16%, transparent); color: var(--lj-success, #16a34a); }

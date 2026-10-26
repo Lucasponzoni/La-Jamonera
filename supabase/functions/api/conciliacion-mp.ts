@@ -311,6 +311,41 @@ export async function grabarIm5({ claves = [], confirmar = false, quien = '', us
   return { ...previa, grabadas: grabadas.length, errores, verificados };
 }
 
+// Verificación contra IM5 de lo ya grabado: vuelve a leer Conciliación de Tarjetas y compara cada cupón con lo que
+// se mandó (conciliado = S, resumen y fecha de acreditación). IM5 a veces fecha el cobro un día después que la
+// factura: se lee desde la primera fecha hasta hoy. claves: sólo esas (detalle de una fila); sin claves, todo lo grabado.
+export async function verificarIm5({ claves = null } = {}) {
+  const lista = Array.isArray(claves) ? [...new Set(claves.map(str).filter((k) => /^im5:\d+:\d+$/.test(k)))].slice(0, 300) : null;
+  const filas = lista
+    ? await sel(admin.from('conciliacion_mp').select('*').in('clave', lista))
+    : await selTodo(() => admin.from('conciliacion_mp').select('*').not('grabado_im5_at', 'is', null).order('clave'));
+  if (!filas.length) return { ok: true, total: 0, bien: 0, problemas: [], detalle: [] };
+  const fechas = filas.map((f) => f.fecha).filter(Boolean).sort();
+  const { mapa, error, truncado } = await leerIm5Conciliados(sumarDias(fechas[0], -1), hoyAR());
+  if (error) throw new HttpError(502, error);
+  const diaAR = (ts) => (ts ? new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(ts)) : '');
+  const detalle = []; const problemas = []; let bien = 0;
+  for (const f of filas) {
+    const t = mapa.get(String(f.im5_pago_id)) || null;
+    const lib = diaAR(f.mp_liberacion_at);
+    const acred = str(t?.fec_acreditacion || t?.fec_acreditacion_real).slice(0, 10);
+    const checks = {
+      encontrado: Boolean(t),
+      conciliado: t ? t.conciliado === 'S' : false,
+      resumen: !t || t.resumen == null || !f.grabado_resumen ? null : Number(t.resumen) === Number(f.grabado_resumen),
+      acreditacion: !t || !acred || !lib ? null : acred === lib
+    };
+    const motivos = [!checks.encontrado && 'no aparece en IM5', checks.encontrado && !checks.conciliado && 'IM5 no lo tiene conciliado',
+      checks.resumen === false && `resumen distinto (IM5 ${t.resumen}, grabado ${f.grabado_resumen})`,
+      checks.acreditacion === false && `fecha de acreditación distinta (IM5 ${acred}, MP ${lib})`].filter(Boolean);
+    if (motivos.length) problemas.push({ clave: f.clave, comprobante: f.comprobante, fecha: f.fecha, importe: f.importe, motivos });
+    else bien += 1;
+    if (t && f.im5_conciliado !== (t.conciliado === 'S')) await admin.from('conciliacion_mp').update({ im5_conciliado: t.conciliado === 'S', im5_fec_conciliacion: t.fec_conciliacion ? str(t.fec_conciliacion).slice(0, 10) : null }).eq('clave', f.clave);
+    if (lista) detalle.push({ clave: f.clave, checks, motivos, im5: t });
+  }
+  return { ok: true, total: filas.length, bien, problemas, detalle, im5: { leidos: mapa.size, truncado: Boolean(truncado) } };
+}
+
 // ---------- 5) Resolver a mano ----------
 const RESOLUCIONES = ['aceptado', 'otro_canal', 'fuera_de_im5', 'error_cajera', 'ignorado'];
 export async function resolver({ clave, accion, mp_pago_id = '', nota = '', quien = '' } = {}) {

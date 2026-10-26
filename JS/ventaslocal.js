@@ -1675,7 +1675,7 @@
     // Vista «Ya en IM5»: encabezado con el total y un separador por grabación (día + quién) con su cantidad e importe.
     const grupos = new Map();
     if (verGrab) lista.forEach((f) => { const g = grupos.get(grupoGrab(f)) || { n: 0, imp: 0 }; g.n += 1; g.imp += Number(f.importe || 0); grupos.set(grupoGrab(f), g); });
-    const cabGrab = verGrab ? `<tr class="vc-sep vc-grab-cab"><td colspan="9"><div class="vc-grab-fila"><div><i class="fa-solid fa-check-double"></i> Conciliado en InfoManager <b>${fmtNum.format(lista.length)}</b><span>${pesos2(lista.reduce((s2, f) => s2 + Number(f.importe || 0), 0))} · de todas las fechas (no depende del período elegido) · lo último grabado arriba.</span></div>${lista.length ? '<sl-button size="small" variant="default" id="vcGrabExcel"><i slot="prefix" class="fa-solid fa-file-excel"></i>Descargar Excel</sl-button>' : ''}</div></td></tr>` : '';
+    const cabGrab = verGrab ? `<tr class="vc-sep vc-grab-cab"><td colspan="9"><div class="vc-grab-fila"><div><i class="fa-solid fa-check-double"></i> Conciliado en InfoManager <b>${fmtNum.format(lista.length)}</b><span>${pesos2(lista.reduce((s2, f) => s2 + Number(f.importe || 0), 0))} · de todas las fechas (no depende del período elegido) · lo último grabado arriba.</span></div>${lista.length ? '<span class="vc-grab-acc"><sl-button size="small" variant="default" id="vcGrabVerificar"><i slot="prefix" class="fa-solid fa-shield-halved"></i>Verificar en IM5</sl-button><sl-button size="small" variant="default" id="vcGrabExcel"><i slot="prefix" class="fa-solid fa-file-excel"></i>Descargar Excel</sl-button></span>' : ''}</div></td></tr>` : '';
     $('vcBody').innerHTML = lista.length ? cabGrab + lista.slice(0, st.conc.limite).map((f, idx) => {
       const gAct = verGrab ? grupoGrab(f) : null;
       const sep = verGrab ? (idx === 0 || gAct !== grupoGrab(lista[idx - 1]) ? `<tr class="vc-sep is-periodo"><td colspan="9"><i class="fa-solid fa-file-signature"></i> ${f.grabado_im5_at ? `Grabado el ${esc(fmtDia(f.grabado_im5_at))}${f.grabado_por ? ` · ${esc(nombreQuien(f.grabado_por))}` : ''}` : 'Conciliado directo en IM5'} <b>${fmtNum.format(grupos.get(gAct).n)}</b><span>${pesos2(grupos.get(gAct).imp)}</span></td></tr>` : '')
@@ -1695,7 +1695,7 @@
         <td class="vl-num">${f.mp_monto != null ? `<b>${pesos2(f.mp_monto)}</b><span class="vl-dim">neto ${pesos2(f.mp_neto)}</span>` : '—'}</td>
         <td class="vl-ocultar-movil">${f.mp_liberacion_at ? `${esc(fmtDia(f.mp_liberacion_at))}${liberado(f) ? '' : ' <span class="vl-dim">(pendiente)</span>'}` : '—'}</td>
         <td>${f.resuelto_at ? `<span class="vc-estado is-res" title="${esc(f.resolucion_nota || '')}"><i class="fa-solid ${RESOL[f.resolucion]?.[1] || 'fa-check'}"></i>${esc(RESOL[f.resolucion]?.[0] || 'Resuelto')}</span><span class="vl-dim">era: ${esc(txt)}${f.resuelto_por ? ` · ${esc(String(f.resuelto_por).split('@')[0])}` : ''}</span>` : `<span class="vc-estado ${clase}" title="${esc(ayuda)}"><i class="fa-solid ${ico}"></i>${esc(txt)}</span>`}${f.estado === 'dif_importe' && !f.resuelto_at ? `<span class="vl-dim">dif. ${pesos2(f.diferencia)}</span>` : ''}${!f.resuelto_at && f.cupon && f.mp_pago_id && ['cupon_mal', 'importe_hora'].includes(f.motivo_match) ? htmlDifCupon(f.cupon, f.mp_pago_id) : ''}${f.motivo_match === 'manual' ? '<span class="vl-dim">vinculado a mano</span>' : ''}${enIm5 ? `<span class="vl-dim">${f.grabado_im5_at ? `Grabado en IM5 ${esc(fmtDiaHora(f.grabado_im5_at))}${f.grabado_resumen ? ` · resumen ${esc(String(f.grabado_resumen))}` : ''}` : 'Conciliado en IM5'}</span>` : ''}</td>
-        <td class="vc-col-acc">${admin && (f.resuelto_at || f.motivo_match === 'manual' || ['revisar', 'dif_importe', 'falta_en_mp', 'falta_en_im5', 'devuelto'].includes(f.estado)) && !enIm5 ? `<sl-button size="small" variant="${f.resuelto_at ? 'text' : 'default'}" data-vc-resolver="${esc(f.clave)}">${f.resuelto_at || f.motivo_match === 'manual' ? 'Ver' : 'Resolver'}</sl-button>` : ''}</td>
+        <td class="vc-col-acc">${admin && (f.resuelto_at || f.motivo_match === 'manual' || ['revisar', 'dif_importe', 'falta_en_mp', 'falta_en_im5', 'devuelto'].includes(f.estado)) && !enIm5 ? `<sl-button size="small" variant="${f.resuelto_at ? 'text' : 'default'}" data-vc-resolver="${esc(f.clave)}">${f.resuelto_at || f.motivo_match === 'manual' ? 'Ver' : 'Resolver'}</sl-button>` : enIm5 && String(f.clave).startsWith('im5:') ? `<sl-button size="small" variant="default" data-vc-detalle="${esc(f.clave)}"><i slot="prefix" class="fa-solid fa-magnifying-glass"></i>Detalle</sl-button>` : ''}</td>
       </tr>`;
     }).join('') : `<tr><td colspan="9" class="vl-ayuda vc-vacio">${filas.length ? 'No hay cobros en este grupo.' : 'Todavía no hay cruce para este período: tocá «Actualizar cruce».'}</td></tr>`;
     $('vcPie').innerHTML = lista.length > st.conc.limite ? `Se muestran ${fmtNum.format(st.conc.limite)} de ${fmtNum.format(lista.length)}. <sl-button size="small" variant="default" id="vcMas">Mostrar 100 más</sl-button>` : '';
@@ -1759,6 +1759,58 @@
       st.conc.sel.clear();
       await cargarConciliacion();
     } catch (e) { notify('error', 'No se pudo grabar en IM5', textoError(e)); } finally { btn.loading = false; }
+  }
+  // Detalle de un cobro ya conciliado: lo de IM5, lo de Mercado Pago, lo que se grabó y lo que IM5 tiene ahora
+  // (se relee en el momento y se compara: conciliado = S, resumen y fecha de acreditación).
+  const kv = (filas) => `<dl class="vc-kv">${filas.filter(([, v]) => v !== '' && v != null).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('')}</dl>`;
+  const fechaCortaIso = (iso) => (iso ? String(iso).slice(0, 10).split('-').reverse().join('/') : '');
+  async function abrirDetalleIm5(clave) {
+    const f = (st.conc.grab || []).find((x) => x.clave === clave) || st.conc.filas.find((x) => x.clave === clave);
+    if (!f) return;
+    const origen = f.mp_origen === 'PSP_TRANSFER' ? 'Transferencia' : f.mp_origen || '';
+    const cruzo = { id_externo: 'id del Point', cupon: 'n° de operación', manual: 'vínculo a mano', importe_hora: 'importe y hora', cupon_mal: 'número parecido' }[f.motivo_match] || f.motivo_match || '';
+    $('vcDetTitulo').textContent = f.comprobante || 'Detalle en InfoManager';
+    $('vcDetCuerpo').innerHTML = `
+      <div class="vc-res-lados">
+        <div><span>InfoManager</span><b>${esc(f.comprobante || '')}</b><small>${esc(f.medio || '')}${f.cupon ? ` · ${esc(f.cupon)}` : ''}</small><b class="vc-res-imp">${pesos2(f.importe)}</b></div>
+        <i class="fa-solid fa-arrows-left-right"></i>
+        <div><span>Mercado Pago</span>${f.mp_pago_id ? `<b>#${esc(f.mp_pago_id)}</b><small>${esc(fmtDiaHora(f.mp_aprobado_at))}${origen ? ` · ${esc(origen)}` : ''}</small><b class="vc-res-imp">${pesos2(f.mp_monto)}</b>` : '<small>—</small>'}</div>
+      </div>
+      <p class="vl-detalle-tit"><i class="fa-solid fa-receipt"></i> Venta en InfoManager</p>
+      ${kv([['Comprobante', esc(f.comprobante || '')], ['Recibo', esc(f.recibo || '')], ['Fecha y hora', esc(fmtDiaHora(f.fecha_hora))], ['Empresa', f.empresa ? esc(String(f.empresa)) : ''], ['Medio', esc(f.medio || '')], ['Cupón / id', esc(f.cupon || '')], ['Importe', pesos2(f.importe)]])}
+      <p class="vl-detalle-tit vl-detalle-tit-2"><i class="fa-solid fa-building-columns"></i> Pago en Mercado Pago</p>
+      ${kv([['N° de operación', f.mp_pago_id ? `#${esc(f.mp_pago_id)}` : ''], ['Origen', esc(origen)], ['Aprobado', esc(fmtDiaHora(f.mp_aprobado_at))], ['Bruto', pesos2(f.mp_monto)], ['Comisión', f.mp_comision != null ? pesos2(f.mp_comision) : ''], ['Neto', pesos2(f.mp_neto)], ['Liberado', esc(fmtDia(f.mp_liberacion_at))], ['Cruzó por', esc(cruzo)]])}
+      <p class="vl-detalle-tit vl-detalle-tit-2"><i class="fa-solid fa-file-signature"></i> Lo que se grabó</p>
+      ${kv([['Grabado el', esc(fmtDiaHora(f.grabado_im5_at))], ['Por', esc(nombreQuien(f.grabado_por))], ['Resumen', esc(f.grabado_resumen ? String(f.grabado_resumen) : '')], ['Fecha de acreditación', esc(fmtDia(f.mp_liberacion_at))]])}
+      <p class="vl-detalle-tit vl-detalle-tit-2"><i class="fa-solid fa-shield-halved"></i> Cómo está ahora en InfoManager</p>
+      <div id="vcDetIm5"><p class="vl-ayuda"><sl-spinner></sl-spinner> Leyendo InfoManager…</p></div>
+      <div class="vl-dialog-pie"><span class="vl-flex"></span><sl-button variant="default" id="vcDetCerrar">Cerrar</sl-button></div>`;
+    $('vcDetDialog').show();
+    try {
+      const res = await window.laJamoneraProxy.postJson('/conciliacion/verificar', { claves: [clave] });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || out.ok === false) throw new Error(out.error || `Error ${res.status}`);
+      const d = (out.detalle || [])[0];
+      const t = d?.im5;
+      if (!t) { $('vcDetIm5').innerHTML = '<div class="vl-apl is-esp"><i class="fa-solid fa-triangle-exclamation"></i><span>El cupón no aparece en Conciliación de Tarjetas de IM5.</span></div>'; return; }
+      const chk = (ok, txt) => `<span class="vc-chk ${ok === false ? 'is-mal' : ok ? 'is-ok' : ''}"><i class="fa-solid ${ok === false ? 'fa-xmark' : ok ? 'fa-check' : 'fa-minus'}"></i>${esc(txt)}</span>`;
+      $('vcDetIm5').innerHTML = `<div class="vc-chks">${chk(d.checks.conciliado, t.conciliado === 'S' ? 'Conciliado (S)' : `Conciliado: ${t.conciliado || 'N'}`)}${chk(d.checks.resumen, `Resumen ${t.resumen ?? '—'}`)}${chk(d.checks.acreditacion, `Acreditado ${fechaCortaIso(t.fec_acreditacion_real || t.fecha_acreditacion)}`)}</div>
+        ${kv([['Recibo en IM5', esc(`${t.tipo_comprobante || ''} ${t.numero || ''}`.trim())], ['Fecha', esc(fechaCortaIso(t.fecha))], ['Cliente', esc(t.cliente || '')], ['Tarjeta', esc(t.tarjeta || '')], ['Plan', esc(t.plan || '')], ['Cupón', esc(t.cupon || '')], ['Importe', t.importe != null ? pesos2(Number(t.importe)) : ''], ['Importe acreditado', t.importe_acreditacion != null ? pesos2(Number(t.importe_acreditacion)) : ''], ['Fecha de acreditación', esc(fechaCortaIso(t.fec_acreditacion_real || t.fecha_acreditacion))], ['Resumen', esc(t.resumen != null ? String(t.resumen) : '')], ['Lote / liquidación', esc(`${t.lote ?? 0} / ${t.liquidacion ?? 0}`)], ['Conciliado el', esc(fechaCortaIso(t.fec_conciliacion))]])}
+        ${d.motivos?.length ? `<div class="vl-apl is-esp"><i class="fa-solid fa-triangle-exclamation"></i><span>${esc(d.motivos.join(' · '))}</span></div>` : '<div class="vl-mp-aviso"><i class="fa-solid fa-circle-check"></i><span>InfoManager tiene este cupón conciliado tal cual se grabó.</span></div>'}`;
+    } catch (e) { $('vcDetIm5').innerHTML = `<p class="vl-ayuda">${esc(textoError(e))}</p>`; }
+  }
+  // Relee IM5 y compara todo lo grabado.
+  async function verificarGrabados(btn) {
+    if (btn) btn.loading = true;
+    try {
+      const res = await window.laJamoneraProxy.postJson('/conciliacion/verificar', {});
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || out.ok === false) throw new Error(out.error || `Error ${res.status}`);
+      if (!out.problemas?.length) notify('success', 'Todo bien en InfoManager', `${fmtNum.format(out.bien)} de ${fmtNum.format(out.total)} cupones conciliados en IM5 con el resumen y la fecha de acreditación correctos.`);
+      else {
+        notify('warning', `${fmtNum.format(out.problemas.length)} cupones con diferencias en IM5`, out.problemas.slice(0, 5).map((p) => `${p.comprobante}: ${p.motivos.join(', ')}`).join(' · '));
+      }
+    } catch (e) { notify('error', 'No se pudo verificar en IM5', textoError(e)); } finally { if (btn) btn.loading = false; }
   }
   // Resolver una diferencia: vincular con el pago/cobro correcto, aceptar, marcar el motivo o deshacer.
   async function abrirResolver(clave) {
@@ -2045,7 +2097,10 @@
     $('vcFiltros').addEventListener('sl-change', (e) => { if (e.target.id !== 'vcOcultarConc') return; st.conc.ocultarConc = e.target.checked; st.conc.limite = 100; pintarConciliacion(); });
     $('vcFiltros').addEventListener('click', (e) => { const b = e.target.closest('[data-vc-filtro]'); if (!b) return; st.conc.filtro = b.dataset.vcFiltro; st.conc.limite = 100; pintarConciliacion(); });
     $('vcPie').addEventListener('click', (e) => { if (!e.target.closest('#vcMas')) return; st.conc.limite += 100; pintarConciliacion(); });
+    $('vcDetCuerpo').addEventListener('click', (e) => { if (e.target.closest('#vcDetCerrar')) $('vcDetDialog').hide(); });
     $('vcBody').addEventListener('click', (e) => {
+      const d = e.target.closest('[data-vc-detalle]'); if (d) return abrirDetalleIm5(d.dataset.vcDetalle);
+      if (e.target.closest('#vcGrabVerificar')) return verificarGrabados(e.target.closest('#vcGrabVerificar'));
       if (!e.target.closest('#vcGrabExcel')) return;
       excelGrabados().catch((err) => notify('error', 'No se pudo armar el Excel', textoError(err)));
     });
