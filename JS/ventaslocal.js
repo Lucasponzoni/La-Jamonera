@@ -1515,7 +1515,8 @@
   const conProblema = (f) => !f.resuelto_at && !f.grabado_im5_at && !f.im5_conciliado && PROBLEMAS.includes(f.estado);
   const liberado = (f) => f.mp_liberacion_at && Date.parse(f.mp_liberacion_at) <= Date.now();
   // «Revisar» con el mismo importe y pago aprobado también se puede grabar: elegirlo es la revisión.
-  const grabable = (f) => (f.estado === 'conciliado' || (f.estado === 'revisar' && f.mp_pago_id && f.mp_estado === 'approved' && Math.abs(Number(f.importe) - Number(f.mp_monto)) <= 0.10)) && !f.grabado_im5_at && !f.im5_conciliado && liberado(f) && String(f.clave).startsWith('im5:');
+  // Lo resuelto a mano no se graba (se decidió no informarlo a IM5).
+  const grabable = (f) => !f.resuelto_at && (f.estado === 'conciliado' || (f.estado === 'revisar' && f.mp_pago_id && f.mp_estado === 'approved' && Math.abs(Number(f.importe) - Number(f.mp_monto)) <= 0.10)) && !f.grabado_im5_at && !f.im5_conciliado && liberado(f) && String(f.clave).startsWith('im5:');
   const fmtDiaHora = (ts) => (ts ? `${fmtDia(ts)} ${fmtHora.format(new Date(ts))}` : '—');
   const fmtDia = (ts) => (ts ? new Intl.DateTimeFormat('es-AR', { timeZone: TZ, day: '2-digit', month: '2-digit' }).format(new Date(ts)) : '—');
   async function leerTodo(armar) {
