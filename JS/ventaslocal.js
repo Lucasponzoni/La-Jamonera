@@ -419,7 +419,7 @@
 
   // ---- Gráficos de la conciliación MP ↔ IM5 (mismo período y empresa que arriba) ----
   const VC_COL = { en_im5: '#15803d', por_grabar: '#22c55e', a_liberar: '#2563eb', revisar: '#d97706', diferencia: '#dc2626', faltantes: '#991b1b', resueltos: '#7c3aed' };
-  const VC_NOM = { en_im5: 'Ya en IM5', por_grabar: 'Por grabar en IM5', a_liberar: 'A liberar', revisar: 'Revisar', diferencia: 'Diferencia', faltantes: 'No está en MP / IM5', resueltos: 'Resueltos a mano' };
+  const VC_NOM = { en_im5: 'Ya en IM5', por_grabar: 'Por grabar en IM5', a_liberar: 'A liberar', revisar: 'Revisar', diferencia: 'Diferencia', faltantes: 'No está en MP', resueltos: 'Resueltos a mano' };
   const VC_IDS = ['vcGEstado', 'vcGPlata', 'vcGComision', 'vcGDias', 'vcGLiberar', 'vcGErrores'];
   async function pintarGraficosConc() {
     const clave = `${st.rango.desde}|${st.rango.hasta}|${st.empresa || ''}`;
@@ -1539,7 +1539,8 @@
       st.conc.grab = null;
       const [res, filas, est, antes, nGrab] = await Promise.all([
         st.sb.rpc('conciliacion_mp_resumen', { p_desde: desde, p_hasta: hasta }),
-        leerTodo(() => st.sb.from('conciliacion_mp').select('*').gte('fecha', desde).lte('fecha', hasta).order('fecha_hora', { ascending: false, nullsFirst: false }).order('clave')),
+        // Los pagos de MP sin venta en IM5 (falta_en_im5) no se contemplan: la conciliación parte de las ventas.
+        leerTodo(() => st.sb.from('conciliacion_mp').select('*').gte('fecha', desde).lte('fecha', hasta).neq('estado', 'falta_en_im5').order('fecha_hora', { ascending: false, nullsFirst: false }).order('clave')),
         st.sb.from('conciliacion_mp_estado').select('*').eq('id', 1).maybeSingle(),
         leerTodo(() => st.sb.from('conciliacion_mp').select('*').lt('fecha', desde).is('grabado_im5_at', null).is('resuelto_at', null)
           .or('im5_conciliado.is.null,im5_conciliado.eq.false').not('estado', 'in', '(devolucion,anulado_im5,falta_en_im5)').order('fecha_hora', { ascending: false, nullsFirst: false }).order('clave')),
@@ -1659,7 +1660,7 @@
       return `<sl-button variant="default" size="small" class="analisis-type-chip ${st.conc.filtro === k ? 'active' : ''} ${k === 'problemas' && cuenta.problemas ? 'vc-chip-mal' : ''}" data-vc-filtro="${k}"><i slot="prefix" class="fa-solid ${ico}"></i>${txt}<span slot="suffix" class="analisis-chip-count">${fmtNum.format(cuenta[k] || 0)}</span></sl-button>`;
     };
     const ver = ['todos', 'problemas', 'listos', 'antes', 'grabados', 'resueltos'].filter((k) => k === 'todos' || cuenta[k]);
-    const estados = ['conciliado', 'pendiente_liberacion', 'revisar', 'dif_importe', 'falta_en_mp', 'falta_en_im5', 'devuelto', 'devolucion', 'anulado_im5'].filter((k) => cuenta[k]);
+    const estados = ['conciliado', 'pendiente_liberacion', 'revisar', 'dif_importe', 'falta_en_mp', 'devuelto', 'devolucion', 'anulado_im5'].filter((k) => cuenta[k]);
     $('vcFiltros').innerHTML = `<div class="vc-grupo"><span class="vc-grupo-lbl">Ver</span>${ver.map(chip).join('')}</div>`
       + (estados.length ? `<div class="vc-grupo"><span class="vc-grupo-lbl">Estado</span>${estados.map(chip).join('')}</div>` : '')
       + `<sl-switch size="small" class="vc-ocultar" id="vcOcultarConc" ${st.conc.ocultarConc ? 'checked' : ''}>Ocultar conciliados</sl-switch>`;
