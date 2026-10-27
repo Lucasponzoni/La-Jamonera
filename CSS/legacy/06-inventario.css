@@ -1691,3 +1691,49 @@
   gap: 10px;
 }
 
+
+/* ── Lote de ingreso: modo, destino y «Así se arma el lote» ── */
+.inv-lote-modos { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
+.inv-lote-modo, .inv-lote-destino {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
+  border: 1px solid var(--lj-border); background: var(--lj-surface); color: var(--lj-text);
+  border-radius: var(--lj-radius-lg); padding: 8px 10px; cursor: pointer; font: inherit;
+}
+.inv-lote-modo small { color: var(--lj-muted); font-size: .78rem; }
+.inv-lote-modo:hover, .inv-lote-destino:hover { border-color: var(--lj-border-strong); }
+.inv-lote-modo.is-active, .inv-lote-destino.is-active { border-color: var(--lj-accent); background: var(--lj-accent-soft); box-shadow: inset 0 0 0 1px var(--lj-accent); }
+.inv-lote-modo:focus-visible, .inv-lote-destino:focus-visible { outline: 2px solid var(--lj-accent); outline-offset: 1px; }
+.inv-lote-destinos { display: flex; gap: 8px; }
+.inv-lote-destino { flex: 1; flex-direction: row; align-items: center; gap: 8px; }
+.inv-lote-destino strong { font-size: 1.15rem; line-height: 1; }
+.inv-lote-destino:disabled { opacity: .55; cursor: not-allowed; }
+
+.inv-lote-explica { border: 1px solid var(--lj-border); background: var(--lj-surface-2); border-radius: var(--lj-radius-lg); padding: 10px 12px; }
+.inv-lote-explica.is-provisorio { border-color: var(--lj-warning); background: var(--lj-warning-soft); }
+.inv-lote-cab { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 12px; font-weight: 600; color: var(--lj-text); }
+.inv-lote-cab code { font-size: 1.05rem; color: var(--lj-brand); background: var(--lj-surface); border: 1px solid var(--lj-border); border-radius: var(--lj-radius); padding: 2px 8px; word-break: break-all; }
+.inv-lote-parts { display: flex; flex-wrap: wrap; align-items: stretch; gap: 4px; margin-top: 8px; }
+.inv-lote-sep { align-self: center; font-weight: 700; color: var(--lj-muted); padding: 0 1px; }
+.inv-lote-part {
+  --tono: var(--lj-accent);
+  display: flex; flex-direction: column; min-width: 64px; padding: 5px 9px;
+  border: 1px solid var(--lj-border); border-top: 3px solid var(--tono); border-radius: var(--lj-radius); background: var(--lj-surface);
+}
+.inv-lote-part strong { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 1rem; color: var(--lj-text); }
+.inv-lote-part small { font-size: .72rem; font-weight: 600; color: var(--tono); text-transform: uppercase; letter-spacing: .02em; }
+.inv-lote-part em { font-size: .72rem; font-style: normal; color: var(--lj-muted); }
+.inv-lote-part.is-esp { --tono: #b4532a; }
+.inv-lote-part.is-est { --tono: #6a4bc4; }
+.inv-lote-part.is-pt { --tono: var(--lj-accent); }
+.inv-lote-part.is-dest { --tono: var(--lj-success); }
+.inv-lote-part.is-fact { --tono: #0f7c8c; }
+.inv-lote-part.is-ini { --tono: #a23b72; }
+.inv-lote-part.is-vto { --tono: var(--lj-brand); }
+.inv-lote-part.is-warn, .inv-lote-part.is-falta { --tono: var(--lj-warning); border-style: dashed; border-top-style: solid; }
+.inv-lote-aviso { margin: 8px 0 0; font-size: .82rem; color: var(--lj-warning); }
+.inv-lote-aviso.is-info { color: var(--lj-muted); }
+.inv-lote-pend { display: inline-block; margin-top: 2px; font-size: .7rem; font-weight: 600; color: var(--lj-warning); background: var(--lj-warning-soft); border-radius: 999px; padding: 1px 7px; }
+.sl-theme-dark .inv-lote-part.is-esp { --tono: #f0956a; }
+.sl-theme-dark .inv-lote-part.is-est { --tono: #b39cff; }
+.sl-theme-dark .inv-lote-part.is-fact { --tono: #5fc8d6; }
+.sl-theme-dark .inv-lote-part.is-ini { --tono: #f08cc0; }

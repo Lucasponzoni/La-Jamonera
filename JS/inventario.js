@@ -22,6 +22,10 @@
     configured: true,
     collapsed: true,
     version: LOT_CONFIG_VERSION,
+    // Modo del lote (ver LOT_MODES): por defecto iniciales + factura + destino.
+    modo: 'factura',
+    especie: '',
+    destinoDefault: 'R',
     tokens: ['remito_factura'],
     customAcronym: 'LJ',
     includeSeparator: true,
@@ -2939,6 +2943,93 @@
     return words.slice(0, 4).map((word) => word[0]).join('').toUpperCase();
   };
 
+  // ── Lote de ingreso (Glosario del legajo + informe de loteo v3) ──
+  // 'pt'          carne de cerdo / vacuna: especie-establecimiento-N° de PT-destino (P-5364-05502-R).
+  //               Si el PT no trae número definitivo va el de la solicitud con «S» (P-5364-05580S-R).
+  //               Sin ninguno de los dos se guarda igual con un lote provisorio (P-SINPT-<factura>-R)
+  //               y al completar el PT editando el ingreso el lote se recalcula.
+  // 'factura'     resto (pollo, envases, panificados…): iniciales-factura limpia-destino (SAL-000300000775-R).
+  // 'vencimiento' especias individuales: sólo el vencimiento dd/mm/aaaa (13/07/2027).
+  // 'tokens'      configuración personalizada anterior (casillas y orden).
+  const LOT_MODES = [
+    { key: 'pt', label: 'Carne con PT', hint: 'Especie · establecimiento · N° de PT · destino' },
+    { key: 'factura', label: 'Iniciales + factura', hint: 'Iniciales · N° de factura · destino' },
+    { key: 'vencimiento', label: 'Vencimiento (especias)', hint: 'Sólo la fecha de vencimiento dd/mm/aaaa' },
+    { key: 'tokens', label: 'Personalizado', hint: 'Elegís los datos y el orden' }
+  ];
+  const LOT_ESPECIES = { P: 'Cerdo', V: 'Vacuno' };
+  const LOT_DESTINOS = { R: 'Producción', S: 'Salón' };
+  const lotModeOf = (lotConfig) => {
+    const modo = normalizeValue(safeObject(lotConfig).modo);
+    return LOT_MODES.some((item) => item.key === modo) ? modo : 'tokens';
+  };
+  const lotDestino = (value) => (normalizeUpper(value) === 'S' ? 'S' : 'R');
+  // N° de factura sin espacios ni guiones: «0003-00000775» → 000300000775.
+  const cleanLotInvoice = (value) => normalizeUpper(value).replace(/[^0-9A-Z]/g, '');
+  // «5364-A-05580» → establecimiento 5364, número 05580 (la letra del medio no va).
+  // ASSAL («388013» o «ASSAL 388013») → sólo el número.
+  const parsePtNumber = (raw) => {
+    const txt = normalizeUpper(raw).replace(/ASSAL|N°|Nº|NRO\.?/g, ' ').trim();
+    if (!txt) return null;
+    const conLetra = txt.match(/^(\d+)\s*[-\s/]\s*[A-Z]{1,2}\s*[-\s/]\s*(\d+)$/);
+    if (conLetra) return { establecimiento: conLetra[1], numero: conLetra[2] };
+    const dosPartes = txt.match(/^(\d+)\s*[-\s/]\s*(\d+)$/);
+    if (dosPartes) return { establecimiento: dosPartes[1], numero: dosPartes[2] };
+    const solo = txt.replace(/[^0-9A-Z]/g, '');
+    return solo ? { establecimiento: '', numero: solo } : null;
+  };
+  const formatLotExpiryDmySlash = (isoDate) => {
+    const normalized = normalizeIsoDate(isoDate);
+    if (!normalized) return '';
+    const [year, month, day] = normalized.split('-');
+    return `${day}/${month}/${year}`;
+  };
+  // Partes del lote con su explicación, para armar el número y para mostrarlo.
+  const buildLotParts = ({ lotConfig, invoiceNumber, expiryDate, productName, ptNumero, ptSolicitud, destino }) => {
+    const config = safeObject(lotConfig);
+    const modo = lotModeOf(config);
+    const dest = lotDestino(destino || config.destinoDefault);
+    const destPart = { valor: dest, etiqueta: 'Destino', detalle: LOT_DESTINOS[dest], tono: 'dest' };
+    const factura = cleanLotInvoice(invoiceNumber);
+    const facturaPart = { valor: factura || 'SINFACT', etiqueta: 'Factura', detalle: factura ? 'sin espacios ni guiones' : 'falta el N° de factura', tono: 'fact', falta: !factura };
+    if (modo === 'pt') {
+      const especie = LOT_ESPECIES[normalizeUpper(config.especie)] ? normalizeUpper(config.especie) : '';
+      const especiePart = { valor: especie || '?', etiqueta: 'Animal', detalle: LOT_ESPECIES[especie] || 'falta elegir: P cerdo · V vacuno', tono: 'esp', falta: !especie };
+      const pt = parsePtNumber(ptNumero);
+      const sol = pt ? null : parsePtNumber(ptSolicitud);
+      const fuente = pt || sol;
+      if (!fuente) {
+        return { modo, separator: '-', provisional: true, aviso: 'Sin PT: el lote queda provisorio. Completá el N° de PT (o de solicitud) editando el ingreso y el lote se recalcula.', parts: [especiePart, { valor: 'SINPT', etiqueta: 'PT pendiente', detalle: 'se completa después', tono: 'warn', falta: true }, facturaPart, destPart] };
+      }
+      const parts = [especiePart];
+      if (fuente.establecimiento) parts.push({ valor: fuente.establecimiento, etiqueta: 'Establecimiento', detalle: 'N° SENASA del frigorífico', tono: 'est' });
+      parts.push(pt
+        ? { valor: fuente.numero, etiqueta: 'N° de PT', detalle: fuente.establecimiento ? 'sin la letra del medio' : 'PT provincial (ASSAL)', tono: 'pt' }
+        : { valor: `${fuente.numero}S`, etiqueta: 'N° de solicitud + S', detalle: 'el PT no trae número definitivo', tono: 'pt' });
+      parts.push(destPart);
+      return { modo, separator: '-', provisional: false, aviso: '', parts };
+    }
+    if (modo === 'factura') {
+      return { modo, separator: '-', provisional: false, aviso: '', parts: [{ valor: getProductInitials(productName), etiqueta: 'Iniciales', detalle: 'del producto', tono: 'ini' }, facturaPart, destPart] };
+    }
+    if (modo === 'vencimiento') {
+      const vto = formatLotExpiryDmySlash(expiryDate);
+      return { modo, separator: '', provisional: false, aviso: '', parts: [{ valor: vto || 'SIN VTO', etiqueta: 'Vencimiento', detalle: 'día / mes / año', tono: 'vto', falta: !vto }] };
+    }
+    return null;
+  };
+  const lotPartsToNumber = (lot) => lot.parts.map((part) => part.valor).join(lot.separator);
+  // Tarjeta «Así se arma el lote»: cada parte con su color y qué significa.
+  const lotExplainHtml = (lot, { titulo = 'Así se arma el lote' } = {}) => {
+    if (!lot) return '';
+    const chips = lot.parts.map((part, index) => `${index && lot.separator ? `<span class="inv-lote-sep">${escapeHtml(lot.separator)}</span>` : ''}<span class="inv-lote-part is-${part.tono}${part.falta ? ' is-falta' : ''}"><strong>${escapeHtml(part.valor)}</strong><small>${escapeHtml(part.etiqueta)}</small>${part.detalle ? `<em>${escapeHtml(part.detalle)}</em>` : ''}</span>`).join('');
+    return `<div class="inv-lote-explica${lot.provisional ? ' is-provisorio' : ''}">
+      <div class="inv-lote-cab"><span><i class="fa-solid fa-barcode"></i> ${escapeHtml(titulo)}</span><code>${escapeHtml(lotPartsToNumber(lot))}</code></div>
+      <div class="inv-lote-parts">${chips}</div>
+      ${lot.aviso ? `<p class="inv-lote-aviso"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(lot.aviso)}</p>` : ''}
+    </div>`;
+  };
+
   const openWeeklySheetConfig = async (ingredientId, { force = false } = {}) => {
     const ingredient = state.ingredientes[ingredientId];
     if (!ingredient) return false;
@@ -3270,14 +3361,16 @@
     });
   };
 
-  const buildLotNumber = ({ lotConfig, invoiceNumber, entryDate, expiryDate, productName }) => {
+  const buildLotNumber = ({ lotConfig, invoiceNumber, entryDate, expiryDate, productName, ptNumero = '', ptSolicitud = '', destino = '' }) => {
     const config = safeObject(lotConfig);
+    const lot = buildLotParts({ lotConfig: config, invoiceNumber, expiryDate, productName, ptNumero, ptSolicitud, destino });
+    if (lot) return lotPartsToNumber(lot);
     const tokens = Array.isArray(config.tokens) ? config.tokens : [];
     const custom = normalizeUpper(config.customAcronym);
     const separator = config.includeSeparator ? (normalizeValue(config.separator) || '-') : '';
     if (!tokens.length) return normalizeValue(invoiceNumber);
     const resolved = tokens.map((token) => {
-      if (token === 'remito_factura') return normalizeValue(invoiceNumber) || 'SIN-FACT';
+      if (token === 'remito_factura') return cleanLotInvoice(invoiceNumber) || 'SINFACT';
       if (token === 'fecha_fabricacion') return formatDateCompactDmy(entryDate);
       if (token === 'fecha_hoy') return formatDateCompactDmy(getArgentinaIsoDate());
       if (token === 'fecha_vencimiento') return formatLotExpiryDate(expiryDate);
@@ -3289,6 +3382,14 @@
   };
 
   const buildLotSummaryBadges = (lotConfig) => {
+    const modo = lotModeOf(lotConfig);
+    if (modo !== 'tokens') {
+      const info = LOT_MODES.find((item) => item.key === modo);
+      const extra = modo === 'pt'
+        ? (LOT_ESPECIES[normalizeUpper(lotConfig?.especie)] || 'Falta elegir cerdo o vacuno')
+        : (modo === 'factura' ? `Destino por defecto: ${LOT_DESTINOS[lotDestino(lotConfig?.destinoDefault)]}` : 'dd/mm/aaaa');
+      return `<span class="inventario-config-badge">${escapeHtml(info.label)}</span><span class="inventario-config-badge is-secondary">${escapeHtml(extra)}</span>`;
+    }
     const tokens = Array.isArray(lotConfig?.tokens) ? lotConfig.tokens : [];
     const customAcronym = normalizeValue(lotConfig?.customAcronym);
     if (!tokens.length) {
@@ -4481,6 +4582,12 @@
       invoiceUploadItems: uploadItems,
       invoiceImageCountLabel: invoiceUploadSummary(uploadItems),
       editingEntryId: entry.id,
+      ptNumero: normalizeValue(entry.ptNumero || ''),
+      ptSolicitud: normalizeValue(entry.ptSolicitud || ''),
+      destino: lotDestino(entry.destino || record.lotConfig.destinoDefault),
+      lotModo: lotModeOf(record.lotConfig),
+      lotEspecie: normalizeUpper(record.lotConfig.especie),
+      lotDestinoDefault: lotDestino(record.lotConfig.destinoDefault),
       tokens: [...record.lotConfig.tokens],
       customAcronym: normalizeValue(record.lotConfig.customAcronym),
       includeSeparator: Boolean(record.lotConfig.includeSeparator),
@@ -4627,7 +4734,7 @@
         <td>${escapeHtml(formatExpiryForUi(entry))} </td>
         <td class="is-num"><span class="inv-qty ${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</span><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td>
         <td class="is-code">${escapeHtml(entry.invoiceNumber || '-')}</td>
-        <td class="is-code inventario-lot-cell">${escapeHtml(entry.lotNumber || '-')}${entry.customLot ? '<br><small class="text-muted">lote propio</small>' : ''}</td>
+        <td class="is-code inventario-lot-cell">${escapeHtml(entry.lotNumber || '-')}${entry.customLot ? '<br><small class="text-muted">lote propio</small>' : ''}${entry.ptPendiente && !entry.customLot ? '<br><span class="inv-lote-pend" title="Lote provisorio: completá el PT editando el ingreso">PT pendiente</span>' : ''}</td>
         <td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td>
         <td>${entryImageUrls(entry).length ? `<sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-open-invoice-image="${entry.id}"><i slot="prefix" class="fa-regular fa-image"></i><span>Ver (${entryImageUrls(entry).length})</span></sl-button>` : '<span class="recetas-tag tone-neu">Sin foto</span>'}</td>
         <td>
@@ -4916,6 +5023,12 @@
       invoiceUploadItems: [],
       invoiceImageCountLabel: 'Sin archivos seleccionados',
       editingEntryId: '',
+      ptNumero: '',
+      ptSolicitud: '',
+      destino: lotDestino(record.lotConfig.destinoDefault),
+      lotModo: lotModeOf(record.lotConfig),
+      lotEspecie: normalizeUpper(record.lotConfig.especie),
+      lotDestinoDefault: lotDestino(record.lotConfig.destinoDefault),
       tokens: [...record.lotConfig.tokens],
       customAcronym: normalizeValue(record.lotConfig.customAcronym),
       includeSeparator: Boolean(record.lotConfig.includeSeparator),
@@ -4964,6 +5077,19 @@
       ? `<strong class="inventario-infinity-symbol">&infin;</strong><span>Disponible sin control manual</span>`
       : `<strong class="${expiredQtyInStockUnit > 0.0001 ? 'inventario-expired-strike' : ''}">${formatQtyUnit(stockQty, stockUnit)}${record.packageQty ? ` x${record.packageQty}` : ''}</strong>${expiredQtyInStockUnit > 0.0001 ? `<span class="inventario-stock-real-line">Real ${formatQtyUnit(realAvailableQty, stockUnit)}${record.packageQty ? ` x${record.packageQty}` : ''}</span>` : ''}`;
 
+    const lotModo = LOT_MODES.some((item) => item.key === state.editorDraft.lotModo) ? state.editorDraft.lotModo : 'tokens';
+    // Config de lote del borrador (lo que se está editando, todavía sin guardar).
+    const draftLotConfig = () => ({
+      modo: lotModo,
+      especie: state.editorDraft.lotEspecie,
+      destinoDefault: state.editorDraft.lotDestinoDefault,
+      tokens: [...state.editorDraft.tokens],
+      customAcronym: normalizeValue(state.editorDraft.customAcronym),
+      includeSeparator: Boolean(state.editorDraft.includeSeparator),
+      separator: normalizeValue(state.editorDraft.separator) || '-'
+    });
+    // Materia prima (se usa en recetas): destino R y sin autoegreso, la IA sólo la baja al vencer.
+    const esMateriaPrima = Boolean(state.materiaPrima?.has(ingredientId));
     const lotOptionRows = LOT_TOKEN_OPTIONS.map((option) => `
       <sl-checkbox class="inventario-check-row" data-lot-check="${option.key}" ${state.editorDraft.tokens.includes(option.key) ? 'checked' : ''}>${option.label}</sl-checkbox>`).join('');
 
@@ -5006,9 +5132,25 @@
       <section class="recipe-step-card step-block inventario-lot-section">
         <div class="d-flex flex-wrap gap-2 align-items-center"><button type="button" class="lj-tile inventario-collapse-head inventario-collapse-head-styled" id="lotConfigToggleBtn" aria-expanded="${state.editorDraft.showLotConfig}">
           <span><span class="recipe-step-number">1</span> Configuración de lote</span>
-          <span class="inventario-collapse-summary">${buildLotSummaryBadges(state.editorDraft)}</span>
+          <span class="inventario-collapse-summary">${buildLotSummaryBadges(draftLotConfig())}</span>
         </div>
         <div id="lotConfigBody" class="step-content ${state.editorDraft.showLotConfig ? '' : 'd-none'}">
+          <div class="inv-lote-modos" role="radiogroup" aria-label="Cómo se arma el lote">
+            ${LOT_MODES.map((item) => `<button type="button" class="inv-lote-modo ${lotModo === item.key ? 'is-active' : ''}" data-lot-modo="${item.key}" role="radio" aria-checked="${lotModo === item.key}"><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.hint)}</small></button>`).join('')}
+          </div>
+          ${lotModo === 'pt' || lotModo === 'factura' ? `<div class="recipe-fields-flex mt-2">
+            ${lotModo === 'pt' ? `<div class="recipe-field recipe-field-half">
+              <label class="lj-label" for="lotEspecie">Animal (P cerdo · V vacuno)</label>
+              <sl-select id="lotEspecie" hoist placeholder="Elegí cerdo o vacuno" value="${ljOptionValue(state.editorDraft.lotEspecie || '')}">${Object.entries(LOT_ESPECIES).map(([key, label]) => `<sl-option value="${key}">${key} · ${label}</sl-option>`).join('')}</sl-select>
+            </div>` : ''}
+            <div class="recipe-field recipe-field-half">
+              <label class="lj-label" for="lotDestinoDefault">Destino por defecto</label>
+              <sl-select id="lotDestinoDefault" hoist value="${ljOptionValue(state.editorDraft.lotDestinoDefault || 'R')}">${Object.entries(LOT_DESTINOS).map(([key, label]) => `<sl-option value="${key}">${key} · ${label}</sl-option>`).join('')}</sl-select>
+              <small class="text-muted">Se puede cambiar en cada ingreso.</small>
+            </div>
+          </div>` : ''}
+          <div id="lotConfigExplain" class="mt-2"></div>
+          <div class="${lotModo === 'tokens' ? '' : 'd-none'}">
           <div class="inventario-check-grid">${lotOptionRows}</div>
           <div class="inventario-inline-fields">
             <sl-input id="lotCustomAcronym" placeholder="Ej: JAM" value="${escapeHtml(state.editorDraft.customAcronym)}" ${state.editorDraft.tokens.includes('siglas_personalizadas') ? '' : 'disabled'}></sl-input>
@@ -5019,6 +5161,7 @@
           </sl-select>
           <div class="inventario-lot-order" id="lotTokenOrder">${tokensHtml || '<div class="inventario-token-placeholder">Tildá opciones para generar badges.</div>'}</div>
           <code id="lotPatternPreview" class="inventario-lot-preview"></code>
+          </div>
           <div class="recipe-table-actions inventario-save-inline mt-2">
             <sl-button variant="default" type="button" id="saveLotConfigBtn" class="recipe-table-action-btn">
               <sl-spinner slot="prefix" class="meta-spinner d-none" id="saveLotConfigSpinner" aria-label="Guardando"></sl-spinner>
@@ -5104,6 +5247,24 @@
             <sl-input id="inventoryCustomLot" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ej: L4521-A (lote de fábrica)" value="${escapeHtml(state.editorDraft.customLot || '')}" ${stockDisabledAttr}></sl-input>
             <small class="text-muted">Si el producto trae su propio lote (ej: condimentos), cargalo acá: reemplaza al lote automático sólo para este ingreso.</small>
           </div>
+          ${lotModo === 'pt' ? `<div class="recipe-field recipe-field-half">
+            <label class="lj-label" for="inventoryPtNumero"><i class="fa-solid fa-file-shield inventario-step-icon"></i> Cert. Sanitario / PT N°</label>
+            <sl-input id="inventoryPtNumero" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ej: 5364-A-05502 · ASSAL 388013" value="${escapeHtml(state.editorDraft.ptNumero || '')}" ${stockDisabledAttr}></sl-input>
+            <small class="text-muted">Si todavía no lo tenés, guardá igual: queda provisorio y lo completás después editando el ingreso.</small>
+          </div>
+          <div class="recipe-field recipe-field-half">
+            <label class="lj-label" for="inventoryPtSolicitud"><i class="fa-regular fa-file-lines inventario-step-icon"></i> N° de solicitud (si el PT no trae número)</label>
+            <sl-input id="inventoryPtSolicitud" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ej: 5364-A-05580" value="${escapeHtml(state.editorDraft.ptSolicitud || '')}" ${stockDisabledAttr}></sl-input>
+            <small class="text-muted">Sólo se usa si el PT está vacío: va con «S» pegada al número.</small>
+          </div>` : ''}
+          ${lotModo === 'pt' || lotModo === 'factura' ? `<div class="recipe-field recipe-field-half">
+            <span class="lj-label"><i class="fa-solid fa-signs-post inventario-step-icon"></i> Destino de este ingreso</span>
+            <div class="inv-lote-destinos" role="radiogroup" aria-label="Destino">
+              ${Object.entries(LOT_DESTINOS).map(([key, label]) => `<button type="button" class="inv-lote-destino ${lotDestino(state.editorDraft.destino) === key ? 'is-active' : ''}" data-lot-destino="${key}" role="radio" aria-checked="${lotDestino(state.editorDraft.destino) === key}" ${stockDisabledAttr}><strong>${key}</strong><span>${label}</span></button>`).join('')}
+            </div>
+            <small class="text-muted">R: se usa para producir · S: venta en el salón.${esMateriaPrima ? ' Materia prima: con R no lleva autoegreso, la IA sólo lo da de baja al vencer.' : ''}</small>
+          </div>` : ''}
+          <div class="recipe-field recipe-field-full" id="inventoryLotExplain"></div>
           <div class="recipe-field recipe-field-half">
             <label class="lj-label" for="inventoryProviderSearch"><sl-icon name="box-seam-fill" class="inventario-step-icon"></sl-icon> Proveedor</label>
             <div class="recipe-ing-autocomplete">
@@ -5248,6 +5409,10 @@
       state.editorDraft.invoiceNumber = nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value || '';
       state.editorDraft.remitoNumber = nodes.editorForm.querySelector('#inventoryRemitoNumber')?.value || '';
       state.editorDraft.customLot = nodes.editorForm.querySelector('#inventoryCustomLot')?.value || '';
+      state.editorDraft.ptNumero = nodes.editorForm.querySelector('#inventoryPtNumero')?.value || '';
+      state.editorDraft.ptSolicitud = nodes.editorForm.querySelector('#inventoryPtSolicitud')?.value || '';
+      if (nodes.editorForm.querySelector('#lotEspecie')) state.editorDraft.lotEspecie = normalizeUpper(ljSelectValue(nodes.editorForm.querySelector('#lotEspecie')));
+      if (nodes.editorForm.querySelector('#lotDestinoDefault')) state.editorDraft.lotDestinoDefault = lotDestino(ljSelectValue(nodes.editorForm.querySelector('#lotDestinoDefault')));
       state.editorDraft.provider = nodes.editorForm.querySelector('#inventoryProvider')?.value || '';
       state.editorDraft.customAcronym = nodes.editorForm.querySelector('#lotCustomAcronym')?.value || '';
       state.editorDraft.includeSeparator = Boolean(nodes.editorForm.querySelector('#lotIncludeSeparator')?.checked);
@@ -5278,7 +5443,40 @@
         };
       });
       state.editorDirty = true;
+      renderLotExplain();
     };
+
+    // Explicación visual del lote: en la configuración con un ejemplo y en el
+    // ingreso con los datos reales que se van cargando.
+    function renderLotExplain() {
+      const custom = normalizeUpper(state.editorDraft.customLot);
+      const real = buildLotParts({
+        lotConfig: draftLotConfig(),
+        invoiceNumber: state.editorDraft.invoiceNumber,
+        expiryDate: state.editorDraft.noPerecedero ? '' : state.editorDraft.expiryDate,
+        productName: ingredient.name || '',
+        ptNumero: state.editorDraft.ptNumero,
+        ptSolicitud: state.editorDraft.ptSolicitud,
+        destino: state.editorDraft.destino
+      });
+      const box = nodes.editorForm.querySelector('#inventoryLotExplain');
+      if (box) {
+        box.innerHTML = custom
+          ? `<div class="inv-lote-explica"><div class="inv-lote-cab"><span><i class="fa-solid fa-barcode"></i> Lote de este ingreso</span><code>${escapeHtml(custom)}</code></div><p class="inv-lote-aviso is-info"><i class="fa-solid fa-circle-info"></i> Se usa el lote propio del producto cargado arriba.</p></div>`
+          : (real ? lotExplainHtml(real, { titulo: 'Lote de este ingreso' }) : '');
+      }
+      const ejemplo = buildLotParts({
+        lotConfig: draftLotConfig(),
+        invoiceNumber: state.editorDraft.invoiceNumber || '0003-00000775',
+        expiryDate: state.editorDraft.expiryDate || addDaysToIso(getArgentinaIsoDate(), 5),
+        productName: ingredient.name || '',
+        ptNumero: (state.editorDraft.ptNumero || state.editorDraft.ptSolicitud) ? state.editorDraft.ptNumero : '5364-A-05502',
+        ptSolicitud: state.editorDraft.ptSolicitud,
+        destino: state.editorDraft.lotDestinoDefault
+      });
+      const cfgBox = nodes.editorForm.querySelector('#lotConfigExplain');
+      if (cfgBox) cfgBox.innerHTML = ejemplo ? lotExplainHtml(ejemplo, { titulo: 'Ejemplo' }) : '';
+    }
 
     const hasDuplicateInvoice = () => {
       const invoice = normalizeLower(nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value);
@@ -5325,7 +5523,7 @@
         productName: ingredient.name || ''
       }) : '';
       nodes.editorForm.querySelector('#lotPatternPreview').textContent = pattern ? `${pattern}${sample ? `  →  ${sample}` : ''}` : 'Sin patrón definido';
-      nodes.editorForm.querySelector('.inventario-collapse-summary').innerHTML = buildLotSummaryBadges(state.editorDraft);
+      nodes.editorForm.querySelector('.inventario-collapse-summary').innerHTML = buildLotSummaryBadges(draftLotConfig());
     };
 
     const syncNoPerecederoState = () => {
@@ -5460,6 +5658,9 @@
             invoiceNumber: '',
             remitoNumber: '',
             customLot: '',
+            ptNumero: '',
+            ptSolicitud: '',
+            destino: state.editorDraft.lotDestinoDefault,
             provider: '',
             invoiceImageFiles: [],
             invoiceImageFile: null,
@@ -5491,6 +5692,9 @@
         invoiceNumber: '',
         remitoNumber: '',
         customLot: '',
+        ptNumero: '',
+        ptSolicitud: '',
+        destino: state.editorDraft.lotDestinoDefault,
         provider: '',
         invoiceImageFiles: [],
         invoiceImageFile: null,
@@ -5502,6 +5706,33 @@
         expiryDate: addDaysToIso(getArgentinaIsoDate(), 5),
         entryDate: getArgentinaIsoDate(),
         bulkEntries: []
+      });
+    });
+
+    nodes.editorForm.querySelectorAll('[data-lot-modo]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        syncDraft();
+        state.editorDraft.lotModo = btn.dataset.lotModo;
+        state.editorDirty = true;
+        renderEditor(ingredientId, state.editorDraft);
+      });
+    });
+    nodes.editorForm.querySelectorAll('[data-lot-destino]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const destino = lotDestino(btn.dataset.lotDestino);
+        state.editorDraft.destino = destino;
+        nodes.editorForm.querySelectorAll('[data-lot-destino]').forEach((other) => {
+          const active = other.dataset.lotDestino === destino;
+          other.classList.toggle('is-active', active);
+          other.setAttribute('aria-checked', String(active));
+        });
+        // Materia prima a producción no lleva autoegreso: la IA sólo la da de baja al vencer.
+        const autoEgreso = nodes.editorForm.querySelector('#inventoryUsoInternoEmpresa');
+        if (destino === 'R' && esMateriaPrima && autoEgreso?.checked) {
+          autoEgreso.checked = false;
+          autoEgreso.closest('.inventario-flag-tile')?.classList.remove('is-checked', 'is-from-pref');
+        }
+        syncDraft();
       });
     });
 
@@ -6320,7 +6551,7 @@
         const availableClass = availableQtyInUnit <= 0.0001 ? 'is-zero' : '';
         const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
         const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(resolutionRow.at)}</div></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td class="is-num inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td class="is-code">${escapeHtml(entry.invoiceNumber || '-')}</td><td>${escapeHtml(entry.lotNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><span class="recetas-tag tone-neu">Sin trazabilidad</span></td></tr>` : '';
-        return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${formatEntryDateTime(entry.entryDate, entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}</td><td>${escapeHtml(formatExpiryForUi(entry))} </td><td class="is-num"><span class="inv-qty ${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</span><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td><td class="is-code">${escapeHtml(entry.invoiceNumber || '-')}</td><td class="is-code inventario-lot-cell">${escapeHtml(entry.lotNumber || '-')}${entry.customLot ? '<br><small class="text-muted">lote propio</small>' : ''}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRow) ? `<sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-icon-only-btn" data-expanded-entry-collapse="${entry.id}" aria-label="Ver detalle" title="Ver detalle"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></sl-button>` : ''}${buildExpandedImageCell(entryImageUrls(entry))}</div></td></tr>${resolutionHtml}${traceHtml}`;
+        return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${formatEntryDateTime(entry.entryDate, entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}</td><td>${escapeHtml(formatExpiryForUi(entry))} </td><td class="is-num"><span class="inv-qty ${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</span><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td><td class="is-code">${escapeHtml(entry.invoiceNumber || '-')}</td><td class="is-code inventario-lot-cell">${escapeHtml(entry.lotNumber || '-')}${entry.customLot ? '<br><small class="text-muted">lote propio</small>' : ''}${entry.ptPendiente && !entry.customLot ? '<br><span class="inv-lote-pend" title="Lote provisorio: completá el PT editando el ingreso">PT pendiente</span>' : ''}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRow) ? `<sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-icon-only-btn" data-expanded-entry-collapse="${entry.id}" aria-label="Ver detalle" title="Ver detalle"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></sl-button>` : ''}${buildExpandedImageCell(entryImageUrls(entry))}</div></td></tr>${resolutionHtml}${traceHtml}`;
       }).join('') : '<tr><td colspan="7" class="text-center">Sin ingresos para mostrar.</td></tr>';
       await openIosSwal({
         ljModal: true,
@@ -6589,6 +6820,7 @@
 
     wireTokenDrag();
     renderPattern();
+    renderLotExplain();
     renderInvoiceFeedback();
     initThumbLoading(nodes.editorForm);
 
@@ -6691,6 +6923,40 @@
     renderList();
   };
 
+  // Config de lote a guardar a partir del borrador del editor.
+  const lotConfigFromDraft = (draftValue) => {
+    const draft = safeObject(draftValue);
+    const tokens = Array.isArray(draft.tokens) ? [...draft.tokens] : [];
+    const modo = lotModeOf({ modo: draft.lotModo });
+    const listo = modo !== 'tokens' || tokens.length > 0;
+    return {
+      configured: listo,
+      collapsed: listo,
+      version: LOT_CONFIG_VERSION,
+      modo,
+      especie: LOT_ESPECIES[normalizeUpper(draft.lotEspecie)] ? normalizeUpper(draft.lotEspecie) : '',
+      destinoDefault: lotDestino(draft.lotDestinoDefault),
+      tokens,
+      customAcronym: normalizeValue(draft.customAcronym),
+      includeSeparator: Boolean(draft.includeSeparator),
+      separator: normalizeValue(draft.separator) || '-'
+    };
+  };
+
+  // Datos del lote que se guardan en el ingreso (para poder recalcularlo después).
+  const lotEntryFields = ({ lotConfig, ptNumero = '', ptSolicitud = '', destino = '' }) => {
+    const modo = lotModeOf(lotConfig);
+    const esPt = modo === 'pt';
+    const usaDestino = esPt || modo === 'factura';
+    return {
+      lotModo: modo,
+      ptNumero: esPt ? normalizeUpper(ptNumero) : '',
+      ptSolicitud: esPt ? normalizeUpper(ptSolicitud) : '',
+      ptPendiente: esPt && !parsePtNumber(ptNumero) && !parsePtNumber(ptSolicitud),
+      destino: usaDestino ? lotDestino(destino || safeObject(lotConfig).destinoDefault) : ''
+    };
+  };
+
   const saveLotConfigOnly = async (ingredientId) => {
     // Mismo patrón que saveSuggestedExpiryDays: spinner dentro del botón,
     // sin alert de éxito. Sólo muestra alert si hay error.
@@ -6703,15 +6969,7 @@
     spinner?.classList.remove('d-none');
     iconEl?.classList.add('d-none');
     try {
-      record.lotConfig = {
-        configured: Array.isArray(draft.tokens) && draft.tokens.length > 0,
-        collapsed: Array.isArray(draft.tokens) && draft.tokens.length > 0,
-        version: LOT_CONFIG_VERSION,
-        tokens: [...(Array.isArray(draft.tokens) ? draft.tokens : [])],
-        customAcronym: normalizeValue(draft.customAcronym),
-        includeSeparator: Boolean(draft.includeSeparator),
-        separator: normalizeValue(draft.separator) || '-'
-      };
+      record.lotConfig = lotConfigFromDraft(draft);
       state.inventario.items[ingredientId] = record;
       rebuildInventarioIndexes();
       await persistInventario({ itemIds: [ingredientId] });
@@ -6756,6 +7014,11 @@
     const invoiceNumber = normalizeValue(nodes.editorForm.querySelector('#inventoryInvoiceNumber')?.value);
     const remitoNumber = normalizeValue(nodes.editorForm.querySelector('#inventoryRemitoNumber')?.value);
     const customLot = normalizeValue(nodes.editorForm.querySelector('#inventoryCustomLot')?.value);
+    const draftLotConfigValue = lotConfigFromDraft(state.editorDraft);
+    const lotModoValue = draftLotConfigValue.modo;
+    const ptNumero = lotModoValue === 'pt' ? normalizeUpper(nodes.editorForm.querySelector('#inventoryPtNumero')?.value) : '';
+    const ptSolicitud = lotModoValue === 'pt' ? normalizeUpper(nodes.editorForm.querySelector('#inventoryPtSolicitud')?.value) : '';
+    const destino = lotDestino(state.editorDraft.destino || draftLotConfigValue.destinoDefault);
     const providerId = normalizeValue(nodes.editorForm.querySelector('#inventoryProvider')?.value);
     const providerData = findProviderById(providerId);
     const provider = providerLabel(providerId);
@@ -6768,7 +7031,31 @@
       return;
     }
 
-    if (!isEditingEntry && !record.hasEntries && !state.editorDraft.tokens.length) {
+    if (lotModoValue === 'pt' && !draftLotConfigValue.especie) {
+      await openIosSwal({
+        title: 'Falta elegir el animal',
+        html: '<p>En «Configuración de lote» elegí P (cerdo) o V (vacuno): es la primera letra del lote.</p>',
+        icon: 'warning',
+        confirmButtonText: 'Entendido'
+      });
+      return;
+    }
+
+    const extraSinEspecie = bulkEntries
+      .map((extra) => ({ extra, cfg: safeObject(getRecord(normalizeValue(extra.ingredientId)).lotConfig) }))
+      .filter(({ extra, cfg }) => normalizeValue(extra.ingredientId) && lotModeOf(cfg) === 'pt' && !LOT_ESPECIES[normalizeUpper(cfg.especie)])
+      .map(({ extra }) => capitalize(state.ingredientes[extra.ingredientId]?.name || extra.ingredientId));
+    if (extraSinEspecie.length) {
+      await openIosSwal({
+        title: 'Falta elegir el animal',
+        html: `<p>Estos productos de la factura usan lote con PT pero no tienen elegido P (cerdo) o V (vacuno): <strong>${escapeHtml(extraSinEspecie.join(', '))}</strong>. Configuralo desde su propio inventario.</p>`,
+        icon: 'warning',
+        confirmButtonText: 'Entendido'
+      });
+      return;
+    }
+
+    if (!isEditingEntry && !record.hasEntries && lotModoValue === 'tokens' && !state.editorDraft.tokens.length) {
       await openIosSwal({
         title: 'Configuración requerida',
         html: '<p>Antes del primer ingreso debés configurar el LOTE.</p>',
@@ -6927,20 +7214,19 @@
           // Sin lote propio: regenerar el lote automático porque el vencimiento
           // pudo cambiar en esta edición (p.ej. congelado fuerza +60 días) y la
           // fecha dentro del lote debe reflejarlo.
+          // También al completar el PT de un ingreso de carne cargado sin él.
           entry.lotNumber = buildLotNumber({
-            lotConfig: {
-              configured: state.editorDraft.tokens.length > 0,
-              tokens: [...state.editorDraft.tokens],
-              customAcronym: normalizeValue(state.editorDraft.customAcronym),
-              includeSeparator: Boolean(state.editorDraft.includeSeparator),
-              separator: normalizeValue(state.editorDraft.separator) || '-'
-            },
+            lotConfig: draftLotConfigValue,
             invoiceNumber,
             entryDate,
             expiryDate: noPerecedero ? '' : expiryDate,
-            productName: state.ingredientes[ingredientId]?.name || ''
+            productName: state.ingredientes[ingredientId]?.name || '',
+            ptNumero,
+            ptSolicitud,
+            destino
           });
         }
+        Object.assign(entry, lotEntryFields({ lotConfig: draftLotConfigValue, ptNumero, ptSolicitud, destino }));
         entry.lastEditedAt = Date.now();
 
         if (usoInternoEmpresa) {
@@ -6987,6 +7273,9 @@
           invoiceNumber: '',
           remitoNumber: '',
           customLot: '',
+          ptNumero: '',
+          ptSolicitud: '',
+          destino: state.editorDraft.lotDestinoDefault,
           provider: '',
           invoiceImageCountLabel: 'Sin archivos seleccionados',
           invoiceImageFiles: [],
@@ -7000,7 +7289,7 @@
         return;
       }
 
-      const buildEntry = ({ targetIngredientId, targetRecord, qtyValue, unitValue, packageQtyValue, entryDateValue, expiryDateValue, noPerecederoValue, usoInternoValue, isFrozenValue, customLotValue = '' }) => {
+      const buildEntry = ({ targetIngredientId, targetRecord, qtyValue, unitValue, packageQtyValue, entryDateValue, expiryDateValue, noPerecederoValue, usoInternoValue, isFrozenValue, customLotValue = '', lotConfigValue, destinoValue }) => {
         // Si es congelado y NO es no-perecedero, forzamos el vto a 60 días.
         if (isFrozenValue && !noPerecederoValue && entryDateValue) {
           const forced = addDaysToIso(entryDateValue, FROZEN_EXPIRY_DAYS);
@@ -7011,18 +7300,16 @@
         // Lote propio del ingreso (ej: lote de fábrica de un condimento):
         // reemplaza al lote generado por la configuración.
         const customLot = normalizeUpper(customLotValue);
+        const targetLotFields = lotEntryFields({ lotConfig: lotConfigValue, ptNumero, ptSolicitud, destino: destinoValue });
         const lotNumber = customLot || buildLotNumber({
-          lotConfig: {
-            configured: state.editorDraft.tokens.length > 0,
-            tokens: [...state.editorDraft.tokens],
-            customAcronym: normalizeValue(state.editorDraft.customAcronym),
-            includeSeparator: Boolean(state.editorDraft.includeSeparator),
-            separator: normalizeValue(state.editorDraft.separator) || '-'
-          },
+          lotConfig: lotConfigValue,
           invoiceNumber,
           entryDate: entryDateValue,
           expiryDate: noPerecederoValue ? '' : expiryDateValue,
-          productName: state.ingredientes[targetIngredientId]?.name || ''
+          productName: state.ingredientes[targetIngredientId]?.name || '',
+          ptNumero: targetLotFields.ptNumero,
+          ptSolicitud: targetLotFields.ptSolicitud,
+          destino: targetLotFields.destino
         });
 
         const entry = {
@@ -7046,6 +7333,7 @@
           remitoNumber,
           lotNumber,
           customLot,
+          ...targetLotFields,
           provider,
           lotStatus: 'disponible',
           invoiceImageUrl: invoiceImageUrls[0] || '',
@@ -7095,7 +7383,9 @@
         noPerecederoValue: noPerecedero,
         usoInternoValue: usoInternoEmpresa,
         isFrozenValue: isFrozenMain,
-        customLotValue: customLot
+        customLotValue: customLot,
+        lotConfigValue: draftLotConfigValue,
+        destinoValue: destino
       });
 
       for (const extra of bulkEntries) {
@@ -7121,18 +7411,14 @@
           expiryDateValue: extraExpiryDate,
           noPerecederoValue: extraNoPerecedero,
           usoInternoValue: Boolean(extra.usoInternoEmpresa),
-          isFrozenValue: Boolean(extra.isFrozen)
+          isFrozenValue: Boolean(extra.isFrozen),
+          // Cada producto de la factura arma el lote con su propia configuración
+          // (misma factura y mismo PT; el destino es el suyo por defecto).
+          lotConfigValue: extraRecord.lotConfig,
+          destinoValue: extraRecord.lotConfig?.destinoDefault
         });
       }
-      record.lotConfig = {
-        configured: state.editorDraft.tokens.length > 0,
-        collapsed: state.editorDraft.tokens.length > 0,
-        version: LOT_CONFIG_VERSION,
-        tokens: [...state.editorDraft.tokens],
-        customAcronym: normalizeValue(state.editorDraft.customAcronym),
-        includeSeparator: Boolean(state.editorDraft.includeSeparator),
-        separator: normalizeValue(state.editorDraft.separator) || '-'
-      };
+      record.lotConfig = draftLotConfigValue;
 
       // Guardar las preferencias de flags usadas en esta carga para
       // pre-tildarlas en la próxima vez que el usuario abra el editor.
@@ -7154,6 +7440,9 @@
         invoiceNumber: '',
         remitoNumber: '',
         customLot: '',
+        ptNumero: '',
+        ptSolicitud: '',
+        destino: state.editorDraft.lotDestinoDefault,
         provider: '',
         invoiceImageCountLabel: 'Sin archivos seleccionados',
         invoiceImageFiles: [],
