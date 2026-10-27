@@ -1874,3 +1874,7 @@
   #inventarioEditorForm .inv-collapse-head { flex-wrap: wrap; }
   #inventarioEditorForm .inv-collapse-head .inventario-collapse-summary { order: 3; width: 100%; margin-left: 0; justify-content: flex-start; }
 }
+
+/* El grupo «Lote de este ingreso» y el aviso de provisorio van como los demás: borde gris; el color sólo en las partes del lote. */
+.inv-ing-grupo.is-lote { border: 1px solid var(--lj-border); border-radius: var(--lj-radius-lg); }
+.inv-lote-explica.is-provisorio { border: 1px solid var(--lj-border); border-radius: var(--lj-radius-lg); }
