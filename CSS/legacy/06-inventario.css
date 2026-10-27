@@ -1737,3 +1737,47 @@
 .sl-theme-dark .inv-lote-part.is-est { --tono: #b39cff; }
 .sl-theme-dark .inv-lote-part.is-fact { --tono: #5fc8d6; }
 .sl-theme-dark .inv-lote-part.is-ini { --tono: #f08cc0; }
+.inv-lote-ico { font-size: 1.15em; line-height: 1; margin-right: 4px; font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; }
+.inv-lote-animal .inv-lote-ico { font-size: 1.4rem; margin-right: 2px; }
+.inv-lote-part strong .inv-lote-ico { font-size: 1em; }
+
+/* ── Cabecera del producto: KPIs claros + tabla plegable de vencidos ── */
+.inv-head-kpis { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+.inv-kpi {
+  flex: 1 1 160px; display: flex; flex-direction: column; gap: 2px; padding: 8px 12px;
+  border: 1px solid var(--lj-border); border-left: 4px solid var(--lj-accent); border-radius: var(--lj-radius-lg); background: var(--lj-surface);
+}
+.inv-kpi small { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--lj-muted); }
+.inv-kpi strong { font-size: 1.35rem; line-height: 1.1; color: var(--lj-text); }
+.inv-kpi span { font-size: .78rem; color: var(--lj-muted); }
+.inv-kpi.is-main { border-left-color: var(--lj-success); }
+.inv-kpi.is-main strong { color: var(--lj-success); }
+.inv-kpi.is-bad { border-left-color: var(--lj-danger); }
+.inv-kpi.is-bad strong { color: var(--lj-danger); }
+.inv-kpi.is-warn { border-left-color: var(--lj-warning); }
+.inv-kpi.is-warn strong { color: var(--lj-warning); }
+.inv-vto-detalle { width: 100%; border: 1px solid var(--lj-border); border-radius: var(--lj-radius-lg); background: var(--lj-surface); }
+.inv-vto-detalle summary { cursor: pointer; padding: 8px 12px; font-weight: 600; color: var(--lj-accent); list-style: none; display: flex; align-items: center; gap: 8px; }
+.inv-vto-detalle summary::-webkit-details-marker { display: none; }
+.inv-vto-detalle summary i { font-size: .8rem; transition: transform .15s; }
+.inv-vto-detalle[open] summary i { transform: rotate(90deg); }
+.inv-vto-scroll { max-height: 280px; overflow: auto; border-top: 1px solid var(--lj-border); }
+.inv-vto-tabla { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.inv-vto-tabla th, .inv-vto-tabla td { padding: 6px 12px; border-top: 1px solid var(--lj-border); text-align: left; white-space: nowrap; }
+.inv-vto-tabla thead th { border-top: 0; font-size: .7rem; text-transform: uppercase; letter-spacing: .03em; color: var(--lj-muted); background: var(--lj-surface-2); position: sticky; top: 0; }
+.inv-vto-tabla .is-num { text-align: right; font-variant-numeric: tabular-nums; }
+.inv-vto-tabla .is-code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.inv-vto-estado { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .72rem; font-weight: 700; }
+.inv-vto-estado.is-bad { background: var(--lj-danger-soft); color: var(--lj-danger); }
+.inv-vto-estado.is-warn { background: var(--lj-warning-soft); color: var(--lj-warning); }
+.inv-head-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.inv-head-tags .recetas-tag { display: inline-flex; align-items: center; gap: 4px; }
+.inv-animal { font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; margin-right: 4px; }
+
+/* ── Formulario de ingreso por grupos ── */
+.inv-ing-form { display: grid; gap: 12px; }
+.inv-ing-grupo { border: 1px solid var(--lj-border); border-radius: var(--lj-radius-lg); background: var(--lj-surface); padding: 10px 12px 12px; }
+.inv-ing-grupo.is-lote { border-color: var(--lj-accent); }
+.inv-ing-grupo-cab { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--lj-text); }
+.inv-ing-grupo-cab small { color: var(--lj-muted); }
+.inv-ing-grupo-num { display: inline-flex; width: 22px; height: 22px; border-radius: 50%; align-items: center; justify-content: center; background: var(--lj-accent-soft); color: var(--lj-accent); font-size: .75rem; font-weight: 700; }

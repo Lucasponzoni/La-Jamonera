@@ -2400,7 +2400,7 @@
       : '';
     return `<button type="button" class="lj-tile recetas-item inv-md-item ${on ? 'is-active' : ''}" role="option" aria-selected="${on}" tabindex="${on ? 0 : -1}" data-inv-select="${escapeHtml(item.id)}">
         ${ingredientAvatar(item)}
-        <span class="recetas-item-copy"><strong title="${escapeHtml(capitalize(item.name))}">${escapeHtml(capitalize(item.name))}</strong><small title="${escapeHtml(sub)}">${escapeHtml(sub)}</small></span>
+        <span class="recetas-item-copy"><strong title="${escapeHtml(capitalize(item.name))}">${lotAnimalBadgeHtml(info.record)}${escapeHtml(capitalize(item.name))}</strong><small title="${escapeHtml(sub)}">${escapeHtml(sub)}</small></span>
         <span class="md-item-tags">${posSyncDe(item.id) ? `<span class="recetas-tag tone-pos" title="Sincronizado por POS: baja con las ventas reales del local">${POS_LOGO}POS</span>` : ''}<span class="recetas-tag tone-${info.tone}">${escapeHtml(info.shortLabel)}</span>${expiredFlag}</span>
       </button>`;
   };
@@ -2958,6 +2958,20 @@
     { key: 'tokens', label: 'Personalizado', hint: 'Elegís los datos y el orden' }
   ];
   const LOT_ESPECIES = { P: 'Cerdo', V: 'Vacuno' };
+  const LOT_ESPECIE_ICONO = { P: '🐖', V: '🐄' };
+  // Icono del animal de un producto configurado como carne con PT.
+  const lotAnimalBadgeHtml = (record) => {
+    const cfg = safeObject(record?.lotConfig);
+    const especie = normalizeUpper(cfg.especie);
+    if (lotModeOf(cfg) !== 'pt' || !LOT_ESPECIES[especie]) return '';
+    return `<span class="inv-animal" title="${LOT_ESPECIES[especie]}">${LOT_ESPECIE_ICONO[especie]}</span>`;
+  };
+  // Icono del animal para un lote de carne (P-… cerdo, V-… vacuno).
+  const lotAnimalIconHtml = (entry) => {
+    const match = /^([PV])-/.exec(normalizeUpper(entry?.lotNumber));
+    if (!match || entry?.lotModo !== 'pt' || entry?.customLot) return '';
+    return `<span class="inv-lote-ico" title="${LOT_ESPECIES[match[1]]}">${LOT_ESPECIE_ICONO[match[1]]}</span> `;
+  };
   const LOT_DESTINOS = { R: 'Producción', S: 'Salón' };
   const lotModeOf = (lotConfig) => {
     const modo = normalizeValue(safeObject(lotConfig).modo);
@@ -2994,7 +3008,7 @@
     const facturaPart = { valor: factura || 'SINFACT', etiqueta: 'Factura', detalle: factura ? 'sin espacios ni guiones' : 'falta el N° de factura', tono: 'fact', falta: !factura };
     if (modo === 'pt') {
       const especie = LOT_ESPECIES[normalizeUpper(config.especie)] ? normalizeUpper(config.especie) : '';
-      const especiePart = { valor: especie || '?', etiqueta: 'Animal', detalle: LOT_ESPECIES[especie] || 'falta elegir: P cerdo · V vacuno', tono: 'esp', falta: !especie };
+      const especiePart = { valor: especie || '?', etiqueta: 'Animal', detalle: LOT_ESPECIES[especie] || 'falta elegir: P cerdo · V vacuno', tono: 'esp', falta: !especie, icono: LOT_ESPECIE_ICONO[especie] || '' };
       const pt = parsePtNumber(ptNumero);
       const sol = pt ? null : parsePtNumber(ptSolicitud);
       const fuente = pt || sol;
@@ -3022,7 +3036,7 @@
   // Tarjeta «Así se arma el lote»: cada parte con su color y qué significa.
   const lotExplainHtml = (lot, { titulo = 'Así se arma el lote' } = {}) => {
     if (!lot) return '';
-    const chips = lot.parts.map((part, index) => `${index && lot.separator ? `<span class="inv-lote-sep">${escapeHtml(lot.separator)}</span>` : ''}<span class="inv-lote-part is-${part.tono}${part.falta ? ' is-falta' : ''}"><strong>${escapeHtml(part.valor)}</strong><small>${escapeHtml(part.etiqueta)}</small>${part.detalle ? `<em>${escapeHtml(part.detalle)}</em>` : ''}</span>`).join('');
+    const chips = lot.parts.map((part, index) => `${index && lot.separator ? `<span class="inv-lote-sep">${escapeHtml(lot.separator)}</span>` : ''}<span class="inv-lote-part is-${part.tono}${part.falta ? ' is-falta' : ''}"><strong>${part.icono ? `<span class="inv-lote-ico">${part.icono}</span>` : ''}${escapeHtml(part.valor)}</strong><small>${escapeHtml(part.etiqueta)}</small>${part.detalle ? `<em>${escapeHtml(part.detalle)}</em>` : ''}</span>`).join('');
     return `<div class="inv-lote-explica${lot.provisional ? ' is-provisorio' : ''}">
       <div class="inv-lote-cab"><span><i class="fa-solid fa-barcode"></i> ${escapeHtml(titulo)}</span><code>${escapeHtml(lotPartsToNumber(lot))}</code></div>
       <div class="inv-lote-parts">${chips}</div>
@@ -3386,7 +3400,7 @@
     if (modo !== 'tokens') {
       const info = LOT_MODES.find((item) => item.key === modo);
       const extra = modo === 'pt'
-        ? (LOT_ESPECIES[normalizeUpper(lotConfig?.especie)] || 'Falta elegir cerdo o vacuno')
+        ? (LOT_ESPECIES[normalizeUpper(lotConfig?.especie)] ? `${LOT_ESPECIE_ICONO[normalizeUpper(lotConfig.especie)]} ${LOT_ESPECIES[normalizeUpper(lotConfig.especie)]}` : 'Falta elegir cerdo o vacuno')
         : (modo === 'factura' ? `Destino por defecto: ${LOT_DESTINOS[lotDestino(lotConfig?.destinoDefault)]}` : 'dd/mm/aaaa');
       return `<span class="inventario-config-badge">${escapeHtml(info.label)}</span><span class="inventario-config-badge is-secondary">${escapeHtml(extra)}</span>`;
     }
@@ -4569,7 +4583,7 @@
       usoInternoEmpresa: Boolean(entry.usoInternoEmpresa),
       // Cargar el flag de congelado desde el entry persistido para que el tile
       // se muestre correctamente al editar un ingreso ya cargado.
-      isFrozen: Boolean(entry.isFrozen || entry.frozen),
+      isFrozen: Boolean(entry.isFrozen || entry.frozen) && !state.materiaPrima?.has(ingredientId),
       // Marcamos los flags como "no vienen de preferencia" porque vienen del
       // entry real que se está editando — no queremos mostrar el badge ámbar.
       flagsFromPreferences: { noPerecedero: false, isFrozen: false, usoInternoEmpresa: false },
@@ -4734,7 +4748,7 @@
         <td>${escapeHtml(formatExpiryForUi(entry))} </td>
         <td class="is-num"><span class="inv-qty ${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</span><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td>
         <td class="is-code">${escapeHtml(entry.invoiceNumber || '-')}</td>
-        <td class="is-code inventario-lot-cell">${escapeHtml(entry.lotNumber || '-')}${entry.customLot ? '<br><small class="text-muted">lote propio</small>' : ''}${entry.ptPendiente && !entry.customLot ? '<br><span class="inv-lote-pend" title="Lote provisorio: completá el PT editando el ingreso">PT pendiente</span>' : ''}</td>
+        <td class="is-code inventario-lot-cell">${lotAnimalIconHtml(entry)}${escapeHtml(entry.lotNumber || '-')}${entry.customLot ? '<br><small class="text-muted">lote propio</small>' : ''}${entry.ptPendiente && !entry.customLot ? '<br><span class="inv-lote-pend" title="Lote provisorio: completá el PT editando el ingreso">PT pendiente</span>' : ''}</td>
         <td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td>
         <td>${entryImageUrls(entry).length ? `<sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-open-invoice-image="${entry.id}"><i slot="prefix" class="fa-regular fa-image"></i><span>Ver (${entryImageUrls(entry).length})</span></sl-button>` : '<span class="recetas-tag tone-neu">Sin foto</span>'}</td>
         <td>
@@ -4995,7 +5009,9 @@
     // se pre-tildan acá. La UI muestra una pista visual junto al tile.
     const flagPrefs = safeObject(record.flagPreferences);
     const hasFlagPrefs = Object.keys(flagPrefs).length > 0;
-    const prefIsFrozen = Boolean(flagPrefs.isFrozen);
+    // Materia prima (se usa en recetas): no se congela al ingreso, va fresca a producción.
+    const esMateriaPrima = Boolean(state.materiaPrima?.has(ingredientId));
+    const prefIsFrozen = Boolean(flagPrefs.isFrozen) && !esMateriaPrima;
     const prefNoPerecedero = Boolean(flagPrefs.noPerecedero);
     const prefAutoEgreso = Boolean(flagPrefs.usoInternoEmpresa);
 
@@ -5063,19 +5079,35 @@
       ...expiredRows.map((entry) => ({ ...entry, type: 'expired' })),
       ...expiringRows.map((entry) => ({ ...entry, type: 'soon' }))
     ];
-    const editorExpiryHtml = expiryRows.length
-      ? `<div class="inventario-expiring-list inventario-expiring-list-editor">${expiryRows.map((entry) => {
-        const pkg = entry.packageQty ? ` x${entry.packageQty}` : '';
-        const lot = entry.lotNumber ? ` · lote ${escapeHtml(entry.lotNumber)}` : '';
-        const when = entry.type === 'expired' ? `Expirado hace ${entry.diffDays} día(s)` : `Vence en ${entry.diffDays} día(s)`;
-        return `<p class="inventario-expiring-line ${entry.type === 'expired' ? 'is-expired' : 'is-soon'}"><strong>${formatQtyUnit(entry.qty, entry.unit)}${pkg}</strong><span>${when}${lot}${entry.expiryDate ? ` · ${formatIsoDateEs(entry.expiryDate)}` : ''}</span></p>`;
-      }).join('')}</div>`
+    const expiringBase = expiringRows.reduce((acc, entry) => acc + toBase(entry.qty, entry.unit), 0);
+    const expiringQtyInStockUnit = fromBase(expiringBase, stockUnit);
+    const pkgSuffix = record.packageQty ? ` x${record.packageQty}` : '';
+    // Lotes por vencer primero (hay que actuar), después los vencidos del más reciente al más viejo.
+    const vtoRows = [
+      ...expiringRows.map((entry) => ({ ...entry, type: 'soon' })).sort((a, b) => a.diffDays - b.diffDays),
+      ...expiredRows.map((entry) => ({ ...entry, type: 'expired' })).sort((a, b) => a.diffDays - b.diffDays)
+    ];
+    const vtoEstado = (entry) => (entry.type === 'expired'
+      ? `Vencido hace ${entry.diffDays} día(s)`
+      : (entry.diffDays === 0 ? 'Vence hoy' : `Vence en ${entry.diffDays} día(s)`));
+    const vtoTablaHtml = vtoRows.length
+      ? `<details class="inv-vto-detalle"><summary><i class="fa-solid fa-chevron-right"></i>Ver los ${vtoRows.length} lote(s) vencidos o por vencer</summary><div class="inv-vto-scroll"><table class="inv-vto-tabla"><thead><tr><th>Estado</th><th class="is-num">Cantidad</th><th>Lote</th><th>Vence</th></tr></thead><tbody>${vtoRows.map((entry) => `<tr><td><span class="inv-vto-estado ${entry.type === 'expired' ? 'is-bad' : 'is-warn'}">${vtoEstado(entry)}</span></td><td class="is-num">${formatQtyUnit(entry.qty, entry.unit)}${entry.packageQty ? ` x${entry.packageQty}` : ''}</td><td class="is-code">${lotAnimalIconHtml(entry)}${escapeHtml(entry.lotNumber || '-')}</td><td>${entry.expiryDate ? formatIsoDateEs(entry.expiryDate) : '-'}</td></tr>`).join('')}</tbody></table></div></details>`
       : '';
+    // Tres números claros: lo disponible de verdad, lo vencido (no cuenta) y lo que está por vencer.
+    const headKpisHtml = infiniteStock
+      ? '<div class="inv-kpi is-main"><small>Stock</small><strong class="inventario-infinity-symbol">&infin;</strong><span>Disponible sin control manual</span></div>'
+      : [
+        `<div class="inv-kpi is-main"><small>Disponible real</small><strong>${formatQtyUnit(realAvailableQty, stockUnit)}${pkgSuffix}</strong><span>${expiredQtyInStockUnit > 0.0001 ? `de ${formatQtyUnit(stockQty, stockUnit)} cargados` : 'todo el stock está vigente'}</span></div>`,
+        expiredRows.length ? `<div class="inv-kpi is-bad"><small>Vencido</small><strong>${formatQtyUnit(expiredQtyInStockUnit, stockUnit)}${pkgSuffix}</strong><span>${expiredRows.length} lote(s) · no cuenta como disponible</span></div>` : '',
+        expiringRows.length ? `<div class="inv-kpi is-warn"><small>${expiringDays === 0 ? 'Vence hoy' : `Por vencer (${expiringDays} días)`}</small><strong>${formatQtyUnit(expiringQtyInStockUnit, stockUnit)}${pkgSuffix}</strong><span>${expiringRows.length} lote(s)</span></div>` : ''
+      ].join('');
+    // Etiquetas de la cabecera: animal (carne con PT), cómo se arma el lote y si es materia prima.
+    const lotCfgHead = safeObject(record.lotConfig);
+    const headModo = lotModeOf(lotCfgHead);
+    const headEspecie = LOT_ESPECIES[normalizeUpper(lotCfgHead.especie)] ? normalizeUpper(lotCfgHead.especie) : '';
+    const headTagsHtml = `<div class="inv-head-tags">${headModo === 'pt' ? `<span class="recetas-tag ${headEspecie ? 'tone-neu' : 'tone-bad'}">${headEspecie ? `<span class="inv-animal">${LOT_ESPECIE_ICONO[headEspecie]}</span>${LOT_ESPECIES[headEspecie]}` : 'Sin animal elegido'}</span>` : ''}<span class="recetas-tag tone-neu"><i class="fa-solid fa-barcode"></i> Lote: ${escapeHtml(LOT_MODES.find((item) => item.key === headModo)?.label || 'Personalizado')}</span>${esMateriaPrima ? '<span class="recetas-tag tone-neu"><i class="fa-solid fa-industry"></i> Materia prima</span>' : ''}</div>`;
     const packageUnit = state.editorDraft.unit || stockUnit;
     const shouldShowPackageQty = getUnitMeta(packageUnit).category === 'unidad' || Number(record.packageQty) > 0;
-    const editorStockHtml = infiniteStock
-      ? `<strong class="inventario-infinity-symbol">&infin;</strong><span>Disponible sin control manual</span>`
-      : `<strong class="${expiredQtyInStockUnit > 0.0001 ? 'inventario-expired-strike' : ''}">${formatQtyUnit(stockQty, stockUnit)}${record.packageQty ? ` x${record.packageQty}` : ''}</strong>${expiredQtyInStockUnit > 0.0001 ? `<span class="inventario-stock-real-line">Real ${formatQtyUnit(realAvailableQty, stockUnit)}${record.packageQty ? ` x${record.packageQty}` : ''}</span>` : ''}`;
 
     const lotModo = LOT_MODES.some((item) => item.key === state.editorDraft.lotModo) ? state.editorDraft.lotModo : 'tokens';
     // Config de lote del borrador (lo que se está editando, todavía sin guardar).
@@ -5088,8 +5120,6 @@
       includeSeparator: Boolean(state.editorDraft.includeSeparator),
       separator: normalizeValue(state.editorDraft.separator) || '-'
     });
-    // Materia prima (se usa en recetas): destino R y sin autoegreso, la IA sólo la baja al vencer.
-    const esMateriaPrima = Boolean(state.materiaPrima?.has(ingredientId));
     const lotOptionRows = LOT_TOKEN_OPTIONS.map((option) => `
       <sl-checkbox class="inventario-check-row" data-lot-check="${option.key}" ${state.editorDraft.tokens.includes(option.key) ? 'checked' : ''}>${option.label}</sl-checkbox>`).join('');
 
@@ -5108,16 +5138,12 @@
             <h6 class="inventario-editor-name">${capitalize(ingredient.name)}</h6>
             <p class="inventario-editor-meta">${sentenceCase(ingredient.description || 'Sin descripción')}</p>
             <p class="inventario-editor-measure">${getMeasureLabel(ingredient.measure || 'kilos')}</p>
+            ${headTagsHtml}
           </div>
         </div>
           <div class="inventario-product-head-stats">
-          <div class="inventario-total-banner">
-            <small>Stock total actual</small>
-            ${editorStockHtml}
-          </div>
-          <div class="inventario-stat-row">
-            ${expiryRows.length ? `<div class="inventario-stat-card is-alert"><small>Lotes con vencimiento (${expiringDays} días)</small>${editorExpiryHtml}</div>` : ''}
-          </div>
+          <div class="inv-head-kpis">${headKpisHtml}</div>
+          ${vtoTablaHtml}
           <div class="inventario-head-actions-row">
             <div class="inventario-check-row inventario-check-row-compact inventario-infinite-toggle"><sl-switch id="inventarioInfiniteStockToggle" ${infiniteStock ? 'checked' : ''}>Stock infinito</sl-switch><sl-spinner class="meta-spinner d-none" id="inventarioInfiniteStockSpinner" aria-label="Guardando"></sl-spinner></div>
             <sl-button variant="default" type="button" class="inventario-head-action" id="inventarioProductThresholdBtn"><i slot="prefix" class="fa-solid fa-sliders"></i><span>Configurar umbrales</span></sl-button>
@@ -5140,8 +5166,11 @@
           </div>
           ${lotModo === 'pt' || lotModo === 'factura' ? `<div class="recipe-fields-flex mt-2">
             ${lotModo === 'pt' ? `<div class="recipe-field recipe-field-half">
-              <label class="lj-label" for="lotEspecie">Animal (P cerdo · V vacuno)</label>
-              <sl-select id="lotEspecie" hoist placeholder="Elegí cerdo o vacuno" value="${ljOptionValue(state.editorDraft.lotEspecie || '')}">${Object.entries(LOT_ESPECIES).map(([key, label]) => `<sl-option value="${key}">${key} · ${label}</sl-option>`).join('')}</sl-select>
+              <span class="lj-label">Animal</span>
+              <div class="inv-lote-destinos" role="radiogroup" aria-label="Animal">
+                ${Object.entries(LOT_ESPECIES).map(([key, label]) => `<button type="button" class="inv-lote-destino inv-lote-animal ${normalizeUpper(state.editorDraft.lotEspecie) === key ? 'is-active' : ''}" data-lot-especie="${key}" role="radio" aria-checked="${normalizeUpper(state.editorDraft.lotEspecie) === key}"><span class="inv-lote-ico">${LOT_ESPECIE_ICONO[key]}</span><strong>${key}</strong><span>${label}</span></button>`).join('')}
+              </div>
+              <small class="text-muted">Primera letra del lote.</small>
             </div>` : ''}
             <div class="recipe-field recipe-field-half">
               <label class="lj-label" for="lotDestinoDefault">Destino por defecto</label>
@@ -5206,7 +5235,10 @@
       <section class="recipe-step-card step-block" id="inventarioStockEntrySection">
         <h6 class="step-title"><span class="recipe-step-number">3</span> ${isEditingEntry ? 'Editar ingreso' : 'Ingresar Stock'}</h6>
         ${isEditingEntry ? '<div class="inventario-editing-entry-note"><i class="fa-solid fa-pen"></i><span>Estás editando un ingreso existente. Guardá los cambios desde esta misma sección.</span></div>' : ''}
-        <div class="step-content recipe-fields-flex inventario-stock-grid">
+        <div class="step-content inventario-stock-grid inv-ing-form">
+          <div class="inv-ing-grupo ">
+            <div class="inv-ing-grupo-cab"><span class="inv-ing-grupo-num">A</span><strong>Cantidad y fechas</strong></div>
+            <div class="recipe-fields-flex">
           <div class="recipe-field recipe-field-half">
             <label class="lj-label" for="inventoryQty"><i class="fa-solid fa-weight-hanging inventario-step-icon"></i> Cantidad a ingresar</label>
             <sl-input id="inventoryQty" type="number" autocomplete="off" min="0" step="0.01" value="${escapeHtml(String(state.editorDraft.qty ?? ''))}" ${stockDisabledAttr}></sl-input>
@@ -5233,6 +5265,11 @@
             <input id="inventoryExpiryDate" class="lj-input" autocomplete="off" value="${escapeHtml(state.editorDraft.expiryDate)}" placeholder="Seleccionar fecha" ${(state.editorDraft.noPerecedero || state.editorDraft.isFrozen || infiniteStock) ? 'disabled' : ''}>
             ${state.editorDraft.isFrozen ? `<small class="text-muted d-block mt-1"><sl-icon name="info-circle" class="me-1"></sl-icon>Vencimiento fijo a <strong>${FROZEN_EXPIRY_DAYS} días</strong> desde la fecha de ingreso.</small>` : ''}
           </div>
+            </div>
+          </div>
+          <div class="inv-ing-grupo ">
+            <div class="inv-ing-grupo-cab"><span class="inv-ing-grupo-num">B</span><strong>Factura y proveedor</strong></div>
+            <div class="recipe-fields-flex">
           <div class="recipe-field recipe-field-half">
             <label class="lj-label" for="inventoryInvoiceNumber"><i class="fa-solid fa-file-invoice inventario-step-icon"></i> Número de factura</label>
             <sl-textarea id="inventoryInvoiceNumber" name="inventory_code_free" class="inventario-invoice-textarea" rows="1" resize="none" placeholder="Ej: A-000123" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" value="${escapeHtml(state.editorDraft.invoiceNumber)}" ${stockDisabledAttr}></sl-textarea>
@@ -5243,29 +5280,6 @@
             <sl-input id="inventoryRemitoNumber" name="inventory_remito_free" placeholder="Ej: R-0001-00045678" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" value="${escapeHtml(state.editorDraft.remitoNumber || '')}" ${stockDisabledAttr}></sl-input>
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="lj-label" for="inventoryCustomLot"><i class="fa-solid fa-barcode inventario-step-icon"></i> Lote propio del producto (opcional)</label>
-            <sl-input id="inventoryCustomLot" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ej: L4521-A (lote de fábrica)" value="${escapeHtml(state.editorDraft.customLot || '')}" ${stockDisabledAttr}></sl-input>
-            <small class="text-muted">Si el producto trae su propio lote (ej: condimentos), cargalo acá: reemplaza al lote automático sólo para este ingreso.</small>
-          </div>
-          ${lotModo === 'pt' ? `<div class="recipe-field recipe-field-half">
-            <label class="lj-label" for="inventoryPtNumero"><i class="fa-solid fa-file-shield inventario-step-icon"></i> Cert. Sanitario / PT N°</label>
-            <sl-input id="inventoryPtNumero" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ej: 5364-A-05502 · ASSAL 388013" value="${escapeHtml(state.editorDraft.ptNumero || '')}" ${stockDisabledAttr}></sl-input>
-            <small class="text-muted">Si todavía no lo tenés, guardá igual: queda provisorio y lo completás después editando el ingreso.</small>
-          </div>
-          <div class="recipe-field recipe-field-half">
-            <label class="lj-label" for="inventoryPtSolicitud"><i class="fa-regular fa-file-lines inventario-step-icon"></i> N° de solicitud (si el PT no trae número)</label>
-            <sl-input id="inventoryPtSolicitud" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ej: 5364-A-05580" value="${escapeHtml(state.editorDraft.ptSolicitud || '')}" ${stockDisabledAttr}></sl-input>
-            <small class="text-muted">Sólo se usa si el PT está vacío: va con «S» pegada al número.</small>
-          </div>` : ''}
-          ${lotModo === 'pt' || lotModo === 'factura' ? `<div class="recipe-field recipe-field-half">
-            <span class="lj-label"><i class="fa-solid fa-signs-post inventario-step-icon"></i> Destino de este ingreso</span>
-            <div class="inv-lote-destinos" role="radiogroup" aria-label="Destino">
-              ${Object.entries(LOT_DESTINOS).map(([key, label]) => `<button type="button" class="inv-lote-destino ${lotDestino(state.editorDraft.destino) === key ? 'is-active' : ''}" data-lot-destino="${key}" role="radio" aria-checked="${lotDestino(state.editorDraft.destino) === key}" ${stockDisabledAttr}><strong>${key}</strong><span>${label}</span></button>`).join('')}
-            </div>
-            <small class="text-muted">R: se usa para producir · S: venta en el salón.${esMateriaPrima ? ' Materia prima: con R no lleva autoegreso, la IA sólo lo da de baja al vencer.' : ''}</small>
-          </div>` : ''}
-          <div class="recipe-field recipe-field-full" id="inventoryLotExplain"></div>
-          <div class="recipe-field recipe-field-half">
             <label class="lj-label" for="inventoryProviderSearch"><sl-icon name="box-seam-fill" class="inventario-step-icon"></sl-icon> Proveedor</label>
             <div class="recipe-ing-autocomplete">
               <div class="recipe-ing-input-wrap">
@@ -5275,6 +5289,47 @@
             </div>
             <input type="hidden" id="inventoryProvider" value="${escapeHtml((providers.some((provider) => provider.id === normalizeValue(state.editorDraft.provider)) || normalizeValue(state.editorDraft.provider) === 'add_provider') ? normalizeValue(state.editorDraft.provider) : '')}" ${stockDisabledAttr}>
           </div>
+          <div class="recipe-field recipe-field-full">
+            <label class="lj-label" for="inventoryInvoiceImage"><i class="fa-regular fa-images inventario-step-icon"></i> Adjuntar factura o remito (imagen o PDF)</label>
+            <label for="inventoryInvoiceImage" class="inventario-upload-dropzone ${infiniteStock ? 'is-disabled' : ''}">
+              <i class="fa-regular fa-images"></i>
+              <span>Arrastrá adjuntos o hacé click para seleccionar</span>
+            </label>
+            <input id="inventoryInvoiceImage" class="image-file-input inventario-hidden-file-input" autocomplete="off" type="file" accept="image/*,application/pdf" multiple ${stockDisabledAttr}>
+            <small id="inventoryInvoiceImageFeedback" class="inventario-file-feedback">${renderInvoiceUploadFeedbackHtml(state.editorDraft)}</small>
+          </div>
+            </div>
+          </div>
+          <div class="inv-ing-grupo is-lote">
+            <div class="inv-ing-grupo-cab"><span class="inv-ing-grupo-num">C</span><strong>Lote de este ingreso</strong><small>${({ pt: 'Cargá el PT y elegí el destino: el lote se arma solo.', factura: 'Se arma con las iniciales, la factura y el destino.', vencimiento: 'El lote es la fecha de vencimiento.' })[lotModo] || 'Según la configuración de lote.'}</small></div>
+            <div class="recipe-fields-flex">
+          ${lotModo === 'pt' ? `<div class="recipe-field recipe-field-half">
+            <label class="lj-label" for="inventoryPtNumero"><i class="fa-solid fa-file-shield inventario-step-icon"></i> Cert. Sanitario / PT N°</label>
+            <sl-input id="inventoryPtNumero" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ej: 5364-A-05502 · ASSAL 388013" value="${escapeHtml(state.editorDraft.ptNumero || '')}" ${stockDisabledAttr}></sl-input>
+            <small class="text-muted">Si todavía no lo tenés, guardá igual: queda provisorio y lo completás después editando el ingreso.</small>
+          </div>` : ''}
+          ${lotModo === 'pt' || lotModo === 'factura' ? `<div class="recipe-field recipe-field-half">
+            <span class="lj-label"><i class="fa-solid fa-signs-post inventario-step-icon"></i> Destino de este ingreso</span>
+            <div class="inv-lote-destinos" role="radiogroup" aria-label="Destino">
+              ${Object.entries(LOT_DESTINOS).map(([key, label]) => `<button type="button" class="inv-lote-destino ${lotDestino(state.editorDraft.destino) === key ? 'is-active' : ''}" data-lot-destino="${key}" role="radio" aria-checked="${lotDestino(state.editorDraft.destino) === key}" ${stockDisabledAttr}><strong>${key}</strong><span>${label}</span></button>`).join('')}
+            </div>
+            <small class="text-muted">R: se usa para producir · S: venta en el salón.${esMateriaPrima ? ' Materia prima: con R no lleva autoegreso, la IA sólo lo da de baja al vencer.' : ''}</small>
+          </div>` : ''}
+          ${lotModo === 'pt' ? `<div class="recipe-field recipe-field-half">
+            <label class="lj-label" for="inventoryPtSolicitud"><i class="fa-regular fa-file-lines inventario-step-icon"></i> N° de solicitud</label>
+            <sl-input id="inventoryPtSolicitud" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ej: 5364-A-05580" value="${escapeHtml(state.editorDraft.ptSolicitud || '')}" ${stockDisabledAttr}></sl-input>
+            <small class="text-muted">Sólo si el PT vino sin número definitivo: el lote lleva ese número con una «S».</small>
+          </div>` : ''}
+          <div class="recipe-field recipe-field-half">
+            <label class="lj-label" for="inventoryCustomLot"><i class="fa-solid fa-barcode inventario-step-icon"></i> Lote propio del producto (opcional)</label>
+            <sl-input id="inventoryCustomLot" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ej: L4521-A (lote de fábrica)" value="${escapeHtml(state.editorDraft.customLot || '')}" ${stockDisabledAttr}></sl-input>
+            <small class="text-muted">Sólo si el envase trae su propio lote de fábrica: reemplaza al lote automático en este ingreso.</small>
+          </div>
+          <div class="recipe-field recipe-field-full" id="inventoryLotExplain"></div>
+            </div>
+          </div>
+          <div class="inv-ing-grupo">
+            <div class="recipe-fields-flex">
           <div class="recipe-field recipe-field-full inventario-flags-block">
             <div class="inventario-flags-head">
               <sl-icon name="tags-fill"></sl-icon>
@@ -5313,7 +5368,7 @@
                   desc: 'Envases primarios & uso interno',
                   hasInfo: false
                 }
-              ].map((tile) => `
+              ].filter((tile) => !(tile.flag === 'frozen' && esMateriaPrima)).map((tile) => `
                 <div class="inventario-flag-tile-wrap ${tile.hasInfo ? 'has-info' : ''}">
                   <label class="inventario-flag-tile ${tile.checked ? 'is-checked' : ''} ${tile.fromPref && tile.checked ? 'is-from-pref' : ''} ${tile.hasInfo ? 'has-info' : ''}" data-flag="${tile.flag}">
                     <span class="inventario-flag-tile-icon"><sl-icon name="${tile.icon}"></sl-icon></span>
@@ -5329,15 +5384,9 @@
                 </div>
               `).join('')}
             </div>
+            ${esMateriaPrima ? '<small class="text-muted d-block mt-1"><sl-icon name="info-circle" class="me-1"></sl-icon>Materia prima: no se congela al ingreso, va fresca a producción.</small>' : ''}
           </div>
-          <div class="recipe-field recipe-field-full">
-            <label class="lj-label" for="inventoryInvoiceImage"><i class="fa-regular fa-images inventario-step-icon"></i> Adjuntar archivos (imagen o PDF)</label>
-            <label for="inventoryInvoiceImage" class="inventario-upload-dropzone ${infiniteStock ? 'is-disabled' : ''}">
-              <i class="fa-regular fa-images"></i>
-              <span>Arrastrá adjuntos o hacé click para seleccionar</span>
-            </label>
-            <input id="inventoryInvoiceImage" class="image-file-input inventario-hidden-file-input" autocomplete="off" type="file" accept="image/*,application/pdf" multiple ${stockDisabledAttr}>
-            <small id="inventoryInvoiceImageFeedback" class="inventario-file-feedback">${renderInvoiceUploadFeedbackHtml(state.editorDraft)}</small>
+            </div>
           </div>
         </div>
           <div class="recipe-table-wrap inventario-bulk-table-wrap ${bulkEntries.length && !isEditingEntry ? '' : 'd-none'}" id="inventarioBulkTableWrap">
@@ -5367,7 +5416,7 @@
             </tr>
             <tr class="inventario-bulk-secondary-row">
               <td></td>
-              <td colspan="5"><div class="inventario-bulk-row-extras"><sl-checkbox class="inventario-check-row inventario-check-row-compact" data-bulk-no-perecedero="${idx}" ${extra.noPerecedero ? 'checked' : ''} ${stockDisabledAttr}>No perecedero</sl-checkbox><sl-checkbox class="inventario-check-row inventario-check-row-compact" data-bulk-auto-egreso="${idx}" ${extra.usoInternoEmpresa ? 'checked' : ''} ${stockDisabledAttr}>Autoegreso</sl-checkbox><span class="inventario-check-row inventario-check-row-compact inventario-frozen-row"><sl-checkbox data-bulk-frozen="${idx}" ${extra.isFrozen ? 'checked' : ''} ${stockDisabledAttr}><sl-icon name="snow2" class="me-1"></sl-icon>Congelado</sl-checkbox>${frozenInfoIconHtml()}</span></div></td>
+              <td colspan="5"><div class="inventario-bulk-row-extras"><sl-checkbox class="inventario-check-row inventario-check-row-compact" data-bulk-no-perecedero="${idx}" ${extra.noPerecedero ? 'checked' : ''} ${stockDisabledAttr}>No perecedero</sl-checkbox><sl-checkbox class="inventario-check-row inventario-check-row-compact" data-bulk-auto-egreso="${idx}" ${extra.usoInternoEmpresa ? 'checked' : ''} ${stockDisabledAttr}>Autoegreso</sl-checkbox>${state.materiaPrima?.has(extraIngredient?.id) ? '' : `<span class="inventario-check-row inventario-check-row-compact inventario-frozen-row"><sl-checkbox data-bulk-frozen="${idx}" ${extra.isFrozen ? 'checked' : ''} ${stockDisabledAttr}><sl-icon name="snow2" class="me-1"></sl-icon>Congelado</sl-checkbox>${frozenInfoIconHtml()}</span>`}</div></td>
             </tr>`;
           }).join('')}</tbody>
               </table>
@@ -5411,7 +5460,6 @@
       state.editorDraft.customLot = nodes.editorForm.querySelector('#inventoryCustomLot')?.value || '';
       state.editorDraft.ptNumero = nodes.editorForm.querySelector('#inventoryPtNumero')?.value || '';
       state.editorDraft.ptSolicitud = nodes.editorForm.querySelector('#inventoryPtSolicitud')?.value || '';
-      if (nodes.editorForm.querySelector('#lotEspecie')) state.editorDraft.lotEspecie = normalizeUpper(ljSelectValue(nodes.editorForm.querySelector('#lotEspecie')));
       if (nodes.editorForm.querySelector('#lotDestinoDefault')) state.editorDraft.lotDestinoDefault = lotDestino(ljSelectValue(nodes.editorForm.querySelector('#lotDestinoDefault')));
       state.editorDraft.provider = nodes.editorForm.querySelector('#inventoryProvider')?.value || '';
       state.editorDraft.customAcronym = nodes.editorForm.querySelector('#lotCustomAcronym')?.value || '';
@@ -5715,6 +5763,19 @@
         state.editorDraft.lotModo = btn.dataset.lotModo;
         state.editorDirty = true;
         renderEditor(ingredientId, state.editorDraft);
+      });
+    });
+    nodes.editorForm.querySelectorAll('[data-lot-especie]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const especie = normalizeUpper(btn.dataset.lotEspecie);
+        state.editorDraft.lotEspecie = especie;
+        nodes.editorForm.querySelectorAll('[data-lot-especie]').forEach((other) => {
+          const active = other.dataset.lotEspecie === especie;
+          other.classList.toggle('is-active', active);
+          other.setAttribute('aria-checked', String(active));
+        });
+        syncDraft();
+        renderPattern();
       });
     });
     nodes.editorForm.querySelectorAll('[data-lot-destino]').forEach((btn) => {
@@ -6551,7 +6612,7 @@
         const availableClass = availableQtyInUnit <= 0.0001 ? 'is-zero' : '';
         const expiredQtyClass = isExpiredAvailable ? 'inventario-expired-strike' : '';
         const resolutionHtml = (!isCollapsed && resolutionRow) ? `<tr class="inventario-resolution-row"><td><div class="inventario-trace-main"><img src="./IMG/Octicons-git-merge.svg" alt="merge" class="inventario-trace-icon">${formatDateTime(resolutionRow.at)}</div></td><td><span class="inventario-resolution-badge">${escapeHtml(resolutionRow.badge)}</span></td><td class="is-num inventario-trace-kilos">-${resolutionRow.resolvedKg.toFixed(2)} kilos<br><span class="inventario-available-line is-zero">disp. ${resolutionRow.availableKg.toFixed(3)} kg</span></td><td class="is-code">${escapeHtml(entry.invoiceNumber || '-')}</td><td>${escapeHtml(entry.lotNumber || '-')}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><span class="recetas-tag tone-neu">Sin trazabilidad</span></td></tr>` : '';
-        return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${formatEntryDateTime(entry.entryDate, entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}</td><td>${escapeHtml(formatExpiryForUi(entry))} </td><td class="is-num"><span class="inv-qty ${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</span><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td><td class="is-code">${escapeHtml(entry.invoiceNumber || '-')}</td><td class="is-code inventario-lot-cell">${escapeHtml(entry.lotNumber || '-')}${entry.customLot ? '<br><small class="text-muted">lote propio</small>' : ''}${entry.ptPendiente && !entry.customLot ? '<br><span class="inv-lote-pend" title="Lote provisorio: completá el PT editando el ingreso">PT pendiente</span>' : ''}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRow) ? `<sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-icon-only-btn" data-expanded-entry-collapse="${entry.id}" aria-label="Ver detalle" title="Ver detalle"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></sl-button>` : ''}${buildExpandedImageCell(entryImageUrls(entry))}</div></td></tr>${resolutionHtml}${traceHtml}`;
+        return `<tr class="inventario-row-tone ${isExpiredAvailable ? 'is-expired-row' : ''} ${resolutionLabel ? 'is-resolution-row' : ''} ${index % 2 === 0 ? 'is-even-row' : 'is-odd-row'}"><td>${formatEntryDateTime(entry.entryDate, entry.createdAt)}${getExpiryBadgeHtml(entry) ? `<br><small>${getExpiryBadgeHtml(entry)}</small>` : ''}</td><td>${escapeHtml(formatExpiryForUi(entry))} </td><td class="is-num"><span class="inv-qty ${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</span><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td><td class="is-code">${escapeHtml(entry.invoiceNumber || '-')}</td><td class="is-code inventario-lot-cell">${lotAnimalIconHtml(entry)}${escapeHtml(entry.lotNumber || '-')}${entry.customLot ? '<br><small class="text-muted">lote propio</small>' : ''}${entry.ptPendiente && !entry.customLot ? '<br><span class="inv-lote-pend" title="Lote provisorio: completá el PT editando el ingreso">PT pendiente</span>' : ''}</td><td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td><td><div class="inventario-entry-actions">${(traceRows.length || resolutionRow) ? `<sl-button variant="default" size="small" type="button" class="lj-icon-btn inventario-threshold-btn inventario-icon-only-btn" data-expanded-entry-collapse="${entry.id}" aria-label="Ver detalle" title="Ver detalle"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></sl-button>` : ''}${buildExpandedImageCell(entryImageUrls(entry))}</div></td></tr>${resolutionHtml}${traceHtml}`;
       }).join('') : '<tr><td colspan="7" class="text-center">Sin ingresos para mostrar.</td></tr>';
       await openIosSwal({
         ljModal: true,
