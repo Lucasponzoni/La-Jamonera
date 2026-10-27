@@ -1890,3 +1890,11 @@
 .inv-pt-adj-item a { color: var(--lj-accent); text-decoration: none; }
 .inv-pt-adj-x { border: 0; background: transparent; color: var(--lj-muted); font-size: 1rem; line-height: 1; padding: 0 2px; cursor: pointer; }
 .inv-pt-adj-x:hover { color: var(--lj-danger); }
+
+/* Lote propio del envase: plegado, sólo se abre cuando hace falta. */
+.inv-lote-propio { font-size: .8rem; }
+.inv-lote-propio summary { display: flex; align-items: center; gap: 6px; list-style: none; cursor: pointer; font-weight: 600; color: var(--lj-accent); }
+.inv-lote-propio summary::-webkit-details-marker { display: none; }
+.inv-lote-propio summary::before { content: '+'; width: 14px; text-align: center; font-weight: 800; }
+.inv-lote-propio[open] summary::before { content: '−'; }
+.inv-lote-propio sl-input { display: block; max-width: 380px; margin-top: 4px; }

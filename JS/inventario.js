@@ -5312,11 +5312,11 @@
             <label class="lj-label" for="inventoryPtNumero"><i class="fa-solid fa-file-shield inventario-step-icon"></i> Cert. Sanitario / PT N°</label>
             <sl-input id="inventoryPtNumero" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ej: 5364-A-05502 · ASSAL 388013" value="${escapeHtml(state.editorDraft.ptNumero || '')}" ${stockDisabledAttr}></sl-input>
             <small class="text-muted">Sin PT a mano: guardá igual, queda provisorio; completalo editando el ingreso.</small>
-            <div class="inv-pt-adj">
-              <label for="inventoryPtFiles" class="inv-pt-adj-btn ${infiniteStock ? 'is-disabled' : ''}"><i class="fa-solid fa-paperclip"></i> Adjuntar PT / Cert. sanitario (imagen o PDF)</label>
-              <input id="inventoryPtFiles" class="inventario-hidden-file-input" type="file" accept="image/*,application/pdf" multiple ${stockDisabledAttr}>
-              <div id="inventoryPtFilesFeedback" class="inv-pt-adj-list"></div>
-            </div>
+          </div>
+          <div class="recipe-field recipe-field-half">
+            <label class="lj-label" for="inventoryPtSolicitud"><i class="fa-regular fa-file-lines inventario-step-icon"></i> N° de solicitud</label>
+            <sl-input id="inventoryPtSolicitud" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ej: 5364-A-05580" value="${escapeHtml(state.editorDraft.ptSolicitud || '')}" ${stockDisabledAttr}></sl-input>
+            <small class="text-muted">Sólo si el PT vino sin número definitivo (el lote lleva «S»).</small>
           </div>` : ''}
           ${lotModo === 'pt' || lotModo === 'factura' ? `<div class="recipe-field recipe-field-half">
             <span class="lj-label"><i class="fa-solid fa-signs-post inventario-step-icon"></i> Destino de este ingreso</span>
@@ -5325,15 +5325,21 @@
             </div>
             <small class="text-muted">R: producción · S: salón.${esMateriaPrima ? ' Materia prima en R: sin autoegreso (la IA sólo baja vencidos).' : ''}</small>
           </div>` : ''}
-          ${lotModo === 'pt' ? `<div class="recipe-field recipe-field-half">
-            <label class="lj-label" for="inventoryPtSolicitud"><i class="fa-regular fa-file-lines inventario-step-icon"></i> N° de solicitud</label>
-            <sl-input id="inventoryPtSolicitud" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ej: 5364-A-05580" value="${escapeHtml(state.editorDraft.ptSolicitud || '')}" ${stockDisabledAttr}></sl-input>
-            <small class="text-muted">Sólo si el PT vino sin número definitivo (el lote lleva «S»).</small>
+          ${lotModo === 'pt' ? `<div class="recipe-field recipe-field-full">
+            <label class="lj-label" for="inventoryPtFiles"><i class="fa-solid fa-file-shield inventario-step-icon"></i> Adjuntar PT / Cert. sanitario (imagen o PDF)</label>
+            <label for="inventoryPtFiles" class="inventario-upload-dropzone ${infiniteStock ? 'is-disabled' : ''}" id="inventoryPtFilesDropzone">
+              <i class="fa-solid fa-file-shield"></i>
+              <span>Arrastrá el PT o hacé click para seleccionar</span>
+            </label>
+            <input id="inventoryPtFiles" class="image-file-input inventario-hidden-file-input" autocomplete="off" type="file" accept="image/*,application/pdf" multiple ${stockDisabledAttr}>
+            <small id="inventoryPtFilesFeedback" class="inventario-file-feedback"></small>
           </div>` : ''}
-          <div class="recipe-field recipe-field-half">
-            <label class="lj-label" for="inventoryCustomLot"><i class="fa-solid fa-barcode inventario-step-icon"></i> Lote propio del producto (opcional)</label>
-            <sl-input id="inventoryCustomLot" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ej: L4521-A (lote de fábrica)" value="${escapeHtml(state.editorDraft.customLot || '')}" ${stockDisabledAttr}></sl-input>
-            <small class="text-muted">Sólo si el envase trae lote de fábrica: reemplaza al automático.</small>
+          <div class="recipe-field recipe-field-full">
+            <details class="inv-lote-propio" ${state.editorDraft.customLot ? 'open' : ''}>
+              <summary><i class="fa-solid fa-barcode inventario-step-icon"></i> El envase trae su propio lote de fábrica (opcional)</summary>
+              <sl-input id="inventoryCustomLot" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ej: L4521-A (lote de fábrica)" value="${escapeHtml(state.editorDraft.customLot || '')}" ${stockDisabledAttr}></sl-input>
+              <small class="text-muted">Reemplaza al lote automático sólo en este ingreso.</small>
+            </details>
           </div>
           <div class="recipe-field recipe-field-full" id="inventoryLotExplain"></div>
             </div>
@@ -6807,16 +6813,13 @@
       if (!box) return;
       const existing = Array.isArray(state.editorDraft.ptExistingUrls) ? state.editorDraft.ptExistingUrls : [];
       const files = Array.isArray(state.editorDraft.ptFiles) ? state.editorDraft.ptFiles : [];
-      if (!existing.length && !files.length) { box.innerHTML = '<small class="text-muted">Sin certificado adjunto.</small>'; return; }
-      box.innerHTML = [
-        ...existing.map((url, idx) => `<span class="inv-pt-adj-item"><a href="${escapeHtml(url)}" target="_blank" rel="noopener"><i class="fa-regular fa-file-lines"></i> PT adjunto ${idx + 1}</a><button type="button" class="inv-pt-adj-x" data-pt-url-remove="${idx}" aria-label="Quitar adjunto">×</button></span>`),
-        ...files.map((file, idx) => `<span class="inv-pt-adj-item is-new"><i class="fa-solid fa-paperclip"></i> ${escapeHtml(file.name)}<button type="button" class="inv-pt-adj-x" data-pt-file-remove="${idx}" aria-label="Quitar archivo">×</button></span>`)
-      ].join('');
+      if (!existing.length && !files.length) { box.textContent = 'Sin archivos seleccionados'; return; }
+      const fila = (nombre, estado, attr, idx, url) => `<span class="inventario-file-upload-row"><span class="inventario-file-upload-name">${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${nombre}</a>` : nombre}</span><span class="inventario-file-upload-actions"><span class="inventario-file-upload-status is-done"><i class="fa-solid fa-circle-check"></i><span>${estado}</span></span><sl-button variant="text" size="small" type="button" class="lj-icon-btn inventario-file-upload-remove" ${attr}="${idx}" aria-label="Quitar adjunto" title="Quitar adjunto"><i class="fa-solid fa-xmark"></i></sl-button></span></span>`;
+      box.innerHTML = `<div class="inventario-file-upload-list">${existing.map((url, idx) => fila(`PT adjunto ${idx + 1}`, 'Cargado', 'data-pt-url-remove', idx, url)).join('')}${files.map((file, idx) => fila(escapeHtml(file.name), 'Se sube al guardar', 'data-pt-file-remove', idx, '')).join('')}</div>`;
     };
     renderPtFilesFeedback();
-    nodes.editorForm.querySelector('#inventoryPtFiles')?.addEventListener('change', async (event) => {
-      const input = event.currentTarget;
-      for (const file of [...(input.files || [])]) {
+    const agregarPtFiles = async (files) => {
+      for (const file of [...(files || [])]) {
         const message = validateInvoiceFile(file);
         if (message) {
           await openIosSwal({ title: 'Adjunto no válido', html: `<p>${escapeHtml(file.name)}: ${escapeHtml(message)}</p>`, icon: 'warning', confirmButtonText: 'Entendido' });
@@ -6824,9 +6827,22 @@
         }
         state.editorDraft.ptFiles = [...(Array.isArray(state.editorDraft.ptFiles) ? state.editorDraft.ptFiles : []), file];
       }
-      input.value = '';
       state.editorDirty = true;
       renderPtFilesFeedback();
+    };
+    nodes.editorForm.querySelector('#inventoryPtFiles')?.addEventListener('change', async (event) => {
+      const input = event.currentTarget;
+      await agregarPtFiles(input.files);
+      input.value = '';
+    });
+    const ptDropzone = nodes.editorForm.querySelector('#inventoryPtFilesDropzone');
+    ptDropzone?.addEventListener('dragover', (event) => { event.preventDefault(); ptDropzone.classList.add('is-dragging'); });
+    ptDropzone?.addEventListener('dragleave', () => ptDropzone.classList.remove('is-dragging'));
+    ptDropzone?.addEventListener('drop', async (event) => {
+      event.preventDefault();
+      ptDropzone.classList.remove('is-dragging');
+      if (infiniteStock) return;
+      await agregarPtFiles(event.dataTransfer?.files || []);
     });
     nodes.editorForm.querySelector('#inventoryPtFilesFeedback')?.addEventListener('click', (event) => {
       const rmFile = event.target.closest('[data-pt-file-remove]');
