@@ -3013,7 +3013,7 @@
       const sol = pt ? null : parsePtNumber(ptSolicitud);
       const fuente = pt || sol;
       if (!fuente) {
-        return { modo, separator: '-', provisional: true, aviso: 'Sin PT: el lote queda provisorio. Completá el N° de PT (o de solicitud) editando el ingreso y el lote se recalcula.', parts: [especiePart, { valor: 'SINPT', etiqueta: 'PT pendiente', detalle: 'se completa después', tono: 'warn', falta: true }, facturaPart, destPart] };
+        return { modo, separator: '-', provisional: true, aviso: 'Lote provisorio: se recalcula al cargar el PT.', parts: [especiePart, { valor: 'SINPT', etiqueta: 'PT pendiente', detalle: 'se completa después', tono: 'warn', falta: true }, facturaPart, destPart] };
       }
       const parts = [especiePart];
       if (fuente.establecimiento) parts.push({ valor: fuente.establecimiento, etiqueta: 'Establecimiento', detalle: 'N° SENASA del frigorífico', tono: 'est' });
