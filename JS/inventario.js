@@ -4601,6 +4601,8 @@
       editingEntryId: entry.id,
       ptNumero: normalizeValue(entry.ptNumero || ''),
       ptSolicitud: normalizeValue(entry.ptSolicitud || ''),
+      ptFiles: [],
+      ptExistingUrls: Array.isArray(entry.ptFileUrls) ? entry.ptFileUrls.filter(Boolean) : [],
       destino: lotDestino(entry.destino || record.lotConfig.destinoDefault),
       lotModo: lotModeOf(record.lotConfig),
       lotEspecie: normalizeUpper(record.lotConfig.especie),
@@ -4751,7 +4753,7 @@
         <td>${escapeHtml(formatExpiryForUi(entry))} </td>
         <td class="is-num"><span class="inv-qty ${expiredQtyClass}">${Number(entry.qty || 0).toFixed(2)} ${escapeHtml(entry.unit || '')}</span><br><span class="inventario-available-line ${availableClass} ${expiredQtyClass}">disp. ${getAvailableInUnit(entry, entry.unit).toFixed(2)} ${escapeHtml(getMeasureAbbr(entry.unit || ''))}${entry.packageQty ? ` x${entry.packageQty}` : ''}</span></td>
         <td class="is-code">${escapeHtml(entry.invoiceNumber || '-')}</td>
-        <td class="is-code inventario-lot-cell">${lotAnimalIconHtml(entry)}${escapeHtml(entry.lotNumber || '-')}${entry.customLot ? '<br><small class="text-muted">lote propio</small>' : ''}${entry.ptPendiente && !entry.customLot ? '<br><span class="inv-lote-pend" title="Lote provisorio: completá el PT editando el ingreso">PT pendiente</span>' : ''}</td>
+        <td class="is-code inventario-lot-cell">${lotAnimalIconHtml(entry)}${escapeHtml(entry.lotNumber || '-')}${entry.customLot ? '<br><small class="text-muted">lote propio</small>' : ''}${entry.ptPendiente && !entry.customLot ? '<br><span class="inv-lote-pend" title="Lote provisorio: completá el PT editando el ingreso">PT pendiente</span>' : ''}${Array.isArray(entry.ptFileUrls) && entry.ptFileUrls.length ? `<br><sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-open-pt-files="${entry.id}"><i slot="prefix" class="fa-solid fa-file-shield"></i><span>PT (${entry.ptFileUrls.length})</span></sl-button>` : ''}</td>
         <td class="inventario-provider-cell">${escapeHtml(providerLabel(entry.provider))}</td>
         <td>${entryImageUrls(entry).length ? `<sl-button variant="default" size="small" type="button" class="inventario-threshold-btn" data-open-invoice-image="${entry.id}"><i slot="prefix" class="fa-regular fa-image"></i><span>Ver (${entryImageUrls(entry).length})</span></sl-button>` : '<span class="recetas-tag tone-neu">Sin foto</span>'}</td>
         <td>
@@ -5044,6 +5046,8 @@
       editingEntryId: '',
       ptNumero: '',
       ptSolicitud: '',
+      ptFiles: [],
+      ptExistingUrls: [],
       destino: lotDestino(record.lotConfig.destinoDefault),
       lotModo: lotModeOf(record.lotConfig),
       lotEspecie: normalizeUpper(record.lotConfig.especie),
@@ -5308,6 +5312,11 @@
             <label class="lj-label" for="inventoryPtNumero"><i class="fa-solid fa-file-shield inventario-step-icon"></i> Cert. Sanitario / PT N°</label>
             <sl-input id="inventoryPtNumero" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ej: 5364-A-05502 · ASSAL 388013" value="${escapeHtml(state.editorDraft.ptNumero || '')}" ${stockDisabledAttr}></sl-input>
             <small class="text-muted">Sin PT a mano: guardá igual, queda provisorio; completalo editando el ingreso.</small>
+            <div class="inv-pt-adj">
+              <label for="inventoryPtFiles" class="inv-pt-adj-btn ${infiniteStock ? 'is-disabled' : ''}"><i class="fa-solid fa-paperclip"></i> Adjuntar PT / Cert. sanitario (imagen o PDF)</label>
+              <input id="inventoryPtFiles" class="inventario-hidden-file-input" type="file" accept="image/*,application/pdf" multiple ${stockDisabledAttr}>
+              <div id="inventoryPtFilesFeedback" class="inv-pt-adj-list"></div>
+            </div>
           </div>` : ''}
           ${lotModo === 'pt' || lotModo === 'factura' ? `<div class="recipe-field recipe-field-half">
             <span class="lj-label"><i class="fa-solid fa-signs-post inventario-step-icon"></i> Destino de este ingreso</span>
@@ -5708,6 +5717,8 @@
             customLot: '',
             ptNumero: '',
             ptSolicitud: '',
+            ptFiles: [],
+            ptExistingUrls: [],
             destino: state.editorDraft.lotDestinoDefault,
             provider: '',
             invoiceImageFiles: [],
@@ -5742,6 +5753,8 @@
         customLot: '',
         ptNumero: '',
         ptSolicitud: '',
+        ptFiles: [],
+        ptExistingUrls: [],
         destino: state.editorDraft.lotDestinoDefault,
         provider: '',
         invoiceImageFiles: [],
@@ -6788,6 +6801,49 @@
       });
     });
 
+    // Certificado sanitario / PT adjunto: se listan los ya guardados y los nuevos; se suben al guardar.
+    const renderPtFilesFeedback = () => {
+      const box = nodes.editorForm.querySelector('#inventoryPtFilesFeedback');
+      if (!box) return;
+      const existing = Array.isArray(state.editorDraft.ptExistingUrls) ? state.editorDraft.ptExistingUrls : [];
+      const files = Array.isArray(state.editorDraft.ptFiles) ? state.editorDraft.ptFiles : [];
+      if (!existing.length && !files.length) { box.innerHTML = '<small class="text-muted">Sin certificado adjunto.</small>'; return; }
+      box.innerHTML = [
+        ...existing.map((url, idx) => `<span class="inv-pt-adj-item"><a href="${escapeHtml(url)}" target="_blank" rel="noopener"><i class="fa-regular fa-file-lines"></i> PT adjunto ${idx + 1}</a><button type="button" class="inv-pt-adj-x" data-pt-url-remove="${idx}" aria-label="Quitar adjunto">×</button></span>`),
+        ...files.map((file, idx) => `<span class="inv-pt-adj-item is-new"><i class="fa-solid fa-paperclip"></i> ${escapeHtml(file.name)}<button type="button" class="inv-pt-adj-x" data-pt-file-remove="${idx}" aria-label="Quitar archivo">×</button></span>`)
+      ].join('');
+    };
+    renderPtFilesFeedback();
+    nodes.editorForm.querySelector('#inventoryPtFiles')?.addEventListener('change', async (event) => {
+      const input = event.currentTarget;
+      for (const file of [...(input.files || [])]) {
+        const message = validateInvoiceFile(file);
+        if (message) {
+          await openIosSwal({ title: 'Adjunto no válido', html: `<p>${escapeHtml(file.name)}: ${escapeHtml(message)}</p>`, icon: 'warning', confirmButtonText: 'Entendido' });
+          continue;
+        }
+        state.editorDraft.ptFiles = [...(Array.isArray(state.editorDraft.ptFiles) ? state.editorDraft.ptFiles : []), file];
+      }
+      input.value = '';
+      state.editorDirty = true;
+      renderPtFilesFeedback();
+    });
+    nodes.editorForm.querySelector('#inventoryPtFilesFeedback')?.addEventListener('click', (event) => {
+      const rmFile = event.target.closest('[data-pt-file-remove]');
+      const rmUrl = event.target.closest('[data-pt-url-remove]');
+      if (rmFile) state.editorDraft.ptFiles = (state.editorDraft.ptFiles || []).filter((_, idx) => idx !== Number(rmFile.dataset.ptFileRemove));
+      if (rmUrl) state.editorDraft.ptExistingUrls = (state.editorDraft.ptExistingUrls || []).filter((_, idx) => idx !== Number(rmUrl.dataset.ptUrlRemove));
+      if (rmFile || rmUrl) { state.editorDirty = true; renderPtFilesFeedback(); }
+    });
+    nodes.editorForm.querySelectorAll('[data-open-pt-files]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const entry = (record.entries || []).find((item) => item.id === btn.dataset.openPtFiles);
+        const urls = Array.isArray(entry?.ptFileUrls) ? entry.ptFileUrls.filter(Boolean) : [];
+        if (!urls.length) return;
+        await openAttachmentViewer([{ invoiceImageUrls: urls }], 0, 'Cert. Sanitario / PT');
+      });
+    });
+
     nodes.editorForm.querySelectorAll('[data-open-invoice-image]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const entryId = btn.dataset.openInvoiceImage;
@@ -7224,6 +7280,14 @@
 
     try {
       const invoiceImageUrls = await waitInvoiceDraftUploads();
+      // Certificado sanitario / PT adjunto (sólo carne con PT): los nuevos se suben acá, los guardados se conservan.
+      const ptFileUrls = lotModoValue === 'pt' ? [...(Array.isArray(state.editorDraft.ptExistingUrls) ? state.editorDraft.ptExistingUrls : [])] : [];
+      if (lotModoValue === 'pt') {
+        for (const file of (Array.isArray(state.editorDraft.ptFiles) ? state.editorDraft.ptFiles : [])) {
+          const url = await uploadImageToStorage(file, 'inventario/pt');
+          if (url) ptFileUrls.push(url);
+        }
+      }
 
       if (isEditingEntry) {
         const entries = Array.isArray(record.entries) ? [...record.entries] : [];
@@ -7267,6 +7331,7 @@
         entry.provider = provider;
         entry.invoiceImageUrls = invoiceImageUrls;
         entry.invoiceImageUrl = invoiceImageUrls[0] || '';
+        entry.ptFileUrls = ptFileUrls;
         // Lote propio editado: si se carga uno, reemplaza el lote del ingreso.
         if (customLot) {
           entry.lotNumber = normalizeUpper(customLot);
@@ -7336,6 +7401,8 @@
           customLot: '',
           ptNumero: '',
           ptSolicitud: '',
+          ptFiles: [],
+          ptExistingUrls: [],
           destino: state.editorDraft.lotDestinoDefault,
           provider: '',
           invoiceImageCountLabel: 'Sin archivos seleccionados',
@@ -7399,6 +7466,8 @@
           lotStatus: 'disponible',
           invoiceImageUrl: invoiceImageUrls[0] || '',
           invoiceImageUrls,
+          // El PT es el mismo para todos los productos de la factura que llevan lote por PT.
+          ptFileUrls: targetLotFields.lotModo === 'pt' ? [...ptFileUrls] : [],
           createdAt: Date.now()
         };
 
@@ -7503,6 +7572,8 @@
         customLot: '',
         ptNumero: '',
         ptSolicitud: '',
+        ptFiles: [],
+        ptExistingUrls: [],
         destino: state.editorDraft.lotDestinoDefault,
         provider: '',
         invoiceImageCountLabel: 'Sin archivos seleccionados',
