@@ -1849,3 +1849,6 @@
   .inv-ph-actions { grid-column: 1 / -1; }
   .inv-ph-actions sl-button { width: 100%; }
 }
+
+/* KPIs de la cabecera sin bordes de color: sólo el número lleva color. */
+.inv-kpi, .inv-kpi.is-main, .inv-kpi.is-bad, .inv-kpi.is-warn { border: 1px solid var(--lj-border); border-radius: var(--lj-radius-lg); background: var(--lj-surface-2); }
