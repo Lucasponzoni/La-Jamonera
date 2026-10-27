@@ -3037,8 +3037,11 @@
   const lotExplainHtml = (lot, { titulo = 'Así se arma el lote' } = {}) => {
     if (!lot) return '';
     const chips = lot.parts.map((part, index) => `${index && lot.separator ? `<span class="inv-lote-sep">${escapeHtml(lot.separator)}</span>` : ''}<span class="inv-lote-part is-${part.tono}${part.falta ? ' is-falta' : ''}"><strong>${part.icono ? `<span class="inv-lote-ico">${part.icono}</span>` : ''}${escapeHtml(part.valor)}</strong><small>${escapeHtml(part.etiqueta)}</small>${part.detalle ? `<em>${escapeHtml(part.detalle)}</em>` : ''}</span>`).join('');
-    return `<div class="inv-lote-explica${lot.provisional ? ' is-provisorio' : ''}">
-      <div class="inv-lote-cab"><span><i class="fa-solid fa-barcode"></i> ${escapeHtml(titulo)}</span><code>${escapeHtml(lotPartsToNumber(lot))}</code></div>
+    // Se muestra como una etiqueta de lote: cabecera chica, franja tipo código de barras, número grande y las partes debajo.
+    return `<div class="inv-lote-explica inv-etiqueta${lot.provisional ? ' is-provisorio' : ''}">
+      <div class="inv-et-cab"><i class="fa-solid fa-tag"></i> ${escapeHtml(titulo)}</div>
+      <div class="inv-et-barra" aria-hidden="true"></div>
+      <div class="inv-et-num"><code>${escapeHtml(lotPartsToNumber(lot))}</code></div>
       <div class="inv-lote-parts">${chips}</div>
       ${lot.aviso ? `<p class="inv-lote-aviso"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(lot.aviso)}</p>` : ''}
     </div>`;
@@ -5525,7 +5528,7 @@
       const box = nodes.editorForm.querySelector('#inventoryLotExplain');
       if (box) {
         box.innerHTML = custom
-          ? `<div class="inv-lote-explica"><div class="inv-lote-cab"><span><i class="fa-solid fa-barcode"></i> Lote de este ingreso</span><code>${escapeHtml(custom)}</code></div><p class="inv-lote-aviso is-info"><i class="fa-solid fa-circle-info"></i> Se usa el lote propio del producto cargado arriba.</p></div>`
+          ? `<div class="inv-lote-explica inv-etiqueta"><div class="inv-et-cab"><i class="fa-solid fa-tag"></i> Lote de este ingreso</div><div class="inv-et-barra" aria-hidden="true"></div><div class="inv-et-num"><code>${escapeHtml(custom)}</code></div><p class="inv-lote-aviso is-info"><i class="fa-solid fa-circle-info"></i> Se usa el lote propio del envase.</p></div>`
           : (real ? lotExplainHtml(real, { titulo: 'Lote de este ingreso' }) : '');
       }
       const ejemplo = buildLotParts({

@@ -1898,3 +1898,15 @@
 .inv-lote-propio summary::before { content: '+'; width: 14px; text-align: center; font-weight: 800; }
 .inv-lote-propio[open] summary::before { content: '−'; }
 .inv-lote-propio sl-input { display: block; max-width: 380px; margin-top: 4px; }
+
+/* ── Tarjeta del lote como etiqueta: centrada, borde perforado arriba, franja de barras y número grande ── */
+.inv-lote-explica.inv-etiqueta { position: relative; max-width: 640px; margin: 6px auto 0; padding: 12px 16px 12px; text-align: center; background: var(--lj-surface); border: 1px solid var(--lj-border-strong); border-radius: var(--lj-radius-lg); box-shadow: var(--lj-shadow); }
+.inv-lote-explica.inv-etiqueta::before { content: ''; position: absolute; left: 14px; right: 14px; top: 5px; border-top: 2px dashed var(--lj-border-strong); }
+.inv-lote-explica.inv-etiqueta.is-provisorio { background: var(--lj-warning-soft); border-color: var(--lj-border-strong); }
+.inv-et-cab { margin-top: 6px; font-size: .68rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--lj-muted); }
+.inv-et-cab i { margin-right: 4px; }
+.inv-et-barra { height: 22px; width: min(100%, 300px); margin: 8px auto 2px; opacity: .8; background: repeating-linear-gradient(90deg, var(--lj-text) 0 2px, transparent 2px 4px, var(--lj-text) 4px 5px, transparent 5px 8px, var(--lj-text) 8px 11px, transparent 11px 13px, var(--lj-text) 13px 14px, transparent 14px 17px); }
+.inv-et-num code { display: inline-block; padding: 2px 10px; border: 0; background: transparent; font-size: 1.55rem; font-weight: 700; letter-spacing: .08em; color: var(--lj-text); word-break: break-all; }
+.inv-ing-form .inv-et-num code { font-size: 1.4rem; }
+.inv-etiqueta .inv-lote-parts { justify-content: center; margin-top: 8px; }
+.inv-etiqueta .inv-lote-aviso { display: flex; justify-content: center; gap: 6px; margin-top: 8px; }
