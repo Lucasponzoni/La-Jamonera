@@ -1852,3 +1852,25 @@
 
 /* KPIs de la cabecera sin bordes de color: sólo el número lleva color. */
 .inv-kpi, .inv-kpi.is-main, .inv-kpi.is-bad, .inv-kpi.is-warn { border: 1px solid var(--lj-border); border-radius: var(--lj-radius-lg); background: var(--lj-surface-2); }
+
+/* ── Secciones plegables del editor (configuración de lote, días sugeridos): una sola caja, cabecera plana ── */
+#inventarioEditorForm .inv-collapse { padding: 0; overflow: hidden; }
+#inventarioEditorForm .inv-collapse-head {
+  display: flex; align-items: center; gap: 10px; width: 100%; margin: 0; padding: 9px 12px;
+  border: 0; border-radius: 0; background: transparent; color: var(--lj-text); font: inherit; font-weight: 600; text-align: left; cursor: pointer;
+  transition: background-color .15s ease;
+}
+#inventarioEditorForm .inv-collapse-head:hover { background: var(--lj-surface-2); }
+#inventarioEditorForm .inv-collapse-head:focus-visible { outline: 2px solid var(--lj-accent); outline-offset: -2px; }
+#inventarioEditorForm .inv-collapse-head[aria-expanded="true"] { border-bottom: 1px solid var(--lj-border); }
+#inventarioEditorForm .inv-collapse-title { display: inline-flex; align-items: center; white-space: nowrap; }
+#inventarioEditorForm .inv-collapse-head .inventario-collapse-summary { margin-left: auto; max-width: none; justify-content: flex-end; gap: 4px; font-size: .76rem; }
+#inventarioEditorForm .inv-collapse-chev { flex: 0 0 auto; font-size: .72rem; color: var(--lj-muted); transition: transform .15s ease; }
+#inventarioEditorForm .inv-collapse-head[aria-expanded="true"] .inv-collapse-chev { transform: rotate(180deg); }
+#inventarioEditorForm .inv-collapse-head .inventario-config-badge { padding: 2px 8px; border-radius: 999px; font-size: .72rem; font-weight: 500; color: var(--lj-text); background: var(--lj-surface-2); }
+#inventarioEditorForm .inv-collapse-head .inventario-config-badge.is-secondary { color: var(--lj-muted); }
+#inventarioEditorForm .inv-collapse-body { padding: 12px; }
+@media (max-width: 640px) {
+  #inventarioEditorForm .inv-collapse-head { flex-wrap: wrap; }
+  #inventarioEditorForm .inv-collapse-head .inventario-collapse-summary { order: 3; width: 100%; margin-left: 0; justify-content: flex-start; }
+}

@@ -5156,12 +5156,13 @@
 
       ${infiniteStock ? infiniteStockNoticeHtml() : ''}
 
-      <section class="recipe-step-card step-block inventario-lot-section">
-        <div class="d-flex flex-wrap gap-2 align-items-center"><button type="button" class="lj-tile inventario-collapse-head inventario-collapse-head-styled" id="lotConfigToggleBtn" aria-expanded="${state.editorDraft.showLotConfig}">
-          <span><span class="recipe-step-number">1</span> Configuración de lote</span>
+      <section class="recipe-step-card step-block inventario-lot-section inv-collapse">
+        <button type="button" class="inv-collapse-head" id="lotConfigToggleBtn" aria-expanded="${state.editorDraft.showLotConfig}" aria-controls="lotConfigBody">
+          <span class="inv-collapse-title"><span class="recipe-step-number">1</span> Configuración de lote</span>
           <span class="inventario-collapse-summary">${buildLotSummaryBadges(draftLotConfig())}</span>
-        </div>
-        <div id="lotConfigBody" class="step-content ${state.editorDraft.showLotConfig ? '' : 'd-none'}">
+          <i class="fa-solid fa-chevron-down inv-collapse-chev" aria-hidden="true"></i>
+        </button>
+        <div id="lotConfigBody" class="step-content inv-collapse-body ${state.editorDraft.showLotConfig ? '' : 'd-none'}">
           <div class="inv-lote-modos" role="radiogroup" aria-label="Cómo se arma el lote">
             ${LOT_MODES.map((item) => `<button type="button" class="inv-lote-modo ${lotModo === item.key ? 'is-active' : ''}" data-lot-modo="${item.key}" role="radio" aria-checked="${lotModo === item.key}"><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.hint)}</small></button>`).join('')}
           </div>
@@ -5202,16 +5203,15 @@
         </div>
       </section>
 
-      <section class="recipe-step-card step-block">
-        <div class="d-flex flex-wrap gap-2 align-items-center">
-          <button type="button" class="lj-tile inventario-collapse-head inventario-collapse-head-styled" id="suggestedExpiryToggleBtn" aria-expanded="${!record.suggestedExpiryDays}">
-            <span><span class="recipe-step-number">2</span> Días de vencimiento sugeridos</span>
-            <span class="inventario-collapse-summary" id="suggestedExpirySummary">
-              ${record.suggestedExpiryDays ? `<sl-badge variant="warning" pill class="inventario-suggest-badge"><i class="fa-solid fa-calendar-check me-1"></i> ${record.suggestedExpiryDays} días</sl-badge>` : ''}
-            </span>
-          </button>
-        </div>
-        <div id="suggestedExpiryBody" class="step-content ${record.suggestedExpiryDays ? 'd-none' : ''}">
+      <section class="recipe-step-card step-block inv-collapse">
+        <button type="button" class="inv-collapse-head" id="suggestedExpiryToggleBtn" aria-expanded="${!record.suggestedExpiryDays}" aria-controls="suggestedExpiryBody">
+          <span class="inv-collapse-title"><span class="recipe-step-number">2</span> Días de vencimiento sugeridos</span>
+          <span class="inventario-collapse-summary" id="suggestedExpirySummary">
+            ${record.suggestedExpiryDays ? `<span class="inventario-config-badge"><i class="fa-solid fa-calendar-check me-1"></i> ${record.suggestedExpiryDays} días</span>` : '<span class="inventario-config-badge is-secondary">Sin sugerencia (5 días)</span>'}
+          </span>
+          <i class="fa-solid fa-chevron-down inv-collapse-chev" aria-hidden="true"></i>
+        </button>
+        <div id="suggestedExpiryBody" class="step-content inv-collapse-body ${record.suggestedExpiryDays ? 'd-none' : ''}">
           <div class="recipe-fields-flex">
             <div class="recipe-field recipe-field-half">
               <label class="lj-label" for="inventarioSuggestedExpiryDays"><i class="fa-solid fa-hourglass-half inventario-step-icon"></i> Días sugeridos</label>
@@ -5435,7 +5435,7 @@
       </section>
 
       <section class="recipe-step-card step-block">
-        <h6 class="step-title"><span class="recipe-step-number">3</span> Historial de ingresos</h6>
+        <h6 class="step-title"><span class="recipe-step-number">4</span> Historial de ingresos</h6>
         ${renderEntryTable(record)}
       </section>`;
 
