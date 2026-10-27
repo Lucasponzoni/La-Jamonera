@@ -3375,6 +3375,9 @@
     });
   };
 
+  // Vencimiento por defecto de un ingreso: ingreso + días sugeridos del producto (5 si no tiene).
+  const suggestedDaysFor = (record) => (Number(record?.suggestedExpiryDays) > 0 ? Number(record.suggestedExpiryDays) : 5);
+
   const buildLotNumber = ({ lotConfig, invoiceNumber, entryDate, expiryDate, productName, ptNumero = '', ptSolicitud = '', destino = '' }) => {
     const config = safeObject(lotConfig);
     const lot = buildLotParts({ lotConfig: config, invoiceNumber, expiryDate, productName, ptNumero, ptSolicitud, destino });
@@ -4583,7 +4586,7 @@
       usoInternoEmpresa: Boolean(entry.usoInternoEmpresa),
       // Cargar el flag de congelado desde el entry persistido para que el tile
       // se muestre correctamente al editar un ingreso ya cargado.
-      isFrozen: Boolean(entry.isFrozen || entry.frozen) && !state.materiaPrima?.has(ingredientId),
+      isFrozen: Boolean(entry.isFrozen || entry.frozen),
       // Marcamos los flags como "no vienen de preferencia" porque vienen del
       // entry real que se está editando — no queremos mostrar el badge ámbar.
       flagsFromPreferences: { noPerecedero: false, isFrozen: false, usoInternoEmpresa: false },
@@ -5009,9 +5012,9 @@
     // se pre-tildan acá. La UI muestra una pista visual junto al tile.
     const flagPrefs = safeObject(record.flagPreferences);
     const hasFlagPrefs = Object.keys(flagPrefs).length > 0;
-    // Materia prima (se usa en recetas): no se congela al ingreso, va fresca a producción.
+    // Materia prima (se usa en recetas): destino R y sin autoegreso, la IA sólo la baja al vencer.
     const esMateriaPrima = Boolean(state.materiaPrima?.has(ingredientId));
-    const prefIsFrozen = Boolean(flagPrefs.isFrozen) && !esMateriaPrima;
+    const prefIsFrozen = Boolean(flagPrefs.isFrozen);
     const prefNoPerecedero = Boolean(flagPrefs.noPerecedero);
     const prefAutoEgreso = Boolean(flagPrefs.usoInternoEmpresa);
 
@@ -5022,7 +5025,7 @@
       entryDate: getArgentinaIsoDate(),
       expiryDate: prefIsFrozen
         ? addDaysToIso(getArgentinaIsoDate(), FROZEN_EXPIRY_DAYS)
-        : addDaysToIso(getArgentinaIsoDate(), 5),
+        : addDaysToIso(getArgentinaIsoDate(), suggestedDaysFor(record)),
       noPerecedero: prefNoPerecedero,
       isFrozen: prefIsFrozen,
       usoInternoEmpresa: prefAutoEgreso,
@@ -5105,7 +5108,7 @@
     const lotCfgHead = safeObject(record.lotConfig);
     const headModo = lotModeOf(lotCfgHead);
     const headEspecie = LOT_ESPECIES[normalizeUpper(lotCfgHead.especie)] ? normalizeUpper(lotCfgHead.especie) : '';
-    const headTagsHtml = `<div class="inv-head-tags">${headModo === 'pt' ? `<span class="recetas-tag ${headEspecie ? 'tone-neu' : 'tone-bad'}">${headEspecie ? `<span class="inv-animal">${LOT_ESPECIE_ICONO[headEspecie]}</span>${LOT_ESPECIES[headEspecie]}` : 'Sin animal elegido'}</span>` : ''}<span class="recetas-tag tone-neu"><i class="fa-solid fa-barcode"></i> Lote: ${escapeHtml(LOT_MODES.find((item) => item.key === headModo)?.label || 'Personalizado')}</span>${esMateriaPrima ? '<span class="recetas-tag tone-neu"><i class="fa-solid fa-industry"></i> Materia prima</span>' : ''}</div>`;
+    const headTagsHtml = `<div class="inv-head-tags inv-ph-tags">${headModo === 'pt' ? `<span class="recetas-tag ${headEspecie ? 'tone-neu' : 'tone-bad'}">${headEspecie ? `<span class="inv-animal">${LOT_ESPECIE_ICONO[headEspecie]}</span>${LOT_ESPECIES[headEspecie]}` : 'Sin animal elegido'}</span>` : ''}<span class="recetas-tag tone-neu"><i class="fa-solid fa-barcode"></i> Lote: ${escapeHtml(LOT_MODES.find((item) => item.key === headModo)?.label || 'Personalizado')}</span>${esMateriaPrima ? '<span class="recetas-tag tone-neu"><i class="fa-solid fa-industry"></i> Materia prima</span>' : ''}</div>`;
     const packageUnit = state.editorDraft.unit || stockUnit;
     const shouldShowPackageQty = getUnitMeta(packageUnit).category === 'unidad' || Number(record.packageQty) > 0;
 
@@ -5130,26 +5133,24 @@
       </div>`).join('');
 
     nodes.editorForm.innerHTML = `
-      <section class="inventario-product-head inventario-product-head-v2">
-        <div class="inventario-product-head-main">
-          <div class="inventario-editor-photo">${ingredientAvatar(ingredient)}</div>
-          <div class="inventario-product-copy">
-            <p class="inventario-editor-kicker">Inventario</p>
-            <h6 class="inventario-editor-name">${capitalize(ingredient.name)}</h6>
-            <p class="inventario-editor-meta">${sentenceCase(ingredient.description || 'Sin descripción')}</p>
-            <p class="inventario-editor-measure">${getMeasureLabel(ingredient.measure || 'kilos')}</p>
-            ${headTagsHtml}
+      <section class="inv-ph">
+        <div class="inv-ph-top">
+          <div class="inventario-editor-photo inv-ph-photo">${ingredientAvatar(ingredient)}</div>
+          <div class="inv-ph-copy">
+            <div class="inv-ph-title"><h6 class="inv-ph-name">${capitalize(ingredient.name)}</h6>${headTagsHtml}</div>
+            <p class="inv-ph-desc">${sentenceCase(ingredient.description || 'Sin descripción')}</p>
+            <p class="inv-ph-measure">${getMeasureLabel(ingredient.measure || 'kilos')}</p>
           </div>
-        </div>
-          <div class="inventario-product-head-stats">
-          <div class="inv-head-kpis">${headKpisHtml}</div>
-          ${vtoTablaHtml}
-          <div class="inventario-head-actions-row">
-            <div class="inventario-check-row inventario-check-row-compact inventario-infinite-toggle"><sl-switch id="inventarioInfiniteStockToggle" ${infiniteStock ? 'checked' : ''}>Stock infinito</sl-switch><sl-spinner class="meta-spinner d-none" id="inventarioInfiniteStockSpinner" aria-label="Guardando"></sl-spinner></div>
-            <sl-button variant="default" type="button" class="inventario-head-action" id="inventarioProductThresholdBtn"><i slot="prefix" class="fa-solid fa-sliders"></i><span>Configurar umbrales</span></sl-button>
-            <sl-button variant="default" type="button" class="inventario-head-action" id="inventarioWeeklySheetBtn"><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planilla Semanal</span></sl-button>
+          <div class="inv-ph-actions">
             <sl-button variant="success" type="button" id="inventarioEditIngredientBtn" class="inventario-head-action"><i slot="prefix" class="fa-solid fa-pen"></i><span>Editar ingrediente</span></sl-button>
           </div>
+        </div>
+        <div class="inv-ph-kpis">${headKpisHtml}</div>
+        ${vtoTablaHtml}
+        <div class="inv-ph-tools">
+          <div class="inventario-check-row inventario-check-row-compact inventario-infinite-toggle"><sl-switch id="inventarioInfiniteStockToggle" ${infiniteStock ? 'checked' : ''}>Stock infinito</sl-switch><sl-spinner class="meta-spinner d-none" id="inventarioInfiniteStockSpinner" aria-label="Guardando"></sl-spinner></div>
+          <sl-button variant="default" type="button" class="inventario-head-action" id="inventarioProductThresholdBtn"><i slot="prefix" class="fa-solid fa-sliders"></i><span>Configurar umbrales</span></sl-button>
+          <sl-button variant="default" type="button" class="inventario-head-action" id="inventarioWeeklySheetBtn"><i slot="prefix" class="fa-regular fa-file-lines"></i><span>Planilla Semanal</span></sl-button>
         </div>
       </section>
 
@@ -5249,7 +5250,7 @@
               ${state.measures.map((m) => `<sl-option value="${ljOptionValue(m.name)}">${escapeHtml(getMeasureLabel(m.name))}</sl-option>`).join('')}
               <sl-option value="add_measure">+ Agregar medida</sl-option>
             </sl-select>
-            ${infiniteStock ? '<small class="text-muted">Unidad bloqueada por stock infinito.</small>' : (record.stockUnit ? `<small class="text-muted d-block">Unidad bloqueada según ingresos previos.</small><sl-button variant="default" size="small" type="button" class="inventario-threshold-btn mt-1" data-mass-unit-change><i slot="prefix" class="fa-solid fa-right-left"></i><span>Cambiar unidad masivamente</span></sl-button>` : '')}
+            ${infiniteStock ? '<small class="text-muted">Unidad bloqueada por stock infinito.</small>' : (record.stockUnit ? `<small class="text-muted d-block">Bloqueada por ingresos previos.</small><sl-button variant="default" size="small" type="button" class="inventario-threshold-btn mt-1" data-mass-unit-change><i slot="prefix" class="fa-solid fa-right-left"></i><span>Cambiar unidad masivamente</span></sl-button>` : '')}
           </div>
           <div class="recipe-field recipe-field-half ${shouldShowPackageQty ? '' : 'd-none'}" id="inventoryPackageQtyWrap">
             <label class="lj-label" for="inventoryPackageQty"><i class="fa-solid fa-box inventario-step-icon"></i> Cantidad por paquete (opcional)</label>
@@ -5261,9 +5262,9 @@
             <input id="inventoryEntryDate" class="lj-input" autocomplete="off" value="${escapeHtml(state.editorDraft.entryDate)}" placeholder="Seleccionar fecha" ${stockDisabledAttr}>
           </div>
           <div class="recipe-field recipe-field-half">
-            <label class="lj-label" for="inventoryExpiryDate"><i class="fa-regular fa-calendar-check inventario-step-icon"></i> Fecha de caducidad</label>
+            <label class="lj-label" for="inventoryExpiryDate"><i class="fa-regular fa-calendar-check inventario-step-icon"></i> ${lotModo === 'pt' ? 'Apto hasta (vence según el PT)' : 'Fecha de caducidad'}</label>
             <input id="inventoryExpiryDate" class="lj-input" autocomplete="off" value="${escapeHtml(state.editorDraft.expiryDate)}" placeholder="Seleccionar fecha" ${(state.editorDraft.noPerecedero || state.editorDraft.isFrozen || infiniteStock) ? 'disabled' : ''}>
-            ${state.editorDraft.isFrozen ? `<small class="text-muted d-block mt-1"><sl-icon name="info-circle" class="me-1"></sl-icon>Vencimiento fijo a <strong>${FROZEN_EXPIRY_DAYS} días</strong> desde la fecha de ingreso.</small>` : ''}
+            ${state.editorDraft.isFrozen ? `<small class="text-muted d-block mt-1"><sl-icon name="info-circle" class="me-1"></sl-icon>Vencimiento fijo a <strong>${FROZEN_EXPIRY_DAYS} días</strong> desde la fecha de ingreso.</small>` : (lotModo === 'pt' ? '<small class="text-muted">«Vence el día» del PT; si es rango, el más corto. Sin fecha en el PT: ingreso + días sugeridos.</small>' : '')}
           </div>
             </div>
           </div>
@@ -5306,24 +5307,24 @@
           ${lotModo === 'pt' ? `<div class="recipe-field recipe-field-half">
             <label class="lj-label" for="inventoryPtNumero"><i class="fa-solid fa-file-shield inventario-step-icon"></i> Cert. Sanitario / PT N°</label>
             <sl-input id="inventoryPtNumero" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ej: 5364-A-05502 · ASSAL 388013" value="${escapeHtml(state.editorDraft.ptNumero || '')}" ${stockDisabledAttr}></sl-input>
-            <small class="text-muted">Si todavía no lo tenés, guardá igual: queda provisorio y lo completás después editando el ingreso.</small>
+            <small class="text-muted">Sin PT a mano: guardá igual, queda provisorio; completalo editando el ingreso.</small>
           </div>` : ''}
           ${lotModo === 'pt' || lotModo === 'factura' ? `<div class="recipe-field recipe-field-half">
             <span class="lj-label"><i class="fa-solid fa-signs-post inventario-step-icon"></i> Destino de este ingreso</span>
             <div class="inv-lote-destinos" role="radiogroup" aria-label="Destino">
               ${Object.entries(LOT_DESTINOS).map(([key, label]) => `<button type="button" class="inv-lote-destino ${lotDestino(state.editorDraft.destino) === key ? 'is-active' : ''}" data-lot-destino="${key}" role="radio" aria-checked="${lotDestino(state.editorDraft.destino) === key}" ${stockDisabledAttr}><strong>${key}</strong><span>${label}</span></button>`).join('')}
             </div>
-            <small class="text-muted">R: se usa para producir · S: venta en el salón.${esMateriaPrima ? ' Materia prima: con R no lleva autoegreso, la IA sólo lo da de baja al vencer.' : ''}</small>
+            <small class="text-muted">R: producción · S: salón.${esMateriaPrima ? ' Materia prima en R: sin autoegreso (la IA sólo baja vencidos).' : ''}</small>
           </div>` : ''}
           ${lotModo === 'pt' ? `<div class="recipe-field recipe-field-half">
             <label class="lj-label" for="inventoryPtSolicitud"><i class="fa-regular fa-file-lines inventario-step-icon"></i> N° de solicitud</label>
             <sl-input id="inventoryPtSolicitud" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ej: 5364-A-05580" value="${escapeHtml(state.editorDraft.ptSolicitud || '')}" ${stockDisabledAttr}></sl-input>
-            <small class="text-muted">Sólo si el PT vino sin número definitivo: el lote lleva ese número con una «S».</small>
+            <small class="text-muted">Sólo si el PT vino sin número definitivo (el lote lleva «S»).</small>
           </div>` : ''}
           <div class="recipe-field recipe-field-half">
             <label class="lj-label" for="inventoryCustomLot"><i class="fa-solid fa-barcode inventario-step-icon"></i> Lote propio del producto (opcional)</label>
             <sl-input id="inventoryCustomLot" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ej: L4521-A (lote de fábrica)" value="${escapeHtml(state.editorDraft.customLot || '')}" ${stockDisabledAttr}></sl-input>
-            <small class="text-muted">Sólo si el envase trae su propio lote de fábrica: reemplaza al lote automático en este ingreso.</small>
+            <small class="text-muted">Sólo si el envase trae lote de fábrica: reemplaza al automático.</small>
           </div>
           <div class="recipe-field recipe-field-full" id="inventoryLotExplain"></div>
             </div>
@@ -5368,7 +5369,7 @@
                   desc: 'Envases primarios & uso interno',
                   hasInfo: false
                 }
-              ].filter((tile) => !(tile.flag === 'frozen' && esMateriaPrima)).map((tile) => `
+              ].map((tile) => `
                 <div class="inventario-flag-tile-wrap ${tile.hasInfo ? 'has-info' : ''}">
                   <label class="inventario-flag-tile ${tile.checked ? 'is-checked' : ''} ${tile.fromPref && tile.checked ? 'is-from-pref' : ''} ${tile.hasInfo ? 'has-info' : ''}" data-flag="${tile.flag}">
                     <span class="inventario-flag-tile-icon"><sl-icon name="${tile.icon}"></sl-icon></span>
@@ -5384,7 +5385,6 @@
                 </div>
               `).join('')}
             </div>
-            ${esMateriaPrima ? '<small class="text-muted d-block mt-1"><sl-icon name="info-circle" class="me-1"></sl-icon>Materia prima: no se congela al ingreso, va fresca a producción.</small>' : ''}
           </div>
             </div>
           </div>
@@ -5416,7 +5416,7 @@
             </tr>
             <tr class="inventario-bulk-secondary-row">
               <td></td>
-              <td colspan="5"><div class="inventario-bulk-row-extras"><sl-checkbox class="inventario-check-row inventario-check-row-compact" data-bulk-no-perecedero="${idx}" ${extra.noPerecedero ? 'checked' : ''} ${stockDisabledAttr}>No perecedero</sl-checkbox><sl-checkbox class="inventario-check-row inventario-check-row-compact" data-bulk-auto-egreso="${idx}" ${extra.usoInternoEmpresa ? 'checked' : ''} ${stockDisabledAttr}>Autoegreso</sl-checkbox>${state.materiaPrima?.has(extraIngredient?.id) ? '' : `<span class="inventario-check-row inventario-check-row-compact inventario-frozen-row"><sl-checkbox data-bulk-frozen="${idx}" ${extra.isFrozen ? 'checked' : ''} ${stockDisabledAttr}><sl-icon name="snow2" class="me-1"></sl-icon>Congelado</sl-checkbox>${frozenInfoIconHtml()}</span>`}</div></td>
+              <td colspan="5"><div class="inventario-bulk-row-extras"><sl-checkbox class="inventario-check-row inventario-check-row-compact" data-bulk-no-perecedero="${idx}" ${extra.noPerecedero ? 'checked' : ''} ${stockDisabledAttr}>No perecedero</sl-checkbox><sl-checkbox class="inventario-check-row inventario-check-row-compact" data-bulk-auto-egreso="${idx}" ${extra.usoInternoEmpresa ? 'checked' : ''} ${stockDisabledAttr}>Autoegreso</sl-checkbox><span class="inventario-check-row inventario-check-row-compact inventario-frozen-row"><sl-checkbox data-bulk-frozen="${idx}" ${extra.isFrozen ? 'checked' : ''} ${stockDisabledAttr}><sl-icon name="snow2" class="me-1"></sl-icon>Congelado</sl-checkbox>${frozenInfoIconHtml()}</span></div></td>
             </tr>`;
           }).join('')}</tbody>
               </table>
@@ -5751,7 +5751,7 @@
         noPerecedero: false,
         usoInternoEmpresa: false,
         isFrozen: false,
-        expiryDate: addDaysToIso(getArgentinaIsoDate(), 5),
+        expiryDate: addDaysToIso(getArgentinaIsoDate(), suggestedDaysFor(record)),
         entryDate: getArgentinaIsoDate(),
         bulkEntries: []
       });
@@ -7343,7 +7343,7 @@
           invoiceUploadItems: [],
           noPerecedero: false,
           usoInternoEmpresa: false,
-          expiryDate: addDaysToIso(getArgentinaIsoDate(), 5),
+          expiryDate: addDaysToIso(getArgentinaIsoDate(), suggestedDaysFor(record)),
           entryDate: getArgentinaIsoDate(),
           bulkEntries: []
         });
@@ -7512,7 +7512,7 @@
         noPerecedero: false,
         usoInternoEmpresa: false,
         isFrozen: false,
-        expiryDate: addDaysToIso(getArgentinaIsoDate(), 5),
+        expiryDate: addDaysToIso(getArgentinaIsoDate(), suggestedDaysFor(record)),
         entryDate: getArgentinaIsoDate(),
         bulkEntries: []
       });
