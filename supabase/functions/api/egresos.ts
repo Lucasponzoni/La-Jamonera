@@ -147,9 +147,11 @@ export async function runAutoEgresos({ dryRun = true, now = new Date(), aiChat, 
     const todayIso = engine.T.dateToIso(now);
     // Productos sincronizados con el POS y materia prima: la IA sólo resuelve vencidos (ver idsSincronizadosPos).
     const soloVencidos = await idsSincronizadosPos(todayIso);
+    // Lotes «sólo venta en local» (carne sin PT): entran a la corrida con egreso diario aunque el ingrediente no lo tenga.
+    const ventaLocalIds = new Set(lots.filter((l) => l.raw && typeof l.raw === 'object' && l.raw.ventaLocal).map((l) => l.ingrediente_id));
 
     const allIds = (regs || [])
-      .filter((r) => (withDefaultWeeklyConfig(r.weekly_sheet_config).egresoEnabled || soloVencidos.has(r.ingrediente_id)) && !r.infinite_stock && (lotsBy[r.ingrediente_id] || []).length)
+      .filter((r) => (withDefaultWeeklyConfig(r.weekly_sheet_config).egresoEnabled || soloVencidos.has(r.ingrediente_id) || ventaLocalIds.has(r.ingrediente_id)) && !r.infinite_stock && (lotsBy[r.ingrediente_id] || []).length)
       .map((r) => r.ingrediente_id);
     if (!allIds.length) { await setCursor(''); return summary; }
 
@@ -194,11 +196,15 @@ export async function runAutoEgresos({ dryRun = true, now = new Date(), aiChat, 
       const movRows = [];
       record.entries.forEach((entry, j) => {
         const prev = record.__lots[j];
+        const ventaLocal = Boolean(entry.ventaLocal);
+        // Sin egreso diario en el ingrediente sólo se procesan los lotes «venta local» (los demás, si están en
+        // «sólo vencidos», se resuelven al vencer como siempre).
+        if (!ventaLocal && !weeklyCfg.egresoEnabled && !record.__soloVencidos) return;
         try {
           const result = engine.processEntryAutoEgreso({
             ingredientId, ingredient, entry, weeklyCfg, todayIso, holidaySet, runId,
             aiPlanByDay: safeObj(aiPlans[normalizeText(entry.id)]),
-            soloVencidos: record.__soloVencidos
+            soloVencidos: record.__soloVencidos && !ventaLocal
           });
           if (!result.changed) return;
           summary.movements += result.movementsCreated;

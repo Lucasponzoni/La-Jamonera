@@ -205,6 +205,7 @@ function summarizeEntryLiteForIndex(entry) {
     expiryDate: normalizeIso(entry.expiryDate),
     noPerecedero: Boolean(entry.noPerecedero),
     usoInternoEmpresa: Boolean(entry.usoInternoEmpresa),
+    ventaLocal: Boolean(entry.ventaLocal),
     isFrozen: Boolean(entry.isFrozen || entry.frozen),
     frozenAt: normalizeIso(entry.frozenAt),
     unit: normalizeText(entry.unit),
@@ -566,9 +567,11 @@ function createEngine({ cfg, random = Math.random, tz = TZ, log }) {
       const record = items[ingredientId];
       if (!record || !Array.isArray(record.entries) || !record.entries.length) return;
       const weeklyCfg = withDefaultWeeklyConfig(record.weeklySheetConfig);
-      if (!weeklyCfg.egresoEnabled || record.__soloVencidos) return;
+      const egresoDiario = weeklyCfg.egresoEnabled && !record.__soloVencidos;
       const ingredient = safeObj(ingredientes[ingredientId]);
       record.entries.forEach((entry) => {
+        // Un lote «sólo venta en local» se reparte día a día aunque el ingrediente no tenga egreso diario.
+        if (!egresoDiario && !entry.ventaLocal) return;
         const window = getEntryProcessingWindow(entry, weeklyCfg, todayIso, holidaySet);
         if (!window) return;
         const unitMeta = getUnitMeta(entry.unit);

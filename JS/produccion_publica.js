@@ -380,6 +380,13 @@
         lines.push(`${rneId}["<b>RNE PROVEEDOR</b><br/>${escapeHtml(providerRne || '-')}"]:::toneRegistry`);
         lines.push(`${nodeId} -.->|LOTE ${lotIndex + 1}| ${lotNodeId}`);
         lines.push(`${lotNodeId} -.->|RNE| ${rneId}`);
+        // Corte que salió de un desposte: se muestra la pieza de origen con su lote y PT.
+        const desp = lot?.despostadoDe || traceLot?.despostadoDe;
+        if (desp && desp.ingredientName) {
+          const despPt = normalize(desp.ptNumero) || (normalize(desp.ptSolicitud) ? `Solic. ${desp.ptSolicitud}` : '');
+          lines.push(`${lotNodeId}_DESP["<b>DESPOSTE</b><br/>de ${escapeHtml(String(desp.ingredientName).toUpperCase())}<br/><b>Lote:</b> ${escapeHtml(desp.lotNumber || '-')}${despPt ? `<br/><b>PT:</b> ${escapeHtml(despPt)}` : ''}<br/><b>Fecha:</b> ${escapeHtml(formatIsoEs(desp.fecha || ''))}"]:::toneDesp`);
+          lines.push(`${lotNodeId} -.->|DESPOSTE| ${lotNodeId}_DESP`);
+        }
         if (previousLotNodeId) lines.push(`${previousLotNodeId} -.-> ${lotNodeId}`);
         previousLotNodeId = lotNodeId;
       });
@@ -408,6 +415,7 @@
     lines.push('classDef toneWaste fill:#ffd8de,stroke:#e994a4,color:#7d2233,stroke-width:1.4px;');
     lines.push('classDef toneIngredient fill:#eaf1ff,stroke:#9fb9e6,color:#173f78,stroke-width:1.35px;');
     lines.push('classDef toneRegistry fill:#e7efff,stroke:#8eaedf,color:#173d73,stroke-width:1.35px;');
+    lines.push('classDef toneDesp fill:#d9ecff,stroke:#5b9bd5,color:#0c3a66,stroke-width:1.5px;');
     return lines.join('\n');
   };
 

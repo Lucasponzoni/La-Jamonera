@@ -429,7 +429,10 @@
     const meta = getUnitMeta(unit);
     return Number(baseQty || 0) / (meta.factor || 1);
   };
+  // «Sólo venta en local» (carne sin PT o marcada a mano): producción nunca la toma, ni como stock ni en lote antiguo.
+  const isEntryVentaLocal = (entry) => Boolean(entry?.ventaLocal);
   const getEntryAvailableQty = (entry) => {
+    if (isEntryVentaLocal(entry)) return 0;
     const available = parseNumber(entry?.availableQty);
     const entryId = normalizeValue(entry?.id);
     const pendingQtyKg = Number(state.pendingExpiryActions?.[entryId]?.qtyKg || 0);
@@ -454,11 +457,13 @@
   // siguen existiendo como entries con disponible 0, pero a la fecha histórica
   // tenían su cantidad completa para la trazabilidad.
   const getEntryOriginalQty = (entry) => {
+    if (isEntryVentaLocal(entry)) return 0;
     const qty = parseNumber(entry?.qty);
     if (Number.isFinite(qty) && qty > 0) return qty;
     return getEntryAvailableQty(entry);
   };
   const getEntryAvailableKg = (entry) => {
+    if (isEntryVentaLocal(entry)) return 0;
     const availableKg = Number(entry?.availableKg);
     const entryId = normalizeValue(entry?.id);
     const pendingQtyKg = Number(state.pendingExpiryActions?.[entryId]?.qtyKg || 0);
@@ -1561,6 +1566,8 @@
         noPerecedero: isEntryNoPerecedero(item.entry),
         isFrozen: Boolean(item.entry.isFrozen || item.entry.frozen),
         frozenAt: normalizeValue(item.entry.frozenAt) || '',
+        // Si el lote salió de un desposte, se guarda de qué pieza (para el gráfico de trazabilidad).
+        despostadoDe: item.entry.despostadoDe || null,
         provider: normalizeValue(item.entry.provider) || '-',
         invoiceNumber: normalizeValue(item.entry.invoiceNumber) || '-',
         invoiceImageUrls: Array.isArray(item.entry.invoiceImageUrls) ? item.entry.invoiceImageUrls : (item.entry.invoiceImageUrl ? [item.entry.invoiceImageUrl] : []),
@@ -2129,6 +2136,7 @@
               noPerecedero: isEntryNoPerecedero(item.entry),
               isFrozen: Boolean(item.entry.isFrozen || item.entry.frozen),
               frozenAt: normalizeValue(item.entry.frozenAt) || '',
+              despostadoDe: item.entry.despostadoDe || null,
               provider: normalizeValue(item.entry.provider) || '-',
               invoiceNumber: normalizeValue(item.entry.invoiceNumber) || '-',
               invoiceImageUrls: Array.isArray(item.entry.invoiceImageUrls) ? item.entry.invoiceImageUrls : (item.entry.invoiceImageUrl ? [item.entry.invoiceImageUrl] : []),
@@ -3743,6 +3751,14 @@
           lines.push(`${planNodeId} -.->|LOTE ${lotIndex + 1}| ${lotNodeId}`);
         }
         lines.push(`${lotNodeId} -.->|RNE| ${rneId}`);
+        // Corte que salió de un desposte: LOTE -> DESPOSTE (pieza de origen con el mismo lote y su PT).
+        const desp = lot?.despostadoDe;
+        if (desp && desp.ingredientName) {
+          const despNodeId = `${lotNodeId}_DESP`;
+          const despPt = normalizeValue(desp.ptNumero) || (normalizeValue(desp.ptSolicitud) ? `Solic. ${desp.ptSolicitud}` : '');
+          lines.push(`${despNodeId}["<b>fa:fa-scissors DESPOSTE</b><br/>de ${esc(String(desp.ingredientName).toUpperCase())}<br/><b>Lote:</b> ${esc(desp.lotNumber || '-')}${despPt ? `<br/><b>PT:</b> ${esc(despPt)}` : ''}<br/><b>Fecha:</b> ${esc(formatIsoEs(desp.fecha || ''))}"]:::toneThaw`);
+          lines.push(`${lotNodeId} -.->|DESPOSTE| ${despNodeId}`);
+        }
         if (previousLotNodeId) lines.push(`${previousLotNodeId} -.-> ${lotNodeId}`);
         previousLotNodeId = lotNodeId;
         });
