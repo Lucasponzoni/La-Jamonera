@@ -822,7 +822,12 @@
       ? `NO REQUIERE RNPA${normalizeValue(rnpa.exemptReason) ? ` - ${normalizeUpper(rnpa.exemptReason)}` : ''}`
       : normalizeUpper(rnpa.number || '-');
     const commercialName = normalizeValue(registro?.recipeNombreComercial || registro?.traceability?.product?.nombreComercial);
-    const ingredientRows = resolveIngredientRows(registro);
+    // Adobo (batch): en la fórmula figura como «Condimento para …» (planilla v004) y en el rótulo se abre en sus componentes.
+    const batchDeRow = (row) => (Array.isArray(row?.lots) ? row.lots : []).map((lot) => lot?.batchDe).find((b) => b && Array.isArray(b.componentes)) || null;
+    const ingredientRows = resolveIngredientRows(registro).map((row) => {
+      const batch = batchDeRow(row);
+      return batch ? { ...row, ingredientName: normalizeUpper(batch.titulo || row.ingredientName), batchComponentes: batch.componentes.map((c) => normalizeValue(c.ingredientName)) } : row;
+    });
     const formulaRows = buildFormulaRows(ingredientRows);
     const managerLabel = resolveManagerNames(registro, context.usersMap);
     const totalIngredients = ingredientRows.reduce((acc, row) => acc + Number(row.qtyKg || 0), 0);
@@ -847,7 +852,7 @@
       ? `LAPSO DE APTITUD: ${shelfLifeDays} D\u00cdAS A PARTIR DE LA FECHA DE ENVASADO / ROTULADO`
       : '';
     // Ingredientes del r\u00f3tulo: nombres de las materias primas usadas en la producci\u00f3n.
-    const rotuloIngredients = [...new Set(ingredientRows.map((row) => normalizeValue(row.ingredientName).toLowerCase()).filter(Boolean))].join(', ');
+    const rotuloIngredients = [...new Set(ingredientRows.flatMap((row) => (Array.isArray(row.batchComponentes) ? row.batchComponentes : [row.ingredientName]).map((name) => normalizeValue(name).toLowerCase())).filter(Boolean))].join(', ');
     // Encabezado "F. Elaboracion": mes/anio real de la produccion (fallback: alta del registro).
     const elaborationMonthLabel = formatMonthShortYearEs(registro?.productionDate || registro?.createdAt || '');
 

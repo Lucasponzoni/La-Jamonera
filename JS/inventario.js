@@ -1272,6 +1272,9 @@
         // Flag de migración one-shot: lotes históricos regenerados al formato
         // LJ-ddmmaaaa-INICIALES. Debe sobrevivir la normalización del config.
         lotMigrationV2: Boolean(inv?.config?.lotMigrationV2),
+        // Fórmulas de batch de adobo y tablas de desposte: se guardan acá y no se pueden perder al reescribir el config.
+        ...(inv?.config?.adobos ? { adobos: inv.config.adobos } : {}),
+        ...(inv?.config?.desposte ? { desposte: inv.config.desposte } : {}),
         providers: Array.isArray(inv?.config?.providers)
           ? inv.config.providers.map((item) => normalizeProvider(item)).filter(Boolean)
           : []
@@ -2503,6 +2506,7 @@
         </div>
         <div class="recetas-detail-tools">
           <sl-button variant="success" size="small" type="button" data-inventario-open-editor="${item.id}" ${info.infiniteStock ? 'disabled title="Stock infinito sin carga manual"' : ''}><i slot="prefix" class="fa-solid fa-plus"></i>Ingresar stock</sl-button>
+          ${state.inventario?.config?.adobos?.[item.id] ? `<sl-button variant="primary" size="small" type="button" data-preparar-batch="${item.id}"><i slot="prefix" class="fa-solid fa-mortar-pestle"></i>Preparar batch</sl-button>` : ''}
           <sl-button variant="default" size="small" type="button" data-inventario-open-editor="${item.id}"><i slot="prefix" class="fa-regular fa-eye"></i>Historial</sl-button>
           <sl-button variant="default" size="small" type="button" class="lj-icon-btn" data-inventario-config-item="${item.id}" title="Configurar umbral" aria-label="Configurar umbral"><i class="fa-solid fa-sliders"></i></sl-button>
         </div>
@@ -2674,6 +2678,7 @@
           vtoCriterio: normalizeValue(entry.vtoCriterio),
           lotNota: normalizeValue(entry.lotNota),
           despostadoDe: entry.despostadoDe || null,
+          esBatch: Boolean(entry.batchDe) || /batch de adobo/i.test(String(entry.provider || '')),
           isLite: Boolean(entry.__lite),
           liteUsageCount: entry.__lite ? Number(entry.__usageCount || 0) : 0
         });
@@ -4671,6 +4676,7 @@
     const scopedRows = getGlobalFilteredEntries(true)
       .filter((row) => inDateRange(row.entryDate, op.rango.from, op.rango.to))
       .filter((row) => !excluidos.has(row.ingredientId))
+      .filter((row) => !row.esBatch) // el adobo es elaboración propia (batch), no un ingreso de materia prima
       .filter((row) => (op.perecederas ? resolveIngredientPerishableFlag(row.ingredientId) : !resolveIngredientPerishableFlag(row.ingredientId)))
       .filter((row) => !op.soloProduccion || vaAProduccion(row))
       .sort((a, b) => String(a.entryDate).localeCompare(String(b.entryDate)) || Number(a.createdAt || 0) - Number(b.createdAt || 0));
@@ -5210,6 +5216,17 @@
           <span class="inv-mov-acc">${traceActionHtml(trace)}</span>
         </div>`).join('') : '';
 
+      // Lote de adobo: de qué especias salió el batch, con botones para imprimir la planilla RE-BPM-XX y el rótulo.
+      const batchHtml = entry.batchDe ? `<details class="inv-desp-det">
+          <summary class="inv-mov inv-mov-desp">
+            <span class="inv-mov-fecha"><i class="fa-solid fa-mortar-pestle"></i>${escapeHtml(formatIsoDateEs(entry.batchDe.fecha) || '')}</span>
+            <span class="inv-mov-tipo"><span class="inv-desp-badge">Batch de adobo ${escapeHtml(entry.batchDe.sigla || '')}</span></span>
+            <span class="inv-mov-kg">${Number(entry.batchDe.kg || entry.qty || 0).toFixed(2)} kg</span>
+          </summary>
+          <ul class="inv-desp-lista">${(entry.batchDe.componentes || []).map((c) => `<li><span class="n">${escapeHtml(capitalize(c.ingredientName || ''))}</span><span class="k">${Number(c.kg || 0).toFixed(3)} kg</span><span class="p">${c.infinito ? escapeHtml(c.nota || 'sin lote') : (c.lotes || []).map((l) => escapeHtml(l.lotNumber || '-')).join(' + ')}</span></li>`).join('')}</ul>
+          <p class="inv-desp-nota">${entry.batchDe.responsable ? `Responsable: ${escapeHtml(entry.batchDe.responsable)} · ` : ''}<button type="button" class="btn btn-link btn-sm p-0" data-batch-planilla="${entry.id}">Imprimir planilla RE-BPM-XX</button> · <button type="button" class="btn btn-link btn-sm p-0" data-batch-rotulo="${entry.id}">Imprimir rótulo</button></p>
+        </details>` : '';
+
       // Despostes de esta pieza: renglón como los demás movimientos; el botón de la derecha abre el desglose.
       const despHtml = despostesDe(entry).map((m) => {
         const cortes = Array.isArray(m.cortes) ? m.cortes : [];
@@ -5285,7 +5302,7 @@
           <div class="inv-ing-doc is-lote"><span class="inv-ing-etq"><i class="fa-solid fa-barcode"></i> Lote <span class="inv-th-ayuda">pasá el mouse: criterio y armado</span></span>${entryLotCellHtml(entry, record)}</div>
           <div class="inv-ing-doc"><span class="inv-ing-etq"><i class="fa-solid fa-file-shield"></i> PT / Cert. sanitario</span>${entryPtCellHtml(entry)}</div>
         </div>
-        ${resolutionHtml || traceHtml || despHtml ? `<div class="inv-ing-movs">${despHtml}${resolutionHtml}${traceHtml}</div>` : ''}
+        ${batchHtml || resolutionHtml || traceHtml || despHtml ? `<div class="inv-ing-movs">${batchHtml}${despHtml}${resolutionHtml}${traceHtml}</div>` : ''}
       </article>`;
     }).join('') : '<p class="inv-ing-vacio">Sin ingresos para mostrar.</p>';
 
@@ -7404,6 +7421,17 @@
         renderEditor(ingredientId, state.editorDraft);
       });
     });
+    nodes.editorForm.querySelectorAll('[data-batch-planilla], [data-batch-rotulo]').forEach((btn) => {
+      btn.addEventListener('click', async (event) => {
+        event.preventDefault(); event.stopPropagation();
+        const entryId = btn.dataset.batchPlanilla || btn.dataset.batchRotulo;
+        const entry = (getRecord(ingredientId)?.entries || []).find((item) => item?.id === entryId);
+        if (!entry || !window.laJamoneraBatchAdobo) return;
+        const nombre = state.ingredientes[ingredientId]?.name || '';
+        if (btn.dataset.batchPlanilla) await window.laJamoneraBatchAdobo.imprimirPlanilla(entry, nombre);
+        else await window.laJamoneraBatchAdobo.imprimirRotulo(entry, nombre);
+      });
+    });
     nodes.editorForm.querySelectorAll('[data-despostar-entry]').forEach((btn) => {
       btn.addEventListener('click', async (event) => {
         event.stopPropagation();
@@ -9231,6 +9259,14 @@
       state.tableSearch = '';
       await ensureInventoryRecordDetail(editorBtn.dataset.inventarioOpenEditor);
       renderEditor(editorBtn.dataset.inventarioOpenEditor);
+      return;
+    }
+
+    const batchBtn = event.target.closest('[data-preparar-batch]');
+    if (batchBtn && window.laJamoneraBatchAdobo) {
+      const id = batchBtn.dataset.prepararBatch;
+      const hecho = await window.laJamoneraBatchAdobo.abrirPreparar(id, { nombre: state.ingredientes[id]?.name || '' });
+      if (hecho) { await reloadEditorData(id); renderList(); }
       return;
     }
 

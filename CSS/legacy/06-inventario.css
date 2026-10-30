@@ -2109,3 +2109,23 @@
 .inv-desp-datos.is-corte dt { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--lj-muted); }
 .inv-desp-datos.is-corte dd { margin: 0; font-size: .78rem; }
 .inv-desp-accion::part(base) { color: #007fa0; border-color: rgba(0, 171, 212, .45); }
+
+/* Batch de adobo: detalle en la tarjeta del lote y modal «Preparar batch» (JS/batch_adobo.js) */
+.inv-desp-lista { list-style: none; margin: 0; padding: 6px 18px 4px; border-top: 1px dashed var(--lj-border, #e3e7ec); }
+.inv-desp-lista li { display: grid; grid-template-columns: minmax(120px, 1fr) 80px minmax(120px, 2fr); gap: 10px; padding: 3px 0; font-size: .82rem; }
+.inv-desp-lista li .k { text-align: right; font-weight: 700; }
+.inv-desp-lista li .p { color: var(--lj-muted); font-size: .76rem; }
+.inv-desp-det > .inv-desp-nota { margin: 0; padding: 4px 18px 10px; font-size: .74rem; color: var(--lj-muted); }
+.batch-modal { text-align: left; font-size: .9rem; }
+.batch-modal .batch-campos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 8px; }
+.batch-modal .batch-campos label { display: flex; flex-direction: column; gap: 4px; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--lj-muted, #5a6573); }
+.batch-modal .batch-campos input { font-size: .95rem; padding: 6px 8px; border: 1px solid var(--lj-border-strong, #d5dbe2); border-radius: 8px; text-transform: none; font-weight: 500; color: var(--lj-text, #0f1b2d); }
+.batch-modal .batch-nota, .batch-modal .batch-motivo { font-size: .78rem; color: var(--lj-muted, #5a6573); margin: 4px 0 8px; }
+.batch-modal .batch-motivo { color: #b45309; font-weight: 600; }
+.batch-modal .batch-lote { margin: 6px 0; }
+.batch-modal .batch-tabla { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.batch-modal .batch-tabla th { text-align: left; font-size: .68rem; text-transform: uppercase; color: var(--lj-muted, #5a6573); border-bottom: 1px solid var(--lj-border, #e3e7ec); padding: 4px 6px; }
+.batch-modal .batch-tabla td { border-bottom: 1px solid var(--lj-border, #eceff3); padding: 4px 6px; vertical-align: top; }
+.batch-modal .batch-tabla .r { text-align: right; white-space: nowrap; }
+.batch-modal .batch-falta, .batch-modal .falta { color: #b91c1c; font-weight: 700; }
+@media (max-width: 640px) { .batch-modal .batch-campos { grid-template-columns: 1fr; } .inv-desp-lista li { grid-template-columns: 1fr 70px; } .inv-desp-lista li .p { grid-column: 1 / -1; } }

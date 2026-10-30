@@ -387,6 +387,19 @@
           lines.push(`${lotNodeId}_DESP["<b>DESPOSTE</b><br/>de ${escapeHtml(String(desp.ingredientName).toUpperCase())}<br/><b>Lote:</b> ${escapeHtml(desp.lotNumber || '-')}${despPt ? `<br/><b>PT:</b> ${escapeHtml(despPt)}` : ''}<br/><b>Fecha:</b> ${escapeHtml(formatIsoEs(desp.fecha || ''))}"]:::toneDesp`);
           lines.push(`${lotNodeId} -.->|DESPOSTE| ${lotNodeId}_DESP`);
         }
+        // Lote de adobo: el batch y las especias con su lote (IT v03).
+        const batch = lot?.batchDe || traceLot?.batchDe;
+        if (batch && Array.isArray(batch.componentes)) {
+          lines.push(`${lotNodeId}_BATCH["<b>BATCH DE ADOBO ${escapeHtml(batch.sigla || '')}</b><br/>${escapeHtml(String(batch.kg ?? ''))} kg · ${escapeHtml(formatIsoEs(batch.fecha || ''))}"]:::toneDesp`);
+          lines.push(`${lotNodeId} -.->|BATCH| ${lotNodeId}_BATCH`);
+          batch.componentes.forEach((comp, compIndex) => {
+            const lotes = Array.isArray(comp.lotes) ? comp.lotes : [];
+            const detalle = comp.infinito ? escapeHtml(comp.nota || 'Stock infinito, sin lote')
+              : lotes.map((l) => `${escapeHtml(l.lotNumber || '-')} · ${escapeHtml(String(l.kg ?? ''))} kg`).join('<br/>');
+            lines.push(`${lotNodeId}_BATCH_C${compIndex}["<b>${escapeHtml(String(comp.ingredientName || '').toUpperCase())}</b><br/>${detalle}"]:::toneLot`);
+            lines.push(`${lotNodeId}_BATCH -.-> ${lotNodeId}_BATCH_C${compIndex}`);
+          });
+        }
         if (previousLotNodeId) lines.push(`${previousLotNodeId} -.-> ${lotNodeId}`);
         previousLotNodeId = lotNodeId;
       });

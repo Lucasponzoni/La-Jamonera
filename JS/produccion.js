@@ -1568,6 +1568,8 @@
         frozenAt: normalizeValue(item.entry.frozenAt) || '',
         // Si el lote salió de un desposte, se guarda de qué pieza (para el gráfico de trazabilidad).
         despostadoDe: item.entry.despostadoDe || null,
+        // Lote de adobo: de qué lotes de especia salió el batch (para el gráfico de trazabilidad).
+        batchDe: item.entry.batchDe || null,
         provider: normalizeValue(item.entry.provider) || '-',
         invoiceNumber: normalizeValue(item.entry.invoiceNumber) || '-',
         invoiceImageUrls: Array.isArray(item.entry.invoiceImageUrls) ? item.entry.invoiceImageUrls : (item.entry.invoiceImageUrl ? [item.entry.invoiceImageUrl] : []),
@@ -2137,6 +2139,7 @@
               isFrozen: Boolean(item.entry.isFrozen || item.entry.frozen),
               frozenAt: normalizeValue(item.entry.frozenAt) || '',
               despostadoDe: item.entry.despostadoDe || null,
+              batchDe: item.entry.batchDe || null,
               provider: normalizeValue(item.entry.provider) || '-',
               invoiceNumber: normalizeValue(item.entry.invoiceNumber) || '-',
               invoiceImageUrls: Array.isArray(item.entry.invoiceImageUrls) ? item.entry.invoiceImageUrls : (item.entry.invoiceImageUrl ? [item.entry.invoiceImageUrl] : []),
@@ -3758,6 +3761,22 @@
           const despPt = normalizeValue(desp.ptNumero) || (normalizeValue(desp.ptSolicitud) ? `Solic. ${desp.ptSolicitud}` : '');
           lines.push(`${despNodeId}["<b>fa:fa-scissors DESPOSTE</b><br/>de ${esc(String(desp.ingredientName).toUpperCase())}<br/><b>Lote:</b> ${esc(desp.lotNumber || '-')}${despPt ? `<br/><b>PT:</b> ${esc(despPt)}` : ''}<br/><b>Fecha:</b> ${esc(formatIsoEs(desp.fecha || ''))}"]:::toneThaw`);
           lines.push(`${lotNodeId} -.->|DESPOSTE| ${despNodeId}`);
+        }
+        // Lote de adobo: LOTE -> BATCH (fecha, kg) -> cada especia con su lote (IT v03: trazabilidad un paso atrás).
+        const batch = lot?.batchDe;
+        if (batch && Array.isArray(batch.componentes)) {
+          const batchNodeId = `${lotNodeId}_BATCH`;
+          lines.push(`${batchNodeId}["<b>fa:fa-mortar-pestle BATCH DE ADOBO ${esc(batch.sigla || '')}</b><br/>${esc(formatCompactQty(batch.kg, 'kilos'))} · ${esc(formatIsoEs(batch.fecha || ''))}${batch.vencePor ? `<br/><b>Vence por:</b> ${esc(batch.vencePor)}` : ''}"]:::toneThaw`);
+          lines.push(`${lotNodeId} -.->|BATCH| ${batchNodeId}`);
+          batch.componentes.forEach((comp, compIndex) => {
+            const compNodeId = `${batchNodeId}_C${compIndex}`;
+            const lotes = Array.isArray(comp.lotes) ? comp.lotes : [];
+            const detalle = comp.infinito
+              ? esc(comp.nota || 'Stock infinito, sin lote')
+              : lotes.map((l) => `${esc(l.lotNumber || '-')} · ${esc(formatCompactQty(l.kg, 'kilos'))}${l.provider ? ` · ${esc(l.provider)}` : ''}`).join('<br/>');
+            lines.push(`${compNodeId}["<b>${esc(String(comp.ingredientName || '').toUpperCase())}</b> ${esc(formatCompactQty(comp.kg, 'kilos'))}<br/>${detalle}"]:::toneLot`);
+            lines.push(`${batchNodeId} -.-> ${compNodeId}`);
+          });
         }
         if (previousLotNodeId) lines.push(`${previousLotNodeId} -.-> ${lotNodeId}`);
         previousLotNodeId = lotNodeId;
@@ -8719,7 +8738,7 @@
           <h3 class="inventario-editor-name">${capitalize(recipe.title || 'Sin título')}</h3>
           ${recipe.nombreComercial ? `<p class="produccion-nombre-comercial-editor">${escapeHtml(capitalize(recipe.nombreComercial))}</p>` : ''}
           <p class="inventario-editor-meta">${capitalize(recipe.description || 'Sin descripción.')}</p>
-          <p class="produccion-max-line"${state.loteAntiguo ? ' style="display:none"' : ''}>Máximo para la fecha: <strong id="produccionDateMaxValue">${hasOnlyInfiniteStock ? '&infin;' : `${analysis.maxKg.toFixed(2)} kg`}</strong><span id="produccionDateMaxHelp">${(!hasOnlyInfiniteStock && Number(analysis.maxKgIncludingExpired || 0) > Number(analysis.maxKg || 0)) ? ` <span class="produccion-expired-max-help">(con vencidos: ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg)</span>` : ''}</span></p>
+          <p class="produccion-max-line"${state.loteAntiguo ? ' style="display:none"' : ''}>Máximo para la fecha: <strong id="produccionDateMaxValue">${hasOnlyInfiniteStock ? '&infin;' : `${analysis.maxKg.toFixed(2)} kg`}</strong><span id="produccionDateMaxHelp">${(!hasOnlyInfiniteStock && Number(analysis.maxKgIncludingExpired || 0) > Number(analysis.maxKg || 0)) ? ` <span class="produccion-expired-max-help">(con vencidos: ${Number(analysis.maxKgIncludingExpired || 0).toFixed(2)} kg)</span>` : ''}</span><span id="produccionBatchHint"></span></p>
           <div id="produccionMissingPanel" class="produccion-missing-panel-v2 d-none" aria-live="polite"></div>
           <p id="produccionReservaTimer" class="produccion-reserva-timer"></p>
         </div>
@@ -9110,6 +9129,18 @@
           ? ` <span class="produccion-expired-max-help">(hay stock desde ${formatIsoEs(analysis.nextAvailableDate)})</span>`
           : '';
         maxHelpNode.innerHTML = `${expiredExtra}${futureExtra}`;
+      }
+      // Adobo (batch): si no alcanza para lo que se quiere producir, se ofrece armar el batch siguiente.
+      const batchHintNode = nodes.editor.querySelector('#produccionBatchHint');
+      if (batchHintNode && window.laJamoneraBatchAdobo && !state.loteAntiguo) {
+        let adobos = {};
+        try { adobos = await window.laJamoneraBatchAdobo.adobos(); } catch (error) { adobos = {}; }
+        const deseado = Math.max(Number(state.editorDesiredQty || 0), parsePositive(qtyInput.value, 0));
+        const faltanAdobo = (analysis.requirements || [])
+          .filter((req) => adobos[normalizeValue(req.ingredientId)])
+          .map((req) => ({ ingredientId: req.ingredientId, name: req.name, kg: Math.max(0, (deseado - Number(req.coverage || 0)) * Number(req.neededPerKg || 0)) }))
+          .filter((item) => item.kg > 0.001);
+        batchHintNode.innerHTML = faltanAdobo.map((item) => ` <button type="button" class="btn btn-sm btn-outline-warning produccion-batch-btn" data-produccion-batch="${escapeHtml(item.ingredientId)}" data-kg="${item.kg.toFixed(3)}"><i class="fa-solid fa-mortar-pestle"></i> Falta ${item.kg.toFixed(2)} kg de ${escapeHtml(item.name)} · Preparar batch</button>`).join('');
       }
       if (!state.sinTrazabilidad && !state.loteAntiguo) qtyInput.max = editorMaxKg.toFixed(2);
       let qty = parsePositive(qtyInput.value, 0.1);
@@ -9585,6 +9616,22 @@
     }
     // Lo que el usuario tipea manda: pasa a ser la cantidad deseada de referencia.
     const rememberDesiredQty = () => { state.editorDesiredQty = parsePositive(qtyInput.value, 0.1); };
+    if (nodes.editor.__batchClick) nodes.editor.removeEventListener('click', nodes.editor.__batchClick);
+    nodes.editor.__batchClick = async (event) => {
+      const btn = event.target.closest('[data-produccion-batch]');
+      if (!btn || !window.laJamoneraBatchAdobo) return;
+      event.preventDefault();
+      const adoboId = btn.dataset.produccionBatch;
+      const kgFalta = Number(btn.dataset.kg) || 0;
+      const fecha = normalizeValue(dateInput.value) || toIsoDate();
+      const hecho = await window.laJamoneraBatchAdobo.abrirPreparar(adoboId, { kgSugerido: kgFalta, fecha, motivo: `Para esta producción faltan ${kgFalta.toFixed(2)} kg de adobo.`, nombre: state.ingredientes?.[adoboId]?.name || '' });
+      if (!hecho) return;
+      const cfg = await window.laJamoneraBatchAdobo.adobos();
+      const ids = [adoboId, ...((cfg[adoboId]?.componentes || []).map((c) => c.ingredientId))];
+      await ensureInventoryDetailsForIds(ids, { force: true });
+      await updateEditorPlan(true);
+    };
+    nodes.editor.addEventListener('click', nodes.editor.__batchClick);
     qtyInput.addEventListener('input', async () => { rememberDesiredQty(); await updateEditorPlan(); });
     qtyInput.addEventListener('change', async () => { rememberDesiredQty(); await updateEditorPlan(); });
     qtyInput.addEventListener('blur', async () => { rememberDesiredQty(); await updateEditorPlan(); });
