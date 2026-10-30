@@ -1,7 +1,7 @@
 // Batches de adobo (IT v03 · planilla RE-BPM-XX v03).
 // Un batch es un lote: DDMMAAAA-SIGLA (-02, -03… si ya hay uno ese día). La fórmula está escrita para 100 kg de adobo y se
 // prepara lo que haga falta. Las especias se descuentan por FEFO; el adobo vence con la especia que vence primero.
-// Stock infinito: el azúcar se compra en comercio local como consumidor final → lote = fecha del batch, vence a los 60 días.
+// Stock infinito: el azúcar se compra en comercio local como consumidor final → lote = fecha del batch, vence a los 6 meses.
 // Las fórmulas viven en /inventario/config.adobos[ingredientId] = { sigla, titulo, base, componentes:[{ingredientId, ingredientName, kg}] }.
 (function () {
   const db = () => window.dbLaJamoneraRest;
@@ -18,9 +18,10 @@
   const factorBase = (e) => (Number(e?.qtyBase) && Number(e?.qty) ? Number(e.qtyBase) / Number(e.qty) : (esGramos(e) ? 1 : 1000));
   const esInfinito = (rec) => Boolean(rec?.infiniteStock || rec?.stockInfinito);
   const cap = (s) => String(s || '').charAt(0).toUpperCase() + String(s || '').slice(1);
-  const AZUCAR_NOTA = 'Comercio local (consumidor final): lote = fecha del batch, vence a los 60 días';
+  const AZUCAR_NOTA = 'Comercio local (consumidor final): lote = fecha del batch, vence a los 6 meses';
   const AZUCAR_PROV = 'Comercio local (consumidor final)';
-  const mas60 = (iso) => { const t = new Date(`${iso}T12:00:00Z`); t.setUTCDate(t.getUTCDate() + 60); return t.toISOString().slice(0, 10); };
+  // fecha + 6 meses (si el día no existe, el último del mes: 31/08 → 28/02)
+  const mas6m = (iso) => { const [y, m, d] = iso.split('-').map(Number); const t = new Date(Date.UTC(y, m - 1 + 6, 1)); t.setUTCDate(Math.min(d, new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate())); return t.toISOString().slice(0, 10); };
 
   let cacheConfig = null;
   const config = async (forzar = false) => {
@@ -46,9 +47,9 @@
       const need = Number(c.kg) * kg / Number(A.base || 100);
       const rec = await leer(c.ingredientId);
       if (esInfinito(rec)) {
-        // Azúcar: comercio local como consumidor final, sin lote del proveedor → lote = fecha del batch, vence a los 60 días.
+        // Azúcar: comercio local como consumidor final, sin lote del proveedor → lote = fecha del batch, vence a los 6 meses.
         if (/azucar|azúcar/i.test(c.ingredientName)) {
-          const vAz = mas60(fecha);
+          const vAz = mas6m(fecha);
           componentes.push({ ...c, kg: r4(need), infinito: true, nota: AZUCAR_NOTA,
             lotes: [{ entryId: '', lotNumber: compacta(fecha), expiryDate: vAz, provider: AZUCAR_PROV, invoiceNumber: '', kg: r4(need) }] });
           if (!vto || vAz < vto) { vto = vAz; vencePor = c.ingredientName; }
@@ -100,7 +101,7 @@
       componentes: componentes.map((c) => ({ ingredientId: c.ingredientId, ingredientName: c.ingredientName, kg: c.kg, infinito: c.infinito, nota: c.nota || '', lotes: c.lotes })) };
     const nota = [`Batch de adobo ${A.sigla} (${String(A.titulo || '').toLowerCase()}), ${kgTxt(kg)} kg. Fórmula base para 100 kg de adobo.`,
       vto ? `Vence ${dmy(vto)}: el componente que vence primero (${vencePor}).` : '',
-      componentes.some((c) => c.infinito && c.nota === AZUCAR_NOTA) ? 'Azúcar: comercio local (consumidor final), lote = fecha del batch, vence a los 60 días.' : ''].filter(Boolean).join(' ');
+      componentes.some((c) => c.infinito && c.nota === AZUCAR_NOTA) ? 'Azúcar: comercio local (consumidor final), lote = fecha del batch, vence a los 6 meses.' : ''].filter(Boolean).join(' ');
     const entry = { id: makeId('entry'), qty: r4(kg), unit: 'kilos', qtyKg: r4(kg), qtyBase: r4(kg * 1000), availableQty: r4(kg), availableBase: r4(kg * 1000), availableKg: r4(kg),
       packageQty: null, productionUsage: [], noPerecedero: false, usoInternoEmpresa: false, isFrozen: false, frozenAt: '', entryDate: fecha, expiryDate: vto || '',
       invoiceNumber: '', remitoNumber: '', lotNumber: lote, customLot: lote, provider: 'Elaboración propia (batch de adobo)', lotStatus: 'disponible',
@@ -160,7 +161,7 @@
       <li><b>Más de un batch del mismo destino en el día:</b> correlativo de dos dígitos al final (09072026-CHE-02, 09072026-CHE-03).</li>
       <li><b>Vencimiento del batch:</b> el más próximo entre todos los ingredientes del batch${b.vencePor ? ` (en este batch: ${esc(b.vencePor)})` : ''}.</li>
       <li><b>Lote del proveedor:</b> el que trae el producto o el anotado en la factura. Si el lote es una fecha (La Canasta: lote = vencimiento) se escribe sólo en números, ddmmaaaa.</li>
-      <li><b>Azúcar:</b> se compra en comercio local como consumidor final; lote = fecha del batch y vence a los 60 días.</li>
+      <li><b>Azúcar:</b> se compra en comercio local como consumidor final; lote = fecha del batch y vence a los 6 meses.</li>
       <li>Rotación de especias por <b>FEFO</b> (primero vence, primero sale). Fórmula base para 100 kg de adobo; este batch: ${kgTxt(entry.qty, 2)} kg.</li></ul></div>
       <table class="firmas"><tbody><tr><td>Elaboró: ________________________________</td><td>Controló / Aprobó: ________________________________</td></tr></tbody></table>
       </body></html>`;
