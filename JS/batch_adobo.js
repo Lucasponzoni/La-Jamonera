@@ -167,36 +167,47 @@
       </body></html>`;
   };
 
-  // Rótulo del batch. Mismo diseño en tres tamaños: Zebra 100 × 70 mm, A4 con 6 rótulos o A4 con un rótulo grande.
+  // Rótulo del batch. Mismo diseño en dos tamaños: Zebra 100 × 70 mm o A4 con 2 rótulos grandes (uno debajo del otro).
+  // Con entry.blanco sale para completar a mano (renglones en lugar de datos, sin código de barras).
   const FORMATOS_ROTULO = {
-    zebra: { page: '100mm 70mm', margin: '0', s: 1, cols: 1, n: 1, borde: false },
-    a4: { page: 'A4', margin: '10mm 7mm', s: 0.96, cols: 2, n: 6, borde: true },
-    a4uno: { page: 'A4 landscape', margin: '12mm', s: 2.5, cols: 1, n: 1, borde: true }
+    zebra: { page: '100mm 70mm', margin: '0', s: 1, n: 1, borde: false },
+    a4: { page: 'A4', margin: '10mm', s: 1.85, n: 2, borde: true }
   };
   const rotuloHtml = (entry, ingredientName, formato = 'zebra') => {
     const b = entry.batchDe || {};
     const f = FORMATOS_ROTULO[formato] || FORMATOS_ROTULO.zebra;
+    const blanco = Boolean(entry.blanco);
+    const ln = '<span class="ln"></span>';
+    const titulo = cap(String(b.titulo || ingredientName || '').replace(/^condimento para\s*/i, ''));
     const contiene = (b.componentes || []).map((c) => cap(c.ingredientName)).join(', ');
-    const una = `<div class="et"><div class="cab"><span>FRIGORÍFICO LA JAMONERA</span><span class="tipo">ADOBO · BATCH ${esc(b.sigla || '')}</span></div>
-      <div class="nom">${esc(cap(b.titulo || ingredientName))}</div>
-      <div class="lw"><small>LOTE</small><div class="lot">${esc(entry.lotNumber)}</div><svg class="bar" data-lote="${esc(entry.lotNumber)}"></svg></div>
-      <div class="dat"><div><small>ELABORACIÓN</small><b>${dmy(b.fecha || entry.entryDate)}</b></div><div><small>PESO</small><b>${kgTxt(entry.qty, 2)} kg</b></div><div class="v"><small>VENCE</small><b>${dmy(entry.expiryDate)}</b></div></div>
-      <div class="pie"><b>Contiene:</b> ${esc(contiene)}.<br>Conservar en lugar seco y fresco, envase cerrado · Uso interno · RNE 21-85083 · Resp.: ${esc(b.responsable || '__________')}</div></div>`;
+    const una = `<div class="et"><div class="cab"><span>FRIGORÍFICO LA JAMONERA</span><span>RNE 21-85083</span></div>
+      <div class="id"><div class="sig"><small>ADOBO</small>${blanco ? '<span class="ln sigln"></span>' : `<b>${esc(b.sigla || '')}</b>`}</div>
+        <div class="nom"><small>BATCH DE ADOBO · CONDIMENTO PARA</small>${blanco ? ln : `<b>${esc(titulo)}</b>`}</div></div>
+      <div class="lw"><small>LOTE${blanco ? ' (DDMMAAAA-SIGLA)' : ''}</small>${blanco ? ln : `<div class="lot">${esc(entry.lotNumber)}</div><svg class="bar" data-lote="${esc(entry.lotNumber)}"></svg>`}</div>
+      <div class="dat"><div><small>ELABORACIÓN</small>${blanco ? ln : `<b>${dmy(b.fecha || entry.entryDate)}</b>`}</div><div><small>PESO</small>${blanco ? ln : `<b>${kgTxt(entry.qty, 2)} kg</b>`}</div>
+        <div class="v"><small>VENCE</small>${blanco ? ln : `<b>${dmy(entry.expiryDate)}</b>`}</div></div>
+      <div class="pie">${blanco ? `<div><b>Contiene:</b> <span class="ln"></span> <b>Resp.:</b> <span class="ln corto"></span></div><div>Conservar en lugar seco y fresco, en envase cerrado · Uso interno</div>`
+        : `<div><b>Contiene:</b> ${esc(contiene)}.</div><div>Conservar en lugar seco y fresco, en envase cerrado · Uso interno · <b>Resp.:</b> ${b.responsable ? esc(b.responsable) : '<span class="ln corto"></span>'}</div>`}</div></div>`;
     const u = (mm) => `${(mm * f.s).toFixed(2)}mm`; const p = (pt) => `${(pt * f.s).toFixed(2)}pt`;
-    return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Rótulo ${esc(entry.lotNumber)}</title>
+    return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Rótulo ${esc(entry.lotNumber || 'batch')}</title>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"><\/script><style>
       @page{size:${f.page};margin:${f.margin}}*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#0F1B2D}
-      .hoja{display:grid;grid-template-columns:repeat(${f.cols},max-content);gap:${f.cols > 1 ? '5mm 5mm' : '0'};justify-content:center}
-      .et{width:${u(100)};height:${u(70)};border:${f.borde ? `${u(0.35)} solid #0F1B2D` : '0'};border-radius:${f.borde ? u(2.5) : '0'};overflow:hidden;display:flex;flex-direction:column;page-break-inside:avoid;background:#fff}
-      .cab{background:#0F1B2D;color:#fff;display:flex;justify-content:space-between;align-items:center;padding:${u(1.6)} ${u(3)};font-weight:700;letter-spacing:.05em;font-size:${p(6.5)}}
-      .cab .tipo{font-size:${p(7.5)};color:#7fd8ee}
-      .nom{font-size:${p(10.5)};font-weight:800;padding:${u(1.6)} ${u(3)} 0;line-height:1.15}
-      .lw{text-align:center;padding:0 ${u(3)}}.lw small{font-size:${p(5.5)};font-weight:700;color:#5A6573;letter-spacing:.12em}
-      .lot{font-size:${p(19)};font-weight:900;line-height:1}.bar{display:block;margin:${u(0.6)} auto 0;height:${u(10)};width:${u(78)}}
-      .dat{display:grid;grid-template-columns:repeat(3,1fr);gap:${u(1.5)};padding:${u(1.4)} ${u(3)} 0}
-      .dat div{background:#f1f4f7;border-radius:${u(1)};padding:${u(0.8)} ${u(1.5)}}.dat small{display:block;font-size:${p(5)};font-weight:700;color:#5A6573;letter-spacing:.08em}
-      .dat b{font-size:${p(9.5)}}.dat .v{background:#e8f6ec;outline:${u(0.3)} solid #15803d}.dat .v b{color:#0f6b31}
-      .pie{margin-top:auto;font-size:${p(5.6)};color:#3b4652;padding:${u(1.2)} ${u(3)} ${u(1.8)};line-height:1.3}
+      .hoja{display:flex;flex-direction:column;align-items:center;gap:${u(5)}}
+      .et{width:${u(100)};height:${u(70)};border:${f.borde ? `${u(0.4)} solid #0F1B2D` : '0'};border-radius:${f.borde ? u(2.5) : '0'};overflow:hidden;display:flex;flex-direction:column;page-break-inside:avoid;background:#fff}
+      .cab{background:#0F1B2D;color:#fff;display:flex;justify-content:space-between;align-items:center;padding:${u(1.5)} ${u(3)};font-weight:700;letter-spacing:.06em;font-size:${p(6.6)}}
+      .id{display:flex;gap:${u(2.5)};align-items:center;padding:${u(2)} ${u(3)} 0}
+      .sig{background:#00ABD4;color:#fff;border-radius:${u(1.2)};width:${u(19)};height:${u(12)};display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none}
+      .sig small{font-size:${p(5.2)};font-weight:700;letter-spacing:.14em}.sig b{font-size:${p(15)};font-weight:900;line-height:1}
+      .nom{flex:1;min-width:0}.nom small,.lw small,.dat small{display:block;font-size:${p(5.4)};font-weight:700;color:#5A6573;letter-spacing:.1em}
+      .nom b{display:block;font-size:${p(11.5)};font-weight:800;line-height:1.12;margin-top:${u(0.5)}}
+      .lw{margin:${u(2)} ${u(3)} 0;border:${u(0.3)} solid #c9d1da;border-radius:${u(1.2)};padding:${u(1.2)} ${u(2)} ${u(1.4)};text-align:center}
+      .lot{font-size:${p(23)};font-weight:900;line-height:1;letter-spacing:.02em}.bar{display:block;margin:${u(0.8)} auto 0;height:${u(8)};width:${u(74)}}
+      .dat{display:grid;grid-template-columns:repeat(3,1fr);gap:${u(1.8)};padding:${u(2)} ${u(3)} 0}
+      .dat div{background:#f1f4f7;border-radius:${u(1)};padding:${u(1)} ${u(1.8)} ${u(1.2)}}.dat b{display:block;font-size:${p(12)};font-weight:800;margin-top:${u(0.4)}}
+      .dat .v{background:#e8f6ec;box-shadow:inset 0 0 0 ${u(0.35)} #15803d}.dat .v b{color:#0f6b31}.dat .v small{color:#15803d}
+      .pie{margin-top:auto;font-size:${p(6.4)};color:#2c3742;padding:${u(1.4)} ${u(3)} ${u(2)};line-height:1.45}
+      .ln{display:block;border-bottom:${u(0.3)} solid #5A6573;height:${u(5.5)}}.lw .ln{height:${u(12)}}.dat .ln{height:${u(5)}}
+      .sig .sigln{width:${u(13)};height:${u(5.5)};border-color:#fff}.pie .ln{display:inline-block;width:${u(52)};height:${u(3.6)};vertical-align:bottom}.pie .ln.corto{width:${u(20)}}
       </style></head><body><div class="hoja">${una.repeat(f.n)}</div>
       <script>document.querySelectorAll('svg.bar').forEach(function(s){try{JsBarcode(s,s.dataset.lote,{format:'CODE128',displayValue:false,margin:0,height:60,width:2});}catch(e){}});<\/script></body></html>`;
   };
@@ -204,7 +215,7 @@
   const imprimirPlanilla = (entry, ingredientName = '') => imprimirHtml(planillaHtml(entry, ingredientName));
   const imprimirRotulo = async (entry, ingredientName = '') => {
     const res = await Swal.fire({ title: 'Rótulo del batch', input: 'radio',
-      inputOptions: { zebra: 'Zebra 100 × 70 mm', a4: 'A4 · 6 rótulos', a4uno: 'A4 · 1 rótulo grande' }, inputValue: 'zebra',
+      inputOptions: { zebra: 'Zebra 100 × 70 mm', a4: 'Hoja A4 · 2 rótulos' }, inputValue: 'zebra',
       showCancelButton: true, confirmButtonText: 'Imprimir', cancelButtonText: 'Cancelar' });
     if (res.isConfirmed) await imprimirHtml(rotuloHtml(entry, ingredientName, res.value));
   };
