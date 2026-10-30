@@ -167,10 +167,11 @@
       </body></html>`;
   };
 
-  // Rótulo del batch. Mismo diseño en dos tamaños: Zebra 100 × 70 mm o A4 con 2 rótulos grandes (uno debajo del otro).
+  // Rótulo del batch. Mismo diseño en tres tamaños: Zebra 100 × 70 mm, Zebra 10 × 15 cm o A4 con 2 rótulos grandes (uno debajo del otro).
   // Con entry.blanco sale para completar a mano (renglones en lugar de datos, sin código de barras).
   const FORMATOS_ROTULO = {
     zebra: { page: '100mm 70mm', margin: '0', s: 1, n: 1, borde: false },
+    zebra15: { page: '150mm 100mm', margin: '0', s: 1.42, n: 1, borde: false },
     a4: { page: 'A4', margin: '10mm', s: 1.85, n: 2, borde: true }
   };
   const rotuloHtml = (entry, ingredientName, formato = 'zebra') => {
@@ -192,7 +193,7 @@
     return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Rótulo ${esc(entry.lotNumber || 'batch')}</title>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"><\/script><style>
       @page{size:${f.page};margin:${f.margin}}*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#0F1B2D}
-      .hoja{display:flex;flex-direction:column;align-items:center;gap:${u(5)}}
+      .hoja{display:flex;flex-direction:column;align-items:center;gap:${u(5)}}${formato === 'zebra15' ? '.hoja{height:100mm;justify-content:center}' : ''}
       .et{width:${u(100)};height:${u(70)};border:${f.borde ? `${u(0.4)} solid #0F1B2D` : '0'};border-radius:${f.borde ? u(2.5) : '0'};overflow:hidden;display:flex;flex-direction:column;page-break-inside:avoid;background:#fff}
       .cab{background:#0F1B2D;color:#fff;display:flex;justify-content:space-between;align-items:center;padding:${u(1.5)} ${u(3)};font-weight:700;letter-spacing:.06em;font-size:${p(6.6)}}
       .id{display:flex;gap:${u(2.5)};align-items:center;padding:${u(2)} ${u(3)} 0}
@@ -215,7 +216,7 @@
   const imprimirPlanilla = (entry, ingredientName = '') => imprimirHtml(planillaHtml(entry, ingredientName));
   const imprimirRotulo = async (entry, ingredientName = '') => {
     const res = await Swal.fire({ title: 'Rótulo del batch', input: 'radio',
-      inputOptions: { zebra: 'Zebra 100 × 70 mm', a4: 'Hoja A4 · 2 rótulos' }, inputValue: 'zebra',
+      inputOptions: { zebra: 'Zebra 100 × 70 mm', zebra15: 'Zebra 10 × 15 cm', a4: 'Hoja A4 · 2 rótulos' }, inputValue: 'zebra',
       showCancelButton: true, confirmButtonText: 'Imprimir', cancelButtonText: 'Cancelar' });
     if (res.isConfirmed) await imprimirHtml(rotuloHtml(entry, ingredientName, res.value));
   };
