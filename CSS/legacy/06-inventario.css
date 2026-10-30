@@ -2129,3 +2129,6 @@
 .batch-modal .batch-tabla .r { text-align: right; white-space: nowrap; }
 .batch-modal .batch-falta, .batch-modal .falta { color: #b91c1c; font-weight: 700; }
 @media (max-width: 640px) { .batch-modal .batch-campos { grid-template-columns: 1fr; } .inv-desp-lista li { grid-template-columns: 1fr 70px; } .inv-desp-lista li .p { grid-column: 1 / -1; } }
+.inv-mov-kg.is-batch { color: var(--lj-text, #0f1b2d); }
+.inv-batch-pie { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 6px 18px 12px; font-size: .76rem; color: var(--lj-muted, #5a6573); }
+.inv-batch-acciones { display: inline-flex; gap: 8px; flex-wrap: wrap; }

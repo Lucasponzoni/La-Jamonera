@@ -5221,10 +5221,16 @@
           <summary class="inv-mov inv-mov-desp">
             <span class="inv-mov-fecha"><i class="fa-solid fa-mortar-pestle"></i>${escapeHtml(formatIsoDateEs(entry.batchDe.fecha) || '')}</span>
             <span class="inv-mov-tipo"><span class="inv-desp-badge">Batch de adobo ${escapeHtml(entry.batchDe.sigla || '')}</span></span>
-            <span class="inv-mov-kg">${Number(entry.batchDe.kg || entry.qty || 0).toFixed(2)} kg</span>
+            <span class="inv-mov-kg is-batch">${Number(entry.batchDe.kg || entry.qty || 0).toFixed(2)} kg</span>
           </summary>
           <ul class="inv-desp-lista">${(entry.batchDe.componentes || []).map((c) => `<li><span class="n">${escapeHtml(capitalize(c.ingredientName || ''))}</span><span class="k">${Number(c.kg || 0).toFixed(3)} kg</span><span class="p">${c.infinito ? escapeHtml(c.nota || 'sin lote') : (c.lotes || []).map((l) => escapeHtml(l.lotNumber || '-')).join(' + ')}</span></li>`).join('')}</ul>
-          <p class="inv-desp-nota">${entry.batchDe.responsable ? `Responsable: ${escapeHtml(entry.batchDe.responsable)} · ` : ''}<button type="button" class="btn btn-link btn-sm p-0" data-batch-planilla="${entry.id}">Imprimir planilla RE-BPM-XX</button> · <button type="button" class="btn btn-link btn-sm p-0" data-batch-rotulo="${entry.id}">Imprimir rótulo</button></p>
+          <div class="inv-batch-pie">
+            <span>${entry.batchDe.responsable ? `Responsable: <b>${escapeHtml(entry.batchDe.responsable)}</b>` : ''}</span>
+            <span class="inv-batch-acciones">
+              <sl-button variant="default" size="small" type="button" data-batch-planilla="${entry.id}"><i slot="prefix" class="fa-solid fa-print"></i>Planilla RE-BPM-XX</sl-button>
+              <sl-button variant="default" size="small" type="button" data-batch-rotulo="${entry.id}"><i slot="prefix" class="fa-solid fa-tag"></i>Rótulo</sl-button>
+            </span>
+          </div>
         </details>` : '';
 
       // Despostes de esta pieza: renglón como los demás movimientos; el botón de la derecha abre el desglose.
