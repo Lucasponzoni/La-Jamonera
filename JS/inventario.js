@@ -2978,12 +2978,12 @@
   //               Sin ninguno de los dos se guarda igual con un lote provisorio (P-SINPT-<factura>-R)
   //               y al completar el PT editando el ingreso el lote se recalcula.
   // 'factura'     resto (pollo, envases, panificados…): iniciales-factura limpia-destino (SAL-000300000775-R).
-  // 'vencimiento' especias individuales: sólo el vencimiento dd/mm/aaaa (13/07/2027).
+  // 'vencimiento' especias individuales: sólo el vencimiento en números, ddmmaaaa (13072027).
   // 'tokens'      configuración personalizada anterior (casillas y orden).
   const LOT_MODES = [
     { key: 'pt', label: 'Carne con PT', hint: 'Especie · establecimiento · N° de PT · destino' },
     { key: 'factura', label: 'Iniciales + factura', hint: 'Iniciales · N° de factura · destino' },
-    { key: 'vencimiento', label: 'Vencimiento (especias)', hint: 'Sólo la fecha de vencimiento dd/mm/aaaa' },
+    { key: 'vencimiento', label: 'Vencimiento (especias)', hint: 'Sólo la fecha de vencimiento en números: ddmmaaaa' },
     { key: 'tokens', label: 'Personalizado', hint: 'Elegís los datos y el orden' }
   ];
   const LOT_ESPECIES = { P: 'Cerdo', V: 'Vacuno' };
@@ -3310,8 +3310,8 @@
       return { modo, separator: '-', provisional: false, aviso: '', parts: [{ valor: getProductInitials(productName), etiqueta: 'Iniciales', detalle: 'del producto', tono: 'ini' }, facturaPart, destPart] };
     }
     if (modo === 'vencimiento') {
-      const vto = formatLotExpiryDmySlash(expiryDate);
-      return { modo, separator: '', provisional: false, aviso: '', parts: [{ valor: vto || 'SIN VTO', etiqueta: 'Vencimiento', detalle: 'día / mes / año', tono: 'vto', falta: !vto }] };
+      const vto = formatLotExpiryDmySlash(expiryDate).replace(/\//g, '');
+      return { modo, separator: '', provisional: false, aviso: '', parts: [{ valor: vto || 'SIN VTO', etiqueta: 'Vencimiento', detalle: 'día mes año, sólo números', tono: 'vto', falta: !vto }] };
     }
     return null;
   };
@@ -3743,7 +3743,7 @@
       const info = LOT_MODES.find((item) => item.key === modo);
       const extra = modo === 'pt'
         ? (LOT_ESPECIES[normalizeUpper(lotConfig?.especie)] ? `${LOT_ESPECIE_ICONO[normalizeUpper(lotConfig.especie)]} ${LOT_ESPECIES[normalizeUpper(lotConfig.especie)]}` : 'Falta elegir cerdo o vacuno')
-        : (modo === 'factura' ? `Destino por defecto: ${LOT_DESTINOS[lotDestino(lotConfig?.destinoDefault)]}` : 'dd/mm/aaaa');
+        : (modo === 'factura' ? `Destino por defecto: ${LOT_DESTINOS[lotDestino(lotConfig?.destinoDefault)]}` : 'ddmmaaaa');
       const criterioBadge = modo === 'pt' ? `<span class="inventario-config-badge is-secondary">Criterio ${escapeHtml(LOT_CRITERIOS[lotCriterioOf(lotConfig)].label)}</span>` : '';
       return `<span class="inventario-config-badge">${escapeHtml(info.label)}</span>${criterioBadge}<span class="inventario-config-badge is-secondary">${escapeHtml(extra)}</span>`;
     }

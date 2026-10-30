@@ -1,7 +1,7 @@
 // Batches de adobo (IT v03 · planilla RE-BPM-XX v03).
 // Un batch es un lote: DDMMAAAA-SIGLA (-02, -03… si ya hay uno ese día). La fórmula está escrita para 100 kg de adobo y se
 // prepara lo que haga falta. Las especias se descuentan por FEFO; el adobo vence con la especia que vence primero.
-// Stock infinito (azúcar: se compra en comercio local como consumidor final) va sin lote y queda aclarado.
+// Stock infinito: el azúcar se compra en comercio local como consumidor final → lote = fecha del batch, vence a los 60 días.
 // Las fórmulas viven en /inventario/config.adobos[ingredientId] = { sigla, titulo, base, componentes:[{ingredientId, ingredientName, kg}] }.
 (function () {
   const db = () => window.dbLaJamoneraRest;
@@ -18,7 +18,9 @@
   const factorBase = (e) => (Number(e?.qtyBase) && Number(e?.qty) ? Number(e.qtyBase) / Number(e.qty) : (esGramos(e) ? 1 : 1000));
   const esInfinito = (rec) => Boolean(rec?.infiniteStock || rec?.stockInfinito);
   const cap = (s) => String(s || '').charAt(0).toUpperCase() + String(s || '').slice(1);
-  const AZUCAR_NOTA = 'Comercio local (consumidor final): stock infinito, sin lote de proveedor';
+  const AZUCAR_NOTA = 'Comercio local (consumidor final): lote = fecha del batch, vence a los 60 días';
+  const AZUCAR_PROV = 'Comercio local (consumidor final)';
+  const mas60 = (iso) => { const t = new Date(`${iso}T12:00:00Z`); t.setUTCDate(t.getUTCDate() + 60); return t.toISOString().slice(0, 10); };
 
   let cacheConfig = null;
   const config = async (forzar = false) => {
@@ -44,7 +46,13 @@
       const need = Number(c.kg) * kg / Number(A.base || 100);
       const rec = await leer(c.ingredientId);
       if (esInfinito(rec)) {
-        componentes.push({ ...c, kg: r4(need), infinito: true, lotes: [], nota: /azucar|azúcar/i.test(c.ingredientName) ? AZUCAR_NOTA : 'Stock infinito, sin lote' });
+        // Azúcar: comercio local como consumidor final, sin lote del proveedor → lote = fecha del batch, vence a los 60 días.
+        if (/azucar|azúcar/i.test(c.ingredientName)) {
+          const vAz = mas60(fecha);
+          componentes.push({ ...c, kg: r4(need), infinito: true, nota: AZUCAR_NOTA,
+            lotes: [{ entryId: '', lotNumber: compacta(fecha), expiryDate: vAz, provider: AZUCAR_PROV, invoiceNumber: '', kg: r4(need) }] });
+          if (!vto || vAz < vto) { vto = vAz; vencePor = c.ingredientName; }
+        } else componentes.push({ ...c, kg: r4(need), infinito: true, lotes: [], nota: 'Stock infinito, sin lote' });
         continue;
       }
       let falta = need; const lotes = [];
@@ -91,12 +99,12 @@
     const batchDe = { batchId, sigla: A.sigla, titulo: A.titulo, fecha, kg: r4(kg), responsable, formulaBase: A.base || 100, vencePor,
       componentes: componentes.map((c) => ({ ingredientId: c.ingredientId, ingredientName: c.ingredientName, kg: c.kg, infinito: c.infinito, nota: c.nota || '', lotes: c.lotes })) };
     const nota = [`Batch de adobo ${A.sigla} (${String(A.titulo || '').toLowerCase()}), ${kgTxt(kg)} kg. Fórmula base para 100 kg de adobo.`,
-      vto ? `Vence ${dmy(vto)}: la especia que vence primero (${vencePor}).` : '',
-      componentes.some((c) => c.infinito && c.nota === AZUCAR_NOTA) ? 'Azúcar: comercio local (consumidor final), stock infinito, sin lote.' : ''].filter(Boolean).join(' ');
+      vto ? `Vence ${dmy(vto)}: el componente que vence primero (${vencePor}).` : '',
+      componentes.some((c) => c.infinito && c.nota === AZUCAR_NOTA) ? 'Azúcar: comercio local (consumidor final), lote = fecha del batch, vence a los 60 días.' : ''].filter(Boolean).join(' ');
     const entry = { id: makeId('entry'), qty: r4(kg), unit: 'kilos', qtyKg: r4(kg), qtyBase: r4(kg * 1000), availableQty: r4(kg), availableBase: r4(kg * 1000), availableKg: r4(kg),
       packageQty: null, productionUsage: [], noPerecedero: false, usoInternoEmpresa: false, isFrozen: false, frozenAt: '', entryDate: fecha, expiryDate: vto || '',
       invoiceNumber: '', remitoNumber: '', lotNumber: lote, customLot: lote, provider: 'Elaboración propia (batch de adobo)', lotStatus: 'disponible',
-      invoiceImageUrl: '', invoiceImageUrls: [], ptFileUrls: [], createdAt: now, lotNota: nota, vtoCriterio: 'la especia que vence primero (IT v03 §5.3)', batchDe };
+      invoiceImageUrl: '', invoiceImageUrls: [], ptFileUrls: [], createdAt: now, lotNota: nota, vtoCriterio: 'el componente que vence primero (IT v03 §5.3)', batchDe };
     const adoboRec = registros[adoboId];
     adoboRec.entries = [entry, ...(adoboRec.entries || [])]; adoboRec.hasEntries = true; adoboRec.stockUnit = adoboRec.stockUnit || 'kilos';
     for (const id of tocados) {
@@ -118,63 +126,91 @@
     const doc = frame.contentDocument; doc.open(); doc.write(html); doc.close();
     setTimeout(() => { try { frame.contentWindow.focus(); frame.contentWindow.print(); } finally { setTimeout(() => { frame.remove(); resolve(); }, 1500); } }, 400);
   });
-  const ESTILO = `*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#0F1B2D;margin:0}
-    table{border-collapse:collapse;width:100%}th,td{border:1px solid #9aa6b2;padding:4px 6px;font-size:11px;text-align:left}th{background:#e8edf2;font-size:10px;text-transform:uppercase}
-    .r{text-align:right}`;
-
+  // Planilla RE-BPM-XX v03 con el diseño de PLANILLA-ADOBO.pdf: cabecera, datos del batch, 14 renglones, siglas, criterios y firmas.
   const planillaHtml = (entry, ingredientName) => {
     const b = entry.batchDe || {};
     const filas = []; let n = 0;
     (b.componentes || []).forEach((c) => {
-      const lotes = c.infinito ? [{ lotNumber: 'Sin lote · stock infinito', provider: 'Comercio local (consumidor final)', expiryDate: '', kg: c.kg }] : (c.lotes || []);
-      lotes.forEach((l) => { n += 1; filas.push(`<tr><td>${n}</td><td>${esc(cap(c.ingredientName))}</td><td>${esc(l.provider || '—')}</td><td>${esc(l.lotNumber || '—')}</td><td>${esc(l.expiryDate ? dmy(l.expiryDate) : '—')}</td><td class="r">${kgTxt(l.kg)} kg</td></tr>`); });
+      const lotes = (c.lotes && c.lotes.length) ? c.lotes : [{ lotNumber: 'Sin lote', provider: c.infinito ? AZUCAR_PROV : '—', expiryDate: '', kg: c.kg }];
+      lotes.forEach((l) => { n += 1; filas.push(`<tr><td class="c n">${n}</td><td>${esc(cap(c.ingredientName))}</td><td>${esc(l.provider || '—')}</td><td class="c">${esc(l.lotNumber || '—')}</td><td class="c">${esc(l.expiryDate ? dmy(l.expiryDate) : '—')}</td><td class="r">${kgTxt(l.kg)} kg</td></tr>`); });
     });
-    for (let i = n + 1; i <= Math.max(14, n); i += 1) filas.push(`<tr><td>${i}</td><td></td><td></td><td></td><td></td><td></td></tr>`);
-    return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(entry.lotNumber)}</title><style>${ESTILO}
-      @page{size:A4;margin:14mm}.cab{text-align:center;border-bottom:2px solid #0F1B2D;padding-bottom:6px;margin-bottom:10px}.cab b{font-size:15px;display:block}.cab small{color:#5A6573}
-      .g{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-bottom:10px}.g div{border:1px solid #9aa6b2;padding:4px 6px;font-size:11px}.g small{display:block;font-size:8.5px;color:#5A6573;text-transform:uppercase}
-      .crit{font-size:9.5px;color:#5A6573;margin-top:8px;line-height:1.4}.firma{display:flex;justify-content:space-between;margin-top:30px;font-size:11px}</style></head><body>
-      <div class="cab"><b>FRIGORÍFICO LA JAMONERA</b>PLANILLA DE ELABORACIÓN DE BATCH / MEZCLA DE ESPECIAS<br><small>Documento: RE-BPM-XX · Versión: 03 · RNE 21-85083</small></div>
-      <div class="g"><div><small>Fecha de elaboración</small>${dmy(b.fecha || entry.entryDate)}</div><div><small>Producto / destino</small>${esc(b.titulo || ingredientName)}</div><div><small>Sigla</small>${esc(b.sigla || '')}</div>
-      <div><small>Lote del batch</small><b>${esc(entry.lotNumber)}</b></div><div><small>Vencimiento</small>${dmy(entry.expiryDate)}</div><div><small>Responsable</small>${esc(b.responsable || '')}&nbsp;</div></div>
-      <table><thead><tr><th>N°</th><th>Especia / aditivo / conservante</th><th>Proveedor</th><th>Lote del proveedor</th><th>Vencimiento</th><th class="r">Cantidad</th></tr></thead>
-      <tbody>${filas.join('')}<tr><td colspan="5"><b>CANTIDAD TOTAL DEL BATCH</b></td><td class="r"><b>${kgTxt(entry.qty)} kg</b></td></tr></tbody></table>
-      <div class="crit">Siglas: CHE chorizo especial · CHP chorizo parrillero (y Chori Max) · CHC chorizo colorado · M morcilla. Lote del batch: DDMMAAAA-SIGLA (fecha de elaboración, sin barras; correlativo -01, -02 si hay más de uno en el día).
-      Vencimiento del batch: el más próximo de los ingredientes${b.vencePor ? ` (${esc(b.vencePor)})` : ''}. La Canasta: lote = vencimiento. Rotación FEFO.
-      Fórmula base para 100 kg de adobo; este batch: ${kgTxt(entry.qty)} kg. El lote y vencimiento del batch se copian en la planilla de producción, fila «Condimento para…».</div>
-      <div class="firma"><span>Elaboró: ______________________________</span><span>Controló / Aprobó: ______________________________</span></div></body></html>`;
+    for (let i = n + 1; i <= Math.max(14, n); i += 1) filas.push(`<tr><td class="c n">${i}</td><td></td><td></td><td></td><td></td><td></td></tr>`);
+    return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Planilla batch ${esc(entry.lotNumber)}</title><style>
+      @page{size:A4;margin:16mm 15mm}*{box-sizing:border-box}body{font-family:Carlito,Calibri,Lato,Arial,sans-serif;color:#000;margin:0;font-size:10.5pt}
+      h1{font-size:15pt;margin:0}h2{font-size:10.5pt;margin:2px 0 1px}.doc{font-size:7.5pt;border-bottom:1.5px solid #000;padding-bottom:4px;margin-bottom:12px}
+      table{border-collapse:collapse;width:100%}th,td{border:.75px solid #444;padding:4px 5px;vertical-align:middle}
+      th{background:#d9d9d9;font-size:8.5pt;font-weight:700;text-align:center}.c{text-align:center}.r{text-align:right}
+      .datos td{height:38px;text-align:center;font-size:10pt}.datos .lote{font-weight:700;font-size:11pt;white-space:nowrap}
+      .ing{margin-top:14px}.ing .banda th{text-align:left}.ing td{height:23px;font-size:9pt}.ing td.n{font-weight:700;width:30px}
+      .total td{background:#d9d9d9;font-weight:700;text-align:right;font-size:8.5pt}.total td.r{background:#fff;font-size:10pt}
+      .siglas{margin-top:14px}.siglas td{text-align:center;width:25%}.siglas b{display:block;font-size:12pt}.siglas small{font-size:7.5pt}
+      .crit{margin-top:14px;font-size:8.6pt}.crit h3{font-size:9.5pt;margin:0 0 4px}.crit ul{margin:0;padding-left:18px}.crit li{margin:2px 0}
+      .firmas{margin-top:18px}.firmas td{height:34px;width:50%;font-size:9pt}</style></head><body>
+      <h1>FRIGORÍFICO LA JAMONERA</h1><h2>PLANILLA DE ELABORACIÓN DE BATCH / MEZCLA DE ESPECIAS</h2>
+      <div class="doc">Documento: RE-BPM-XX &nbsp;|&nbsp; Versión: 03 &nbsp;|&nbsp; RNE 21-85083</div>
+      <table class="datos"><thead><tr><th>Fecha de elaboración</th><th>Producto / destino</th><th>Sigla producto</th><th>Lote del batch</th><th>Vencimiento del batch</th><th>Responsable</th></tr></thead>
+      <tbody><tr><td>${dmy(b.fecha || entry.entryDate)}</td><td>${esc(cap(b.titulo || ingredientName))}</td><td>${esc(b.sigla || '')}</td><td class="lote">${esc(entry.lotNumber)}</td><td>${dmy(entry.expiryDate)}</td><td>${esc(b.responsable || '')}</td></tr></tbody></table>
+      <table class="ing"><thead><tr class="banda"><th colspan="6">INGREDIENTES / ESPECIAS DEL BATCH</th></tr>
+      <tr><th style="width:30px">N°</th><th>Especia / aditivo / conservante</th><th>Proveedor</th><th>Lote del proveedor</th><th>Vencimiento<br>(dd/mm/aaaa)</th><th style="width:90px">Cantidad</th></tr></thead>
+      <tbody>${filas.join('')}<tr class="total"><td colspan="5">CANTIDAD TOTAL DEL BATCH</td><td class="r">${kgTxt(entry.qty)} kg</td></tr></tbody></table>
+      <table class="siglas"><thead><tr><th colspan="4">SIGLAS DE PRODUCTO DESTINO</th></tr></thead><tbody><tr>
+      <td><b>CHE</b><small>Chorizo especial</small></td><td><b>CHP</b><small>Chorizo parrillero y Chori Max</small></td><td><b>CHC</b><small>Chorizo colorado</small></td><td><b>M</b><small>Morcilla</small></td></tr></tbody></table>
+      <div class="crit"><h3>Criterios de codificación (ver instructivo IT-BPM-XX, versión 03)</h3><ul>
+      <li><b>Lote del batch: DDMMAAAA-SIGLA</b> (fecha de elaboración en números, sin barras, y sigla del producto destino). Ej.: 09072026-CHE.</li>
+      <li><b>Más de un batch del mismo destino en el día:</b> correlativo de dos dígitos al final (09072026-CHE-02, 09072026-CHE-03).</li>
+      <li><b>Vencimiento del batch:</b> el más próximo entre todos los ingredientes del batch${b.vencePor ? ` (en este batch: ${esc(b.vencePor)})` : ''}.</li>
+      <li><b>Lote del proveedor:</b> el que trae el producto o el anotado en la factura. Si el lote es una fecha (La Canasta: lote = vencimiento) se escribe sólo en números, ddmmaaaa.</li>
+      <li><b>Azúcar:</b> se compra en comercio local como consumidor final; lote = fecha del batch y vence a los 60 días.</li>
+      <li>Rotación de especias por <b>FEFO</b> (primero vence, primero sale). Fórmula base para 100 kg de adobo; este batch: ${kgTxt(entry.qty, 2)} kg.</li></ul></div>
+      <table class="firmas"><tbody><tr><td>Elaboró: ________________________________</td><td>Controló / Aprobó: ________________________________</td></tr></tbody></table>
+      </body></html>`;
   };
 
+  // Rótulo del batch. Mismo diseño en tres tamaños: Zebra 100 × 70 mm, A4 con 6 rótulos o A4 con un rótulo grande.
+  const FORMATOS_ROTULO = {
+    zebra: { page: '100mm 70mm', margin: '0', s: 1, cols: 1, n: 1, borde: false },
+    a4: { page: 'A4', margin: '10mm 7mm', s: 0.96, cols: 2, n: 6, borde: true },
+    a4uno: { page: 'A4 landscape', margin: '12mm', s: 2.5, cols: 1, n: 1, borde: true }
+  };
   const rotuloHtml = (entry, ingredientName, formato = 'zebra') => {
     const b = entry.batchDe || {};
+    const f = FORMATOS_ROTULO[formato] || FORMATOS_ROTULO.zebra;
     const contiene = (b.componentes || []).map((c) => cap(c.ingredientName)).join(', ');
-    const una = `<div class="et"><div class="cab"><span>ADOBO · BATCH</span><span>${esc(b.sigla || '')}</span></div><div class="nom">${esc(cap(b.titulo || ingredientName))}</div>
-      <div class="lot">${esc(entry.lotNumber)}</div><svg class="bar" data-lote="${esc(entry.lotNumber)}"></svg>
-      <div class="dat"><div>Elaboración<b>${dmy(b.fecha || entry.entryDate)}</b></div><div>Peso<b>${kgTxt(entry.qty, 2)} kg</b></div><div class="v">Vence<b>${dmy(entry.expiryDate)}</b></div></div>
-      <div class="pie">Contiene: ${esc(contiene)} · Conservar en lugar seco y fresco · Resp.: ${esc(b.responsable || '________')}</div></div>`;
-    const a4 = formato === 'a4';
-    return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(entry.lotNumber)}</title>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"><\/script><style>${ESTILO}
-      @page{size:${a4 ? 'A4' : '100mm 70mm'};margin:${a4 ? '8mm' : '0'}}
-      .hoja{display:${a4 ? 'grid' : 'block'};grid-template-columns:1fr 1fr;gap:4mm}
-      .et{width:100mm;height:70mm;border:${a4 ? '1px dashed #9aa6b2' : '0'};padding:3mm;overflow:hidden;page-break-inside:avoid}
-      .et .cab{background:#0F1B2D;color:#fff;padding:1.5mm 3mm;display:flex;justify-content:space-between;font-size:9pt;font-weight:bold;letter-spacing:.06em}
-      .nom{font-size:11pt;font-weight:bold;margin-top:1.5mm}.lot{font-size:18pt;font-weight:900;text-align:center}.bar{display:block;margin:0 auto;height:12mm;width:80mm}
-      .dat{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5mm;font-size:7pt}.dat div{background:#f1f4f7;padding:1mm 1.5mm}.dat b{display:block;font-size:10pt}.dat .v{border:1px solid #15803d;background:#e8f6ec}
-      .pie{font-size:6.5pt;color:#5A6573;margin-top:1mm}</style></head><body><div class="hoja">${a4 ? una.repeat(6) : una}</div>
-      <script>document.querySelectorAll('svg.bar').forEach(function(s){try{JsBarcode(s,s.dataset.lote,{format:'CODE128',displayValue:false,margin:0,height:40});}catch(e){}});<\/script></body></html>`;
+    const una = `<div class="et"><div class="cab"><span>FRIGORÍFICO LA JAMONERA</span><span class="tipo">ADOBO · BATCH ${esc(b.sigla || '')}</span></div>
+      <div class="nom">${esc(cap(b.titulo || ingredientName))}</div>
+      <div class="lw"><small>LOTE</small><div class="lot">${esc(entry.lotNumber)}</div><svg class="bar" data-lote="${esc(entry.lotNumber)}"></svg></div>
+      <div class="dat"><div><small>ELABORACIÓN</small><b>${dmy(b.fecha || entry.entryDate)}</b></div><div><small>PESO</small><b>${kgTxt(entry.qty, 2)} kg</b></div><div class="v"><small>VENCE</small><b>${dmy(entry.expiryDate)}</b></div></div>
+      <div class="pie"><b>Contiene:</b> ${esc(contiene)}.<br>Conservar en lugar seco y fresco, envase cerrado · Uso interno · RNE 21-85083 · Resp.: ${esc(b.responsable || '__________')}</div></div>`;
+    const u = (mm) => `${(mm * f.s).toFixed(2)}mm`; const p = (pt) => `${(pt * f.s).toFixed(2)}pt`;
+    return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Rótulo ${esc(entry.lotNumber)}</title>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"><\/script><style>
+      @page{size:${f.page};margin:${f.margin}}*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#0F1B2D}
+      .hoja{display:grid;grid-template-columns:repeat(${f.cols},max-content);gap:${f.cols > 1 ? '5mm 5mm' : '0'};justify-content:center}
+      .et{width:${u(100)};height:${u(70)};border:${f.borde ? `${u(0.35)} solid #0F1B2D` : '0'};border-radius:${f.borde ? u(2.5) : '0'};overflow:hidden;display:flex;flex-direction:column;page-break-inside:avoid;background:#fff}
+      .cab{background:#0F1B2D;color:#fff;display:flex;justify-content:space-between;align-items:center;padding:${u(1.6)} ${u(3)};font-weight:700;letter-spacing:.05em;font-size:${p(6.5)}}
+      .cab .tipo{font-size:${p(7.5)};color:#7fd8ee}
+      .nom{font-size:${p(10.5)};font-weight:800;padding:${u(1.6)} ${u(3)} 0;line-height:1.15}
+      .lw{text-align:center;padding:0 ${u(3)}}.lw small{font-size:${p(5.5)};font-weight:700;color:#5A6573;letter-spacing:.12em}
+      .lot{font-size:${p(19)};font-weight:900;line-height:1}.bar{display:block;margin:${u(0.6)} auto 0;height:${u(10)};width:${u(78)}}
+      .dat{display:grid;grid-template-columns:repeat(3,1fr);gap:${u(1.5)};padding:${u(1.4)} ${u(3)} 0}
+      .dat div{background:#f1f4f7;border-radius:${u(1)};padding:${u(0.8)} ${u(1.5)}}.dat small{display:block;font-size:${p(5)};font-weight:700;color:#5A6573;letter-spacing:.08em}
+      .dat b{font-size:${p(9.5)}}.dat .v{background:#e8f6ec;outline:${u(0.3)} solid #15803d}.dat .v b{color:#0f6b31}
+      .pie{margin-top:auto;font-size:${p(5.6)};color:#3b4652;padding:${u(1.2)} ${u(3)} ${u(1.8)};line-height:1.3}
+      </style></head><body><div class="hoja">${una.repeat(f.n)}</div>
+      <script>document.querySelectorAll('svg.bar').forEach(function(s){try{JsBarcode(s,s.dataset.lote,{format:'CODE128',displayValue:false,margin:0,height:60,width:2});}catch(e){}});<\/script></body></html>`;
   };
 
   const imprimirPlanilla = (entry, ingredientName = '') => imprimirHtml(planillaHtml(entry, ingredientName));
   const imprimirRotulo = async (entry, ingredientName = '') => {
-    const res = await Swal.fire({ title: 'Rótulo del batch', input: 'radio', inputOptions: { zebra: 'Zebra 100 × 70 mm', a4: 'Hoja A4 de 6' }, inputValue: 'zebra',
+    const res = await Swal.fire({ title: 'Rótulo del batch', input: 'radio',
+      inputOptions: { zebra: 'Zebra 100 × 70 mm', a4: 'A4 · 6 rótulos', a4uno: 'A4 · 1 rótulo grande' }, inputValue: 'zebra',
       showCancelButton: true, confirmButtonText: 'Imprimir', cancelButtonText: 'Cancelar' });
     if (res.isConfirmed) await imprimirHtml(rotuloHtml(entry, ingredientName, res.value));
   };
 
   // ── modal «Preparar batch» ──
   const tablaPlanHtml = (plan) => {
-    const filas = plan.componentes.map((c) => `<tr><td>${esc(cap(c.ingredientName))}</td><td>${c.infinito ? `<small>${esc(c.nota)}</small>`
+    const filas = plan.componentes.map((c) => `<tr><td>${esc(cap(c.ingredientName))}</td><td>${c.infinito && !c.lotes.length ? `<small>${esc(c.nota)}</small>`
       : (c.lotes.map((l) => `<code>${esc(l.lotNumber || '—')}</code> <small>${kgTxt(l.kg)} kg · vence ${dmy(l.expiryDate)}</small>`).join('<br>') || '<small class="falta">sin stock</small>')}</td>
       <td class="r">${kgTxt(c.kg)}</td></tr>`).join('');
     const faltan = plan.faltan.length ? `<p class="batch-falta"><b>No alcanza:</b> ${plan.faltan.map((f) => `${esc(cap(f.ingredientName))} ${kgTxt(f.kg)} kg`).join(' · ')}. Cargá la factura o prepará menos kg.</p>` : '';
