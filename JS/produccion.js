@@ -4635,132 +4635,145 @@
     const normalized = normalizeLower(value);
     return !normalized || normalized.includes('sin dirección') || normalized.includes('sin direccion') || normalized.includes('xlsx');
   };
+  // Planilla de reparto con el diseño del «Registro protocolo» (Lucas, 01/11/2026): sólo productos de elaboración
+  // propia (sin milanesas, que se venden en mostrador), lote del rótulo + N° de producción, kilos con coma decimal y
+  // un QR de trazabilidad por producción (clickeable). Sin facturas de los demás productos.
+  const DISPATCH_MESES = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
+  const formatDispatchKg = (value) => `${Number(value || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} kg`;
+  const dispatchInitials = (value = '') => normalizeUpper(value).normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Z0-9\s]/g, ' ').split(/\s+/).filter(Boolean).map((word) => word[0]).join('') || 'PROD';
+  const dispatchProductionDate = (allocation = {}) => {
+    const explicit = normalizeValue(allocation.productionDate);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(explicit)) return explicit;
+    const match = /PROD-[A-Z]+-(\d{2})(\d{2})(\d{4})-/.exec(normalizeValue(allocation.productionId));
+    return match ? `${match[3]}-${match[2]}-${match[1]}` : '';
+  };
+  const getDispatchOwnProducts = (dispatchRow = {}) => (Array.isArray(dispatchRow.products) ? dispatchRow.products : [])
+    .filter((item) => normalizeValue(item.sourceType) === 'production' && !/milanes/i.test(normalizeValue(item.recipeTitle)) && Number(item.qtyKg || 0) > 0);
+  const getDispatchProductionTraces = (dispatchRow = {}) => {
+    const seen = new Map();
+    getDispatchOwnProducts(dispatchRow).forEach((item) => (Array.isArray(item.allocations) ? item.allocations : []).forEach((allocation) => {
+      const productionId = normalizeValue(allocation.productionId);
+      if (productionId && !seen.has(productionId)) seen.set(productionId, { productionId, url: getDispatchTraceUrl(productionId), productTitle: normalizeValue(item.recipeTitle) });
+    }));
+    return [...seen.values()];
+  };
   const renderDispatchPlanillaQr = async (host, dispatchRow) => {
     if (!host || !dispatchRow?.id) return;
     const ready = await ensureQrCodeLib();
     if (!ready || !window.QRCode) return;
-    const traces = buildDispatchTraceTargets(dispatchRow);
-    if (!traces.length) {
-      host.innerHTML = '';
-      return;
-    }
+    const traces = getDispatchProductionTraces(dispatchRow);
     host.innerHTML = '';
-    host.style.display = 'flex';
-    host.style.flexWrap = 'wrap';
-    host.style.justifyContent = 'center';
-    host.style.alignItems = 'flex-start';
-    host.style.gap = '12px';
     traces.forEach((trace) => {
-      const wrap = document.createElement('div');
-      wrap.style.display = 'flex';
-      wrap.style.flexDirection = 'column';
-      wrap.style.alignItems = 'center';
-      wrap.style.gap = '4px';
-      wrap.style.flex = '0 0 auto';
+      const card = document.createElement('a');
+      card.className = 'planilla-qr-card dispatch-rep-qr';
+      card.href = trace.url;
+      card.target = '_blank';
+      card.rel = 'noopener';
       const qrBox = document.createElement('div');
-      qrBox.style.width = '130px';
-      qrBox.style.height = '130px';
-      const caption = document.createElement('small');
-      caption.style.fontWeight = '700';
-      caption.style.color = '#1f2a44';
-      caption.style.textAlign = 'center';
-      caption.textContent = trace.label;
-      const subcaption = document.createElement('small');
-      subcaption.style.color = '#6b7280';
-      subcaption.style.textAlign = 'center';
-      subcaption.style.fontSize = '10px';
-      subcaption.textContent = normalizeValue(trace.productTitle || trace.parentLabel || 'Producto');
-      wrap.appendChild(qrBox);
-      wrap.appendChild(caption);
-      wrap.appendChild(subcaption);
-      host.appendChild(wrap);
+      qrBox.className = 'dispatch-rep-qrbox';
+      const caption = document.createElement('p');
+      caption.className = 'planilla-qr-note';
+      caption.textContent = trace.productionId;
+      card.appendChild(qrBox);
+      card.appendChild(caption);
+      host.appendChild(card);
       // eslint-disable-next-line no-new
-      new window.QRCode(qrBox, { text: trace.url, width: 130, height: 130, colorDark: '#111827', colorLight: '#ffffff' });
+      new window.QRCode(qrBox, { text: trace.url, width: 110, height: 110, colorDark: '#111827', colorLight: '#ffffff' });
     });
   };
   const printDispatchPlanilla = async (_node, dispatchRow) => {
     if (!dispatchRow?.id) return;
     await printDispatchPlanillasBatch([dispatchRow]);
   };
+  const DISPATCH_PLANILLA_STYLE = '<style>.dispatch-rep .planilla-proto-formula{table-layout:fixed;width:100%}.dispatch-rep .planilla-proto-formula th,.dispatch-rep .planilla-proto-formula td{overflow-wrap:anywhere}.dispatch-rep .planilla-proto-formula th{white-space:nowrap;font-size:10px}.dispatch-rep .dispatch-rep-fecha{white-space:nowrap}.dispatch-rep .dispatch-rep-num{text-align:right}.dispatch-rep .planilla-proto-formula td small{display:block}.dispatch-rep-qrs{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}.dispatch-rep-qr{text-decoration:none;color:inherit}.dispatch-rep-qrbox{width:110px;height:110px;margin:0 auto}</style>';
   const buildDispatchPlanillaHtml = (dispatchRow) => {
     const client = { ...getDispatchClient(dispatchRow.clientId), ...safeObject(dispatchRow.clientSnapshot) };
     const vehicle = getDispatchVehicle(dispatchRow.vehicleId);
     const managerTokens = Array.isArray(dispatchRow.managers) ? dispatchRow.managers : [];
     const managerProfiles = Array.isArray(dispatchRow.managerProfiles) ? dispatchRow.managerProfiles : [];
     const managerLabel = managerTokens.length
-      ? managerTokens.map((token) => {
-        const manager = getManagerDisplay(token);
-        return `${manager.name} (${manager.role})`;
-      }).join(', ')
-      : (managerProfiles.length
-        ? managerProfiles.map((m) => `${normalizeValue(m.name) || 'Sin responsable'} (${normalizeValue(m.role) || 'Encargado'})`).join(', ')
-        : 'Sin responsable (Encargado)');
+      ? managerTokens.map((token) => { const manager = getManagerDisplay(token); return `${manager.name} (${manager.role})`; }).join(', ')
+      : (managerProfiles.length ? managerProfiles.map((m) => `${normalizeValue(m.name) || 'Sin responsable'} (${normalizeValue(m.role) || 'Encargado'})`).join(', ') : '-');
     const location = getDispatchLocationLabel(dispatchRow, client);
-    const { groups, standalone } = getDispatchGroupedProducts(dispatchRow);
-    const standaloneRows = [];
-    standalone.forEach((item) => {
-      const allocations = Array.isArray(item.allocations) && item.allocations.length
-        ? item.allocations
-        : [{ lotNumber: '-', qtyKg: item.qtyKg, qty: item.qty, unit: item.qtyUnit || 'kilos', expiryDate: '', productionId: '' }];
-      const renderedAllocations = allocations.map((allocation) => {
-        const qtyText = getDispatchAllocationDisplay(item, allocation).label;
-        const expiryText = formatDispatchPlanillaExpiry(allocation.expiryDate);
-        const lotText = `${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(qtyText)}`;
-        const markerCell = normalizeValue(item.sourceRowId) ? '<span class="dispatch-planilla-child-label">↳</span>' : '<span class="dispatch-planilla-parent-marker">⭬</span>';
-        return `<tr class="${normalizeValue(item.sourceRowId) ? 'dispatch-planilla-child-row' : ''}"><td class="dispatch-planilla-marker-cell">${markerCell}</td><td><span style="display:inline-flex;align-items:center;gap:8px;">${sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl) ? `<img src="${(window.ljThumb || String)(escapeHtml(sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl)))}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(item.recipeTitle || '-')}</span></span></td><td><strong>${escapeHtml(qtyText)}</strong></td><td>${expiryText}</td><td><strong>${lotText}</strong></td></tr>`;
-      }).join('');
-      standaloneRows.push(renderedAllocations);
-    });
-    const detailRows = [
-      ...groups.map((group) => {
-        const groupRows = group.items.map((item) => {
-          const allocations = Array.isArray(item.allocations) && item.allocations.length
-            ? item.allocations
-            : [{ lotNumber: '-', qtyKg: item.qtyKg, qty: item.qty, unit: item.qtyUnit || 'kilos', expiryDate: '', productionId: '' }];
-          return allocations.map((allocation) => {
-            const qtyText = getDispatchAllocationDisplay(item, allocation).label;
-            const expiryText = formatDispatchPlanillaExpiry(allocation.expiryDate);
-            const lotText = `${escapeHtml(allocation.lotNumber || '-')} · ${escapeHtml(qtyText)}`;
-            return `<tr class="dispatch-planilla-child-row"><td class="dispatch-planilla-marker-cell"><span class="dispatch-planilla-child-label">↳</span></td><td><span style="display:inline-flex;align-items:center;gap:8px;">${sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl) ? `<img src="${(window.ljThumb || String)(escapeHtml(sanitizeImageUrl(item.recipeImageUrl || state.recetas?.[item.recipeId]?.imageUrl)))}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #d7def2;">` : ''}<span>${escapeHtml(item.recipeTitle || '-')}</span></span></td><td><strong>${escapeHtml(qtyText)}</strong></td><td>${expiryText}</td><td><strong>${lotText}</strong></td></tr>`;
-          }).join('');
-        }).join('');
-        return `<tr class="dispatch-planilla-parent-row"><td colspan="5"><strong>${escapeHtml(group.label)}</strong></td></tr>${groupRows}`;
-      }),
-      ...standaloneRows
-    ].join('') || '<tr><td colspan="5">Sin productos.</td></tr>';
+    const products = getDispatchOwnProducts(dispatchRow);
+    const rows = products.flatMap((item) => {
+      const recipe = safeObject(state.recetas?.[item.recipeId]);
+      const title = normalizeUpper(recipe.title || item.recipeTitle || '-');
+      const commercial = normalizeUpper(recipe.nombreComercial);
+      return (Array.isArray(item.allocations) ? item.allocations : []).map((allocation) => {
+        const productionDate = dispatchProductionDate(allocation);
+        const lot = productionDate ? `LJ-${productionDate.split('-').reverse().join('')}-${dispatchInitials(recipe.title || item.recipeTitle)}` : normalizeValue(allocation.lotNumber) || '-';
+        return `<tr><td class="planilla-proto-ing"><strong>${escapeHtml(title)}</strong>${commercial && commercial !== title ? `<small class="planilla-substitute-note">${escapeHtml(commercial)}</small>` : ''}</td><td><strong>${escapeHtml(lot)}</strong>${allocation.productionId ? `<small class="planilla-substitute-note">${escapeHtml(allocation.productionId)}</small>` : ''}</td><td class="dispatch-rep-fecha">${escapeHtml(productionDate ? formatIsoEs(productionDate) : '-')}</td><td class="dispatch-rep-fecha">${escapeHtml(formatIsoEs(normalizeValue(allocation.expiryDate)) || '-')}</td><td class="planilla-qty-cell">${escapeHtml(formatDispatchKg(allocation.qtyKg))}</td></tr>`;
+      });
+    }).join('') || '<tr><td colspan="5">Sin productos de elaboración propia.</td></tr>';
+    const total = products.reduce((sum, item) => sum + Number(item.qtyKg || 0), 0);
     const comments = (Array.isArray(dispatchRow.comments) ? dispatchRow.comments : []).map((c) => normalizeValue(c)).filter(Boolean);
-    const commentsRows = comments.length
-      ? comments.map((item, idx) => `<tr><td colspan="5"><strong>OBSERVACIÓN ${idx + 1}:</strong> ${escapeHtml(item)}</td></tr>`).join('')
-      : '<tr><td colspan="5"><strong>OBSERVACIÓN 1:</strong> Sin observaciones</td></tr>';
     const dispatchIso = normalizeDispatchDateToken(dispatchRow.dispatchDate) || toIsoDate(dispatchRow.createdAt || nowTs());
-    const dispatchAtNine = (() => {
-      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dispatchIso);
-      if (!match) return '';
-      return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 9, 0, 0).getTime();
-    })();
-    const dispatchHeaderDateTime = dispatchAtNine ? formatDateTime(dispatchAtNine) : '-';
-    const backofficeLoadedAt = '';
-    const headerTable = `<table style="width:100%;border-collapse:collapse;table-layout:fixed"><tbody><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">FRIGORIFICO LA JAMONERA • REGISTRO DE SALIDA DE PRODUCTOS TERMINADOS</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px;font-weight:800;text-align:center" colspan="4">${escapeHtml(dispatchRow.code || dispatchRow.id)}</td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px">FECHA Y HORA:</td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(dispatchHeaderDateTime)}</strong></td><td style="border:1px solid #2f2f2f;padding:4px">CLIENTE:</td><td style="border:1px solid #2f2f2f;padding:4px"><strong>${escapeHtml(normalizeValue(client.name) || '-')}</strong></td></tr><tr><td style="border:1px solid #2f2f2f;padding:4px" colspan="4">DIRECCION: <strong>${escapeHtml(location)}</strong></td></tr></tbody></table>`;
-    const planillaStyle = '<style>.dispatch-planilla-print{font-family:Inter,Arial,sans-serif;color:#111827;background:#fff}.dispatch-planilla-print table{width:100%;border-collapse:collapse;table-layout:fixed}.dispatch-planilla-print th,.dispatch-planilla-print td{border:1px solid #2f2f2f;padding:6px;word-break:break-word;background:#fff;color:#111827}.dispatch-planilla-parent-row td{background:#eef3ff;font-weight:800;color:#223863}.dispatch-planilla-child-row td{background:#fbfcff}.dispatch-planilla-marker-cell{width:28px;text-align:center;padding:6px 4px}.dispatch-planilla-child-label,.dispatch-planilla-parent-marker{color:#4b78e8;font-weight:800;display:inline-flex;align-items:center;justify-content:center}.dispatch-planilla-parent-marker{color:#94a3b8}.dispatch-planilla-qr-section{margin-top:32px;padding-top:22px;display:grid;gap:14px;border-top:1px solid #d7def2;justify-items:center}.dispatch-planilla-qr-copy{width:100%;text-align:center}.dispatch-planilla-qr-copy p{margin:0 0 6px;font-weight:700;text-align:center}.dispatch-planilla-qr-copy small{color:#556487;display:block;text-align:center}.dispatch-planilla-qr-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:12px}</style>';
-    const hasTraceQr = buildDispatchTraceTargets(dispatchRow).length > 0;
-    const qrSection = hasTraceQr
-      ? '<div class="dispatch-planilla-qr-section"><div data-dispatch-planilla-qr class="dispatch-planilla-qr-grid"></div><div class="dispatch-planilla-qr-copy"><p>QR de trazabilidad para las facturas y producciones</p><small>Escaneá el QR con tu celular para acceder.</small></div></div>'
-      : '';
-    const html = `${planillaStyle}<div class="dispatch-planilla-print" id="dispatchPlanillaPrintable">${headerTable}<div class="table-responsive" style="margin-top:8px;"><table><thead><tr><th style="width:28px">⤮</th><th>Productos</th><th>Cantidad</th><th>Vencimiento</th><th>Número de lote</th></tr></thead><tbody>${detailRows}<tr><td colspan="5"><strong>VEHÍCULO (UTA-URA):</strong> ${escapeHtml(`${vehicle.number || '-'} - ${vehicle.patent || '-'} - ${vehicle.brand || vehicle.type || '-'}`)}</td></tr>${commentsRows}<tr><td colspan="5"><strong>CONTROLO:</strong> ${escapeHtml(managerLabel)}</td></tr><tr><td colspan="3"><strong>TEMPERATURA UNIDAD DE TRANSPORTE:</strong> 3 °C</td><td colspan="2"><strong>UNIDAD DE TRANSPORTE ESTADO:</strong> A (ACEPTABLE)</td></tr></tbody></table></div>${qrSection}</div><small class="dispatch-planilla-footer">Fecha y hora de carga en BackOffice: ${escapeHtml(backofficeLoadedAt)}</small>`;
-    return { html };
+    const [year, month] = dispatchIso.split('-');
+    const vehicleLabel = vehicle.patent ? normalizeUpper(`${vehicle.number || '-'} · ${vehicle.patent} · ${vehicle.brand || vehicle.type || ''}`) : '-';
+    const rne = normalizeValue(state.config?.rne?.number) || '21-085083';
+    const html = `${DISPATCH_PLANILLA_STYLE}<div class="planilla-card planilla-print-a4 planilla-proto dispatch-rep" id="dispatchPlanillaPrintable">
+      <table class="planilla-proto-head-table"><tbody>
+        <tr><td class="planilla-proto-brand"><div class="planilla-proto-brand-inner"><img class="planilla-proto-logo" src="./IMG/La%20Jamonera%20Cerdito.webp" alt=""><span>Frigorífico<strong>La Jamonera</strong></span></div></td>
+          <td class="planilla-proto-doc-title">REGISTRO DE SALIDA DE PRODUCTOS TERMINADOS</td>
+          <td class="planilla-proto-version"><span><small>Versión</small><strong>004</strong></span><span><small>F. Reparto</small><strong>${escapeHtml(month ? `${DISPATCH_MESES[Number(month) - 1]} ${year}` : '-')}</strong></span></td></tr>
+        <tr><td class="planilla-proto-format-label">FORMATO</td><td colspan="2" class="planilla-proto-format-value"><span class="planilla-proto-code">${escapeHtml(dispatchRow.code || dispatchRow.id)}</span><span class="planilla-proto-dot">&bull;</span>REPARTO A DOMICILIO<span class="planilla-proto-dot">&bull;</span>RNE EMPRESA ${escapeHtml(rne)}</td></tr>
+      </tbody></table>
+      <table class="planilla-proto-fields-table"><tbody>
+        <tr><th>FECHA DE REPARTO</th><td>${escapeHtml(formatIsoEs(dispatchIso))} · 09:00</td></tr>
+        <tr><th>CLIENTE</th><td><strong>${escapeHtml(normalizeUpper(client.name) || '-')}</strong></td></tr>
+        <tr><th>DIRECCIÓN</th><td>${escapeHtml(normalizeUpper(location))}</td></tr>
+        <tr><th>VEHÍCULO (UTA-URA)</th><td>${escapeHtml(vehicleLabel)}</td></tr>
+        <tr><th>TEMPERATURA UNIDAD DE TRANSPORTE</th><td>3 °C · ESTADO A (ACEPTABLE)</td></tr>
+      </tbody></table>
+      <div class="planilla-table-scroll"><table class="planilla-table planilla-formula-table planilla-proto-formula">
+        <colgroup><col style="width:31%"><col style="width:27%"><col style="width:14%"><col style="width:14%"><col style="width:14%"></colgroup>
+        <thead><tr><th>PRODUCTO</th><th>N° DE LOTE</th><th>ELABORACIÓN</th><th>VENCE</th><th class="dispatch-rep-num">KG</th></tr></thead>
+        <tbody>${rows}<tr class="planilla-proto-total-row"><td colspan="4"><strong>TOTAL</strong></td><td class="planilla-qty-cell"><strong>${escapeHtml(formatDispatchKg(total))}</strong></td></tr></tbody>
+      </table></div>
+      <p class="planilla-proto-aptitud">Lote del producto (como en su rótulo) y N° de producción · el QR abre su trazabilidad</p>
+      <table class="planilla-proto-fields-table"><tbody><tr><th>CONTROLÓ</th><td>${escapeHtml(normalizeUpper(managerLabel))}</td></tr></tbody></table>
+      <section class="planilla-proto-bottom">
+        <div class="planilla-proto-observations"><p><strong>OBSERVACIONES:</strong> ${escapeHtml(normalizeUpper(comments.join(' · ')) || 'SIN OBSERVACIONES')}</p></div>
+        <div data-dispatch-planilla-qr class="dispatch-rep-qrs"></div>
+      </section>
+    </div>`;
+    return { html, totalKg: total, dispatchIso };
   };
+  // Carátula de la impresión masiva (estilo de los legajos de auditoría).
+  const buildDispatchCoverHtml = (rows = []) => {
+    const dates = rows.map((row) => normalizeDispatchDateToken(row.dispatchDate)).filter(Boolean).sort();
+    const totalKg = rows.reduce((sum, row) => sum + getDispatchOwnProducts(row).reduce((s, item) => s + Number(item.qtyKg || 0), 0), 0);
+    const tile = (label, value) => `<div class="dispatch-cv-tile"><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></div>`;
+    return `<section class="dispatch-cv"><img class="dispatch-cv-logo" src="./IMG/ABR%20LOGO.png" alt=""><div class="dispatch-cv-marca">Asesoría Bromatológica · Rosario</div>
+      <div class="dispatch-cv-kick">Registro · Salida de productos terminados</div><h1><span>Repartos a</span><span class="dispatch-cv-c">domicilio</span></h1>
+      <p class="dispatch-cv-sub">planillas «Registro de salida de productos terminados»</p><div class="dispatch-cv-rule"></div>
+      <div class="dispatch-cv-tiles">${tile('Período', dates.length ? `${formatIsoEs(dates[0])} al ${formatIsoEs(dates[dates.length - 1])}` : '-')}${tile('Repartos', `${rows.length} planillas`)}${tile('Kilos repartidos', formatDispatchKg(totalKg))}${tile('Productos', 'Sólo elaboración propia')}${tile('Lotes', 'Lote del rótulo y N° de producción')}${tile('Trazabilidad', 'QR por producción (también clickeable)')}</div>
+      <div class="dispatch-cv-nota"><h3>La Jamonera</h3><small>Generado el ${escapeHtml(formatIsoEs(toIsoDate()))}</small><p>Con vehículo, encargado y temperatura de la unidad de transporte.</p></div></section>`;
+  };
+  const DISPATCH_COVER_STYLE = '.dispatch-cv{font-family:"Inter","Segoe UI",Arial,sans-serif;color:#0F1B2D;padding:8mm 8mm 0}.dispatch-cv-logo{height:2.05cm;display:block}.dispatch-cv-marca{font-size:7.5pt;font-weight:800;letter-spacing:.22em;color:#00ABD4;text-transform:uppercase;margin-top:5px}.dispatch-cv-kick{margin-top:36px;font-size:7.5pt;font-weight:800;letter-spacing:.22em;color:#5A6573;text-transform:uppercase}.dispatch-cv h1{font-weight:900;font-size:40pt;line-height:.98;margin:10px 0 12px}.dispatch-cv h1 span{display:block}.dispatch-cv-c{color:#00ABD4}.dispatch-cv-sub{font-style:italic;font-size:15pt;color:#5A6573;margin:0 0 22px}.dispatch-cv-rule{height:3px;background:#00ABD4;margin:0 0 16px}.dispatch-cv-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.dispatch-cv-tile{background:#F1ECE1;border-left:3px solid #00ABD4;padding:10px 11px 12px;min-height:66px}.dispatch-cv-tile small{display:block;font-size:6.6pt;font-weight:800;letter-spacing:.16em;color:#00ABD4;text-transform:uppercase;margin-bottom:5px}.dispatch-cv-tile b{font-size:9pt;font-weight:700;line-height:1.3}.dispatch-cv-nota{margin-top:26px;background:#FBF9F4;border:1px solid #E6E0D3;padding:16px 22px;text-align:center}.dispatch-cv-nota h3{margin:0 0 3px;font-size:10.5pt;font-weight:800}.dispatch-cv-nota small{display:block;font-size:6.8pt;font-weight:800;letter-spacing:.18em;color:#00ABD4;text-transform:uppercase;margin-bottom:8px}.dispatch-cv-nota p{margin:0;font-size:8.6pt;color:#5A6573}';
+  // Reglas de planilla que la página ya cargó: se copian embebidas en la ventana de impresión.
+  const collectDispatchPlanillaCss = () => [...document.styleSheets].map((sheet) => {
+    if (!/CSS\/legacy\/(15-planilla|22-planilla-protocolo)\.css/.test(String(sheet.href || ''))) return '';
+    try { return [...sheet.cssRules].map((rule) => rule.cssText).join('\n'); } catch (e) { return ''; }
+  }).join('\n').replace(/<\/style/gi, '<\\/style');
   const printDispatchPlanillasBatch = async (rows = [], onProgress) => {
-    const list = Array.isArray(rows) ? rows : [];
+    // Sólo repartos con productos de elaboración propia, del más nuevo al más viejo.
+    const list = (Array.isArray(rows) ? rows : []).filter((row) => getDispatchOwnProducts(row).length)
+      .sort((a, b) => normalizeValue(normalizeDispatchDateToken(b.dispatchDate)).localeCompare(normalizeValue(normalizeDispatchDateToken(a.dispatchDate))) || normalizeValue(b.code).localeCompare(normalizeValue(a.code)));
     if (!list.length) return;
-    const win = window.open('', '_blank', 'width=1400,height=900');
+    const win = window.open('', '_blank', 'width=1100,height=900');
     if (!win) return;
-    win.document.write('<html><head><title>Planillas masivas reparto</title><style>@page{size:landscape;margin:10mm}body{font-family:Inter,Arial,sans-serif;color:#111827;background:#ffffff;margin:0;padding:8px}.dispatch-planilla-print{background:#fff}.dispatch-planilla-print table{width:100%;border-collapse:collapse;table-layout:fixed}.dispatch-planilla-print th,.dispatch-planilla-print td{border:1px solid #2f2f2f;padding:6px;word-break:break-word;background:#fff;color:#111827}.page-break{page-break-before:always;break-before:page}</style></head><body></body></html>');
+    const base = new URL('./', window.location.href).href;
+    win.document.write(`<html><head><base href="${escapeHtml(base)}"><title>Repartos</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet"><link rel="stylesheet" href="./CSS/legacy/15-planilla.css"><link rel="stylesheet" href="./CSS/legacy/22-planilla-protocolo.css"><style>${collectDispatchPlanillaCss()}</style><style>@page{size:A4 portrait;margin:10mm}body{width:190mm;margin:0 auto;padding:0;font-family:"Inter","Segoe UI",Arial,sans-serif;color:#111827;background:#ffffff}.page-break{page-break-before:always;break-before:page}${DISPATCH_COVER_STYLE}</style></head><body></body></html>`);
     win.document.close();
+    if (list.length > 1) win.document.body.insertAdjacentHTML('beforeend', buildDispatchCoverHtml(list));
     for (let index = 0; index < list.length; index += 1) {
       const row = list[index];
       const section = win.document.createElement('section');
-      section.className = index > 0 ? 'page-break' : '';
-      section.innerHTML = buildDispatchPlanillaHtml(row).html.replace(/Fecha y hora de carga en BackOffice:[^<]*/gi, '');
+      section.className = index > 0 || list.length > 1 ? 'page-break' : '';
+      section.innerHTML = buildDispatchPlanillaHtml(row).html;
       win.document.body.appendChild(section);
       const printable = section.querySelector('#dispatchPlanillaPrintable');
       if (printable) {
