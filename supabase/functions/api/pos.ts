@@ -21,9 +21,9 @@ const MAX_COMPROBANTES = 400;
 export const POS_DEFAULTS = {
   activo: false, desde: '', excluirMateriaPrima: true, iaSoloVencidos: true, avisarSinStock: true,
   // Reparto: venta del usuario de reparto con dirección, o venta que cobra el artículo de envío (Lucas, 01/11/2026).
-  // Las recetas que coinciden con «excluirRecetas» (milanesas) se venden en mostrador aunque la venta sea un reparto.
+  // Las recetas que coinciden con «excluirRecetas» (expresión) se venden en mostrador aunque la venta sea un reparto.
   // «unidades»: vehículo y encargado que se alternan día por día.
-  repartos: { activo: true, usuario: 'BRENDA', exigeObs: true, articuloEnvio: '325', excluirRecetas: 'milanes', unidades: [] }
+  repartos: { activo: true, usuario: 'BRENDA', exigeObs: true, articuloEnvio: '325', excluirRecetas: '', unidades: [] }
 };
 export function configPos(cfg) {
   const p = (cfg && typeof cfg.pos === 'object' && cfg.pos) || {};

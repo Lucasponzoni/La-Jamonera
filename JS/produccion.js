@@ -4635,9 +4635,9 @@
     const normalized = normalizeLower(value);
     return !normalized || normalized.includes('sin dirección') || normalized.includes('sin direccion') || normalized.includes('xlsx');
   };
-  // Planilla de reparto con el diseño del «Registro protocolo» (Lucas, 01/11/2026): sólo productos de elaboración
-  // propia (sin milanesas, que se venden en mostrador), lote del rótulo + N° de producción, kilos con coma decimal y
-  // un QR de trazabilidad por producción (clickeable). Sin facturas de los demás productos.
+  // Planilla de reparto con el diseño del «Registro protocolo» (Lucas, 01/11/2026): productos de elaboración propia
+  // (milanesas incluidas: tienen RNPA) con lote del rótulo + N° de producción, kilos con coma decimal y un QR de
+  // trazabilidad por producción (clickeable); la reventa va con su lote, sin QR. Sin facturas.
   const DISPATCH_MESES = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
   const formatDispatchKg = (value) => `${Number(value || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} kg`;
   const dispatchInitials = (value = '') => normalizeUpper(value).normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -4649,10 +4649,10 @@
     return match ? `${match[3]}-${match[2]}-${match[1]}` : '';
   };
   const getDispatchOwnProducts = (dispatchRow = {}) => (Array.isArray(dispatchRow.products) ? dispatchRow.products : [])
-    .filter((item) => normalizeValue(item.sourceType) === 'production' && !/milanes/i.test(normalizeValue(item.recipeTitle)) && Number(item.qtyKg || 0) > 0);
+    .filter((item) => normalizeValue(item.sourceType) === 'production' && Number(item.qtyKg || 0) > 0);
   // Productos de reventa (inventario) del reparto: van a la planilla con su lote, sin QR (Lucas, 01/11/2026).
   const getDispatchResaleProducts = (dispatchRow = {}) => (Array.isArray(dispatchRow.products) ? dispatchRow.products : [])
-    .filter((item) => normalizeValue(item.sourceType) !== 'production' && !/milanes/i.test(normalizeValue(item.recipeTitle)) && (Number(item.qty || 0) > 0 || Number(item.qtyKg || 0) > 0));
+    .filter((item) => normalizeValue(item.sourceType) !== 'production' && (Number(item.qty || 0) > 0 || Number(item.qtyKg || 0) > 0));
   const getDispatchPrintableProducts = (dispatchRow = {}) => [...getDispatchOwnProducts(dispatchRow), ...getDispatchResaleProducts(dispatchRow)];
   const formatDispatchItemQty = (item = {}, allocation = {}) => {
     const unit = normalizeLower(allocation.unit || item.qtyUnit || '');
@@ -4775,7 +4775,7 @@
     try { return [...sheet.cssRules].map((rule) => rule.cssText).join('\n'); } catch (e) { return ''; }
   }).join('\n').replace(/<\/style/gi, '<\\/style');
   const printDispatchPlanillasBatch = async (rows = [], onProgress) => {
-    // Repartos con algún producto (sin milanesas), del más nuevo al más viejo.
+    // Repartos con algún producto, del más nuevo al más viejo.
     const list = (Array.isArray(rows) ? rows : []).filter((row) => getDispatchPrintableProducts(row).length)
       .sort((a, b) => normalizeValue(normalizeDispatchDateToken(b.dispatchDate)).localeCompare(normalizeValue(normalizeDispatchDateToken(a.dispatchDate))) || normalizeValue(b.code).localeCompare(normalizeValue(a.code)));
     if (!list.length) return;
