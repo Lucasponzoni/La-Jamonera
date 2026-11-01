@@ -4650,6 +4650,16 @@
   };
   const getDispatchOwnProducts = (dispatchRow = {}) => (Array.isArray(dispatchRow.products) ? dispatchRow.products : [])
     .filter((item) => normalizeValue(item.sourceType) === 'production' && !/milanes/i.test(normalizeValue(item.recipeTitle)) && Number(item.qtyKg || 0) > 0);
+  // Productos de reventa (inventario) del reparto: van a la planilla con su lote, sin QR (Lucas, 01/11/2026).
+  const getDispatchResaleProducts = (dispatchRow = {}) => (Array.isArray(dispatchRow.products) ? dispatchRow.products : [])
+    .filter((item) => normalizeValue(item.sourceType) !== 'production' && !/milanes/i.test(normalizeValue(item.recipeTitle)) && (Number(item.qty || 0) > 0 || Number(item.qtyKg || 0) > 0));
+  const getDispatchPrintableProducts = (dispatchRow = {}) => [...getDispatchOwnProducts(dispatchRow), ...getDispatchResaleProducts(dispatchRow)];
+  const formatDispatchItemQty = (item = {}, allocation = {}) => {
+    const unit = normalizeLower(allocation.unit || item.qtyUnit || '');
+    if (!unit || /kilo|kg/.test(unit)) return formatDispatchKg(allocation.qtyKg ?? allocation.qty ?? item.qtyKg);
+    const qty = Number(allocation.qty ?? item.qty ?? 0);
+    return `${qty.toLocaleString('es-AR', { maximumFractionDigits: 3 })} ${qty === 1 ? unit.replace(/es$|s$/, '') : unit}`;
+  };
   const getDispatchProductionTraces = (dispatchRow = {}) => {
     const seen = new Map();
     getDispatchOwnProducts(dispatchRow).forEach((item) => (Array.isArray(item.allocations) ? item.allocations : []).forEach((allocation) => {
@@ -4706,7 +4716,13 @@
         const lot = productionDate ? `LJ-${productionDate.split('-').reverse().join('')}-${dispatchInitials(recipe.title || item.recipeTitle)}` : normalizeValue(allocation.lotNumber) || '-';
         return `<tr><td class="planilla-proto-ing"><strong>${escapeHtml(title)}</strong>${commercial && commercial !== title ? `<small class="planilla-substitute-note">${escapeHtml(commercial)}</small>` : ''}</td><td><strong>${escapeHtml(lot)}</strong>${allocation.productionId ? `<small class="planilla-substitute-note">${escapeHtml(allocation.productionId)}</small>` : ''}</td><td class="dispatch-rep-fecha">${escapeHtml(productionDate ? formatIsoEs(productionDate) : '-')}</td><td class="dispatch-rep-fecha">${escapeHtml(formatIsoEs(normalizeValue(allocation.expiryDate)) || '-')}</td><td class="planilla-qty-cell">${escapeHtml(formatDispatchKg(allocation.qtyKg))}</td></tr>`;
       });
-    }).join('') || '<tr><td colspan="5">Sin productos de elaboración propia.</td></tr>';
+    }).join('');
+    const resaleRows = getDispatchResaleProducts(dispatchRow).flatMap((item) => {
+      const title = normalizeUpper(item.recipeTitle || '-');
+      const allocations = Array.isArray(item.allocations) && item.allocations.length ? item.allocations : [{ lotNumber: '-', qty: item.qty, unit: item.qtyUnit, qtyKg: item.qtyKg }];
+      return allocations.map((allocation) => `<tr><td class="planilla-proto-ing"><strong>${escapeHtml(title)}</strong><small class="planilla-substitute-note">REVENTA</small></td><td><strong>${escapeHtml(normalizeValue(allocation.lotNumber) || '-')}</strong></td><td class="dispatch-rep-fecha">-</td><td class="dispatch-rep-fecha">${escapeHtml(normalizeValue(allocation.expiryDate) ? formatIsoEs(normalizeValue(allocation.expiryDate)) : '-')}</td><td class="planilla-qty-cell">${escapeHtml(formatDispatchItemQty(item, allocation))}</td></tr>`);
+    }).join('');
+    const allRows = `${rows}${resaleRows}` || '<tr><td colspan="5">Sin productos.</td></tr>';
     const total = products.reduce((sum, item) => sum + Number(item.qtyKg || 0), 0);
     const comments = (Array.isArray(dispatchRow.comments) ? dispatchRow.comments : []).map((c) => normalizeValue(c)).filter(Boolean);
     const dispatchIso = normalizeDispatchDateToken(dispatchRow.dispatchDate) || toIsoDate(dispatchRow.createdAt || nowTs());
@@ -4729,10 +4745,10 @@
       </tbody></table>
       <div class="planilla-table-scroll"><table class="planilla-table planilla-formula-table planilla-proto-formula">
         <colgroup><col style="width:31%"><col style="width:27%"><col style="width:14%"><col style="width:14%"><col style="width:14%"></colgroup>
-        <thead><tr><th>PRODUCTO</th><th>N° DE LOTE</th><th>ELABORACIÓN</th><th>VENCE</th><th class="dispatch-rep-num">KG</th></tr></thead>
-        <tbody>${rows}<tr class="planilla-proto-total-row"><td colspan="4"><strong>TOTAL</strong></td><td class="planilla-qty-cell"><strong>${escapeHtml(formatDispatchKg(total))}</strong></td></tr></tbody>
+        <thead><tr><th>PRODUCTO</th><th>N° DE LOTE</th><th>ELABORACIÓN</th><th>VENCE</th><th class="dispatch-rep-num">CANTIDAD</th></tr></thead>
+        <tbody>${allRows}<tr class="planilla-proto-total-row"><td colspan="4"><strong>TOTAL ELABORACIÓN PROPIA</strong></td><td class="planilla-qty-cell"><strong>${escapeHtml(formatDispatchKg(total))}</strong></td></tr></tbody>
       </table></div>
-      <p class="planilla-proto-aptitud">Lote del producto (como en su rótulo) y N° de producción · el QR abre su trazabilidad</p>
+      <p class="planilla-proto-aptitud">Elaboración propia: lote del rótulo y N° de producción · el QR abre su trazabilidad. Reventa: lote del proveedor, sin QR.</p>
       <table class="planilla-proto-fields-table"><tbody><tr><th>CONTROLÓ</th><td>${escapeHtml(normalizeUpper(managerLabel))}</td></tr></tbody></table>
       <section class="planilla-proto-bottom">
         <div class="planilla-proto-observations"><p><strong>OBSERVACIONES:</strong> ${escapeHtml(normalizeUpper(comments.join(' · ')) || 'SIN OBSERVACIONES')}</p></div>
@@ -4749,7 +4765,7 @@
     return `<section class="dispatch-cv"><img class="dispatch-cv-logo" src="./IMG/ABR%20LOGO.png" alt=""><div class="dispatch-cv-marca">Asesoría Bromatológica · Rosario</div>
       <div class="dispatch-cv-kick">Registro · Salida de productos terminados</div><h1><span>Repartos a</span><span class="dispatch-cv-c">domicilio</span></h1>
       <p class="dispatch-cv-sub">planillas «Registro de salida de productos terminados»</p><div class="dispatch-cv-rule"></div>
-      <div class="dispatch-cv-tiles">${tile('Período', dates.length ? `${formatIsoEs(dates[0])} al ${formatIsoEs(dates[dates.length - 1])}` : '-')}${tile('Repartos', `${rows.length} planillas`)}${tile('Kilos repartidos', formatDispatchKg(totalKg))}${tile('Productos', 'Sólo elaboración propia')}${tile('Lotes', 'Lote del rótulo y N° de producción')}${tile('Trazabilidad', 'QR por producción (también clickeable)')}</div>
+      <div class="dispatch-cv-tiles">${tile('Período', dates.length ? `${formatIsoEs(dates[0])} al ${formatIsoEs(dates[dates.length - 1])}` : '-')}${tile('Repartos', `${rows.length} planillas`)}${tile('Kilos repartidos', formatDispatchKg(totalKg))}${tile('Productos', 'Elaboración propia y reventa')}${tile('Lotes', 'Lote del rótulo y N° de producción')}${tile('Trazabilidad', 'QR por producción (también clickeable)')}</div>
       <div class="dispatch-cv-nota"><h3>La Jamonera</h3><small>Generado el ${escapeHtml(formatIsoEs(toIsoDate()))}</small><p>Con vehículo, encargado y temperatura de la unidad de transporte.</p></div></section>`;
   };
   const DISPATCH_COVER_STYLE = '.dispatch-cv{font-family:"Inter","Segoe UI",Arial,sans-serif;color:#0F1B2D;padding:8mm 8mm 0}.dispatch-cv-logo{height:2.05cm;display:block}.dispatch-cv-marca{font-size:7.5pt;font-weight:800;letter-spacing:.22em;color:#00ABD4;text-transform:uppercase;margin-top:5px}.dispatch-cv-kick{margin-top:36px;font-size:7.5pt;font-weight:800;letter-spacing:.22em;color:#5A6573;text-transform:uppercase}.dispatch-cv h1{font-weight:900;font-size:40pt;line-height:.98;margin:10px 0 12px}.dispatch-cv h1 span{display:block}.dispatch-cv-c{color:#00ABD4}.dispatch-cv-sub{font-style:italic;font-size:15pt;color:#5A6573;margin:0 0 22px}.dispatch-cv-rule{height:3px;background:#00ABD4;margin:0 0 16px}.dispatch-cv-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.dispatch-cv-tile{background:#F1ECE1;border-left:3px solid #00ABD4;padding:10px 11px 12px;min-height:66px}.dispatch-cv-tile small{display:block;font-size:6.6pt;font-weight:800;letter-spacing:.16em;color:#00ABD4;text-transform:uppercase;margin-bottom:5px}.dispatch-cv-tile b{font-size:9pt;font-weight:700;line-height:1.3}.dispatch-cv-nota{margin-top:26px;background:#FBF9F4;border:1px solid #E6E0D3;padding:16px 22px;text-align:center}.dispatch-cv-nota h3{margin:0 0 3px;font-size:10.5pt;font-weight:800}.dispatch-cv-nota small{display:block;font-size:6.8pt;font-weight:800;letter-spacing:.18em;color:#00ABD4;text-transform:uppercase;margin-bottom:8px}.dispatch-cv-nota p{margin:0;font-size:8.6pt;color:#5A6573}';
@@ -4759,8 +4775,8 @@
     try { return [...sheet.cssRules].map((rule) => rule.cssText).join('\n'); } catch (e) { return ''; }
   }).join('\n').replace(/<\/style/gi, '<\\/style');
   const printDispatchPlanillasBatch = async (rows = [], onProgress) => {
-    // Sólo repartos con productos de elaboración propia, del más nuevo al más viejo.
-    const list = (Array.isArray(rows) ? rows : []).filter((row) => getDispatchOwnProducts(row).length)
+    // Repartos con algún producto (sin milanesas), del más nuevo al más viejo.
+    const list = (Array.isArray(rows) ? rows : []).filter((row) => getDispatchPrintableProducts(row).length)
       .sort((a, b) => normalizeValue(normalizeDispatchDateToken(b.dispatchDate)).localeCompare(normalizeValue(normalizeDispatchDateToken(a.dispatchDate))) || normalizeValue(b.code).localeCompare(normalizeValue(a.code)));
     if (!list.length) return;
     const win = window.open('', '_blank', 'width=1100,height=900');
