@@ -20,7 +20,10 @@ const MAX_COMPROBANTES = 400;
 
 export const POS_DEFAULTS = {
   activo: false, desde: '', excluirMateriaPrima: true, iaSoloVencidos: true, avisarSinStock: true,
-  repartos: { activo: true, usuario: 'BRENDA', exigeObs: true }
+  // Reparto: venta del usuario de reparto con dirección, o venta que cobra el artículo de envío (Lucas, 01/11/2026).
+  // Las recetas que coinciden con «excluirRecetas» (milanesas) se venden en mostrador aunque la venta sea un reparto.
+  // «unidades»: vehículo y encargado que se alternan día por día.
+  repartos: { activo: true, usuario: 'BRENDA', exigeObs: true, articuloEnvio: '325', excluirRecetas: 'milanes', unidades: [] }
 };
 export function configPos(cfg) {
   const p = (cfg && typeof cfg.pos === 'object' && cfg.pos) || {};
@@ -134,7 +137,8 @@ export async function aplicarVentasPos({ simular = false, desde = '', hasta = ''
     const its = itemsDe.get(`${c.empresa}:${c.id}`) || [];
     resumen.comprobantes += 1;
     const comp = codigoComp(c);
-    const esReparto = cfg.repartos.activo && str(c.usuario).toUpperCase().startsWith(str(cfg.repartos.usuario).toUpperCase()) && (!cfg.repartos.exigeObs || obsUtil(c.observaciones));
+    const conEnvio = Boolean(cfg.repartos.articuloEnvio) && its.some((it) => str(it.cod_articulo) === str(cfg.repartos.articuloEnvio));
+    const esReparto = cfg.repartos.activo && (conEnvio || (str(c.usuario).toUpperCase().startsWith(str(cfg.repartos.usuario).toUpperCase()) && (!cfg.repartos.exigeObs || obsUtil(c.observaciones))));
     const reparto = esReparto ? { productos: [] } : null;
     const atTs = c.fecha_hora ? Date.parse(c.fecha_hora) : Date.parse(`${c.fecha}T15:00:00-03:00`);
     for (const it of its) {
@@ -190,6 +194,8 @@ export async function aplicarVentasPos({ simular = false, desde = '', hasta = ''
         if (pend > EPS) marca({ ...destino, cantidad: r4(pend / meta.factor), unidad: reg.stock_unit }, 'sin_stock', `${nomComp}${lotes.length ? 'no alcanzó el stock' : 'sin stock disponible'}`);
       } else {
         const destino = { destino: 'produccion', ref_id: v.ref_id };
+        const excl = str(cfg.repartos.excluirRecetas);
+        const recReparto = reparto && !(excl && new RegExp(excl, 'i').test(str(nombres.get(v.ref_id)?.titulo)));
         if (!v.factor && pideFactorKg(it.descripcion) && Math.abs(num(it.cantidad) - Math.round(num(it.cantidad))) <= EPS) {
           marca({ ...destino, cantidad: r4(num(it.cantidad)), unidad: 'unidades' }, 'excluido', 'se vende por unidad: falta el factor (kg por unidad)'); continue;
         }
@@ -200,11 +206,11 @@ export async function aplicarVentasPos({ simular = false, desde = '', hasta = ''
           if (pend <= EPS) break;
           const toma = Math.min(p._kg, pend);
           p._kg = r4(p._kg - toma); pend = r4(pend - toma);
-          marca({ ...destino, lote_id: p.produccion_id, cantidad: r4(toma), unidad: 'kilos', reparto_id: reparto ? 'pendiente' : null }, 'aplicado', `${nomComp}producción ${p.produccion_id}`);
+          marca({ ...destino, lote_id: p.produccion_id, cantidad: r4(toma), unidad: 'kilos', reparto_id: recReparto ? 'pendiente' : null }, 'aplicado', `${nomComp}producción ${p.produccion_id}`);
           allocs.push({ productionId: p.produccion_id, lotNumber: p.produccion_id, productionDate: str(p.fecha), expiryDate: str(p.vence), availableKg: r4(p._kg + toma), qtyKg: r4(toma) });
         }
         if (pend > EPS) marca({ ...destino, cantidad: r4(pend), unidad: 'kilos' }, 'sin_stock', `${nomComp}${prods.length ? 'no alcanzó lo producido' : 'sin producción disponible (o vencida)'}`);
-        if (reparto && allocs.length) {
+        if (recReparto && allocs.length) {
           const n = nombres.get(v.ref_id) || {};
           reparto.productos.push({ tipo: 'receta', id: v.ref_id, nombre: n.comercial || n.titulo || '', titulo: n.titulo || '', img: n.img || '', qtyKg: r4(allocs.reduce((s, a) => s + a.qtyKg, 0)), allocs });
         }
@@ -213,7 +219,7 @@ export async function aplicarVentasPos({ simular = false, desde = '', hasta = ''
     }
     if (reparto && reparto.productos.length) {
       const id = `reparto_pos_${c.empresa}_${c.id}`;
-      repartos.push({ id, c, comp, productos: reparto.productos });
+      repartos.push({ id, c, comp, conEnvio, productos: reparto.productos });
       filas.filter((f) => f.empresa === c.empresa && f.comprobante_id === c.id && f.reparto_id === 'pendiente').forEach((f) => { f.reparto_id = id; });
       resumen.repartos += 1;
       if (simular) resumen.detalle.push({ comp, reparto: true, estado: 'reparto', motivo: `Reparto a ${obsUtil(c.observaciones)} · ${reparto.productos.length} productos` });
@@ -248,12 +254,15 @@ export async function aplicarVentasPos({ simular = false, desde = '', hasta = ''
   }
 
   // Repartos (BRENDA + dirección) → Producción, igual que los guarda la app.
+  // Vehículo y encargado: un día una unidad y al siguiente la otra (lista en la config).
+  const unidades = Array.isArray(cfg.repartos.unidades) ? cfg.repartos.unidades.filter((u) => u && u.vehicleId) : [];
+  const unidadDelDia = (iso) => (unidades.length ? unidades[Math.floor(Date.parse(`${iso}T12:00:00Z`) / 86400000) % unidades.length] : {});
   for (const r of repartos) {
     const { c } = r;
     const registro = {
       id: r.id, code: `REP-POS-${ddmmyyyy(c.fecha)}-${String(c.numero || c.id).padStart(5, '0')}`, dispatchDate: c.fecha,
-      clientId: '', vehicleId: '', managers: [], managerProfiles: [],
-      comments: [`Reparto desde el POS · ${r.comp} · caja ${str(c.usuario)}`],
+      clientId: '', vehicleId: unidadDelDia(c.fecha).vehicleId || '', managers: unidadDelDia(c.fecha).managers || [], managerProfiles: [],
+      comments: [`Reparto desde el POS · ${r.comp} · ${r.conEnvio ? 'venta con envío' : `caja ${str(c.usuario)}`}`],
       proofs: [],
       clientSnapshot: { id: '', name: str(c.cliente) || 'Cliente', doc: str(c.cod_cliente), address: obsUtil(c.observaciones), city: '', province: '', country: 'Argentina' },
       products: r.productos.map((p) => (p.tipo === 'receta'
