@@ -437,6 +437,7 @@
 
     const viewerNodes = {
       modal: document.getElementById('imageViewerModal'),
+      stage: document.getElementById('viewerStage'),
       image: document.getElementById('viewerImage'),
       spinner: document.getElementById('viewerStageSpinner'),
       document: document.getElementById('viewerDocument'),
@@ -450,12 +451,14 @@
 
     if (!viewerNodes.modal || !window.LJModal) return null;
 
-    const state = { images: [], index: 0, scale: 1 };
-
-    const setScale = (value) => {
-      state.scale = Math.max(1, Math.min(4, value));
-      if (viewerNodes.image) viewerNodes.image.style.transform = `scale(${state.scale})`;
-    };
+    const state = { images: [], index: 0 };
+    const zoom = window.LJVisorZoom?.attach({
+      stage: viewerNodes.stage,
+      image: viewerNodes.image,
+      zoomIn: viewerNodes.zoomIn,
+      zoomOut: viewerNodes.zoomOut
+    });
+    const setScale = () => zoom?.reset();
 
     const isViewerPdfUrl = (url) => /\.pdf(?:$|[?#])/i.test(String(url || '').split('?')[0] || '');
     const ensurePdfPlaceholder = () => {
@@ -488,6 +491,17 @@
       viewerNodes.zoomIn?.classList.toggle('d-none', isPdf);
       viewerNodes.zoomOut?.classList.toggle('d-none', isPdf);
       viewerNodes.spinner?.classList.remove('d-none');
+      viewerNodes.stage?.classList.toggle('is-image', !isPdf);
+      if (isPdf && !item.sinPaginas && window.LJVisorZoom?.usarPaginas()) {
+        // En celular el PDF dentro de un iframe no se puede mirar bien: se muestra como imágenes.
+        viewerNodes.document?.classList.add('d-none');
+        pdfPlaceholder?.classList.add('d-none');
+        window.LJVisorZoom.expandirPdf(state.images, state.index).then(() => {
+          if (state.images[state.index]?.src === item.src && !item.sinPaginas) return;
+          render();
+        });
+        return;
+      }
       if (!isPdf) {
         // Imagen: ocultamos iframe + placeholder, mostramos img.
         if (viewerNodes.document) {
@@ -497,6 +511,7 @@
         }
         pdfPlaceholder?.classList.add('d-none');
         viewerNodes.image.classList.remove('is-loaded');
+        zoom?.reset();
         viewerNodes.image.src = item.src;
       } else {
         // PDF inline en el iframe.
@@ -531,8 +546,6 @@
       setScale(1);
       render();
     });
-    viewerNodes.zoomIn?.addEventListener('click', () => setScale(state.scale + 0.2));
-    viewerNodes.zoomOut?.addEventListener('click', () => setScale(state.scale - 0.2));
     viewerNodes.back?.addEventListener('click', () => LJModal.close(viewerNodes.modal));
 
     const openAttachmentViewer = async (entries, startIndex = 0, title = 'Adjuntos') => {

@@ -131,7 +131,6 @@
     activeStockStatus: 'all',
     viewerImages: [],
     viewerIndex: 0,
-    viewerScale: 1,
     entryCollapseByIngredient: {},
     globalEntryCollapse: {},
     providerRneFilter: 'all',
@@ -4105,34 +4104,12 @@
     return rows;
   };
 
-  const clampViewerOffsets = () => {
-    if (!nodes.viewerImage || !nodes.viewerStage || state.viewerScale <= 1) return;
-    const stageRect = nodes.viewerStage.getBoundingClientRect();
-    const baseWidth = nodes.viewerImage.clientWidth;
-    const baseHeight = nodes.viewerImage.clientHeight;
-    if (!stageRect.width || !stageRect.height || !baseWidth || !baseHeight) return;
-    const scaledWidth = baseWidth * state.viewerScale;
-    const scaledHeight = baseHeight * state.viewerScale;
-    const maxOffsetX = Math.max(0, (scaledWidth - stageRect.width) / 2);
-    const maxOffsetY = Math.max(0, (scaledHeight - stageRect.height) / 2);
-    state.viewerOffsetX = Math.min(maxOffsetX, Math.max(-maxOffsetX, state.viewerOffsetX));
-    state.viewerOffsetY = Math.min(maxOffsetY, Math.max(-maxOffsetY, state.viewerOffsetY));
-  };
-
-  const applyViewerTransform = () => {
-    if (!nodes.viewerImage) return;
-    clampViewerOffsets();
-    nodes.viewerImage.style.transform = `translate(${state.viewerOffsetX}px, ${state.viewerOffsetY}px) scale(${state.viewerScale})`;
-  };
-
-  const setViewerScale = (value) => {
-    state.viewerScale = Math.max(1, Math.min(4, value));
-    if (state.viewerScale <= 1) {
-      state.viewerOffsetX = 0;
-      state.viewerOffsetY = 0;
-    }
-    applyViewerTransform();
-  };
+  const viewerZoom = window.LJVisorZoom?.attach({
+    stage: nodes.viewerStage,
+    image: nodes.viewerImage,
+    zoomIn: nodes.viewerZoomInBtn,
+    zoomOut: nodes.viewerZoomOutBtn
+  });
 
   const isViewerPdfUrl = (url) => /\.pdf(?:$|[?#])/i.test(String(url || '').split('?')[0] || '');
 
@@ -4163,8 +4140,8 @@
     const isPdf = isViewerPdfUrl(item.src);
     const pdfPlaceholder = ensureViewerDocumentPlaceholder();
     if (nodes.viewerDownloadBtn) {
-      nodes.viewerDownloadBtn.href = item.src || '#';
-      const rawName = String(item.src || '').split('/').pop()?.split('?')[0] || 'adjunto';
+      nodes.viewerDownloadBtn.href = item.original || item.src || '#';
+      const rawName = String(item.original || item.src || '').split('/').pop()?.split('?')[0] || 'adjunto';
       nodes.viewerDownloadBtn.download = decodeURIComponent(rawName) || 'adjunto';
     }
     nodes.viewerStage?.classList.toggle('is-document', isPdf);
@@ -4175,6 +4152,16 @@
     nodes.viewerZoomOutBtn?.classList.toggle('d-none', isPdf);
     nodes.viewerStageSpinner?.classList.remove('d-none');
     nodes.viewerImage.classList.remove('is-loaded');
+    if (isPdf && !item.sinPaginas && window.LJVisorZoom?.usarPaginas()) {
+      // En celular el PDF dentro de un iframe no se puede mirar bien: se muestra como imágenes.
+      nodes.viewerDocument?.classList.add('d-none');
+      pdfPlaceholder?.classList.add('d-none');
+      window.LJVisorZoom.expandirPdf(state.viewerImages, state.viewerIndex).then(() => {
+        if (state.viewerImages[state.viewerIndex]?.src === item.src && !item.sinPaginas) return;
+        renderViewerImage();
+      });
+      return;
+    }
     if (isPdf) {
       // Mostramos el PDF INLINE en el iframe. Si por algún motivo el browser
       // no lo soporta o el iframe falla, dejamos el placeholder como fallback.
@@ -4202,9 +4189,7 @@
       nodes.viewerDocument.onload = null;
     }
     pdfPlaceholder?.classList.add('d-none');
-    state.viewerOffsetX = 0;
-    state.viewerOffsetY = 0;
-    applyViewerTransform();
+    viewerZoom?.reset();
     nodes.viewerImage.src = item.src;
   };
 
@@ -4215,9 +4200,7 @@
     if (viewerTitle) viewerTitle.textContent = title;
     state.viewerImages = images;
     state.viewerIndex = Math.min(Math.max(0, startIndex), images.length - 1);
-    state.viewerOffsetX = 0;
-    state.viewerOffsetY = 0;
-    setViewerScale(1);
+    viewerZoom?.reset();
     renderViewerImage();
     // Los sl-dialog comparten z-index y se apilan por orden en el DOM: lo movemos al final
     // del body (estando cerrado) para que quede arriba de cualquier modal o alerta abierta.
@@ -4229,77 +4212,6 @@
 
   window.laJamoneraOpenImageViewer = openAttachmentViewer;
 
-
-  nodes.viewerStage?.addEventListener('wheel', (event) => {
-    if (!state.viewerImages.length || nodes.viewerImage?.classList.contains('d-none')) return;
-    event.preventDefault();
-    const delta = event.deltaY < 0 ? 0.2 : -0.2;
-    setViewerScale(state.viewerScale + delta);
-  }, { passive: false });
-
-  let pinchStartDistance = 0;
-  let pinchStartScale = 1;
-  const touchDistance = (touches) => {
-    if (!touches || touches.length < 2) return 0;
-    const dx = touches[0].clientX - touches[1].clientX;
-    const dy = touches[0].clientY - touches[1].clientY;
-    return Math.sqrt((dx * dx) + (dy * dy));
-  };
-
-  nodes.viewerStage?.addEventListener('touchstart', (event) => {
-    if (event.touches.length < 2) return;
-    pinchStartDistance = touchDistance(event.touches);
-    pinchStartScale = state.viewerScale;
-  }, { passive: true });
-
-  nodes.viewerStage?.addEventListener('touchmove', (event) => {
-    if (event.touches.length < 2 || !pinchStartDistance) return;
-    event.preventDefault();
-    const nextDistance = touchDistance(event.touches);
-    const ratio = nextDistance / pinchStartDistance;
-    setViewerScale(pinchStartScale * ratio);
-  }, { passive: false });
-
-  nodes.viewerStage?.addEventListener('touchend', (event) => {
-    if (pinchStartDistance && state.viewerScale <= 1) {
-      state.viewerOffsetX = 0;
-      state.viewerOffsetY = 0;
-      applyViewerTransform();
-    }
-    if ((event.touches?.length || 0) < 2) {
-      pinchStartDistance = 0;
-    }
-  });
-  nodes.viewerStage?.addEventListener('touchcancel', () => {
-    pinchStartDistance = 0;
-  });
-
-  nodes.viewerStage?.addEventListener('pointerdown', (event) => {
-    if (state.viewerScale <= 1) return;
-    state.viewerIsDragging = true;
-    state.viewerDragStartX = event.clientX - state.viewerOffsetX;
-    state.viewerDragStartY = event.clientY - state.viewerOffsetY;
-    event.preventDefault();
-    nodes.viewerStage?.setPointerCapture?.(event.pointerId);
-    nodes.viewerStage?.classList.add('is-dragging');
-  });
-
-  nodes.viewerStage?.addEventListener('pointermove', (event) => {
-    if (!state.viewerIsDragging) return;
-    state.viewerOffsetX = event.clientX - state.viewerDragStartX;
-    state.viewerOffsetY = event.clientY - state.viewerDragStartY;
-    applyViewerTransform();
-  });
-
-  const stopViewerDrag = (event) => {
-    if (!state.viewerIsDragging) return;
-    state.viewerIsDragging = false;
-    nodes.viewerStage?.classList.remove('is-dragging');
-    nodes.viewerStage?.releasePointerCapture?.(event.pointerId);
-  };
-  nodes.viewerStage?.addEventListener('pointerup', stopViewerDrag);
-  nodes.viewerStage?.addEventListener('pointercancel', stopViewerDrag);
-  nodes.viewerStage?.addEventListener('pointerleave', stopViewerDrag);
 
   const inDateRange = (value, from, to) => {
     const dateIso = normalizeIsoDate(value);
@@ -9922,26 +9834,19 @@
   nodes.viewerPrevBtn?.addEventListener('click', () => {
     if (!state.viewerImages.length) return;
     state.viewerIndex = (state.viewerIndex - 1 + state.viewerImages.length) % state.viewerImages.length;
-    state.viewerOffsetX = 0;
-    state.viewerOffsetY = 0;
-    setViewerScale(1);
+    viewerZoom?.reset();
     renderViewerImage();
   });
   nodes.viewerNextBtn?.addEventListener('click', () => {
     if (!state.viewerImages.length) return;
     state.viewerIndex = (state.viewerIndex + 1) % state.viewerImages.length;
-    state.viewerOffsetX = 0;
-    state.viewerOffsetY = 0;
-    setViewerScale(1);
+    viewerZoom?.reset();
     renderViewerImage();
   });
-  nodes.viewerZoomInBtn?.addEventListener('click', () => setViewerScale(state.viewerScale + 0.25));
-  nodes.viewerZoomOutBtn?.addEventListener('click', () => setViewerScale(state.viewerScale - 0.25));
   nodes.viewerBackBtn?.addEventListener('click', () => LJModal.close(nodes.imageViewerModal));
   nodes.viewerImage?.addEventListener('load', () => {
     nodes.viewerImage.classList.add('is-loaded');
     nodes.viewerStageSpinner?.classList.add('d-none');
-    applyViewerTransform();
   });
   nodes.viewerImage?.addEventListener('error', () => {
     nodes.viewerStageSpinner?.classList.add('d-none');
@@ -9963,9 +9868,6 @@
 
   LJModal.on(inventarioModal, 'hide', () => {
     snapshotEditorDraft();
-  });
-  window.addEventListener('resize', () => {
-    if (state.viewerScale > 1) applyViewerTransform();
   });
 
   LJModal.on(inventarioModal, 'show', loadInventario);

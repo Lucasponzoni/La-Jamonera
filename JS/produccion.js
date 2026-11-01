@@ -11481,29 +11481,6 @@
     });
     return picker.isConfirmed ? picker.value : null;
   };
-  const printWeeklyProductionPlanilla = (html) => {
-    const win = window.open('', '_blank', 'width=1400,height=900');
-    if (!win) return;
-    const printStyle = `<style>@page{size:landscape;margin:8mm}*{box-sizing:border-box}body{font-family:Inter,Arial,sans-serif;color:#111827;background:#ffffff;margin:0;padding:8px}.weekly-production-sheet{display:grid;gap:10px}.weekly-sheet-block{border:1px solid #1f2937;border-radius:0!important;overflow:visible;background:#fff;break-inside:avoid}.weekly-sheet-block h3,.weekly-sheet-block h4{margin:0;text-align:center;font-weight:900;padding:6px 8px;letter-spacing:.02em;text-transform:uppercase;border-radius:0!important}.weekly-sheet-block h3{background:#0f172a;color:#fff;font-size:15px;border-bottom:1px solid #1f2937}.weekly-sheet-block h4{background:#f1f5f9;color:#1e3a5f;border-bottom:1px solid #1f2937;font-size:13px}.weekly-sheet-table{width:100%;border-collapse:collapse;table-layout:fixed;text-transform:uppercase;border-radius:0!important;overflow:visible}.weekly-sheet-table th:nth-child(1),.weekly-sheet-table td:nth-child(1){width:11%}.weekly-sheet-table th:nth-child(2),.weekly-sheet-table td:nth-child(2){width:11%}.weekly-sheet-table th:nth-child(3),.weekly-sheet-table td:nth-child(3){width:22%}.weekly-sheet-table th,.weekly-sheet-table td{border:1px solid #334155;padding:5px 4px;overflow-wrap:normal;word-break:normal;text-align:center;font-size:10.5px;line-height:1.18;vertical-align:middle;border-radius:0!important}.weekly-sheet-table th{font-weight:900}.weekly-sheet-table th.th-cat{background:#14532d;color:#fff}.weekly-sheet-table th.th-day{background:#1d4ed8;color:#fff}.weekly-sheet-table th.th-total{background:#0f172a;color:#fff}.weekly-sheet-table td{background:#fff}.weekly-sheet-table td.weekly-cat-cell{overflow-wrap:anywhere}.weekly-sheet-table td.weekly-product-td{text-align:left;padding:5px 6px}.weekly-sheet-table td.is-missing{background:#fff7ed;color:#9a3412}.weekly-sheet-table td.is-ok{background:#ecfdf5;color:#14532d;font-weight:800}.weekly-sheet-table td.weekly-total{font-weight:900;background:#e0f2fe;color:#0f3f63}.weekly-product-cell{display:flex;align-items:center;gap:7px;justify-content:flex-start;text-align:left;font-weight:900;width:100%}.weekly-product-cell img{width:22px;height:22px;border-radius:999px;object-fit:cover;border:1px solid #94a3b8;flex:0 0 auto}.weekly-product-text{display:flex;flex-direction:column;min-width:0;flex:1 1 auto;line-height:1.12}.weekly-product-text strong{font-size:10px;overflow-wrap:anywhere;word-break:normal}.weekly-product-text small{font-size:8.5px;text-transform:none}.page-break{page-break-before:always;break-before:page}</style>`;
-    win.document.write(`<html><head><title>Planilla de producción semanal</title>${printStyle}</head><body>${html}</body></html>`);
-    win.document.close();
-    const safePrint = () => {
-      try {
-        if (win.__printed) return;
-        win.__printed = true;
-        win.focus();
-        win.print();
-      } catch (_) {
-      }
-    };
-    waitPrintAssets(win).then(() => {
-      setTimeout(safePrint, 120);
-    }).catch(() => {
-      safePrint();
-    });
-    setTimeout(safePrint, 1200);
-  };
-
   const openWeeklyProductionPlanillaByPeriod = async () => {
     const range = await askRequiredRangeForWeeklyProductionSheet();
     if (!range) return;
@@ -11560,82 +11537,35 @@
     const excluded = new Set(selector.value.mode === 'exclude' ? selector.value.selected : []);
     const products = uniqueRecipes.filter((item) => !excluded.has(item.id));
     if (!products.length) return;
-    const rowsInRange = allRows.filter((row) => {
-      const date = normalizeValue(row.productionDate);
-      return date && date >= range.from && date <= range.to;
+    const docHtml = window.laJamoneraDocumentos.semanalHtml({
+      rows: allRows,
+      recipes: state.recetas,
+      groups: state.recipeGroups,
+      from: range.from,
+      to: range.to,
+      excluded,
+      base: window.location.href
     });
-    // Alinear segmentos a semanas calendario (Lunes a Domingo) que CONTIENEN
-    // el range elegido. Así, aunque el usuario elija "Mié 13 a Vie 22" o sólo
-    // "Lun a Vie", siempre evaluamos la semana entera para detectar producción
-    // en sábado/domingo. Si hay producción en finde, se muestran esos días.
-    const toIsoDateFromObj = (d) => {
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${y}-${m}-${day}`;
-    };
-    const mondayOf = (iso) => {
-      const d = new Date(`${iso}T00:00:00`);
-      const w = d.getDay(); // 0=Dom, 1=Lun ... 6=Sab
-      const offsetToMonday = w === 0 ? -6 : 1 - w;
-      d.setDate(d.getDate() + offsetToMonday);
-      return toIsoDateFromObj(d);
-    };
-    const sundayOf = (iso) => {
-      const d = new Date(`${iso}T00:00:00`);
-      const w = d.getDay();
-      const offsetToSunday = w === 0 ? 0 : 7 - w;
-      d.setDate(d.getDate() + offsetToSunday);
-      return toIsoDateFromObj(d);
-    };
-    const segments = [];
-    let cursor = mondayOf(range.from);
-    const lastSunday = sundayOf(range.to);
-    while (cursor && cursor <= lastSunday) {
-      const segEnd = addIsoDays(cursor, 6); // Lun + 6 = Dom
-      segments.push({ start: cursor, end: segEnd });
-      cursor = addIsoDays(segEnd, 1);
+    if (!docHtml) {
+      await openIosSwal({ title: 'Sin producción', html: '<p>No hay producción registrada en ese período para los productos elegidos.</p>', icon: 'info', confirmButtonText: 'Entendido' });
+      return;
     }
-    const dayLabelByIndex = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-    const html = `<div class="weekly-production-sheet">${segments.map((segment, idx) => {
-      // Semana completa Lun-Dom para evaluar producción.
-      const dayIsos = [];
-      let d = segment.start;
-      while (d && d <= segment.end) {
-        dayIsos.push(d);
-        d = addIsoDays(d, 1);
-      }
-      // hasWeekendProduction = true si hay quantityKg>0 en sáb/dom de esa semana.
-      const hasWeekendProduction = dayIsos.some((iso) => {
-        const weekday = new Date(`${iso}T00:00:00`).getDay();
-        if (!(weekday === 0 || weekday === 6)) return false;
-        return rowsInRange.some((row) => normalizeValue(row.productionDate) === iso && Number(row.quantityKg || 0) > 0);
-      });
-      // Default Lun-Vie. Si hay producción en sáb/dom, también se incluyen.
-      const displayIsos = dayIsos.filter((iso) => {
-        const weekday = new Date(`${iso}T00:00:00`).getDay();
-        if (weekday >= 1 && weekday <= 5) return true;
-        return hasWeekendProduction && (weekday === 0 || weekday === 6);
-      });
-      const headers = displayIsos.map((iso) => dayLabelByIndex[new Date(`${iso}T00:00:00`).getDay()] || '-');
-      const rowsHtml = products.slice().sort((a,b)=> `${a.subcategory}|${a.title}`.localeCompare(`${b.subcategory}|${b.title}`,'es')).map((product) => {
-        const daily = displayIsos.map((iso) => rowsInRange.filter((row) => normalizeValue(row.recipeId || row.recipeTitle || row.id) === product.id && normalizeValue(row.productionDate) === iso).reduce((acc, row) => acc + Number(row.quantityKg || 0), 0));
-        const total = daily.reduce((acc, value) => acc + value, 0);
-        return `<tr><td class="weekly-cat-cell">${escapeHtml(capitalize(product.category.replaceAll('-', ' ')))}</td><td class="weekly-cat-cell">${escapeHtml(capitalize(product.subcategory))}</td><td class="weekly-product-td"><div class="weekly-product-cell">${product.imageUrl ? `<img class="weekly-product-thumb" src="${(window.ljThumb || String)(escapeHtml(product.imageUrl))}" alt="${escapeHtml(product.title)}">` : ''}<div class="weekly-product-text"><strong>${escapeHtml(normalizeUpper(product.title))}</strong>${product.nombreComercial ? `<small>${escapeHtml(capitalize(product.nombreComercial))}</small>` : ''}</div></div></td>${daily.map((kg) => `<td class="${kg > 0 ? 'is-ok' : 'is-missing'}">${kg > 0 ? `${kg.toFixed(2)}KG` : ''}</td>`).join('')}<td class="weekly-total">${total.toFixed(2)}KG</td></tr>`;
-      }).join('');
-        return `<section class="weekly-sheet-block ${idx ? 'page-break' : ''}"><h3>FRIGORIFICO LA JAMONERA • PLANILLA DE PRODUCCION SEMANAL</h3><h4>SEMANA DE ${formatIsoEs(segment.start)} A ${formatIsoEs(segment.end)}</h4><div class="table-responsive"><table class="weekly-sheet-table"><thead><tr><th class="th-cat">CATEGORIA</th><th class="th-cat">SUBCATEGORIA</th><th class="th-cat">PRODUCTO</th>${headers.map((d) => `<th class="th-day">${d.toUpperCase()}</th>`).join('')}<th class="th-total">TOTAL</th></tr></thead><tbody>${rowsHtml || `<tr><td colspan="${4 + headers.length}">Sin datos.</td></tr>`}</tbody></table></div></section>`;
-    }).join('')}</div>`;
-
     await openIosSwal({
       ljModal: true,
       title: 'Planilla de Producción Semanal',
       width: 'min(1400px,98vw)',
-      html: `<div class="planilla-toolbar"><sl-button variant="default" type="button" id="weeklyProductionPrintBtn"><i slot="prefix" class="fa-solid fa-print"></i><span>Imprimir</span></sl-button></div><div class="planilla-card">${html}</div>`,
+      html: '<div class="planilla-toolbar"><sl-button variant="default" type="button" id="weeklyProductionPrintBtn"><i slot="prefix" class="fa-solid fa-print"></i><span>Imprimir</span></sl-button></div><iframe id="weeklyProductionFrame" title="Planilla de producción semanal" style="width:100%;height:74vh;border:0;display:block"></iframe>',
       confirmButtonText: 'Cerrar',
       customClass: { popup: 'produccion-trace-alert planilla-modal', confirmButton: 'secondary' },
       didOpen: (popup) => {
+        const frame = popup.querySelector('#weeklyProductionFrame');
+        frame.srcdoc = docHtml;
         popup.querySelector('#weeklyProductionPrintBtn')?.addEventListener('click', async () => {
-          printWeeklyProductionPlanilla(html);
+          const win = frame.contentWindow;
+          await waitPrintAssets(win);
+          await win.document.fonts?.ready;
+          win.focus();
+          win.print();
         });
       }
     });
