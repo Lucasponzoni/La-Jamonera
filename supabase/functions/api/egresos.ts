@@ -48,7 +48,31 @@ export async function idsSincronizadosPos(_todayIso) {
   } catch { return new Set(); }
 }
 
+// Materia prima de producción (ingredientes que usan las recetas): la IA nunca la da de baja, ni vencida.
+// Sólo se procesan sus lotes «venta en local» (carne sin PT, que no entra a producción).
+export async function idsMateriaPrima() {
+  const { data, error } = await admin.rpc('pos_materia_prima');
+  if (error) throw new Error(`materia prima: ${error.message}`); // sin la lista no se corre: mejor no dar de baja nada
+  return new Set((data || []).map((x) => (typeof x === 'string' ? x : Object.values(x)[0])).filter(Boolean));
+}
+
 const JOB = 'auto_egresos';
+
+// Switch general del autoegreso con IA (job_state.config.enabled). Lo prende o apaga un admin desde la app.
+export async function estadoAutoEgresos() {
+  const { data } = await admin.from('job_state').select('config, estado, updated_at').eq('job', JOB).maybeSingle();
+  const cfg = safeObj(data?.config);
+  const estado = safeObj(data?.estado);
+  return { enabled: Boolean(cfg.enabled), motivo: str(cfg.pausadoMotivo), cambiadoPor: str(cfg.cambiadoPor), cambiadoAt: str(cfg.cambiadoAt), lastRunAt: str(estado.lastRunAt) };
+}
+
+export async function setAutoEgresos({ enabled, motivo = '', por = '' }) {
+  const { data } = await admin.from('job_state').select('config').eq('job', JOB).maybeSingle();
+  const config = { ...safeObj(data?.config), enabled: Boolean(enabled), pausadoMotivo: enabled ? '' : str(motivo), cambiadoPor: str(por), cambiadoAt: new Date().toISOString() };
+  const { error } = await admin.from('job_state').upsert({ job: JOB, config, updated_at: new Date().toISOString() }, { onConflict: 'job' });
+  if (error) throw new Error(error.message);
+  return estadoAutoEgresos();
+}
 const LOCK_SECONDS = 9 * 60;
 const EDGE_DEFAULTS = { MAX_RUN_MILLIS: 110000, MAX_PRODUCTS_PER_RUN: 60 };
 
@@ -147,11 +171,15 @@ export async function runAutoEgresos({ dryRun = true, now = new Date(), aiChat, 
     const todayIso = engine.T.dateToIso(now);
     // Productos sincronizados con el POS y materia prima: la IA sólo resuelve vencidos (ver idsSincronizadosPos).
     const soloVencidos = await idsSincronizadosPos(todayIso);
+    const materiaPrima = await idsMateriaPrima();
     // Lotes «sólo venta en local» (carne sin PT): entran a la corrida con egreso diario aunque el ingrediente no lo tenga.
     const ventaLocalIds = new Set(lots.filter((l) => l.raw && typeof l.raw === 'object' && l.raw.ventaLocal).map((l) => l.ingrediente_id));
 
     const allIds = (regs || [])
-      .filter((r) => (withDefaultWeeklyConfig(r.weekly_sheet_config).egresoEnabled || soloVencidos.has(r.ingrediente_id) || ventaLocalIds.has(r.ingrediente_id)) && !r.infinite_stock && (lotsBy[r.ingrediente_id] || []).length)
+      .filter((r) => (materiaPrima.has(r.ingrediente_id)
+        ? ventaLocalIds.has(r.ingrediente_id)
+        : (withDefaultWeeklyConfig(r.weekly_sheet_config).egresoEnabled || soloVencidos.has(r.ingrediente_id) || ventaLocalIds.has(r.ingrediente_id)))
+        && !r.infinite_stock && (lotsBy[r.ingrediente_id] || []).length)
       .map((r) => r.ingrediente_id);
     if (!allIds.length) { await setCursor(''); return summary; }
 
@@ -197,6 +225,8 @@ export async function runAutoEgresos({ dryRun = true, now = new Date(), aiChat, 
       record.entries.forEach((entry, j) => {
         const prev = record.__lots[j];
         const ventaLocal = Boolean(entry.ventaLocal);
+        // Materia prima de producción: sólo sus lotes «venta en local»; el resto no se toca nunca.
+        if (materiaPrima.has(ingredientId) && !ventaLocal) return;
         // Sin egreso diario en el ingrediente sólo se procesan los lotes «venta local» (los demás, si están en
         // «sólo vencidos», se resuelven al vencer como siempre).
         if (!ventaLocal && !weeklyCfg.egresoEnabled && !record.__soloVencidos) return;

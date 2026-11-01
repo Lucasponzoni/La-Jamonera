@@ -279,3 +279,65 @@ svg[id^="lj_trace_"] .flowchart-link { stroke-width: 1.4px; }
 svg[id^="lj_trace_"] .edgeLabel,
 svg[id^="lj_trace_"] .edgeLabel rect { background-color: #f8fafc; fill: #f8fafc; }
 svg[id^="lj_trace_"] .edgeLabel span { color: #64748b; font-weight: 600; }
+
+/* ═══ Tarjeta de lote de la trazabilidad (interna y pública), legible y pensada para el celular ═══ */
+.tl-card { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px !important; border-radius: 14px !important; border: 1px solid #dbe3ef !important; background: #fff !important; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+.tl-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.tl-lote { display: flex; flex-direction: column; min-width: 0; }
+.tl-etq { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #64748b; }
+.tl-lote strong { font-size: 20px; font-weight: 800; color: #0f172a; line-height: 1.2; overflow-wrap: anywhere; }
+.tl-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.tl-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600; background: #f1f5f9; color: #334155; }
+.tl-badge.is-vence { background: #eff6ff; color: #1d4ed8; }
+.tl-badge.is-frio { background: #ecfeff; color: #0e7490; }
+.tl-uso { display: grid; gap: 6px; padding: 10px 12px; border-radius: 12px; background: #f8fafc; }
+.tl-uso-num { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.tl-uso-num strong { font-size: 22px; font-weight: 800; color: #15803d; }
+.tl-uso-num span { font-size: 13px; color: #475569; }
+.tl-bar { height: 8px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+.tl-bar span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #22c55e, #16a34a); }
+.tl-uso small { font-size: 12.5px; color: #64748b; }
+.tl-datos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 14px; margin: 0; }
+.tl-datos > div { min-width: 0; }
+.tl-datos dt { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #64748b; display: flex; align-items: center; gap: 5px; }
+.tl-datos dt i { color: #94a3b8; }
+.tl-datos dd { margin: 2px 0 0; font-size: 15px; font-weight: 600; color: #0f172a; overflow-wrap: anywhere; }
+.tl-obs { margin: 0; font-size: 13px; color: #475569; }
+.tl-pt { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: #fefce8; border: 1px solid #fde68a; }
+.tl-pt > i { font-size: 22px; color: #b45309; }
+.tl-pt strong { display: block; font-size: 15.5px; font-weight: 800; color: #78350f; }
+.tl-pt span { font-size: 13px; color: #92400e; }
+.tl-armado { border: 1px solid #c7d2fe; border-radius: 12px; background: #eef2ff; overflow: hidden; }
+.tl-armado summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; font-weight: 700; color: #3730a3; font-size: 14px; }
+.tl-armado summary::-webkit-details-marker { display: none; }
+.tl-armado[open] .tl-chev { transform: rotate(180deg); }
+.tl-chev { transition: transform .2s ease; }
+.tl-armado-body { display: grid; gap: 10px; padding: 4px 12px 12px; }
+.tl-criterio { justify-self: start; padding: 3px 10px; border-radius: 999px; background: #e0e7ff; color: #3730a3; font-size: 12px; font-weight: 700; }
+.tl-numero code { display: inline-block; padding: 6px 12px; border-radius: 10px; background: #fff; border: 1px dashed #818cf8; font-size: 18px; font-weight: 800; color: #1e1b4b; overflow-wrap: anywhere; white-space: normal; }
+.tl-partes { display: flex; flex-wrap: wrap; gap: 8px; }
+.tl-parte { display: flex; flex-direction: column; min-width: 110px; padding: 8px 10px; border-radius: 10px; background: #fff; border: 1px solid #e0e7ff; }
+.tl-parte strong { font-size: 16px; font-weight: 800; color: #1e1b4b; overflow-wrap: anywhere; }
+.tl-parte small { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #6366f1; }
+.tl-parte em { font-style: normal; font-size: 12px; color: #64748b; }
+.tl-pasos { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.tl-pasos li { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; color: #94a3b8; }
+.tl-pasos li i { margin-top: 2px; }
+.tl-pasos li.is-si { color: #15803d; font-weight: 700; }
+.tl-pasos li.is-no { color: #64748b; }
+.tl-pasos li.is-no i { color: #ef4444; }
+.tl-vence-crit, .tl-aviso, .tl-nota { margin: 0; font-size: 13px; color: #334155; display: flex; gap: 6px; align-items: flex-start; }
+.tl-aviso { color: #b45309; }
+.tl-acciones { display: flex; flex-wrap: wrap; gap: 8px; }
+
+@media (max-width: 760px) {
+  .tl-card { padding: 12px !important; }
+  .tl-lote strong { font-size: 18px; }
+  .tl-datos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tl-acciones > * { flex: 1 1 calc(50% - 8px); }
+  .tl-acciones sl-button::part(base) { width: 100%; justify-content: center; }
+  .produccion-trace-ingredient-card > header { flex-direction: column; align-items: stretch !important; gap: 10px; }
+  .produccion-trace-ingredient-card > header .produccion-trace-card-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .produccion-trace-ingredient-card > header .produccion-trace-card-actions > * { flex: 1 1 calc(50% - 8px); }
+  .produccion-trace-lots { padding: 8px !important; }
+}

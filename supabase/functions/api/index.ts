@@ -24,7 +24,7 @@ import {
 } from './shared.ts';
 import * as gemini from './gemini.ts';
 import { handleAdminUsers } from './admin-users.ts';
-import { runAutoEgresos, refreshInventoryIndex } from './egresos.ts';
+import { runAutoEgresos, refreshInventoryIndex, estadoAutoEgresos, setAutoEgresos } from './egresos.ts';
 import { runVentas, guardarCredenciales, estadoCredenciales, enviarAvisoPrueba } from './ventas-im5.ts';
 import { pagosMP, estadoMP, guardarCredMP, guardarClaveNinjaPos } from './mp.ts';
 import { aplicarVentasPos, revertirComprobantePos } from './pos.ts';
@@ -188,6 +188,16 @@ async function route(req: Request, path: string) {
   if (path === '/admin-users' && method === 'POST') {
     const c = await requireAdmin(req);
     return await handleAdminUsers(c, await readBody(req));
+  }
+
+  // Switch general del autoegreso con IA: cualquiera activo lo ve; sólo un admin lo prende o apaga.
+  if (path === '/auto-egresos/estado') {
+    if (method === 'GET') { await requireActive(req); return { ok: true, ...(await estadoAutoEgresos()) }; }
+    if (method === 'POST') {
+      const c = await requireAdmin(req);
+      const body = await readBody(req);
+      return { ok: true, ...(await setAutoEgresos({ enabled: body.enabled === true, motivo: String(body.motivo || ''), por: c.user.email || '' })) };
+    }
   }
 
   if (path === '/auto-egresos/run' && method === 'POST') {

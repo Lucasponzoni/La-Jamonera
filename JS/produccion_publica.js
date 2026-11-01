@@ -356,7 +356,7 @@
       const nodeId = `ING_${idx + 1}`;
       const traceIngredient = (Array.isArray(registro?.traceability?.ingredients) ? registro.traceability.ingredients : []).find((row) => normalize(row?.ingredientId) === normalize(plan?.ingredientId));
       const usedQty = getIngredientPlanUsedQty(plan, { hasSiblingSubstitute: hasSubstituteSibling(allPlans, plan) });
-      const relationLabel = plan?.isSubstitute && normalize(plan?.sourceIngredientName) ? `<br/><b>Sustituye a:</b> ${escapeHtml(plan.sourceIngredientName)}` : '';
+      const relationLabel = ''; // sin «sustituye a» (Lucas, 01/11/2026)
       lines.push(`${nodeId}["<b>${idx + 1}. ${escapeHtml((plan?.ingredientName || traceIngredient?.ingredientName || 'Ingrediente').toUpperCase())}</b>${relationLabel}<br/><b>Usado total:</b> ${escapeHtml(String(Number(usedQty || 0).toFixed(3)))} ${escapeHtml(plan?.ingredientUnit || plan?.unit || '')}<br/><b>Lotes usados:</b> ${lots.length}"]:::toneIngredient`);
       lines.push(`I --> ${nodeId}`);
       const traceLots = Array.isArray(traceIngredient?.lots) ? traceIngredient.lots : [];
@@ -567,7 +567,14 @@
 
   const TRACE_PENDING_RNE = 'Pendiente';
   const TRACE_PENDING_RNPA = 'Pendiente';
-  const INFINITE_STOCK_NOTICE = 'Stock infinito, producto comprado en el dia por caja chica, sin trazabilidad.';
+  const INFINITE_STOCK_NOTICE = 'Stock infinito: marca, lote y vencimiento no aplican.';
+  const COMPRA_LOCAL_NOTICE = 'Comercio local (consumidor final): marca, lote y vencimiento no aplican.';
+  const AGUA_NOTICE = 'Agua: marca, lote y vencimiento no aplican.';
+  const esAgua = (plan) => /^agua$/i.test(String(plan?.ingredientName || plan?.sourceIngredientName || '').trim());
+  const infiniteNoticeFor = (plans = []) => {
+    if (plans.length && plans.every(esAgua)) return AGUA_NOTICE;
+    return plans.some((plan) => plan?.compraLocal) ? COMPRA_LOCAL_NOTICE : INFINITE_STOCK_NOTICE;
+  };
 
   const formatCompactQty = (value, unit = '') => {
     const amount = Number(value || 0);
@@ -632,6 +639,37 @@
       return acc;
     }, {}));
 
+    // PT del lote (número y fila en la planilla de ingresos) y «cómo se armó el número de lote» (Lucas, 01/11/2026).
+    const tracePtLabel = (lot) => {
+      const pt = normalize(lot?.ptNumero);
+      if (!pt) return '';
+      return `${pt}${lot?.ptFila ? ` · fila ${lot.ptFila} de la planilla de ingresos` : ''}`;
+    };
+    const traceLoteDetalleHtml = (lot) => {
+      const d = lot?.loteDetalle && typeof lot.loteDetalle === 'object' ? lot.loteDetalle : {};
+      const filas = Array.isArray(d.filas) ? d.filas : [];
+      if (!d.titulo && !filas.length) return '';
+      // Partes del número: valor grande y qué es, como en la etiqueta del inventario.
+      const partes = filas.filter(([k]) => k !== 'Vence').map(([k, v]) => {
+        const [valor, ...resto] = String(v || '').split(' · ');
+        return `<span class="tl-parte"><strong>${escapeHtml(valor)}</strong><small>${escapeHtml(k)}</small>${resto.length ? `<em>${escapeHtml(resto.join(' · '))}</em>` : ''}</span>`;
+      }).join('');
+      const vence = filas.find(([k]) => k === 'Vence');
+      const icono = { si: 'fa-circle-check', no: 'fa-circle-xmark', omit: 'fa-circle-minus' };
+      const pasos = Array.isArray(d.pasos) && d.pasos.length
+        ? `<ol class="tl-pasos">${d.pasos.map((paso) => `<li class="is-${escapeHtml(paso.estado)}"><i class="fa-solid ${icono[paso.estado] || 'fa-circle'}"></i><span>${escapeHtml(paso.texto)}</span></li>`).join('')}</ol>` : '';
+      return `<details class="tl-armado"><summary><span><i class="fa-solid fa-tag"></i> ¿Cómo se armó el lote?</span><i class="fa-solid fa-chevron-down tl-chev"></i></summary>
+        <div class="tl-armado-body">
+          ${d.titulo ? `<span class="tl-criterio">${escapeHtml(d.titulo)}</span>` : ''}
+          <div class="tl-numero"><code>${escapeHtml(d.numero || lot?.lotNumber || '')}</code></div>
+          ${partes ? `<div class="tl-partes">${partes}</div>` : ''}
+          ${pasos}
+          ${vence ? `<p class="tl-vence-crit"><i class="fa-regular fa-calendar"></i> Vence ${escapeHtml(vence[1])}</p>` : ''}
+          ${d.aviso ? `<p class="tl-aviso"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(d.aviso)}</p>` : ''}
+          ${d.nota ? `<p class="tl-nota"><i class="fa-regular fa-note-sticky"></i> ${escapeHtml(d.nota)}</p>` : ''}
+        </div>
+      </details>`;
+    };
     const ingredientsHtml = groupedIngredients.map((group, idx) => {
       const item = group.plans[0] || {};
       const traceIngredient = traceIngredients.find((row) => normalize(row?.ingredientId) === normalize(item?.ingredientId));
@@ -648,23 +686,35 @@
         const availableQty = Number(lot?.availableQty || 0);
         const remainingQty = Math.max(0, availableQty - takenQty);
         const providerRne = resolveProviderRneFromLot(lot);
-        return `<article class="produccion-trace-lot-card">
-          <div class="produccion-trace-lot-head">
-            <strong><i class="fa-solid fa-barcode"></i> Lote ${escapeHtml(lot?.lotNumber || lot?.entryId || '-')}</strong>
-            ${Boolean(lot?.isFrozen || lot?.frozen) ? '<span class="produccion-trace-used-badge">Congelado a -18 grados</span>' : ''}
-            <span class="produccion-trace-used-badge">Vencimiento al elaborar: ${escapeHtml(formatIsoEs(lot?.expiryDate || ''))}</span>
+        const unitLabel = lot?.unit || item?.ingredientUnit || '';
+        const usedPct = availableQty > 0 ? Math.max(4, Math.min(100, Math.round((takenQty / availableQty) * 100))) : 100;
+        const rneText = getTraceRneDisplay(providerRne);
+        const ptText = normalize(lot?.ptNumero);
+        // Tarjeta de lote pensada para leer de un vistazo y en el celular (Lucas, 01/11/2026).
+        return `<article class="produccion-trace-lot-card tl-card">
+          <header class="tl-head">
+            <div class="tl-lote"><span class="tl-etq"><i class="fa-solid fa-barcode"></i> Lote</span><strong>${escapeHtml(lot?.lotNumber || lot?.entryId || '-')}</strong></div>
+            <div class="tl-badges">
+              <span class="tl-badge is-vence"><i class="fa-regular fa-calendar"></i> Vence ${escapeHtml(formatIsoEs(lot?.expiryDate || ''))}</span>
+              ${Boolean(lot?.isFrozen || lot?.frozen) ? '<span class="tl-badge is-frio"><i class="fa-solid fa-snowflake"></i> Congelado -18 °C</span>' : ''}
+              ${Number(lot?.mergedEntries || 1) > 1 ? `<span class="tl-badge">${Number(lot.mergedEntries)} ingresos del mismo lote</span>` : ''}
+            </div>
+          </header>
+          <div class="tl-uso">
+            <div class="tl-uso-num"><strong>${escapeHtml(formatCompactQty(takenQty, unitLabel))}</strong><span>usados en esta producción</span></div>
+            <div class="tl-bar" aria-hidden="true"><span style="width:${usedPct}%"></span></div>
+            <small>Había ${escapeHtml(formatCompactQty(availableQty, unitLabel))} · quedaron ${escapeHtml(formatCompactQty(remainingQty, unitLabel))}</small>
           </div>
-          <div class="produccion-trace-grid">
-            <p><strong>Usado</strong><span>${formatCompactQty(takenQty, lot?.unit || item?.ingredientUnit || '')}</span></p>
-            <p><strong>Disponible</strong><span>${formatCompactQty(availableQty, lot?.unit || item?.ingredientUnit || '')}</span></p>
-            <p><strong>Remanente</strong><span>${formatCompactQty(remainingQty, lot?.unit || item?.ingredientUnit || '')}</span></p>
-            <p><strong>Proveedor</strong><span>${escapeHtml(lot?.provider || 'Sin proveedor')}</span></p>
-            <p><strong>RNE proveedor</strong><span>${escapeHtml(getTraceRneDisplay(providerRne))}</span></p>
-            ${normalize(providerRne.observations) ? `<p><strong>Obs. RNE</strong><span>${escapeHtml(providerRne.observations)}</span></p>` : ''}
-            <p><strong>Factura</strong><span>${escapeHtml(lot?.invoiceNumber || '-')}</span></p>
-            <p><strong>Ingreso</strong><span>${escapeHtml(normalize(lot?.entryDate) ? formatIsoEs(lot.entryDate) : '-')}</span></p>
-          </div>
-          <div class="produccion-trace-card-actions">${Array.isArray(lot?.invoiceImageUrls) && lot.invoiceImageUrls.length ? `<sl-button variant="default" size="small" type="button" class="public-trace-btn" data-public-images='${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}'><i slot="prefix" class="fa-solid fa-paperclip"></i>Ver adjunto (${lot.invoiceImageUrls.length})</sl-button>` : '<sl-button variant="danger" outline size="small" type="button" class="public-trace-btn public-trace-btn-missing" disabled>Sin adjuntos</sl-button>'}${providerRne.attachmentUrl ? `<sl-button variant="default" size="small" type="button" class="public-trace-btn" data-public-images='${encodeURIComponent(JSON.stringify([providerRne.attachmentUrl]))}'><i slot="prefix" class="fa-regular fa-eye"></i>Ver adjunto RNE</sl-button>` : '<sl-button variant="danger" outline size="small" type="button" class="public-trace-btn public-trace-btn-missing" disabled>RNE sin adjunto</sl-button>'}</div>
+          <dl class="tl-datos">
+            <div><dt><i class="fa-solid fa-truck"></i> Proveedor</dt><dd>${escapeHtml(lot?.provider || 'Sin proveedor')}</dd></div>
+            <div><dt><i class="fa-solid fa-id-card"></i> RNE</dt><dd>${escapeHtml(rneText)}</dd></div>
+            <div><dt><i class="fa-solid fa-file-invoice"></i> Factura</dt><dd>${escapeHtml(lot?.invoiceNumber || '-')}</dd></div>
+            <div><dt><i class="fa-solid fa-dolly"></i> Ingresó</dt><dd>${escapeHtml(normalize(lot?.entryDate) ? formatIsoEs(lot.entryDate) : '-')}</dd></div>
+          </dl>
+          ${normalize(providerRne.observations) ? `<p class="tl-obs"><i class="fa-solid fa-circle-info"></i> ${escapeHtml(providerRne.observations)}</p>` : ''}
+          ${ptText ? `<div class="tl-pt"><i class="fa-solid fa-file-shield"></i><div><strong>PT ${escapeHtml(ptText)}</strong>${lot?.ptFila ? `<span>Fila ${escapeHtml(lot.ptFila)} de la planilla de ingresos</span>` : '<span>Permiso de tránsito / certificado sanitario</span>'}</div></div>` : ''}
+          ${traceLoteDetalleHtml(lot)}
+          <div class="produccion-trace-card-actions tl-acciones">${Array.isArray(lot?.invoiceImageUrls) && lot.invoiceImageUrls.length ? `<sl-button variant="default" size="small" type="button" class="public-trace-btn" data-public-images='${encodeURIComponent(JSON.stringify(lot.invoiceImageUrls))}'><i slot="prefix" class="fa-solid fa-paperclip"></i>Ver adjunto (${lot.invoiceImageUrls.length})</sl-button>` : '<sl-button variant="danger" outline size="small" type="button" class="public-trace-btn public-trace-btn-missing" disabled>Sin adjuntos</sl-button>'}${Array.isArray(lot?.ptFileUrls) && lot.ptFileUrls.length ? `<sl-button variant="default" size="small" type="button" class="public-trace-btn" data-public-images='${encodeURIComponent(JSON.stringify(lot.ptFileUrls))}'><i slot="prefix" class="fa-solid fa-file-shield"></i>Ver PT (${lot.ptFileUrls.length})</sl-button>` : ''}${providerRne.attachmentUrl ? `<sl-button variant="default" size="small" type="button" class="public-trace-btn" data-public-images='${encodeURIComponent(JSON.stringify([providerRne.attachmentUrl]))}'><i slot="prefix" class="fa-regular fa-eye"></i>Ver adjunto RNE</sl-button>` : '<sl-button variant="danger" outline size="small" type="button" class="public-trace-btn public-trace-btn-missing" disabled>RNE sin adjunto</sl-button>'}</div>
         </article>`;
       }).join('');
 
@@ -675,8 +725,8 @@
             <span class="produccion-trace-ingredient-avatar">${ingredientImage ? `<img src="${escapeHtml(ingredientImage)}" alt="${escapeHtml(item?.ingredientName || 'Ingrediente')}">` : '<i class="fa-solid fa-carrot"></i>'}</span>
             <div>
               <h6><i class="fa-solid fa-box-open"></i> ${escapeHtml(group.sourceIngredientName || item?.ingredientName || item?.ingredientId || 'Ingrediente')}</h6>
-              ${group.plans.some((plan) => plan.isSubstitute && getIngredientPlanUsedQty(plan) > 0.0001) ? `<small><i class="fa-solid fa-link"></i> Sustitutos usados: ${escapeHtml(group.plans.filter((plan) => plan.isSubstitute && getIngredientPlanUsedQty(plan) > 0.0001).map((plan) => plan.ingredientName).join(' + ') || '-')}</small>` : ''}
-              ${hasInfiniteStock ? '<small><i class="fa-solid fa-infinity"></i> Stock infinito sin trazabilidad</small>' : ''}
+              ${group.plans.some((plan) => plan.isSubstitute && getIngredientPlanUsedQty(plan) > 0.0001) ? `<small><i class="fa-solid fa-list"></i> Desglose de cortes usados: ${escapeHtml(group.plans.filter((plan) => plan.isSubstitute && getIngredientPlanUsedQty(plan) > 0.0001).map((plan) => plan.ingredientName).join(' + ') || '-')}</small>` : ''}
+              ${hasInfiniteStock ? `<small><i class="fa-solid fa-infinity"></i> ${group.plans.every(esAgua) ? 'Marca, lote y vencimiento: no aplica' : (group.plans.some((plan) => plan?.compraLocal) ? 'Comercio local (consumidor final)' : 'Stock infinito sin trazabilidad')}</small>` : ''}
               <small>Cantidad usada: ${formatCompactQty(totalUsedQty, item?.unit || item?.ingredientUnit || '')}</small>
               <small> - RNE proveedor: <strong>${escapeHtml(getTraceRneDisplay(providerRneSummary))}</strong></small>
               ${normalize(providerRneSummary.observations) ? `<small> - Obs. RNE: <strong>${escapeHtml(providerRneSummary.observations)}</strong></small>` : ''}
@@ -684,7 +734,7 @@
           </div>
           <div class="produccion-trace-card-actions">${aggregatedImages.length ? `<sl-button variant="default" size="small" type="button" class="public-trace-btn" data-public-images='${encodeURIComponent(JSON.stringify(aggregatedImages))}'><i slot="prefix" class="fa-regular fa-images"></i>Ver adjunto (${aggregatedImages.length})</sl-button>` : '<sl-button variant="danger" outline size="small" type="button" class="public-trace-btn public-trace-btn-missing" disabled>Sin adjuntos</sl-button>'}${providerRneSummary.attachmentUrl ? `<sl-button variant="default" size="small" type="button" class="public-trace-btn" data-public-images='${encodeURIComponent(JSON.stringify([providerRneSummary.attachmentUrl]))}'><i slot="prefix" class="fa-regular fa-eye"></i>Ver adjunto RNE</sl-button>` : '<sl-button variant="danger" outline size="small" type="button" class="public-trace-btn public-trace-btn-missing" disabled>RNE sin adjunto</sl-button>'}</div>
         </header>
-        <div class="produccion-trace-lots">${lotCards || (hasInfiniteStock ? `<div class="produccion-lote-infinite-note"><i class="fa-solid fa-infinity" aria-hidden="true"></i><span>${escapeHtml(INFINITE_STOCK_NOTICE)}</span></div>` : '<p class="m-0">Sin lotes asociados.</p>')}</div>
+        <div class="produccion-trace-lots">${lotCards || (hasInfiniteStock ? `<div class="produccion-lote-infinite-note"><i class="fa-solid fa-infinity" aria-hidden="true"></i><span>${escapeHtml(infiniteNoticeFor(group.plans))}</span></div>` : '<p class="m-0">Sin lotes asociados.</p>')}</div>
       </article>`;
     }).join('') || '<p class="ingrediente-empty-list">Sin desglose de lotes para esta producción.</p>';
 

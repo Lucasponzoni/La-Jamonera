@@ -517,9 +517,11 @@
     const type = normalizeValue(registro?.packagingDelayTypeAtProduction || registro?.packagingDelayType || registro?.traceability?.product?.packagingDelayType);
     return type === 'freeze_before_packaging' ? 'CONGELADO PREVIO A ENVASADO' : 'ENVASADO';
   };
-  const getPackagingDateDisplay = (registro = {}) => normalizeValue(registro?.packagingDate)
-    ? formatIsoEs(registro.packagingDate)
-    : 'Al producir';
+  // Sin espera de envasado: se envasa el mismo día de la producción (se muestra la fecha, no «Al producir»).
+  const getPackagingDateDisplay = (registro = {}) => {
+    const fecha = normalizeValue(registro?.packagingDate) || normalizeValue(registro?.productionDate);
+    return fecha ? formatIsoEs(fecha) : '-';
+  };
   const getInitialsToken = (value = '') => {
     const words = normalizeUpper(value)
       .normalize('NFD')
@@ -532,7 +534,7 @@
   const getProductionLotDisplay = (registro = {}) => {
     const explicit = normalizeValue(registro?.lotNumber || registro?.productLotNumber);
     if (explicit) return normalizeUpper(explicit);
-    const dateToken = normalizeValue(registro?.productionDate || '').replaceAll('-', '');
+    const dateToken = normalizeValue(registro?.productionDate || '').split('-').reverse().join(''); // DDMMAAAA (formato argentino)
     const productToken = getInitialsToken(registro?.recipeTitle || registro?.traceability?.product?.title || 'Producto');
     return `LJ-${dateToken || 'SFECHA'}-${productToken}`;
   };
@@ -541,7 +543,7 @@
     return !text || text === '-';
   };
   const getFallbackLotDisplay = (registro = {}, name = '') => {
-    const dateToken = normalizeValue(registro?.productionDate || '').replaceAll('-', '');
+    const dateToken = normalizeValue(registro?.productionDate || '').split('-').reverse().join(''); // DDMMAAAA (formato argentino)
     return `LJ-${dateToken || 'SFECHA'}-${getInitialsToken(name || registro?.recipeTitle || 'Producto')}`;
   };
   const getIngredientExpiryValue = (registro = {}, expiry = '') => {
@@ -720,15 +722,26 @@
       });
       const firstLot = lots[0] || {};
       const displayName = normalizeUpper(plan?.ingredientName || traceIngredient?.ingredientName || 'INGREDIENTE');
-      const lotNumberDisplay = joinUnique(lotNumbers);
-      const expiryValue = getIngredientExpiryValue(registro, firstLot?.expiryDate || '');
+      // Agua y productos de stock infinito: marca, lote y vencimiento «No aplica» (Lucas, 31/10/2026).
+      const sinLoteNiVto = /^AGUA$/.test(displayName) || Boolean(plan?.infiniteStock || traceIngredient?.infiniteStock);
+      // Compra CF (consumidor final): lote propio (cebolla y verdeo = fecha de producción), sin RNE (Lucas, 01/11/2026).
+      const compraCF = mergedLots.length > 0 && lots.every((lot) => /compra cf/i.test(normalizeValue(lot?.provider)));
+      const sinLote = sinLoteNiVto && !compraCF;
+      const lotNumberDisplay = sinLote ? 'No aplica' : joinUnique(lotNumbers);
+      const expiryValue = sinLoteNiVto ? 'No aplica' : getIngredientExpiryValue(registro, firstLot?.expiryDate || '');
       const takeQty = Number(firstLot?.takeQty || 0);
       const availableQty = Number(firstLot?.availableQty || 0);
       const remainingQty = Math.max(0, availableQty - takeQty);
       const hasMultiProvider = [...new Set(providers.map((item) => normalizeValue(item)).filter(Boolean))].length > 1;
       const lotUsageSummary = observationLots.map((lot, lotIdx) => {
         const exp = formatIsoEs(lots[lotIdx]?.expiryDate || '-');
-        return `${lot.qtyLabel} de lote ${lot.index} ${lot.lotNumber} (vence ${exp})`;
+        // PT / certificado sanitario y página de su ficha en la planilla de ingresos (Lucas, 01/11/2026).
+        const pt = normalizeValue(lots[lotIdx]?.ptNumero);
+        const ptFila = normalizeValue(lots[lotIdx]?.ptFila);
+        // … marca negrita: se convierte en <strong> después de escapar el texto.
+        // \u0001...\u0002 marca negrita: se pasa a <strong> después de escapar el texto.
+        const ptLabel = pt ? `, \u0001PT ${pt}${ptFila ? `, fila ${ptFila} de la planilla de ingresos` : ''}\u0002` : '';
+        return `${lot.qtyLabel} de lote ${lot.index} ${lot.lotNumber} (vence ${exp}${ptLabel})`;
       }).join(', ');
       const providersSummary = hasMultiProvider
         ? `El proveedor es ${observationLots.map((lot) => `${lot.provider} para lote ${lot.index}`).join(' y ')}`
@@ -745,10 +758,10 @@
         sourceRequiredQty: Number(meta.requiredQty || qtyRaw || 0),
         sourceUnit: normalizeValue(meta.unit || qtyUnit),
         ingredientImage: normalizeValue(plan?.ingredientImageUrl || traceIngredient?.ingredientImageUrl),
-        provider: joinUnique(providers),
+        provider: sinLote ? 'No aplica' : joinUnique(providers),
         lotNumber: isMissingPlanillaValue(lotNumberDisplay) ? getFallbackLotDisplay(registro, displayName) : lotNumberDisplay,
         expiryDate: expiryValue,
-        rne: joinUnique(rnes),
+        rne: compraCF ? 'No aplica' : joinUnique(rnes),
         qtyRaw,
         qtyUnit,
         qty: formatQty(qtyRaw, qtyUnit),
@@ -757,7 +770,8 @@
         remaining: formatQty(remainingQty, firstLot?.unit || plan?.ingredientUnit || plan?.unit || ''),
         invoiceNumber: normalizeValue(firstLot?.invoiceNumber || '-'),
         entryDate: formatIsoEs(firstLot?.entryDate || '-'),
-        autoObservation: lots.length > 1
+        // Cortes con PT: siempre en observaciones, aunque sea un solo lote (Lucas, 01/11/2026).
+        autoObservation: lots.length > 1 || lots.some((lot) => normalizeValue(lot?.ptNumero))
           ? `${plan?.ingredientName || traceIngredient?.ingredientName || 'Ingrediente'}, se usó ${lotUsageSummary}. ${providersSummary}.`
           : ''
       };
@@ -797,22 +811,21 @@
       <td class="planilla-qty-cell">${escapeHtml(renderQtyKg(row))}</td>
     </tr>`;
 
+    // Ingrediente cubierto con otros cortes: fila con el desglose, sin «sustitutos» ni «sustituye a…» (Lucas, 01/11/2026).
     return groups.map((group) => {
       const hasSubstitutes = group.rows.some((row) => row.isSubstitute);
+      const rowsHtml = group.rows.map((row) => renderDataRow({ ...row, relation: '' }, row.isSubstitute ? 'planilla-substitute-row' : '')).join('');
+      if (!hasSubstitutes) return rowsHtml;
       const totalUsed = group.rows.reduce((sum, row) => sum + Number(row.qtyRaw || 0), 0);
       const directUsed = group.rows.filter((row) => !row.isSubstitute).reduce((sum, row) => sum + Number(row.qtyRaw || 0), 0);
-      if (!hasSubstitutes) return group.rows.map((row) => renderDataRow(row)).join('');
-      const badge = directUsed > 0.0001 ? 'COMBINADO CON SUSTITUTOS' : 'CUBIERTO CON SUSTITUTOS';
-      const directText = directUsed > 0.0001 ? `ORIGINAL USADO: ${formatQty(directUsed, group.sourceUnit)}` : 'INGREDIENTE ORIGINAL SIN CONSUMO DIRECTO';
       const sourceRequiredLabel = escapeHtml(formatQty(group.sourceRequiredQty || totalUsed, group.sourceUnit));
       const totalUsedLabel = escapeHtml(formatQty(totalUsed, group.sourceUnit));
+      const directText = directUsed > 0.0001 ? ` <span aria-hidden="true">|</span> ORIGINAL USADO: <b>${escapeHtml(formatQty(directUsed, group.sourceUnit))}</b>` : '';
       return `<tr class="planilla-source-row"><td colspan="5">
-        <div class="planilla-source-head">
-          <strong>${escapeHtml(normalizeUpper(group.sourceIngredientName))}</strong>
-          <span><i class="fa-solid fa-link"></i> ${badge}</span>
-        </div>
-        <div class="planilla-source-meta">REQUERIDO: <b>${sourceRequiredLabel}</b> <span aria-hidden="true">|</span> TOTAL USADO: <b>${totalUsedLabel}</b> <span aria-hidden="true">|</span> ${escapeHtml(directText)}</div>
-      </td></tr>${group.rows.map((row) => renderDataRow(row, row.isSubstitute ? 'planilla-substitute-row' : '')).join('')}`;
+        <div class="planilla-source-head"><strong>${escapeHtml(normalizeUpper(group.sourceIngredientName))}</strong></div>
+        <div class="planilla-source-meta">REQUERIDO: <b>${sourceRequiredLabel}</b> <span aria-hidden="true">|</span> TOTAL USADO: <b>${totalUsedLabel}</b>${directText}</div>
+        <div class="planilla-source-meta"><b>DESGLOSE DE CORTES USADOS:</b></div>
+      </td></tr>${rowsHtml}`;
     }).join('') || '<tr><td colspan="5">SIN INGREDIENTES CARGADOS.</td></tr>';
   };
 
@@ -874,7 +887,7 @@
         <tbody>
           <tr><th>FECHA DE ELABORACI\u00d3N</th><td>${escapeHtml(formatIsoEs(registro?.productionDate || '') || '-')}</td></tr>
           <tr><th>FECHA DE ${escapeHtml(getPackagingLabel(registro))} / ROTULADO</th><td>${escapeHtml(getPackagingDateDisplay(registro))}</td></tr>
-          <tr><th>PRODUCTO</th><td><strong>${escapeHtml(normalizeUpper(registro?.recipeTitle || '-'))}</strong>${commercialName ? ` <small>(${escapeHtml(normalizeUpper(commercialName))})</small>` : ''}</td></tr>
+          <tr><th>PRODUCTO</th><td><strong>${escapeHtml(normalizeUpper(registro?.recipeTitle || '-'))}</strong>${commercialName && normalizeUpper(commercialName) !== normalizeUpper(registro?.recipeTitle) ? ` <small>(${escapeHtml(normalizeUpper(commercialName))})</small>` : ''}</td></tr>
           <tr><th>N\u00b0 LOTE ASIGNADO</th><td>${escapeHtml(getProductionLotDisplay(registro))}</td></tr>
           <tr><th>FECHA DE VENCIMIENTO</th><td>${escapeHtml(normalizeUpper(getProductExpiryDisplay(registro)))}</td></tr>
           <tr><th>BASE DE C\u00c1LCULO</th><td>${escapeHtml(baseCalculoLabel)}</td></tr>
@@ -896,10 +909,10 @@
       </table>
       <section class="planilla-proto-bottom">
         <div class="planilla-proto-observations">
-          <p><strong>OBSERVACIONES:</strong> ${escapeHtml(observationsLabel)}</p>
+          <p><strong>OBSERVACIONES:</strong> ${escapeHtml(observationsLabel).replace(/\u0001/g, '<strong class="planilla-obs-pt">').replace(/\u0002/g, '</strong>')}</p>
           ${rotuloIngredients ? `<p><strong>Ingredientes (r\u00f3tulo):</strong> ${escapeHtml(rotuloIngredients)}.</p>` : ''}
         </div>
-        <article class="planilla-qr-card"><div id="planillaQrTarget"></div><p class="planilla-qr-note">QR trazabilidad</p></article>
+        <article class="planilla-qr-card"><a class="planilla-qr-link" href="${escapeHtml(getTraceUrl(registro))}" target="_blank" rel="noopener" title="Abrir trazabilidad"><div id="planillaQrTarget"></div><p class="planilla-qr-note">QR trazabilidad</p></a></article>
       </section>
     </div>`;
   };

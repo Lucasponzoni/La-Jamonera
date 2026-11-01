@@ -516,3 +516,25 @@ sl-spinner.inventario-inline-delete-spinner {
   }
 }
 
+
+/* Listado de proveedores (auditoría) en el editor del proveedor */
+.inventario-listado-grupo {
+  padding: 8px 10px;
+  border: 1px solid var(--sl-color-neutral-200, #e5e7eb);
+  border-radius: 10px;
+}
+.inventario-listado-materias {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 6px 2px;
+}
+
+/* Switch general del autoegreso con IA en la barra de Inventario */
+.inventario-ia-switch {
+  align-self: center;
+  white-space: nowrap;
+  font-size: 0.85rem;
+}

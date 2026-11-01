@@ -3382,6 +3382,47 @@
       ${entry.lotNota ?`<p class="inv-lote-tip-nota"><b>Nota:</b> ${escapeHtml(entry.lotNota)}</p>` : ''}
     </div>`;
   };
+  // Mismo detalle del tooltip pero como datos: se guarda en cada lote de una producción para que la
+  // trazabilidad (también la pública) muestre cómo se armó el número de lote.
+  const explicarLoteIngreso = (entry = {}, record = {}, productName = '') => {
+    const detalle = { titulo: '', numero: normalizeValue(entry.lotNumber), pasos: [], filas: [], aviso: '', nota: normalizeValue(entry.lotNota) };
+    if (normalizeValue(entry.customLot)) {
+      detalle.titulo = 'Lote propio del envase';
+      detalle.filas.push(['Lote', 'cargado a mano en el ingreso']);
+    } else {
+      const cfg = safeObject(record?.lotConfig);
+      const criterio = entry.lotModo === 'pt' ? entryLotCriterio(entry) : '';
+      const lot = buildLotParts({
+        lotConfig: { ...cfg, modo: entry.lotModo || cfg.modo },
+        invoiceNumber: entry.invoiceNumber,
+        expiryDate: entry.expiryDate,
+        productName,
+        ptNumero: entry.ptNumero,
+        ptSolicitud: entry.ptSolicitud,
+        destino: entry.destino,
+        loteElaborador: entry.loteElaborador,
+        tropa: entry.tropa,
+        faenaFecha: entry.faenaFecha,
+        criterio
+      });
+      detalle.titulo = criterio
+        ? `Criterio ${LOT_CRITERIOS[criterio].label} · ${LOT_CRITERIOS[criterio].norma}`
+        : `Criterio: ${LOT_MODO_TEXTO[lotModeOf({ modo: entry.lotModo || cfg.modo })] || 'Personalizado'}`;
+      if (lot) {
+        if (criterio === 'instituto') {
+          detalle.pasos = LOT_PASOS_INSTITUTO.map((texto, index) => {
+            const n = index + 1;
+            return { texto: `Paso ${n}. ${texto}`, estado: lot.paso === n ? 'si' : (lot.paso && n > lot.paso ? 'omit' : 'no') };
+          });
+        }
+        detalle.filas = lot.parts.map((part) => [part.etiqueta, `${part.valor}${part.detalle ? ` · ${part.detalle}` : ''}`]);
+        detalle.aviso = lot.aviso && !detalle.nota.includes(lot.aviso) ? lot.aviso : '';
+      }
+    }
+    if (entry.expiryDate) detalle.filas.push(['Vence', `${formatLotExpiryDmySlash(entry.expiryDate)}${entry.vtoCriterio ? ` · ${entry.vtoCriterio}` : ''}`]);
+    return detalle;
+  };
+  window.laJamoneraLoteDetalle = explicarLoteIngreso;
 
   const openWeeklySheetConfig = async (ingredientId, { force = false } = {}) => {
     const ingredient = state.ingredientes[ingredientId];
@@ -8553,6 +8594,8 @@
               <p class="inventario-provider-manager-copy">RNE, vencimientos y adjuntos.</p>
             </div>
             <div class="produccion-config-actions">
+              <sl-button variant="default" type="button" class="inventario-threshold-btn" data-provider-listado="registro" title="Portada y tabla con el registro sanitario de cada proveedor"><i slot="prefix" class="fa-solid fa-file-shield"></i><span>Listado de proveedores</span></sl-button>
+              <sl-button variant="default" type="button" class="inventario-threshold-btn" data-provider-listado="materias" title="Portada y tabla con las materias primas que se le compran a cada proveedor"><i slot="prefix" class="fa-solid fa-boxes-stacked"></i><span>Proveedores y materias primas</span></sl-button>
               <sl-button variant="default" type="button" class="inventario-threshold-btn" id="inventarioProviderExportExcelBtn"><i slot="prefix" class="fa-solid fa-file-excel"></i><span>Descargar Excel</span></sl-button>
               <sl-button variant="default" type="button" class="inventario-threshold-btn" id="inventarioProviderImportExcelBtn"><i slot="prefix" class="fa-solid fa-file-arrow-up"></i><span>Subir Excel</span></sl-button>
               <input id="inventarioProviderImportExcelInput" class="d-none" type="file" accept=".xlsx,.xlsm,.xls">
@@ -8590,6 +8633,93 @@
             });
           }
           initThumbLoading(root);
+        };
+
+        // ── Listado de proveedores (auditoría): datos de provider.listado, ver JS/proveedores_listado.js ──
+        const PL = () => window.laJamoneraProveedoresListado;
+        const listadoLots = async () => {
+          await ensurePeriodLotsLoaded();
+          const lots = {};
+          Object.keys(state.ingredientes).forEach((id) => { lots[id] = periodEntriesFor(id); });
+          return {
+            lots,
+            ingredientes: state.ingredientes,
+            noPerecedero: (id, entry) => Boolean(entry?.noPerecedero || safeObject(getRecord(id).flagPreferences).noPerecedero)
+          };
+        };
+
+        const renderListadoEditor = (provider) => {
+          if (!PL()) return '';
+          const l = PL().listadoDe(provider);
+          const grupo = (g) => {
+            const v = l[g.key];
+            return `<div class="inventario-listado-grupo mt-2">
+              <sl-checkbox class="inventario-check-row inventario-check-row-compact" data-listado-activo="${g.key}" ${v.activo ? 'checked' : ''}>${g.etiqueta}</sl-checkbox>
+              <sl-input class="mt-1" data-listado-campo="${g.key}.rubro" value="${escapeHtml(v.rubro)}" placeholder="Rubro (ej: Cortes de cerdo)"></sl-input>
+              <sl-input class="mt-1" data-listado-campo="${g.key}.productos" value="${escapeHtml(v.productos)}" placeholder="Productos (ej: Varios)"></sl-input>
+              <input type="text" class="lj-input mt-1" data-listado-campo="${g.key}.conservacion" value="${escapeHtml(v.conservacion)}" placeholder="Conservación" list="inventarioListadoConservacion">
+            </div>`;
+          };
+          return `<div class="produccion-rne-history-wrap mt-3">
+            <h6><strong>Listado de proveedores (auditoría)</strong></h6>
+            <sl-checkbox class="inventario-check-row inventario-check-row-compact" id="providerListadoIncluir" ${l.incluir ? 'checked' : ''}>Incluir en los listados</sl-checkbox>
+            <label class="lj-label mt-2"><strong>Nombre en el listado</strong> (opcional)</label>
+            <sl-input data-listado-campo="nombre" value="${escapeHtml(l.nombre)}" placeholder="Razón social, ej: ${escapeHtml(provider?.name || 'PROVEEDOR S.R.L.')}"></sl-input>
+            <label class="lj-label mt-2"><strong>CUIT</strong> (opcional)</label>
+            <sl-input data-listado-campo="cuit" value="${escapeHtml(l.cuit)}" placeholder="30-12345678-9"></sl-input>
+            <label class="lj-label mt-2"><strong>Localidad</strong></label>
+            <sl-input data-listado-campo="localidad" value="${escapeHtml(l.localidad)}" placeholder="Rosario"></sl-input>
+            <label class="lj-label mt-2"><strong>Registro como sale en el listado</strong></label>
+            <sl-input data-listado-campo="registro" value="${escapeHtml(l.registro)}" placeholder="${escapeHtml(provider?.rne?.number || 'Ej: N° SENASA: 5364')}"></sl-input>
+            <small class="text-muted">Vacío = el número de RNE cargado arriba.</small>
+            <label class="lj-label mt-2"><strong>Verificación</strong> (opcional)</label>
+            <sl-input data-listado-campo="verificacion" value="${escapeHtml(l.verificacion)}" placeholder="Ej: Padrón SENASA; coincide con los PT 5364-A"></sl-input>
+            <small class="text-muted">Si se completa, sale como «Verificado» con esta aclaración; si no, como «Identificado».</small>
+            ${PL().GRUPOS.map(grupo).join('')}
+            <datalist id="inventarioListadoConservacion">${PL().CONSERVACION.map((c) => `<option value="${escapeHtml(c)}"></option>`).join('')}</datalist>
+            <label class="lj-label mt-2"><strong>Agrupa los ingresos de</strong> (opcional)</label>
+            <sl-input data-listado-campo="alias" value="${escapeHtml(l.alias.join(', '))}" placeholder="Otros nombres del mismo proveedor, separados por coma"></sl-input>
+            <label class="lj-label mt-2"><strong>Materias primas que se le compran</strong></label>
+            <div id="providerListadoMaterias" class="inventario-listado-materias"><small class="text-muted">Cargando ingresos…</small></div>
+            <small class="text-muted">Destildá lo que no va en el listado (reventa, compras sueltas).</small>
+          </div>`;
+        };
+
+        const fillListadoMaterias = async (provider) => {
+          const box = root.querySelector('#providerListadoMaterias');
+          if (!box || !PL()) return;
+          try {
+            const datos = await listadoLots();
+            const aliasInput = root.querySelector('[data-listado-campo="alias"]');
+            const alias = String(aliasInput?.value || '').split(',').map((x) => normalizeUpper(x)).filter(Boolean);
+            const l = PL().listadoDe(provider);
+            const mps = PL().materiasPrimas({ ...provider, listado: { ...safeObject(provider.listado), alias } }, datos);
+            if (!root.contains(box)) return;
+            box.innerHTML = mps.length
+              ? mps.map((m) => `<sl-checkbox class="inventario-check-row inventario-check-row-compact" data-listado-mp="${escapeHtml(m.ingredientId)}" ${l.mpExcluidos.includes(m.ingredientId) ? '' : 'checked'}>${escapeHtml(m.nombre)} <small class="text-muted">· ${m.n} ingreso${m.n === 1 ? '' : 's'}${m.np ? ' · no perecedero' : ''}</small></sl-checkbox>`).join('')
+              : '<small class="text-muted">Sin ingresos de este proveedor. En el listado de materias primas salen los productos.</small>';
+          } catch (error) {
+            box.innerHTML = '<small class="text-muted">No se pudieron leer los ingresos.</small>';
+          }
+        };
+
+        const readListadoEditor = (provider) => {
+          if (!root.querySelector('#providerListadoIncluir')) return safeObject(provider.listado);
+          const campo = (k) => normalizeValue(root.querySelector(`[data-listado-campo="${k}"]`)?.value);
+          const grupo = (k) => ({
+            activo: Boolean(root.querySelector(`[data-listado-activo="${k}"]`)?.checked),
+            rubro: campo(`${k}.rubro`), productos: campo(`${k}.productos`), conservacion: campo(`${k}.conservacion`)
+          });
+          const marcadas = [...root.querySelectorAll('[data-listado-mp]')];
+          const prev = safeObject(provider.listado);
+          return {
+            incluir: Boolean(root.querySelector('#providerListadoIncluir')?.checked),
+            nombre: campo('nombre'), cuit: campo('cuit'), localidad: campo('localidad'), registro: campo('registro'), verificacion: campo('verificacion'),
+            alias: campo('alias').split(',').map((x) => normalizeUpper(x)).filter(Boolean),
+            // si la lista no llegó a cargarse se conservan las exclusiones anteriores
+            mpExcluidos: marcadas.length ? marcadas.filter((n) => !n.checked).map((n) => n.dataset.listadoMp) : (Array.isArray(prev.mpExcluidos) ? prev.mpExcluidos : []),
+            perecedero: grupo('perecedero'), noPerecedero: grupo('noPerecedero')
+          };
         };
 
         const renderEditor = (providerId) => {
@@ -8640,6 +8770,7 @@
                   <h6><strong>Historial de RNE</strong></h6>
                   ${historyHtml}
                 </div>
+                ${renderListadoEditor(provider)}
                 <div class="produccion-config-actions mt-3">
                   <sl-button variant="success" type="button" data-provider-rne-save="${provider.id}"><i slot="prefix" class="fa-solid fa-floppy-disk"></i><span>Guardar</span></sl-button>
                 </div>
@@ -8680,6 +8811,8 @@
           infiniteInput?.addEventListener('change', syncInfinite);
           nonFoodInput?.addEventListener('change', syncInfinite);
           syncInfinite();
+          fillListadoMaterias(provider);
+          root.querySelector('[data-listado-campo="alias"]')?.addEventListener('sl-change', () => fillListadoMaterias(provider));
 
           initThumbLoading(root);
           requestAnimationFrame(() => {
@@ -8813,6 +8946,17 @@
               anchor.click();
               anchor.remove();
               setTimeout(() => URL.revokeObjectURL(url), 2000);
+            });
+            return;
+          }
+
+          const listadoBtn = event.target.closest('[data-provider-listado]');
+          if (listadoBtn) {
+            await withButtonSpinner(listadoBtn, async () => {
+              if (!PL()) return;
+              const datos = await listadoLots();
+              const html = PL().html(listadoBtn.dataset.providerListado, sortedProviders(), datos, { hoy: getArgentinaIsoDate() });
+              await PL().imprimir(html);
             });
             return;
           }
@@ -8975,6 +9119,7 @@
                 photoUrl,
                 nonFoodCategory,
                 createdAt: Number(provider.createdAt || Date.now()),
+                listado: readListadoEditor(provider),
                 rne: {
                   ...getDefaultProviderRne(),
                   ...currentRne,
@@ -9459,6 +9604,47 @@
   nodes.list?.addEventListener('scroll', updateListScrollHint);
   nodes.configBtn?.addEventListener('click', openGlobalConfig);
   nodes.providersRneBtn?.addEventListener('click', openProvidersRneManager);
+
+  // Switch general del autoegreso con IA (/auto-egresos/estado). Lo ven todos; lo cambia sólo un admin, con confirmación.
+  const iaSwitch = document.getElementById('inventarioIaAutoEgresoSwitch');
+  const syncIaSwitch = async () => {
+    if (!iaSwitch || !window.laJamoneraProxy) return;
+    try {
+      const [estado, me] = await Promise.all([
+        window.laJamoneraProxy.getJson('/auto-egresos/estado').then((r) => r.json()),
+        window.laJamoneraProxy.getJson('/me').then((r) => r.json()).catch(() => ({}))
+      ]);
+      iaSwitch.checked = Boolean(estado.enabled);
+      iaSwitch.disabled = !me.admin;
+      iaSwitch.title = estado.enabled
+        ? 'Autoegreso con IA prendido. La materia prima de producción nunca baja por IA.'
+        : `Autoegreso con IA apagado${estado.motivo ? ` · ${estado.motivo}` : ''}`;
+    } catch (error) {
+      console.warn('[Inventario] estado del autoegreso', error);
+    }
+  };
+  iaSwitch?.addEventListener('sl-change', async () => {
+    const quiere = iaSwitch.checked;
+    const ok = await openIosSwal({
+      title: quiere ? '¿Prender el autoegreso con IA?' : '¿Apagar el autoegreso con IA?',
+      html: quiere
+        ? '<p>La IA vuelve a bajar stock todos los días según la rotación de cada producto y a resolver vencidos como venta en mostrador.</p><p>La materia prima de producción no baja nunca por IA, aunque esté vencida.</p>'
+        : '<p>La IA deja de bajar stock y de resolver vencidos hasta que lo vuelvas a prender.</p>',
+      icon: 'question', showCancelButton: true, confirmButtonText: quiere ? 'Prender' : 'Apagar', cancelButtonText: 'Cancelar'
+    });
+    if (!ok?.isConfirmed) { iaSwitch.checked = !quiere; return; }
+    iaSwitch.disabled = true;
+    try {
+      const r = await window.laJamoneraProxy.postJson('/auto-egresos/estado', { enabled: quiere, motivo: quiere ? '' : 'Apagado desde Inventario' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    } catch (error) {
+      iaSwitch.checked = !quiere;
+      await openIosSwal({ title: 'No se pudo cambiar', html: '<p>No se pudo cambiar el autoegreso. Probá de nuevo.</p>', icon: 'error', confirmButtonText: 'Entendido' });
+    } finally {
+      await syncIaSwitch();
+    }
+  });
+  syncIaSwitch();
   nodes.weeklyConfigBtn?.addEventListener('click', openWeeklyConfigManager);
   nodes.createIngredientBtn?.addEventListener('click', openCreateIngredient);
   nodes.toolbarCreateBtn?.addEventListener('click', openCreateIngredient);

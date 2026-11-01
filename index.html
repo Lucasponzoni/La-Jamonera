@@ -75,7 +75,7 @@
   <link rel="stylesheet" href="./CSS/legacy/11-produccion-2.css?v=202610182133">
   <link rel="stylesheet" href="./CSS/legacy/12-trazabilidad-ui.css?v=202610182133">
   <link rel="stylesheet" href="./CSS/legacy/13-trazabilidad-diagrama.css?v=202610182133">
-  <link rel="stylesheet" href="./CSS/legacy/14-inventario-rne.css?v=202610182133">
+  <link rel="stylesheet" href="./CSS/legacy/14-inventario-rne.css?v=202610311900">
   <link rel="stylesheet" href="./CSS/legacy/15-planilla.css?v=202610182133">
   <link rel="stylesheet" href="./CSS/legacy/16-trazabilidad-publica.css?v=202610182133">
   <link rel="stylesheet" href="./CSS/legacy/17-inventario-3.css?v=202610182133">
@@ -83,9 +83,9 @@
   <link rel="stylesheet" href="./CSS/legacy/19-reparto.css?v=202610182133">
   <link rel="stylesheet" href="./CSS/legacy/20-usuarios.css?v=202610182133">
   <link rel="stylesheet" href="./CSS/legacy/21-misc-2026.css?v=202610182133">
-  <link rel="stylesheet" href="./CSS/legacy/22-planilla-protocolo.css?v=202610182133">
+  <link rel="stylesheet" href="./CSS/legacy/22-planilla-protocolo.css?v=202611011430">
   <link rel="stylesheet" href="./CSS/legacy/23-configuracion.css?v=202610182133">
-  <link rel="stylesheet" href="./CSS/legacy/23-trazabilidad-v3.css?v=202610182133">
+  <link rel="stylesheet" href="./CSS/legacy/23-trazabilidad-v3.css?v=202611011430">
   <link rel="stylesheet" href="./CSS/panel.css?v=202610182133">
 </head>
 <body>
@@ -363,6 +363,7 @@
                       <i slot="prefix" class="fa-regular fa-file-lines"></i>
                       <span>Planilla semanal</span>
                     </sl-button>
+                    <sl-switch id="inventarioIaAutoEgresoSwitch" class="inventario-ia-switch" size="small" disabled title="Autoegreso con IA: baja diaria de stock y resolución de vencidos. La materia prima de producción nunca baja por IA.">IA autoegreso</sl-switch>
                     <sl-button variant="default" id="inventarioProvidersRneBtn" type="button">
                       <i slot="prefix" class="fa-solid fa-file-shield"></i>
                       <span>RNE</span>
@@ -628,10 +629,11 @@
   <script defer src="./JS/recetas.js?v=202610182133"></script>
   <script defer src="./JS/Notificaciones.js?v=202610182133"></script>
   <script defer src="./JS/batch_adobo.js?v=202610302300"></script>
-  <script defer src="./JS/inventario.js?v=202610301900"></script>
+  <script defer src="./JS/proveedores_listado.js?v=202610311900"></script>
+  <script defer src="./JS/inventario.js?v=202611011430"></script>
   <script defer src="./JS/ui/trace-diagram.js?v=202610182133"></script>
-  <script defer src="./JS/produccion.js?v=202610301500"></script>
-  <script defer src="./JS/planilla_produccion.js?v=202610301500"></script>
+  <script defer src="./JS/produccion.js?v=202611011430"></script>
+  <script defer src="./JS/planilla_produccion.js?v=202611011430"></script>
   <script defer src="./JS/usuarios.js?v=202610182133"></script>
   <script defer src="./JS/app.js?v=202610182133"></script>
 </body>

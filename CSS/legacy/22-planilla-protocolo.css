@@ -563,3 +563,15 @@
   line-height: 1;
   user-select: none;
 }
+
+/* PT y fila de la planilla de ingresos en observaciones: negrita del mismo tamaño y color que el texto. */
+.planilla-proto-observations p strong.planilla-obs-pt {
+  font-size: inherit;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--proto-ink);
+}
+
+/* QR de la planilla con enlace a la trazabilidad (también clickeable en el PDF). */
+.planilla-qr-link { color: inherit; text-decoration: none; display: block; }
