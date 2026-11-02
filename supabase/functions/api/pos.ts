@@ -23,7 +23,7 @@ export const POS_DEFAULTS = {
   // Reparto: venta del usuario de reparto con dirección, o venta que cobra el artículo de envío (Lucas, 01/11/2026).
   // Las recetas que coinciden con «excluirRecetas» (expresión) se venden en mostrador aunque la venta sea un reparto.
   // «unidades»: vehículo y encargado que se alternan día por día.
-  repartos: { activo: true, usuario: 'BRENDA', exigeObs: true, articuloEnvio: '325', excluirRecetas: '', unidades: [] }
+  repartos: { activo: true, usuario: 'BRENDA', exigeObs: true, articuloEnvio: '325', excluirRecetas: '', unidades: [], materiaPrimaVentaLocal: true }
 };
 export function configPos(cfg) {
   const p = (cfg && typeof cfg.pos === 'object' && cfg.pos) || {};
@@ -106,7 +106,7 @@ export async function aplicarVentasPos({ simular = false, desde = '', hasta = ''
   const registros = new Map((ingIds.length ? await sel(admin.from('inventario_registros').select('ingrediente_id,stock_unit,infinite_stock').in('ingrediente_id', ingIds)) : []).map((r) => [r.ingrediente_id, r]));
   const lotesDe = new Map();
   for (let i = 0; i < ingIds.length; i += 100) {
-    (await sel(admin.from('inventario_lotes').select('id,ingrediente_id,fecha_ingreso,vencimiento,unidad,disponible,disponible_base,disponible_kg,estado,auto_egreso_state,no_perecedero,lote,factura,orden,created_at')
+    (await sel(admin.from('inventario_lotes').select('id,ingrediente_id,fecha_ingreso,vencimiento,unidad,disponible,disponible_base,disponible_kg,estado,auto_egreso_state,no_perecedero,lote,factura,orden,created_at,venta_local:raw->ventaLocal')
       .in('ingrediente_id', ingIds.slice(i, i + 100)).or('disponible.gt.0,disponible_base.gt.0')))
       .forEach((l) => {
         if (!lotesDe.has(l.ingrediente_id)) lotesDe.set(l.ingrediente_id, []);
@@ -162,7 +162,10 @@ export async function aplicarVentasPos({ simular = false, desde = '', hasta = ''
 
       if (v.tipo === 'ingrediente') {
         const destino = { destino: 'inventario', ref_id: v.ref_id };
-        if (materiaPrima.has(v.ref_id)) { marca(destino, 'excluido', 'materia prima (se descuenta con las producciones)'); continue; }
+        // Materia prima: no se descuenta, salvo en un reparto y sólo de lotes «venta local» (carne sin PT), nunca de
+        // los lotes con PT que van a producción (Lucas, 02/11/2026).
+        const soloVentaLocal = materiaPrima.has(v.ref_id);
+        if (soloVentaLocal && !(reparto && cfg.repartos.materiaPrimaVentaLocal)) { marca(destino, 'excluido', 'materia prima (se descuenta con las producciones)'); continue; }
         const reg = registros.get(v.ref_id);
         if (!reg || reg.infinite_stock) { marca(destino, 'excluido', reg ? 'stock infinito' : 'sin registro de inventario'); continue; }
         const meta = getUnitMeta(reg.stock_unit);
@@ -170,7 +173,8 @@ export async function aplicarVentasPos({ simular = false, desde = '', hasta = ''
           marca({ ...destino, cantidad: r4(cant), unidad: reg.stock_unit }, 'excluido', 'se vende por kilo y el stock es por unidad: falta el factor'); continue;
         }
         let pend = cant * meta.factor; // en base (g, ml o unidades)
-        const lotes = (lotesDe.get(v.ref_id) || []).filter((l) => l._base > EPS && str(l.fecha_ingreso || '0000') <= c.fecha && (l.no_perecedero || !l.vencimiento || l.vencimiento >= c.fecha));
+        const lotes = (lotesDe.get(v.ref_id) || []).filter((l) => l._base > EPS && str(l.fecha_ingreso || '0000') <= c.fecha && (l.no_perecedero || !l.vencimiento || l.vencimiento >= c.fecha)
+          && (!soloVentaLocal || l.venta_local === true || str(l.venta_local) === 'true'));
         for (const l of lotes) {
           if (pend <= EPS) break;
           const toma = Math.min(l._base, pend);
@@ -191,7 +195,7 @@ export async function aplicarVentasPos({ simular = false, desde = '', hasta = ''
           if (reparto) reparto.productos.push({ tipo: 'ingrediente', id: v.ref_id, nombre: nombres.get(v.ref_id) || '', qty: roundQty(qty, meta), unidad: reg.stock_unit, qtyKg: kg,
             alloc: { ingredientId: v.ref_id, entryId: l.id, lotNumber: l.lote || l.factura || '', qty: roundQty(qty, meta), unit: reg.stock_unit, qtyKg: kg, expiryDate: str(l.vencimiento) } });
         }
-        if (pend > EPS) marca({ ...destino, cantidad: r4(pend / meta.factor), unidad: reg.stock_unit }, 'sin_stock', `${nomComp}${lotes.length ? 'no alcanzó el stock' : 'sin stock disponible'}`);
+        if (pend > EPS) marca({ ...destino, cantidad: r4(pend / meta.factor), unidad: reg.stock_unit }, 'sin_stock', `${nomComp}${soloVentaLocal ? 'materia prima: sin lote de venta local' : (lotes.length ? 'no alcanzó el stock' : 'sin stock disponible')}`);
       } else {
         const destino = { destino: 'produccion', ref_id: v.ref_id };
         const excl = str(cfg.repartos.excluirRecetas);
