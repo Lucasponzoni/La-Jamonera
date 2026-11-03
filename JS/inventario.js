@@ -2974,7 +2974,7 @@
   // ── Lote de ingreso (Glosario del legajo + informe de loteo v3) ──
   // 'pt'          carne de cerdo / vacuna: especie-establecimiento-N° de PT-destino (P-5364-05502-R).
   //               Si el PT no trae número definitivo va el de la solicitud con «S» (P-5364-05580S-R).
-  //               Sin ninguno de los dos se guarda igual con un lote provisorio (P-SINPT-<factura>-R)
+  //               Sin ninguno de los dos se guarda igual con lote por factura (iniciales-factura-destino, venta local)
   //               y al completar el PT editando el ingreso el lote se recalcula.
   // 'factura'     resto (pollo, envases, panificados…): iniciales-factura limpia-destino (SAL-000300000775-R).
   // 'vencimiento' especias individuales: sólo el vencimiento en números, ddmmaaaa (13072027).
@@ -3285,8 +3285,9 @@
             { valor: '*', etiqueta: 'Asterisco', detalle: 'el lote es el PT', tono: 'warn' }
           ] };
       }
-      return { ...base, separator: '-', paso: 0, provisional: true, aviso: 'Lote provisorio: se recalcula al cargar el PT.',
-        parts: [{ valor: 'SINPT', etiqueta: 'PT pendiente', detalle: 'se completa después', tono: 'warn', falta: true }, facturaPart] };
+      // Sin PT (venta en el local): lote por factura, como la reventa; se recalcula si después llega el PT.
+      return { ...base, separator: '-', paso: 0, provisional: true, aviso: 'Sin PT: lote por factura (venta en el local). Se recalcula al cargar el PT.',
+        parts: [{ valor: getProductInitials(productName), etiqueta: 'Iniciales', detalle: 'del producto', tono: 'ini' }, facturaPart, destPart] };
     }
     if (modo === 'pt') {
       const especie = LOT_ESPECIES[normalizeUpper(config.especie)] ? normalizeUpper(config.especie) : '';
@@ -3295,7 +3296,7 @@
       const sol = pt ? null : parsePtNumber(ptSolicitud);
       const fuente = pt || sol;
       if (!fuente) {
-        return { modo, separator: '-', provisional: true, aviso: 'Lote provisorio: se recalcula al cargar el PT.', parts: [especiePart, { valor: 'SINPT', etiqueta: 'PT pendiente', detalle: 'se completa después', tono: 'warn', falta: true }, facturaPart, destPart] };
+        return { modo, separator: '-', provisional: true, aviso: 'Sin PT: lote por factura (venta en el local). Se recalcula al cargar el PT.', parts: [{ valor: getProductInitials(productName), etiqueta: 'Iniciales', detalle: 'del producto', tono: 'ini' }, facturaPart, destPart] };
       }
       const parts = [especiePart];
       if (fuente.establecimiento) parts.push({ valor: fuente.establecimiento, etiqueta: 'Establecimiento', detalle: 'N° SENASA del frigorífico', tono: 'est' });
