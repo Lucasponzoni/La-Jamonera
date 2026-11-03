@@ -4741,7 +4741,7 @@
         <tr><th>CLIENTE</th><td><strong>${escapeHtml(normalizeUpper(client.name) || '-')}</strong></td></tr>
         <tr><th>DIRECCIÓN</th><td>${escapeHtml(normalizeUpper(location))}</td></tr>
         <tr><th>VEHÍCULO (UTA-URA)</th><td>${escapeHtml(vehicleLabel)}</td></tr>
-        <tr><th>TEMPERATURA UNIDAD DE TRANSPORTE</th><td>3 °C · ESTADO A (ACEPTABLE)</td></tr>
+        <tr><th>TEMPERATURA UNIDAD DE TRANSPORTE</th><td>5 °C · ESTADO A (ACEPTABLE)</td></tr>
       </tbody></table>
       <div class="planilla-table-scroll"><table class="planilla-table planilla-formula-table planilla-proto-formula">
         <colgroup><col style="width:31%"><col style="width:27%"><col style="width:14%"><col style="width:14%"><col style="width:14%"></colgroup>
