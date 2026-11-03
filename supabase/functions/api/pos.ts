@@ -41,6 +41,15 @@ const obsUtil = (o) => { const t = str(o).trim(); return t && !/^factura im5$/i.
 const pideFactorKg = (desc) => /\bx\s*\d+\s*(u\b|un\b|unid|und)|\bx\s*\d+\s*$|promo|caja/i.test(str(desc));
 
 async function sel(q) { const { data, error } = await q; if (error) throw new HttpError(500, error.message); return data || []; }
+// Supabase devuelve como mucho 1000 filas por consulta: se pagina hasta traer todo.
+async function selTodo(armar, tam = 1000) {
+  const out = [];
+  for (let i = 0; ; i += tam) {
+    const filas = await sel(armar().range(i, i + tam - 1));
+    out.push(...filas);
+    if (filas.length < tam) return out;
+  }
+}
 
 // Ejecuta (o simula) la aplicación de ventas. Devuelve un resumen y, en simulación, el detalle por renglón.
 // comprobante { empresa, id }: sólo ese (prueba o corrección manual); no mira el interruptor ni la fecha de inicio.
@@ -75,15 +84,19 @@ export async function aplicarVentasPos({ simular = false, desde = '', hasta = ''
       lista.push({ tipo: v.tipo, ref_id: v.ref_id, factor: v.cantidad == null ? null : num(v.cantidad) });
     });
   const materiaPrima = new Set(cfg.excluirMateriaPrima ? (await sel(admin.rpc('pos_materia_prima'))).map((x) => (typeof x === 'string' ? x : Object.values(x)[0])) : []);
-  let qc = admin.from('im5_comprobantes')
-    .select('empresa,id,tipo,letra,punto_venta,numero,fecha,fecha_hora,usuario,cliente,cod_cliente,observaciones,anulada,items_ok')
-    .eq('items_ok', true).eq('anulada', false).in('tipo', ['FA', 'NC']);
-  qc = uno ? qc.eq('empresa', uno.empresa).eq('id', uno.id) : qc.gte('fecha', d0).lte('fecha', d1);
-  const comps = await sel(qc.order('fecha').order('fecha_hora', { nullsFirst: true }).limit(5000));
+  const armarComps = () => {
+    const qc = admin.from('im5_comprobantes')
+      .select('empresa,id,tipo,letra,punto_venta,numero,fecha,fecha_hora,usuario,cliente,cod_cliente,observaciones,anulada,items_ok')
+      .eq('items_ok', true).eq('anulada', false).in('tipo', ['FA', 'NC']);
+    return (uno ? qc.eq('empresa', uno.empresa).eq('id', uno.id) : qc.gte('fecha', d0).lte('fecha', d1))
+      .order('fecha').order('fecha_hora', { nullsFirst: true }).order('empresa').order('id');
+  };
+  const comps = await selTodo(armarComps);
   const hechos = new Set();
   for (let i = 0; i < comps.length; i += 300) {
     const ids = comps.slice(i, i + 300).map((c) => c.id);
-    (await sel(admin.from('im5_aplicaciones').select('empresa,comprobante_id').in('comprobante_id', ids))).forEach((a) => hechos.add(`${a.empresa}:${a.comprobante_id}`));
+    (await selTodo(() => admin.from('im5_aplicaciones').select('empresa,comprobante_id').in('comprobante_id', ids).order('id')))
+      .forEach((a) => hechos.add(`${a.empresa}:${a.comprobante_id}`));
   }
   const pendientes = comps.filter((c) => !hechos.has(`${c.empresa}:${c.id}`)).slice(0, MAX_COMPROBANTES);
   if (!pendientes.length) return resumen;
